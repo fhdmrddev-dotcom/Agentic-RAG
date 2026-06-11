@@ -120,6 +120,33 @@ class LlmHumanInputPhaseConfig(_StrictBase):
     timeout_seconds: int = 300
 
 
+class LlmEmitPhaseConfig(_StrictBase):
+    """Phase 101.1 (D-04) — the 6th phase type: a SEALED FORCED EMIT.
+
+    The ONLY path that produces a typed deliverable. The model is FORCED (never an
+    open auto-tool-choice loop — D-01, the GAP-A root cause) to emit cited DATA against
+    the ``emitter``'s strict schema; a PINNED deterministic driver renders it (D-02 — no
+    model-written code touches the deliverable). Adding a future deliverable = register
+    ONE entry in ``EMITTER_REGISTRY`` (schema + driver), never new engine code.
+
+    Additive-optional / ZERO-migration: appended to the ``PhaseConfig`` union as the
+    6th discriminated member (the standard extension — the 5 existing members were added
+    this way). ``_StrictBase`` rejects unknown keys (T-101.1-01-01); old JSONB phase rows
+    without ``llm_emit`` still ``model_validate()``. The optional shape-symmetry fields
+    mirror the other LLM members so the family stays uniform.
+    """
+
+    phase_type: Literal["llm_emit"]
+    prompt: str
+    emitter: str = "render_template"  # the EMITTER_REGISTRY key (closed-dict resolved)
+    model: str | None = None  # None = inherit thread settings
+    # Shape-symmetry optionals (mirror the other LLM members; load-bearing in the
+    # executor plan — bound-scope retrieval + skill composition feeding the emit).
+    folder_scope: list[UUID] | None = None  # 098 PROJ-02: resolved id list, NOT a prompt hint
+    skill_ref: UUID | None = None             # 099 WFSKILL-01 (D-09): resolved skill id, NOT a name
+    skill_snapshot: SkillSnapshot | None = None  # materialized at first kickoff; None on drafts
+
+
 PhaseConfig = Annotated[
     Union[
         ProgrammaticPhaseConfig,
@@ -127,6 +154,7 @@ PhaseConfig = Annotated[
         LlmAgentPhaseConfig,
         LlmBatchAgentsPhaseConfig,
         LlmHumanInputPhaseConfig,
+        LlmEmitPhaseConfig,
     ],
     Field(discriminator="phase_type"),
 ]

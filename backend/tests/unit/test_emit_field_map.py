@@ -19,13 +19,10 @@ so the suite exits 0 BEFORE Task 2, and Task 2 un-marks them to GREEN.
 
 from __future__ import annotations
 
-import pytest
-
 
 # ── D-09 — the flat model strict-schema + back-compat (this plan's Task 2) ────
 
 
-@pytest.mark.xfail(strict=False, reason="101.1-01 Task 2 — EmitFieldMap model (un-marked to GREEN there)")
 def test_flat_model_strict_schema():
     """``EmitFieldMap.model_json_schema()`` is strict-provider-friendly:
     ``additionalProperties: false`` at every object level, NO minLength/maxLength/
@@ -69,7 +66,6 @@ def test_flat_model_strict_schema():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="101.1-01 Task 2 — un-marked to GREEN there (GenericFieldMap is unchanged)")
 def test_legacy_nested_still_validates():
     """A 097/101-shaped NESTED ``GenericFieldMap`` artifact (per-leaf ``Cited``
     wrapper) STILL ``model_validate()``s unchanged — the flatten is additive
@@ -104,7 +100,6 @@ def test_legacy_nested_still_validates():
     assert fm.collections["rows"][0]["risk_id"].value == "R-01"
 
 
-@pytest.mark.xfail(strict=False, reason="101.1-01 Task 2 — emit_field_map_to_legacy normalizer (un-marked to GREEN there)")
 def test_emit_field_map_to_legacy_roundtrip():
     """``emit_field_map_to_legacy`` maps a flat ``EmitFieldMap`` to the SAME flat-dict
     shape the existing ``_iter_leaves`` / ``check_coverage`` / ``build_context`` consume:

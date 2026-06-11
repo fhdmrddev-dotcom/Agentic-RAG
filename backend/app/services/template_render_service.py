@@ -43,7 +43,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # A well-formed scalar placeholder token: ``{{ identifier }}`` (optional surrounding
 # whitespace, a dotted/underscored identifier inside). Used by the arbitrary run-replace
@@ -133,6 +133,104 @@ def build_field_map_tool_schema(placeholder_keys: list[str]) -> dict:
         "NEVER invent a value or a citation."
     ).strip()
     return schema
+
+
+# ---------------------------------------------------------------------------
+# 1b. The FLAT, strict-friendly cited field-map (Phase 101.1 / D-09 — RESEARCH §3)
+# ---------------------------------------------------------------------------
+# ADDITIVE — does NOT replace ``GenericFieldMap`` (097/101 nested-cited artifacts
+# still ``model_validate()`` against it). The flat shape is the biggest single
+# cross-provider reliability lever: ``extra="forbid"`` everywhere (→ every object
+# level emits ``additionalProperties:false``), the citation lives as SIBLING fields
+# on the same object as ``value`` (NOT a nested ``Cited{}`` wrapper), NO recursion
+# (a fixed depth of 3 — ``EmitFieldMap → FlatRow → FlatScalar``), and NO
+# ``minLength``/``maxLength``/``pattern`` (unsupported by Anthropic + DeepSeek
+# strict). Every field is present + nullable (the OpenAI/DeepSeek strict
+# "all-required-with-null-optionals" requirement) so the model can DECLINE
+# (``value=None``) rather than invent.
+#
+# It is gated behind the new ``llm_emit`` phase type (the only path that emits this
+# shape); the existing deterministic gate/driver consume the LEGACY flat-dict shape,
+# so ``emit_field_map_to_legacy`` is the seam that keeps THIS plan additive — the
+# citation gate (``_iter_leaves``/``check_coverage``) and the docxtpl driver
+# (``build_context``) are NOT re-touched here (Plan 04 re-touches them WITH its own
+# parity tests).
+
+
+class FlatScalar(BaseModel):
+    """One filled value + its provenance, flat (citation as SIBLING fields).
+
+    ``value=None`` means "not found in the KB" (an honest decline, D-03). The four
+    provenance fields are the EXACT field set ``Cited`` carries — copied as siblings
+    so a strict schema sees one flat object, not a nested ``$ref`` wrapper.
+    """
+
+    model_config = ConfigDict(extra="forbid")  # → additionalProperties:false
+
+    key: str  # the placeholder / column name (was a dict KEY in GenericFieldMap)
+    value: str | None  # the value, or null = declined (required-with-null-optional)
+    source_chunk_id: str | None  # the <doc id> spotlight id this value came from
+    source_doc: str | None  # filename of the source document
+    source_page: int | None  # page / chunk_index if known
+
+
+class FlatRow(BaseModel):
+    """One row of a collection — a flat list of cells (each cell a ``FlatScalar``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    collection: str  # which collection this row belongs to (e.g. "rows")
+    cells: list[FlatScalar]  # each cell's ``key`` is the column name
+
+
+class EmitFieldMap(BaseModel):
+    """The flat, strict-friendly cited field-map (D-09).
+
+    ``scalars`` is a FLAT list (stable, ordered, strict-friendly — NOT an open
+    ``dict``); ``rows`` is a FLAT list-of-rows. The whole shape is bounded at depth 3
+    with ``additionalProperties:false`` everywhere — the cross-provider forcing target
+    every TIER-FORCE provider accepts.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scalars: list[FlatScalar]
+    rows: list[FlatRow]
+
+
+def emit_field_map_to_legacy(fm: EmitFieldMap) -> dict:
+    """Normalize a flat ``EmitFieldMap`` to the LEGACY flat-dict shape the existing
+    ``_iter_leaves`` / ``check_coverage`` / ``build_context`` already consume.
+
+    The seam that keeps Phase 101.1 ADDITIVE: the flat model is the new forced-emit
+    target, but the deterministic gate + docxtpl driver are unchanged in this plan —
+    this normalizer maps the flat lists BACK to the generic-envelope shape they read:
+
+      - scalars  → ``{key: {value, source_chunk_id, source_doc, source_page}}``
+      - rows     → ``{collection: [{col_key: {...cited...}}, ...]}``
+
+    A ``FlatRow``'s ``cells`` become one ``{col_key: cited}`` dict (keyed by each
+    cell's ``key``); rows with the same ``collection`` accumulate into that
+    collection's list in emission order.
+    """
+
+    def _cited(s: FlatScalar) -> dict:
+        return {
+            "value": s.value,
+            "source_chunk_id": s.source_chunk_id,
+            "source_doc": s.source_doc,
+            "source_page": s.source_page,
+        }
+
+    scalars: dict[str, dict] = {s.key: _cited(s) for s in fm.scalars}
+
+    collections: dict[str, list[dict]] = {}
+    for row in fm.rows:
+        collections.setdefault(row.collection, []).append(
+            {cell.key: _cited(cell) for cell in row.cells}
+        )
+
+    return {"scalars": scalars, "collections": collections}
 
 
 # ---------------------------------------------------------------------------

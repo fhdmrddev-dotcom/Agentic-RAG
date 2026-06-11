@@ -165,6 +165,20 @@ class ModelCapability(TypedDict, total=False):
     # (whitelist tools are always retained). Read at
     # openai_service.apply_tool_budget via MODEL_CAPABILITIES[model].get("max_tools").
     max_tools: int  # Phase 091 TOOL-05 — soft ceiling on get_tools schema count (SEED-035)
+    # Phase 101.1 D-15 — capability-tiered FORCED EMISSION flags (default SAFE).
+    # ``forced_emission`` True => this model can be FORCED to call a named tool
+    # (TIER-FORCE per RESEARCH §2: openai/anthropic[non-thinking]/google/deepseek-v4/
+    # glm/minimax/openrouter-with-require). ABSENT => TIER-COERCE (Kimi/Moonshot/Ollama —
+    # genuinely unforceable). The lookup MUST read
+    # ``get_model_capability(id).get("forced_emission", False)`` so a case-sensitivity
+    # registry MISS (e.g. ``MiniMax-M3`` vs ``minimax-m3``) SAFELY degrades to coerce —
+    # never wrongly assumes force works (Pitfall 7 / the zhipu/minimax tool-drop trap).
+    forced_emission: bool  # Phase 101.1 D-15 — TIER-FORCE eligibility (default SAFE = absent)
+    # ``strict_json_schema`` True => a token-level guaranteed schema is VERIFIED
+    # (openai confirmed; deepseek strict confirmed). Left ABSENT where unverified
+    # (MiniMax — A1, live-verify) so a strict response_format is only requested where it
+    # genuinely holds.
+    strict_json_schema: bool  # Phase 101.1 D-15 — verified token-level schema guarantee (default SAFE = absent)
 
 
 # Capability registry: which models support native API tool calling.
@@ -195,32 +209,38 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # verified against live /models 2026-06-07 (096 D-05 curation) — o3/o4 removed (no longer
     # served); gpt-5.5-pro / gpt-5.4-pro / gpt-5.2 added; gpt-5.5 timeout 300s -> 600s
     # (flagship tier — Open Q4 resolved, operator-approved)
-    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
-    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
-    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "gpt-5.2":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # live /models 2026-06-07 (096 D-05 curation)
-    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class per memory feedback_model_names_representative.md
-    "gpt-5.4-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # 300s -> 600s flagship tier (Open Q4 resolved, operator-approved 2026-06-07)
-    "gpt-5.5-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
-    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    # Phase 101.1 D-15: OpenAI is TIER-FORCE with a VERIFIED strict json_schema
+    # (forced_emission + strict_json_schema both True, incl. reasoning models).
+    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},
+    "gpt-5.2":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # live /models 2026-06-07 (096 D-05 curation)
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # representative-class per memory feedback_model_names_representative.md
+    "gpt-5.4-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # representative-class
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # representative-class
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # 300s -> 600s flagship tier (Open Q4 resolved, operator-approved 2026-06-07)
+    "gpt-5.5-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True},
     # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use
     # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
     # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
     # verified against live /models 2026-06-07 (096 D-05 curation) — opus-4-8 added; undated
     # claude-sonnet-4-5 replaced by the dated claude-sonnet-4-5-20250929 (only the dated ID is served)
-    "claude-opus-4-8":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation)
-    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},  # extended thinking — Issue #51568
-    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},
-    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},
-    "claude-sonnet-4-5-20250929": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},  # dated ID — undated alias not served live (096 D-05 curation 2026-06-07)
-    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 300, "max_output_tokens":  64000, "capability_source": "registry"},
+    # Phase 101.1 D-15: Anthropic is TIER-FORCE-NOTHINK — forced_emission True, but
+    # forcing ERRORS under extended thinking, so the emit call runs thinking OFF
+    # (already the resting state — no thinking param in anthropic_service.py). NO
+    # strict_json_schema (forcing is built on forced tool use, not a token-level schema).
+    "claude-opus-4-8":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True},  # newest flagship — live /models 2026-06-07 (096 D-05 curation)
+    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True},  # extended thinking — Issue #51568
+    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True},
+    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry", "forced_emission": True},
+    "claude-sonnet-4-5-20250929": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry", "forced_emission": True},  # dated ID — undated alias not served live (096 D-05 curation 2026-06-07)
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 300, "max_output_tokens":  64000, "capability_source": "registry", "forced_emission": True},
     # Google direct — native function calling
     # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
     # Plan 075.4-02 D-075.4-NN — google rows carry supports_parallel_tools=False
@@ -231,64 +251,88 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # past a modest active-tool count (SEED-035). Conservative ceiling; the harness
     # executor caps the per-phase schema list here (whitelist tools always retained).
     # Only affects the harness path — Deep-Mode get_tools() is untouched (SC#2).
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    # Phase 101.1 D-15: Google is TIER-FORCE — forced_emission True (tool_config
+    # function_calling_config mode='ANY' + allowed_function_names forces a function call).
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
     # gemini-3.5-flash — representative-class per memory feedback_model_names_representative.md.
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
-    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
     # gemini-3.1-flash-lite — production budget tier in the Gemini-3 family;
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
-    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True},
     # DeepSeek direct — OpenAI-compatible API at api.deepseek.com
     # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek-chat /
     # deepseek-reasoner removed: the announced 2026-07-24 deprecation was effected early;
     # live /models serves only the v4 tier
-    "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
-    "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry"},
+    # Phase 101.1 D-15: DeepSeek-v4 is TIER-FORCE with VERIFIED strict mode (BOTH
+    # thinking + non-thinking; the server validates the json schema). Per-MODEL, not
+    # per-provider — the served ids are v4-flash/v4-pro (deepseek-reasoner, which does
+    # NOT support tool_choice, is no longer served — RESEARCH §2 caveat).
+    "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
+    "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True},
     # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.ai
     # verified against live /models 2026-06-07 (096 D-05 curation) — kimi-k2.5 added
+    # Phase 101.1 D-15: TIER-COERCE — Kimi/Moonshot are genuinely UNFORCEABLE (no
+    # required/named tool_choice; thinking further restricts to auto/none). LEAVE
+    # forced_emission ABSENT (default SAFE → coerce: directive + hard-validate + retry,
+    # never a code-emission fallback).
     "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},
     "kimi-k2.5":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},  # live /models 2026-06-07 (096 D-05 curation)
     "moonshot-v1-8k":     {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
     # MiniMax direct — OpenAI-compatible API at api.minimax.io (INTERNATIONAL; all 8 verified
     # against live /models 2026-06-07, 096 D-05 curation — MiniMax-M3 added, exact PascalCase)
-    "MiniMax-M2":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
-    "MiniMax-M2.1":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
-    "MiniMax-M2.1-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast
-    "MiniMax-M2.5":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
-    "MiniMax-M2.5-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast rep (eval/native-7 baseline)
-    "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # (PascalCase — API is case-sensitive)
-    "MiniMax-M2.7-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast flagship
-    "MiniMax-M3":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation; exact PascalCase)
+    # Phase 101.1 D-15: MiniMax is TIER-FORCE via OpenAI-compatible tool_choice
+    # (forced_emission True). strict_json_schema LEFT ABSENT — whether a token-level
+    # response_format guarantee exists is UNVERIFIED (A1, live-verify); PascalCase ids
+    # are exact (the API is case-sensitive — a miss SAFELY degrades to coerce, Pitfall 7).
+    "MiniMax-M2":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},
+    "MiniMax-M2.1":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},
+    "MiniMax-M2.1-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # fast
+    "MiniMax-M2.5":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},
+    "MiniMax-M2.5-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # fast rep (eval/native-7 baseline)
+    "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # (PascalCase — API is case-sensitive)
+    "MiniMax-M2.7-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # fast flagship
+    "MiniMax-M3":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # newest flagship — live /models 2026-06-07 (096 D-05 curation; exact PascalCase)
     # GLM/Zhipu direct — OpenAI-compatible API at api.z.ai/api/paas/v4 (INTERNATIONAL; codes from live /models, specs per docs.z.ai/guides/llm/*; D-089 docs curation 2026-05-30)
-    "glm-4.5":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
-    "glm-4.5-air":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry"},  # lightweight fast tier
-    "glm-4.6":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},  # 200K ctx (eval/native-7 baseline)
-    "glm-4.7":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
-    "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # GLM-5 family — 200K ctx / 128K out
-    "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry"},  # fast GLM-5 tier
-    "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
+    # Phase 101.1 D-15: GLM/Zhipu is TIER-FORCE via OpenAI-compatible tool_choice
+    # (forced_emission True). strict_json_schema LEFT ABSENT — verify strict
+    # response_format live (RESEARCH §2 MEDIUM). PascalCase/exact ids matter (the
+    # zhipu/minimax case-sensitivity tool-drop trap — a miss SAFELY coerces, Pitfall 7).
+    "glm-4.5":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True},
+    "glm-4.5-air":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True},  # lightweight fast tier
+    "glm-4.6":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True},  # 200K ctx (eval/native-7 baseline)
+    "glm-4.7":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True},
+    "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # GLM-5 family — 200K ctx / 128K out
+    "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True},  # fast GLM-5 tier
+    "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek/deepseek-reasoner
     # + minimax/minimax-m2.5:free removed (no longer served by OpenRouter live /models)
-    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
-    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry"},
-    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
+    # Phase 101.1 D-15: OpenRouter is TIER-FORCE *conditional* — forced_emission True
+    # ONLY where the routed upstream is itself forceable (deepseek / z-ai-glm / minimax).
+    # The forcing adapter MUST send provider.require_parameters=true so OpenRouter does
+    # NOT silently downgrade. A route to Kimi/Moonshot is STILL unforceable even with
+    # require_parameters → those rows LEAVE forced_emission ABSENT (default SAFE coerce).
+    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry", "forced_emission": True},
+    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry", "forced_emission": True},
+    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},
+    # moonshotai/kimi-* route to Kimi (unforceable even with require_parameters) → ABSENT.
     "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
     "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
     # minimax-01 — legacy/discontinued ID; no clear vendor doc as of 2026-05-18; OMITTED
     # per RESEARCH.md A5 recommendation (pass-through preferred over guessed 16384).
-    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "capability_source": "registry"},
-    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
-    "deepseek/deepseek-v4-pro":   {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
+    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "capability_source": "registry", "forced_emission": True},
+    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True},
+    "deepseek/deepseek-v4-pro":   {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry", "forced_emission": True},
 }
 
 
