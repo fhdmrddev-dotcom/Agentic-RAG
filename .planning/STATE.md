@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T18:18:37.571Z"
-last_activity: 2026-06-11 -- Plan 101.1-08 (gap-closure: binary persist 5a + ephemeral path 5b + snapshot degrade gap-4-backend) COMPLETE
+last_updated: "2026-06-11T18:40:00.000Z"
+last_activity: 2026-06-11 -- Plan 101.1-09 (gap-closure: download gap-3 + GAP-C phase_substep demux gap-6 RATIFIED + panel self-heal gap-4-frontend) COMPLETE
 progress:
   total_phases: 14
   completed_phases: 5
-  total_plans: 39
-  completed_plans: 38
-  percent: 97
+  total_plans: 40
+  completed_plans: 39
+  percent: 98
 ---
 
 # Project State
@@ -27,9 +27,20 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: --phase (101.1) — EXECUTING (gap-closure plans 07-10)
-Plan: 8 of 10 (gap-closure) — COMPLETE
+Plan: 9 of 10 (gap-closure) — COMPLETE
 Status: Executing Phase 101.1 gap-closure
-Last activity: 2026-06-11 -- Plan 101.1-08 COMPLETE (gap 5a binary persist + gap 5b ephemeral path + gap 4 backend snapshot degrade)
+Last activity: 2026-06-11 -- Plan 101.1-09 COMPLETE (gap 3 download + gap 6 GAP-C phase_substep demux RATIFIED + gap 4 frontend panel self-heal)
+
+**Plan 101.1-09 (GAP CLOSURE — gap 3 Download dead-text + gap 6 GAP-C phase_substep demux unwired + gap 4 frontend panel staleness) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `0ef88874` / GREEN `8b47e417`, TDD): **gap 3 — a produced deliverable is downloadable from the panel.** `downloadWorkspaceFile(threadId, fileId, filename)` (`api.ts`, the 067.3 Bearer-blob pattern, reuses `DownloadError`) fronts a NEW `GET /threads/{id}/workspace/files/{file_id}/raw` route (`workspace.py`) that returns the EXACT bytes of an inline binary file as an attachment — the existing `/content` route base64-DECODES inline content to TEXT and CORRUPTS a binary docx, so a 37 KB docx deliverable was unreachable. Bytes come from the pg pool (`get_file_by_id` → asyncpg raw `bytes`, byte-exact), NOT the supabase-py hex string. SAME guards as `/content`: `_verify_thread_ownership` (404 non-owner) + expiry + cross-thread, ALL collapsed to 404 (no existence leak); `_safe_download_filename` neutralizes Content-Disposition header injection. `FilePreview.tsx` wires `onDownload` at all three Fallback call sites (inline-default / bucket-non-image / error) with a graceful inline error; the bucket-image preview unchanged. 5 backend route tests + 3 FilePreview tests GREEN; T-101.1-09-01 mitigated.
+- ✓ Task 2 (RED `fdbb0502` / GREEN `991df25e` [api.ts demux branch + store action] + `ad4828e2` [StreamsProvider wiring], TDD): **gap 6 (GAP-C / D-11) — the phase_substep demux Plan 04 deferred.** The backend already emits all 12 `phase_substep` events (Plan 04 `_emit_phase_substep`) but NOTHING populated `Phase.emitSubStep`/`emitFailure`. ADDITIVE + PANEL-ONLY wiring: `onPhaseSubstep` callback on `StreamCallbacks` + a `phase_substep` else-if demux branch (flat payload, NO return → cursor-advance fires) in `api.ts`; `setPhaseEmitSubstepForThread(threadId, slug, phaseIndex, patch)` store action that patches the matching `phasesByThread` row (match by slug, fallback phaseIndex) and writes `phasesByThread` EXCLUSIVELY (never `bucketsBySurface`); the `onPhaseSubstep` demux callback in `StreamsProvider.tsx` closing over the factory threadId (Pitfall 6). **RED LINE held:** the chat selector reads `bucketsBySurface` only → Deep byte-identical, zero chat re-render (PANEL-09); one shared event for every provider (no provider branch — D-14). PhaseCard (Plan 04) already renders `emitSubStep`/`emitFailure` → the live emit sub-step rail (forcing → emitting → [recovering] → validating → rendering → validated + failed-as-failed). T-101.1-09-02/-03 mitigated.
+- ✓ Task 3 (RED `fdbb0502` / GREEN folded into `ad4828e2`, TDD): **gap 4 (frontend half) — the FILES panel self-heals on a harness terminal.** On a successful harness `run_completed`, `StreamsProvider` refetches `getThreadWorkspaceFiles(threadId)` → `replaceWorkspaceFilesForThread` for the OWNING thread so a just-persisted deliverable's file + phase status appear WITHOUT an F5 (the UAT log showed FILES fetched ~2 min BEFORE the emit's row existed and never refetched). Best-effort (a failed refetch never throws into the SSE consumer); `run_completed` is HARNESS-ONLY so Deep is untouched. The Plan-08 snapshot degrade ensures this refetch doesn't 503 on a GC'd buffer.
+- ✓ Task 4 (`checkpoint:human-verify`) — **GAP-C / gap-6 scope RATIFIED (operator: "ship demux", 2026-06-11):** keep the panel-only `phase_substep` demux shipping in 101.1 (honors the CONTEXT D-11 promise). The alternative offered at the checkpoint (re-scope GAP-C's visible half to the run-legibility phase + revert Task 2) was DECLINED. No revert, no source change. Safe to ratify because the demux is additive + panel-only (writes `phasesByThread`, never the chat-surface G-5 hot files).
+- **No deviations.** Plan executed exactly as written (Tasks 2 + 3 share the `ad4828e2` GREEN commit — both live in the StreamsProvider callback factory, anticipated by the plan's Task-3 fold note).
+- **SEED-056 net-new-failure proof:** the plan's 3 exact touched test files (`StreamsProvider.test.tsx` + `api.test.ts` + `FilePreview.test.tsx`) = **15 passed / 0 failed** in isolation; backend `test_workspace_template.py` = **17 passed / 0 failed**. The 10 frontend failures from a broad substring `npm test -- StreamsProvider.test` come ONLY from the UNRELATED `src/__tests__/providers/streamsProvider.test.tsx` (lowercase, `__tests__/`) — plan 09 never touched it (empty `git diff 16f5f837 HEAD`). Proven PRE-EXISTING rot by **base-checkout**: with the 3 plan source files reverted to base `16f5f837`, that file fails **10/41 IDENTICALLY** (10 failed / 31 passed at base AND HEAD), then restored clean to HEAD. **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-101.1-09-01 raw-route info-disclosure → 404-collapse + ownership/expiry guards; -02 cross-thread rail tampering → closure threadId; -03 Deep-surface tampering → `phasesByThread`-only, never `bucketsBySurface`; -04 download Bearer EoP → accepted, 067.3 trade-off). SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-09-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (Plan 10 live re-verify).
+- **Next:** Plan 101.1-10 (live re-verify: download a produced cited .docx from the panel + watch the emit sub-step rail populate live + confirm the FILES panel self-heals without F5; blocked pptx/xlsx tests 6-8 + weak-model re-runs) then `/gsd:verify-work 101.1` + `/gsd:secure-phase 101.1`.
 
 **Plan 101.1-08 (GAP CLOSURE — gap 5 binary version-diff persist crash + ephemeral output-path collision; gap 4 snapshot 'no such key' 503) — COMPLETE (2026-06-11):**
 
