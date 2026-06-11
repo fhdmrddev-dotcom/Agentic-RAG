@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: verifying
+status: planning
 last_updated: "2026-06-11T21:53:18.431Z"
-last_activity: "2026-06-11 -- Plan 101.1-10 COMPLETE (live re-verify: dirty-row repair + all 6 gaps PROVEN CLOSED + Tests 6-8 reach honest verdicts + weak-model render column filled)"
+last_activity: "2026-06-12 -- Phase 102 context gathered (/gsd:discuss-phase 102 — D-01..D-14 captured in 102-CONTEXT.md; SEED-082 102-half folded; next /gsd:plan-phase 102)"
 progress:
   total_phases: 14
   completed_phases: 6
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase --phase — 101.1
+**Current focus:** Phase 102 — Reusable Validation-Gate Library + Output-Quality Gate
 
 ## Current Position
 
-Phase: --phase (101.1) — gap-closure plans 07-10 COMPLETE (live re-verified)
-Plan: 10 of 10 (gap-closure) — COMPLETE
-Status: Phase 101.1 gap-closure execution COMPLETE — ready for /gsd:verify-work 101.1 + /gsd:secure-phase 101.1
-Last activity: 2026-06-11 -- Plan 101.1-10 COMPLETE (live re-verify: dirty-row repair + all 6 gaps PROVEN CLOSED + Tests 6-8 reach honest verdicts + weak-model render column filled)
+Phase: 102 (Reusable Validation-Gate Library + Output-Quality Gate) — CONTEXT GATHERED 2026-06-12
+Plan: none yet — next is /gsd:plan-phase 102
+Status: Phase 101.1 FULLY CLOSED (verify-work 19/19 live + secure-phase 36/36 threats closed @ ee0bd331). Phase 102 discussed: 14 decisions (D-01..D-14) in `102-CONTEXT.md` — engine-side SEED-082 policy enum (strict|flag|partial|draft + integrity strict|documented_limit), judge-as-forced-emission (app_settings judge model, stored rubric), real golden run behind a new server-side POST /workflows/{id}/publish HARD blocker, freshness as first `timing: pre` validator + generic `ask_user` 4th on_failure disposition, 5 first-class validator kinds wrapping existing primitives, business_requirement additive-optional + required-at-publish. Operator steer D-09: NO library validator is mandatory (menu, not checklist — free-form workflow variations stay open). SEED-082 frontmatter flipped to partially-folded (103 half pending).
+Last activity: 2026-06-12 -- Phase 102 context gathered (/gsd:discuss-phase 102)
 
 **Plan 101.1-10 (GAP CLOSURE — dirty-row repair + live re-verification across the 6 gaps) — COMPLETE (2026-06-11):**
 
