@@ -162,7 +162,12 @@ Plans:
   3. NATIVE-path narrated-JSON recovery + `finish_reason` guard closes the silent-drop on reasoning-natives; no emission is ever silently dropped.
   4. The bound library template AssetRef is resolved server-side and injected into emit args at phase-build time (GAP-B); the FILL phase produces a real openable .docx on every forceable provider attempt-1, and an honest receipt-bearing failure (never silent 0-docx, never Markdown stand-in) where a tier can't land (GAP-A/GAP-D).
   5. Emit-moment run honesty: discrete `forcing → emitting → rendering → validating` sub-events with distinguishable failure states (GAP-C). Every transition writes an INSERT-only `harness_audit` row keyed to `run_id` + `definition@version` (the Phase 107 receipt substrate).
-**Plans**: TBD (next: `/gsd:plan-phase 101.1`)
+**Plans**: 5 plans (G-5 routing decided: tightly-scoped additive gateway seam, not an anthropic_service.py extraction — D-14 guard test ships in Plan 02)
+- [ ] 101.1-01-PLAN.md — Foundation: flat EmitFieldMap + closed EMITTER_REGISTRY + LlmEmitPhaseConfig (6th union member) + default-SAFE MODEL_CAPABILITIES flags + migration 069 (ALTER harness_audit) + Wave 0 test stubs
+- [ ] 101.1-02-PLAN.md — Cross-provider core: capability-tiered forcing at the gateway boundary (D-05) + forced_emit substrate with D-06 NATIVE narrated-JSON recovery + the D-14 shared-path guard test
+- [ ] 101.1-03-PLAN.md — The _exec_llm_emit executor: sealed forced shot (never the open loop) + GAP-B server-side AssetRef inject + the D-08 6-layer no-fail ladder + per-transition audit receipt; render_template demoted to the EMITTER_REGISTRY post_processor
+- [ ] 101.1-04-PLAN.md — GAP-C run honesty: phase_substep sub-events + 5 failure states on the existing PhaseCard rail (no new UI) + the flat-map ↔ citation-gate/docxtpl-driver re-touch with parity tests
+- [ ] 101.1-05-PLAN.md — Finalize for live UAT (operator): apply 069 + regen full-schema + re-seed the D-13 two-step llm_emit WorkflowDefinition; smoke-test one forceable provider → openable cited .docx
 **UI hint**: yes (GAP-C emit-moment honesty)
 **VALIDATION (SC#10)**: workflow-run-bearing + produces files + touches provider routing across all 7 natives + OpenRouter — author the full 4-axis cross-provider scoreboard; re-run the 8 rows of `101-HUMAN-UAT.md`. **G-5 FIRES** on `anthropic_service.py` (forcing seam) — plan-phase decides adapter audit vs scoped additive seam. **G-6**: failure modes = silent 0-docx / narrated-not-emitted / uncited-not-rejected / won't-open are the pre-named "how we'd know this failed" rows. Full discussed context: `.planning/phases/101.1-guaranteed-emission-layer/101.1-CONTEXT.md`.
 
