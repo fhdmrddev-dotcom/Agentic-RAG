@@ -22,6 +22,7 @@ executor plan wires the deterministic render-dispatch — Plan 03's hardened
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -127,7 +128,24 @@ async def _render_template_post(
 
     # out_filename: a sensible basename derived from the template filename; the handler's
     # own _safe_out_filename (CR-01) coerces a bad name to a safe default — do NOT pre-sanitize.
-    out_filename = resolved_template.get("filename") or "deliverable.docx"
+    template_filename = resolved_template.get("filename") or "deliverable.docx"
+    # Preserve the template extension so the integrity re-open infers the right OOXML
+    # format (pptx → pptx, xlsx → xlsx); default to .docx for an extension-less name.
+    ext = os.path.splitext(template_filename)[1].lstrip(".").lower() or "docx"
+    if ext not in ("docx", "pptx", "xlsx"):
+        ext = "docx"
+
+    if asset_dict is None:
+        # 101.1-08 (gap 5b / UAT run 4ea9bc56): the ephemeral output must NOT reuse the
+        # uploaded template's filename — that overwrites the user's template and forces a
+        # version-2 binary-delta write. A distinct output stem makes the fill a fresh v1
+        # (no delta, no collision, the template stays intact). (_safe_out_filename in the
+        # handler matches ^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)$ — this name passes it.)
+        out_filename = f"deliverable-filled.{ext}"
+    else:
+        # Bound branch: keep the current derivation — the handler already routes the bound
+        # output to a distinct /risk-register.docx, so there is no collision to fix here.
+        out_filename = template_filename
 
     args = {
         "field_map": validated_map,
