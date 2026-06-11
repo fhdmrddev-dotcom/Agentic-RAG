@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T18:08:16.012Z"
-last_activity: 2026-06-11 -- Plan 101.1-07 (gap-closure: DeepSeek FORCE-NOTHINK + D-08 layer-6 backstop + single-owner persist) COMPLETE
+last_updated: "2026-06-11T18:18:37.571Z"
+last_activity: 2026-06-11 -- Plan 101.1-08 (gap-closure: binary persist 5a + ephemeral path 5b + snapshot degrade gap-4-backend) COMPLETE
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 39
-  completed_plans: 37
-  percent: 95
+  completed_plans: 38
+  percent: 97
 ---
 
 # Project State
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: --phase (101.1) — EXECUTING (gap-closure plans 07-10)
-Plan: 07 of 10 (gap-closure) — COMPLETE
+Plan: 8 of 10 (gap-closure) — COMPLETE
 Status: Executing Phase 101.1 gap-closure
-Last activity: 2026-06-11 -- Plan 101.1-07 COMPLETE (gap 1a DeepSeek FORCE-NOTHINK + gap 1b layer-6 backstop + gap 2 single-owner persist)
+Last activity: 2026-06-11 -- Plan 101.1-08 COMPLETE (gap 5a binary persist + gap 5b ephemeral path + gap 4 backend snapshot degrade)
+
+**Plan 101.1-08 (GAP CLOSURE — gap 5 binary version-diff persist crash + ephemeral output-path collision; gap 4 snapshot 'no such key' 503) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `67fad983` / GREEN `3bf2fbe5`, TDD): **skip the version delta for binary mimes (gap 5a — the crash root).** `write_file` now computes a unified-text delta only when `version_num > 1 AND not _is_binary_mime(mime)` — a docx/pptx/xlsx second version no longer decodes its `\x00` zip bytes into a NUL that Postgres JSONB rejects (`UntranslatableCharacterError` at `insert_version` — UAT run 4ea9bc56; the deliverable passed every gate then died at persist). `_is_binary_mime` is conservative (anything not `text/*` and not in `{application/json, text/csv}` is binary). Defense-in-depth: `_compute_delta_from_prev` returns the NUL-free binary verdict if a NUL appears in either side, so no NUL can reach a JSONB delta even on a mis-typed extension. 4 tests (binary skip / text delta unchanged / classifier / NUL defense).
+- ✓ Task 2 (RED `91cc3127` / GREEN `abebe30a`, TDD): **distinct ephemeral output filename (gap 5b — no template overwrite).** The ephemeral-upload branch (`asset_dict is None`) of `_render_template_post` now writes `deliverable-filled.<ext>` (preserving the OOXML extension for the integrity re-open; matches `_safe_out_filename`'s allow-list) — a DISTINCT path, so the rendered deliverable persists as a fresh v1 instead of overwriting the user's uploaded template AND tripping the version-2 binary-delta crash. The bound branch is unchanged (handler already routes to a distinct `/risk-register.docx`). 3 tests (1 parametrized ×3): ephemeral distinctness / bound unchanged / extension preserved.
+- ✓ Task 3 (RED `4f5774c9` / GREEN `22717eb2`, TDD): **snapshot 'no such key' degrade — not 503 (gap 4 backend half, G-5 behavior-only).** `GET /threads/{id}/snapshot`'s cursor loop adds a specific `except ResponseError` BEFORE the broad `except` — `'no such key'` (a GC'd terminal-run buffer) `continue`s (skip that run's cursor; the DB reconcile is the source of truth, D-v2.5-03) and returns 200; any non-missing-key `ResponseError` (e.g. WRONGTYPE) re-raises into the existing 503 path; a real connection-level `RedisError` still 503s + Retry-After. **G-5 RED LINE held** — `threads.py` +25/-1, no new `def`/`async def`/`@router` (verified). 4 tests (degrade 200 / real outage 503 / healthy cursor / non-missing-key 503).
+- **No deviations.** Plan executed exactly as written. Both halves of gap 5 fixed (skip-only still overwrites the template; distinct-name-only still risks a NUL delta). G-5 satisfied on `threads.py` (behavior-only except-branch).
+- **SEED-056 net-new-failure proof:** plan-08 target suites (`test_workspace_service`/`test_emitters`/`test_threads_snapshot`) = **13 passed**; full emission target set (+ harness_audit_emit/emit_field_map/forced_emit/gateway_forcing/workspace_api) = **51 passed / 0 failed**; adjacent consumers (workspace_api/llm_emit_executor/template_render/template_integrity) green. The single `test_075_snapshot` failure is PRE-EXISTING rot — proven by base-checkout (`threads.py` reverted to `1394fe78` → fails IDENTICALLY; the test's runs-mock lacks a `model` key required by an earlier plan's line-291 enrichment, unrelated to the snapshot cursor loop). **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-101.1-08-01 binary-delta DoS → skip+NUL-guard; -02 template-tampering → distinct ephemeral path; -03 snapshot DoS → degrade; -04 cross-thread read → accepted, ownership/user_id filters unchanged). SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-08-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (live cross-provider UAT; Plan 10 re-verify).
+- **Next:** the remaining gap plans (101.1-09..10) then `/gsd:verify-work 101.1` (Plan 10 live re-verify: an ephemeral-upload fill persists its deliverable [UAT Test 4] + a finished/expired run's snapshot no longer 500s) + `/gsd:secure-phase 101.1`.
 
 **Plan 101.1-07 (GAP CLOSURE — gap 1 DeepSeek silent run-crash + missing D-08 layer-6 backstop; gap 2 duplicate honest-failure message) — COMPLETE (2026-06-11):**
 
