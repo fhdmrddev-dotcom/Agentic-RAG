@@ -1021,6 +1021,32 @@ async def _emit_unexpected_failure(phase, *, definition, emitter, run_id, pool, 
     return _emit_failure_output("render_failed", msg)
 
 
+class _ProducerStreamCtx:
+    """101.1 review WR-03: a shallow ctx proxy that re-points ``run_id`` at the
+    PRODUCER stream id for the emit-path render dispatch.
+
+    ``_handle_render_template`` emits ``workspace_file_written`` via
+    ``ctx.emit(ctx.redis, ctx.run_id, ...)`` — but on the harness ctx bag,
+    ``ctx.run_id`` is the **workflow_runs** id, a stream nobody tails (the exact
+    Facet-B routing problem 092-07 fixed everywhere else; compare
+    ``_emit_phase_substep``, which prefers ``ctx.producer_run_id``, and
+    ``_build_phase_tool_context``, which sets ``run_id=_producer_id``). Without
+    this, the live file card never appears mid-run from an emit phase — only the
+    plan-09 terminal refetch heals it, and only on a ``completed`` run.
+
+    Every other attribute passes through to the wrapped ctx unchanged (pool /
+    supabase / thread_id / current_user / redis / emit / ...).
+    """
+
+    def __init__(self, inner, run_id) -> None:
+        self._inner = inner
+        self.run_id = run_id
+
+    def __getattr__(self, name: str):
+        # Only called when normal lookup misses (run_id/_inner resolve locally).
+        return getattr(self._inner, name)
+
+
 async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     """The 6th phase type (D-04) — a SEALED, capability-tiered FORCED EMIT.
 
@@ -1277,7 +1303,16 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         resolved = dict(src)
         resolved["asset_ref"] = asset_ref
         resolved["retrieved_ids"] = sorted(retrieved_ids)
-        render_out = await entry.post_processor(legacy_map, resolved, ctx)
+        # WR-03 (101.1 review): hand the render a ctx whose run_id is the PRODUCER
+        # stream (the one the frontend tails) so the handler's live
+        # workspace_file_written event renders the file card mid-run — never the
+        # workflow_runs id (an unsubscribed stream). Falls back to ctx.run_id on a
+        # minimal/unit-test ctx with no producer_run_id (same fallback as
+        # _emit_phase_substep) — best-effort, never a crash.
+        _render_ctx = _ProducerStreamCtx(
+            ctx, getattr(ctx, "producer_run_id", None) or getattr(ctx, "run_id", None)
+        )
+        render_out = await entry.post_processor(legacy_map, resolved, _render_ctx)
         status = (render_out or {}).get("status")
 
         if status == "ok":
