@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T07:50:51.164Z"
-last_activity: 2026-06-11 -- Phase 101.1 Plan 01 (foundation substrate) COMPLETE
+last_updated: "2026-06-11T08:09:12.136Z"
+last_activity: 2026-06-11
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 34
-  completed_plans: 31
-  percent: 91
+  completed_plans: 32
+  percent: 94
 ---
 
 # Project State
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 101.1 (guaranteed-emission-layer) — EXECUTING
-Plan: 2 of 5 (Plan 01 COMPLETE)
-Status: Executing Phase 101.1
-Last activity: 2026-06-11 -- Phase 101.1 Plan 01 (foundation substrate) COMPLETE
+Plan: 3 of 5 (Plans 01 + 02 COMPLETE)
+Status: Ready to execute
+Last activity: 2026-06-11
+
+**Plan 101.1-02 (Wave 2, the cross-provider forcing core) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `ab306330` / GREEN `6672626e`, TDD): the **D-05/D-14 capability-tiered forcing seam at the gateway boundary**. `GatewayRequest` gained `force_tool_name` + `strict_schema` (additive, default-SAFE — the `tool_choice="auto"` path is byte-identical). Per-provider translation in all 3 native adapters: **anthropic** → `tool_choice={"type":"tool","name":<emitter>}` (thinking OFF, TIER-FORCE-NOTHINK); **google** → `tool_config(function_calling_config(mode="ANY", allowed_function_names=[<emitter>]))`; **openai_compat** → named `tool_choice` + strict `response_format` (from the forced tool's params) when `strict_schema`. **G-5 honored: `anthropic_service.py` grew by EXACTLY one param** (`tool_choice: dict | None = None`; `git diff --stat` = 1 file +12/-2 — additive seam, NOT an extraction). `agent_loop.py` byte-identical (`git diff --stat` empty). The D-14 guard test GREEN (no per-provider forcing branch in the shared chunk/SSE path; Deep byte-identical).
+- ✓ Task 2 (RED `47cbe58b` / GREEN `183ae315`, TDD): the **`forced_emit` substrate** (NEW `backend/app/services/forced_emit.py`, D-08 layers 1-4). `forced_emit(...)` resolves the tier registry-first default-SAFE (`get_model_capability(id).get("forced_emission", False)` — miss = TIER-COERCE), builds a `GatewayRequest` with `force_tool_name=<emitter>` for TIER-FORCE (or `tool_choice="auto"` + an explicit directive for TIER-COERCE — Kimi/Moonshot, never a code fallback), drives `open_stream` ONCE (sealed single shot — **never the open agent loop**, D-01/Pitfall 5; ast-guard + grep = 0), rejects a truncated half-object (`is_truncated`, D-08 layer 4), and on the NATIVE path recovers a still-narrated emission via `recover_narrated_emission` (D-06 — parses a fenced/tool-wrapped `EmitFieldMap` back + `model_validate`, else an honest `model_failed_to_emit`; never a silent drop / prose-as-artifact / the GAP-D fix). Returns `{emitted, tier, provider, forced, recovered_from_narration, truncated, failure}` for the Plan-03 executor's layers 5-6.
+- **2 deviations (both Rule 3 — blocking, additive, default-SAFE):** (1) `google_service.stream_google` (+1 `tool_config` param) and `openai_service.create_adaptive_streaming_chat` (+`force_tool_name`/`strict_response_format`, a forced branch beside the `:1352` auto branch) — the symmetric siblings of the anthropic seam the plan prescribed; the only way to inject forcing without branching the shared chunk handler. (2) `is_truncated` reconciled to accept `stop_reason=`/`finish_reason=` kwargs alongside the legacy positional dict (the Wave-0 stub asserts the kwargs form; Plan 01 SUMMARY flagged it for this plan). Both keep every existing caller byte-identical.
+- **SEED-056 net-new-failure proof:** target files `test_gateway_forcing.py` (9) + `test_forced_emit.py` (8) = 17 passed; wider target set 60 passed / 0 failed. Wave slice `4 failed / 200 passed` — all 4 PRE-EXISTING rot proven by **base-checkout** (checked out `backend/app` + the 3 failing test files at the pre-plan base `b256a813`, all 4 failed IDENTICALLY, restored to HEAD); none import any module Plan 02 changed; `config.py` untouched by Plan 02. **Net-new failures = 0.**
+- All 5 STRIDE threats addressed (T-101.1-02-01 D-14 guard; -02 D-06 `model_validate`-before-accept; -03 default-SAFE registry-miss; -04 `is_truncated` reject; -05 TIER-COERCE hard-validate). SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-02-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (live cross-provider UAT).
+- **Next:** `/gsd:execute-phase 101.1` Plan 03 (`_exec_llm_emit` 6th harness executor — calls `forced_emit` not the open loop, runs D-08 layers 5-6 retry/honest-fail, wires the `EmitterEntry.post_processor` render-dispatch, GAP-B AssetRef injection, GAP-C sub-events + D-12 audit receipt).
 
 **Plan 101.1-01 (Wave 1, the foundation substrate) — COMPLETE (2026-06-11):**
 
