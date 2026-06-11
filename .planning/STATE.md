@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: verifying
-last_updated: "2026-06-11T00:10:00.000Z"
-last_activity: 2026-06-11 -- Phase 101 gap-closure (Plan 06) complete — 5 code-review findings fixed
+last_updated: "2026-06-11T00:30:00.000Z"
+last_activity: 2026-06-11 -- Phase 101 live UAT BLOCKED (0 .docx produced); GAP-A..D filed; gap-closure needed
 progress:
   total_phases: 13
-  completed_phases: 5
+  completed_phases: 4
   total_plans: 29
   completed_plans: 30
-  percent: 100
+  percent: 83
 ---
 
 # Project State
@@ -22,14 +22,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101 — Template-Fill + Integrity Validation (5 plans + gap-closure Plan 06 [5 code-review findings fixed] complete — awaiting `/gsd:verify-work 101` + cross-provider live UAT)
+**Current focus:** Phase 101 — Template-Fill + Integrity Validation — code COMPLETE + verified, but LIVE UAT (2026-06-11) found the feature does NOT produce a deliverable end-to-end. TMPL-02/03 stay OPEN. Next = a **Phase 101 gap-closure** for GAP-A..D (see `101-LIVE-UAT-FINDINGS.md`).
 
 ## Current Position
 
-Phase: 101 — EXECUTION COMPLETE (5/5 plans) + gap-closure Plan 06, awaiting verification
-Plan: 101-06 (gap closure — 5 code-review findings fixed) — COMPLETE
-Status: Phase execution + gap-closure complete — ready for `/gsd:verify-work 101` (TMPL-02 / TMPL-03 mark complete at phase verification)
-Last activity: 2026-06-11 -- Phase 101 gap-closure (Plan 06) complete
+Phase: 101 — code complete (5 plans + gap-closure 101-06) + VERIFIED at code level, but LIVE UAT BLOCKED (goal not met live)
+Plan: live UAT done (Chrome MCP + psycopg2); next = author a Phase 101 gap-closure (forced-emission + library-asset wiring + run-honesty + cross-provider)
+Status: NOT shippable yet — 4 workflow-wiring/run-honesty gaps block end-to-end file production
+Last activity: 2026-06-11 -- Phase 101 live UAT: 4 runs (opus + deepseek), 0 .docx produced; GAP-A..D filed
+
+**Phase 101 LIVE UAT (2026-06-11) — code verified, feature NOT yet usable. See `101-LIVE-UAT-FINDINGS.md` + `101-HUMAN-UAT.md`:**
+
+- **VERIFIED working:** the 101-06 code fixes hold live — opus actually CALLED `render_template` (relayed the resolver's "upload a template" error), proving the WR-01 schema-visibility fix reaches the model + the dispatcher/resolver execute; Deep untouched. Retrieval + citations excellent (6 fully-cited risks, honest declines, 20-25 sources). Sandbox image carries docxtpl (operator-built 101.1).
+- **GAP-A (blocker):** the seeded `fill` phase is an `llm_agent` OPEN loop with AUTO tool-choice (max_steps≈8) → models NARRATE instead of committing the render_template call. DeepSeek narrated the field-map JSON as text; opus (vague prompt) wrote Markdown; opus (directive) said "Let me render…" then stopped. → fix = spike-097 FORCED single-emission pattern (`tool_choice` forced) + directive phase prompt + step budget.
+- **GAP-B (blocker):** the workflow's LIBRARY template (`definition.assets[]` AssetRef → seeded Storage object, D-09 trusted docxtpl path) is NEVER surfaced/injected to `render_template` → when opus DID call the tool it fell to the ephemeral-upload branch (asset_ref=None) and asked for an upload. → fix = surface the bound template AssetRef to the fill phase (auto-inject `asset` when omitted, route library→docxtpl engine; run_replace can't grow `{%tr%}` + WR-03 residual gate would reject it).
+- **GAP-C:** run-honesty — fill phase shows a static "Step 0 · working…" black box; internal agent steps (search×N → render) invisible (1 phase, N hidden steps). → stream sub-agent tool cards + advance step counter + per-phase sub-step list.
+- **GAP-D:** cross-provider — DeepSeek-v4-flash narrates the field-map as text (reasoning-model tool-call trap). → provider-boundary handling, shared fill path must not branch.
+- **No .docx produced on any of 4 runs.** TMPL-02/TMPL-03 stay OPEN — Phase 101 goal ("fills into a real, openable deliverable") NOT met live. The 101-06 code fixes stand; the gaps are workflow-wiring + run-honesty ABOVE the dispatcher.
+
+---
+_Historical (Phase 101 per-plan execution detail below — all code-complete + 101-06 verified):_
 
 **Plan 101-01 (Wave 0 scaffold) — COMPLETE (2026-06-10):**
 
