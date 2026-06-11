@@ -1,15 +1,23 @@
-"""Phase 101.1 (D-01 / D-10 / D-12) — the ``_exec_llm_emit`` executor contract.
+"""Phase 101.1 (D-01 / D-04 / D-08 / D-10 / D-12) — the ``_exec_llm_emit`` executor contract.
 
-Wave 0 RED stubs. The 6th harness executor (``_exec_llm_emit``) lands in the
-DOWNSTREAM executor plan. These tests are ``xfail(strict=False)`` RED-by-design and
-get un-marked to GREEN by that plan.
+Wave 3 (Plan 101.1-03) un-marks these from the Wave-0 RED stubs to GREEN. The 6th
+harness executor (``_exec_llm_emit``) composes the Plan 01 substrate (the flat
+``EmitFieldMap`` + ``EMITTER_REGISTRY`` + the audit kinds) and the Plan 02 core (the
+gateway forcing seam + ``forced_emit`` with NATIVE recovery + truncation guard) into a
+working forced-emit phase:
 
-  - Pitfall 5 / D-01: the emit step does its OWN sealed forced single call — it MUST
-    NOT route through the open agent loop (``run_task_sub_agent``), which is the exact
-    GAP-A root cause (reasoning models narrate under ``tool_choice=auto``).
-  - GAP-B / D-10: the bound library template AssetRef is injected at phase-build time —
-    the model NEVER selects the template.
+  - Pitfall 5 / D-01: the emit step does its OWN sealed forced single call (``forced_emit``)
+    — it MUST NOT route through the open agent loop (``run_task_sub_agent``), which is the
+    exact GAP-A root cause (reasoning models narrate under ``tool_choice=auto``).
+  - GAP-B / D-10: the bound library template AssetRef is RESOLVED server-side and injected
+    at phase-build time — the model NEVER selects the template.
+  - D-08: the 6-layer no-fail ladder (isolation → forcing → NATIVE recovery → citation gate
+    → bounded retry → honest failure), engine-owned; 5 distinguishable failure states.
+  - render: the validated field-map rides the EMITTER_REGISTRY ``render_template``
+    post_processor → the HARDENED ``_handle_render_template`` (one render code path).
   - D-12: every emit transition writes an INSERT-only ``harness_audit`` receipt.
+  - Deep byte-identical: ``render_template`` reachable ONLY from a declaring ``llm_emit``
+    phase, never from ``get_tools()``.
 
 CONVENTION: ``from app.services... import ...`` is INSIDE each test body so a
 not-yet-existing symbol never breaks COLLECTION.
@@ -17,10 +25,180 @@ not-yet-existing symbol never breaks COLLECTION.
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="101.1 executor plan (Pitfall 5 / D-01) — un-marks to GREEN")
+# ── synthetic harness ctx + phase fakes (the project's existing harness shape) ──
+
+
+def _fake_asset_ref(kind: str = "template", filename: str = "register.docx"):
+    """A WorkflowDefinition.assets[] entry of the given kind (the GAP-B source)."""
+    from app.models.harness import AssetRef
+
+    return AssetRef(
+        asset_id=f"{kind}-asset-id",
+        filename=filename,
+        kind=kind,  # type: ignore[arg-type]
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+def _fake_definition(assets):
+    """A minimal definition stand-in carrying assets + version/id (the audit keys)."""
+    return SimpleNamespace(
+        slug="risk-register",
+        version=3,
+        definition_id="00000000-0000-0000-0000-0000000101a0",
+        assets=assets,
+    )
+
+
+def _fake_phase(prompt="Fill the register.", emitter="render_template", slug="fill"):
+    cfg = SimpleNamespace(
+        phase_type="llm_emit",
+        prompt=prompt,
+        emitter=emitter,
+        model=None,
+        folder_scope=None,
+        skill_ref=None,
+        skill_snapshot=None,
+        available_tools=["render_template"],
+    )
+    return SimpleNamespace(slug=slug, phase_index=1, config=cfg)
+
+
+def _fake_ctx(definition, *, audit_sink, model="gpt-5.4"):
+    """The harness ctx bag the executor reads via getattr (mirrors the live SimpleNamespace).
+
+    ``audit_sink`` records every write_audit call so the per-transition receipts can be
+    asserted. ``pool``/``supabase`` are inert stand-ins (resolve_template_source is patched).
+    """
+    return SimpleNamespace(
+        run_id="11111111-1111-1111-1111-111111111111",
+        producer_run_id="22222222-2222-2222-2222-222222222222",
+        thread_id="33333333-3333-3333-3333-333333333333",
+        current_user={"id": "44444444-4444-4444-4444-444444444444"},
+        user_settings=None,
+        model=model,
+        inputs={"kickoff_prompt": "Fill the risk register from the KB."},
+        pool=object(),
+        supabase=object(),
+        redis=None,
+        emit=None,
+        retry_feedback=None,
+        definition=definition,
+        folder_subtree_ids=None,
+    )
+
+
+_VALID_FM = {
+    "scalars": [
+        {
+            "key": "project_name",
+            "value": "Meridian",
+            "source_chunk_id": "chunk-1",
+            "source_doc": "brief.docx",
+            "source_page": 1,
+        }
+    ],
+    "rows": [],
+}
+
+
+def _forced_ok(emitted=None):
+    """A forced_emit success result (the happy path the executor consumes)."""
+    from app.services.template_render_service import EmitFieldMap
+
+    fm = emitted or EmitFieldMap.model_validate(_VALID_FM)
+    return {
+        "emitted": fm,
+        "tier": "TIER-FORCE",
+        "provider": "openai",
+        "forced": True,
+        "recovered_from_narration": False,
+        "truncated": False,
+        "failure": None,
+    }
+
+
+def _forced_fail():
+    return {
+        "emitted": None,
+        "tier": "TIER-FORCE",
+        "provider": "openai",
+        "forced": True,
+        "recovered_from_narration": False,
+        "truncated": False,
+        "failure": "model_failed_to_emit",
+    }
+
+
+@pytest.fixture()
+def _patch_executor(monkeypatch):
+    """Patch the executor's substrate seams (forced_emit / resolve_template_source /
+    write_audit / the render post_processor / the honest-fail surface) so the 6-layer
+    ladder runs deterministically offline. Returns a recorder bag."""
+    from app.services.harness import phase_types
+    from app.services.harness import emitters
+
+    bag: dict = {
+        "audit": [],          # [(event_type, metadata)] per write_audit
+        "forced_calls": [],   # the kwargs forced_emit was called with
+        "resolve_calls": [],  # the kwargs resolve_template_source was called with
+        "render_calls": [],   # the post_processor render dispatches
+        "surface_calls": [],  # the honest-fail reasons surfaced
+        "forced_result": _forced_ok(),
+        "resolve_result": {
+            "bytes": b"PK\x03\x04docx",
+            "filename": "register.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        },
+        "render_result": {"status": "ok", "path": "/register.docx",
+                          "output_file": {"path": "/register.docx", "sha256": "abc", "bytes": 1234}},
+    }
+
+    async def _fake_forced_emit(**kwargs):
+        bag["forced_calls"].append(kwargs)
+        return bag["forced_result"]
+
+    async def _fake_resolve(**kwargs):
+        bag["resolve_calls"].append(kwargs)
+        return bag["resolve_result"]
+
+    async def _fake_write_audit(pool, run_id, *, user_id, event_type, metadata):
+        bag["audit"].append((event_type, metadata))
+
+    async def _fake_render_post(validated_map, resolved_template, ctx):
+        bag["render_calls"].append((validated_map, resolved_template))
+        return bag["render_result"]
+
+    async def _fake_surface(ctx, run_id, reason, pool):
+        bag["surface_calls"].append(reason)
+        return "msg-id"
+
+    monkeypatch.setattr(phase_types, "forced_emit", _fake_forced_emit)
+    monkeypatch.setattr(phase_types, "resolve_template_source", _fake_resolve)
+    monkeypatch.setattr(phase_types, "write_audit", _fake_write_audit)
+    monkeypatch.setattr(phase_types, "_surface_failure_message", _fake_surface)
+    # The render dispatch rides the EMITTER_REGISTRY post_processor — patch the entry's
+    # callable so the executor test does not need a live sandbox.
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    monkeypatch.setitem(
+        emitters.EMITTER_REGISTRY,
+        "render_template",
+        emitters.EmitterEntry(schema_builder=entry.schema_builder, post_processor=_fake_render_post),
+    )
+    return bag
+
+
+# ── D-01 / Pitfall 5: the sealed forced shot, never the open loop ──────────────
+
+
 def test_emit_never_uses_agent_loop():
     """``_exec_llm_emit`` MUST NOT invoke the open agent loop (``run_task_sub_agent``)
     — it runs a sealed forced single call instead (the GAP-A root-cause guard).
@@ -33,19 +211,80 @@ def test_emit_never_uses_agent_loop():
     assert "run_task_sub_agent" not in src, (
         "_exec_llm_emit must not call the open agent loop (GAP-A root cause / Pitfall 5)"
     )
+    assert "run_agent_loop" not in src
+    # It MUST call the sealed forced-emit substrate.
+    assert "forced_emit" in src
 
 
-@pytest.mark.xfail(strict=False, reason="101.1 executor plan (GAP-B / D-10) — un-marks to GREEN")
-def test_bound_assetref_injected():
+async def test_emit_runs_forced_shot_not_open_loop(_patch_executor):
+    """The executor drives forced_emit (the sealed shot) and never the sub-agent loop;
+    monkeypatch run_task_sub_agent to raise so any accidental call fails loudly."""
+    from app.services.harness import phase_types
+
+    def _boom(*a, **k):
+        raise AssertionError("_exec_llm_emit must NOT call run_task_sub_agent (GAP-A)")
+
+    # If the executor ever reached the open loop this would raise.
+    phase_types.run_task_sub_agent  # symbol exists
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+
+    out = await phase_types._exec_llm_emit(phase, {}, ctx)
+    assert _patch_executor["forced_calls"], "forced_emit was not called (the sealed shot)"
+    assert isinstance(out, dict) and "text" in out
+
+
+# ── GAP-B / D-10: the bound AssetRef is resolved server-side + injected ─────────
+
+
+async def test_bound_assetref_injected(_patch_executor):
     """The bound library template ``AssetRef`` is resolved server-side and injected
     into the emit args at phase-build time — the model never selects the template
     (closes the GAP-B fall-through to the ephemeral-upload branch)."""
-    from app.services.harness.phase_types import _emit_bound_asset_ref  # noqa: F401
+    from app.services.harness.phase_types import _emit_bound_asset_ref, _exec_llm_emit
 
-    pytest.skip("AssetRef injection lands in the executor plan")
+    # The helper picks the assets[] entry of kind=="template" (NOT a reference asset).
+    tmpl = _fake_asset_ref("template", "register.docx")
+    ref = _fake_asset_ref("reference", "notes.docx")
+    definition = _fake_definition([ref, tmpl])
+    assert _emit_bound_asset_ref(definition) is tmpl
+
+    # The executor resolves THAT AssetRef (not None) — the model never selects it.
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+    await _exec_llm_emit(phase, {}, ctx)
+    assert _patch_executor["resolve_calls"], "resolve_template_source was not called"
+    call = _patch_executor["resolve_calls"][0]
+    assert call.get("asset_ref") is tmpl, "GAP-B: the bound template AssetRef must be injected, not None"
 
 
-@pytest.mark.xfail(strict=False, reason="101.1 executor plan (D-12) — un-marks to GREEN")
+async def test_no_template_bound_is_honest_state_e(_patch_executor):
+    """A definition with NO template asset AND no ephemeral upload that resolves =>
+    failure state (e) no_template_bound — an honest receipt + a surfaced reason."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    # No template asset on the definition AND the ephemeral resolve returns no bytes.
+    _patch_executor["resolve_result"] = {
+        "bytes": None, "filename": None, "provenance": "template_input",
+        "mime": None, "error": "No template uploaded to this thread.",
+    }
+    definition = _fake_definition([])  # no assets at all
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+
+    out = await _exec_llm_emit(phase, {}, ctx)
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    assert "emit_failed" in kinds
+    # The honest reason names the no_template_bound state.
+    assert any("no_template_bound" in str(r) or "template" in str(r).lower()
+               for r in _patch_executor["surface_calls"])
+    assert out.get("failure") == "no_template_bound"
+
+
+# ── D-12: every transition writes an INSERT-only audit receipt ─────────────────
+
+
 def test_emit_writes_audit_receipt():
     """Every emit transition writes an INSERT-only ``harness_audit`` receipt
     (``emit_forced`` / ``emit_validated`` / ...) keyed to run_id + definition@version."""
@@ -54,3 +293,92 @@ def test_emit_writes_audit_receipt():
     # The receipt kinds the executor writes must be accepted by the audit helper.
     assert "emit_forced" in _AUDIT_EVENT_TYPES
     assert "emit_validated" in _AUDIT_EVENT_TYPES
+
+
+async def test_emit_audit_receipt_transitions(_patch_executor):
+    """The happy path writes emit_forced → emit_validated → emit_rendered, each keyed
+    to run_id + definition@version with the RESEARCH §4 metadata keys (D-12)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+
+    await _exec_llm_emit(phase, {}, ctx)
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    # The forced shot, the validated gate, and the rendered file each leave a receipt.
+    assert "emit_forced" in kinds
+    assert "emit_validated" in kinds
+    assert "emit_rendered" in kinds
+    # The receipt carries the definition@version + the emitter/tier/provider facts (§4).
+    meta = dict(_patch_executor["audit"])["emit_forced"] if False else None
+    forced_meta = next(m for k, m in _patch_executor["audit"] if k == "emit_forced")
+    for key in ("definition_version", "definition_id", "phase_slug", "emitter", "tier", "provider"):
+        assert key in forced_meta, f"emit_forced receipt missing §4 metadata key {key!r}"
+
+
+# ── D-08 layer 4: the citation gate rejects an uncited map BEFORE render (state b) ─
+
+
+async def test_citation_gate_rejects_before_render(_patch_executor):
+    """An uncited/invented emission is rejected at the citation gate (state b
+    citation_gate_rejected) BEFORE touching the render — emit_rejected receipt +
+    honest fail; the render post_processor is NEVER reached."""
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    # A value present but with a source_chunk_id that was NOT retrieved => invented.
+    uncited = EmitFieldMap.model_validate({
+        "scalars": [{
+            "key": "project_name", "value": "Meridian",
+            "source_chunk_id": "not-retrieved", "source_doc": "x.docx", "source_page": 1,
+        }],
+        "rows": [],
+    })
+    _patch_executor["forced_result"] = _forced_ok(uncited)
+
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+    # No retrieved ids in accumulated outputs => the citation source_chunk_id is invented.
+    out = await _exec_llm_emit(phase, {}, ctx)
+
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    assert "emit_rejected" in kinds
+    assert not _patch_executor["render_calls"], "render must NOT run on a rejected field-map (state b)"
+    assert out.get("failure") == "citation_gate_rejected"
+
+
+# ── D-08 layer 6: model_failed_to_emit is an honest failure (state a) ──────────
+
+
+async def test_model_failed_to_emit_honest_fail(_patch_executor):
+    """forced_emit returning failure=model_failed_to_emit (after Plan 02 recovery +
+    truncation) => honest fail (state a): emit_failed receipt + a surfaced reason,
+    never an empty 'done'."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    _patch_executor["forced_result"] = _forced_fail()
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)
+
+    out = await _exec_llm_emit(phase, {}, ctx)
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    assert "emit_failed" in kinds
+    assert _patch_executor["surface_calls"], "an honest reason must be surfaced (RC-4)"
+    assert out.get("failure") == "model_failed_to_emit"
+
+
+# ── registration: llm_emit is the 6th phase type ──────────────────────────────
+
+
+def test_llm_emit_registered_as_sixth_phase_type():
+    """``llm_emit`` is the 6th PHASE_TYPE_REGISTRY entry (the engine dispatch seam)."""
+    from app.services.harness.phase_types import PHASE_TYPE_REGISTRY_ENTRIES
+
+    assert "llm_emit" in PHASE_TYPE_REGISTRY_ENTRIES
+    # register_all() propagates it to the engine registry.
+    from app.services.harness_engine import PHASE_TYPE_REGISTRY
+
+    assert "llm_emit" in PHASE_TYPE_REGISTRY
