@@ -21,10 +21,16 @@ executor plan wires the deterministic render-dispatch — Plan 03's hardened
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from app.services.template_render_service import build_field_map_tool_schema
+
+# NOTE (Pitfall 4): NO ``import docxtpl`` at module top — render is sandbox-only. The
+# post_processor RE-DISPATCHES the hardened ``_handle_render_template`` (which ships the
+# heavy libs into the SEALED sandbox via ``_RENDER_DRIVER_SRC``); this module never
+# imports the heavy render libs nor renders in-process — there is exactly ONE render path.
 
 __all__ = [
     "EmitterEntry",
@@ -88,10 +94,71 @@ def resolve_emitter(name: str) -> EmitterEntry:
         ) from None
 
 
+async def _render_template_post(
+    validated_map: dict, resolved_template: dict, ctx: Any
+) -> dict:
+    """The ``render_template`` deterministic driver (D-04 / A2) — RE-DISPATCH the EXISTING
+    hardened ``_handle_render_template`` with the validated field-map + the server-resolved
+    template. ONE render code path: the CR-01 shell-safety (``_safe_out_filename`` allow-list
+    + ``shlex.quote``), the truncation guard, the citation gate, the integrity gate, and the
+    sealed-sandbox plumbing are ALL inherited — this function re-implements NONE of them.
+
+    ``_handle_render_template`` is imported LAZILY inside the function to avoid an import
+    cycle (emitters → tool_dispatcher → ...). It re-resolves the SAME trusted library
+    template from the ``asset`` arg (the server-resolved ``AssetRef`` — the model never
+    selects it, D-10) so there is no second resolution path either.
+
+    Returns the handler's parsed verdict dict (``{status, path, ...}``) — the executor
+    maps ``status`` to the D-08 success / state-c / state-d branches + the audit receipt.
+    """
+    # Lazy import (break the emitters → tool_dispatcher cycle; mirrors phase_types).
+    from app.services.tool_dispatcher import _handle_render_template
+
+    asset_ref = resolved_template.get("asset_ref")
+    # The hardened handler validates+re-resolves from the asset DICT (AssetRef.model_validate).
+    asset_dict = None
+    if asset_ref is not None:
+        asset_dict = {
+            "asset_id": getattr(asset_ref, "asset_id", None),
+            "filename": getattr(asset_ref, "filename", None),
+            "kind": getattr(asset_ref, "kind", None),
+            "mime": getattr(asset_ref, "mime", None),
+        }
+
+    # out_filename: a sensible basename derived from the template filename; the handler's
+    # own _safe_out_filename (CR-01) coerces a bad name to a safe default — do NOT pre-sanitize.
+    out_filename = resolved_template.get("filename") or "deliverable.docx"
+
+    args = {
+        "field_map": validated_map,
+        "retrieved_ids": list(resolved_template.get("retrieved_ids") or []),
+        "out_filename": out_filename,
+        "asset": asset_dict,  # None => the handler takes the ephemeral-upload branch
+        # Truncation was already guarded by forced_emit (D-08 layer 4) before the gate;
+        # pass empty meta so the handler's re-check is a no-op (never re-rejects a clean shot).
+        "emission_meta": {},
+    }
+
+    result = await _handle_render_template(args, ctx)
+    # _handle_render_template returns a ToolResult whose .result is a JSON string.
+    raw = getattr(result, "result", None)
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return {"status": "error", "reason": "bad_verdict", "message": raw}
+    if isinstance(raw, dict):
+        return raw
+    return {"status": "error", "reason": "no_verdict", "message": "render produced no verdict"}
+
+
 # ── v1 entry: render_template (D-04 — render_template demoted to the first emitter) ──
 # schema_builder = the Pitfall-4-safe field-map tool schema (Pydantic only, no docxtpl).
-# post_processor = None for now; the executor plan wires the deterministic render
-# dispatch (reusing the hardened _handle_render_template — one render code path).
+# post_processor = _render_template_post — re-dispatches the hardened _handle_render_template
+# (one render code path; CR-01/WR-02/WR-03/WR-04 hardening + the two D-08 gates inherited).
 register_emitter("render_template")(
-    EmitterEntry(schema_builder=build_field_map_tool_schema, post_processor=None)
+    EmitterEntry(
+        schema_builder=build_field_map_tool_schema,
+        post_processor=_render_template_post,
+    )
 )
