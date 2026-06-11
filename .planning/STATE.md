@@ -221,6 +221,12 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 - **No deviations.** Zero backend files touched; additive-only inside the existing catch. SUMMARY: `.planning/phases/099-workflow-skill-composition/099-08-SUMMARY.md`.
 - **Next:** operator runs the Task 4 live L10 re-run (see SUMMARY "Checkpoint — Awaiting Operator Verification").
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260611-irx | Per-process log filename — fix Windows multi-worker RotatingFileHandler rollover crash (WinError 32) | 2026-06-11 | `b5e916e2` | [260611-irx-worker-log-rotation-pid](./quick/260611-irx-worker-log-rotation-pid/) |
+
 ### Recent Completed Phases
 
 **Phase 098 — Project Binding & Server-Side KB Scope Governance — COMPLETE (2026-06-10).** 5/5 plans. VERIFICATION verified (4/4 observable truths + 14 artifacts). HUMAN-UAT complete 6/6 (SC#10 cross-provider × multi-tool × parallel-thread × long-message + `scope_violation` observability + D-13 whitelist refusal). SECURE-PHASE `threats_open: 0` — 13 planned threats closed; WR-03 (fail-open scope → observable emit + kickoff fail-closed) + IN-01 (cycle guard) fixed in code, IN-02/IN-03 accepted (`098-SECURITY.md`). **Still OPEN (run-honesty UI polish, NOT security/scope):** BUG-260609-02 (SUB-RESULTS "Sub-task" loses desc on nav), BUG-260609-04 (phase card placeholder slug "phase-0"), 1-2s empty-bubble. **Next: `/gsd:plan-phase 099` (Workflow ↔ Skill Composition).**
