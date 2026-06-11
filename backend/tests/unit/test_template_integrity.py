@@ -92,3 +92,64 @@ def test_template_input_routes_to_non_jinja_engine():
     engine = select_engine("template_input")
     assert engine == "run_replace"
     assert engine != "docxtpl"
+
+
+# ── Plan 101.1-04 — flat EmitFieldMap integrity + truncation parity (D-09 / WR-04) ──
+
+
+def test_is_truncated_rejects_flat_shape():
+    """The truncation guard (Pitfall 3) is shape-agnostic: a truncated forced-emit shot
+    is rejected by stop_reason/finish_reason REGARDLESS of whether the (would-be) tool
+    JSON encodes a flat EmitFieldMap or a nested GenericFieldMap. is_truncated reads only
+    the stop/finish reason, so it covers the flat path identically — assert both call
+    forms the flat-path forced_emit caller uses."""
+    from app.services.template_render_service import is_truncated
+
+    # The forced_emit caller passes the two reasons directly in hand (kwargs form).
+    assert is_truncated(stop_reason="max_tokens") is True
+    assert is_truncated(finish_reason="length") is True
+    # A clean terminal of a flat forced shot is NOT truncated.
+    assert is_truncated(stop_reason="tool_use", finish_reason="tool_calls") is False
+    # Legacy positional-dict form stays equivalent (no flat-vs-nested divergence).
+    assert is_truncated({"finish_reason": "length"}) is True
+
+
+def test_flat_emit_field_map_renders_openable_file(tmp_path):
+    """Integrity parity (D-09): a flat EmitFieldMap, normalized + built into the render
+    context, renders a docx that re-opens cleanly (assert_integrity opened=True) — the
+    flat shape inherits the SAME integrity guarantee as the nested path because the
+    driver is unchanged downstream of build_context."""
+    from app.services.template_render_service import (
+        EmitFieldMap,
+        assert_integrity,
+        build_context,
+        emit_field_map_to_legacy,
+        render_docx_template,
+    )
+
+    _cols = ("risk_id", "cause", "event", "effect", "probability",
+             "impact", "response_strategy", "owner", "status")
+    flat = {
+        "scalars": [
+            {"key": "project_name", "value": "Meridian", "source_chunk_id": "c1",
+             "source_doc": None, "source_page": None},
+            {"key": "report_date", "value": "2026-06-10", "source_chunk_id": "c1",
+             "source_doc": None, "source_page": None},
+        ],
+        "rows": [
+            {"collection": "rows", "cells": [
+                {"key": c, "value": f"{c}-v", "source_chunk_id": "c1",
+                 "source_doc": None, "source_page": None}
+                for c in _cols
+            ]},
+        ],
+    }
+    legacy = emit_field_map_to_legacy(EmitFieldMap.model_validate(flat))
+    ctx = build_context(legacy)
+    out = tmp_path / "flat-filled.docx"
+    render_docx_template(str(RISK_REGISTER_DOCX), ctx, str(out))
+
+    verdict = assert_integrity(str(out), "docx")
+    assert verdict["opened"] is True
+    # header(1) + 1 grown body row.
+    assert verdict["rows"] == 1 + 1

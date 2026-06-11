@@ -203,6 +203,251 @@ def test_engine_selection_by_provenance():
     assert select_engine("template_input") == "run_replace"
 
 
+# ── Plan 101.1-04 — flat EmitFieldMap render parity + citation-gate re-touch (D-09) ──
+#
+# WR-04 "two copies cannot drift": the flat EmitFieldMap (Plan 01) must produce the
+# SAME build_context output (and the SAME rendered bytes) as the equivalent nested
+# GenericFieldMap, and check_coverage must return identical uncited/invented/null-rate
+# verdicts over both shapes. The third _iter_leaves/build_context branch routes the
+# flat shape through the SAME normalizer the nested path consumes — one code path,
+# no drift. The driver (render_docx_template / run_replace) stays UNCHANGED downstream
+# of build_context. Old 097/101 nested artifacts still validate + render (back-compat).
+
+
+def _equivalent_flat_and_nested():
+    """Build a flat EmitFieldMap dict and the LEGACY-nested dict that encodes the same
+    data, so a parity test can assert build_context / check_coverage agree on both."""
+    flat = {
+        "scalars": [
+            {"key": "project_name", "value": "Meridian", "source_chunk_id": "chunk-1",
+             "source_doc": "brief.pdf", "source_page": 2},
+            {"key": "report_date", "value": "2026-06-10", "source_chunk_id": "chunk-2",
+             "source_doc": "brief.pdf", "source_page": 1},
+        ],
+        "rows": [
+            {"collection": "rows", "cells": [
+                {"key": "risk_id", "value": "R-01", "source_chunk_id": "chunk-1",
+                 "source_doc": "brief.pdf", "source_page": 2},
+                {"key": "owner", "value": "Alex", "source_chunk_id": "chunk-2",
+                 "source_doc": "brief.pdf", "source_page": 1},
+            ]},
+            {"collection": "rows", "cells": [
+                {"key": "risk_id", "value": "R-02", "source_chunk_id": "chunk-2",
+                 "source_doc": "brief.pdf", "source_page": 1},
+                {"key": "owner", "value": None, "source_chunk_id": None,
+                 "source_doc": None, "source_page": None},
+            ]},
+        ],
+    }
+    # The legacy-nested encoding of the same data (what emit_field_map_to_legacy yields).
+    nested = {
+        "scalars": {
+            "project_name": {"value": "Meridian", "source_chunk_id": "chunk-1",
+                             "source_doc": "brief.pdf", "source_page": 2},
+            "report_date": {"value": "2026-06-10", "source_chunk_id": "chunk-2",
+                            "source_doc": "brief.pdf", "source_page": 1},
+        },
+        "collections": {
+            "rows": [
+                {"risk_id": {"value": "R-01", "source_chunk_id": "chunk-1",
+                             "source_doc": "brief.pdf", "source_page": 2},
+                 "owner": {"value": "Alex", "source_chunk_id": "chunk-2",
+                           "source_doc": "brief.pdf", "source_page": 1}},
+                {"risk_id": {"value": "R-02", "source_chunk_id": "chunk-2",
+                             "source_doc": "brief.pdf", "source_page": 1},
+                 "owner": {"value": None, "source_chunk_id": None,
+                           "source_doc": None, "source_page": None}},
+            ],
+        },
+    }
+    return flat, nested
+
+
+def test_flat_map_renders_identical():
+    """WR-04 — a flat EmitFieldMap and its equivalent nested GenericFieldMap produce the
+    SAME build_context output (the two copies cannot drift). The third branch routes the
+    flat shape through the SAME normalizer the nested path already consumes."""
+    from app.services.template_render_service import build_context
+
+    flat, nested = _equivalent_flat_and_nested()
+
+    ctx_flat = build_context(flat)
+    ctx_nested = build_context(nested)
+
+    # The render context is byte-for-byte identical regardless of input shape.
+    assert ctx_flat == ctx_nested
+
+    # And it is the real expected shape (scalars blanked-safe, rows with default score).
+    assert ctx_flat["project_name"]["value"] == "Meridian"
+    assert ctx_flat["report_date"]["value"] == "2026-06-10"
+    assert len(ctx_flat["rows"]) == 2
+    assert ctx_flat["rows"][0]["risk_id"]["value"] == "R-01"
+    # A null leaf renders as a blank cell ('' not 'None').
+    assert ctx_flat["rows"][1]["owner"]["value"] == ""
+
+
+def test_flat_emit_field_map_model_normalizes():
+    """The flat EmitFieldMap MODEL (not just its dict) normalizes to the SAME legacy dict
+    the nested build_context consumes — emit_field_map_to_legacy + build_context agree."""
+    from app.services.template_render_service import (
+        EmitFieldMap,
+        build_context,
+        emit_field_map_to_legacy,
+    )
+
+    flat, nested = _equivalent_flat_and_nested()
+
+    model = EmitFieldMap.model_validate(flat)
+    legacy = emit_field_map_to_legacy(model)
+
+    # The normalizer output == the hand-written nested encoding.
+    assert legacy == nested
+    # And build_context over the model's flat dict == build_context over the legacy dict.
+    assert build_context(model.model_dump()) == build_context(legacy)
+
+
+def test_flat_map_citation_gate_parity():
+    """WR-04 — check_coverage returns IDENTICAL verdicts (uncited / invented / null-rate)
+    for the flat vs nested shape over the same data, including an invented-citation case
+    that must be REJECTED on both shapes."""
+    from app.services.template_render_service import check_coverage
+
+    retrieved_ids = {"chunk-1", "chunk-2"}
+    placeholder_keys = ["project_name", "report_date", "rows"]
+
+    # Clean-data parity first.
+    flat, nested = _equivalent_flat_and_nested()
+    stats_flat = check_coverage(flat, retrieved_ids, placeholder_keys)
+    stats_nested = check_coverage(nested, retrieved_ids, placeholder_keys)
+    assert stats_flat == stats_nested
+    assert stats_flat["invented_citation_count"] == 0
+    assert stats_flat["uncited_value_count"] == 0
+
+    # Now an invented + an uncited leaf — both shapes must report them identically.
+    flat_bad = {
+        "scalars": [
+            {"key": "project_name", "value": "Meridian", "source_chunk_id": "chunk-99",
+             "source_doc": None, "source_page": None},  # invented (chunk-99 not retrieved)
+        ],
+        "rows": [
+            {"collection": "rows", "cells": [
+                {"key": "risk_id", "value": "R-01", "source_chunk_id": None,
+                 "source_doc": None, "source_page": None},  # uncited (value, no source)
+            ]},
+        ],
+    }
+    nested_bad = {
+        "scalars": {
+            "project_name": {"value": "Meridian", "source_chunk_id": "chunk-99"},
+        },
+        "collections": {
+            "rows": [{"risk_id": {"value": "R-01", "source_chunk_id": None}}],
+        },
+    }
+    s_flat = check_coverage(flat_bad, retrieved_ids, placeholder_keys)
+    s_nested = check_coverage(nested_bad, retrieved_ids, placeholder_keys)
+    assert s_flat["invented_citation_count"] == s_nested["invented_citation_count"] == 1
+    assert s_flat["uncited_value_count"] == s_nested["uncited_value_count"] == 1
+
+
+def test_legacy_nested_still_renders():
+    """Back-compat (D-09): a 097/101-shaped nested GenericFieldMap still flows through
+    build_context UNCHANGED — the third branch is additive, never a regression."""
+    from app.services.template_render_service import GenericFieldMap, build_context
+
+    # The exact nested envelope shape Phase 097/101 emitted (dict scalars + collections).
+    nested = {
+        "scalars": {"project_name": {"value": "Legacy", "source_chunk_id": "c1"}},
+        "collections": {"rows": [{"risk_id": {"value": "R-9", "source_chunk_id": "c1"}}]},
+    }
+    # It still validates as a GenericFieldMap (the model is byte-untouched).
+    assert GenericFieldMap.model_validate(nested) is not None
+
+    ctx = build_context(nested)
+    assert ctx["project_name"]["value"] == "Legacy"
+    assert ctx["rows"][0]["risk_id"]["value"] == "R-9"
+    # The default-blank derived field is still present for trusted templates.
+    assert ctx["rows"][0]["score"] == ""
+
+
+_RISK_COLS = (
+    "risk_id", "cause", "event", "effect", "probability",
+    "impact", "response_strategy", "owner", "status",
+)
+
+
+def _full_risk_flat_and_nested(n_rows: int = 2):
+    """A flat EmitFieldMap + its equivalent nested map carrying EVERY column the trusted
+    ``risk-register.docx`` template references (so the docxtpl render resolves all
+    ``{{ r.<col>.value }}`` lookups). Used by the byte-parity render tests."""
+    def _cell(key, value, cid="chunk-1"):
+        return {"key": key, "value": value, "source_chunk_id": cid,
+                "source_doc": "brief.pdf", "source_page": 1}
+
+    flat = {
+        "scalars": [
+            _cell("project_name", "Meridian"),
+            _cell("report_date", "2026-06-10"),
+        ],
+        "rows": [
+            {"collection": "rows", "cells": [_cell(c, f"{c}-{i}") for c in _RISK_COLS]}
+            for i in range(n_rows)
+        ],
+    }
+    nested = {
+        "scalars": {
+            "project_name": {"value": "Meridian", "source_chunk_id": "chunk-1",
+                             "source_doc": "brief.pdf", "source_page": 1},
+            "report_date": {"value": "2026-06-10", "source_chunk_id": "chunk-1",
+                            "source_doc": "brief.pdf", "source_page": 1},
+        },
+        "collections": {
+            "rows": [
+                {c: {"value": f"{c}-{i}", "source_chunk_id": "chunk-1",
+                     "source_doc": "brief.pdf", "source_page": 1} for c in _RISK_COLS}
+                for i in range(n_rows)
+            ],
+        },
+    }
+    return flat, nested
+
+
+def test_flat_map_renders_same_bytes(tmp_path):
+    """WR-04 (byte-level) — a flat EmitFieldMap and its equivalent nested map, rendered
+    through the UNCHANGED docxtpl driver, produce the SAME docx (the driver is unchanged
+    downstream of build_context, so identical context → identical render). Re-open both
+    and assert the same grown-row count AND identical extracted body text."""
+    from app.services.template_render_service import (
+        assert_integrity,
+        build_context,
+        render_docx_template,
+    )
+
+    flat, nested = _full_risk_flat_and_nested(2)
+
+    # The render CONTEXT is identical (the WR-04 contract): identical context → identical
+    # docxtpl render (the driver is deterministic + unchanged downstream).
+    assert build_context(flat) == build_context(nested)
+
+    out_flat = tmp_path / "flat.docx"
+    out_nested = tmp_path / "nested.docx"
+    render_docx_template(str(RISK_REGISTER_DOCX), build_context(flat), str(out_flat))
+    render_docx_template(str(RISK_REGISTER_DOCX), build_context(nested), str(out_nested))
+
+    v_flat = assert_integrity(str(out_flat), "docx")
+    v_nested = assert_integrity(str(out_nested), "docx")
+    # Same structure: header(1) + 2 grown rows on both.
+    assert v_flat["rows"] == v_nested["rows"] == 1 + 2
+    assert v_flat["opened"] is True and v_nested["opened"] is True
+
+    # Same extracted body text — the rendered content is identical, not just the count.
+    from docx import Document
+
+    txt_flat = "\n".join(p.text for p in Document(str(out_flat)).paragraphs)
+    txt_nested = "\n".join(p.text for p in Document(str(out_nested)).paragraphs)
+    assert txt_flat == txt_nested
+
+
 # ── Plan 101-04 — the render_template tool handler (the integration piece) ────
 #
 # These are the OFFLINE-testable slices of the BEFORE-render citation gate and the
