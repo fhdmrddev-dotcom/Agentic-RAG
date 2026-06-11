@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T08:32:40.642Z"
+last_updated: "2026-06-11T08:59:01.515Z"
 last_activity: 2026-06-11
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 34
-  completed_plans: 33
-  percent: 97
+  completed_plans: 34
+  percent: 100
 ---
 
 # Project State
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 101.1 (guaranteed-emission-layer) — EXECUTING
-Plan: 4 of 5 (Plans 01 + 02 + 03 COMPLETE)
-Status: Ready to execute
+Plan: 5 of 5 (Plans 01 + 02 + 03 + 04 COMPLETE)
+Status: Ready to execute (Plan 05 = operator-run finalize for live UAT)
 Last activity: 2026-06-11
+
+**Plan 101.1-04 (Wave 4, GAP-C emit run-honesty + flat-vs-nested render parity) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `267870e7` / GREEN `624e4b18`, TDD): **WR-04 flat-vs-nested render parity (D-09)** — added a THIRD branch to `_iter_leaves`/`check_coverage`/`build_context` (`backend/app/services/template_render_service.py`). A flat `EmitFieldMap` dict (`scalars` LIST + `rows` of `{collection, cells}`) is normalized to the legacy envelope FIRST via the SAME `_flat_emit_field_map_to_legacy_dict` that `emit_field_map_to_legacy` now delegates to (**ONE flat→legacy mapping — "two copies cannot drift"**), then walked identically to the nested path. Flat produces the SAME `build_context` output, the SAME docx (grown-row count + extracted body text), and the SAME `check_coverage` uncited/invented/null-rate verdict as the equivalent nested map. **Driver UNCHANGED downstream of `build_context`** (`render_docx_template`/`run_replace_docx`/`_replace_in_paragraph` byte-untouched, `git diff`-proven); `GenericFieldMap` byte-untouched (097/101 nested back-compat). `_is_flat_emit_field_map_dict` discriminates STRUCTURALLY (scalars-LIST / rows with collection+cells) so the existing Phase-101 flat spike-style shape is NOT misrouted.
+- ✓ Task 2 (backend RED `409f6bc2` / GREEN `65eeb935`; frontend RED `b34020a5` / GREEN `f31fedf7`, TDD): **GAP-C emit run-honesty (D-11).** Backend: `_exec_llm_emit` emits a discrete `phase_substep` per transition via `_emit_phase_substep` (reuses the canonical `harness_engine._emit` one-XADD — **no new wire path, no per-provider branch, D-14 holds; `grep -c "xadd(" == 0`**): `forcing → emitting → [recovering, only on D-06 narration] → validating → rendering → validated`; each terminal failure emits `failure=<one of the 5>` (model_failed_to_emit / citation_gate_rejected / render_failed / integrity_failed / no_template_bound). Best-effort (no redis = no crash). Frontend (`PhaseCard.tsx` + `types/index.ts`): `SUBSTEP_META` (6 sub-steps → glyph + label + node tint: active-pulsing / recovering-amber / validated-green) rendered as a sub-row on the EXISTING status-node rail (**no new UI / A5 — only new file is `PhaseCard.test.tsx`**); the closed `FailureKind` taxonomy extended with the 5 `EmitFailure` values + `EMIT_FAILURE_COPY` fixed copy; `classifyFailure` honors `phase.emitFailure` first → failed-as-failed even before status flips (RC-4); `Phase.emitSubStep`/`emitFailure` additive-optional. **XSS rule held** (fixed text children; `grep -c dangerouslySetInnerHTML == 0`).
+- **No deviations.** Plan executed exactly as written. The `phase_substep` demux wiring (`api.ts`/`StreamsProvider` populating `Phase.emitSubStep`/`emitFailure` from the wire) is intentionally OUT of scope — the deferred run-legibility phase (CONTEXT D-11 emit-moment slice; the G-5 StreamsProvider hot file is not grown here). This plan ships the RENDER contract on the existing rail.
+- **WR-04 parity proven** (6 assertions GREEN: build_context parity, model-normalize, citation-gate parity incl. a rejected case, same-bytes render, integrity parity, nested back-compat). **Sketch-findings skill loaded** — extended PhaseCard STATUS_META→SUBSTEP_META + the closed FAILURE TAXONOMY + reason_unknown fallback (sketch 008/010/014 run-honesty rail); G-2 did NOT fire.
+- **SEED-056 net-new-failure proof (both surfaces, baseline-anchored at `49d27e2f`):** Backend target set (template_render/template_integrity/emit_field_map/llm_emit_executor/harness_audit_emit/tool_dispatcher/forced_emit/gateway_forcing) = **84 passed / 0 failed**. Wider wave slice `10 failed / 292 passed` — all 10 PRE-EXISTING rot proven by base-checkout (`phase_types.py` + `template_render_service.py` at `49d27e2f` → the 10 failed IDENTICALLY, restored to HEAD); the documented SEED-056 set (test_063/067_4×2/075_code×2/threads_skills/bounded_retry/075_4×2/phase56). Frontend panel suite **153 passed** (incl. 19 new PhaseCard) + providers **21 passed**; baseline-anchored GREEN at base AND HEAD (additive-optional Phase fields broke no consumer). **Net-new failures = 0 (backend + frontend).**
+- SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-04-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (live cross-provider UAT, the 099/WFSKILL-01 multi-plan convention).
+- **Next:** `/gsd:execute-phase 101.1` Plan 05 (operator-run finalize: apply migration 069 via the Supabase SQL editor + regen `full-schema.sql` + re-seed the D-13 two-step `llm_emit` WorkflowDefinition + rebuild/bump the sandbox image + run the 8 live-UAT rows + the SC#10 4-axis scoreboard).
 
 **Plan 101.1-03 (Wave 3, the `_exec_llm_emit` forced-emit executor) — COMPLETE (2026-06-11):**
 
