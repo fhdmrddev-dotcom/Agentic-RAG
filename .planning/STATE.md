@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: verifying
-last_updated: "2026-06-11T00:30:00.000Z"
-last_activity: 2026-06-11 -- Phase 101 live UAT BLOCKED (0 .docx produced); GAP-A..D filed; gap-closure needed
+status: discussing
+last_updated: "2026-06-11T12:00:00.000Z"
+last_activity: 2026-06-11 -- Phase 101.1 (Guaranteed Emission Layer) DISCUSSED + CONTEXT written; foundational forced-emit fix for GAP-A..D ratified
 progress:
   total_phases: 13
   completed_phases: 4
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101 — Template-Fill + Integrity Validation — code COMPLETE + verified, but LIVE UAT (2026-06-11) found the feature does NOT produce a deliverable end-to-end. TMPL-02/03 stay OPEN. Next = a **Phase 101 gap-closure** for GAP-A..D (see `101-LIVE-UAT-FINDINGS.md`).
+**Current focus:** Phase 101.1 — **Guaranteed Structured Emission Layer** (Template-Fill Gap-Closure) — DISCUSSED 2026-06-11, CONTEXT written. Foundational forced-emit layer (`llm_emit` + emitter registry + capability-tiered gateway forcing + native-path recovery + audit receipt) that closes the Phase 101 live 0-docx failure (GAP-A..D) AND becomes the rail 102/103/104 ride. Operator ratified the foundational path (not a minimal patch) + the line: **no model-written code touches the deliverable — cited data + pinned renderer only**. Next = `/gsd:plan-phase 101.1`.
 
 ## Current Position
 
-Phase: 101 — code complete (5 plans + gap-closure 101-06) + VERIFIED at code level, but LIVE UAT BLOCKED (goal not met live)
-Plan: live UAT done (Chrome MCP + psycopg2); next = author a Phase 101 gap-closure (forced-emission + library-asset wiring + run-honesty + cross-provider)
-Status: NOT shippable yet — 4 workflow-wiring/run-honesty gaps block end-to-end file production
-Last activity: 2026-06-11 -- Phase 101 live UAT: 4 runs (opus + deepseek), 0 .docx produced; GAP-A..D filed
+Phase: 101.1 — discussed, CONTEXT captured (`.planning/phases/101.1-guaranteed-emission-layer/101.1-CONTEXT.md`). Phase 101 stays Blocked-on-live-UAT until 101.1 ships (TMPL-02/03 OPEN).
+Plan: none yet — next = `/gsd:plan-phase 101.1`.
+Status: direction LOCKED via two adversarial multi-agent investigations (root-cause + forward-aligned architecture). 15 decisions D-01..D-15 in CONTEXT. G-5 fires on `anthropic_service.py` (decide adapter audit vs scoped seam at plan-phase).
+Last activity: 2026-06-11 -- Phase 101.1 discussed; CONTEXT.md + ROADMAP insert + STATE update committed.
 
 **Phase 101 LIVE UAT (2026-06-11) — code verified, feature NOT yet usable. See `101-LIVE-UAT-FINDINGS.md` + `101-HUMAN-UAT.md`:**
 

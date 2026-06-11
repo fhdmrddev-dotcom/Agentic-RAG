@@ -46,6 +46,7 @@
 - [x] **Phase 099: Workflow ↔ Skill Composition** ✓ COMPLETE (2026-06-10) - A phase can pull a project skill's judgment via `skill_ref` with a version snapshot; Deep path byte-identical
 - [x] **Phase 100: Ephemeral Template Upload** ✓ COMPLETE (2026-06-10) - Upload a docx/pptx/xlsx for one run, workspace-only, TTL + sweep, never ingested, never in search
 - [ ] **Phase 101: Template-Fill + Integrity Validation** - Fill that exact template from project-KB content via a cited field-map; re-open to assert integrity; SSTI contained
+- [ ] **Phase 101.1: Guaranteed Structured Emission Layer (Template-Fill Gap-Closure)** - Shared forced-emission primitive (`llm_emit` + emitter registry + capability-tiered gateway forcing + native-path recovery + audit receipt) so ANY deliverable phase works cross-provider with the no-model-code/cited/reproducible guarantee; template-fill is its first instance, closing the GAP-A..D live 0-docx failure
 - [ ] **Phase 102: Reusable Validation-Gate Library + Output-Quality Gate** - A library of validator kinds for any phase + a HARD publish-blocking output-quality judge gate
 - [ ] **Phase 103: Workflows Page + Authoring API + NL Authoring** - Describe → draft → refine in a form → read-only graph → publish → run from a thread (no drag canvas)
 - [ ] **Phase 104: PM Flagship Content Pack** - PM templates + workflow defs + register schemas authored on the generic primitives; headline single template-fill demo
@@ -151,6 +152,20 @@ Plans:
 **UI hint**: yes
 **VALIDATION (SC#10)**: workflow-run-bearing + produces files across providers — author the full 4-axis cross-provider scoreboard. **G-6**: the SC#4 failure modes are the pre-named "How we'd know this failed" UAT rows.
 
+### Phase 101.1: Guaranteed Structured Emission Layer (Template-Fill Gap-Closure)
+**Goal**: Introduce ONE shared "guaranteed structured emission" engine layer — a generic `llm_emit` phase type that FORCES the model to emit cited DATA against a strict schema, which a pinned deterministic no-model-code driver renders into the deliverable — so any workflow that must produce a typed artifact works reliably across the native-7 with the safety/audit guarantees intact. Template-fill is its first instance, closing the GAP-A..D live 0-docx failure end-to-end.
+**Depends on**: Phase 101 (deterministic driver + citation gate + integrity re-open already shipped — 101.1 changes only HOW the model is asked to produce the field-map), Phase 100 (upload), Phase 098 (scoped retrieval). Unblocks Phase 101's live goal (TMPL-02/TMPL-03).
+**Requirements**: TMPL-02, TMPL-03 (closes them live — Phase 101 left them OPEN); foundational for GATE-01/QUAL-01 (102), WFAUTH-02 (103), GRID-01 (106), GOV-02 (107).
+**Success Criteria** (what must be TRUE):
+  1. A new generic `llm_emit` phase type (6th in `PHASE_TYPE_REGISTRY`, additive-optional, Deep byte-identical) forces a single isolated structured emission; `render_template` is demoted to the first entry of a closed `EMITTER_REGISTRY`.
+  2. Capability-tiered forcing at the gateway service boundary: TIER-FORCE (OpenAI/Gemini/DeepSeek/GLM/MiniMax/OpenRouter native `required`/named), TIER-FORCE-NOTHINK (Anthropic, thinking off for the emit call), TIER-COERCE (Kimi/Moonshot directive + `finish_reason` hard-validate + retry) — shared SSE/chunk path untouched + a guard test prevents provider-branch leakage.
+  3. NATIVE-path narrated-JSON recovery + `finish_reason` guard closes the silent-drop on reasoning-natives; no emission is ever silently dropped.
+  4. The bound library template AssetRef is resolved server-side and injected into emit args at phase-build time (GAP-B); the FILL phase produces a real openable .docx on every forceable provider attempt-1, and an honest receipt-bearing failure (never silent 0-docx, never Markdown stand-in) where a tier can't land (GAP-A/GAP-D).
+  5. Emit-moment run honesty: discrete `forcing → emitting → rendering → validating` sub-events with distinguishable failure states (GAP-C). Every transition writes an INSERT-only `harness_audit` row keyed to `run_id` + `definition@version` (the Phase 107 receipt substrate).
+**Plans**: TBD (next: `/gsd:plan-phase 101.1`)
+**UI hint**: yes (GAP-C emit-moment honesty)
+**VALIDATION (SC#10)**: workflow-run-bearing + produces files + touches provider routing across all 7 natives + OpenRouter — author the full 4-axis cross-provider scoreboard; re-run the 8 rows of `101-HUMAN-UAT.md`. **G-5 FIRES** on `anthropic_service.py` (forcing seam) — plan-phase decides adapter audit vs scoped additive seam. **G-6**: failure modes = silent 0-docx / narrated-not-emitted / uncited-not-rejected / won't-open are the pre-named "how we'd know this failed" rows. Full discussed context: `.planning/phases/101.1-guaranteed-emission-layer/101.1-CONTEXT.md`.
+
 ### Phase 102: Reusable Validation-Gate Library + Output-Quality Gate
 **Goal**: Any phase can attach a reusable validator, and a workflow cannot publish unless it provably produces good output for its one declared business requirement.
 **Depends on**: Phase 101 (`output_file_valid` / `citations_required` exercised concretely first)
@@ -243,7 +258,7 @@ Plans:
 
 ## Progress
 
-**Execution Order:** Phases execute in numeric order: 097 → 098 → 099 → 100 → 101 → 102 → 103 → 104 → (STRETCH) 105 → 106 → 107 → 108 → 109
+**Execution Order:** Phases execute in numeric order: 097 → 098 → 099 → 100 → 101 → 101.1 → 102 → 103 → 104 → (STRETCH) 105 → 106 → 107 → 108 → 109
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -251,7 +266,8 @@ Plans:
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
-| 101. Template-Fill + Integrity Validation | 5/5 | Awaiting verification | - |
+| 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
+| 101.1. Guaranteed Structured Emission Layer | 0/TBD | Discussed (CONTEXT) | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
