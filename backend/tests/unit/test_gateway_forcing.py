@@ -268,6 +268,89 @@ def test_openai_compat_forced_tool_choice_kwargs():
     assert sig.parameters["strict_response_format"].default is False
 
 
+# ── Phase 101.1-07 (gap 1a / D-15 / TIER-FORCE-NOTHINK) — DeepSeek forced emit ─
+# disables the thinking block (a named tool_choice WITH thinking ON 400s on
+# DeepSeek v4: "Thinking mode does not support this tool_choice", UAT runs
+# 575e7345/a7f415ad). The forced branch is provider-scoped; the auto path
+# (force_tool_name None) keeps thinking ON byte-identical.
+
+
+def _capture_openai_kwargs(monkeypatch, **call_kwargs):
+    """Drive create_adaptive_streaming_chat with a captured fake client; return the
+    kwargs dict the OpenAI request construction built (never makes a network call)."""
+    from app.services import openai_service as oai
+
+    captured: dict = {}
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return iter([])
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        chat = _FakeChat()
+
+    monkeypatch.setattr(oai, "get_llm_client", lambda user_settings=None: _FakeClient())
+    oai.create_adaptive_streaming_chat(**call_kwargs)
+    return captured
+
+
+def test_deepseek_forced_emit_disables_thinking(monkeypatch):
+    """A DeepSeek forced emit (force_tool_name set) builds kwargs WITHOUT
+    extra_body.thinking (thinking OFF) AND with the named tool_choice — so DeepSeek
+    v4 no longer 400s on 'Thinking mode does not support this tool_choice' (gap 1a)."""
+    us = SimpleNamespace(active_provider="deepseek", llm_model="deepseek-v4", openrouter_tool_strategy="quality")
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "fill"}],
+        model="deepseek-v4",
+        user_settings=us,
+        tools_override=[{"function": {"name": "render_template", "parameters": {}}}],
+        force_tool_name="render_template",
+    )
+    # Thinking is NOT enabled on the forced DeepSeek path.
+    assert kwargs.get("extra_body", {}).get("thinking") is None
+    # The named tool_choice IS sent.
+    assert kwargs["tool_choice"]["function"]["name"] == "render_template"
+
+
+def test_deepseek_non_forced_keeps_thinking(monkeypatch):
+    """A DeepSeek call with force_tool_name=None (the Deep / non-forced path) STILL
+    enables thinking — byte-identical to the pre-101.1-07 behavior."""
+    us = SimpleNamespace(active_provider="deepseek", llm_model="deepseek-v4", openrouter_tool_strategy="quality")
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "hi"}],
+        model="deepseek-v4",
+        user_settings=us,
+        # tools_override avoids get_tools(user_settings) on the auto path (the minimal
+        # SimpleNamespace settings has no web_search_enabled attr) — the thinking-block
+        # gate under test runs BEFORE the tool branch.
+        tools_override=[{"function": {"name": "search_documents", "parameters": {}}}],
+        tool_choice="auto",
+    )
+    assert kwargs["extra_body"]["thinking"]["type"] == "enabled"
+
+
+def test_non_deepseek_forced_unaffected(monkeypatch):
+    """A non-DeepSeek forced call is unaffected — no extra_body.thinking key appears
+    just because forcing is on (the gate is DeepSeek-specific)."""
+    us = SimpleNamespace(active_provider="openai", llm_model="gpt-5.4", openrouter_tool_strategy="quality")
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "fill"}],
+        model="gpt-5.4",
+        user_settings=us,
+        tools_override=[{"function": {"name": "render_template", "parameters": {}}}],
+        force_tool_name="render_template",
+    )
+    assert kwargs.get("extra_body", {}).get("thinking") is None
+    assert kwargs["tool_choice"]["function"]["name"] == "render_template"
+
+
 # ── Tier resolution — default SAFE on a registry miss ─────────────────────────
 
 
