@@ -813,7 +813,14 @@ def test_parse_docx_template_variables_real_fixture():
     from app.services.template_render_service import parse_docx_template_variables
 
     oracle = parse_docx_template_variables(_real_template_bytes())
-    assert oracle == {"scalars": ["project_name", "report_date"], "collections": ["rows"]}
+    assert oracle == {
+        "scalars": ["project_name", "report_date"],
+        "collections": ["rows"],
+        # The Cited cells the MODEL must emit; `score` (bare {{ r.score }}, no .value)
+        # is driver-computed (D-11) and correctly excluded.
+        "columns": {"rows": ["cause", "effect", "event", "impact", "owner",
+                             "probability", "response_strategy", "risk_id", "status"]},
+    }
     # Not-a-docx => None (no oracle, never a crash).
     assert parse_docx_template_variables(b"PK..garbage") is None
 
@@ -839,6 +846,11 @@ async def test_oracle_keys_reach_model_and_gate_coverage(_patch_executor):
                        "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1}],
         }],
     })
+    # All 9 template columns (the oracle's column set — score is driver-computed,
+    # excluded). A row missing any of these would die in the render as UndefinedError
+    # (live run 454e30c9: "'dict object' has no attribute 'risk_id'").
+    _COLS = ["cause", "effect", "event", "impact", "owner", "probability",
+             "response_strategy", "risk_id", "status"]
     right_keys = EmitFieldMap.model_validate({
         "scalars": [
             {"key": "project_name", "value": "Meridian",
@@ -848,8 +860,9 @@ async def test_oracle_keys_reach_model_and_gate_coverage(_patch_executor):
         ],
         "rows": [{
             "collection": "rows",
-            "cells": [{"key": "cause", "value": "Legacy CRM",
-                       "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1}],
+            "cells": [{"key": c, "value": "x",
+                       "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1}
+                      for c in _COLS],
         }],
     })
     bag["forced_queue"] = [_forced_ok(wrong_keys), _forced_ok(right_keys)]
@@ -858,10 +871,11 @@ async def test_oracle_keys_reach_model_and_gate_coverage(_patch_executor):
     ctx = _fake_ctx(definition, audit_sink=bag["audit"])
     out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
 
-    # The oracle reached the model verbatim.
+    # The oracle reached the model verbatim — keys AND row-cell columns.
     user_turn = bag["forced_calls"][0]["messages"][0]["content"]
     assert "TEMPLATE PLACEHOLDERS" in user_turn
     assert "project_name" in user_turn and "report_date" in user_turn and "rows" in user_turn
+    assert "risk_id" in user_turn and "response_strategy" in user_turn
     # Attempt 1 (wrong keys) rejected with the missing keys named; attempt 2 passed.
     events = [ev for ev, _ in bag["audit"]]
     assert events.count("emit_rejected") == 1

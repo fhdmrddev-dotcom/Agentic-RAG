@@ -1070,10 +1070,16 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     # the render died on UndefinedError). Parsed server-side from the resolved bytes.
     oracle = _template_oracle(src)
     if oracle:
+        coll_specs = []
+        for coll in oracle["collections"]:
+            cols = (oracle.get("columns") or {}).get(coll)
+            coll_specs.append(
+                f"{coll} (each row's cells keyed EXACTLY: {', '.join(cols)})" if cols else coll
+            )
         oracle_text = (
             "TEMPLATE PLACEHOLDERS — emit EXACTLY these keys, names verbatim: "
             f"scalars: {', '.join(oracle['scalars']) or '(none)'}; "
-            f"collections (one entry per row): {', '.join(oracle['collections']) or '(none)'}. "
+            f"collections (one entry per row): {'; '.join(coll_specs) or '(none)'}. "
             "Every listed key must appear in the field-map; set a value to null when the "
             "sources do not support it."
         )
@@ -1154,6 +1160,17 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
         gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
         missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
+        # 101.1-06: column coverage — the template derefs specific cell keys inside the
+        # row loop ({{ r.risk_id.value }}); a mis-keyed cell would die in the render as
+        # UndefinedError (live run 454e30c9). Deterministic, BEFORE the sandbox.
+        if oracle:
+            for coll, cols in (oracle.get("columns") or {}).items():
+                emitted_rows = (legacy_map.get("collections") or {}).get(coll) or []
+                emitted_cols = set()
+                for row in emitted_rows:
+                    emitted_cols |= set((row or {}).keys())
+                if emitted_rows:
+                    missing_keys += [f"{coll}.{c}" for c in cols if c not in emitted_cols]
         if (
             gate["uncited_value_count"] == 0
             and gate["invented_citation_count"] == 0

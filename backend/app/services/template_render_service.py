@@ -358,12 +358,16 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     the heavy lib never enters backend/app/**; a docx is a zip and the tokens are plain
     text once XML tags are stripped — the stripping also coalesces run-split tokens).
 
-    Returns ``{"scalars": [names], "collections": [loop targets]}`` (sorted, deduped),
-    or ``None`` when the bytes are not a readable docx or carry no tokens. A scalar is
-    the ROOT identifier of a ``{{ root(.attr)* }}`` token (the 097/101 trusted templates
-    dereference ``Cited`` dicts: ``{{ project_name.value }}`` → context key
-    ``project_name``); roots that are loop VARIABLES (``{{ r.cause.value }}`` where
-    ``{%tr for r in rows %}``) or collection names are excluded — those are loop-local.
+    Returns ``{"scalars": [names], "collections": [loop targets], "columns":
+    {collection: [cell keys]}}`` (sorted, deduped), or ``None`` when the bytes are not
+    a readable docx or carry no tokens. A scalar is the ROOT identifier of a
+    ``{{ root(.attr)* }}`` token (the 097/101 trusted templates dereference ``Cited``
+    dicts: ``{{ project_name.value }}`` → context key ``project_name``); roots that are
+    loop VARIABLES (``{{ r.cause.value }}`` where ``{%tr for r in rows %}``) or
+    collection names are excluded — those are loop-local. A COLUMN is a loop-var deref
+    ending in ``.value`` (``{{ r.risk_id.value }}`` → column ``risk_id`` of ``rows``) —
+    the Cited cells the MODEL must emit; bare loop derefs (``{{ r.score }}``) are
+    driver-computed (the D-11 derived-compute hook) and excluded from the oracle.
 
     101.1-06: this is the 097 "parse template first" coverage oracle, productized — the
     emit prompt names EXACTLY these keys and ``check_coverage`` validates against them
@@ -385,18 +389,28 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
         )
     except Exception:  # noqa: BLE001 — not-a-docx / corrupt zip => no oracle, never a crash
         return None
-    loop_vars = set()
+    loop_vars: dict[str, str] = {}  # loop var -> its collection
     collections = set()
     for var, coll in re.findall(
         r"\{%[^%]*?\bfor\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)[^%]*?%\}", text
     ):
-        loop_vars.add(var)
+        loop_vars[var] = coll
         collections.add(coll)
     roots = set(re.findall(r"\{\{\s*([A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*\s*\}\}", text))
-    scalars = roots - loop_vars - collections
+    scalars = roots - set(loop_vars) - collections
+    columns: dict[str, set] = {}
+    for var, col in re.findall(
+        r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.value\s*\}\}", text
+    ):
+        if var in loop_vars:
+            columns.setdefault(loop_vars[var], set()).add(col)
     if not scalars and not collections:
         return None
-    return {"scalars": sorted(scalars), "collections": sorted(collections)}
+    return {
+        "scalars": sorted(scalars),
+        "collections": sorted(collections),
+        "columns": {c: sorted(cols) for c, cols in columns.items()},
+    }
 
 
 def check_coverage(
