@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T08:09:12.136Z"
+last_updated: "2026-06-11T08:32:40.642Z"
 last_activity: 2026-06-11
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 34
-  completed_plans: 32
-  percent: 94
+  completed_plans: 33
+  percent: 97
 ---
 
 # Project State
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 101.1 (guaranteed-emission-layer) — EXECUTING
-Plan: 3 of 5 (Plans 01 + 02 COMPLETE)
+Plan: 4 of 5 (Plans 01 + 02 + 03 COMPLETE)
 Status: Ready to execute
 Last activity: 2026-06-11
+
+**Plan 101.1-03 (Wave 3, the `_exec_llm_emit` forced-emit executor) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `c203c277` / GREEN `0073f238`, TDD): **`_exec_llm_emit` — the 6th harness executor** (`backend/app/services/harness/phase_types.py`). Modeled on `_exec_llm_agent` but DIVERGING at the call — it drives **`forced_emit`** (the SEALED single shot, Plan 02), **NEVER `run_task_sub_agent`/the open agent loop** (the exact GAP-A root cause, D-01/Pitfall 5; proven by a source-inspection guard test = `(False, False, True)` for run_task_sub_agent/run_agent_loop/forced_emit). Registered as the 6th `PHASE_TYPE_REGISTRY_ENTRIES` line (`"llm_emit"`). **GAP-B (D-10):** `_emit_bound_asset_ref(definition)` picks the `assets[]` entry of `kind=="template"` → `resolve_template_source(asset_ref=<that ref>)` — the model NEVER selects the template; no-template-bound => honest state (e). **The D-08 6-layer ladder:** forced shot → citation gate (`emit_field_map_to_legacy` → `check_coverage`, BEFORE render, state b) → render → integrity (state d, file NEVER persisted, cited map preserved) → bounded retry (engine's `_run_phase_with_gates` + `_retry_suffix`) → honest fail (`_surface_failure_message`/RC-4). **5 distinguishable failure states** (a model_failed_to_emit / b citation_gate_rejected / c render_failed / d integrity_failed / e no_template_bound). **D-12:** per-transition INSERT-only `write_audit` receipts (emit_forced/recovered/validated/rejected/rendered/integrity_failed/failed) keyed to run_id + definition@version with the RESEARCH §4 metadata (output-file sha256 via stdlib `hashlib`).
+- ✓ Task 2 (RED `9f2e29b9` / GREEN `827dc068`, TDD): **wired the `render_template` EMITTER_REGISTRY post_processor** (`backend/app/services/harness/emitters.py`) — `_render_template_post` re-dispatches the EXISTING hardened `_handle_render_template` (**one render code path**; CR-01 shell-safety + truncation/citation/integrity gates + sealed-sandbox plumbing ALL inherited). Lazy import (break the emitters → tool_dispatcher cycle); **no module-top docxtpl, no second render path** (Pitfall 4).
+- **2 deviations:** (1) **[Rule 3]** threaded `ctx.definition = definition` in `run_workflow` (`harness_engine.py`, +14 lines) — the executor receives only `(phase, accumulated_outputs, ctx)` and the definition is NOT on the live/resume ctx bag (built in `threads.py`/`_build_resume_context`, neither touchable — `threads.py` is G-5-frozen). `run_workflow` is the ONE site holding both; additive + defensive, Deep never reaches it. (2) **[Rule 1]** updated `test_phase_dispatch_routes_each_of_5_types` to include the 6th type `llm_emit` (`eb8958aa`).
+- **Deep byte-identical (red line) PROVEN:** `get_tools()` still OMITS `render_template` (Deep calls it directly → byte-identical); `_exec_llm_emit` body has no open-loop runner; `agent_loop.py` + `threads.py` `git diff --stat` EMPTY; the only `harness_engine.py` change is the +14-line additive `ctx.definition` thread (a harness-only path Deep never reaches).
+- **SEED-056 net-new-failure proof:** target files `test_llm_emit_executor.py` (11) + full target set (forced_emit/gateway_forcing/emit_field_map/harness_audit_emit/template_render/template_integrity/tool_dispatcher) = **71 passed / 0 failed**; harness slice 15 passed. Wider wave slice `18 failed / 382 passed` — all 18 PRE-EXISTING rot proven by **base-checkout** (checked out the 3 changed source files at the pre-plan base `f57977c2`, the 18 failed IDENTICALLY [30 at base with full modules], restored to HEAD); the known `test_bounded_retry_reaches_failed_after_3_attempts` proven still pre-existing via a SECOND stash-at-base (my `harness_engine.py` change stashed out); none import any symbol I changed. **Net-new failures = 0.**
+- SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-03-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (live cross-provider UAT).
+- **Next:** `/gsd:execute-phase 101.1` Plan 04 (gate/driver parity — re-touch `_iter_leaves`/`build_context` for the flat shape WITH parity tests; the executor already feeds the gate/handler the `emit_field_map_to_legacy` normalized dict).
 
 **Plan 101.1-02 (Wave 2, the cross-provider forcing core) — COMPLETE (2026-06-11):**
 

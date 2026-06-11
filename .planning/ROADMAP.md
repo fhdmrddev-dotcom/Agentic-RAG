@@ -165,7 +165,7 @@ Plans:
 **Plans**: 5 plans (G-5 routing decided: tightly-scoped additive gateway seam, not an anthropic_service.py extraction — D-14 guard test ships in Plan 02)
 - [x] 101.1-01-PLAN.md — Foundation: flat EmitFieldMap + closed EMITTER_REGISTRY + LlmEmitPhaseConfig (6th union member) + default-SAFE MODEL_CAPABILITIES flags + migration 069 (ALTER harness_audit) + Wave 0 test stubs ✅ 2026-06-11 (e4f93251/23375e20/d2905b2f)
 - [x] 101.1-02-PLAN.md — Cross-provider core: capability-tiered forcing at the gateway boundary (D-05) + forced_emit substrate with D-06 NATIVE narrated-JSON recovery + the D-14 shared-path guard test ✅ 2026-06-11 (ab306330/6672626e/47cbe58b/183ae315)
-- [ ] 101.1-03-PLAN.md — The _exec_llm_emit executor: sealed forced shot (never the open loop) + GAP-B server-side AssetRef inject + the D-08 6-layer no-fail ladder + per-transition audit receipt; render_template demoted to the EMITTER_REGISTRY post_processor
+- [x] 101.1-03-PLAN.md — The _exec_llm_emit executor: sealed forced shot (never the open loop) + GAP-B server-side AssetRef inject + the D-08 6-layer no-fail ladder + per-transition audit receipt; render_template demoted to the EMITTER_REGISTRY post_processor ✅ 2026-06-11 (c203c277/0073f238/9f2e29b9/827dc068/eb8958aa)
 - [ ] 101.1-04-PLAN.md — GAP-C run honesty: phase_substep sub-events + 5 failure states on the existing PhaseCard rail (no new UI) + the flat-map ↔ citation-gate/docxtpl-driver re-touch with parity tests
 - [ ] 101.1-05-PLAN.md — Finalize for live UAT (operator): apply 069 + regen full-schema + re-seed the D-13 two-step llm_emit WorkflowDefinition; smoke-test one forceable provider → openable cited .docx
 **UI hint**: yes (GAP-C emit-moment honesty)
@@ -272,7 +272,7 @@ Plans:
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
 | 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
-| 101.1. Guaranteed Structured Emission Layer | 2/5 | Executing | - |
+| 101.1. Guaranteed Structured Emission Layer | 3/5 | Executing | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
