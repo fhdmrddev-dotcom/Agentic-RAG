@@ -221,7 +221,11 @@ class _NoopRedis:
 
 
 def test_phase_dispatch_routes_each_of_5_types():
-    """HARNESS-01: each of the 5 phase_type literals routes to its executor."""
+    """HARNESS-01: each phase_type literal routes to its executor.
+
+    101.1 (D-04): the 6th phase type ``llm_emit`` (the SEALED FORCED EMIT) joins the
+    original 5 — the dispatch registry now resolves all 6.
+    """
     import app.services.harness  # noqa: F401 — triggers register_all()
     from app.services.harness_engine import PHASE_TYPE_REGISTRY
 
@@ -231,6 +235,7 @@ def test_phase_dispatch_routes_each_of_5_types():
         "llm_agent",
         "llm_batch_agents",
         "llm_human_input",
+        "llm_emit",  # 101.1 — the 6th (forced-emit phase, D-04)
     }
     # Every registered executor is callable (the dispatch seam resolves each).
     for executor in PHASE_TYPE_REGISTRY.values():
