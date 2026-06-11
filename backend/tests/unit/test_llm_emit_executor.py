@@ -390,3 +390,71 @@ def test_llm_emit_registered_as_sixth_phase_type():
     from app.services.harness_engine import PHASE_TYPE_REGISTRY
 
     assert "llm_emit" in PHASE_TYPE_REGISTRY
+
+
+# ── Task 2: the render_template post_processor re-dispatches the hardened handler ─
+
+
+async def test_render_post_reuses_handler(monkeypatch):
+    """The render_template EMITTER_REGISTRY post_processor re-dispatches the EXISTING
+    hardened ``_handle_render_template`` (one render code path) — it calls it exactly
+    once with the validated field-map + the resolved template, and returns its verdict.
+    It does NOT re-implement the render command / gates / sandbox plumbing."""
+    from app.services.harness import emitters
+    import app.services.tool_dispatcher as td
+
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    assert entry.post_processor is not None, "render_template post_processor must be wired"
+
+    calls: list = []
+
+    class _FakeResult:
+        def __init__(self, payload):
+            self.result = json.dumps(payload)
+
+    async def _recorder(args, ctx):
+        calls.append((args, ctx))
+        return _FakeResult({"status": "ok", "path": "/register.docx",
+                            "size_bytes": 1234, "engine": "docxtpl"})
+
+    monkeypatch.setattr(td, "_handle_render_template", _recorder)
+
+    validated_map = {"scalars": {"project_name": {"value": "Meridian",
+                     "source_chunk_id": "chunk-1", "source_doc": "b.docx", "source_page": 1}},
+                     "collections": {}}
+    resolved_template = {
+        "bytes": b"PK\x03\x04", "filename": "register.docx", "provenance": "library",
+        "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "error": None, "asset_ref": _fake_asset_ref(), "retrieved_ids": ["chunk-1"],
+    }
+    fake_ctx = SimpleNamespace(pool=object(), supabase=object(),
+                              thread_id="t", current_user={"id": "u"}, run_id="r",
+                              emit=None, redis=None)
+
+    out = await entry.post_processor(validated_map, resolved_template, fake_ctx)
+    assert len(calls) == 1, "the hardened handler must be re-dispatched exactly once"
+    args, _ = calls[0]
+    # The validated field-map is passed as the handler's field_map arg.
+    assert args["field_map"] == validated_map
+    # The retrieved ids thread through so the handler's citation gate re-passes.
+    assert "chunk-1" in args.get("retrieved_ids", [])
+    # The post_processor returns the handler's parsed verdict (status ok).
+    assert out["status"] == "ok"
+    assert out["path"] == "/register.docx"
+
+
+def test_emitter_post_no_top_level_docxtpl():
+    """Pitfall 4 — no ``import docxtpl`` at the emitters.py module top (render is
+    sandbox-only; the heavy lib never enters backend/app/**)."""
+    import pathlib
+
+    src = pathlib.Path(
+        __file__
+    ).resolve().parents[2].joinpath("app", "services", "harness", "emitters.py").read_text(encoding="utf-8")
+    for line in src.splitlines():
+        stripped = line.strip()
+        assert not stripped.startswith("import docxtpl"), "no module-top docxtpl (Pitfall 4)"
+        assert not stripped.startswith("from docxtpl"), "no module-top docxtpl (Pitfall 4)"
+    # And no second render path (no SandboxedEnvironment / DocxTemplate.render here).
+    assert "SandboxedEnvironment" not in src
+    assert "DocxTemplate" not in src

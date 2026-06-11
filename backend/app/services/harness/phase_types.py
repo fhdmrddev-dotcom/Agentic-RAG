@@ -1007,7 +1007,14 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("render_failed", msg, field_map=legacy_map)
 
-    render_out = await entry.post_processor(legacy_map, src, ctx)
+    # The post_processor re-dispatches the HARDENED _handle_render_template (one render
+    # code path). Thread the server-resolved asset_ref + the validated retrieved-id set
+    # through the resolved-template payload so the handler re-resolves the SAME trusted
+    # template (the model never selects it) and its citation gate re-passes deterministically.
+    resolved = dict(src)
+    resolved["asset_ref"] = asset_ref
+    resolved["retrieved_ids"] = sorted(retrieved_ids)
+    render_out = await entry.post_processor(legacy_map, resolved, ctx)
     status = (render_out or {}).get("status")
 
     if status == "ok":
