@@ -378,6 +378,152 @@ async def test_model_failed_to_emit_honest_fail(_patch_executor):
     assert out.get("failure") == "model_failed_to_emit"
 
 
+# ── GAP-C / D-11: discrete phase_substep run-honesty sub-events on each transition ─
+
+
+class _RecordingRedis:
+    """A minimal redis stand-in that records every XADD payload so the GAP-C
+    phase_substep sub-events can be asserted (no live Redis)."""
+
+    def __init__(self):
+        self.events: list[dict] = []
+
+    async def xadd(self, stream, fields, **kwargs):
+        import json as _json
+
+        self.events.append(_json.loads(fields["data"]))
+
+
+def _fake_ctx_with_redis(definition, *, audit_sink, redis, model="gpt-5.4"):
+    """The harness ctx bag WITH a recording redis + the canonical _emit bound on it,
+    so the executor's phase_substep emits are captured (GAP-C wire vocabulary)."""
+    from app.services.harness_engine import _emit
+
+    ctx = _fake_ctx(definition, audit_sink=audit_sink, model=model)
+    ctx.redis = redis
+    ctx.emit = _emit  # the canonical one-XADD the executor reuses (no new wire path)
+    return ctx
+
+
+def _substep_statuses(redis):
+    return [e.get("status") for e in redis.events if e.get("type") == "phase_substep" and e.get("status")]
+
+
+def _substep_failures(redis):
+    return [e.get("failure") for e in redis.events if e.get("type") == "phase_substep" and e.get("failure")]
+
+
+async def test_gapc_emit_substeps_happy_path(_patch_executor):
+    """The happy path streams the discrete forcing → emitting → validating → rendering →
+    validated sub-events on the EXISTING producer stream via the canonical _emit (GAP-C /
+    D-11). Each rides the one-XADD path (type='phase_substep') — no new wire branch."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    redis = _RecordingRedis()
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx_with_redis(definition, audit_sink=_patch_executor, redis=redis)
+
+    await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    statuses = _substep_statuses(redis)
+    # The live transitions fire in order (recovering only on a D-06 narration — absent here).
+    assert statuses == ["forcing", "emitting", "validating", "rendering", "validated"]
+    # Every sub-event carries the phase slug so the frontend maps it to the right rail row.
+    substeps = [e for e in redis.events if e.get("type") == "phase_substep"]
+    assert all(e.get("phase") == phase.slug for e in substeps)
+    # No failure sub-event on the happy path (never a failed-as-failed on success).
+    assert _substep_failures(redis) == []
+
+
+async def test_gapc_recovering_substep_on_native_narration(_patch_executor):
+    """When D-06 NATIVE narration recovery fires (recovered_from_narration=True), the
+    degraded-but-honest 'recovering' sub-event is emitted between emitting and validating."""
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    recovered = dict(_forced_ok(EmitFieldMap.model_validate(_VALID_FM)))
+    recovered["recovered_from_narration"] = True
+    _patch_executor["forced_result"] = recovered
+
+    redis = _RecordingRedis()
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx_with_redis(definition, audit_sink=_patch_executor, redis=redis)
+
+    await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+    statuses = _substep_statuses(redis)
+    assert "recovering" in statuses
+    # It sits between emitting and validating (amber-tint, degraded but honest).
+    assert statuses.index("emitting") < statuses.index("recovering") < statuses.index("validating")
+
+
+async def test_gapc_failure_substep_state_a_model_failed(_patch_executor):
+    """State (a): a model-failed-to-emit terminal emits a phase_substep with
+    failure=model_failed_to_emit (failed-as-failed — never a 'validated' done node, RC-4)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    _patch_executor["forced_result"] = _forced_fail()
+    redis = _RecordingRedis()
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx_with_redis(definition, audit_sink=_patch_executor, redis=redis)
+
+    await _exec_llm_emit(_fake_phase(), {}, ctx)
+    assert "model_failed_to_emit" in _substep_failures(redis)
+    assert "validated" not in _substep_statuses(redis)  # never a success node on failure
+
+
+async def test_gapc_failure_substep_state_b_citation_rejected(_patch_executor):
+    """State (b): an uncited/invented emission emits failure=citation_gate_rejected and
+    never reaches the rendering sub-event (the gate rejects BEFORE render)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    uncited = EmitFieldMap.model_validate({
+        "scalars": [{"key": "project_name", "value": "Meridian",
+                     "source_chunk_id": "not-retrieved", "source_doc": "x.docx", "source_page": 1}],
+        "rows": [],
+    })
+    _patch_executor["forced_result"] = _forced_ok(uncited)
+    redis = _RecordingRedis()
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx_with_redis(definition, audit_sink=_patch_executor, redis=redis)
+
+    await _exec_llm_emit(_fake_phase(), {}, ctx)
+    assert "citation_gate_rejected" in _substep_failures(redis)
+    assert "rendering" not in _substep_statuses(redis)  # render never reached on a reject
+
+
+async def test_gapc_failure_substep_state_e_no_template(_patch_executor):
+    """State (e): no template bound emits failure=no_template_bound — and no forcing
+    sub-event (the executor fails before the forced shot)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    _patch_executor["resolve_result"] = {
+        "bytes": None, "filename": None, "provenance": "template_input",
+        "mime": None, "error": "No template uploaded.",
+    }
+    redis = _RecordingRedis()
+    definition = _fake_definition([])
+    ctx = _fake_ctx_with_redis(definition, audit_sink=_patch_executor, redis=redis)
+
+    await _exec_llm_emit(_fake_phase(), {}, ctx)
+    assert "no_template_bound" in _substep_failures(redis)
+    assert "forcing" not in _substep_statuses(redis)  # never started the forced shot
+
+
+async def test_gapc_substep_emit_is_best_effort(_patch_executor):
+    """A missing redis (a minimal ctx) must NEVER crash the emit — the GAP-C sub-events
+    are best-effort run-honesty, not load-bearing for producing the deliverable."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor)  # redis=None
+    out = await _exec_llm_emit(_fake_phase(), _retrieved_accumulated("chunk-1"), ctx)
+    # The deliverable still produced despite no redis (the emit short-circuited cleanly).
+    assert out.get("path") or out.get("output_file")
+
+
 # ── registration: llm_emit is the 6th phase type ──────────────────────────────
 
 
