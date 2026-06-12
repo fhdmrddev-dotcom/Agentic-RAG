@@ -211,14 +211,25 @@ async def _validate_programmatic(output: dict, config: dict, ctx) -> GateResult:
 
 
 # ── fan-in ───────────────────────────────────────────────────────────────────
-async def run_gates(phase, output: dict, ctx) -> GateResult:
+async def run_gates(phase, output: dict, ctx, *, timing: str | None = None) -> GateResult:
     """Run every ``phase.validators`` gate in order; return the FIRST failure.
 
     Returns ``GateResult(True, None)`` when all gates pass (or the phase has no
     validators). The engine's bounded-retry loop consumes the returned
     ``error_message`` (feeds it back into the retry prompt, audits + emits it).
+
+    Phase 102 (D-10): an optional keyword-only ``timing`` filter. When ``None``
+    (the default) EVERY spec runs — byte-identical to today, so every existing
+    caller + unit test is unchanged. When set (``"pre"`` / ``"post"``) only specs
+    whose ``spec.timing`` matches run; a spec without the field defaults to
+    ``"post"`` (the model default). CRITICAL: ``idx`` stays the enumerate index
+    into the FULL ``phase.validators`` list — NEVER a filtered sub-list — so
+    ``GateResult.validator_index`` and the engine's ``_failing_on_failure``
+    derivation (WR-03) keep pointing at the right spec.
     """
     for idx, spec in enumerate(getattr(phase, "validators", None) or []):
+        if timing is not None and getattr(spec, "timing", "post") != timing:
+            continue  # the OTHER-phase timing — skip but keep idx the FULL-list index
         validator = VALIDATOR_REGISTRY.get(spec.kind)
         if validator is None:
             # A kind not in the registry is a definition/runtime error — fail

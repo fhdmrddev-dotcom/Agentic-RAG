@@ -11,10 +11,7 @@ Imports INSIDE the body; no top-level import of an unbuilt symbol.
 
 from __future__ import annotations
 
-import pytest
 
-
-@pytest.mark.xfail(strict=False, reason="Plan 04 not yet landed")
 def test_run_gates_timing_filter_post_default():
     """``run_gates(phase, output, ctx)`` with NO timing kwarg runs ALL specs
     (back-compat byte-identical); ``timing="post"`` runs only post specs; ``timing="pre"``
@@ -33,7 +30,6 @@ def test_run_gates_timing_filter_post_default():
     assert asyncio.iscoroutinefunction(run_gates)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 04 not yet landed")
 def test_validator_index_is_full_list_index():
     """When filtering by timing, the ``validator_index`` threaded back is the index into
     the FULL ``phase.validators`` list, not the filtered sub-list — so the engine's
