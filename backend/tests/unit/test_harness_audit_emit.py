@@ -51,8 +51,10 @@ def test_write_audit_accepts_emit_kinds():
     ):
         assert kind in _AUDIT_EVENT_TYPES
 
-    # 9 existing + 7 emit = 16 total kinds.
-    assert len(_AUDIT_EVENT_TYPES) == 16
+    # 9 (059) + 7 emit (069) + 6 judge/publish (070, Phase 102) = 22 total kinds.
+    # The 069 emit kinds are still all present (the 070 ALTER is additive); this
+    # count is bumped in lockstep with the _AUDIT_EVENT_TYPES extension (Phase 102 Task 3).
+    assert len(_AUDIT_EVENT_TYPES) == 22
 
 
 def test_receipt_metadata_shape():

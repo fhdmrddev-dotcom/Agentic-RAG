@@ -13,8 +13,6 @@ symbol never breaks COLLECTION.
 
 from __future__ import annotations
 
-import pytest
-
 # The 6 new 102 receipt kinds migration 070 adds to the CHECK (lockstep with
 # _AUDIT_EVENT_TYPES). CONTEXT D-12 / Claude's-discretion receipt naming.
 _KINDS_102 = [
@@ -27,10 +25,10 @@ _KINDS_102 = [
 ]
 
 
-@pytest.mark.xfail(strict=False, reason="Task 3 (this plan) un-marks to GREEN after the lockstep extension")
 def test_audit_accepts_102_kinds():
     """After Task 3 (migration 070 CHECK + the ``_AUDIT_EVENT_TYPES`` extension), every
-    102 receipt kind is in the fail-fast frozenset; the total is 22 (16 prior + 6 new)."""
+    102 receipt kind is in the fail-fast frozenset; the total is 22 (16 prior + 6 new).
+    Un-marked to GREEN by this plan's Task 3 (the lockstep is satisfied offline here)."""
     from app.db.workflows import _AUDIT_EVENT_TYPES
 
     for kind in _KINDS_102:
