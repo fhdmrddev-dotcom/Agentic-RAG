@@ -1090,6 +1090,12 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     model = _effective_model(phase, ctx)
     run_id = getattr(ctx, "run_id", None)
     pool = getattr(ctx, "pool", None)
+    # D-01 (SEED-082): the citation policy decides ONLY the post-verdict disposition
+    # (the verdict computation below is UNCHANGED). strict (the default) is byte-
+    # identical to today's state-(b) honest fail; flag/partial/draft mark/blank/label
+    # the WR-02-persisted field-map and DELIVER — via the deterministic driver, NO new
+    # emit shot (the strict path never touches emit_policy).
+    citation_policy = getattr(phase.config, "citation_policy", "strict")
 
     try:
         # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
@@ -1158,6 +1164,11 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # 0 invented, 4 uncited — exactly the case one feedback round fixes).
         # Receipts are per-attempt (INSERT-only — the attempt trail IS the audit story).
         citation_feedback = ""
+        # D-01: when a non-strict citation_policy delivers an uncited map, this holds the
+        # surfaced summary/draft-label so the render-success return carries it visibly
+        # (the user-facing half of "never a silent pass-off" — T-102-04-03). None on the
+        # strict path (which never reaches the render after a citation rejection).
+        policy_applied_summary: str | None = None
         for attempt in range(1, _EMIT_MAX_ATTEMPTS + 1):
             await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
             forced_md = _emit_audit_metadata(
@@ -1265,21 +1276,59 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 continue
 
             # State (b): uncited / invented / missing keys — final (no evidence to cite,
-            # or attempts exhausted).
-            msg = (
-                "The emitted field-map has uncited or invented values or is missing required "
-                "template keys — every non-null value must cite a source that was actually "
-                "retrieved, and every template placeholder must be present. The deliverable "
-                "was NOT produced; the cited field-map is preserved in the run's phase record."
-            )
-            await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
-            await _surface_failure_message(ctx, run_id, msg, pool)
-            return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+            # or attempts exhausted). The DISPOSITION is governed by citation_policy
+            # (D-01) — the verdict above is unchanged; only what happens NOW differs.
+            if citation_policy == "strict":
+                # strict (the default) — BYTE-IDENTICAL to today's honest fail. The
+                # deliverable is NOT produced; the cited field-map is preserved.
+                msg = (
+                    "The emitted field-map has uncited or invented values or is missing required "
+                    "template keys — every non-null value must cite a source that was actually "
+                    "retrieved, and every template placeholder must be present. The deliverable "
+                    "was NOT produced; the cited field-map is preserved in the run's phase record."
+                )
+                await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
+                await _surface_failure_message(ctx, run_id, msg, pool)
+                return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
 
-        await _emit_audit(ctx, event_type="emit_validated", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result,
-            gate=gate, render_verdict=None, output_file=None,
-        ))
+            # NON-strict (flag/partial/draft) — DELIVER off the WR-02 persisted field-map
+            # with marks/blanks/label (SEED-082: every non-strict mode MARKS or BLANKS,
+            # never a silent pass-off — T-102-04-03). The deterministic driver re-renders
+            # the SAME map (NO new emit shot, NEVER model-written code): we mutate
+            # legacy_map IN PLACE so the render dispatch below picks up the modified map.
+            from app.services.harness.emit_policy import apply_citation_policy
+
+            applied = apply_citation_policy(legacy_map, gate, citation_policy)
+            legacy_map = applied["field_map"]  # the marked/blanked/as-is map to render
+            policy_summary = applied.get("coverage_summary") or applied.get("draft_label") or ""
+            policy_applied_summary = policy_summary  # carried into the render-success text
+            # policy_applied receipt (the Plan-01 kind, live on migration 070) — the
+            # governance record that a non-strict policy delivered unverified data.
+            policy_md = _emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=gate, render_verdict=None, output_file=None,
+            )
+            policy_md["citation_policy"] = citation_policy
+            policy_md["policy_summary"] = policy_summary
+            if applied.get("gap_list"):
+                policy_md["gap_list"] = applied["gap_list"]
+            await _emit_audit(ctx, event_type="policy_applied", metadata=policy_md)
+            # Surface the coverage summary visibly (never silent — the user SEES that the
+            # deliverable carries unverified/blanked/draft content).
+            await _surface_failure_message(ctx, run_id, policy_summary, pool)
+            # Fall through to the render path with the modified map (the deliverable IS
+            # produced, marked/blanked/labeled).
+            break
+
+        # emit_validated is the GATE-PASSED receipt — write it only when the citation
+        # gate genuinely passed (the strict break at the gate-passed line). When a
+        # non-strict policy delivered an uncited map, the policy_applied receipt above
+        # is the record (not a false "validated") — skip emit_validated for that path.
+        if policy_applied_summary is None:
+            await _emit_audit(ctx, event_type="emit_validated", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=gate, render_verdict=None, output_file=None,
+            ))
 
         # ── 4. Render (post_processor) — re-dispatch the HARDENED handler (one path) ──
         entry = resolve_emitter(emitter)
@@ -1323,8 +1372,16 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             ))
             await _emit_phase_substep(ctx, phase, status="validated")  # integrity re-open passed → done (green)
             path = render_out.get("path") or (output_file or {}).get("path")
+            base_text = (
+                f"Produced the filled deliverable: {path}" if path
+                else "Produced the filled deliverable."
+            )
+            # D-01: a non-strict policy delivery carries its summary VISIBLY in the chat
+            # message (the user always SEES the deliverable is marked/blanked/DRAFT —
+            # never a silent pass-off, T-102-04-03).
+            text = f"{base_text}\n\n{policy_applied_summary}" if policy_applied_summary else base_text
             return {
-                "text": f"Produced the filled deliverable: {path}" if path else "Produced the filled deliverable.",
+                "text": text,
                 "output_file": output_file,
                 "path": path,
                 "field_map": legacy_map,
