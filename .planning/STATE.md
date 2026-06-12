@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: executing
-last_updated: "2026-06-12T07:30:04.426Z"
+status: verifying
+last_updated: "2026-06-12T07:44:20Z"
 last_activity: 2026-06-12
 progress:
   total_phases: 14
-  completed_phases: 6
-  total_plans: 44
-  completed_plans: 44
+  completed_phases: 7
+  total_plans: 45
+  completed_plans: 45
   percent: 100
 ---
 
@@ -26,10 +26,21 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 102 (reusable-validation-gate-library-output-quality-gate) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute Plan 05 (the QUAL-01 server-side publish path — lint → golden run → judge verdict as a HARD blocker)
-Last activity: 2026-06-12 -- Plan 102-04 (the engine seams — timing:pre + ask_user 4th disposition + citation_policy post-verdict branch) COMPLETE
+Phase: 102 (reusable-validation-gate-library-output-quality-gate) — ALL 5 PLANS EXECUTED
+Plan: 5 of 5 — COMPLETE
+Status: Phase complete — ready for `/gsd:verify-work 102` (the SC#10 4-axis golden-run scoreboard) then `/gsd:secure-phase 102`
+Last activity: 2026-06-12
+
+**Plan 102-05 (Wave 4, the QUAL-01 server-side publish path — D-07/D-08) — COMPLETE (2026-06-12):**
+
+- ✓ Task 1 (commit `14d375ee`, feat/TDD): **`db/workflows.py` — get_definition + is_golden_run kwarg + publish_definition flip.** `get_definition(by id, owner-scoped, DRAFTS included)` mirrors the `list_published_workflows` RLS predicate (`created_by = $2 OR is_global`) for a single id — a non-owner gets `None` (the route 404s, no existence leak, V4/T-102-05-01/-06); `create_workflow_run` gains `is_golden_run: bool = False` (keyword-only, the migration-070 column — every existing caller byte-identical); `publish_definition` flips `status` draft->published keyed by id RETURNING the version, with a `status='draft'` WHERE guard making a double-publish idempotent. `$N` placeholders only (0 f-string SQL added).
+- ✓ Task 2 (commit `d2d05b59`, feat/TDD): **`publish_service.py` (NEW, 584 lines) — the 4-stage orchestration (D-07/D-08).** `publish()` runs (0) load+owner-check, (1) business_requirement present (D-13), (2) `lint_workflow` (short-circuits BEFORE the golden run), (3) the REAL golden run on the project KB (`is_golden_run=True`, no mocks/no opt-out — D-05), (4) the judge verdict over the run's final output (the QUAL-01 HARD blocker — a lint-clean+judge-fail CANNOT publish), (5) the flip. SEALED orchestration (the forced_emit posture): returns the D-08 structured `{published, blocked_stage, named_failures, golden_run_id}`, NEVER raises into the route — a golden-run crash returns `blocked_stage="golden_run_error"`. The judge rides `forced_emit` over the run's output (the independent `harness_judge_model`, D-03; a failure/None verdict is an honest fail, never a silent pass). `_drive_golden_run` mirrors `harness_engine._build_resume_context` (the canonical out-of-threads.py ctx template — G-5: NOT threads.py): ephemeral validation thread + service-role supabase + resolved folder scope + resolve-never-mutate ctx model. Governance receipts: `publish_attempted` (keyed to the real golden run_id), `publish_blocked` (stage-0/1/2 keyed to a NULL run_id — `harness_audit.run_id` is nullable), `publish_succeeded`, `judge_verdict`. 6 tests GREEN (3 required + good-output-publishes + cross-user-not-found + golden-run-error-structured).
+- ✓ Task 3 (commit `d08c3b0c`, feat/TDD): **`POST /workflows/{definition_id}/publish` route (api/workflows.py — G-5: NOT threads.py).** Joins the EXISTING workflows router (already mounted in `main.py` — no new registration); `PublishRequest`(golden_input) + `PublishVerdict`(machine-renderable D-08 shape for 103); delegates to `publish_service.publish` (imported as a MODULE — patchable); HTTP mapping `not_found->404` (no existence leak), `already_published->409`, `business_requirement->400` (D-13), lint/structural/judge block or success ->200 structured verdict; `definition_id: UUID` path param -> 422 on malformed (V5). 4 route-level tests GREEN (404/400/200-success/200-judge-block).
+- ✓ **Un-mark (commit `ba79174a`, test): `test_publish_flip.py` LIVE round-trip against :54322** — seed a draft -> the draft->published flip (publish_definition's exact UPDATE) is ALLOWED by the `workflow_definitions_block_published` immutability trigger -> a published->edit raises `CheckViolation` (still blocked, the 056/067 immutability guarantee) -> rollback (no pollution). The Plan-05-owned half the Plan-01 + Plan-02 SUMMARYs both flagged.
+- **No deviations.** Plan executed exactly as written. `threads.py` byte-untouched (G-5 — proven by `git diff --stat`); the golden run is a REAL run with no mocks (D-05); `forced_emit` unmodified (the verdict parse lives in the caller); the publish flip is the allowed path while published->edit stays blocked. The 3 Plan-01 stubs were strengthened to real behavior tests (mocking the golden-run + judge BOUNDARIES per `feedback_mock_completeness`); the live publish-flip un-mark is the documented Plan-05 half.
+- **SEED-056 net-new-failure proof:** Plan-05 target suite = **11 passed** (`test_publish_service` 10 + `test_publish_flip` 1 live). Wider harness/workflow slice **166 passed / 3 failed** — the 3 (`test_075_4_final_output_files_payload`×2 + `test_phase56_iteration_start`) are PRE-EXISTING ROT proven by **base-checkout**: with `db/workflows.py`+`api/workflows.py` reverted to the wave base `c0fe3633` the same 3 fail IDENTICALLY (production-source-assertion tests grepping `threads.py`/`task_service.py`, import NONE of my changed modules; `publish_service.py` is a new file no pre-existing test imports). Source restored clean to HEAD; the 11 Plan-05 tests re-confirmed GREEN. **Net-new failures = 0.**
+- All 6 STRIDE threats addressed (T-102-05-01 EoP cross-user publish → `get_definition` owner-scope + 404; -02 gameable verdict → forced_emit honest fail + REAL golden run + receipts; -03 prompt injection → fixed JUDGE_RUBRIC_CORE + requirement-as-DATA + schema-bound overall_passed + independent judge model; -04 publish-spam DoS → rare deliberate authed event + existing caps, rate-limit noted-not-built; -05 flip bypassing the immutability trigger → `WHERE status='draft'`, published->edit still blocked, PROVEN LIVE; -06 not_found existence leak → 404-collapse). No stubs. SUMMARY: `.planning/phases/102-reusable-validation-gate-library-output-quality-gate/102-05-SUMMARY.md` (Self-Check: PASSED). **GATE-01/QUAL-01 mark complete at phase verification** (the multi-plan 099/WFSKILL-01 convention).
+- **Phase 102 COMPLETE — all 5 plans landed (01 foundation, 02 migration-070 live, 03 the 5 validator kinds, 04 the engine seams, 05 the publish path).** The QUAL-01 hard blocker is LIVE; the GATE-01 library is registered; the SEED-082 policy enum is engine-side. **Next:** `/gsd:verify-work 102` (the SC#10 4-axis golden-run cross-provider scoreboard — the LIVE acceptance per D-05) then `/gsd:secure-phase 102`. Then Phase 103 (Workflows page + NL authoring — a client of the `POST /workflows/{id}/publish` endpoint; G-2 sketch-before-plan FIRES).
 
 **Plan 102-04 (Wave 3 sibling, the engine seams — D-10 timing:pre + D-11 ask_user + D-01 citation_policy) — COMPLETE (2026-06-12):**
 
