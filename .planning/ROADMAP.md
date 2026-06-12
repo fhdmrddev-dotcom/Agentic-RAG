@@ -185,7 +185,7 @@ Plans:
   2. The `freshness` validator guarantees a "check the date first" preflight that branches to `ask_user` on stale/multiple versions; `citations_required` deterministically rejects uncited register rows before any judge call.
   3. A workflow declares exactly one `business_requirement`; an `llm_judge` output-quality gate plus a publish-time golden run are a HARD publish blocker — a structurally lint-clean workflow that produces bad output cannot publish.
 **Plans**: 5 plans (4 waves) — planned 2026-06-12
-- [ ] 102-01-PLAN.md (Wave 1) — Foundation: additive-optional model fields (ValidatorSpec 5 kinds + timing, LlmEmitPhaseConfig citation_policy/integrity_policy, WorkflowDefinition business_requirement) + harness_judge_model setting + migration 070 (CHECK ALTER + workflow_runs.is_golden_run) + _AUDIT_EVENT_TYPES lockstep (16->22) + 8 Wave-0 test stubs
+- [x] 102-01-PLAN.md (Wave 1) — Foundation: additive-optional model fields (ValidatorSpec 5 kinds + timing, LlmEmitPhaseConfig citation_policy/integrity_policy, WorkflowDefinition business_requirement) + harness_judge_model setting + migration 070 (CHECK ALTER + workflow_runs.is_golden_run) + _AUDIT_EVENT_TYPES lockstep (16->22) + 8 Wave-0 test stubs — COMPLETE 2026-06-12 (d8354dd6/ee8ae7af/c293fd49)
 - [ ] 102-02-PLAN.md (Wave 2) — [BLOCKING] apply migration 070 to :54322 (psycopg2-direct, no reset) + regenerate full-schema (autonomous:false — may need the operator to start the stack)
 - [ ] 102-03-PLAN.md (Wave 3) — the 5 first-class validator kinds (D-12): citations_required/output_file_valid/structure_check/llm_judge_rubric wrap shipped primitives + net-new freshness deterministic KB queries + run_gates timing filter (D-10 back-compat half)
 - [ ] 102-04-PLAN.md (Wave 3) — engine seams: timing:pre pre-gate pass + ask_user 4th on_failure disposition (D-10/D-11, the 085 pause) + citation_policy post-verdict disposition in _exec_llm_emit (D-01, strict byte-identical)
@@ -283,7 +283,7 @@ Plans:
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
 | 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
 | 101.1. Guaranteed Structured Emission Layer | 6/10 (build 01-05 + gap 06 done; gap-closure 07-10 planned from the live UAT) | Executing (gap closure) | - |
-| 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/5 | Planned (2026-06-12) | - |
+| 102. Reusable Validation-Gate Library + Output-Quality Gate | 1/5 | Executing (2026-06-12) | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
 | 105. Scheduled/Recurring Triggers + Budget Caps (STRETCH) | 0/TBD | Not started | - |

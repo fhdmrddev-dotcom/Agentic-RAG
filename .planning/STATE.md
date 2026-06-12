@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: planning
-last_updated: "2026-06-11T21:53:18.431Z"
-last_activity: "2026-06-12 -- Phase 102 context gathered (/gsd:discuss-phase 102 — D-01..D-14 captured in 102-CONTEXT.md; SEED-082 102-half folded; next /gsd:plan-phase 102)"
+status: executing
+last_updated: "2026-06-12T06:51:16.896Z"
+last_activity: 2026-06-12
 progress:
   total_phases: 14
   completed_phases: 6
-  total_plans: 39
-  completed_plans: 40
-  percent: 100
+  total_plans: 44
+  completed_plans: 41
+  percent: 93
 ---
 
 # Project State
@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 102 (Reusable Validation-Gate Library + Output-Quality Gate) — CONTEXT GATHERED 2026-06-12
-Plan: none yet — next is /gsd:plan-phase 102
-Status: Phase 101.1 FULLY CLOSED (verify-work 19/19 live + secure-phase 36/36 threats closed @ ee0bd331). Phase 102 discussed: 14 decisions (D-01..D-14) in `102-CONTEXT.md` — engine-side SEED-082 policy enum (strict|flag|partial|draft + integrity strict|documented_limit), judge-as-forced-emission (app_settings judge model, stored rubric), real golden run behind a new server-side POST /workflows/{id}/publish HARD blocker, freshness as first `timing: pre` validator + generic `ask_user` 4th on_failure disposition, 5 first-class validator kinds wrapping existing primitives, business_requirement additive-optional + required-at-publish. Operator steer D-09: NO library validator is mandatory (menu, not checklist — free-form workflow variations stay open). SEED-082 frontmatter flipped to partially-folded (103 half pending).
-Last activity: 2026-06-12 -- Phase 102 context gathered (/gsd:discuss-phase 102)
+Phase: 102 (reusable-validation-gate-library-output-quality-gate) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute Plan 02 (BLOCKING — operator applies migration 070)
+Last activity: 2026-06-12 -- Plan 102-01 (foundation substrate) COMPLETE
+
+**Plan 102-01 (Wave 1, the foundation substrate) — COMPLETE (2026-06-12):**
+
+- ✓ Task 1 (commit `d8354dd6`, TDD RED): 8 Wave-0 cross-plan test files under `backend/tests/unit/` matching the VALIDATION.md Per-Task map — `test_validator_kinds.py` (the 5 new kinds), `test_freshness.py` (deterministic stale/version checks + ask_user finding), `test_pre_post_timing.py` (the D-10 run_gates timing filter), `test_ask_user_disposition.py` (the D-11 4th disposition), `test_citation_policy.py` (the D-01 enum dispositions), `test_publish_service.py` (the QUAL-01 pipeline order + hard blocker), `test_harness_audit_102.py` (the 22-kind lockstep), `test_publish_flip.py` (live-DB draft->published trigger, psycopg2 :54322, xfail + skip-guarded). All not-yet-built behaviors `xfail(strict=False)`; imports INSIDE the test bodies; suite exits 0 (21 xfailed, 2 xpassed).
+- ✓ Task 2 (commit `ee8ae7af`, TDD GREEN): the additive-optional model/config fields — `ValidatorSpec.kind` extended to 9 kinds (4 existing + `citations_required`/`freshness`/`structure_check`/`output_file_valid`/`llm_judge_rubric`) + `timing: pre|post` default post (D-10); `LlmEmitPhaseConfig.citation_policy` (strict|flag|partial|draft) + `integrity_policy` (strict|documented_limit), both default `strict` byte-identical (D-01); `WorkflowDefinition.business_requirement: str | None = None` (D-13); `Settings.harness_judge_model: str | None = None` (D-03). Pre-102 JSONB rows `model_validate()` unchanged (zero migration for the schema fields). `claude-opus-4-8`/`gpt-5.5` confirmed `forced_emission:True` so the None judge-model default resolves to a forceable model.
+- ✓ Task 3 (commit `c293fd49`, TDD GREEN): migration `070_harness_validation_gate_library.sql` (ALTER the harness_audit event_type CHECK with the 6 new 102 receipt kinds `judge_verdict`/`publish_attempted`/`publish_blocked`/`publish_succeeded`/`policy_applied`/`validator_ask_user_approved` + ADD `workflow_runs.is_golden_run boolean DEFAULT false`, D-05) + `_AUDIT_EVENT_TYPES` extended 16→22 in LOCKSTEP with the CHECK; `write_audit` ValueError/docstring 16→22. Un-marked `test_harness_audit_102.py` to GREEN. **Migration NOT applied — Plan 02 [BLOCKING] operator step.**
+- **1 deviation [Rule 1]:** bumped the stale `len(_AUDIT_EVENT_TYPES) == 16` assertion in the Phase-101.1 sibling test `test_harness_audit_emit.py` to `== 22` — directly caused by this task's additive frozenset extension (the ALTER is additive; all 16 prior kinds remain). Within the lockstep mechanic the task already owned.
+- **SEED-056 net-new-failure proof:** Wave-0 target suite exits 0 (`test_harness_audit_102` GREEN). Wider unit slice **56 failed / 716 passed** at HEAD; reverting the 3 touched source files to the wave base (`1d81d1f8`) yields **58 failed** — the 2 EXTRA are MY un-marked tests failing against the reverted 16-kind source (proving the source is load-bearing). The 56 are documented pre-existing rot (none import this plan's changed modules). **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-102-01-01 closed `kind` Literal + extra='forbid'; -02 _AUDIT_EVENT_TYPES/CHECK lockstep fail-fast; -03 is_golden_run additive boolean no-RLS; -04 every new field optional-with-default → pre-102 rows validate). SUMMARY: `.planning/phases/102-reusable-validation-gate-library-output-quality-gate/102-01-SUMMARY.md` (Self-Check: PASSED). **GATE-01/QUAL-01 stay OPEN** — multi-plan requirements, mark complete at phase verification.
+- **Next:** `/gsd:execute-phase 102` Plan 02 ([BLOCKING], autonomous:false) — operator applies migration 070 to :54322 (psycopg2-direct, NO reset) + regenerates `supabase/full-schema.sql`; un-marks the live half of `test_publish_flip.py` once Plan 05 wires the trigger behavior.
 
 **Plan 101.1-10 (GAP CLOSURE — dirty-row repair + live re-verification across the 6 gaps) — COMPLETE (2026-06-11):**
 
@@ -403,4 +413,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 101.1 (guaranteed-emission-layer) — 5 plans — 2026-06-11T07:25:19.717Z
+**Planned Phase:** 102 (Reusable Validation-Gate Library + Output-Quality Gate) — 5 plans — 2026-06-11T22:34:10.657Z
