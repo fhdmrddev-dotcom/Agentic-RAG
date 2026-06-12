@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YZTKnHWame0FogNWApuCp8RkPxTHZdj7IT221noT2vrXOFH6LAP5Yy4nqSwY6k3
+\restrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -454,7 +454,7 @@ CREATE TABLE public.harness_audit (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     org_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text])))
 );
 
 
@@ -784,6 +784,7 @@ CREATE TABLE public.workflow_runs (
     model text,
     continues_used integer DEFAULT 0 NOT NULL,
     user_id uuid,
+    is_golden_run boolean DEFAULT false,
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -829,6 +830,13 @@ COMMENT ON COLUMN public.workflow_runs.continues_used IS 'D-06: Continue cap cou
 
 COMMENT ON COLUMN public.workflow_runs.user_id IS '092-05 F1: run-owner (server-side current_user at creation). Sourced into harness_audit.user_id (NOT NULL) on every audit write and into the      
   resume ctx (_build_resume_context). FK -> auth.users ON DELETE CASCADE. Nullable for legacy rows; new inserts always supply it.';
+
+
+--
+-- Name: COLUMN workflow_runs.is_golden_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.is_golden_run IS 'Phase 102 QUAL-01 (D-05). True = a publish-time validation run (real engine, real KB, judge-graded). Excluded from ordinary run history/listings. Default false (every pre-102 + ordinary run byte-identical).';
 
 
 --
@@ -2513,5 +2521,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YZTKnHWame0FogNWApuCp8RkPxTHZdj7IT221noT2vrXOFH6LAP5Yy4nqSwY6k3
+\unrestrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
 
