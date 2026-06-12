@@ -83,6 +83,7 @@ async def create_workflow_run(
     inputs: dict,
     model: str | None,
     user_id: UUID,
+    is_golden_run: bool = False,
 ) -> UUID:
     """Atomically create a workflow run + its phase rows + set the thread anchor.
 
@@ -112,14 +113,22 @@ async def create_workflow_run(
     ``$N`` placeholders only; ``json.dumps(inputs)`` + ``$3::jsonb`` (this file
     does NOT use a pool JSONB codec — mirror complete_phase :240).
 
+    Phase 102 (D-05 / QUAL-01): ``is_golden_run`` (keyword-only, default False —
+    every existing caller stays byte-identical) flags a publish-time VALIDATION
+    run (the migration-070 ``workflow_runs.is_golden_run`` column, live on :54322
+    via Plan 02). A golden run is a REAL end-to-end run on the project KB whose
+    final output the publish-path judge grades (no mocks, no opt-out); the flag
+    only marks the row so the receipt VIEW (Phase 107) can distinguish "what good
+    looked like at publish approval" from a normal run.
+
     Returns the new workflow_run id.
     """
     async with pool.acquire() as con:
         async with con.transaction():
             run_id = await con.fetchval(
                 """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id)
-                VALUES ($1, $2, 'active', $3::jsonb, $4, $5)
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6)
                 RETURNING id
                 """,
                 thread_id,
@@ -127,6 +136,7 @@ async def create_workflow_run(
                 json.dumps(inputs),
                 model,
                 user_id,
+                is_golden_run,
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
@@ -183,6 +193,62 @@ async def list_published_workflows(
     sql += " ORDER BY name"
     rows = await pool.fetch(sql, *params)
     return [dict(r) for r in rows]
+
+
+# ── single-definition read + publish flip (Phase 102 / QUAL-01, D-07) ────────
+async def get_definition(
+    pool: asyncpg.Pool, definition_id: UUID, *, user_id: UUID
+) -> dict | None:
+    """Load ONE workflow definition (DRAFTS INCLUDED) the user may publish.
+
+    The publish path (Plan 05) loads a DRAFT before flipping it — so unlike
+    ``list_published_workflows`` this read does NOT filter ``status='published'``;
+    it returns the draft (or published) row for an OWNED id.
+
+    OWNER-SCOPED (V4 / T-102-05-01): mirrors the ``list_published_workflows``
+    RLS predicate — ``created_by = $2 OR is_global = true`` — for a SINGLE id.
+    A non-owner gets ``None`` (NOT another user's draft); the publish endpoint
+    converts ``None`` to a uniform 404 so a not-found and a cross-user id are
+    indistinguishable (no existence leak — T-102-05-06, the 101.1-09 404-collapse
+    precedent). ``$N`` placeholders only.
+
+    Returns ``{id, slug, version, name, status, definition, created_by}`` or
+    ``None``. ``definition`` is the JSONB the caller ``model_validate``s into a
+    ``WorkflowDefinition`` (asyncpg's pool codec decodes it to a dict).
+    """
+    row = await pool.fetchrow(
+        "SELECT id, slug, version, name, status, definition, created_by "
+        "FROM workflow_definitions "
+        "WHERE id = $1 AND (created_by = $2 OR is_global = true)",
+        definition_id,
+        user_id,
+    )
+    return dict(row) if row is not None else None
+
+
+async def publish_definition(pool: asyncpg.Pool, definition_id: UUID) -> int:
+    """Flip a definition ``status`` draft -> published (D-07), RETURNING the version.
+
+    The ONLY draft->published flip site. Mirrors ``finish_run``'s
+    ``UPDATE ... SET ... WHERE id=$1`` status-flip shape (``$N`` only). The
+    ``workflow_definitions_block_published_update`` immutability trigger ALLOWS
+    this transition (it only blocks an UPDATE where ``OLD.status='published'`` —
+    a published->edit), so the draft->published flip is the allowed path while a
+    published row stays frozen (T-102-05-05 / the 091 immutability invariant).
+
+    The ``status='draft'`` WHERE guard makes a double-publish a no-op (idempotent):
+    a re-flip finds 0 matching rows and returns ``-1``. The caller (publish_service)
+    has already owner-checked + state-checked, so ``-1`` here means "not a draft /
+    already published / not found" — a defensive sentinel, not the happy path.
+
+    Returns the published ``version`` (for the D-08 success verdict), or ``-1``.
+    """
+    row = await pool.fetchrow(
+        "UPDATE workflow_definitions SET status = 'published' "
+        "WHERE id = $1 AND status = 'draft' RETURNING version",
+        definition_id,
+    )
+    return row["version"] if row is not None else -1
 
 
 # ── workflow_phases reads (RUN-KEYED → workflow_run_id) ──────────────────────
