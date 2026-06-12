@@ -145,6 +145,13 @@ class LlmEmitPhaseConfig(_StrictBase):
     folder_scope: list[UUID] | None = None  # 098 PROJ-02: resolved id list, NOT a prompt hint
     skill_ref: UUID | None = None             # 099 WFSKILL-01 (D-09): resolved skill id, NOT a name
     skill_snapshot: SkillSnapshot | None = None  # materialized at first kickoff; None on drafts
+    # Phase 102 (D-01 / SEED-082) — policy enums consumed AFTER the verdict (verdict
+    # computation UNCHANGED; strict is the default + byte-identical). The judge gate
+    # and the citation gate share this vocabulary. flag = deliver WITH visible marks +
+    # coverage summary; partial = blank uncited values + gap list; draft = no citation
+    # enforcement, doc labeled DRAFT. Every non-strict mode marks or blanks, never silent.
+    citation_policy: Literal["strict", "flag", "partial", "draft"] = "strict"
+    integrity_policy: Literal["strict", "documented_limit"] = "strict"  # F3 sibling (pptx/xlsx)
 
 
 PhaseConfig = Annotated[
@@ -161,12 +168,22 @@ PhaseConfig = Annotated[
 
 
 class ValidatorSpec(_StrictBase):
-    """HARNESS-04 gate kinds (091 owns execution; this is the shape)."""
+    """HARNESS-04 gate kinds (091 owns execution; this is the shape).
 
-    kind: Literal["json_schema", "regex_match", "workspace_file_exists", "programmatic"]
+    Phase 102 (GATE-01): + 5 library kinds (D-12) + timing (D-10) + ask_user
+    on_failure value (D-11, on_failure stays a str — skip_to_phase:<slug> already
+    parses, so ask_user is just one more recognized value, not a new type).
+    """
+
+    kind: Literal[
+        "json_schema", "regex_match", "workspace_file_exists", "programmatic",
+        "citations_required", "freshness", "structure_check",
+        "output_file_valid", "llm_judge_rubric",
+    ]
     config: dict = Field(default_factory=dict)
-    on_failure: str = "fail_run"  # fail_run | retry | skip_to_phase:<slug>
+    on_failure: str = "fail_run"  # fail_run | retry | skip_to_phase:<slug> | ask_user (D-11)
     max_retries: int = 2
+    timing: Literal["pre", "post"] = "post"  # D-10 — default post = every existing gate byte-unchanged
 
 
 class PhaseSpec(_StrictBase):
@@ -215,6 +232,11 @@ class WorkflowDefinition(_StrictBase):
     provenance: Literal["source", "derived"] = "source"                                      # D-08 (net-new flag)
     inputs: list[InputFieldSpec] | None = None                                               # co-lock (Phase 103 behavior)
     assets: list[AssetRef] | None = None                                                     # co-lock — implemented in Phase 101 (template_asset_service)
+
+    # ── 102 (D-13) — the ONE business requirement the QUAL-01 judge anchors to.
+    # Additive-optional (old rows model_validate() to None). OPTIONAL on a draft;
+    # the publish ENDPOINT (Plan 05), NOT this schema, enforces "required at publish".
+    business_requirement: str | None = None
 
     @model_validator(mode="after")
     def _folder_scope_requires_project(self) -> "WorkflowDefinition":

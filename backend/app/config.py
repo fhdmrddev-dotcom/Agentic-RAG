@@ -953,6 +953,14 @@ class Settings(BaseSettings):
     harness_phase_max_steps: int = 12
     harness_phase_wall_clock_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 12  # 300 x 12 = 3600
 
+    # Phase 102 (D-03 / QUAL-01) — the LLM-judge model for the output-quality gate.
+    # Settings-not-env (a model id is a VALUE, not a secret). None = a registry default
+    # resolved at call time to a forced_emission:True model (claude-opus-4-8 / gpt-5.5,
+    # both verified forced_emission:True at config.py MODEL_CAPABILITIES) so the judge
+    # verdict is forceable. Independent of the run model (no self-judging). Per-workflow
+    # override allowed (Plan 05).
+    harness_judge_model: str | None = None
+
     # Phase 091 (091-08 / CR-01) — resume-claim lease window. claim_run stamps
     # workflow_runs.claimed_at on the winning CAS; a racing WORKER_COUNT=2 sibling
     # sees the fresh stamp → 0 rows → skips (no double-execution). A crash mid-resume
