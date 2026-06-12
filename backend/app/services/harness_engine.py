@@ -550,15 +550,27 @@ def _parse_on_failure(on_failure: str) -> _OnFailure:
     """Parse a failing validator's ``on_failure`` disposition.
 
     Recognizes ``fail_run`` (the D-07 baseline), ``retry`` (retry exhausted ⇒ falls
-    back to fail_run unless a skip_to_phase is configured), and
-    ``skip_to_phase:<slug>`` (D-09). ANY unrecognized value routes to ``fail_run``
-    (fail-safe, T-091-18).
+    back to fail_run unless a skip_to_phase is configured), ``skip_to_phase:<slug>``
+    (D-09), and ``ask_user`` (the D-11 generic 4th disposition — any validator can
+    declare it; the engine pauses for a human choice via the 085 ask_user_service).
+    ANY unrecognized value routes to ``fail_run`` (fail-safe, T-091-18).
+
+    NOTE: ``ask_user`` is a PURE-PARSE result here — ``_route_on_failure`` (the sync
+    mapper) cannot await the user, so the pause is resolved INLINE in
+    ``_run_phase_with_gates`` via ``_resolve_failure_with_ask_user`` (where
+    redis/pool/ctx are in scope — RESEARCH Pattern 3 / A4). A bare ``_route_on_failure``
+    seeing an ``ask_user`` disposition treats it as ``fail_run`` (fail-safe — it
+    cannot pause), so the engine MUST route ask_user through the async helper.
     """
     from app.services.harness.reachability import parse_skip_target
 
     target = parse_skip_target(on_failure)
     if target is not None:
         return _OnFailure("skip_to_phase", target)
+    if on_failure == "ask_user":
+        # D-11 — the 4th disposition. Resolved INLINE (the async helper), never by
+        # the sync _route_on_failure (which cannot await the user).
+        return _OnFailure("ask_user", None)
     if on_failure in ("fail_run", "retry"):
         # `retry` here means "retries are exhausted" → D-07 baseline (fail_run).
         return _OnFailure("fail_run", None)
@@ -638,6 +650,33 @@ async def _run_phase_with_gates(
     phase_max_retries = validators[0].max_retries if validators else 2
     failed_idx: int | None = None
 
+    # ── D-10 PRE-gate pass — run timing="pre" validators BEFORE the executor body ──
+    # A pre validator (freshness's "check the date first" preflight) checks
+    # inputs/scope rather than output. A pre failure routes via the SAME disposition
+    # machinery (fail_run / skip_to_phase / ask_user) WITHOUT running the body —
+    # unless an ask_user Proceed approves running despite the finding (helper returns
+    # None → fall through to the body). A phase with NO pre validators gets a passing
+    # GateResult immediately → byte-identical (the existing default-post path).
+    pre = await run_gates(phase, {"_phase_inputs": accumulated_outputs}, ctx, timing="pre")
+    if not pre.passed:
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
+            metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
+                      "timing": "pre"},
+        )
+        await _emit(redis, stream_run_id, "gate_failed",
+            phase=phase.slug, attempt=0, error=pre.error_message,
+        )
+        outcome = await _resolve_failure_with_ask_user(
+            phase, pre.error_message, 0, pre.validator_index,
+            run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+            _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+            is_pre=True,
+        )
+        if outcome is not None:
+            return outcome  # fail_run / skip_to_phase / aborted ask_user
+        # outcome is None → ask_user Proceed: fall through and run the body.
+
     attempt = 0
     last_output = None
     while True:
@@ -663,7 +702,7 @@ async def _run_phase_with_gates(
             # disposition heuristic (skip_to_phase-bearing validator else first).
             return _route_on_failure(phase, gate_error, attempt, failed_idx)
 
-        gate = await run_gates(phase, output, ctx)
+        gate = await run_gates(phase, output, ctx, timing="post")
         if gate.passed:
             if validators:
                 await write_audit(
@@ -709,8 +748,18 @@ async def _run_phase_with_gates(
             continue
 
         # Exhausted → on_failure routing (from the SAME failing validator, WR-03).
+        # Routed through the async helper so an ``ask_user`` disposition (D-11) can
+        # pause for a human choice: a Proceed returns ``completed`` carrying THIS
+        # attempt's produced output; an Abort/unanswered → honest fail_run; a
+        # fail_run/skip_to_phase disposition delegates to _route_on_failure
+        # (byte-identical for every non-ask_user phase).
         _clear_retry_feedback(ctx)
-        return _route_on_failure(phase, gate.error_message, attempt, failed_idx)
+        return await _resolve_failure_with_ask_user(
+            phase, gate.error_message, attempt, failed_idx,
+            run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+            _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+            produced_output=output, is_pre=False,
+        )
 
 
 def _route_on_failure(
@@ -728,7 +777,209 @@ def _route_on_failure(
     )
     if disposition.kind == "skip_to_phase":
         return PhaseOutcome("skip_to", None, disposition.target_slug, reason)
+    # ``ask_user`` cannot be resolved here (this sync mapper cannot await the user) —
+    # fail safe to fail_run. The engine routes ask_user through
+    # ``_resolve_failure_with_ask_user`` (the async helper) BEFORE ever reaching here,
+    # so this branch is only hit when the pause path is unreachable (no redis/ctx).
     return PhaseOutcome("fail_run", None, None, reason)
+
+
+def _ask_user_choices_from_finding(error_message: str) -> list[str]:
+    """Derive the ask_user choices from a validator's structured finding (D-11).
+
+    The freshness validator (Plan 03) encodes its finding as a parseable
+    ``error_message`` prefix:
+      - ``freshness:staleness|...``         → ["Proceed anyway", "Abort"]
+      - ``freshness:version_ambiguity|...`` → ["Use newest version", "Use as-is", "Abort"]
+    Any other finding falls back to the generic Proceed/Abort pair. The choices are
+    presented to the user; the engine maps the chosen text back to a continue/fail
+    routing (an Abort-like choice → fail_run; anything else → Proceed).
+    """
+    msg = error_message or ""
+    if msg.startswith("freshness:version_ambiguity|"):
+        return ["Use newest version", "Use as-is", "Abort"]
+    if msg.startswith("freshness:staleness|"):
+        return ["Proceed anyway", "Abort"]
+    return ["Proceed anyway", "Abort"]
+
+
+def _is_abort_choice(choice: str) -> bool:
+    """A chosen option that means 'do NOT proceed' → honest fail_run (D-11)."""
+    return (choice or "").strip().lower() in ("abort", "cancel", "stop", "")
+
+
+async def _resolve_failure_with_ask_user(
+    phase,
+    error_message: str,
+    attempt: int,
+    failed_idx: int | None,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    ctx,
+    _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
+    produced_output: dict | None = None,
+    is_pre: bool = False,
+) -> PhaseOutcome | None:
+    """Resolve a failing validator's disposition, pausing for a human choice when
+    the disposition is ``ask_user`` (D-11).
+
+    If the failing validator's ``on_failure`` is NOT ``ask_user``, delegate to the
+    sync ``_route_on_failure`` (fail_run / skip_to_phase) — byte-identical behavior.
+
+    When it IS ``ask_user``: pause via the 085 ask_user_service ordering
+    (durable prompt row → emit ``ask_user_prompt`` → SUBSCRIBE-before-emit block on
+    ``subscribe_for_response``), presenting the validator's structured finding as
+    choices. The answer routes:
+      - unanswered (subscribe returns None, the 085 expiry) → honest ``fail_run``.
+      - an Abort-like choice                                → honest ``fail_run``.
+      - a Proceed/use-version choice → write a ``validator_ask_user_approved`` receipt
+        (someone explicitly approved grounding on the flagged finding — governance)
+        and CONTINUE: for a PRE gate return ``None`` (signal 'run the body'); for a
+        POST gate return ``completed`` carrying the already-produced output.
+
+    The redis/pool ordering, the channel keying, and the expiry-honest-fail are the
+    SAME shipped 085 substrate ``_exec_llm_human_input`` uses — never re-invented.
+    """
+    disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
+    if disp.kind != "ask_user":
+        # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
+        return _route_on_failure(phase, error_message, attempt, failed_idx)
+
+    # ── ask_user pause (copy _exec_llm_human_input ordering VERBATIM) ──
+    # The pause needs a live redis transport + a run_id channel; without them the
+    # disposition cannot pause (a unit/minimal ctx) → fail safe to fail_run, never
+    # a hung run.
+    if redis is None or run_id is None:
+        return _route_on_failure(phase, error_message, attempt, failed_idx)
+
+    from uuid import uuid4
+
+    tool_call_id = uuid4().hex
+    choices = _ask_user_choices_from_finding(error_message)
+    prompt = (
+        f"A validation check on phase '{phase.slug}' flagged: {error_message}. "
+        "How should the run proceed?"
+    )
+    timeout_seconds = min(
+        getattr(phase.config, "timeout_seconds", settings.ask_user_max_timeout_seconds)
+        if getattr(phase, "config", None) is not None
+        else settings.ask_user_max_timeout_seconds,
+        settings.ask_user_max_timeout_seconds,
+    )
+
+    # 1. Durable prompt row (the resume matcher keys on run_id) — best-effort, the
+    #    live block-on-answer flow does not depend on it (mirrors _exec_llm_human_input).
+    supabase = getattr(ctx, "supabase", None)
+    current_user = getattr(ctx, "current_user", None) or {}
+    thread_id = getattr(ctx, "thread_id", None)
+    if supabase is not None and thread_id:
+        try:
+            from app.utils.db import aexec
+
+            await aexec(
+                supabase.table("messages").insert(
+                    {
+                        "thread_id": thread_id,
+                        "user_id": current_user.get("id"),
+                        "role": "system",
+                        "content": prompt,
+                        "tool_calls": [
+                            {
+                                "kind": "ask_user_prompt",
+                                "tool_call_id": tool_call_id,
+                                "prompt": prompt,
+                                "options": choices,
+                                "timeout_seconds": timeout_seconds,
+                                "run_id": str(run_id),
+                            }
+                        ],
+                    }
+                )
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user disposition: prompt row insert failed run=%s tcid=%s",
+                run_id, tool_call_id,
+            )
+
+    # 2. Emit the ask_user prompt so the frontend renders the choice — on the
+    #    PRODUCER stream the frontend tails (the direct-executor-emit transport
+    #    pattern from _exec_llm_human_input), while the durable row + subscribe
+    #    channel stay on the workflow run_id for live↔resume consistency.
+    _stream_id = getattr(ctx, "producer_run_id", None) or stream_run_id or run_id
+    emit = getattr(ctx, "emit", None) or _emit
+    try:
+        await emit(
+            redis, _stream_id, "ask_user_prompt",
+            tool_call_id=tool_call_id,
+            prompt=prompt,
+            options=choices,
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("ask_user disposition: ask_user_prompt emit failed")
+
+    # 3. Block on the answer (SUBSCRIBE-before-emit is enforced inside the helper;
+    #    None on timeout — honest fail, never a hung run — the 085 expiry).
+    from app.services.ask_user_service import subscribe_for_response
+
+    payload = await subscribe_for_response(
+        redis, run_id, tool_call_id, float(timeout_seconds)
+    )
+
+    reason_base = (
+        f"Phase {phase.phase_index + 1} ({phase.slug}) validation flagged: {error_message}"
+    )
+
+    if payload is None:
+        # Unanswered (the 085 expiry) → honest fail, never hung.
+        return PhaseOutcome(
+            "fail_run", None, None, f"{reason_base} — unanswered, run failed"
+        )
+
+    # Resolve the chosen option text (choice-click arrives as {choice_index: N};
+    # same defense as _exec_llm_human_input / the Deep dispatcher handler).
+    choice = ""
+    if payload.get("kind") == "response":
+        choice = (payload.get("response_text") or "").strip()
+        if not choice and choices:
+            _ci = payload.get("choice_index")
+            try:
+                _ci = int(_ci)
+                if 0 <= _ci < len(choices):
+                    choice = str(choices[_ci])
+            except (TypeError, ValueError):
+                pass
+
+    if _is_abort_choice(choice):
+        return PhaseOutcome(
+            "fail_run", None, None, f"{reason_base} — aborted by user"
+        )
+
+    # Proceed (or use-version) — write the governance receipt, then continue.
+    try:
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="validator_ask_user_approved",
+            metadata={
+                "phase": phase.slug,
+                "validator": failed_idx,
+                "choice": choice,
+                "finding": error_message,
+            },
+        )
+    except Exception:  # noqa: BLE001 — a receipt write must never strand the approved run
+        logger.warning(
+            "ask_user disposition: validator_ask_user_approved receipt write failed run=%s",
+            run_id,
+        )
+
+    if is_pre:
+        return None  # signal: run the body (the user approved running despite the finding)
+    return PhaseOutcome("completed", produced_output, None, None)
 
 
 def _clear_retry_feedback(ctx) -> None:

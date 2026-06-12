@@ -55,3 +55,89 @@ def test_validator_index_is_full_list_index():
     # satisfy; here we pin the contract shape.
     assert phase.validators[1].timing == "post"
     assert asyncio.iscoroutinefunction(run_gates)
+
+
+def test_pre_gate_runs_before_body_and_routes_failure():
+    """Plan 04 engine seam — a timing="pre" validator failure routes BEFORE the
+    executor body runs (the body is never reached on a pre fail_run)."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.models.harness import PhaseSpec, ValidatorSpec
+    from app.services import harness_engine
+
+    body_ran = {"value": False}
+
+    async def _fake_execute_phase(phase, accumulated, ctx):
+        body_ran["value"] = True
+        return {"text": "body output"}
+
+    # A pre validator that fails fail_run; no post validators.
+    phase = PhaseSpec(
+        slug="p",
+        phase_index=0,
+        config={"phase_type": "programmatic", "fn": "noop"},
+        validators=[ValidatorSpec(kind="freshness", timing="pre", on_failure="fail_run")],
+    )
+
+    async def _fake_run_gates(ph, output, ctx, *, timing=None):
+        from app.services.harness.validators import GateResult
+
+        if timing == "pre":
+            return GateResult(False, "freshness:staleness|stale", 0)
+        return GateResult(True, None)
+
+    ctx = SimpleNamespace(current_user={"id": uuid4()}, retry_feedback=None)
+
+    with patch.object(harness_engine, "_execute_phase", _fake_execute_phase), \
+         patch("app.services.harness.validators.run_gates", _fake_run_gates), \
+         patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch.object(harness_engine, "_emit", AsyncMock()):
+        outcome = asyncio.run(
+            harness_engine._run_phase_with_gates(
+                phase, {}, ctx,
+                run_id=uuid4(), pool=object(), redis=object(),
+                wall_clock=30, _audit_user_id=uuid4(),
+            )
+        )
+
+    # The pre failure routed to fail_run; the executor body NEVER ran.
+    assert outcome.kind == "fail_run"
+    assert body_ran["value"] is False
+
+
+def test_no_pre_validators_runs_body_byte_identical():
+    """A phase with NO pre validators is byte-identical — the pre-gate pass returns
+    passed immediately, the body runs, the post gate passes, the phase completes."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.models.harness import PhaseSpec
+    from app.services import harness_engine
+
+    async def _fake_execute_phase(phase, accumulated, ctx):
+        return {"text": "body output"}
+
+    phase = PhaseSpec(
+        slug="p", phase_index=0,
+        config={"phase_type": "programmatic", "fn": "noop"}, validators=[],
+    )
+    ctx = SimpleNamespace(current_user={"id": uuid4()}, retry_feedback=None)
+
+    with patch.object(harness_engine, "_execute_phase", _fake_execute_phase), \
+         patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch.object(harness_engine, "_emit", AsyncMock()):
+        outcome = asyncio.run(
+            harness_engine._run_phase_with_gates(
+                phase, {}, ctx,
+                run_id=uuid4(), pool=object(), redis=object(),
+                wall_clock=30, _audit_user_id=uuid4(),
+            )
+        )
+
+    assert outcome.kind == "completed"
+    assert outcome.output == {"text": "body output"}
