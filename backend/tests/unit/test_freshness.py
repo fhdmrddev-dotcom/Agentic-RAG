@@ -11,10 +11,7 @@ the test body (collection never breaks on an unbuilt symbol).
 
 from __future__ import annotations
 
-import pytest
 
-
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_freshness_stale():
     """``timing="pre"``: the newest relevant document older than ``max_age_days`` ->
     ``GateResult.passed is False``."""
@@ -34,7 +31,6 @@ def test_freshness_stale():
     assert result.passed is False
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_freshness_version_ambiguity_asks():
     """An exact-stem filename collision present -> the validator's failure carries a
     structured finding suitable for ``on_failure="ask_user"`` (Use version X / Use Y /
@@ -57,7 +53,6 @@ def test_freshness_version_ambiguity_asks():
     assert result.error_message is not None
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_freshness_requires_max_age_days():
     """No ``max_age_days`` configured -> fails closed with a descriptive message (NO
     global default per CONTEXT — staleness is meaningless without the deliverable's

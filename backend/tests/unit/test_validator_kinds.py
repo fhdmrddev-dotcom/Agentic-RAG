@@ -14,10 +14,7 @@ suite exits 0 today (xfailed, never errored on collection).
 
 from __future__ import annotations
 
-import pytest
 
-
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_citations_required_rejects_uncited():
     """``citations_required`` (emit-output deterministic mode) wraps ``check_coverage``:
     an output whose field_map carries an uncited value FAILS the gate (D-14)."""
@@ -40,7 +37,6 @@ def test_citations_required_rejects_uncited():
     assert result.passed is False
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_citations_required_presence():
     """``citations_required`` presence mode over a text output: at least N markers
     required (D-14). No markers -> fail; markers present -> pass."""
@@ -59,7 +55,6 @@ def test_citations_required_presence():
     assert with_markers.passed is True
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_output_file_valid_reopens():
     """``output_file_valid`` wraps ``assert_integrity`` (format-aware): a verdict-shaped
     output where the file would not re-open FAILS the gate; an unknown extension fails
@@ -81,7 +76,6 @@ def test_output_file_valid_reopens():
     assert closed.passed is False  # fails closed, no crash
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_structure_check_loose():
     """``structure_check`` loose mode: named sections present, order-insensitive,
     extras allowed (D-14). A missing section fails."""
@@ -102,7 +96,6 @@ def test_structure_check_loose():
     assert missing.passed is False
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 not yet landed")
 def test_judge_rides_forced_emit():
     """``llm_judge_rubric`` rides ``forced_emit``: a ``model_failed_to_emit`` failure
     FAILS the gate (never a silent pass); an ``overall_passed=False`` verdict FAILS."""
