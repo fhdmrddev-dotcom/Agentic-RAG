@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-12T06:51:16.896Z"
+last_updated: "2026-06-12T07:00:13.796Z"
 last_activity: 2026-06-12
 progress:
   total_phases: 14
   completed_phases: 6
   total_plans: 44
-  completed_plans: 41
-  percent: 93
+  completed_plans: 42
+  percent: 95
 ---
 
 # Project State
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 102 (reusable-validation-gate-library-output-quality-gate) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute Plan 02 (BLOCKING — operator applies migration 070)
-Last activity: 2026-06-12 -- Plan 102-01 (foundation substrate) COMPLETE
+Plan: 3 of 5
+Status: Ready to execute Plan 03 (the 5 first-class validator kinds — D-12)
+Last activity: 2026-06-12 -- Plan 102-02 (migration 070 live-apply, BLOCKING gate) COMPLETE
+
+**Plan 102-02 (Wave 2, the BLOCKING migration-070 live-apply gate) — COMPLETE (2026-06-12):**
+
+- ✓ Task 1 (commit `990a3bcc`, feat): **migration `070_harness_validation_gate_library.sql` APPLIED to the live local DB (:54322) via psycopg2-direct** (one transaction; NEVER `db push`/`db reset` — the CLAUDE.md hard rule + the 100/101.1 precedent). Read-back assertions passed (`OK migration 070 live`): the live `harness_audit_event_type_check` constraint def now carries all 22 kinds incl. the 6 new Phase-102 receipts (`judge_verdict`/`publish_attempted`/`publish_blocked`/`publish_succeeded`/`policy_applied`/`validator_ask_user_approved`) in lockstep with the Plan-01 `_AUDIT_EVENT_TYPES` frozenset, and `workflow_runs.is_golden_run boolean DEFAULT false` (D-05) is present. Idempotency proven (a 2nd apply no-ops — DROP/ADD CONSTRAINT re-runnable, ADD COLUMN IF NOT EXISTS). Then regenerated `supabase/full-schema.sql` with the DEFAULT no-reset live dump (NOT `--reset`) — the bootstrap artifact reflects both changes (`is_golden_run` × 3).
+- ✓ Task 2 (`checkpoint:human-verify`, gate=blocking) — **APPROVED on hard DB evidence** (orchestrator-verified via independent psycopg2 read-back on :54322, unattended session, recorded in the orchestrator log): CHECK accepts all 22 kinds incl. the 6 new receipts; `workflow_runs.is_golden_run` present default false; `full-schema.sql` regenerated (commit `990a3bcc`). Approval granted on the read-back, not a visual check.
+- **No deviations.** Plan executed exactly as written. The local Supabase stack was up, so the autonomous psycopg2-direct path was used (no SQL-editor paste fallback needed). The migration FILE was not edited — this plan only crossed the Plan-01-authored SQL into the live schema + regenerated the artifact.
+- Both STRIDE threats mitigated (T-102-02-01 partial-apply → one transaction + read-back-before-done + idempotent ALTER; T-102-02-02 `db reset` DoS → psycopg2/no-reset only, project rule honored). SUMMARY: `.planning/phases/102-reusable-validation-gate-library-output-quality-gate/102-02-SUMMARY.md` (Self-Check: PASSED). **GATE-01/QUAL-01 stay OPEN** — multi-plan requirements, mark complete at phase verification.
+- **Plans 03/04/05 unblocked:** the CHECK kinds + `is_golden_run` column now exist on the live DB, so any downstream test or live run writing the 6 new receipt kinds or setting `is_golden_run=True` (Plan 05's publish-flip) will not 23514 / fail on a missing column. The live half of `test_publish_flip.py` un-marks once Plan 05 wires the draft->published trigger.
+- **Next:** `/gsd:execute-phase 102` Plan 03 (the 5 first-class validator kinds — D-12: `citations_required`/`output_file_valid`/`structure_check`/`llm_judge_rubric` wrap shipped primitives + net-new `freshness` deterministic KB queries + the `run_gates` timing filter, D-10 back-compat half).
 
 **Plan 102-01 (Wave 1, the foundation substrate) — COMPLETE (2026-06-12):**
 
