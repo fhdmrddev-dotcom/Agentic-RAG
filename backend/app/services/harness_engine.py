@@ -790,14 +790,20 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
     The freshness validator (Plan 03) encodes its finding as a parseable
     ``error_message`` prefix:
       - ``freshness:staleness|...``         → ["Proceed anyway", "Abort"]
-      - ``freshness:version_ambiguity|...`` → ["Use newest version", "Use as-is", "Abort"]
+      - ``freshness:version_ambiguity|...`` → ["Proceed despite version ambiguity", "Abort"]
     Any other finding falls back to the generic Proceed/Abort pair. The choices are
     presented to the user; the engine maps the chosen text back to a continue/fail
     routing (an Abort-like choice → fail_run; anything else → Proceed).
+
+    WR-08: the version-ambiguity branch presents the HONEST pair matching the
+    staleness pair — NOT "Use newest version" / "Use as-is", which implied
+    version-scoped retrieval that does not exist (both old non-abort choices routed
+    identically to Proceed). Until version-scoped narrowing ships, the user explicitly
+    approves continuing with UNFILTERED retrieval; the v1 cut is noted in the receipt.
     """
     msg = error_message or ""
     if msg.startswith("freshness:version_ambiguity|"):
-        return ["Use newest version", "Use as-is", "Abort"]
+        return ["Proceed despite version ambiguity", "Abort"]
     if msg.startswith("freshness:staleness|"):
         return ["Proceed anyway", "Abort"]
     return ["Proceed anyway", "Abort"]
@@ -959,17 +965,26 @@ async def _resolve_failure_with_ask_user(
             "fail_run", None, None, f"{reason_base} — aborted by user"
         )
 
-    # Proceed (or use-version) — write the governance receipt, then continue.
+    # Proceed — write the governance receipt, then continue.
+    receipt_metadata = {
+        "phase": phase.slug,
+        "validator": failed_idx,
+        "choice": choice,
+        "finding": error_message,
+    }
+    # WR-08: note the v1 honest cut on a version-ambiguity approval — the user
+    # approved continuing with UNFILTERED retrieval (version-scoped narrowing is
+    # not yet implemented), so the receipt must not assert that semantic.
+    if (error_message or "").startswith("freshness:version_ambiguity|"):
+        receipt_metadata["version_ambiguity_v1_cut"] = (
+            "honest Proceed/Abort — version-scoped retrieval not yet implemented; "
+            "Proceed continues with unfiltered retrieval"
+        )
     try:
         await write_audit(
             pool, run_id, user_id=_audit_user_id,
             event_type="validator_ask_user_approved",
-            metadata={
-                "phase": phase.slug,
-                "validator": failed_idx,
-                "choice": choice,
-                "finding": error_message,
-            },
+            metadata=receipt_metadata,
         )
     except Exception:  # noqa: BLE001 — a receipt write must never strand the approved run
         logger.warning(

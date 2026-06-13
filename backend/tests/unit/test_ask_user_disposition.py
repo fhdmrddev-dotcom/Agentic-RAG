@@ -168,6 +168,78 @@ def test_ask_user_unanswered_expiry_fails():
     assert write_audit.await_count == 0
 
 
+def test_version_ambiguity_choices_are_honest():
+    """WR-08: a ``freshness:version_ambiguity|`` finding presents the HONEST pair
+    ["Proceed despite version ambiguity", "Abort"] — NOT "Use newest version" /
+    "Use as-is" (both old non-abort choices routed identically to Proceed but implied
+    unimplemented version-scoped retrieval). The staleness branch is unchanged."""
+    from app.services.harness_engine import _ask_user_choices_from_finding
+
+    version = _ask_user_choices_from_finding(
+        "freshness:version_ambiguity|report-v2.docx,report-v3.docx"
+    )
+    assert version == ["Proceed despite version ambiguity", "Abort"]
+    # The dishonest version-selection wording is gone.
+    assert "Use newest version" not in version
+    assert "Use as-is" not in version
+
+    # The staleness branch is untouched (honest Proceed/Abort pair as before).
+    staleness = _ask_user_choices_from_finding("freshness:staleness|400d old")
+    assert staleness == ["Proceed anyway", "Abort"]
+
+    # The generic fallback is untouched.
+    generic = _ask_user_choices_from_finding("some other finding")
+    assert generic == ["Proceed anyway", "Abort"]
+
+
+def test_version_ambiguity_proceed_records_v1_cut_note():
+    """WR-08: a Proceed on a version-ambiguity finding writes the
+    ``validator_ask_user_approved`` receipt carrying the ``version_ambiguity_v1_cut``
+    metadata note (the honest record that the user approved continuing with UNFILTERED
+    retrieval); a staleness Proceed receipt does NOT carry the note."""
+    from app.services import harness_engine
+
+    # ── version-ambiguity Proceed → the v1-cut note is on the receipt ──
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "Proceed despite version ambiguity"}
+    )
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _phase(),
+                "freshness:version_ambiguity|report-v2.docx,report-v3.docx",
+                0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+    assert outcome is None  # pre-gate Proceed → run the body
+    assert write_audit.await_count == 1
+    _, kwargs = write_audit.await_args
+    assert kwargs["event_type"] == "validator_ask_user_approved"
+    assert "version_ambiguity_v1_cut" in kwargs["metadata"]
+    assert "version-scoped retrieval not yet implemented" in kwargs["metadata"][
+        "version_ambiguity_v1_cut"
+    ]
+
+    # ── a staleness Proceed receipt does NOT carry the note ──
+    write_audit2 = AsyncMock()
+    subscribe2 = AsyncMock(return_value={"kind": "response", "response_text": "Proceed anyway"})
+    with patch.object(harness_engine, "write_audit", write_audit2), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
+        asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _phase(), "freshness:staleness|400d old", 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+    _, kwargs2 = write_audit2.await_args
+    assert "version_ambiguity_v1_cut" not in kwargs2["metadata"]
+
+
 def test_non_ask_user_disposition_delegates_to_route():
     """A non-ask_user disposition (fail_run) delegates to ``_route_on_failure`` — the
     helper never pauses (subscribe is never called)."""
