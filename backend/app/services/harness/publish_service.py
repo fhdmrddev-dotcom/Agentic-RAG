@@ -151,15 +151,46 @@ async def publish_workflow(
         )
 
     # ── stage 3: the REAL golden run (is_golden_run=True; no mocks, no opt-out) ───
+    # WR-04 (T-102-09-03): the synchronous golden run is bounded by a publish-level
+    # wall budget. ``asyncio.wait_for`` cancels a wedged run after
+    # ``harness_publish_max_seconds`` so the request cannot hang for hours; a timeout
+    # maps to an honest ``golden_run_timeout`` block (never a hung request / 500). The
+    # TimeoutError handler MUST precede the broad ``except Exception`` (asyncio.TimeoutError
+    # is a subclass of Exception in 3.11+ — order matters).
+    import asyncio  # function-local (mirrors _drive_golden_run)
+
+    from app.config import settings  # function-local
+
     try:
-        golden_run_id, final_output, terminal_status = await _drive_golden_run(
-            definition_id=definition_id,
-            definition=definition,
-            golden_input=golden_input,
+        golden_run_id, final_output, terminal_status = await asyncio.wait_for(
+            _drive_golden_run(
+                definition_id=definition_id,
+                definition=definition,
+                golden_input=golden_input,
+                user_id=user_id,
+                pool=pool,
+                redis=redis,
+                supabase=supabase,
+            ),
+            timeout=settings.harness_publish_max_seconds,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "publish: golden run exceeded the publish budget (%ss) for definition %s",
+            settings.harness_publish_max_seconds,
+            definition_id,
+        )
+        return await _block(
+            pool,
+            run_id=None,
             user_id=user_id,
-            pool=pool,
-            redis=redis,
-            supabase=supabase,
+            definition_id=definition_id,
+            stage="golden_run_timeout",
+            named_failures=[
+                f"the golden run exceeded the publish budget "
+                f"({settings.harness_publish_max_seconds}s) and was abandoned"
+            ],
+            golden_run_id=None,
         )
     except Exception as e:  # noqa: BLE001 — a golden-run crash is a structured block, never a 500
         logger.exception("publish: golden run failed for definition %s", definition_id)

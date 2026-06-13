@@ -217,6 +217,49 @@ async def test_golden_run_error_is_structured_not_raised():
     flip.assert_not_called()
 
 
+# ── WR-04: the publish deadline (asyncio.wait_for → golden_run_timeout) ────────
+@pytest.mark.asyncio
+async def test_golden_run_timeout_blocks_not_raises():
+    """WR-04 / T-102-09-03: a golden run that exceeds the publish budget maps to an
+    honest ``golden_run_timeout`` block — never a hung request nor a 500. Drive a real
+    timeout by patching the budget to ~0s and making ``_drive_golden_run`` sleep past it
+    so ``asyncio.wait_for`` cancels it."""
+    import asyncio
+
+    row = _definition_row(business_requirement="Deliver a cited answer.")
+
+    async def _hang(**_kwargs):
+        await asyncio.sleep(5)  # well past the patched ~0s budget → TimeoutError
+        return (uuid4(), {"text": "never reached"}, "completed")
+
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_drive_golden_run", _hang),
+        patch.object(publish_service, "_judge_golden_output", AsyncMock()) as judge,
+        patch("app.db.workflows.publish_definition", AsyncMock()) as flip,
+        # Shrink the publish budget so the 5s sleep blows it instantly:
+        patch("app.config.settings.harness_publish_max_seconds", 0.05),
+    ):
+        result = await _call()  # must NOT raise
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "golden_run_timeout"
+    assert result["named_failures"]  # the named budget-exceeded failure
+    assert result["golden_run_id"] is None  # no usable run id (it was abandoned)
+    judge.assert_not_called()  # the judge never ran (no output to judge)
+    flip.assert_not_called()  # no flip on a timed-out golden run
+
+
+def test_harness_publish_max_seconds_config_present():
+    """WR-04: the publish-level wall budget knob exists on Settings (bounded, generous)."""
+    from app.config import settings
+
+    assert hasattr(settings, "harness_publish_max_seconds")
+    assert isinstance(settings.harness_publish_max_seconds, int)
+    assert settings.harness_publish_max_seconds > 0
+
+
 # ── WR-02: owner-only publish read (a non-owner cannot load a global DRAFT) ────
 @pytest.mark.asyncio
 async def test_get_definition_publish_read_is_owner_only_for_drafts():

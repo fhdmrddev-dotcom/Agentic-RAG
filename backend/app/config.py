@@ -961,6 +961,16 @@ class Settings(BaseSettings):
     # override allowed (Plan 05).
     harness_judge_model: str | None = None
 
+    # Phase 102 (WR-04 / T-102-09-03 / QUAL-01) — the publish-level wall budget. The
+    # synchronous publish endpoint drives a FULL golden run on the request thread; without
+    # a deadline a wedged run holds the request indefinitely (a DoS / hours-long hold). The
+    # golden-run drive is wrapped in ``asyncio.wait_for(harness_publish_max_seconds)`` and a
+    # timeout maps to an honest ``golden_run_timeout`` block (never a hung request / 500).
+    # Generous (publish is a rare deliberate event) but bounded (24 x 300s = 7200s = 2h).
+    # The full background-job publish rework that would remove the synchronous hold entirely
+    # stays deferred to Phase 103 — this is the minimum-viable hardening. Env-overridable.
+    harness_publish_max_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 24  # 300 x 24 = 7200
+
     # Phase 091 (091-08 / CR-01) — resume-claim lease window. claim_run stamps
     # workflow_runs.claimed_at on the winning CAS; a racing WORKER_COUNT=2 sibling
     # sees the fresh stamp → 0 rows → skips (no double-execution). A crash mid-resume
