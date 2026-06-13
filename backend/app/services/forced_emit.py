@@ -43,6 +43,7 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from app.config import get_model_capability
@@ -94,22 +95,25 @@ def _coerce_schema_block(emitter: str, tools: list[dict]) -> str:
     return ""
 
 
-def recover_narrated_emission(content: str) -> EmitFieldMap | None:
+def recover_narrated_emission(
+    content: str, schema_model: type[BaseModel] | None = None
+) -> BaseModel | None:
     """D-06 NATIVE narrated-JSON recovery: parse a still-narrated field-map back into a
-    validated ``EmitFieldMap`` — or return ``None`` (honest failure, NEVER a silent
-    drop, NEVER an empty "success" map).
+    validated model (``schema_model or EmitFieldMap``) — or return ``None`` (honest
+    failure, NEVER a silent drop, NEVER an empty "success" map).
 
     Two recovery strategies, in order:
       1. The tool-wrapped narration (``{"tool": <emitter>, "arguments": {...}}`` in a
          fenced block) — reuse the SAME ``parse_structured_tool_calls`` helper the
          STRUCTURED path uses (``agent_loop.py``/``task_service.py``), then validate
-         the parsed ``arguments`` against ``EmitFieldMap``.
-      2. A BARE fenced object that is DIRECTLY an ``EmitFieldMap`` (the reasoning-native
-         GAP-D shape — the model narrates the field-map itself, not a tool wrapper).
+         the parsed ``arguments`` against the model.
+      2. A BARE fenced object that is DIRECTLY a valid model instance (the
+         reasoning-native GAP-D shape — the model narrates the field-map itself, not a
+         tool wrapper).
 
-    Either way the recovered object MUST ``model_validate`` as an ``EmitFieldMap`` to be
-    accepted — an un-parseable / non-validating narration returns ``None`` (the run then
-    fails honestly upstream).
+    Either way the recovered object MUST ``model_validate`` against ``schema_model`` (or
+    ``EmitFieldMap`` by default — CR-01 additive seam) to be accepted; an un-parseable /
+    non-validating narration returns ``None`` (the run then fails honestly upstream).
     """
     if not content or not content.strip():
         return None
@@ -119,28 +123,35 @@ def recover_narrated_emission(content: str) -> EmitFieldMap | None:
     # even though the emit tool is absent from the global get_tools() catalog.
     try:
         for call in parse_structured_tool_calls(content, known_tools=None):
-            fm = _validate_args(call.function.arguments)
+            fm = _validate_args(call.function.arguments, schema_model)
             if fm is not None:
                 return fm
     except Exception:  # noqa: BLE001 — recovery is best-effort; fall through to strategy 2
         logger.debug("forced_emit: structured-wrapper recovery failed", exc_info=True)
 
-    # Strategy 2: a bare fenced object that is directly an EmitFieldMap.
+    # Strategy 2: a bare fenced object that is directly a valid model instance.
     for blob in _iter_fenced_json(content):
-        fm = _validate_args(blob)
+        fm = _validate_args(blob, schema_model)
         if fm is not None:
             return fm
     return None
 
 
-def _validate_args(raw: Any) -> EmitFieldMap | None:
-    """Validate raw tool-call arguments (a JSON string or a dict) as an EmitFieldMap.
-    Returns ``None`` on any parse/validation error (never raises — honest-fail path)."""
+def _validate_args(
+    raw: Any, schema_model: type[BaseModel] | None = None
+) -> BaseModel | None:
+    """Validate raw tool-call arguments (a JSON string or a dict) against the emission
+    model. CR-01 additive seam: ``_model = schema_model or EmitFieldMap`` — the default
+    (``schema_model=None``) preserves the byte-identical ``EmitFieldMap`` validation
+    every existing emit caller relies on; the judge callers pass
+    ``schema_model=JudgeVerdict`` to validate a verdict shot. Returns ``None`` on any
+    parse/validation error (never raises — honest-fail path)."""
+    _model = schema_model or EmitFieldMap
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
         if not isinstance(data, dict):
             return None
-        return EmitFieldMap.model_validate(data)
+        return _model.model_validate(data)
     except Exception:  # noqa: BLE001 — a non-validating object is an honest failure, not a crash
         return None
 
@@ -201,6 +212,7 @@ async def forced_emit(
     user_settings: Any,
     system_prompt: str = "",
     max_tokens: int | None = None,
+    schema_model: type[BaseModel] | None = None,
 ) -> dict:
     """Run a SEALED single forced shot and return a structured result.
 
@@ -285,11 +297,13 @@ async def forced_emit(
         return _failure(tier, provider, forced=forced, truncated=True)
 
     # Happy path: the model committed the forced tool call → validate its args.
-    emitted: EmitFieldMap | None = None
+    # CR-01: validate against ``schema_model or EmitFieldMap`` — the judge callers pass
+    # ``schema_model=JudgeVerdict``; the default (None) is byte-identical EmitFieldMap.
+    emitted: BaseModel | None = None
     recovered = False
     for call in tool_calls:
         if call.get("name") == emitter:
-            emitted = _validate_args(call.get("arguments"))
+            emitted = _validate_args(call.get("arguments"), schema_model)
             if emitted is not None:
                 break
 
@@ -305,7 +319,7 @@ async def forced_emit(
         and calling_mode in (CallingMode.NATIVE, CallingMode.STRUCTURED)
         and content.strip()
     ):
-        emitted = recover_narrated_emission(content)
+        emitted = recover_narrated_emission(content, schema_model)
         if emitted is not None:
             recovered = True
 
