@@ -446,6 +446,11 @@ async def _validate_freshness(output: dict, config: dict, ctx) -> GateResult:
     folder_ids = (
         getattr(ctx, "scope_folder_ids", None)
         or getattr(ctx, "folder_scope", None)
+        # WR-01: folder_subtree_ids is the attribute EVERY real ctx bag carries
+        # (live kickoff, _build_resume_context, publish_service._drive_golden_run) —
+        # without this third fallback the live path always failed "no KB scope
+        # context" and the GATE-01 freshness preflight never fired on a real run.
+        or getattr(ctx, "folder_subtree_ids", None)
     )
     if pool is None or not folder_ids:
         return GateResult(
