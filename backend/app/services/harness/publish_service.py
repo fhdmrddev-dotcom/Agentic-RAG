@@ -244,6 +244,22 @@ async def publish_workflow(
 
     # ── stage 5: flip (all passed) ───────────────────────────────────────────────
     version = await publish_definition(pool, definition_id)
+    # WR-03 (T-102-09-02): publish_definition returns -1 when its ``status='draft'``
+    # WHERE guard matched 0 rows — a concurrent double-publish (the race loser) or a
+    # row no longer a draft. Without this check the caller returned a FALSE
+    # ``{published: True, version: -1}`` receipt + a FALSE ``publish_succeeded``
+    # governance row. Route the sentinel to an honest ``already_published`` block (the
+    # route maps it to 409) so neither the API response nor the governance trail lies.
+    if version == -1:
+        return await _block(
+            pool,
+            run_id=golden_run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="already_published",
+            named_failures=["the draft was published concurrently or is no longer a draft"],
+            golden_run_id=golden_run_id,
+        )
     await _safe_audit(
         pool,
         golden_run_id,

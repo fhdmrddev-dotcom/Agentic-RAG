@@ -217,6 +217,118 @@ async def test_golden_run_error_is_structured_not_raised():
     flip.assert_not_called()
 
 
+# ── WR-02: owner-only publish read (a non-owner cannot load a global DRAFT) ────
+@pytest.mark.asyncio
+async def test_get_definition_publish_read_is_owner_only_for_drafts():
+    """WR-02 / T-102-09-01: ``get_definition``'s publish read restricts drafts to true
+    ownership — the bare ``OR is_global = true`` is GONE; a global row is readable only
+    when PUBLISHED. The SQL predicate is the security boundary (a non-owner can no longer
+    load a global DRAFT → no golden run / no flip on another user's draft)."""
+    from unittest.mock import AsyncMock as _AsyncMock
+
+    from app.db import workflows as wf_db
+
+    captured: dict = {}
+
+    async def _fake_fetchrow(query, *args):
+        captured["query"] = query
+        captured["args"] = args
+        return None  # a non-owner of a global draft → no row → None (the EoP is closed)
+
+    pool = _AsyncMock()
+    pool.fetchrow = _fake_fetchrow
+    other_user = uuid4()
+
+    result = await wf_db.get_definition(pool, _DEF_ID, user_id=other_user)
+
+    assert result is None  # a non-owner gets None for a global draft
+    q = captured["query"]
+    # The corrected, owner-only-for-drafts predicate:
+    assert "(is_global = true AND status = 'published')" in q
+    # The over-wide bare global predicate is GONE (no global-DRAFT exposure):
+    assert "OR is_global = true)" not in q
+    # $N placeholders only — the owner id is bound as $2 (no f-string SQL):
+    assert "created_by = $2" in q
+    assert captured["args"] == (_DEF_ID, other_user)
+
+
+@pytest.mark.asyncio
+async def test_non_owner_global_draft_publish_is_refused():
+    """WR-02 end-to-end: when ``get_definition`` returns None for a non-owner's attempt
+    to publish a global draft, the publish path refuses with ``not_found`` (404, no leak)
+    and NEVER drives a golden run or flips (the EoP path is closed)."""
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=None)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_drive_golden_run", AsyncMock()) as drive,
+        patch("app.db.workflows.publish_definition", AsyncMock()) as flip,
+    ):
+        result = await _call(user={"id": str(uuid4())})  # a DIFFERENT, non-owner user
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "not_found"  # uniform 404, no existence leak
+    drive.assert_not_called()  # no golden run on another user's draft
+    flip.assert_not_called()  # no privileged state change
+
+
+# ── WR-03: the concurrent-double-publish sentinel → honest already_published ────
+@pytest.mark.asyncio
+async def test_concurrent_double_publish_blocks_at_already_published():
+    """WR-03 / T-102-09-02: ``publish_definition`` returns -1 when its ``status='draft'``
+    WHERE guard matched 0 rows (a concurrent double-publish race loser). The caller must
+    route the sentinel to an honest ``already_published`` block — NOT a false
+    ``{published: True, version: -1}`` receipt nor a false ``publish_succeeded`` row."""
+    row = _definition_row(business_requirement="Deliver a cited answer.")
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 95, "summary": "good", "criteria": []}
+    audit_events: list = []
+
+    async def _capture_audit(pool, run_id, *, user_id, event_type, metadata):
+        audit_events.append(event_type)
+
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock(side_effect=_capture_audit)),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
+        ),
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        # publish_definition finds 0 draft rows (already flipped by a concurrent publish) → -1:
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=-1)),
+    ):
+        result = await _call()
+
+    # The honest block — NOT a false success receipt:
+    assert result["published"] is not True
+    assert result.get("version") != -1  # never {published: True, version: -1}
+    assert result["blocked_stage"] == "already_published"
+    assert result["golden_run_id"] == golden_run_id
+    # A FALSE publish_succeeded governance row was NEVER written:
+    assert "publish_succeeded" not in audit_events
+
+
+# ── IN-02: write_audit accepts a nullable run_id (the publish_blocked receipt) ──
+def test_write_audit_signature_allows_nullable_run_id():
+    """IN-02: ``write_audit``'s ``run_id`` parameter is annotated ``UUID | None`` — the
+    NULL-run ``publish_blocked`` receipts (stage-0/1/2, before any golden run) rely on it;
+    the column is nullable. Verify the annotation rather than a live DB write."""
+    import inspect
+    import typing
+    from uuid import UUID as _UUID
+
+    from app.db.workflows import write_audit
+
+    sig = inspect.signature(write_audit)
+    hints = typing.get_type_hints(write_audit)
+    assert "run_id" in sig.parameters
+    run_id_hint = hints["run_id"]
+    # ``UUID | None`` resolves to ``typing.Optional[UUID]`` == ``Union[UUID, None]``:
+    args = typing.get_args(run_id_hint)
+    assert type(None) in args, f"run_id must be nullable, got {run_id_hint!r}"
+    assert _UUID in args, f"run_id must still accept UUID, got {run_id_hint!r}"
+
+
 # ── route-level HTTP mapping (api/workflows.py — G-5: NOT threads.py) ──────────
 @pytest.mark.asyncio
 async def test_route_not_found_maps_to_404():

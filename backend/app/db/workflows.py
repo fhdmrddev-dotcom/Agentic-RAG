@@ -199,18 +199,22 @@ async def list_published_workflows(
 async def get_definition(
     pool: asyncpg.Pool, definition_id: UUID, *, user_id: UUID
 ) -> dict | None:
-    """Load ONE workflow definition (DRAFTS INCLUDED) the user may publish.
+    """Load ONE workflow definition (the OWNER's drafts INCLUDED) the user may publish.
 
     The publish path (Plan 05) loads a DRAFT before flipping it — so unlike
-    ``list_published_workflows`` this read does NOT filter ``status='published'``;
-    it returns the draft (or published) row for an OWNED id.
+    ``list_published_workflows`` this read does NOT filter ``status='published'``
+    for the OWNER; it returns the owner's draft (or published) row for their id.
 
-    OWNER-SCOPED (V4 / T-102-05-01): mirrors the ``list_published_workflows``
-    RLS predicate — ``created_by = $2 OR is_global = true`` — for a SINGLE id.
-    A non-owner gets ``None`` (NOT another user's draft); the publish endpoint
-    converts ``None`` to a uniform 404 so a not-found and a cross-user id are
-    indistinguishable (no existence leak — T-102-05-06, the 101.1-09 404-collapse
-    precedent). ``$N`` placeholders only.
+    OWNER-SCOPED for DRAFTS (V4 / T-102-05-01 + WR-02 / T-102-09-01): a row is
+    readable only when ``created_by = $2`` (the true owner — drafts included) OR
+    it is a GLOBAL PUBLISHED row (``is_global = true AND status = 'published'``).
+    The bare ``OR is_global = true`` is GONE: a non-owner can NO LONGER load (and
+    therefore can NOT golden-run / publish-flip) another user's GLOBAL DRAFT — that
+    was a real elevation-of-privilege (a privileged state change by a non-owner). A
+    non-owner now gets ``None`` for ANY draft (including a global draft); the publish
+    endpoint converts ``None`` to a uniform 404 so a not-found and a cross-user /
+    non-owned-draft id are indistinguishable (no existence leak — T-102-05-06 /
+    T-102-09-01, the 101.1-09 404-collapse precedent). ``$N`` placeholders only.
 
     Returns ``{id, slug, version, name, status, definition, created_by}`` or
     ``None``. ``definition`` is the JSONB the caller ``model_validate``s into a
@@ -219,7 +223,7 @@ async def get_definition(
     row = await pool.fetchrow(
         "SELECT id, slug, version, name, status, definition, created_by "
         "FROM workflow_definitions "
-        "WHERE id = $1 AND (created_by = $2 OR is_global = true)",
+        "WHERE id = $1 AND (created_by = $2 OR (is_global = true AND status = 'published'))",
         definition_id,
         user_id,
     )
@@ -572,13 +576,20 @@ async def claim_run(
 # ── harness_audit (this table's own column IS run_id — correct) ──────────────
 async def write_audit(
     pool: asyncpg.Pool,
-    run_id: UUID,
+    run_id: UUID | None,
     *,
     user_id: UUID | None,
     event_type: str,
     metadata: dict,
 ) -> None:
     """INSERT one ``harness_audit`` row (INSERT-only RLS).
+
+    ``run_id`` is ``UUID | None`` (IN-02): the ``harness_audit.run_id`` column IS
+    nullable (full-schema.sql:452). A NULL ``run_id`` is the NULLABLE-RECEIPT
+    CONTRACT for receipts that precede any run — the Phase-102 stage-0/1/2
+    ``publish_blocked`` receipts are written BEFORE a golden run exists, so they key
+    to a NULL ``run_id`` and carry the definition id in ``metadata`` instead. A
+    keyed receipt (run created) passes the real run id; both are valid.
 
     ``event_type`` MUST be one of the 22 kinds in the 059 + 069 + 070 CHECK (9
     harness lifecycle/gate kinds + 7 Phase-101.1 emit-transition kinds + 6
