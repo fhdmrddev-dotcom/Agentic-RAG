@@ -278,3 +278,109 @@ async def test_forced_emit_happy_path_unchanged(_patch_gateway):
     res = await _run()
     assert res["emitted"] is not None
     assert res["failure"] is None
+
+
+# ── Phase 102-06 (CR-01) — the additive schema_model seam, driven UN-MOCKED ─────
+# These tests do NOT mock _validate_args / recover_narrated_emission / the validate
+# loop — only open_stream (via _patch_gateway). They prove the previously-hollow live
+# judge path now flows a real verdict, AND that the default path is byte-identical.
+
+
+_VALID_JUDGE_VERDICT = {
+    "overall_passed": True,
+    "overall_score": 88,
+    "grounded_in_evidence": True,
+    "answers_business_requirement": True,
+    "did_the_work_not_delegated": True,
+    "criteria": [
+        {"criterion": "grounded", "passed": True, "score": 90, "evidence": "doc-1"}
+    ],
+    "summary": "Meets the requirement.",
+}
+
+
+def _judge_verdict_stream(field_map: dict):
+    """A NATIVE stream that committed the forced `judge_verdict` tool call (the happy
+    path) — mirrors `_tool_call_stream` but names the judge emitter + a JudgeVerdict
+    payload."""
+    return [
+        {
+            "type": "finish",
+            "finish_reason": "tool_calls",
+            "tool_calls": [
+                {"id": "call_j", "name": "judge_verdict", "arguments": json.dumps(field_map)}
+            ],
+        },
+        {"type": "usage", "input_tokens": 10, "output_tokens": 20},
+    ]
+
+
+async def test_forced_emit_judge_verdict_unmocked(_patch_gateway):
+    """CR-01: a JudgeVerdict-shaped forced shot driven through forced_emit's REAL
+    validate loop (Task 1's `_model.model_validate`) with `schema_model=JudgeVerdict`
+    yields a non-None JudgeVerdict — the previously-hollow live judge path now flows a
+    verdict. Only open_stream is mocked; the validate loop runs un-mocked."""
+    from app.services.forced_emit import forced_emit
+    from app.services.harness.validator_kinds import JudgeVerdict
+
+    _patch_gateway["events"] = _judge_verdict_stream(_VALID_JUDGE_VERDICT)
+    judge_tool = [
+        {
+            "type": "function",
+            "function": {
+                "name": "judge_verdict",
+                "description": "Emit the structured quality verdict.",
+                "parameters": JudgeVerdict.model_json_schema(),
+            },
+        }
+    ]
+    result = await forced_emit(
+        messages=[{"role": "user", "content": "grade this output"}],
+        model="gpt-5.5",
+        provider="openai",
+        emitter="judge_verdict",
+        tools=judge_tool,
+        user_settings=None,
+        schema_model=JudgeVerdict,
+    )
+    assert result["emitted"] is not None
+    assert isinstance(result["emitted"], JudgeVerdict)
+    assert result["emitted"].overall_passed is True
+    assert result["failure"] is None
+
+
+async def test_forced_emit_default_still_emitfieldmap(_patch_gateway):
+    """REGRESSION (CR-01 default byte-identity): with NO `schema_model`, a valid
+    EmitFieldMap stream still validates to an EmitFieldMap (failure=None) — AND a
+    JudgeVerdict-shaped payload with NO schema_model yields `emitted is None` (the OLD
+    broken behavior is the CORRECT default — EmitFieldMap rejects a JudgeVerdict).
+    Drives the real validate loop un-mocked."""
+    from app.services.forced_emit import forced_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    # 1. Default path: a valid EmitFieldMap stream validates byte-identically.
+    _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
+    res = await forced_emit(
+        messages=[{"role": "user", "content": "fill the template"}],
+        model="gpt-5.5",
+        provider="openai",
+        emitter="render_template",
+        tools=[{"function": {"name": "render_template", "parameters": {}}}],
+        user_settings=None,
+    )
+    assert isinstance(res["emitted"], EmitFieldMap)
+    assert res["failure"] is None
+
+    # 2. A JudgeVerdict-shaped payload with NO schema_model is REJECTED by the default
+    #    EmitFieldMap validation → emitted is None (the correct default behavior).
+    _patch_gateway["events"] = _judge_verdict_stream(_VALID_JUDGE_VERDICT)
+    res2 = await forced_emit(
+        messages=[{"role": "user", "content": "grade this output"}],
+        model="gpt-5.5",
+        provider="openai",
+        emitter="judge_verdict",
+        tools=[{"function": {"name": "judge_verdict", "parameters": {}}}],
+        user_settings=None,
+    )
+    assert res2["emitted"] is None
+    assert res2["failure"] == "model_failed_to_emit"
