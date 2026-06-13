@@ -142,6 +142,51 @@ standard criteria), an overall_score, and a one-paragraph summary naming any con
 """
 
 
+def _render_field_map_for_judge(fm: dict) -> str:
+    """Render a filled emit field-map as gradeable lines — each cell's value + its source
+    citation (FINDING-06). Lets the judge SEE a document/template-fill deliverable instead
+    of a content-free confirmation. Caps the rendering so a huge map can't blow the context."""
+    lines: list[str] = []
+
+    def _cell(name: str, cell) -> str:
+        if isinstance(cell, dict):
+            src = cell.get("source_doc") or cell.get("source_chunk_id") or ""
+            return f"{name}={cell.get('value')!r} [{('cited:' + str(src)) if src else 'UNCITED'}]"
+        return f"{name}={cell!r}"
+
+    for k, cell in (fm.get("scalars") or {}).items():
+        lines.append("- " + _cell(k, cell))
+    for cname, rows in (fm.get("collections") or {}).items():
+        n = len(rows) if isinstance(rows, list) else "?"
+        lines.append(f"- {cname} (collection, {n} rows):")
+        if isinstance(rows, list):
+            for i, row in enumerate(rows):
+                if isinstance(row, dict):
+                    lines.append(f"    row {i}: " + "; ".join(_cell(fk, c) for fk, c in row.items()))
+    return "\n".join(lines)[:8000]
+
+
+def _judge_graded_text(output) -> str:
+    """The text the judge grades. For prose it is the phase ``text``; for a document /
+    template-fill deliverable the ``text`` is just a confirmation, so append a readable
+    rendering of the cited ``field_map`` (FINDING-06) + the deliverable filename. Shared
+    by the in-run llm_judge_rubric validator AND the publish-stage judge so both grade the
+    SAME thing — the actual deliverable content, never a content-free confirmation."""
+    if not isinstance(output, dict):
+        return str(output or "")
+    graded = output.get("text") or ""
+    fm = output.get("field_map")
+    if fm:
+        graded = (
+            f"{graded}\n\n--- FILLED DELIVERABLE (each cell: value + its source citation) ---\n"
+            f"{_render_field_map_for_judge(fm)}"
+        )
+    of = output.get("output_file")
+    if of:
+        graded = f"{graded}\n\n[deliverable file: {of.get('filename') or of.get('path')}]"
+    return graded
+
+
 # ── 1. citations_required (wraps check_coverage; D-14 two modes) ──────────────
 @register_validator("citations_required")
 async def _validate_citations_required(output: dict, config: dict, ctx) -> GateResult:
@@ -360,10 +405,7 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
         "business_requirement", ""
     )
     author_criteria = config.get("criteria") or "(none)"
-    graded = _output_text(output)
-    of = output.get("output_file")
-    if of:
-        graded = f"{graded}\n\n[deliverable: {of.get('filename') or of.get('path')}]"
+    graded = _judge_graded_text(output)  # FINDING-06: prose + cited field_map + deliverable
 
     # Resolve the INDEPENDENT judge model (D-03) — config override, ctx, then the
     # shared resolver (WR-05) so the in-run validator gets the SAME registry default

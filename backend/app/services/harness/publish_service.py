@@ -655,6 +655,7 @@ async def _judge_golden_output(
     from app.services.harness.validator_kinds import (  # function-local
         JUDGE_RUBRIC_CORE,
         JudgeVerdict,
+        _judge_graded_text,
         resolve_judge_model,
     )
 
@@ -671,13 +672,10 @@ async def _judge_golden_output(
     if provider is None:
         return {"failure": f"no provider for judge model {model!r}"}
 
-    # Build the graded text from the golden run's final output (the deliverable).
-    graded = final_output.get("text") if isinstance(final_output, dict) else None
-    if not graded:
-        graded = str(final_output)
-    of = final_output.get("output_file") if isinstance(final_output, dict) else None
-    if of:
-        graded = f"{graded}\n\n[deliverable: {of.get('filename') or of.get('path')}]"
+    # Build the graded text from the golden run's final output (the deliverable). FINDING-06:
+    # _judge_graded_text appends the cited field_map for a document/template-fill deliverable
+    # (whose `text` is only a confirmation) so the judge grades the actual content + citations.
+    graded = _judge_graded_text(final_output)
 
     # The rubric core (fixed) + the business_requirement woven as DATA (T-102-03-02).
     # The author's per-workflow criteria ride the llm_judge_rubric ValidatorSpec.config
