@@ -76,6 +76,61 @@ def test_output_file_valid_reopens():
     assert closed.passed is False  # fails closed, no crash
 
 
+def test_output_file_valid_config_path_out_of_workspace_refused():
+    """WR-07: an author-supplied ``config["path"]`` must resolve through the run's
+    workspace (``get_file_by_path``) — an out-of-workspace path is REFUSED, never
+    opened. With a ctx whose ``get_file_by_path`` returns None, the gate fails and
+    ``assert_integrity`` is NEVER called (no raw server-filesystem open / oracle)."""
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["output_file_valid"]
+
+    # An author-controlled path with NO of.get("path") — the config[path] branch.
+    output = {"output_file": {"filename": "passwd.docx"}}
+    config = {"path": "/etc/passwd.docx"}
+    ctx = SimpleNamespace(pool=object(), thread_id="thread-1")
+
+    # The workspace lookup says this path is NOT a workspace file → refuse.
+    get_file = AsyncMock(return_value=None)
+    assert_integrity = patch(
+        "app.services.template_render_service.assert_integrity"
+    )
+
+    with patch("app.db.workspace.get_file_by_path", get_file), assert_integrity as ai:
+        result = asyncio.run(validator(output, config, ctx))
+
+    assert result.passed is False
+    # The out-of-workspace path was refused, NOT opened.
+    ai.assert_not_called()
+    get_file.assert_awaited_once()
+
+
+def test_output_file_valid_no_workspace_context_refused():
+    """WR-07: a ``config["path"]`` with no ctx pool/thread_id to resolve it against
+    fails closed ('no workspace context') — never a raw open."""
+    import asyncio
+    from unittest.mock import patch
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["output_file_valid"]
+    output = {"output_file": {"filename": "out.docx"}}
+    config = {"path": "/srv/secret.docx"}
+
+    with patch("app.services.template_render_service.assert_integrity") as ai:
+        result = asyncio.run(validator(output, config, None))  # ctx=None → no pool/thread
+
+    assert result.passed is False
+    assert "workspace" in str(result.error_message).lower()
+    ai.assert_not_called()
+
+
 def test_structure_check_loose():
     """``structure_check`` loose mode: named sections present, order-insensitive,
     extras allowed (D-14). A missing section fails."""

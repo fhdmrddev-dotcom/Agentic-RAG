@@ -227,7 +227,40 @@ async def _validate_output_file_valid(output: dict, config: dict, ctx) -> GateRe
         )
 
     # OOXML: re-open the file on disk via assert_integrity (the corruption oracle).
-    path = of.get("path") or config.get("path")
+    # The render-driver path (of.get("path"), produced THIS run, already
+    # workspace-managed) re-opens directly; an AUTHOR-supplied config["path"] is
+    # workspace-scoped first (WR-07 — never a raw server-filesystem open driven by
+    # definition JSONB).
+    path = of.get("path")
+    if not path:
+        cfg_path = config.get("path")
+        if cfg_path:
+            # WR-07: resolve the author-controlled config["path"] through the run's
+            # workspace (the workspace_file_exists pattern) — an out-of-workspace
+            # path is REFUSED, never opened as a filesystem existence/type oracle.
+            pool = getattr(ctx, "pool", None)
+            thread_id = getattr(ctx, "thread_id", None)
+            if pool is None or not thread_id:
+                return GateResult(
+                    False,
+                    "output_file_valid: no workspace context to resolve config.path",
+                )
+            from app.db.workspace import get_file_by_path  # function-local
+
+            row = await get_file_by_path(pool, thread_id, cfg_path)
+            if row is None:
+                return GateResult(
+                    False,
+                    f"output_file_valid: {cfg_path!r} is not a workspace file",
+                )
+            # Re-open the workspace-managed location, NOT the raw config["path"].
+            path = row.get("content_storage_path") or row.get("path")
+            if not path:
+                return GateResult(
+                    False,
+                    f"output_file_valid: {cfg_path!r} has no stored location to re-open",
+                )
+
     if not path:
         # No physical path to re-open, but a pre-computed opened=True verdict is OK.
         if of.get("opened") is True and of.get("residual_clean", True):
@@ -238,8 +271,11 @@ async def _validate_output_file_valid(output: dict, config: dict, ctx) -> GateRe
 
     try:
         verdict = assert_integrity(path, ext)
-    except Exception as e:  # noqa: BLE001 — a corrupt/unopenable file fails the gate, never crashes
-        return GateResult(False, f"output_file_valid: {filename} failed re-open: {e}")
+    except Exception:  # noqa: BLE001 — a corrupt/unopenable file fails the gate, never crashes
+        # WR-07: no raw exception text (no filesystem oracle via differing errors).
+        return GateResult(
+            False, f"output_file_valid: {filename} failed integrity re-open"
+        )
 
     if not verdict.get("opened"):
         return GateResult(False, f"output_file_valid: {filename} did not re-open")
