@@ -35,6 +35,13 @@ The run itself completed correctly (output intact, phase completed, no data loss
 
 **Worse variant (L6 row, kimi-k2.6/Moonshot, screenshot `Screenshot 2026-06-10 123038.png`):** TWO bare assistant avatars with NO "Setting up agent..."/"Starting workflow..." placeholder text at all — the streaming placeholder text vanished entirely on a slow-provider run, leaving only empty avatar shells. Timer reset reproduced across BOTH parallel threads (the Deep thread's tool panel stayed correct).
 
+## Update — reproduced + DB-confirmed render-only during Phase 102 UAT (2026-06-13)
+
+Re-observed during Phase 102 freshness `ask_user` live UAT (DeepSeek `deepseek-v4-flash`, workflow `fresh-pause-102uat`):
+- **At KICKOFF (flow start), not just on nav:** an orphan empty assistant avatar (no content) appears, and is sometimes **duplicated at start — one orphan avatar + one showing "starting workflow"**. This pins a second trigger beyond nav-back: the run-kickoff optimistic placeholder + the first SSE event double-mount (the S3 MessageList key-mismatch / S4 optimistic+reconcile-race seams).
+- **CONFIRMED render-only (not a data dup):** the backend has exactly **1 assistant message row** per run (`messages` where role='assistant' = 1 for both the Proceed run ccec4354 and the Abort run 146a3bc2). The duplicate/orphan is purely a frontend render artifact — no duplicated message, no data loss. The freshness pause itself worked correctly (Proceed → completed + `validator_ask_user_approved` receipt; Abort → honest fail).
+- **NOT a Phase 102 regression:** Phase 102 changed zero frontend files (all fixes were backend: publish_service / forced_emit / validator_kinds). This is the same pre-existing chat-surface bug; DeepSeek's first-token latency amplifies the empty-avatar window.
+
 ## Why it matters
 
 The run timer is the operator's primary "is this stuck?" signal during long workflow runs; a timer that restarts on every navigation makes a 5-minute run look like it just started, defeating run honesty (Phase 094/095 design goals). The duplicate empty avatar reads as a broken/phantom message. Both erode trust in the live-execution surface, especially during slow provider runs (Google) where the operator is most likely to navigate away.
