@@ -46,7 +46,38 @@ from app.services.harness.validators import (
     register_validator,
 )
 
-__all__ = ["JudgeVerdict", "JudgeCriterionVerdict", "JUDGE_RUBRIC_CORE"]
+__all__ = [
+    "JudgeVerdict",
+    "JudgeCriterionVerdict",
+    "JUDGE_RUBRIC_CORE",
+    "resolve_judge_model",
+]
+
+
+# ── shared judge-model resolution (WR-05) ─────────────────────────────────────
+def resolve_judge_model(settings) -> str | None:
+    """Resolve the INDEPENDENT judge model the same way on BOTH the publish path and
+    the in-run ``llm_judge_rubric`` validator (WR-05 — the documented knob
+    ``Settings.harness_judge_model`` must resolve identically everywhere).
+
+    Resolution order (D-03 — never the run model; a forceable model so the verdict is
+    truncation-safe):
+      1. ``settings.harness_judge_model`` if set.
+      2. else the first registry default in ``("claude-opus-4-8", "gpt-5.5")`` whose
+         ``get_model_capability(candidate).get("forced_emission")`` is truthy.
+      3. else ``None`` (the caller emits an honest "no judge model resolved" failure).
+    """
+    model = getattr(settings, "harness_judge_model", None)
+    if model:
+        return model
+
+    from app.config import get_model_capability  # function-local (Pitfall 4)
+
+    for candidate in ("claude-opus-4-8", "gpt-5.5"):
+        cap = get_model_capability(candidate) or {}
+        if cap.get("forced_emission"):
+            return candidate
+    return None
 
 
 # ── the judge verdict schema (forced emission; flat, depth-2, extra=forbid) ────
@@ -292,12 +323,14 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
     if of:
         graded = f"{graded}\n\n[deliverable: {of.get('filename') or of.get('path')}]"
 
-    # Resolve the INDEPENDENT judge model (D-03) — config override, ctx, then setting.
+    # Resolve the INDEPENDENT judge model (D-03) — config override, ctx, then the
+    # shared resolver (WR-05) so the in-run validator gets the SAME registry default
+    # (claude-opus-4-8 / gpt-5.5) the publish path resolves.
     model = config.get("model") or getattr(ctx, "judge_model", None)
     if model is None:
         from app.config import settings  # function-local
 
-        model = getattr(settings, "harness_judge_model", None)
+        model = resolve_judge_model(settings)
     if model is None:
         return GateResult(
             False,
@@ -320,10 +353,11 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
     )
     messages = [{"role": "user", "content": graded}]
     # The verdict tool schema is built from JudgeVerdict (Pitfall-4-safe — pure
-    # Pydantic, no docxtpl). forced_emit is unmodified: it parses the forced tool
-    # call against its EmitFieldMap shape, so the LIVE judge path re-validates the
-    # raw result as a JudgeVerdict (see _evaluate_judge_verdict). A failure/None
-    # result is an honest fail — never a silent pass.
+    # Pydantic, no docxtpl). CR-01: forced_emit now takes an additive ``schema_model``
+    # so the forced tool call is validated against JudgeVerdict directly — ``emitted``
+    # is a JudgeVerdict (not None) on success. forced_emit stays verdict-AGNOSTIC (it
+    # never imports JudgeVerdict); the verdict parse lives here. A failure/None result
+    # is an honest fail — never a silent pass.
     judge_tool = [
         {
             "type": "function",
@@ -342,6 +376,7 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
         tools=judge_tool,
         user_settings=getattr(ctx, "user_settings", None),
         system_prompt=system_prompt,
+        schema_model=JudgeVerdict,
     )
     if result.get("failure") or result.get("emitted") is None:
         return GateResult(

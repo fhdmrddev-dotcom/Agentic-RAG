@@ -59,13 +59,9 @@ async def publish_workflow(
       - success -> 200 ``{published: True, version, golden_run_id}``
     """
     # Function-local heavy imports (Pitfall 4 — no engine/render import at module top).
-    from app.db.workflows import (
-        create_workflow_run,
-        get_definition,
-        load_run_phases,
-        publish_definition,
-        write_audit,
-    )
+    # IN-01: create_workflow_run / load_run_phases / write_audit are used only by the
+    # helpers (which re-import them locally) — publish_workflow itself needs only these.
+    from app.db.workflows import get_definition, publish_definition
     from app.models.harness import WorkflowDefinition
     from app.services.harness.reachability import lint_workflow
 
@@ -201,10 +197,24 @@ async def publish_workflow(
         )
 
     # ── stage 4: the judge verdict (the QUAL-01 hard blocker) ────────────────────
+    # IN-04: forward the run owner's effective settings to the judge shot (the SAME
+    # cached read the golden run used — D-v2.5-01) instead of user_settings=None, so the
+    # judge provider's gateway key/config resolution is owner-bound. Best-effort: a load
+    # failure degrades to None (the judge still resolves an independent forceable model).
+    owner_settings = None
+    try:
+        from app.models.user_settings import load_user_settings  # function-local
+
+        owner_settings = load_user_settings(str(user_id))
+    except Exception:  # noqa: BLE001 — judge falls back to its independent model resolution
+        logger.warning(
+            "publish: owner settings load failed for %s (judge shot)", user_id, exc_info=True
+        )
     verdict = await _judge_golden_output(
         definition=definition,
         final_output=final_output,
         pool=pool,
+        owner_settings=owner_settings,
     )
     # The verdict is recorded REGARDLESS of pass/fail (governance — Phase 107).
     await _safe_audit(
@@ -468,7 +478,9 @@ async def _drive_golden_run(
     return run_id, final_output, terminal_status
 
 
-async def _judge_golden_output(*, definition, final_output: dict, pool) -> dict:
+async def _judge_golden_output(
+    *, definition, final_output: dict, pool, owner_settings=None
+) -> dict:
     """Run the forced judge shot over the golden run's final output (the QUAL-01 gate).
 
     Reuses the Plan-03 ``llm_judge_rubric`` machinery: it runs the forced judge shot
@@ -476,28 +488,24 @@ async def _judge_golden_output(*, definition, final_output: dict, pool) -> dict:
     independent judge model per D-03) and returns the verdict dict. A ``failure``/None
     result is an honest fail — a coerce/weak judge can NEVER silently produce a pass.
 
+    ``owner_settings`` (IN-04) is the run owner's effective settings forwarded into the
+    judge shot's ``forced_emit`` (the gateway key/config resolution) — consistent with
+    the in-run validator's ``ctx.user_settings`` forwarding; ``None`` degrades gracefully.
+
     Returns the JudgeVerdict dict, or ``{"failure": <reason>}`` on an honest failure.
     """
+    from app.config import get_model_capability, settings
     from app.services.harness.validator_kinds import (  # function-local
         JUDGE_RUBRIC_CORE,
         JudgeVerdict,
+        resolve_judge_model,
     )
 
-    # Resolve the INDEPENDENT judge model (D-03) — the harness_judge_model setting,
+    # Resolve the INDEPENDENT judge model (D-03) via the SHARED resolver (WR-05) — the
+    # SAME registry default (claude-opus-4-8 / gpt-5.5) the in-run validator resolves;
     # never the run model (no self-judging; a coerce-tier run model never becomes the
     # publish blocker's weak link).
-    from app.config import get_model_capability, settings
-
-    model = getattr(settings, "harness_judge_model", None)
-    if model is None:
-        # Resolve a forced_emission-capable default (D-01 — a forceable judge model so
-        # the verdict is truncation-safe). The 101.1 SUMMARY confirmed claude-opus-4-8 /
-        # gpt-5.5 carry forced_emission:True; prefer claude-opus-4-8.
-        for candidate in ("claude-opus-4-8", "gpt-5.5"):
-            cap = get_model_capability(candidate) or {}
-            if cap.get("forced_emission"):
-                model = candidate
-                break
+    model = resolve_judge_model(settings)
     if model is None:
         return {"failure": "no judge model resolved (Settings.harness_judge_model unset)"}
 
@@ -542,8 +550,9 @@ async def _judge_golden_output(*, definition, final_output: dict, pool) -> dict:
             provider=provider,
             emitter="judge_verdict",
             tools=judge_tool,
-            user_settings=None,
+            user_settings=owner_settings,  # IN-04: owner-bound, not None
             system_prompt=system_prompt,
+            schema_model=JudgeVerdict,  # CR-01: validate the forced shot as a verdict
         )
     except Exception as e:  # noqa: BLE001 — a judge-shot crash is an honest failure, never a pass
         logger.exception("publish: judge forced_emit raised")
@@ -554,9 +563,10 @@ async def _judge_golden_output(*, definition, final_output: dict, pool) -> dict:
 
     emitted = result["emitted"]
     raw = emitted.model_dump() if hasattr(emitted, "model_dump") else emitted
-    # The forced shot parses against EmitFieldMap, so re-validate the raw result as a
-    # JudgeVerdict (the validator's live-path discipline — the verdict parse lives here,
-    # not in forced_emit, which is byte-untouched).
+    # CR-01: forced_emit validated the forced shot against JudgeVerdict (schema_model),
+    # so ``emitted`` is already a JudgeVerdict — this re-validation is the real (no
+    # longer dead) verdict parse. forced_emit stays verdict-AGNOSTIC; the caller owns
+    # the verdict parse.
     try:
         return JudgeVerdict.model_validate(raw).model_dump()
     except Exception as e:  # noqa: BLE001
