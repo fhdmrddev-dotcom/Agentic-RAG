@@ -155,6 +155,12 @@ async def _render_template_post(
         # Truncation was already guarded by forced_emit (D-08 layer 4) before the gate;
         # pass empty meta so the handler's re-check is a no-op (never re-rejects a clean shot).
         "emission_meta": {},
+        # CR-02 (102-08): thread the applied non-strict citation policy (flag/partial/draft)
+        # so the handler's own citation gate becomes POLICY-AWARE — the policy decision was
+        # already made + receipted + the map deliberately marked/blanked/labeled upstream.
+        # None on the strict path (the key absent in resolved_template) → the gate rejects
+        # an uncited map exactly as today (byte-identical default trust bar).
+        "citation_policy_applied": resolved_template.get("citation_policy_applied"),
     }
 
     result = await _handle_render_template(args, ctx)

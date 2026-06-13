@@ -1603,7 +1603,16 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
         placeholder_keys = list(field_map.keys())
 
     stats = check_coverage(field_map, retrieved_ids, placeholder_keys)
-    if stats["uncited_value_count"] > 0 or stats["invented_citation_count"] > 0:
+    # CR-02 (102-08): the gate is POLICY-AWARE. When a non-strict citation_policy
+    # (flag/partial/draft) was applied UPSTREAM (the executor's _exec_llm_emit non-strict
+    # branch set citation_policy_applied — a server-set value, never the model/definition
+    # JSONB), the map was DELIBERATELY marked/blanked/labeled and the policy decision was
+    # already made + receipted (policy_applied) + surfaced-on-success. The gate no longer
+    # re-rejects that policy-modified map. The STRICT path (no citation_policy_applied)
+    # rejects an uncited/invented map exactly as today — the default trust bar holds
+    # byte-identical (T-102-08-01).
+    if (stats["uncited_value_count"] > 0 or stats["invented_citation_count"] > 0) \
+            and not args.get("citation_policy_applied"):
         return ToolResult(result=_json_local.dumps({
             "status": "rejected",
             "reason": "uncited_or_invented",

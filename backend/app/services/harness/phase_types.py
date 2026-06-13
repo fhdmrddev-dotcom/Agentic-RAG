@@ -1169,6 +1169,9 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         # (the user-facing half of "never a silent pass-off" — T-102-04-03). None on the
         # strict path (which never reaches the render after a citation rejection).
         policy_applied_summary: str | None = None
+        # CR-02 (102-08): the non-strict policy threaded onto the render payload (None on
+        # the strict / gate-passed path → the handler gate stays byte-identical strict).
+        policy_applied_value: str | None = None
         for attempt in range(1, _EMIT_MAX_ATTEMPTS + 1):
             await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
             forced_md = _emit_audit_metadata(
@@ -1299,9 +1302,32 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             from app.services.harness.emit_policy import apply_citation_policy
 
             applied = apply_citation_policy(legacy_map, gate, citation_policy)
+            # WR-06 (102-08): the policy named offenders but matched ZERO leaves to modify
+            # (a no-op) — honest-fail back to STRICT rather than claiming a false success.
+            # Route through the EXISTING strict honest-fail path (byte-identical) and do
+            # NOT set citation_policy_applied (the render gate stays strict).
+            if not applied.get("delivered", True):
+                msg = (
+                    "The emitted field-map has uncited or invented values that the "
+                    f"'{citation_policy}' citation policy could not safely mark or blank "
+                    f"({applied.get('reason') or 'no matching leaves'}); failing back to "
+                    "strict. The deliverable was NOT produced; the cited field-map is "
+                    "preserved in the run's phase record."
+                )
+                await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")
+                await _surface_failure_message(ctx, run_id, msg, pool)
+                return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+
             legacy_map = applied["field_map"]  # the marked/blanked/as-is map to render
             policy_summary = applied.get("coverage_summary") or applied.get("draft_label") or ""
             policy_applied_summary = policy_summary  # carried into the render-success text
+            # CR-02 (102-08): thread the applied policy onto the resolved render payload so
+            # the handler's own citation gate becomes POLICY-AWARE — the policy decision was
+            # already made + receipted (policy_applied) and is surfaced ON SUCCESS only
+            # (IN-03). The value is present ONLY on this non-strict deliver branch; strict
+            # never reaches here, so its resolved payload carries no such key and the gate
+            # rejects exactly as today (byte-identical).
+            policy_applied_value = citation_policy
             # policy_applied receipt (the Plan-01 kind, live on migration 070) — the
             # governance record that a non-strict policy delivered unverified data.
             policy_md = _emit_audit_metadata(
@@ -1313,9 +1339,12 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             if applied.get("gap_list"):
                 policy_md["gap_list"] = applied["gap_list"]
             await _emit_audit(ctx, event_type="policy_applied", metadata=policy_md)
-            # Surface the coverage summary visibly (never silent — the user SEES that the
-            # deliverable carries unverified/blanked/draft content).
-            await _surface_failure_message(ctx, run_id, policy_summary, pool)
+            # IN-03 (102-08): do NOT surface the policy summary pre-render. The user must
+            # never be told a delivery succeeded before the render actually succeeds — the
+            # summary is folded into the render-SUCCESS text (the single surface) below, and
+            # a render FAILURE after the policy surfaces a FAILURE message (not the summary)
+            # via the state-c/state-d paths. This kills the "told delivered then told
+            # failed" contradiction AND the 101.1 duplicate-message echo.
             # Fall through to the render path with the modified map (the deliverable IS
             # produced, marked/blanked/labeled).
             break
@@ -1352,6 +1381,12 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         resolved = dict(src)
         resolved["asset_ref"] = asset_ref
         resolved["retrieved_ids"] = sorted(retrieved_ids)
+        # CR-02 (102-08): present ONLY when a non-strict policy delivered an uncited map
+        # — the emitter copies it into the handler args so the citation gate is policy-
+        # aware (does not re-reject the deliberately-modified map). None on the strict +
+        # gate-passed paths → the handler gate rejects exactly as today (byte-identical).
+        if policy_applied_value is not None:
+            resolved["citation_policy_applied"] = policy_applied_value
         # WR-03 (101.1 review): hand the render a ctx whose run_id is the PRODUCER
         # stream (the one the frontend tails) so the handler's live
         # workspace_file_written event renders the file card mid-run — never the
