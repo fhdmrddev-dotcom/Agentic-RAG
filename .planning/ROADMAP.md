@@ -47,7 +47,7 @@
 - [x] **Phase 100: Ephemeral Template Upload** ✓ COMPLETE (2026-06-10) - Upload a docx/pptx/xlsx for one run, workspace-only, TTL + sweep, never ingested, never in search
 - [ ] **Phase 101: Template-Fill + Integrity Validation** - Fill that exact template from project-KB content via a cited field-map; re-open to assert integrity; SSTI contained
 - [ ] **Phase 101.1: Guaranteed Structured Emission Layer (Template-Fill Gap-Closure)** - Shared forced-emission primitive (`llm_emit` + emitter registry + capability-tiered gateway forcing + native-path recovery + audit receipt) so ANY deliverable phase works cross-provider with the no-model-code/cited/reproducible guarantee; template-fill is its first instance, closing the GAP-A..D live 0-docx failure
-- [ ] **Phase 102: Reusable Validation-Gate Library + Output-Quality Gate** - A library of validator kinds for any phase + a HARD publish-blocking output-quality judge gate
+- [x] **Phase 102: Reusable Validation-Gate Library + Output-Quality Gate** ✓ COMPLETE (2026-06-13) - A library of validator kinds for any phase + a HARD publish-blocking output-quality judge gate (verify-work 7/7 LIVE + secure-phase 34/34 threats closed, threats_open: 0)
 - [ ] **Phase 103: Workflows Page + Authoring API + NL Authoring** - Describe → draft → refine in a form → read-only graph → publish → run from a thread (no drag canvas)
 - [ ] **Phase 104: PM Flagship Content Pack** - PM templates + workflow defs + register schemas authored on the generic primitives; headline single template-fill demo
 
