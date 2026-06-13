@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: verifying
-last_updated: "2026-06-12T07:44:20Z"
-last_activity: 2026-06-12
+last_updated: "2026-06-13T19:00:00.000Z"
+last_activity: 2026-06-13
 progress:
   total_phases: 14
-  completed_phases: 7
-  total_plans: 45
-  completed_plans: 45
-  percent: 100
+  completed_phases: 6
+  total_plans: 52
+  completed_plans: 49
+  percent: 94
 ---
 
 # Project State
@@ -26,10 +26,21 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 102 (reusable-validation-gate-library-output-quality-gate) — ALL 5 PLANS EXECUTED
-Plan: 5 of 5 — COMPLETE
-Status: Phase complete — ready for `/gsd:verify-work 102` (the SC#10 4-axis golden-run scoreboard) then `/gsd:secure-phase 102`
-Last activity: 2026-06-12
+Phase: 102 (reusable-validation-gate-library-output-quality-gate) — ALL 9 PLANS EXECUTED (5 core + 4 gap-closure)
+Plan: 9 of 9 — COMPLETE (gap plans 06-09 landed; the 3 `gaps_found` truths are now CLOSED in code)
+Status: Phase code-complete — ready for RE-VERIFY `/gsd:verify-work 102` (the SC#10 4-axis golden-run scoreboard, the LIVE D-05 acceptance) then `/gsd:secure-phase 102`
+Last activity: 2026-06-13
+
+**Phase 102 GAP-CLOSURE (waves 5-7, plans 06-09) — EXECUTED 2026-06-13.** The prior `/gsd:verify-work 102` returned `gaps_found` (1/3 truths green, 3 mock-masked live paths); the code review filed CR-01/CR-02/WR-01..08/IN-01..04. Four gap plans (plan-checker PASSED) executed sequential-on-main-tree (worktrees off — venv-relative verify); all 4 SUMMARYs `Self-Check: PASSED`, G-5 held (`threads.py`/`agent_loop.py` byte-untouched across all 16 commits), combined target suites **74 passed / 0 failed**, net-new failures **0** per-plan (base-checkout proven):
+
+- **102-06 (Wave 5, keystone CR-01)** — `forced_emit` gains an additive `schema_model: type[BaseModel] | None = None` seam (`_model = schema_model or EmitFieldMap`; default byte-identical, forced_emit stays verdict-agnostic). Both judge callers wired to `schema_model=JudgeVerdict` via a shared `resolve_judge_model` helper (WR-05); publish judge forwards `owner_settings` (IN-04); unused imports dropped (IN-01). An UN-MOCKED integration test drives the real validate loop → a `JudgeVerdict` now flows (previously `emitted` was ALWAYS None → every publish blocked at `stage=judge`). Commits `98146e54`/`a7816937`/`260c0a0b`/`2ac93f57`.
+- **102-07 (Wave 6, GATE-01 validator live paths)** — freshness preflight now fires live via the `folder_subtree_ids` ctx fallback (WR-01 — was always "no KB scope context"); `output_file_valid` resolves `config[path]` through the workspace (`get_file_by_path`), refusing out-of-workspace paths (WR-07 oracle closed); version-ambiguity `ask_user` offers honest choices ("Proceed despite version ambiguity"/"Abort") + a v1-cut receipt note (WR-08). 20/20 target tests green. Commits `aa437939`/`ba080a56`/`66de7a41`/`f337f42f`.
+- **102-08 (Wave 6, CR-02 citation_policy delivery)** — non-strict `citation_policy` (flag/partial/draft) now DELIVERS: `citation_policy_applied` threaded `phase_types → emitters → tool_dispatcher`, the render gate is policy-aware (rejects only when uncited/invented AND no policy applied); strict stays byte-identical. `emit_policy` matches the full `(location,field)` leaf pair + invented_leaves, fails back to strict on a no-op verdict (WR-06); the policy summary surfaces only AFTER a successful render (IN-03). An un-mocked render round-trip drives the real `_handle_render_template` gate. 16/16 target tests green. Commits `bcf642f3`/`7dbe72a1`/`b29f9722`/`2e1eb3ca`.
+- **102-09 (Wave 7, QUAL-01 publish security)** — owner-only `get_definition` publish read (`created_by=$2 OR (is_global AND status='published')` — WR-02 EoP closed, a non-owner can no longer publish a global DRAFT); `version==-1` sentinel → honest `already_published` block (WR-03, no false `publish_succeeded` receipt); `asyncio.wait_for(harness_publish_max_seconds)` golden-run deadline → `golden_run_timeout` + interactive-phase (`llm_human_input`/`ask_user`) pre-run block (WR-04 minimum-viable — the full background-job rework stays deferred to 103); nullable `write_audit(run_id)` annotation (IN-02). No new migration (config knob only). 20/20 target tests green. Commits `1fedb596`/`78aad9ee`/`18eff014`/`1b6c99e8`.
+
+**Orchestrator decision (auditable):** the post-execution `code_review_gate` formal re-run (`Skill gsd:code-review`) was DEFERRED — these 4 plans ARE the implementation of `102-REVIEW.md`'s findings (re-running would overwrite that foundational finding→plan mapping and isn't in the recorded next-step plan). Diligence was instead satisfied by each plan's own STRIDE threat model + un-mocked tests + the green combined suite + per-plan net-new=0 base-checkout proof. Run `/gsd:code-review 102` manually if a fresh formal review is wanted before secure-phase.
+
+**Next:** `/gsd:verify-work 102` (re-verify the 3 previously-failed truths LIVE — the judge now produces a real verdict; a lint-clean good-output workflow reaches a real `overall_passed`; the freshness preflight fires; non-strict citation_policy delivers) then `/gsd:secure-phase 102`. Then Phase 103 (Workflows page + NL authoring — a client of `POST /workflows/{id}/publish`; G-2 sketch-before-plan FIRES).
 
 **Plan 102-05 (Wave 4, the QUAL-01 server-side publish path — D-07/D-08) — COMPLETE (2026-06-12):**
 
@@ -459,4 +470,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 102 (Reusable Validation-Gate Library + Output-Quality Gate) — 5 plans — 2026-06-11T22:34:10.657Z
+**Planned Phase:** 102 (reusable-validation-gate-library-output-quality-gate) — 9 plans — 2026-06-13T14:06:44.992Z
