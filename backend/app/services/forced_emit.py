@@ -46,7 +46,7 @@ from typing import Any
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from app.config import get_model_capability
+from app.config import get_model_capability, settings
 from app.services.provider_gateway import CallingMode, GatewayRequest, open_stream
 from app.services.template_render_service import EmitFieldMap, is_truncated
 from app.services.tool_parser import parse_structured_tool_calls
@@ -237,6 +237,32 @@ async def forced_emit(
     forced = bool(cap.get("forced_emission", False))  # default-SAFE — a miss is coerce
     strict = bool(cap.get("strict_json_schema", False))
     tier = "TIER-FORCE" if forced else "TIER-COERCE"
+
+    # Cross-provider key resolution (102-UAT-02). A forced shot may TARGET a provider that
+    # is NOT the caller's active provider — the judge (D-03 independent model) is the first
+    # such caller. The gateway adapters resolve api_key from the SINGLE active-provider
+    # ``user_settings.llm_api_key`` (provider_gateway/anthropic.py:59 / google.py / openai),
+    # so a cross-provider shot would be handed the WRONG provider's key → 401 → provider_error.
+    # Resolve the TARGET provider's per-provider key here and inject it on a COPY of the
+    # caller's settings. Fires ONLY when (a) the target provider differs from the active
+    # provider AND (b) the caller passed a real settings model AND (c) the env carries that
+    # provider's key — so the active-provider path (Deep emit) is byte-identical (no copy).
+    _active_provider = (getattr(user_settings, "active_provider", "") or settings.llm_provider or "")
+    if provider and provider != _active_provider and hasattr(user_settings, "model_copy"):
+        _target_key = getattr(settings, f"{provider}_api_key", "")
+        if _target_key:
+            _updates = {"llm_api_key": _target_key}
+            # FINDING-05 (102-UAT): the openai-compat path (openai/openrouter/deepseek/
+            # moonshot/minimax/zhipu) resolves the ENDPOINT from ``llm_base_url`` — the
+            # active provider's by default. A cross-provider shot must ALSO carry the
+            # TARGET provider's base_url, else the right key is sent to the wrong endpoint
+            # (e.g. an openrouter key → api.openai.com → 401). Native adapters (anthropic/
+            # google) ignore llm_base_url (fixed SDK endpoints), so this is harmless there;
+            # "" (openai target) → the SDK's own default endpoint.
+            from app.config import _PROVIDER_BASE_URLS  # function-local
+            if provider in _PROVIDER_BASE_URLS:
+                _updates["llm_base_url"] = _PROVIDER_BASE_URLS[provider]
+            user_settings = user_settings.model_copy(update=_updates)
 
     _system = system_prompt
     if forced:

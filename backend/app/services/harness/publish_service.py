@@ -547,10 +547,35 @@ async def _drive_golden_run(
         is_golden_run=True,
     )
 
+    # ── 3b. mint the producer-shell `runs` row (FK fix — mirrors _build_resume_context
+    #        Facet C, 092-07). A harness sub-agent's parent_run_id FKs `runs.run_id`, so
+    #        `ctx.producer_run_id` MUST be a real `runs` row — NOT the workflow_run id
+    #        (which lives in `workflow_runs` and raises `runs_parent_run_id_fkey` on the
+    #        first sub-agent spawn). This golden-run ctx build site was the UNPATCHED case
+    #        `phase_types._build_sub_agent_parent_context` warns of (live producer + both
+    #        resume sites mint/borrow a real runs row; the publish path did not). The shell
+    #        never makes an LLM call; placeholder model/provider are bookkeeping only.
+    from uuid import uuid4
+    from app.db.runs import finalize_run, insert_run
+
+    _producer_id = uuid4()
+    _thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
+    _user_uuid = user_id if isinstance(user_id, UUID) else UUID(str(user_id))
+    await insert_run(
+        pool,
+        run_id=_producer_id,
+        thread_id=_thread_uuid,
+        user_id=_user_uuid,
+        status="streaming",
+        model="unknown",
+        provider="unknown",
+        parent_run_id=None,
+    )
+
     # ── 4. build the minimal validation ctx (mirrors _build_resume_context) ──────
     ctx = SimpleNamespace(
         run_id=run_id,
-        producer_run_id=run_id,  # no separate producer row for a publish run
+        producer_run_id=_producer_id,  # real `runs` shell (sub-agent FK), NOT the workflow_run id
         thread_id=str(thread_id),
         current_user={"id": str(user_id)},
         user_settings=owner_settings,
@@ -567,25 +592,47 @@ async def _drive_golden_run(
         per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),
     )
 
-    # ── 5. drive the real run end-to-end (the engine owns the terminal status) ───
-    await run_workflow(run_id, definition, ctx, pool=pool, redis=redis, stream_run_id=run_id)
+    # ── 5+6. drive the real run end-to-end + harvest, ALWAYS terminalizing the
+    #         producer shell on exit (no stranded 'streaming' row → the F2 self-heal
+    #         stays intact; mirrors the resume caller's "MUST terminalize" contract). ──
+    from datetime import datetime, timezone
 
-    # ── 6. harvest the terminal status + the final phase output for the judge ────
-    phases = await load_run_phases(pool, run_id)
-    terminal_status = "failed" if any(p.get("status") == "failed" for p in phases) else "completed"
-    final_output: dict = {}
-    for p in sorted(phases, key=lambda q: q.get("phase_index", 0)):
-        out = p.get("output")
-        if isinstance(out, str):
-            import json
+    _shell_status = "failed"
+    try:
+        await run_workflow(run_id, definition, ctx, pool=pool, redis=redis, stream_run_id=run_id)
 
-            try:
-                out = json.loads(out)
-            except (ValueError, TypeError):
-                out = None
-        if isinstance(out, dict):
-            final_output = out  # the LAST phase with an output wins (the deliverable)
-    return run_id, final_output, terminal_status
+        phases = await load_run_phases(pool, run_id)
+        terminal_status = "failed" if any(p.get("status") == "failed" for p in phases) else "completed"
+        final_output: dict = {}
+        for p in sorted(phases, key=lambda q: q.get("phase_index", 0)):
+            out = p.get("output")
+            if isinstance(out, str):
+                import json
+
+                try:
+                    out = json.loads(out)
+                except (ValueError, TypeError):
+                    out = None
+            if isinstance(out, dict):
+                final_output = out  # the LAST phase with an output wins (the deliverable)
+        _shell_status = "completed"
+        return run_id, final_output, terminal_status
+    finally:
+        try:
+            await finalize_run(
+                pool,
+                run_id=_producer_id,
+                status=_shell_status,
+                error=None,
+                completed_at=datetime.now(timezone.utc),
+                message_id=None,
+                input_tokens=None,
+                output_tokens=None,
+            )
+        except Exception:  # noqa: BLE001 — shell cleanup never masks the run's own outcome
+            logger.warning(
+                "publish: producer-shell finalize failed for %s", _producer_id, exc_info=True
+            )
 
 
 async def _judge_golden_output(
@@ -653,23 +700,35 @@ async def _judge_golden_output(
 
     from app.services.forced_emit import forced_emit  # function-local
 
-    try:
-        result = await forced_emit(
-            messages=[{"role": "user", "content": graded}],
-            model=model,
-            provider=provider,
-            emitter="judge_verdict",
-            tools=judge_tool,
-            user_settings=owner_settings,  # IN-04: owner-bound, not None
-            system_prompt=system_prompt,
-            schema_model=JudgeVerdict,  # CR-01: validate the forced shot as a verdict
-        )
-    except Exception as e:  # noqa: BLE001 — a judge-shot crash is an honest failure, never a pass
-        logger.exception("publish: judge forced_emit raised")
-        return {"failure": f"judge shot raised: {e}"}
+    # FINDING-03 (102-UAT): publish is a single deliberate event — a TRANSIENT no-verdict
+    # (model_failed_to_emit / a provider hiccup) must not block a GOOD publish. Bounded
+    # retry on a NON-verdict only (mirrors the in-run D-02 gate retry ≤3). A real verdict
+    # (valid emission) stops the loop on the first success, so a genuine overall_passed=False
+    # is honored — this never re-judges or softens a real verdict.
+    result: dict | None = None
+    last_failure = "the judge produced no verdict"
+    for _attempt in range(3):
+        try:
+            result = await forced_emit(
+                messages=[{"role": "user", "content": graded}],
+                model=model,
+                provider=provider,
+                emitter="judge_verdict",
+                tools=judge_tool,
+                user_settings=owner_settings,  # IN-04: owner-bound, not None
+                system_prompt=system_prompt,
+                schema_model=JudgeVerdict,  # CR-01: validate the forced shot as a verdict
+            )
+        except Exception as e:  # noqa: BLE001 — a judge-shot crash is an honest failure, never a pass
+            logger.warning("publish: judge forced_emit raised (attempt %d/3): %s", _attempt + 1, e)
+            last_failure = f"judge shot raised: {e}"
+            continue
+        if not result.get("failure") and result.get("emitted") is not None:
+            break  # a valid verdict — accept it (pass OR fail), do not retry
+        last_failure = result.get("failure") or last_failure
 
-    if result.get("failure") or result.get("emitted") is None:
-        return {"failure": result.get("failure") or "the judge produced no verdict"}
+    if result is None or result.get("failure") or result.get("emitted") is None:
+        return {"failure": last_failure}
 
     emitted = result["emitted"]
     raw = emitted.model_dump() if hasattr(emitted, "model_dump") else emitted

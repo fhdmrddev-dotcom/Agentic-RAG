@@ -91,7 +91,13 @@ class JudgeCriterionVerdict(BaseModel):
     criterion: str
     passed: bool
     score: int
-    evidence: str | None = None
+    # FINDING-04 (102-UAT): OpenAI strict structured-output requires EVERY property in
+    # `required`. A field with a DEFAULT (even ``str = ""``) is omitted from `required`
+    # → OpenAI rejects the forced judge tool with 400 "Missing 'evidence'". Declare it
+    # required (no default) so it lands in the schema's `required` list and is strict-safe
+    # on ALL providers; the forced judge tool guarantees the model supplies it. Anthropic/
+    # Google already emit it, so they are unaffected.
+    evidence: str
 
 
 class JudgeVerdict(BaseModel):
