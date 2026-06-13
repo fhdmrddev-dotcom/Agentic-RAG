@@ -244,3 +244,159 @@ def test_draft_unaffected_by_fallback():
     )
     assert applied["delivered"] is True
     assert applied["field_map"]["scalars"]["a"]["value"] == "v"
+
+
+# ---------------------------------------------------------------------------
+# Plan 102-08 Task 3 — UN-MOCKED render-gate round-trip (CR-02). The Plan-04
+# tests above exercise only the pure apply_citation_policy transform; the
+# verification flagged that the RENDER ROUND-TRIP was never driven — the
+# previously-hollow path. These drive _render_template_post -> the REAL
+# _handle_render_template with the citation gate UN-mocked (check_coverage + the
+# gate condition are real). Mocking is allowed ONLY BELOW the gate: the strict
+# reject returns AT the gate (resolve_template_source is never reached); the
+# deliver cases pass the gate then stop at a mocked resolve_template_source so we
+# assert on the GATE VERDICT (rejected vs proceeding past), not real docx bytes.
+# ---------------------------------------------------------------------------
+
+
+def _render_ctx():
+    """A minimal ctx for _handle_render_template. The gate runs BEFORE any ctx use;
+    the deliver cases only reach resolve_template_source (mocked), which reads these
+    attrs to BUILD the call expression — their values are irrelevant (the mock ignores
+    args)."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        pool=None,
+        supabase=None,
+        thread_id="t-1",
+        current_user={"id": "u-1"},
+        redis=None,
+        run_id="r-1",
+        emit=lambda *a, **k: None,
+    )
+
+
+def _uncited_field_map():
+    """A legacy generic envelope with ONE uncited value — the strict gate rejects it
+    (uncited_value_count == 1). retrieved_ids is empty so the value is uncited."""
+    return {
+        "scalars": {"top_risk": {"value": "supply chain", "source_chunk_id": None}},
+        "collections": {},
+    }
+
+
+async def _drive_render(monkeypatch, field_map, *, citation_policy_applied):
+    """Drive _render_template_post -> the REAL _handle_render_template gate. Mocks ONLY
+    resolve_template_source (BELOW the gate) so a passing gate stops at template
+    resolution with a known error verdict (status='error', reason='template_resolution')
+    — we then distinguish 'rejected' (gate blocked) from 'proceeded past the gate'."""
+    from app.services.harness import emitters
+
+    async def _fake_resolve(**kwargs):
+        # Below the gate — a passing gate reaches here; return a clean error so the
+        # handler returns BEFORE touching the sandbox (we assert on the gate verdict).
+        return {"error": "STOP-AFTER-GATE (resolve mocked below the gate)"}
+
+    # Patch in the SOURCE module (the handler imports it function-locally).
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _fake_resolve
+    )
+
+    resolved_template = {
+        "filename": "risk-register.docx",
+        "retrieved_ids": [],  # nothing retrieved -> the value is uncited
+        "asset_ref": None,  # ephemeral-upload branch (no real asset resolution)
+    }
+    if citation_policy_applied is not None:
+        resolved_template["citation_policy_applied"] = citation_policy_applied
+
+    return await emitters._render_template_post(field_map, resolved_template, _render_ctx())
+
+
+@pytest.mark.asyncio
+async def test_render_gate_rejects_strict_uncited(monkeypatch):
+    """Strict (no citation_policy_applied): the REAL handler gate hard-rejects an uncited
+    map — the default trust bar holds byte-identical (T-102-08-01)."""
+    verdict = await _drive_render(
+        monkeypatch, _uncited_field_map(), citation_policy_applied=None
+    )
+    assert verdict["status"] == "rejected"
+    assert verdict["reason"] == "uncited_or_invented"
+
+
+@pytest.mark.asyncio
+async def test_render_gate_delivers_flag(monkeypatch):
+    """flag: apply the policy, set citation_policy_applied='flag', drive the REAL gate —
+    the gate does NOT reject (it proceeds past the citation gate to template resolution).
+    The delivered map carries the [unverified] mark on the uncited value."""
+    from app.services.harness import emit_policy
+
+    applied = emit_policy.apply_citation_policy(
+        _uncited_field_map(),
+        gate={"uncited_leaves": ["scalar.top_risk"], "invented_leaves": []},
+        policy="flag",
+    )
+    assert applied["delivered"] is True
+    marked = applied["field_map"]
+    assert "[unverified]" in marked["scalars"]["top_risk"]["value"]
+
+    verdict = await _drive_render(monkeypatch, marked, citation_policy_applied="flag")
+    # The gate did NOT reject — the call proceeded past it (stopped at the mocked resolve).
+    assert verdict["status"] != "rejected"
+    assert verdict.get("reason") != "uncited_or_invented"
+    # Proof it reached BELOW the gate (template resolution), not bounced at the gate.
+    assert verdict["reason"] == "template_resolution"
+
+
+@pytest.mark.asyncio
+async def test_render_gate_delivers_partial(monkeypatch):
+    """partial: the uncited cell is BLANKED (value None) and a CITED sibling cell with
+    the same column name is NOT blanked (WR-06); the gate does not reject; gap list set."""
+    from app.services.harness import emit_policy
+
+    fm = {
+        "scalars": {},
+        "collections": {
+            "risks": [
+                {"risk_id": {"value": "R-uncited", "source_chunk_id": None}},
+                {"risk_id": {"value": "R-cited", "source_chunk_id": "chunk-1"}},
+            ]
+        },
+    }
+    applied = emit_policy.apply_citation_policy(
+        fm,
+        gate={"uncited_leaves": ["risks0.risk_id"], "invented_leaves": []},
+        policy="partial",
+    )
+    assert applied["delivered"] is True
+    rows = applied["field_map"]["collections"]["risks"]
+    assert rows[0]["risk_id"]["value"] is None  # uncited blanked
+    assert rows[1]["risk_id"]["value"] == "R-cited"  # CITED sibling preserved (WR-06)
+    assert applied.get("gap_list")  # the blanked-leaf gap list
+
+    # The blanked map still has a CITED value (risks1.risk_id) — drive it with retrieved
+    # ids matching so the gate sees zero uncited; the policy made it gate-clean. Assert the
+    # gate does NOT reject.
+    verdict = await _drive_render(monkeypatch, applied["field_map"], citation_policy_applied="partial")
+    assert verdict["status"] != "rejected"
+    assert verdict["reason"] == "template_resolution"
+
+
+@pytest.mark.asyncio
+async def test_render_gate_delivers_draft(monkeypatch):
+    """draft: no citation enforcement — the gate does not reject (policy applied) and the
+    draft label is present in the policy result."""
+    from app.services.harness import emit_policy
+
+    applied = emit_policy.apply_citation_policy(
+        _uncited_field_map(),
+        gate={"uncited_leaves": ["scalar.top_risk"], "invented_leaves": []},
+        policy="draft",
+    )
+    assert applied["delivered"] is True
+    assert applied.get("draft_label")
+
+    verdict = await _drive_render(monkeypatch, applied["field_map"], citation_policy_applied="draft")
+    assert verdict["status"] != "rejected"
+    assert verdict["reason"] == "template_resolution"
