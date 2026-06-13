@@ -150,6 +150,26 @@ async def publish_workflow(
             golden_run_id=None,
         )
 
+    # ── stage 2.5: interactive-phase pre-run block (WR-04 — lint-class) ──────────
+    # A synchronous publish cannot validate interactive phases: an llm_human_input
+    # phase (or a validator whose on_failure routes to ask_user) BLOCKS on an
+    # unsubscribed ask_user prompt for which no human is watching, dead-ending the
+    # publish golden run. Block such definitions PRE-RUN with a named failure (cheap —
+    # no provider call) so the golden run is never driven for them. The full
+    # background-job publish that COULD validate interactive phases is the deferred
+    # Phase-103 rework — this is the honest minimum-viable cut.
+    interactive_failures = _interactive_phase_failures(definition)
+    if interactive_failures:
+        return await _block(
+            pool,
+            run_id=None,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="interactive_phase",
+            named_failures=interactive_failures,
+            golden_run_id=None,
+        )
+
     # ── stage 3: the REAL golden run (is_golden_run=True; no mocks, no opt-out) ───
     # WR-04 (T-102-09-03): the synchronous golden run is bounded by a publish-level
     # wall budget. ``asyncio.wait_for`` cancels a wedged run after
@@ -377,6 +397,49 @@ def _structural_failures(final_output) -> list:
     if reason:
         return [str(reason)]
     return []
+
+
+def _interactive_phase_failures(definition) -> list:
+    """Named failures for any INTERACTIVE phase blocking the synchronous publish (WR-04).
+
+    Returns one ``{"phase": <slug>, "message": ...}`` entry per phase that would
+    dead-end the synchronous publish golden run by blocking on a human:
+
+      - an ``llm_human_input`` phase (``config.phase_type == "llm_human_input"``), or
+      - any validator whose ``on_failure == "ask_user"`` (the D-11 interactive
+        disposition — it pauses the run waiting for a human to choose).
+
+    Empty list == no interactive phases (the publish proceeds to the golden run). This
+    is a PRE-RUN lint-class check (no provider call) — it short-circuits BEFORE any
+    golden run so an unsubscribed ``ask_user`` prompt can never wedge the publish.
+
+    The full background-job publish that COULD validate interactive phases (a human
+    subscriber, a durable resume) is the DEFERRED Phase-103 rework — out of scope here.
+    """
+    failures: list = []
+    for phase in getattr(definition, "phases", []) or []:
+        slug = getattr(phase, "slug", None)
+        config = getattr(phase, "config", None)
+        if getattr(config, "phase_type", None) == "llm_human_input":
+            failures.append(
+                {
+                    "phase": slug,
+                    "message": "interactive phases (llm_human_input / ask_user "
+                    "dispositions) cannot be validated in a synchronous publish",
+                }
+            )
+            continue  # one finding per phase is enough
+        for v in getattr(phase, "validators", []) or []:
+            if getattr(v, "on_failure", None) == "ask_user":
+                failures.append(
+                    {
+                        "phase": slug,
+                        "message": "interactive phases (llm_human_input / ask_user "
+                        "dispositions) cannot be validated in a synchronous publish",
+                    }
+                )
+                break  # one finding per phase is enough
+    return failures
 
 
 def _judge_named_failures(verdict: dict) -> list:

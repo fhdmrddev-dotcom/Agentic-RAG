@@ -372,6 +372,115 @@ def test_write_audit_signature_allows_nullable_run_id():
     assert _UUID in args, f"run_id must still accept UUID, got {run_id_hint!r}"
 
 
+# ── WR-04: interactive-phase pre-run block (llm_human_input / ask_user) ────────
+def _interactive_definition_row(*, kind: str) -> dict:
+    """A lint-clean definition row whose single phase is INTERACTIVE.
+
+    ``kind == "llm_human_input"`` → an llm_human_input phase.
+    ``kind == "ask_user_validator"`` → an llm_single phase with a validator whose
+    ``on_failure == "ask_user"`` (the D-11 interactive disposition).
+    """
+    if kind == "llm_human_input":
+        phase = {
+            "slug": "approve",
+            "phase_index": 0,
+            "config": {"phase_type": "llm_human_input", "prompt": "Approve this?"},
+            "validators": [],
+        }
+    else:
+        phase = {
+            "slug": "answer",
+            "phase_index": 0,
+            "config": {"phase_type": "llm_single", "prompt": "Answer the question."},
+            "validators": [
+                {"kind": "regex_match", "config": {"pattern": "x"}, "on_failure": "ask_user"}
+            ],
+        }
+    definition = {
+        "slug": "qual-test",
+        "version": 1,
+        "name": "Quality Test Workflow",
+        "status": "draft",
+        "phases": [phase],
+        "business_requirement": "Deliver a cited answer.",
+    }
+    return {
+        "id": _DEF_ID,
+        "slug": "qual-test",
+        "version": 1,
+        "name": "Quality Test Workflow",
+        "status": "draft",
+        "definition": definition,
+        "created_by": UUID(_USER["id"]),
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["llm_human_input", "ask_user_validator"])
+async def test_interactive_phase_blocks_publish_before_golden_run(kind):
+    """WR-04: a definition with an interactive phase (llm_human_input OR an ask_user
+    validator disposition) is blocked at ``interactive_phase`` PRE-RUN — the golden run
+    is NEVER driven (an unsubscribed ask_user prompt cannot wedge the publish)."""
+    row = _interactive_definition_row(kind=kind)
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_drive_golden_run", AsyncMock()) as drive,
+        patch("app.db.workflows.publish_definition", AsyncMock()) as flip,
+    ):
+        result = await _call()
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "interactive_phase"
+    assert result["named_failures"]  # the named phase + message
+    assert result["golden_run_id"] is None
+    drive.assert_not_awaited()  # the golden run was NEVER driven
+    flip.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_non_interactive_definition_proceeds_past_interactive_check():
+    """WR-04 control: a non-interactive definition is NOT blocked at the interactive
+    stage — it proceeds to the golden run (the check is a targeted guard, not a wall)."""
+    row = _definition_row(business_requirement="Deliver a cited answer.")  # llm_single, no ask_user
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 90, "summary": "good", "criteria": []}
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
+        ) as drive,
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+    ):
+        result = await _call()
+
+    assert result["published"] is True  # proceeded past the interactive check
+    drive.assert_awaited_once()  # the golden run WAS driven (not blocked)
+
+
+def test_interactive_phase_failures_helper_detects_both_forms():
+    """WR-04 unit: ``_interactive_phase_failures`` flags both an ``llm_human_input``
+    phase AND an ``ask_user`` validator disposition; a clean definition returns []."""
+    from app.models.harness import WorkflowDefinition
+
+    human = WorkflowDefinition.model_validate(
+        _interactive_definition_row(kind="llm_human_input")["definition"]
+    )
+    asker = WorkflowDefinition.model_validate(
+        _interactive_definition_row(kind="ask_user_validator")["definition"]
+    )
+    clean = WorkflowDefinition.model_validate(
+        _definition_row(business_requirement="x")["definition"]
+    )
+
+    assert publish_service._interactive_phase_failures(human)  # llm_human_input flagged
+    assert publish_service._interactive_phase_failures(asker)  # ask_user validator flagged
+    assert publish_service._interactive_phase_failures(clean) == []  # nothing flagged
+
+
 # ── route-level HTTP mapping (api/workflows.py — G-5: NOT threads.py) ──────────
 @pytest.mark.asyncio
 async def test_route_not_found_maps_to_404():
