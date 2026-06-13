@@ -26,12 +26,25 @@ the existing render path.
       "delivered": True,
       "policy": <policy>,
       "coverage_summary": <str, flag/partial>,   # the surfaced message line
-      "gap_list":         <list[str], partial>,   # the blanked keys
+      "gap_list":         <list[str], partial>,   # the blanked leaves
       "draft_label":      <str, draft>,           # the DRAFT header line
     }
 
+…or, when the verdict named offenders but ZERO leaves were actually modified (WR-06
+honesty — a stale/mismatched leaf string means the policy is a no-op), a strict-fallback
+signal so the caller honest-fails rather than claiming a false success:
+    {"field_map": <unchanged>, "delivered": False, "fallback": "strict", "reason": <str>}
+
 The function is PURE (no I/O) — the executor owns the audit receipt + the surface +
 the render dispatch.
+
+WR-06 (102-08): matching is on the FULL ``(location, field)`` pair — exactly the
+``"{location}.{field}"`` strings ``check_coverage`` puts in ``uncited_leaves`` /
+``invented_leaves`` (``"scalar"`` for scalars, ``"{cname}{ri}"`` for collection cells).
+A bare-field-name match over-blanks a CITED sibling cell sharing the same column name
+(``risks0.risk_id`` uncited would destroy ``risks1.risk_id`` cited); the full-pair match
+touches ONLY the named leaf. Invented-citation leaves are blanked/marked too (an invented
+citation is no better than none).
 """
 
 from __future__ import annotations
@@ -42,54 +55,82 @@ _UNVERIFIED_MARK = "[unverified]"
 _DRAFT_LABEL = "DRAFT — citations not enforced"
 
 
-def _leaf_field_name(leaf: str) -> str:
-    """The field-name half of a ``check_coverage`` ``uncited_leaves`` entry.
-
-    ``check_coverage`` formats leaves as ``"{location}.{field}"`` (e.g.
-    ``"scalar.project_name"`` / ``"risks0.risk_id"``). The bare-key form (a test/flat
-    shape passing just ``"k"``) has no dot — return it as-is.
-    """
-    return leaf.rsplit(".", 1)[-1] if "." in leaf else leaf
-
-
-def _uncited_field_names(gate: dict) -> set[str]:
-    """The set of field-names flagged uncited by the verdict (location-agnostic)."""
-    return {_leaf_field_name(x) for x in (gate.get("uncited_leaves") or [])}
+def _offending_leaves(gate: dict) -> set[str]:
+    """The set of FULL ``"{location}.{field}"`` leaf strings the verdict flagged —
+    BOTH uncited AND invented (WR-06). Kept verbatim from the verdict (the location is
+    NOT stripped) so the leaf matches the exact pair ``_iter_leaf_dicts`` yields."""
+    leaves = (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
+    return {str(x) for x in leaves}
 
 
 def _iter_leaf_dicts(field_map: dict):
-    """Yield (key, cited_dict) over every Cited leaf of a field-map, mutating in place.
+    """Yield (leaf, cited_dict) over every Cited leaf of a field-map, mutating in place.
+
+    ``leaf`` is the FULL ``"{location}.{field}"`` string formatted EXACTLY as
+    ``template_render_service.check_coverage._iter_leaves`` formats it (``"scalar"`` for
+    scalars, ``"{cname}{ri}"`` index-aware for collection cells) so a caller can compare
+    against the verdict's full leaf strings (WR-06 — never the bare field name).
 
     Handles BOTH the legacy generic envelope (``scalars: {key: {value, ...}}`` +
     ``collections: {name: [{col: {value,...}}]}``) AND the flat ``EmitFieldMap`` test
-    shape (``scalars`` is a LIST of ``{key, value, citation}`` + ``rows``). Yields the
-    actual mutable leaf dict so the caller can mark/blank it.
+    shape (``scalars`` is a LIST of ``{key, value, citation}`` + ``rows`` of
+    ``{collection, cells}``). Yields the actual mutable leaf dict so the caller can
+    mark/blank it. The flat shape's leaf strings mirror ``check_coverage`` after the same
+    flat→legacy normalization (``scalar.{key}`` / ``{collection}{ri}.{key}``).
     """
     scalars = field_map.get("scalars")
     collections = field_map.get("collections")
 
-    # Flat EmitFieldMap shape: scalars is a LIST of {key, value, citation}.
+    # Flat EmitFieldMap shape: scalars is a LIST of {key, value, citation}; rows carry a
+    # {collection, cells} shape. Mirror check_coverage's flat→legacy leaf strings.
     if isinstance(scalars, list):
         for cell in scalars:
             if isinstance(cell, dict):
-                yield (cell.get("key"), cell)
-        for row in (field_map.get("rows") or []):
-            for cell in (row.get("cells") or []) if isinstance(row, dict) else []:
-                if isinstance(cell, dict):
-                    yield (cell.get("key"), cell)
+                yield (f"scalar.{cell.get('key')}", cell)
+        # Group rows by collection name so the per-collection row index matches the
+        # legacy envelope's "{cname}{ri}" exactly (check_coverage walks collections then
+        # enumerates rows). Preserve first-seen collection order.
+        per_coll: dict[str, list] = {}
+        for row in field_map.get("rows") or []:
+            if not isinstance(row, dict):
+                continue
+            cname = row.get("collection") or "rows"
+            per_coll.setdefault(cname, []).append(row)
+        for cname, rows in per_coll.items():
+            for ri, row in enumerate(rows):
+                for cell in row.get("cells") or []:
+                    if isinstance(cell, dict):
+                        yield (f"{cname}{ri}.{cell.get('key')}", cell)
         return
 
     # Legacy generic envelope.
     if isinstance(scalars, dict):
         for key, cited in scalars.items():
             if isinstance(cited, dict):
-                yield (key, cited)
+                yield (f"scalar.{key}", cited)
     if isinstance(collections, dict):
-        for _cname, rows in collections.items():
-            for row in rows or []:
+        for cname, rows in collections.items():
+            for ri, row in enumerate(rows or []):
                 for col, cited in (row or {}).items():
                     if isinstance(cited, dict):
-                        yield (col, cited)
+                        yield (f"{cname}{ri}.{col}", cited)
+
+
+def _strict_fallback(field_map: dict, policy: str, offenders: set[str]) -> dict:
+    """WR-06 honesty: the verdict named offenders but the policy matched ZERO leaves to
+    modify (a stale/mismatched leaf string) — signal a strict fallback so the caller
+    honest-fails rather than claiming a false success with a gap list of never-blanked
+    keys / marks that never landed."""
+    return {
+        "field_map": field_map,
+        "delivered": False,
+        "policy": policy,
+        "fallback": "strict",
+        "reason": (
+            "policy named offenders but matched no leaves to modify — "
+            f"failing back to strict ({', '.join(sorted(offenders)) or 'none'})"
+        ),
+    }
 
 
 def apply_citation_policy(field_map: dict, gate: dict, policy: str) -> dict:
@@ -99,7 +140,9 @@ def apply_citation_policy(field_map: dict, gate: dict, policy: str) -> dict:
     with ``"strict"`` is a programming error; it raises so the strict path can never
     accidentally route here. For ``flag``/``partial``/``draft`` it returns the modified
     field-map + the surfaced-message material; every mode MARKS or BLANKS (never a
-    silent pass-off — T-102-04-03).
+    silent pass-off — T-102-04-03). WR-06: matching is on the FULL ``(location, field)``
+    pair (never a cited sibling), invented leaves are blanked/marked too, and a no-op
+    falls back to strict.
     """
     if policy == "strict":
         raise ValueError(
@@ -108,16 +151,20 @@ def apply_citation_policy(field_map: dict, gate: dict, policy: str) -> dict:
         )
 
     fm = copy.deepcopy(field_map)
-    uncited = _uncited_field_names(gate)
+    offenders = _offending_leaves(gate)
 
     if policy == "flag":
-        marked = 0
-        for key, cited in _iter_leaf_dicts(fm):
-            if key in uncited and cited.get("value") is not None:
+        marked: list[str] = []
+        for leaf, cited in _iter_leaf_dicts(fm):
+            if leaf in offenders and cited.get("value") is not None:
                 cited["value"] = f"{cited['value']} {_UNVERIFIED_MARK}"
-                marked += 1
+                marked.append(leaf)
+        # WR-06 honesty: the verdict named offenders but NONE matched a real leaf → no-op
+        # → fail back to strict (never claim marks that did not land).
+        if offenders and not marked:
+            return _strict_fallback(field_map, "flag", offenders)
         summary = (
-            f"Quality check: {marked or len(uncited)} value(s) unverified — "
+            f"Quality check: {len(marked)} value(s) unverified — "
             f"delivered WITH {_UNVERIFIED_MARK} marks"
         )
         return {
@@ -129,28 +176,30 @@ def apply_citation_policy(field_map: dict, gate: dict, policy: str) -> dict:
 
     if policy == "partial":
         blanked: list[str] = []
-        for key, cited in _iter_leaf_dicts(fm):
-            if key in uncited and cited.get("value") is not None:
+        for leaf, cited in _iter_leaf_dicts(fm):
+            if leaf in offenders and cited.get("value") is not None:
                 cited["value"] = None
-                if key not in blanked:
-                    blanked.append(key)
-        # Always carry a non-empty gap list when the verdict named uncited leaves
-        # (a flat-shape map may not expose the exact keys to blank — name them anyway).
-        gap_list = blanked or sorted(uncited)
+                if leaf not in blanked:
+                    blanked.append(leaf)
+        # WR-06 honesty: offenders named but nothing blanked → no-op → strict fallback
+        # (never a gap list of keys that were never actually blanked).
+        if offenders and not blanked:
+            return _strict_fallback(field_map, "partial", offenders)
         summary = (
-            f"Quality check: {len(gap_list)} value(s) had no citation and were BLANKED "
-            f"(null-over-invent): {', '.join(gap_list)}"
+            f"Quality check: {len(blanked)} value(s) had no valid citation and were "
+            f"BLANKED (null-over-invent): {', '.join(blanked)}"
         )
         return {
             "field_map": fm,
             "delivered": True,
             "policy": "partial",
             "coverage_summary": summary,
-            "gap_list": gap_list,
+            "gap_list": blanked,
         }
 
     if policy == "draft":
-        # No citation enforcement — deliver as-is with a visible DRAFT label.
+        # No citation enforcement — deliver as-is with a visible DRAFT label (draft never
+        # falls back to strict; it makes no claim about specific leaves).
         return {
             "field_map": fm,
             "delivered": True,
