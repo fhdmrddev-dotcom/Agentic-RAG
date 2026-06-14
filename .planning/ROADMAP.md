@@ -227,7 +227,7 @@ Plans:
   3. A domain author can re-author or extend a pack workflow through the Workflows page without code changes.
 **Plans**: 3 plans
 Plans:
-- [ ] 104-01-PLAN.md — Content artifacts: 2 docxtpl templates (status scalars + risk 9-col with inline P×I score) + 5-doc synthetic corpus + template-shape test [Wave 1]
+- [x] 104-01-PLAN.md — Content artifacts: 2 docxtpl templates (status scalars + risk 9-col with inline P×I score) + 5-doc synthetic corpus + template-shape test [Wave 1] ✅ 2026-06-14 (PM-01 — content/data only, ZERO engine code; weekly-status-report.docx exposes all 8 EmitFieldMap scalar keys; risk-register.docx grows rows via {%tr%} with 8 cited cols + an INLINE Jinja P×I Score (not {{ r.score }} — prod build_context has no numeric_hook); 5-doc Project Meridian markdown corpus (7 worded-P/I risks); 4-test oracle GREEN (Score renders 6 for High×Medium / 0 for unmapped, fixture mirrors build_context dict shape); no backend/app/** touched, no migration; commits 2fd1fff3/b5844629/f04f53de)
 - [ ] 104-02-PLAN.md — Seed/provisioning script: corpus ingest + template upload + 2-phase published def JSONB (DELETE-then-INSERT, is_global=false) + seed-smoke/RLS/immutability test [Wave 2]
 - [ ] 104-03-PLAN.md — Live proof orchestration: cross-provider kickoff harness + finalized SC#10 scoreboard (VALIDATION.md) + HUMAN-UAT runbook + the human-verify SC#2/SC#1/SC#3/SC#10 checkpoint [Wave 3]
 **VALIDATION (SC#10)**: the flagship runs cross-provider — the 4-axis scoreboard is the acceptance bar for the demo.
