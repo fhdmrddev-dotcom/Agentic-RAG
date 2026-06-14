@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: verifying
-last_updated: "2026-06-14T13:15:00.000Z"
+last_updated: "2026-06-14T19:05:00.000Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 14
   completed_phases: 8
-  total_plans: 55
+  total_plans: 54
   completed_plans: 55
   percent: 100
 ---
@@ -26,10 +26,13 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 103 (workflows-page-authoring-api-nl-authoring) — EXECUTED 6/6 (2026-06-14), awaiting human UAT + secure-phase
-Plan: 6 of 6 complete
-Status: All 6 plans landed sequential-on-main-tree (worktrees off — backend plans need the relative venv). Verification = `human_needed` (9/9 must-haves verified in code; 7 lived-experience UAT items pending in `103-HUMAN-UAT.md`). Code review (1C/7W/4I) → 9 fixed incl. security Critical CR-01, 1 false-positive, 1 deferred (WR-01). NEXT = run the 7 UAT items (or `/gsd:verify-work 103`) → on pass, mark phase complete → `/gsd:secure-phase 103`.
+Phase: 104 (pm-flagship-content-pack) — CONTEXT GATHERED (2026-06-14, discuss-phase complete)
+Plan: 0 of TBD (not yet planned)
+Status: Discuss-phase done — `104-CONTEXT.md` committed (`7c2fb763`). All 4 gray areas discussed (delivery+author-proof / depth-vs-breadth / demo-KB / status-report-content); user approved recommendations. **All load-bearing code claims adversarially verified before lock** (5 agents / 13 claims / all CONFIRMED, workflow `wf_9c59dcb9-7db`). Key locked decisions: opt-in self-contained seed script (per-account, `is_global=false`, no KB pollution); 3 workflows = Charter (page-authored TEXT proof) + Weekly Status Report (seeded template-fill, the SC#2 headline + full SC#10 scoreboard) + Risk Register (seeded template-fill, 2nd full publishable); template-fill defs are 2-phase (retrieve→emit) + seed-authored (`assets[]` baked in — Builder has no template-attach UI, `/generate` `template_asset_id` is a dead UUID-vs-path seam); ZERO new engine code. NEXT = `/gsd:plan-phase 104`.
+Resume file: `.planning/phases/104-pm-flagship-content-pack/104-CONTEXT.md`
 Last activity: 2026-06-14
+
+> **Milestone close still pending on Phase 103:** `/gsd:secure-phase 103` (no `103-SECURITY.md` yet) + the 7 `103-HUMAN-UAT.md` lived-experience items remain before v2.9 closes. 103 was EXECUTED 6/6 + live-UAT-hardened (9 bugs fixed); code review 9 fixed / 1 false-positive / 1 deferred (WR-01).
 
 **Phase 103 (Workflows Page + Authoring API + NL Authoring) — EXECUTED 2026-06-14 (6/6 plans, awaiting UAT):**
 
