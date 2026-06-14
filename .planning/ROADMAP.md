@@ -212,7 +212,7 @@ Plans:
 - [x] 103-03-PLAN.md — Frontend foundation: api.ts authoring fns/types + deriveTier()/TIERS + shared NAV_ITEMS + ActiveView + AppDock deletion (REQ-7 wiring) [Wave 2] ✅ 2026-06-14 (WFAUTH-04 wiring)
 - [x] 103-04-PLAN.md — Builder + read-only PhaseSpineGraph + 400px form panel (REQ-4, REQ-5) [Wave 3] ✅ 2026-06-14 (WFAUTH-01/02/03 — describe-first Builder, read-only vertical spine, 6 phase_type forms; 29 vitest GREEN, net-new failures 0, no router/graph-lib/drag-canvas)
 - [x] 103-05-PLAN.md — Publish-gauntlet UI client: verbatim PublishVerdict + key-detection + judge hard wall (REQ-6) [Wave 3] ✅ 2026-06-14 (WFAUTH-01 — golden_input form + 8 server-fixed stages + 5 fields verbatim + 4 HTTP outcomes + named_failures key-detection + judge hard-wall no-override; 12 vitest GREEN, net-new failures 0, mounts into Plan-04 renderPublish? seam)
-- [ ] 103-06-PLAN.md — Workflows page: filter rail + drafts shelf + Run launch + Tweak v(N+1) fork + ChatLayout render branch (REQ-7) [Wave 3]
+- [x] 103-06-PLAN.md — Workflows page: filter rail + drafts shelf + Run launch + Tweak v(N+1) fork + ChatLayout render branch (REQ-7) [Wave 3] ✅ 2026-06-14 (WFAUTH-04 — project ?project_folder_id= filter rail + drafts-above-published shelves + dashed Build-card + client-derived deriveTier badge + Run modal reusing the existing kickoff (no bespoke route, threads.py byte-identical) + Tweak v(N+1) INSERT + auto-return-with-Run-CTA + shared NAV_ITEMS drawer; 11 vitest GREEN, net-new failures 0, no router)
 **UI hint**: yes
 **G-2 (sketch-before-plan FIRES)**: run `/gsd:sketch` BEFORE `/gsd:spec-phase` — confirm/extend `sketch-findings-agentic-rag` sketches 012 (workflows-page) + 013 (workflow-builder) for the NL-form-editor + live-graph surfaces.
 **VALIDATION (SC#10)**: NL-gen calls a provider, runs stream, UI state changes — author the 4-axis cross-provider rows. **Greenfield**: new page + new API router; does NOT touch `threads.py` / `anthropic_service.py`.
@@ -295,7 +295,7 @@ Plans:
 | 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
 | 101.1. Guaranteed Structured Emission Layer | 6/10 (build 01-05 + gap 06 done; gap-closure 07-10 planned from the live UAT) | Executing (gap closure) | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 4/5 | Executing (2026-06-12) | - |
-| 103. Workflows Page + Authoring API + NL Authoring | 5/6 (01-05 done; 06 planned, Wave 3) | Executing (2026-06-14) | - |
+| 103. Workflows Page + Authoring API + NL Authoring | 6/6 | Complete    | 2026-06-14 |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
 | 105. Scheduled/Recurring Triggers + Budget Caps (STRETCH) | 0/TBD | Not started | - |
 | 106. Citation-Traceable Grid Renderer (STRETCH) | 0/TBD | Not started | - |

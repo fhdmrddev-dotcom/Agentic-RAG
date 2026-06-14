@@ -31,7 +31,8 @@
 **: A user can **describe a workflow in natural language** and receive a valid draft definition — one-shot structured generation over the strict `WorkflowDefinition` schema, grounded in the project folder tree + tool/skill registry + any uploaded template; invalid generations auto-retry against the validation error.
 - [x] **WFAUTH-03
 **: The Workflows page renders a **read-only live graph** of a workflow's phases/edges (view, not drag-to-build).
-- [ ] **WFAUTH-04**: A published workflow can be browsed in a project-filtered library and **run from a thread** (the thread enters workflow mode; Deep is the resting default). Definitions are immutable-on-publish + versioned.
+- [x] **WFAUTH-04
+**: A published workflow can be browsed in a project-filtered library and **run from a thread** (the thread enters workflow mode; Deep is the resting default). Definitions are immutable-on-publish + versioned.
 
 ### QUAL — Output-quality / strict adherence
 - [ ] **QUAL-01**: A workflow declares exactly **one `business_requirement`**; an `llm_judge` output-quality gate + a publish-time **golden run** are a **HARD publish blocker** — a structurally-lint-clean workflow that produces bad output cannot publish. *(NL-authoring MUST NOT ship without this.)*
@@ -119,7 +120,7 @@
 | WFAUTH-01 | Phase 103 | Pending |
 | WFAUTH-02 | Phase 103 | Pending |
 | WFAUTH-03 | Phase 103 | Pending |
-| WFAUTH-04 | Phase 103 | Pending |
+| WFAUTH-04 | Phase 103 | Complete |
 | PM-01 | Phase 104 | Pending |
 | SCHED-01 (STRETCH) | Phase 105 | Pending |
 | GRID-01 (STRETCH) | Phase 106 | Pending |
