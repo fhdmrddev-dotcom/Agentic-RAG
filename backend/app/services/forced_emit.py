@@ -213,6 +213,7 @@ async def forced_emit(
     system_prompt: str = "",
     max_tokens: int | None = None,
     schema_model: type[BaseModel] | None = None,
+    strict: bool | None = None,
 ) -> dict:
     """Run a SEALED single forced shot and return a structured result.
 
@@ -232,10 +233,19 @@ async def forced_emit(
     The caller (``_exec_llm_emit``, Plan 03) runs the D-08 layers 5-6 (bounded retry /
     honest-fail surface) on a non-None ``failure``; this substrate never retries and
     never falls back to model-written code (D-03).
+
+    ``strict`` (Phase 103 / REQ-2 / Pitfall 1) is an ADDITIVE override for the gateway's
+    ``strict_schema`` flag. ``None`` (the default) preserves the registry-derived
+    ``cap.get("strict_json_schema")`` behavior BYTE-IDENTICALLY for every existing caller
+    (the emit deliverable + the judge). An explicit ``False`` forces strict OFF — the
+    forcing-without-strict path the authoring shot uses so an optional-heavy
+    ``WorkflowDefinition`` does NOT 400 on OpenAI/DeepSeek (strict mode requires every
+    property in ``required``). ``True`` is reserved (not used by 103).
     """
     cap = get_model_capability(model) or {}
     forced = bool(cap.get("forced_emission", False))  # default-SAFE — a miss is coerce
-    strict = bool(cap.get("strict_json_schema", False))
+    # Phase 103 (REQ-2 / Pitfall 1): strict override — None = cap-derived (emit/judge byte-identical); False = force-without-strict for the optional-heavy WorkflowDefinition authoring shot (avoids OpenAI/DeepSeek strict 400).
+    strict = bool(cap.get("strict_json_schema", False)) if strict is None else bool(strict)
     tier = "TIER-FORCE" if forced else "TIER-COERCE"
 
     # Cross-provider key resolution (102-UAT-02). A forced shot may TARGET a provider that
