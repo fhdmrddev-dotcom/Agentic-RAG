@@ -205,7 +205,14 @@ Plans:
   2. A user can describe a workflow in natural language and receive a valid draft definition — one-shot structured generation over the strict `WorkflowDefinition` schema, grounded in the project folder tree + tool/skill registry + any uploaded template, with invalid generations auto-retrying against the validation error.
   3. The Workflows page renders a read-only live graph of a workflow's phases/edges (view, not drag-to-build).
   4. A published workflow can be browsed in a project-filtered library and run from a thread (the thread enters workflow mode; Deep is the resting default); definitions are immutable-on-publish + versioned.
-**Plans**: TBD
+**Plans**: 6 plans in 3 waves
+Plans:
+- [ ] 103-01-PLAN.md — Backend foundation: additive PhaseSpec.name + harness_authoring_model knob + draft-CRUD DB fns/routes (23514->409) + Wave-0 tests (REQ-1, REQ-3) [Wave 1]
+- [ ] 103-02-PLAN.md — NL-gen backend: additive strict override on forced_emit + workflow_authoring service + POST /workflows/generate (REQ-2) [Wave 2]
+- [ ] 103-03-PLAN.md — Frontend foundation: api.ts authoring fns/types + deriveTier()/TIERS + shared NAV_ITEMS + ActiveView + AppDock deletion (REQ-7 wiring) [Wave 2]
+- [ ] 103-04-PLAN.md — Builder + read-only PhaseSpineGraph + 400px form panel (REQ-4, REQ-5) [Wave 3]
+- [ ] 103-05-PLAN.md — Publish-gauntlet UI client: verbatim PublishVerdict + key-detection + judge hard wall (REQ-6) [Wave 3]
+- [ ] 103-06-PLAN.md — Workflows page: filter rail + drafts shelf + Run launch + Tweak v(N+1) fork + ChatLayout render branch (REQ-7) [Wave 3]
 **UI hint**: yes
 **G-2 (sketch-before-plan FIRES)**: run `/gsd:sketch` BEFORE `/gsd:spec-phase` — confirm/extend `sketch-findings-agentic-rag` sketches 012 (workflows-page) + 013 (workflow-builder) for the NL-form-editor + live-graph surfaces.
 **VALIDATION (SC#10)**: NL-gen calls a provider, runs stream, UI state changes — author the 4-axis cross-provider rows. **Greenfield**: new page + new API router; does NOT touch `threads.py` / `anthropic_service.py`.
