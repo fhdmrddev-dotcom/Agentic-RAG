@@ -2,6 +2,14 @@
  * Phase 103-05 Task 1 (REQ-6 / WFAUTH-01, sketch 020-B "Publish Gauntlet Honesty")
  * — the publish-gauntlet UI CLIENT.
  *
+ * Phase 103-ux: the gauntlet no longer crams into the Builder HEADER (where the
+ * full 8-stage spine + verdict overflowed and OVERLAPPED the read-only diagram +
+ * step-form). The resting render is now a COMPACT "Publish…" trigger button that
+ * fits the header; the full gauntlet content opens in a centered MODAL over a
+ * dimmed/blurred backdrop (the SAME shell as WorkflowsPage's RunModal — same
+ * z-index, backdrop, Escape/focus contract). Only the CONTAINER is new — every
+ * honesty contract below is byte-for-behavior unchanged and lives in the modal.
+ *
  * Publishing is NOT a button that succeeds: it triggers the EXISTING server-side
  * 8-stage gauntlet (owner → definition-valid → business_requirement → lint →
  * interactive-phase → a REAL golden run on the project KB → structural gate →
@@ -30,7 +38,7 @@
  * The run link gates strictly on `golden_run_id != null` (stage 3+ reached);
  * otherwise an explicit no-run note. Lint codes render the LOWERCASE literals.
  */
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
 
 export interface PublishGauntletProps {
@@ -281,13 +289,73 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
   )
 }
 
-export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletProps) {
+/**
+ * The in-progress notice while the golden run blocks the request. Phase 103-ux:
+ * a calm message + a live elapsed-seconds timer so the user can SEE it's still
+ * alive (the publish runs the WHOLE workflow for real on the KB — minutes is
+ * normal). Live per-phase progress needs backend streaming → OUT OF SCOPE.
+ */
+function PublishingNotice({ elapsedSec }: { elapsedSec: number }) {
+  const mm = Math.floor(elapsedSec / 60)
+  const ss = elapsedSec % 60
+  const clock = mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`
+  return (
+    <div className="rounded border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden /> Publishing… running
+          the golden run on your KB
+        </div>
+        <span data-testid="publish-elapsed" className="font-mono text-[12px] tabular-nums text-amber-600 dark:text-amber-400">
+          {clock} elapsed
+        </span>
+      </div>
+      <p className="mt-2 leading-relaxed text-muted-foreground">
+        Publish runs your <b>whole workflow for real</b> against your knowledge base, then an independent judge grades the
+        result — so a multi-step workflow can take a <b>few minutes</b>. Same harness, same tools, same model, so the judge
+        grades a <b>real</b> deliverable, not a dry-run. It blocks until the verdict is ready — please <b>don’t close the
+        tab</b>; the verdict comes back inline when the run + judge finish.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * The full gauntlet content (the resting publish form + the 8-stage spine +
+ * the in-progress notice + the verbatim outcome). Rendered INSIDE the modal.
+ * The honesty contracts live here, unchanged — only the container moved.
+ */
+function GauntletContent({
+  definitionId,
+  onPublished,
+  loading,
+  setLoading,
+  goldenInputRef,
+}: {
+  definitionId: string
+  onPublished?: (version: number) => void
+  loading: boolean
+  setLoading: (v: boolean) => void
+  goldenInputRef: React.RefObject<HTMLTextAreaElement | null>
+}) {
   const [goldenInput, setGoldenInput] = useState("")
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [elapsedSec, setElapsedSec] = useState(0)
 
   const canPublish = goldenInput.trim().length > 0 && !loading
+
+  // Elapsed-seconds ticker — runs only while the golden run is in flight, so the
+  // user can SEE the synchronous publish is alive (no live per-phase progress).
+  useEffect(() => {
+    if (!loading) return
+    setElapsedSec(0)
+    const started = Date.now()
+    const id = window.setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - started) / 1000))
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [loading])
 
   async function runGauntlet() {
     if (!canPublish) return
@@ -316,7 +384,7 @@ export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletPr
   const isBlock = outcome != null && !isSuccess
 
   return (
-    <div className="w-full max-w-[760px]">
+    <div className="w-full">
       {/* D1 — the resting publish form: ONE golden_input textarea + Publish. */}
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
@@ -332,6 +400,7 @@ export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletPr
         </label>
         <textarea
           id="golden_input"
+          ref={goldenInputRef}
           value={goldenInput}
           onChange={(e) => setGoldenInput(e.target.value)}
           placeholder="A representative kickoff prompt — choose something typical, not a corner case."
@@ -352,19 +421,7 @@ export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletPr
       {/* The 8-stage spine + the golden-run hero while the gauntlet blocks the request. */}
       <GauntletSpine blockedStage={verdict?.blocked_stage ?? null} running={loading} />
 
-      {loading && (
-        <div className="rounded border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
-          <div className="flex items-center gap-2 font-semibold">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden /> Publishing… running
-            the golden run on your KB
-          </div>
-          <p className="mt-2 leading-relaxed text-muted-foreground">
-            Same harness, same tools, same model — so the judge grades a <b>real</b> deliverable, not a dry-run. This is
-            synchronous and can take a while. Background-job publish isn’t built yet, so this blocks the request — don’t
-            close the tab; the verdict comes back inline when the run + judge finish.
-          </p>
-        </div>
-      )}
+      {loading && <PublishingNotice elapsedSec={elapsedSec} />}
 
       {error && !loading && <div className="mt-3 text-[12px] text-destructive">Publish request failed: {error}</div>}
 
@@ -454,5 +511,127 @@ export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletPr
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * The exported gauntlet: a COMPACT trigger button + a centered MODAL (sketch
+ * 020-B, Phase 103-ux). At rest it is JUST the "Publish…" button (fits the
+ * Builder header's shrink-0 slot). Clicking it opens the full gauntlet content
+ * in a modal over a dimmed/blurred backdrop — the SAME shell as WorkflowsPage's
+ * RunModal (same z-[9000] backdrop, same Escape/focus contract). Because the
+ * modal is `position:fixed`, it escapes the header's overflow/shrink-0 context
+ * and never clips or crams into the layout.
+ */
+export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletProps) {
+  const [open, setOpen] = useState(false)
+  // `loading` lives on the wrapper so close affordances (✕ / backdrop / Escape)
+  // can be BLOCKED while a publish is in flight (the gauntlet runs synchronously).
+  const [loading, setLoading] = useState(false)
+
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const goldenInputRef = useRef<HTMLTextAreaElement>(null)
+
+  function requestClose() {
+    // Never close while a publish is in flight (the request blocks; closing would
+    // orphan the in-progress notice + the user's elapsed-time reassurance).
+    if (loading) return
+    setOpen(false)
+  }
+
+  // Initial focus lands on the golden_input textarea once the modal opens.
+  useEffect(() => {
+    if (open) goldenInputRef.current?.focus()
+  }, [open])
+
+  // Escape-to-close + simple Tab focus containment — mirrors RunModal's contract.
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        requestClose()
+        return
+      }
+      if (e.key !== "Tab") return
+      const root = dialogRef.current
+      if (!root) return
+      const focusables = root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loading])
+
+  return (
+    <>
+      {/* The resting trigger — compact, fits the Builder header's shrink-0 slot. */}
+      <button
+        type="button"
+        data-testid="publish-trigger"
+        onClick={() => setOpen(true)}
+        className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+      >
+        ◆ Publish…
+      </button>
+
+      {open && (
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Publish this workflow"
+          data-testid="publish-modal"
+          className="fixed inset-0 z-[9000] grid place-items-center bg-black/60 p-6 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            // Click the dimmed backdrop (not the card) to close — blocked mid-publish.
+            if (e.target === e.currentTarget) requestClose()
+          }}
+        >
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true">◆</span>
+                <span className="text-[15px] font-semibold text-foreground">Publish this workflow</span>
+              </div>
+              <button
+                type="button"
+                data-testid="publish-modal-close"
+                onClick={requestClose}
+                disabled={loading}
+                aria-label="Close"
+                title={loading ? "Can’t close while the gauntlet is running" : "Close"}
+                className="rounded-md border border-border px-2 py-0.5 text-[15px] leading-none text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ✕
+              </button>
+            </div>
+            {/* The scrollable body so the 8-stage spine + verdict never overflow. */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <GauntletContent
+                definitionId={definitionId}
+                onPublished={onPublished}
+                loading={loading}
+                setLoading={setLoading}
+                goldenInputRef={goldenInputRef}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

@@ -2,8 +2,15 @@
  * Phase 103-05 Task 1 (REQ-6 / WFAUTH-01, sketch 020-B) — PublishGauntlet tests.
  *
  * The publish-gauntlet UI CLIENT. The gauntlet RUNS server-side (Phase 102); this
- * client must NEVER re-derive the verdict. These tests pin the locked honesty
- * contracts (the G-6 silent-pass guards):
+ * client must NEVER re-derive the verdict.
+ *
+ * Phase 103-ux: the gauntlet now opens as a MODAL. The resting render is just a
+ * compact "Publish…" trigger — the full gauntlet content (form / spine / verdict)
+ * is NOT in the DOM until the trigger is clicked. Every honesty assertion below
+ * therefore opens the modal first (`openModal()`); the contracts themselves are
+ * unchanged. These tests pin the locked honesty contracts (the G-6 silent-pass
+ * guards):
+ *  - at rest only the "Publish…" trigger renders; the gauntlet content mounts on click.
  *  - the publish form is ONE golden_input textarea + a Publish button disabled on
  *    empty/whitespace; the body is {golden_input}.
  *  - the 5 PublishVerdict fields render VERBATIM (no client re-derivation of
@@ -38,15 +45,39 @@ beforeEach(() => {
   mockedPublish.mockReset()
 })
 
-/** Click into the golden_input textarea, type, and hit Publish. */
+/** Open the publish modal (click the compact "Publish…" trigger). */
+async function openModal() {
+  const user = userEvent.setup()
+  await user.click(screen.getByTestId("publish-trigger"))
+  // The modal + its golden_input textarea are now mounted.
+  await waitFor(() => expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument())
+}
+
+/** Open the modal, type the golden_input, and hit the "run the gauntlet" Publish. */
 async function doPublish(input = "a representative kickoff") {
   const user = userEvent.setup()
+  await openModal()
   const textarea = screen.getByLabelText(/golden_input/i)
   await user.type(textarea, input)
-  await user.click(screen.getByRole("button", { name: /publish/i }))
+  await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
 }
 
 describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => {
+  it("at rest only the compact 'Publish…' trigger renders; the gauntlet content mounts on click", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    // The trigger is present, but the gauntlet content (form / spine) is NOT.
+    expect(screen.getByTestId("publish-trigger")).toBeInTheDocument()
+    expect(screen.queryByLabelText(/golden_input/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("gauntlet-spine")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument()
+
+    await openModal()
+    // After opening the modal the form + the 8-stage spine are mounted.
+    expect(screen.getByTestId("publish-modal")).toBeInTheDocument()
+    expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument()
+    expect(screen.getByTestId("gauntlet-spine")).toBeInTheDocument()
+  })
+
   it("Publish is disabled on empty/whitespace, enabled on non-empty, and sends {golden_input}", async () => {
     mockedPublish.mockResolvedValue({
       kind: "verdict",
@@ -54,8 +85,9 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     } satisfies PublishOutcome)
     const user = userEvent.setup()
     render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
 
-    const btn = screen.getByRole("button", { name: /publish/i })
+    const btn = screen.getByRole("button", { name: /run the gauntlet/i })
     expect(btn).toBeDisabled()
 
     const textarea = screen.getByLabelText(/golden_input/i)
@@ -239,8 +271,9 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     expect(screen.getByText(/could not produce a verdict|treated as a block/i)).toBeInTheDocument()
   })
 
-  it("the 8 server-fixed stages render (the gauntlet spine)", () => {
+  it("the 8 server-fixed stages render (the gauntlet spine)", async () => {
     render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
     const spine = screen.getByTestId("gauntlet-spine")
     // Match the exact server-fixed stage LABELS (8 ordered stages, sketch 020-B D2).
     for (const label of [
@@ -278,5 +311,78 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
 
   it("the run link gates on golden_run_id != null", () => {
     expect(publishGauntletSource).toMatch(/golden_run_id\s*!==?\s*null|golden_run_id != null/)
+  })
+})
+
+describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
+  it("is a real aria-modal dialog with the shared z-[9000] backdrop, and initial focus lands on golden_input", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    const modal = screen.getByTestId("publish-modal")
+    expect(modal).toHaveAttribute("role", "dialog")
+    expect(modal).toHaveAttribute("aria-modal", "true")
+    expect(modal.className).toMatch(/z-\[9000\]/)
+    // Initial focus is inside the dialog (the golden_input textarea).
+    await waitFor(() => expect(screen.getByLabelText(/golden_input/i)).toHaveFocus())
+  })
+
+  it("closes via the ✕ button, Escape, and a backdrop click — and the trigger reopens it", async () => {
+    const user = userEvent.setup()
+    render(<PublishGauntlet definitionId="def-1" />)
+
+    // ✕ close
+    await openModal()
+    await user.click(screen.getByTestId("publish-modal-close"))
+    await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
+
+    // Escape close
+    await openModal()
+    await user.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
+
+    // Backdrop click close (mousedown on the backdrop element itself, not the card)
+    await openModal()
+    await user.click(screen.getByTestId("publish-modal"))
+    await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
+  })
+
+  it("blocks every close affordance WHILE a publish is in flight (✕ disabled, Escape + backdrop no-op)", async () => {
+    const user = userEvent.setup()
+    // A pending publish that never resolves during the assertion window.
+    let resolvePublish: (v: PublishOutcome) => void = () => {}
+    mockedPublish.mockReturnValue(
+      new Promise<PublishOutcome>((res) => {
+        resolvePublish = res
+      }),
+    )
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+
+    // In flight: the in-progress notice + elapsed timer show; close is blocked.
+    await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument())
+    expect(screen.getByTestId("publish-modal-close")).toBeDisabled()
+    await user.keyboard("{Escape}")
+    expect(screen.getByTestId("publish-modal")).toBeInTheDocument()
+    await user.click(screen.getByTestId("publish-modal")) // backdrop click no-op
+    expect(screen.getByTestId("publish-modal")).toBeInTheDocument()
+
+    // Resolve → loading ends → close affordances unlock again.
+    resolvePublish({
+      kind: "verdict",
+      verdict: { published: true, version: 1, golden_run_id: "r1", blocked_stage: null, named_failures: [] },
+    })
+    await waitFor(() => expect(screen.getByTestId("publish-modal-close")).toBeEnabled())
+  })
+
+  it("shows an elapsed-seconds timer while the golden run is in flight", async () => {
+    const user = userEvent.setup()
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {})) // never resolves
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toHaveTextContent(/elapsed/i))
   })
 })
