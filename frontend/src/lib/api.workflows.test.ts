@@ -111,6 +111,17 @@ describe("publishWorkflow — the 4 distinct HTTP outcomes (no binary 200/else h
     expect(out.verdict.blocked_stage).toBe("business_requirement")
   })
 
+  it("WR-02: a 400 with a missing/mistyped detail throws — never an undefined verdict", async () => {
+    // A detail-less 400 body must NOT cast `undefined` to PublishVerdict (the gauntlet
+    // would crash on verdict.named_failures.length). It throws an honest error instead.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(400, { message: "bad request" })))
+    await expect(publishWorkflow("wf-1", "x")).rejects.toThrow(/malformed verdict body/)
+
+    // A 400 whose detail is a bare string (not a PublishVerdict object) also throws.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(400, { detail: "no business requirement" })))
+    await expect(publishWorkflow("wf-1", "x")).rejects.toThrow(/malformed verdict body/)
+  })
+
   it("a 404 maps to kind:'not_found'", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(404, { detail: "workflow not found" })))
     const out = await publishWorkflow("missing", "x")

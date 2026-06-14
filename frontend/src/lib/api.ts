@@ -2161,8 +2161,16 @@ export async function publishWorkflow(
     return { kind: "verdict", verdict }
   }
   if (res.status === 400) {
-    const body = (await res.json().catch(() => ({}))) as { detail?: PublishVerdict }
-    return { kind: "business_requirement", verdict: body.detail as PublishVerdict }
+    // WR-02: defend against a detail-less / mistyped 400 body. The backend rides the
+    // full PublishVerdict in `detail` (api/workflows.py:209), but a malformed body must
+    // NEVER cast `undefined` to PublishVerdict — the gauntlet would then crash on
+    // `verdict.named_failures.length`. Verify the shape; otherwise throw an honest error.
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown }
+    const detail = body.detail
+    if (detail && typeof detail === "object" && "published" in detail) {
+      return { kind: "business_requirement", verdict: detail as PublishVerdict }
+    }
+    throw new Error("business_requirement block: malformed verdict body (no PublishVerdict in detail)")
   }
   if (res.status === 404) return { kind: "not_found" }
   if (res.status === 409) return { kind: "already_published" }
