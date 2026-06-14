@@ -233,15 +233,19 @@ def ingest_corpus(supabase: Client, conn, folder_id: str) -> list[str]:
         content_hash = hashlib.sha256(raw).hexdigest()
         filename = path.name
 
-        # Folder-scoped sha256 dedup (documents.py:404-423) — re-runs short-circuit.
+        # Folder-scoped sha256 dedup. The live `documents_dedup_idx` UNIQUE index is on
+        # (user_id, content_hash, COALESCE(folder_id,...)) WHERE status <> 'failed' — so ANY
+        # non-failed row (pending OR completed) with this (uid, hash, folder) blocks a
+        # re-INSERT. To stay idempotent whether or not embeddings ran (a SEED_PM_RUN_INGEST=0
+        # run leaves the row at status='pending'), short-circuit on any non-failed match —
+        # NOT just status='completed' (which would miss a prior pending row and 23505-collide).
         existing = (
             supabase.table("documents")
             .select("id")
             .eq("user_id", DEMO_USER_ID)
             .eq("content_hash", content_hash)
-            .eq("status", "completed")
-            .eq("is_latest", True)
             .eq("folder_id", folder_id)
+            .neq("status", "failed")
             .limit(1)
             .execute()
         )

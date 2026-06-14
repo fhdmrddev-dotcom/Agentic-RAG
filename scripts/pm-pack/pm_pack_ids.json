@@ -1,0 +1,20 @@
+{
+  "demo_user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+  "demo_folder_id": "1564da7e-2348-4237-b7a1-ec17c5ea8f4b",
+  "definitions": [
+    {
+      "def_id": "00000000-0000-0000-0000-0000001040a0",
+      "slug": "pm-weekly-status-report",
+      "version": 1,
+      "asset_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-weekly-status-report.docx",
+      "filename": "weekly-status-report.docx"
+    },
+    {
+      "def_id": "00000000-0000-0000-0000-0000001040a1",
+      "slug": "pm-risk-register",
+      "version": 1,
+      "asset_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-risk-register.docx",
+      "filename": "risk-register.docx"
+    }
+  ]
+}
