@@ -310,7 +310,253 @@ def upload_template(supabase: Client, local_path: Path, slug: str) -> str:
     return path
 
 
-# ── Task 2 (def authoring + DELETE-then-INSERT + manifest) lands below ──────────────
+# ── Task 2: def authoring + DELETE-then-INSERT + manifest ───────────────────────────
+
+
+def _build_def(
+    *,
+    def_id: str,
+    slug: str,
+    name: str,
+    folder_id: str,
+    asset_path: str,
+    asset_filename: str,
+    business_requirement: str,
+    retrieve_prompt: str,
+    emit_prompt: str,
+) -> dict:
+    """Author the FULL WorkflowDefinition JSONB to the 2-phase fill shape (S-5 DRIFT FLAG).
+
+    Phase[0] ``llm_agent`` with ``available_tools:["search_documents"]`` retrieves the KB
+    evidence (its source_refs build the citation valid-id set). Phase[1] ``llm_emit``
+    (``emitter:"render_template"``) renders the bound template — ``render_template`` is in
+    NO phase's available_tools because the emit resolves the ``assets[kind=="template"]``
+    entry SERVER-SIDE via ``_emit_bound_asset_ref`` (phase_types.py:724-741), so the model
+    never selects it. Both phases set ``folder_scope:[folder_id]`` → ``project_folder_id``
+    MUST be set (the ``_folder_scope_requires_project`` model_validator). ``output_file_valid``
+    carries an EMPTY ``config:{}`` (the emit IS the producer; the validator re-opens the
+    produced file — validator_kinds.py:285-286,315-339; the config["path"] branch at :287-313
+    is the author-supplied WR-07 path, NOT needed here). Every gate ``on_failure:"fail_run"``
+    (no interactive/ask_user phase — the publish gauntlet pre-blocks those, S-8).
+    """
+    return {
+        "slug": slug,
+        "version": DEF_VERSION,
+        "name": name,
+        "status": "published",
+        "project_folder_id": folder_id,
+        "business_requirement": business_requirement,
+        "phases": [
+            {
+                "slug": "retrieve",
+                "phase_index": 0,
+                "config": {
+                    "phase_type": "llm_agent",
+                    "prompt": retrieve_prompt,
+                    "available_tools": ["search_documents"],
+                    "folder_scope": [folder_id],
+                },
+                "validators": [],
+            },
+            {
+                "slug": "emit",
+                "phase_index": 1,
+                "config": {
+                    "phase_type": "llm_emit",
+                    "emitter": "render_template",
+                    "prompt": emit_prompt,
+                    "folder_scope": [folder_id],
+                    "citation_policy": "strict",
+                    "integrity_policy": "strict",
+                },
+                "validators": [
+                    {
+                        "kind": "citations_required",
+                        "config": {"mode": "deterministic"},
+                        "on_failure": "fail_run",
+                    },
+                    {
+                        "kind": "output_file_valid",
+                        "config": {},
+                        "on_failure": "fail_run",
+                    },
+                ],
+            },
+        ],
+        "assets": [
+            {
+                "asset_id": asset_path,
+                "filename": asset_filename,
+                "kind": "template",
+                "mime": MIME,
+            }
+        ],
+    }
+
+
+def build_status_def(folder_id: str, asset_path: str) -> dict:
+    """The Weekly Status Report fill def (the SC#2 headline + SC#10 scoreboard target)."""
+    return _build_def(
+        def_id=STATUS_DEF_ID,
+        slug="pm-weekly-status-report",
+        name="Weekly Status Report",
+        folder_id=folder_id,
+        asset_path=asset_path,
+        asset_filename="weekly-status-report.docx",
+        business_requirement=(
+            "Produce a cited weekly status report from the project KB with overall RAG "
+            "status, accomplishments this period, planned work next period, risks/blockers, "
+            "and key milestones. Every reported value must be grounded in the project's "
+            "knowledge base; leave a value null where the sources do not support it."
+        ),
+        retrieve_prompt=(
+            "Search the project KB for the latest reporting-period status: accomplishments, "
+            "planned next steps, risks/blockers, milestones, and the overall RAG status. "
+            "Gather the source passages that support each value the status report will fill."
+        ),
+        emit_prompt=(
+            "Fill the weekly-status-report template from the retrieved KB evidence. Cite "
+            "every non-null value against its source chunk; set a value to null where the "
+            "sources do not support it (do not invent)."
+        ),
+    )
+
+
+def build_risk_def(folder_id: str, asset_path: str) -> dict:
+    """The Risk Register fill def (full publishable; no full scoreboard required, D-104-2)."""
+    return _build_def(
+        def_id=RISK_DEF_ID,
+        slug="pm-risk-register",
+        name="Risk Register",
+        folder_id=folder_id,
+        asset_path=asset_path,
+        asset_filename="risk-register.docx",
+        business_requirement=(
+            "Produce a cited project risk register from the project KB: one row per "
+            "identified risk with id, description, category, probability, impact, owner, "
+            "mitigation, and status — every cell grounded in the knowledge base. The Score "
+            "is computed by the template (probability x impact); leave any cell null where "
+            "the sources do not support a value."
+        ),
+        retrieve_prompt=(
+            "Search the project KB for all identified project risks: for each risk gather "
+            "its description, category, probability, impact, owner, mitigation, and current "
+            "status, with the source passages that support each field."
+        ),
+        emit_prompt=(
+            "Fill the risk-register template's rows from the retrieved KB evidence — one "
+            "row per risk with the 8 cited columns (id, description, category, probability, "
+            "impact, owner, mitigation, status). Cite every non-null cell against its source "
+            "chunk; set a cell to null where the sources do not support it. Do NOT emit a "
+            "Score — the template computes it (probability x impact) from the cited cells."
+        ),
+    )
+
+
+def _validate_def(def_dict: dict) -> None:
+    """Validate a def dict through the live Pydantic model BEFORE the INSERT — a mis-shaped
+    def must never land. Exercises the model_validator (folder_scope ⊆ project_folder_id)
+    + the discriminated-union phase configs. Raises (aborts the seed) on a ValidationError.
+    """
+    from app.models.harness import WorkflowDefinition  # noqa: PLC0415
+
+    WorkflowDefinition.model_validate(def_dict)
+
+
+def upsert_definition(conn, def_id: str, def_dict: dict) -> None:
+    """DELETE-then-INSERT the published def (S-3 — the immutability trigger blocks UPDATE).
+
+    SELECT the existing ``definition::text``; if a row exists and differs, DELETE it (the
+    BEFORE-UPDATE immutability trigger is UPDATE-only — DELETE is allowed), then INSERT the
+    published row (ON CONFLICT (id) DO NOTHING covers a concurrent insert). Read-back assert
+    the 2-phase shape: assets[0].kind=='template', the retrieve phase declares
+    'search_documents', the emit phase is 'llm_emit', business_requirement is non-null.
+    Never UPDATEs a published row.
+    """
+    target_def = json.dumps(def_dict)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT definition::text FROM public.workflow_definitions WHERE id = %s",
+            (def_id,),
+        )
+        existing = cur.fetchone()
+        if existing is not None and existing[0] != target_def:
+            # Stale published row — DELETE so the corrected def can be re-inserted.
+            # DELETE is permitted (the immutability trigger is BEFORE UPDATE only).
+            cur.execute(
+                "DELETE FROM public.workflow_definitions WHERE id = %s",
+                (def_id,),
+            )
+
+        cur.execute(
+            """
+            INSERT INTO public.workflow_definitions
+                (id, slug, version, name, status, definition, created_by, is_global)
+            VALUES (%s, %s, %s, %s, 'published', %s::jsonb, %s, false)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (
+                def_id,
+                def_dict["slug"],
+                def_dict["version"],
+                def_dict["name"],
+                target_def,
+                DEMO_USER_ID,
+            ),
+        )
+        conn.commit()
+
+        # Read-back assert the 2-phase shape (S-5 — NOT the 1-phase render-on-agent assert).
+        cur.execute(
+            "SELECT definition->'assets'->0->>'kind', "
+            "definition->'phases'->0->'config'->'available_tools', "
+            "definition->'phases'->1->'config'->>'phase_type', "
+            "definition->>'business_requirement' "
+            "FROM public.workflow_definitions WHERE id = %s",
+            (def_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise SystemExit(f"Definition read-back failed: no row at id={def_id}")
+        asset_kind, retrieve_tools, emit_type, biz_req = row
+        if asset_kind != "template":
+            raise SystemExit(f"Read-back: assets[0].kind expected 'template', got {asset_kind!r}")
+        if "search_documents" not in (retrieve_tools or []):
+            raise SystemExit(
+                f"Read-back: retrieve phase available_tools must include 'search_documents', "
+                f"got {retrieve_tools!r}"
+            )
+        if emit_type != "llm_emit":
+            raise SystemExit(f"Read-back: emit phase phase_type expected 'llm_emit', got {emit_type!r}")
+        if not biz_req:
+            raise SystemExit("Read-back: business_requirement must be non-null")
+
+
+def emit_ids(folder_id: str, status_asset: str, risk_asset: str) -> None:
+    """Emit scripts/pm-pack/pm_pack_ids.json — the manifest the verifier + Plan-03 scoreboard
+    consume (def ids, asset paths, folder id). NO secrets — ids/paths only.
+    """
+    payload = {
+        "demo_user_id": DEMO_USER_ID,
+        "demo_folder_id": folder_id,
+        "definitions": [
+            {
+                "def_id": STATUS_DEF_ID,
+                "slug": "pm-weekly-status-report",
+                "version": DEF_VERSION,
+                "asset_id": status_asset,
+                "filename": "weekly-status-report.docx",
+            },
+            {
+                "def_id": RISK_DEF_ID,
+                "slug": "pm-risk-register",
+                "version": DEF_VERSION,
+                "asset_id": risk_asset,
+                "filename": "risk-register.docx",
+            },
+        ],
+    }
+    OUT_PATH.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -332,13 +578,23 @@ def main() -> int:
             for spec in TEMPLATE_SPECS
         }
 
-        # 4 + 5 (Task 2): build/validate/upsert both defs + emit the manifest.
-        # (wired in Task 2)
+        # 4. Build + validate + upsert both 2-phase defs (DELETE-then-INSERT).
+        status_asset = asset_paths["pm-weekly-status-report"]
+        risk_asset = asset_paths["pm-risk-register"]
+        status_def = build_status_def(folder_id, status_asset)
+        risk_def = build_risk_def(folder_id, risk_asset)
+        _validate_def(status_def)  # abort the seed on a mis-shaped def (never INSERT it)
+        _validate_def(risk_def)
+        upsert_definition(conn, STATUS_DEF_ID, status_def)
+        upsert_definition(conn, RISK_DEF_ID, risk_def)
+
+        # 5. Emit the manifest for the verifier + Plan-03 scoreboard (ids/paths only).
+        emit_ids(folder_id, status_asset, risk_asset)
 
         print(
             f"SEEDED folder_id={folder_id} docs={len(doc_ids)} "
-            f"status_asset={asset_paths['pm-weekly-status-report']} "
-            f"risk_asset={asset_paths['pm-risk-register']}"
+            f"status_def={STATUS_DEF_ID} status_asset={status_asset} "
+            f"risk_def={RISK_DEF_ID} risk_asset={risk_asset} manifest={OUT_PATH.name}"
         )
     finally:
         conn.close()
