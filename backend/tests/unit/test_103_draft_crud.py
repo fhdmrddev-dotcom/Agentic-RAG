@@ -73,8 +73,7 @@ def _two_owners(cur):
     return rows[0][0], rows[1][0]
 
 
-# ── Plan 01 Task 2 fills these (DB-fn level) — un-xfailed once the fns land ────
-@pytest.mark.xfail(reason="Plan 01 Task 2 implements create/list/update/delete_workflow_definition", strict=False)
+# ── Plan 01 Task 2 fills these (DB-fn level) — GREEN against :54322 ────────────
 @pytest.mark.asyncio
 async def test_create_persists_draft_and_returns_id_version():
     """create_workflow_definition INSERTs status='draft', is_global=false and
@@ -107,7 +106,6 @@ async def test_create_persists_draft_and_returns_id_version():
         await pool.close()
 
 
-@pytest.mark.xfail(reason="Plan 01 Task 2 implements list_draft_workflows owner-scope", strict=False)
 @pytest.mark.asyncio
 async def test_list_drafts_is_owner_scoped():
     """list_draft_workflows returns ONLY the caller's drafts — a second user's draft
@@ -151,7 +149,6 @@ async def test_list_drafts_is_owner_scoped():
         await pool.close()
 
 
-@pytest.mark.xfail(reason="Plan 01 Task 2 implements update/delete_workflow_definition", strict=False)
 @pytest.mark.asyncio
 async def test_update_round_trips_and_delete_then_none():
     """update_workflow_definition mutates a draft and round-trips the change;
@@ -186,7 +183,16 @@ async def test_update_round_trips_and_delete_then_none():
             )
             assert upd is not None
             read = await get_definition(pool, def_id, user_id=owner)
-            assert read["definition"]["name"] == "Renamed Draft"  # round-tripped
+            # A bare asyncpg pool (no app JSONB codec) returns ``definition`` as a JSON
+            # string — the live app pool decodes it to a dict. Normalize either way:
+            import json as _json
+
+            decoded = read["definition"]
+            if isinstance(decoded, str):
+                decoded = _json.loads(decoded)
+            assert decoded["name"] == "Renamed Draft"  # round-tripped
+            # The row's top-level ``name`` column was updated too:
+            assert read["name"] == "Renamed Draft"
 
             deleted = await delete_workflow_definition(pool, def_id, user_id=owner)
             assert deleted is True

@@ -255,6 +255,119 @@ async def publish_definition(pool: asyncpg.Pool, definition_id: UUID) -> int:
     return row["version"] if row is not None else -1
 
 
+# ── draft CRUD (Phase 103 / REQ-1 / WFAUTH-01) ───────────────────────────────
+# The authoring substrate the Workflows page (Plan 06) + Builder (Plan 04) sit on.
+# Mirror the in-file owner-scoped ``$N``-only precedent (get_definition /
+# list_published_workflows / create_workflow_run). The service-role engine bypasses
+# RLS, so EVERY query self-scopes ``created_by = $N`` (a second user's draft is
+# absent — T-103-01-01). ``$N`` placeholders only (no f-string on SQL).
+async def create_workflow_definition(
+    pool: asyncpg.Pool, *, definition: WorkflowDefinition, user_id: UUID
+) -> dict:
+    """INSERT a new DRAFT definition, RETURNING ``{id, version}`` (REQ-1 create).
+
+    Server-enforced invariants (T-103-01-03): ``status='draft'``, ``is_global=false``,
+    ``created_by=user_id`` are bound LITERALLY/by the trusted owner id — never from the
+    client body (the route forces ``body.status='draft'`` too; this is the second
+    backstop). The ``definition`` JSONB is ``json.dumps(definition.model_dump(mode="json"))``
+    + ``$N::jsonb`` (mirror create_workflow_run — this file uses no pool JSONB codec).
+
+    Tweak fork (REQ-7 / Pitfall 6): a fork is just this INSERT with
+    ``definition.version = published_N + 1`` and the SAME slug — the frozen published
+    row is NEVER UPDATEd. ``UNIQUE(slug, version)`` (migration 056) keeps versions
+    distinct.
+
+    Returns ``{id, version}``.
+    """
+    row = await pool.fetchrow(
+        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+        "VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
+        "RETURNING id, version",
+        definition.slug,
+        definition.version,
+        definition.name,
+        json.dumps(definition.model_dump(mode="json")),
+        user_id,
+    )
+    return dict(row)
+
+
+async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dict]:
+    """The caller's OWN drafts (the Workflows page drafts shelf — D-103-4).
+
+    Owner-scoped ONLY (``status = 'draft' AND created_by = $1``) — a second user's
+    draft is ABSENT (T-103-01-01 EoP; the service role bypasses RLS so the WHERE is
+    the boundary). Mirrors ``get_definition``'s owner-scope shape, narrowed to drafts.
+    ``$N`` placeholders only. Returns the id/slug/version/name the shelf needs.
+    """
+    rows = await pool.fetch(
+        "SELECT id, slug, version, name FROM workflow_definitions "
+        "WHERE status = 'draft' AND created_by = $1 "
+        "ORDER BY name",
+        user_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def update_workflow_definition(
+    pool: asyncpg.Pool, definition_id: UUID, *, definition: WorkflowDefinition, user_id: UUID
+) -> dict | None:
+    """UPDATE a DRAFT's ``name`` + ``definition`` JSONB (REQ-1 PATCH), RETURNING
+    ``{id, version}`` or ``None``.
+
+    Owner-scoped + draft-only (``id = $1 AND created_by = $2 AND status = 'draft'``):
+    a row not owned by the caller, not a draft, or not found matches 0 rows -> ``None``
+    (the route maps ``None`` -> 404; no existence leak — the get_definition precedent).
+
+    PUBLISHED-ROW FREEZE (T-103-01-02): the immutability trigger
+    ``workflow_definitions_block_published`` raises Postgres ``23514`` on a published-row
+    UPDATE. The ``status='draft'`` WHERE guard makes the normal published-row PATCH a
+    0-row no-op (-> ``None`` -> 404). The trigger is NOT caught here — it is left to
+    PROPAGATE as ``asyncpg.exceptions.CheckViolationError`` so the route maps it to HTTP
+    409 (mirroring ``publish_definition``'s draft->published trigger note: the trigger is
+    the source of truth; the route maps the exception, never a silent overwrite or a 500).
+    ``$N`` placeholders only.
+
+    Returns ``{id, version}`` or ``None``.
+    """
+    row = await pool.fetchrow(
+        "UPDATE workflow_definitions SET name = $3, definition = $4::jsonb "
+        "WHERE id = $1 AND created_by = $2 AND status = 'draft' "
+        "RETURNING id, version",
+        definition_id,
+        user_id,
+        definition.name,
+        json.dumps(definition.model_dump(mode="json")),
+    )
+    return dict(row) if row is not None else None
+
+
+async def delete_workflow_definition(
+    pool: asyncpg.Pool, definition_id: UUID, *, user_id: UUID
+) -> bool:
+    """DELETE a DRAFT owned by the caller (REQ-1 DELETE). Returns True iff a row was
+    removed.
+
+    Owner-scoped + draft-only (``id = $1 AND created_by = $2 AND status = 'draft'``):
+    a non-owned / non-draft / missing id removes 0 rows -> ``False`` (the route maps
+    ``False`` -> 404; no existence leak).
+
+    PUBLISHED-ROW FREEZE (T-103-01-02): same as ``update_workflow_definition`` — the
+    immutability trigger raises ``23514`` on a published-row DELETE; the ``status='draft'``
+    guard makes the normal published-row DELETE a 0-row no-op (-> ``False`` -> 404), and a
+    trigger violation is left to PROPAGATE as ``CheckViolationError`` for the route to map
+    to HTTP 409. ``$N`` placeholders only.
+    """
+    row = await pool.fetchrow(
+        "DELETE FROM workflow_definitions "
+        "WHERE id = $1 AND created_by = $2 AND status = 'draft' "
+        "RETURNING id",
+        definition_id,
+        user_id,
+    )
+    return row is not None
+
+
 # ── workflow_phases reads (RUN-KEYED → workflow_run_id) ──────────────────────
 async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
     """All phases for a run, in ``phase_index`` order (resumability substrate).

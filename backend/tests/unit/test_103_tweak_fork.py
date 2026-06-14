@@ -61,7 +61,6 @@ def _draft_definition(slug: str, version: int) -> dict:
     }
 
 
-@pytest.mark.xfail(reason="Plan 01 Task 2 implements create_workflow_definition (fork INSERT)", strict=False)
 @pytest.mark.asyncio
 async def test_tweak_fork_creates_v_n_plus_1_and_two_published_rows():
     """Seed+publish vN, fork v(N+1) as a draft via create_workflow_definition (INSERT,
