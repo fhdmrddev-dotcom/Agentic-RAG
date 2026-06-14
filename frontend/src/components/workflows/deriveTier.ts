@@ -118,8 +118,12 @@ export function deriveTier(
       return hasAnyFloorGate ? TIERS.MIDDLE : TIERS.LOOSE
     default: {
       // Exhaustiveness guard — a new citation_policy enum must be handled here.
+      // IR-03: at RUNTIME an unknown policy (future enum / malformed JSONB) must NOT
+      // return the raw string as a Tier (the caller would crash reading .id/.glyph).
+      // Keep the compile-time check, but fall back to the safe LOOSE tier at runtime.
       const _never: never = citationPolicy
-      return _never
+      void _never
+      return TIERS.LOOSE
     }
   }
 }
