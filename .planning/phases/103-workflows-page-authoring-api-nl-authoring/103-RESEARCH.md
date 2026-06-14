@@ -508,14 +508,16 @@ function deriveTier(citationPolicy: CitationPolicy, validatorKinds: Set<Validato
 
 **These four assumptions are organizational/mechanism choices, not behavioral unknowns — the behavioral contracts (REQ-2 retry count, grounding fidelity, honest fail) are all locked and verified. A1 is the one worth an explicit planner decision.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **The exact minimal edit to disable strict mode for the authoring shot (Pitfall 1 / A1).**
+> RESOLVED at planning: Q1 → Plan 02 Task 1 (additive `strict: bool | None = None` override on `forced_emit`, default-preserving). Q2 → Plan 02 Task 2 (structured log + LangSmith span + `forced_emit` call-count mock; no migration).
+
+1. **The exact minimal edit to disable strict mode for the authoring shot (Pitfall 1 / A1).** — **RESOLVED:** Plan 02 Task 1 adds the additive `strict` override (recommendation (a)).
    - What we know: `forced_emit` sets `strict` from `cap.get("strict_json_schema")` and the openai_compat adapter applies `"strict": true` to the function def; OpenAI strict requires all-fields-required; `WorkflowDefinition` is optional-heavy; forcing-WITHOUT-strict is a distinct, working code branch.
    - What's unclear: whether to (a) add a `strict: bool | None = None` override kwarg to `forced_emit` (additive, default preserves emit behavior), (b) have the route call the gateway path that forces-without-strict, or (c) make the authoring schema strict-shaped (heavier; fights the optional-with-default design).
    - Recommendation: (a) the additive `strict` override on `forced_emit` is the smallest, safest, RED-LINE-safe edit (default `None` = current `cap`-derived behavior = byte-identical for emit/judge). Plan it as the first REQ-2 task.
 
-2. **Whether `nl_generation_attempt` needs a DB-queryable receipt or a log/span suffices (A2).**
+2. **Whether `nl_generation_attempt` needs a DB-queryable receipt or a log/span suffices (A2).** — **RESOLVED:** Plan 02 Task 2 emits a structured log + LangSmith span; the unit test asserts the count via a `forced_emit` call-count mock — no migration.
    - What we know: the SPEC says "structured log/trace event"; `harness_audit` is a closed-CHECK constraint (migration to add a kind).
    - What's unclear: the verifier's preferred assertion surface (LangSmith span count vs DB row count vs mocked `forced_emit.call_count`).
    - Recommendation: emit a structured log + rely on LangSmith span count / a `forced_emit` call-count mock for the unit test — no migration. Confirm in VALIDATION.
@@ -696,9 +698,9 @@ Per CLAUDE.md: REQ-2 calls a provider via forced structured generation, so VALID
 | Architecture (forced_emit reuse) | HIGH | Substrate + seam + gateway translation read + provider-docs-verified |
 | Pitfalls | HIGH | Strict-mode risk derived from code + verified OpenAI requirement; provider quirks from verified bug reports |
 
-### Open Questions
-1. The minimal edit to disable strict mode for the authoring shot (recommend an additive `strict` override on `forced_emit`, default-preserving) — Open Q1 / A1.
-2. Whether `nl_generation_attempt` needs a DB receipt or a log/span suffices (recommend log/span — no migration) — Open Q2 / A2.
+### Open Questions (RESOLVED)
+1. The minimal edit to disable strict mode for the authoring shot (recommend an additive `strict` override on `forced_emit`, default-preserving) — Open Q1 / A1. **RESOLVED → Plan 02 Task 1.**
+2. Whether `nl_generation_attempt` needs a DB receipt or a log/span suffices (recommend log/span — no migration) — Open Q2 / A2. **RESOLVED → Plan 02 Task 2.**
 
 ### Ready for Planning
 Research complete. The planner can create PLAN.md files. Recommend sequencing the strict-mode handling (Open Q1) as the FIRST REQ-2 task, then the grounding/retry orchestration, then the UI surfaces against the locked sketch-018..023 contract.

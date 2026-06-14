@@ -84,3 +84,41 @@ threat ref, test type, and automated command. Seeded from `103-RESEARCH.md` → 
 *Backend Wave-0 lives in Plan 01 Task 1 (8 files, xfail until filled by Plans 01/02). Frontend Wave-0 is per-plan (TDD: test ships with the component). `wave_0_complete` flips true once Plan 01 Task 1 lands.*
 
 ---
+
+## SC#10 4-Axis Cross-Provider NL-Gen Matrix (MANDATORY — authored here, not in PLAN.md)
+
+Per CLAUDE.md: REQ-2 calls a provider via forced structured generation, so VALIDATION rows are REQUIRED across the full native roster — one representative per axis, with reasoning-native AND tool-sensitive BOTH covered (not OpenAI-only). Exercised live at `/gsd:verify-work 103`.
+
+| Axis | Required coverage for 103 | Representative + watch-for | Pass condition |
+|------|---------------------------|---------------------------|----------------|
+| Cross-provider | OpenAI, Anthropic, Google, OpenRouter (+ name the full native-7: DeepSeek, Moonshot/Kimi, Z.ai-GLM, MiniMax) | Anthropic (`claude-opus-4-8`) = product default. **OpenAI/DeepSeek: assert NO strict-mode 400 (Pitfall 1).** **DeepSeek/Moonshot (reasoning-native): thinking-OFF on the forced path / coerce-tier honest verdict (Pitfall 4).** **GLM/MiniMax (tool-sensitive): exact registry case (Pitfall 3); MiniMax-M3 passes OR documented (`minimax-m3-invalid-tool-args-400`, Pitfall 2).** | NL-gen produces a `model_validate()`-passing GROUNDED draft; no silent tool-drop; `attempt`=1 on valid |
+| Multi-tool | ≥1 row whose generated draft composes ≥2 phase types using ≥2 distinct `available_tools` from the registry | grounding fidelity: every `available_tools`/`skill_ref` ∈ the real registry | UUIDs ⊆ bound subtree; tools/skills ∈ registry |
+| Parallel-thread | ≥1 row: Builder generating in one view while a separate Chat thread streams | NL-gen never touches the streaming/Deep path; no cross-talk | Both keep correct mode; Deep byte-identical |
+| Long-message | ≥1 row: a verbose multi-paragraph describe prompt (≥5 KB) yielding a multi-phase draft | no truncation (`is_truncated` false); `max_tokens` sized for a large `WorkflowDefinition` | Definition validates; retry semantics unchanged |
+
+---
+
+## Manual-Only / Lived-Experience Verifications (G-4)
+
+| Behavior | Requirement | Why Manual | Test Instructions |
+|----------|-------------|------------|-------------------|
+| Single-state-transition draft reveal (one DOM batch, no per-node animation/stagger) | REQ-5 | Lived-experience visual contract — wire/snapshot insufficient | Describe a workflow; observe "Composing…"→full-graph reveal in ONE commit (no stagger/incremental append) |
+| 400px panel pushes (not overlays) the graph; bottom-sheet <768px | REQ-5 | Layout geometry across viewport widths | Open a node form at ≥1100px (column shrinks, no h-scroll) and at <768px (bottom-sheet) |
+| Read-only graph offers no drag/handle/add-node | REQ-4 | Behavioral backstop beyond static check | Synthetic pointer drag on a node → zero change to phase_index/edges |
+| Judge block is a hard wall — no override | REQ-6 | Negative-space UI assertion | Force a judge block; per-criterion rows + struck-through "publish anyway" + only "Fix & re-publish" |
+| Run lands in Chat | REQ-7 | Cross-surface navigation | Run never leaves you on the Workflows page; the thread enters harness mode |
+| Deep chat byte-identical post-merge | Constraint | Cross-cutting regression | One Deep-mode (non-workflow) streaming chat row passes unchanged |
+
+---
+
+## Validation Sign-Off
+
+- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
+- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
+- [ ] Wave 0 covers all MISSING references
+- [ ] No watch-mode flags
+- [ ] Feedback latency < 90s
+- [ ] SC#10 4-axis rows exercised at verification (one representative per axis; reasoning-native + tool-sensitive both covered)
+- [x] `nyquist_compliant: true` set in frontmatter
+
+**Approval:** pending
