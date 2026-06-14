@@ -13,19 +13,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  MessageSquare, FileText, Activity, Zap, Settings,
+  MessageSquare,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
   Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
   AlertCircle, Square,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { Folder, Thread } from "@/types"
+// Phase 103 (REQ-7) — the single shared nav source (kills the triplication).
+import { NAV_ITEMS } from "@/lib/nav-items"
 // SEED-064: cross-thread run visibility + Stop.
 import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
 import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
 
 interface Props {
-  // From AppDock
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
   onSignOut: () => void
@@ -40,14 +41,6 @@ interface Props {
   theme: "light" | "dark"
   onToggleTheme: () => void
 }
-
-const NAV_ITEMS = [
-  { view: "chat" as ActiveView,           icon: MessageSquare, label: "Chat" },
-  { view: "documents" as ActiveView,      icon: FileText,      label: "Documents" },
-  { view: "library-health" as ActiveView, icon: Activity,      label: "Library Health" },
-  { view: "skills" as ActiveView,         icon: Zap,           label: "Skills" },
-  { view: "settings" as ActiveView,       icon: Settings,      label: "Settings" },
-] as const
 
 export function NavPanel({
   activeView,
