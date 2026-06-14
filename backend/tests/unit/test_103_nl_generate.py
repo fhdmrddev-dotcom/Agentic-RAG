@@ -110,7 +110,9 @@ async def test_one_call_on_valid(monkeypatch):
         settings=object(),
     )
     assert result["ok"] is True
-    assert result["definition"]["slug"] == "weekly-risk"
+    # The net-new draft slug is uniquified with a short hash suffix (UAT-103) so two
+    # same-named generations never collide on UNIQUE(slug, version) at create time.
+    assert result["definition"]["slug"].startswith("weekly-risk-")
     assert len(calls) == 1  # exactly ONE provider call
 
 

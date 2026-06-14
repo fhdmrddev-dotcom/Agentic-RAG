@@ -465,4 +465,12 @@ async def generate_workflow_definition(
     if fidelity is not None:
         return fidelity
 
+    # Mint a UNIQUE slug for this net-new draft so two same-named generations never
+    # collide on UNIQUE(slug, version) at create time (mirrors the existing fixture
+    # convention of a short hash suffix). The Tweak fork keeps the published slug (a
+    # different code path), so this is scoped to NL-generated births only (UAT-103).
+    import uuid  # function-local (Pitfall 4 discipline)
+
+    wd = wd.model_copy(update={"slug": f"{wd.slug}-{uuid.uuid4().hex[:8]}"})
+
     return {"ok": True, "definition": wd.model_dump(mode="json")}

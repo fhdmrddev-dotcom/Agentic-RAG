@@ -26,7 +26,7 @@
  * wired exactly like the app's existing ChatLayout push grid
  * (`gridTemplateColumns: minmax(0,1fr) <44px|400px>`).
  */
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft } from "@/lib/api"
 import { PhaseSpineGraph, type PhaseSpecJSON } from "@/components/workflows/PhaseSpineGraph"
 import { PhaseFormPanel, type PhaseConfigPatch } from "@/components/workflows/PhaseFormPanel"
@@ -64,6 +64,12 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
   // The persisted draft id (null until the first save). A generated draft is
   // persisted via createWorkflowDraft on the FIRST edit/save, then PATCHed.
   const [draftId, setDraftId] = useState<string | null>(null)
+  // Synchronous mirrors of the persist state. setDraftId is async, so several
+  // onPersist calls can fire while draftId is still null and each would re-run
+  // createWorkflowDraft → a UniqueViolation storm on (slug, version). The refs
+  // collapse the first save to EXACTLY ONE create (UAT-103 save-loop fix).
+  const draftIdRef = useRef<string | null>(null)
+  const creatingRef = useRef(false)
 
   const canDraft = describe.trim().length > 0 && state.phase !== "composing"
   const panelOpen = selectedSlug !== null
@@ -82,6 +88,8 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
     setState({ phase: "composing" })
     setSelectedSlug(null)
     setDraftId(null)
+    draftIdRef.current = null
+    creatingRef.current = false
     try {
       const result = await generateWorkflow({ describe: text })
       if (result.ok) {
@@ -122,17 +130,26 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
     if (state.phase !== "drafted") return
     const def = state.definition as unknown as Record<string, unknown>
     try {
-      if (draftId === null) {
-        const created = await createWorkflowDraft(def)
-        setDraftId(created.id)
+      if (draftIdRef.current === null) {
+        // First save: create EXACTLY ONCE. If a create is already in flight,
+        // skip — re-running it would collide on UNIQUE(slug, version) → 500.
+        if (creatingRef.current) return
+        creatingRef.current = true
+        try {
+          const created = await createWorkflowDraft(def)
+          draftIdRef.current = created.id // synchronous: subsequent calls PATCH
+          setDraftId(created.id)
+        } finally {
+          creatingRef.current = false
+        }
       } else {
-        await updateWorkflowDraft(draftId, def)
+        await updateWorkflowDraft(draftIdRef.current, def)
       }
     } catch {
-      // A persist failure (409 published / 404 / network) is non-fatal to the
-      // in-memory draft; the visible conflict surface is Plan 06 (Tweak→fork).
+      // A persist failure (409 / 404 / network) is non-fatal to the in-memory
+      // draft; the visible conflict surface is Plan 06 (Tweak→fork).
     }
-  }, [state, draftId])
+  }, [state])
 
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
   if (state.phase === "empty" || state.phase === "composing" || state.phase === "error") {

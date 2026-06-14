@@ -238,7 +238,16 @@ async def create_draft(
     user_id = _coerce_user_id(current_user)
     # Force draft status server-side — never trust the client's ``status``:
     body = body.model_copy(update={"status": "draft"})
-    row = await create_workflow_definition(pool, definition=body, user_id=user_id)
+    try:
+        row = await create_workflow_definition(pool, definition=body, user_id=user_id)
+    except asyncpg.exceptions.UniqueViolationError:
+        # UNIQUE(slug, version) already taken (e.g. a re-fired save or a same-named
+        # draft). An honest 409 — NEVER a raw 500 (UAT-103). The client treats a
+        # persist 409 as non-fatal to the in-memory draft.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="a workflow with this slug and version already exists",
+        )
     return DraftCreateResponse(**row)
 
 
