@@ -12,18 +12,23 @@
  *    nodes (never a broken/partial draft — the G-6 silent-invalid-draft guard).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, within, waitFor } from "@testing-library/react"
 
-// Mock the authoring client fns the page consumes (Plan 03 seams).
-const { mockGenerate, mockCreate, mockUpdate } = vi.hoisted(() => ({
+// Mock the authoring client fns the page consumes (Plan 03 seams + the 103-ux
+// folder/skill name fetch the form panel + project picker read).
+const { mockGenerate, mockCreate, mockUpdate, mockListFolders, mockListSkills } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdate: vi.fn(),
+  mockListFolders: vi.fn(),
+  mockListSkills: vi.fn(),
 }))
 vi.mock("@/lib/api", () => ({
   generateWorkflow: mockGenerate,
   createWorkflowDraft: mockCreate,
   updateWorkflowDraft: mockUpdate,
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
 }))
 
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
@@ -43,10 +48,13 @@ const draft3 = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: no folders/skills (keeps the empty-screen tests calm + deterministic).
+  mockListFolders.mockResolvedValue([])
+  mockListSkills.mockResolvedValue([])
 })
 
 describe("WorkflowBuilderPage — describe-first empty Builder", () => {
-  it("empty DOM = exactly 1 textarea + 1 hint + 1 disabled submit button", () => {
+  it("empty DOM = exactly 1 textarea + 1 hint + 1 disabled submit button (no folders)", () => {
     const { container } = render(<WorkflowBuilderPage />)
     // Exactly one textarea.
     expect(container.querySelectorAll("textarea")).toHaveLength(1)
@@ -59,16 +67,26 @@ describe("WorkflowBuilderPage — describe-first empty Builder", () => {
     expect(screen.getByTestId("describe-hint")).toBeInTheDocument()
   })
 
-  it("the empty screen has NO grounding chip / strictness dial / folder picker / phase node / left rail", () => {
+  it("the empty screen has NO grounding chip / strictness dial / phase node / left rail", () => {
     render(<WorkflowBuilderPage />)
     expect(screen.queryByTestId("grounding-chip")).not.toBeInTheDocument()
     expect(screen.queryByTestId("strictness-dial")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("folder-picker")).not.toBeInTheDocument()
     expect(screen.queryByTestId("phase-form-rail")).not.toBeInTheDocument()
     // No spine node (the graph only appears post-draft).
     expect(screen.queryByText(/READ-ONLY GRAPH/i)).not.toBeInTheDocument()
     // No left nav rail inside the page.
     expect(screen.queryByTestId("builder-left-rail")).not.toBeInTheDocument()
+  })
+
+  it("shows ONE calm project-folder picker once folders load (the only added control)", async () => {
+    mockListFolders.mockResolvedValue([
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+    ])
+    render(<WorkflowBuilderPage />)
+    const picker = await screen.findByTestId("project-folder-picker")
+    expect(picker).toBeInTheDocument()
+    // It lists the real folder NAME (never a UUID).
+    expect(within(picker).getByText("Project Meridian")).toBeInTheDocument()
   })
 
   it("the draft button is disabled on empty/whitespace, enabled on non-empty", async () => {
@@ -123,6 +141,28 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     // The grid track reflects panelOpen (400px column).
     const grid = screen.getByTestId("builder-grid")
     expect(grid.getAttribute("style") ?? "").toContain("400px")
+  })
+
+  it("forwards the chosen project_folder_id to generate + shows the bound NAME in the header", async () => {
+    mockListFolders.mockResolvedValue([
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+    ])
+    mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage />)
+    // Pick the project, then describe + draft.
+    const picker = await screen.findByTestId("project-folder-picker")
+    await user.selectOptions(picker, "f1")
+    await user.type(screen.getByRole("textbox"), "summarize vendor risk")
+    await user.click(screen.getByRole("button", { name: /draft/i }))
+    await screen.findByTestId("spine-node-gather")
+    // generate received the bound folder id.
+    expect(mockGenerate).toHaveBeenCalledWith(expect.objectContaining({ project_folder_id: "f1" }))
+    // The draft header shows the bound folder NAME (not the UUID).
+    const bound = await screen.findByTestId("builder-bound-folder")
+    expect(bound.textContent).toContain("Project Meridian")
+    expect(bound.textContent).not.toContain("f1")
   })
 
   it("ok:false generate → honest error surface, NO phase nodes (no broken draft)", async () => {

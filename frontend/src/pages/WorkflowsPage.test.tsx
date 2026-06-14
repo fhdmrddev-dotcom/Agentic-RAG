@@ -18,18 +18,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within, waitFor, fireEvent } from "@testing-library/react"
 
-const { mockListPublished, mockListDrafts, mockCreateDraft, mockGenerate, mockUpdate, mockPublish } =
-  vi.hoisted(() => ({
-    mockListPublished: vi.fn(),
-    mockListDrafts: vi.fn(),
-    mockCreateDraft: vi.fn(),
-    mockGenerate: vi.fn(),
-    mockUpdate: vi.fn(),
-    mockPublish: vi.fn(),
-  }))
+const {
+  mockListPublished,
+  mockListDrafts,
+  mockCreateDraft,
+  mockGenerate,
+  mockUpdate,
+  mockPublish,
+  mockListFolders,
+  mockListSkills,
+} = vi.hoisted(() => ({
+  mockListPublished: vi.fn(),
+  mockListDrafts: vi.fn(),
+  mockCreateDraft: vi.fn(),
+  mockGenerate: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockPublish: vi.fn(),
+  mockListFolders: vi.fn(),
+  mockListSkills: vi.fn(),
+}))
 
 // Mock the api seam. The page consumes listPublishedWorkflows + listDraftWorkflows
-// + createWorkflowDraft; the hosted Builder/Gauntlet consume generate/create/update/publish.
+// + createWorkflowDraft; the hosted Builder consumes generate/create/update +
+// listFolders/listSkills (103-ux folder/skill name maps); the Gauntlet consumes publish.
 vi.mock("@/lib/api", () => ({
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
@@ -37,6 +48,8 @@ vi.mock("@/lib/api", () => ({
   generateWorkflow: mockGenerate,
   updateWorkflowDraft: mockUpdate,
   publishWorkflow: mockPublish,
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
@@ -113,6 +126,9 @@ beforeEach(() => {
   mockListPublished.mockResolvedValue([strictPublished, loosePublished])
   mockListDrafts.mockResolvedValue([draftRow])
   mockCreateDraft.mockResolvedValue({ id: "new-draft", version: 3 })
+  // The hosted Builder fetches folders + skills on mount (103-ux name maps).
+  mockListFolders.mockResolvedValue(folders)
+  mockListSkills.mockResolvedValue([])
 })
 
 describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-query)", () => {

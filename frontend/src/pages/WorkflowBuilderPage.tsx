@@ -26,10 +26,10 @@
  * wired exactly like the app's existing ChatLayout push grid
  * (`gridTemplateColumns: minmax(0,1fr) <44px|400px>`).
  */
-import { useCallback, useMemo, useRef, useState } from "react"
-import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft } from "@/lib/api"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph, type PhaseSpecJSON } from "@/components/workflows/PhaseSpineGraph"
-import { PhaseFormPanel, type PhaseConfigPatch } from "@/components/workflows/PhaseFormPanel"
+import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/components/workflows/PhaseFormPanel"
 
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
@@ -61,6 +61,15 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
   const [describe, setDescribe] = useState("")
   const [state, setState] = useState<BuilderState>({ phase: "empty" })
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
+  // Phase 103-ux: the project (knowledge base) the generated workflow binds to.
+  // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
+  // by name in the draft header afterwards.
+  const [projectFolderId, setProjectFolderId] = useState<string>("")
+  // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
+  // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
+  const [folderNames, setFolderNames] = useState<IdNameMap>({})
+  const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
+  const [skillNames, setSkillNames] = useState<IdNameMap>({})
   // The persisted draft id (null until the first save). A generated draft is
   // persisted via createWorkflowDraft on the FIRST edit/save, then PATCHed.
   const [draftId, setDraftId] = useState<string | null>(null)
@@ -82,6 +91,45 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
     return definition.phases.find((p) => p.slug === selectedSlug) ?? null
   }, [definition, selectedSlug])
 
+  // Phase 103-ux: fetch folders + skills ONCE on mount → id→name maps for the form
+  // panel + the project picker. Best-effort; a failure leaves the maps empty (the
+  // panel then falls back to showing the raw id, never a crash).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const folders = await listFolders()
+        if (cancelled) return
+        const map: IdNameMap = {}
+        for (const f of folders) map[f.id] = f.name
+        setFolderNames(map)
+        setFolderOptions(folders.map((f) => ({ id: f.id, name: f.name })))
+      } catch {
+        /* non-fatal — the panel falls back to the raw id */
+      }
+      try {
+        const skills = await listSkills()
+        if (cancelled) return
+        const map: IdNameMap = {}
+        for (const s of skills) map[s.id] = s.name
+        setSkillNames(map)
+      } catch {
+        /* non-fatal */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // The bound project-folder NAME for the draft header (from the chosen picker id,
+  // or the definition's own project_folder_id if the AI bound one).
+  const boundFolderName = useMemo<string | null>(() => {
+    const id =
+      (state.phase === "drafted" ? state.definition.project_folder_id : null) || projectFolderId || null
+    return id ? (folderNames[id] ?? null) : null
+  }, [state, projectFolderId, folderNames])
+
   const onDraft = useCallback(async () => {
     const text = describe.trim()
     if (text.length === 0) return
@@ -91,11 +139,20 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
     draftIdRef.current = null
     creatingRef.current = false
     try {
-      const result = await generateWorkflow({ describe: text })
+      const result = await generateWorkflow({
+        describe: text,
+        // Phase 103-ux: bind the generated workflow to the chosen project (KB). The
+        // backend GenerateRequest accepts project_folder_id; omit when none picked.
+        ...(projectFolderId ? { project_folder_id: projectFolderId } : {}),
+      })
       if (result.ok) {
         // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
         // ONE setState. The graph renders whole, in one DOM batch (no timed reveal).
-        setState({ phase: "drafted", definition: result.definition as unknown as BuilderDefinition })
+        // Stamp the chosen project_folder_id onto the definition if the generator
+        // didn't already bind one (so the draft + later publish carry the binding).
+        const def = result.definition as unknown as BuilderDefinition
+        if (projectFolderId && !def.project_folder_id) def.project_folder_id = projectFolderId
+        setState({ phase: "drafted", definition: def })
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         setState({ phase: "error", message: result.error, detail: result.detail })
@@ -107,7 +164,7 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
         detail: e instanceof Error ? e.message : undefined,
       })
     }
-  }, [describe])
+  }, [describe, projectFolderId])
 
   // Merge a phase-form patch into the selected phase's config (immutable).
   const onPhaseChange = useCallback(
@@ -175,6 +232,30 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
             className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
 
+          {/* Phase 103-ux: ONE calm project picker — binds the generated workflow to
+              a knowledge base. Only shown once folders have loaded (keeps the empty
+              screen calm when there are none). NOT the sketch's full infer+confirm loop. */}
+          {folderOptions.length > 0 && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] text-muted-foreground">Which knowledge base should this use?</span>
+              <select
+                data-testid="project-folder-picker"
+                aria-label="Which knowledge base should this use?"
+                value={projectFolderId}
+                onChange={(e) => setProjectFolderId(e.target.value)}
+                disabled={state.phase === "composing"}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">No specific knowledge base</option>
+                {folderOptions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
@@ -223,6 +304,15 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
             draft
           </span>
+          {/* Phase 103-ux: the bound project (knowledge base) NAME, not a UUID. */}
+          {boundFolderName && (
+            <span
+              data-testid="builder-bound-folder"
+              className="shrink-0 truncate rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
+            >
+              📁 {boundFolderName}
+            </span>
+          )}
         </div>
         {renderPublish && (
           <div className="shrink-0">{renderPublish(state.definition, draftId)}</div>
@@ -242,6 +332,9 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
         <PhaseFormPanel
           phase={selectedPhase}
           open={panelOpen}
+          folderName={boundFolderName ?? undefined}
+          folderNames={folderNames}
+          skillNames={skillNames}
           onChange={onPhaseChange}
           onPersist={onPersist}
         />
