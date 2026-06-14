@@ -1,13 +1,16 @@
 /**
  * Phase 103-04 Task 2 (REQ-5 / WFAUTH-01, sketch 019-D D9) — PhaseFormPanel tests.
  *
- * The 400px push panel + the SIX phase_type-conditioned forms. These tests pin the
- * locked contract:
+ * Phase 103-ux: the form now uses PLAIN-LANGUAGE labels (Instructions, AI model,
+ * Creativity, What this step can do, Folders it can read, …) with the technical
+ * term behind an ⓘ hint. These tests assert the FRIENDLY accessible names + the
+ * locked per-type field CONDITIONING (unchanged from the raw-label version):
  *  - each of the 6 phase types renders ONLY its real fields; the others are ABSENT
- *    (programmatic/llm_human_input show NO model/tools/scope; only llm_emit has
- *    citation_policy).
- *  - on llm_emit, integrity_policy is present but DISABLED/read-only (greyed); it
- *    appears on NO other type, and citation_policy is editable.
+ *    (programmatic/llm_human_input show NO model/tools/scope; only llm_emit has the
+ *    sourcing-strictness control).
+ *  - on llm_emit, the file-check (integrity_policy) control is present but
+ *    DISABLED/read-only (greyed); it appears on NO other type, and the
+ *    sourcing-strictness (citation_policy) control is editable.
  *  - folder_scope renders the folder NAME + bound UUID, NEVER a path.
  *  - the panel is NOT position:absolute/fixed — it is a grid track (push, not overlay).
  *  - a field change calls onChange; a blur/save calls onPersist.
@@ -31,8 +34,8 @@ function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> 
 
 const noop = () => {}
 
-describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
-  it("programmatic: renders fn + input_keys; NO model/tools/scope/prompt", () => {
+describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", () => {
+  it("programmatic: renders Function + Inputs; NO model/tools/scope/instructions", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "programmatic", fn: "split_topic", input_keys: ["topic"] })}
@@ -41,17 +44,17 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    expect(screen.getByLabelText(/fn/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/input_keys/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/^model/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/available_tools/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/folder_scope/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/^prompt/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/citation_policy/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/integrity_policy/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/^function/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^inputs/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/what this step can do/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/folders it can read/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^instructions/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
   })
 
-  it("llm_single: renders prompt + model + temperature + folder_scope + skill_ref; NO tools/max_steps", () => {
+  it("llm_single: renders Instructions + AI model + Creativity + Folders + Skill; NO tools/max-steps", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_single", prompt: "write it", model: "claude-opus-4-8", temperature: 0.2 })}
@@ -60,16 +63,16 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    expect(screen.getByLabelText(/^prompt/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^model/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/temperature/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/available_tools/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/max_steps/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/citation_policy/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/integrity_policy/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^ai model/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^creativity/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/what this step can do/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/max steps/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
   })
 
-  it("llm_agent: adds available_tools + max_steps (default 12) + wall_clock_seconds", () => {
+  it("llm_agent: adds What-this-step-can-do + Max steps (default 12) + Time limit", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents"] })}
@@ -78,16 +81,33 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    expect(screen.getByLabelText(/^prompt/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/available_tools/i)).toBeInTheDocument()
-    const maxSteps = screen.getByLabelText(/max_steps/i) as HTMLInputElement
+    expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/what this step can do/i)).toBeInTheDocument()
+    const maxSteps = screen.getByLabelText(/max steps/i) as HTMLInputElement
     expect(maxSteps).toBeInTheDocument()
     expect(maxSteps.value).toBe("12") // default
-    expect(screen.getByLabelText(/wall_clock_seconds/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/citation_policy/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/time limit/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
   })
 
-  it("llm_batch_agents: adds max_parallel_agents (default 5) + merge_strategy", () => {
+  it("llm_agent: available_tools render as friendly chips (raw ids reachable via title)", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents", "execute_code"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+      />,
+    )
+    const chips = screen.getByTestId("tools-chips")
+    expect(chips.textContent).toContain("Search documents")
+    expect(chips.textContent).toContain("Run code")
+    // The editable comma field still carries the raw ids.
+    const field = screen.getByLabelText(/what this step can do/i) as HTMLInputElement
+    expect(field.value).toContain("search_documents")
+  })
+
+  it("llm_batch_agents: adds Parallel workers (default 5) + How to combine results", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_batch_agents", prompt: "fan out", available_tools: ["search_documents"] })}
@@ -96,13 +116,13 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    const maxParallel = screen.getByLabelText(/max_parallel_agents/i) as HTMLInputElement
+    const maxParallel = screen.getByLabelText(/parallel workers/i) as HTMLInputElement
     expect(maxParallel).toBeInTheDocument()
     expect(maxParallel.value).toBe("5") // default
-    expect(screen.getByLabelText(/merge_strategy/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/how to combine results/i)).toBeInTheDocument()
   })
 
-  it("llm_human_input: renders prompt + options + timeout_seconds (default 300); NO model/tools/scope", () => {
+  it("llm_human_input: renders Instructions + Choices + Wait timeout (default 300); NO model/tools/scope", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_human_input", prompt: "confirm?", options: ["yes", "no"] })}
@@ -111,17 +131,17 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    expect(screen.getByLabelText(/^prompt/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/options/i)).toBeInTheDocument()
-    const timeout = screen.getByLabelText(/timeout_seconds/i) as HTMLInputElement
+    expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/choices to offer the person/i)).toBeInTheDocument()
+    const timeout = screen.getByLabelText(/wait timeout/i) as HTMLInputElement
     expect(timeout).toBeInTheDocument()
     expect(timeout.value).toBe("300") // default
-    expect(screen.queryByLabelText(/^model/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/available_tools/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/folder_scope/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/what this step can do/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/folders it can read/i)).not.toBeInTheDocument()
   })
 
-  it("llm_emit: renders citation_policy (editable) + integrity_policy (greyed/read-only)", () => {
+  it("llm_emit: renders Sourcing strictness (editable) + File check (greyed/read-only)", () => {
     render(
       <PhaseFormPanel
         phase={phaseOf({
@@ -136,17 +156,30 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={noop}
       />,
     )
-    expect(screen.getByLabelText(/^prompt/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/emitter/i)).toBeInTheDocument()
-    const citation = screen.getByLabelText(/citation_policy/i) as HTMLSelectElement
+    expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/output type/i)).toBeInTheDocument()
+    const citation = screen.getByLabelText(/sourcing strictness/i) as HTMLSelectElement
     expect(citation).toBeInTheDocument()
     expect(citation.disabled).toBe(false) // editable
-    const integrity = screen.getByLabelText(/integrity_policy/i) as HTMLSelectElement
+    const integrity = screen.getByLabelText(/file check/i) as HTMLSelectElement
     expect(integrity).toBeInTheDocument()
     expect(integrity.disabled).toBe(true) // greyed/read-only (shown-but-inert)
   })
 
-  it("integrity_policy is ABSENT on every non-llm_emit type", () => {
+  it("llm_emit: each sourcing-strictness option shows a plain-language caption", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_emit", prompt: "render", emitter: "render_template", citation_policy: "strict" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+      />,
+    )
+    // The "strict" caption is shown plainly (no enum jargon required to understand it).
+    expect(screen.getByText(/every claim must be cited/i)).toBeInTheDocument()
+  })
+
+  it("the file-check / sourcing-strictness controls are ABSENT on every non-llm_emit type", () => {
     const nonEmit = ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_human_input"]
     for (const pt of nonEmit) {
       const config: Record<string, unknown> = { phase_type: pt }
@@ -156,29 +189,45 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
       const { unmount } = render(
         <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} />,
       )
-      expect(screen.queryByLabelText(/integrity_policy/i)).not.toBeInTheDocument()
-      expect(screen.queryByLabelText(/citation_policy/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
       unmount()
     }
   })
 
-  it("folder_scope renders the folder NAME + bound UUID, never a path", () => {
+  it("folder_scope renders the folder NAME (from the id→name map) + bound UUID, never a path", () => {
     const uuid = "8c1a0000-0000-4000-8000-000000000001"
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_single", prompt: "x", folder_scope: [uuid] })}
         open
-        folderName="Vendors — 2025 Assessments"
+        folderNames={{ [uuid]: "Vendors — 2025 Assessments" }}
         onChange={noop}
         onPersist={noop}
       />,
     )
     const scope = screen.getByTestId("folder-scope-display")
     expect(scope.textContent).toContain("Vendors — 2025 Assessments")
-    expect(scope.textContent).toContain(uuid)
-    // Never a filesystem path.
+    // The bound id is reachable via the chip's title attribute (not a path).
+    const chip = scope.querySelector(`[title="${uuid}"]`)
+    expect(chip).toBeTruthy()
+    // Never a filesystem path in the visible text.
     expect(scope.textContent).not.toMatch(/\/[A-Za-z]/)
     expect(scope.textContent).not.toMatch(/[A-Za-z]:\\/)
+  })
+
+  it("skill_ref renders the skill NAME (from the id→name map)", () => {
+    const skillId = "skill-abc"
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_single", prompt: "x", skill_ref: skillId })}
+        open
+        skillNames={{ [skillId]: "Risk Scoring Rubric" }}
+        onChange={noop}
+        onPersist={noop}
+      />,
+    )
+    expect(screen.getByTestId("skill-name").textContent).toContain("Risk Scoring Rubric")
   })
 
   it("calls onChange on a field edit and onPersist on blur", async () => {
@@ -194,7 +243,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
         onPersist={onPersist}
       />,
     )
-    const prompt = screen.getByLabelText(/^prompt/i)
+    const prompt = screen.getByLabelText(/^instructions/i)
     await user.click(prompt)
     await user.type(prompt, "!")
     expect(onChange).toHaveBeenCalled()
@@ -227,7 +276,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
       />,
     )
     expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument()
-    expect(screen.queryByLabelText(/^prompt/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^instructions/i)).not.toBeInTheDocument()
   })
 
   it("the SOURCE is push (not overlay) — no position:absolute/fixed inset", () => {
