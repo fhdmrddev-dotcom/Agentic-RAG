@@ -981,3 +981,59 @@ async def test_failure_output_is_surfaced_flagged(_patch_executor):
     failed = await _exec_llm_emit(_fake_phase(), {}, ctx)
     assert failed.get("_surfaced") is True
     assert failed.get("failure") == "model_failed_to_emit"
+
+
+# ── 104-03 (live-UAT root cause, runs 27571799 / f18fb994): the emit SUCCESS output must
+#    carry retrieved_ids + placeholder_keys so a POST-PHASE citations_required validator
+#    (the 102 validation-gate library, first attached to an llm_emit phase by the Phase-104
+#    PM defs) re-validates against the REAL valid-id set, not an empty one. Without them the
+#    validator's check_coverage saw retrieved_ids=∅ → every cited value read "invented"
+#    (uncited=0 invented=N) and the run FAILED *after* emit_validated + emit_rendered (a
+#    correct, cited, integrity-checked .docx had already been produced). ──────────────────
+
+
+async def test_emit_success_output_carries_retrieved_ids_for_post_phase_validator(_patch_executor):
+    """The emit success output exposes the SAME valid-id set + oracle keys the internal
+    citation gate passed on, so a post-phase ``citations_required`` validator re-validates
+    against the real set (regression: these keys were absent → the validator over-rejected
+    every cited value as invented after the .docx had already rendered)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.harness.validator_kinds import (
+        _validate_citations_required,
+        _validate_output_file_valid,
+    )
+
+    definition = _fake_definition([_fake_asset_ref()])
+    phase = _fake_phase()
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor["audit"])
+
+    # The emission cites chunk-1; the retrieval evidence exposes chunk-1 — the internal
+    # gate passes and the .docx renders (render_result status "ok").
+    out = await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
+
+    # The fix: the success output exposes retrieved_ids + placeholder_keys.
+    assert "retrieved_ids" in out, (
+        "emit success output must expose retrieved_ids for a post-phase citations_required validator"
+    )
+    assert "chunk-1" in out["retrieved_ids"]
+    assert "placeholder_keys" in out
+
+    # The post-phase citations_required validator (102 library) now PASSES over the emit
+    # output — before the fix it saw retrieved_ids=∅ and rejected every cited value as
+    # invented (uncited=0 invented=N), failing the run after emit_validated + emit_rendered.
+    gate = await _validate_citations_required(out, {"mode": "deterministic"}, ctx)
+    assert gate.passed, (
+        f"post-phase citations_required must pass when the internal gate passed; got: {gate.error_message}"
+    )
+
+    # And the SECOND post-phase validator (output_file_valid): the emit output_file carries
+    # the engine's integrity verdict (opened=True), so the validator honors it instead of
+    # re-opening the workspace-INLINE virtual path (which would fail "integrity re-open").
+    assert out["output_file"].get("opened") is True, (
+        "emit success output_file must carry the engine's pre-computed integrity verdict"
+    )
+    ofv = await _validate_output_file_valid(out, {}, ctx)
+    assert ofv.passed, (
+        f"post-phase output_file_valid must honor the engine's opened=True verdict for a "
+        f"workspace-inline file; got: {ofv.error_message}"
+    )

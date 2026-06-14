@@ -1401,6 +1401,19 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
 
         if status == "ok":
             output_file = render_out.get("output_file") or _output_file_meta(render_out)
+            # 104-03 (live-UAT root cause): carry the engine's integrity verdict onto the
+            # output-file receipt so a post-phase ``output_file_valid`` validator honors it.
+            # The produced file is workspace-INLINE (its ``path`` is a virtual workspace path,
+            # not a filesystem path) — a second independent re-open here is impossible, so the
+            # validator trusts the engine's opened/residual verdict (the same assert_integrity
+            # the executor already ran; status=="ok" guarantees opened + residual_clean True).
+            if isinstance(output_file, dict) and "opened" not in output_file:
+                _v = render_out.get("verdict") or {}
+                output_file = {
+                    **output_file,
+                    "opened": bool(_v.get("opened", True)),
+                    "residual_clean": bool(_v.get("residual_clean", True)),
+                }
             await _emit_audit(ctx, event_type="emit_rendered", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
                 render_verdict=render_out.get("verdict"), output_file=output_file,
@@ -1420,6 +1433,15 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 "output_file": output_file,
                 "path": path,
                 "field_map": legacy_map,
+                # 104-03 (live-UAT root cause): expose the SAME valid-id set + oracle keys
+                # the internal citation gate just passed on, so a post-phase
+                # ``citations_required`` validator (the 102 library — first attached to an
+                # ``llm_emit`` phase by the Phase-104 PM defs) re-validates against the real
+                # set instead of an empty one. Without these, the validator's check_coverage
+                # saw retrieved_ids=∅ → every cited value read "invented" → the run failed
+                # AFTER emit_validated + emit_rendered (a real cited .docx was produced).
+                "retrieved_ids": sorted(retrieved_ids),
+                "placeholder_keys": placeholder_keys,
                 "source_refs": [],
                 "citations": [],
             }

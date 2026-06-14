@@ -264,6 +264,13 @@ async def _validate_output_file_valid(output: dict, config: dict, ctx) -> GateRe
     # Pre-computed re-open verdict (the persisted-verdict / probe seam).
     if of.get("opened") is False:
         return GateResult(False, "output_file_valid: file did not re-open (opened=False)")
+    # 104-03: SYMMETRIC seam — honor the engine's pre-computed PASS verdict. The llm_emit
+    # executor already re-opened the rendered bytes via assert_integrity before persisting,
+    # and the deliverable is stored as a workspace-INLINE file whose ``path`` is a virtual
+    # workspace path (not a filesystem path a second re-open could resolve). Trust opened=True
+    # the same way opened=False is trusted above (the documented engine/persisted-verdict seam).
+    if of.get("opened") is True and of.get("residual_clean", True):
+        return GateResult(True, None)
 
     filename = of.get("filename") or of.get("path") or config.get("path") or ""
     ext = _file_ext(filename)
