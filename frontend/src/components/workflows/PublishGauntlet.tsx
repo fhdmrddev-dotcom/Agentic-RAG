@@ -200,17 +200,22 @@ function VerdictFields({ verdict }: { verdict: PublishVerdict }) {
   )
 }
 
-/** The "view the golden run" link, gated on golden_run_id != null; else the note. */
+/** The "view the golden run" link, gated on golden_run_id != null; else the note.
+ *  IR-02: the run-surface route is deferred (D-103-A → 103.1/104), so this is NOT
+ *  yet navigable. Render it as a disabled button (not an <a href="#"> that scrolls
+ *  to top) with an honest "coming soon" title — no dead affordance. */
 function RunLink({ goldenRunId }: { goldenRunId: string | null }) {
   if (goldenRunId != null) {
     return (
-      <a
+      <button
+        type="button"
         data-testid="run-link"
-        href="#"
-        className="mt-4 inline-flex items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-[12px] font-semibold text-primary"
+        disabled
+        title="Run view coming soon — the golden-run surface lands in a later phase (D-103-A)."
+        className="mt-4 inline-flex cursor-not-allowed items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-[12px] font-semibold text-primary opacity-70"
       >
-        ▦ Open the golden run that was judged · {goldenRunId.slice(0, 8)}…
-      </a>
+        ▦ Golden run that was judged · {goldenRunId.slice(0, 8)}… (view coming soon)
+      </button>
     )
   }
   return (
