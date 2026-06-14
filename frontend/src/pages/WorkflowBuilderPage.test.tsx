@@ -12,7 +12,7 @@
  *    nodes (never a broken/partial draft — the G-6 silent-invalid-draft guard).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within, waitFor } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 
 // Mock the authoring client fns the page consumes (Plan 03 seams + the 103-ux
 // folder/skill name fetch the form panel + project picker read).

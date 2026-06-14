@@ -147,6 +147,29 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
     fireEvent.click(screen.getByText("DBA Chapters"))
     await waitFor(() => expect(mockListPublished).toHaveBeenCalledWith("folder-aaa"))
   })
+
+  it("latest-wins: a STALE earlier response never paints over the current selection", async () => {
+    // The "All projects" (mount) fetch resolves SLOWLY; the project fetch resolves
+    // FIRST. The rendered list must match the LATER selection, not the stale mount one.
+    let releaseAll: (rows: unknown[]) => void = () => {}
+    const slowAll = new Promise<unknown[]>((r) => (releaseAll = r))
+    // First call (All projects, mount) → the slow promise; second (project) → fast.
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockReturnValueOnce(slowAll) // mount: All projects (7 imaginary rows) — stale
+      .mockResolvedValueOnce([strictPublished]) // project filter: exactly 1 row
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    // Switch to the project BEFORE the mount fetch resolves.
+    fireEvent.click(screen.getByText("DBA Chapters"))
+    // The project (later) fetch resolves first → 1 published card.
+    await waitFor(() => expect(screen.getAllByTestId("published-card")).toHaveLength(1))
+    // Now the stale mount fetch finally resolves with a DIFFERENT (larger) list.
+    releaseAll([strictPublished, loosePublished])
+    // It must be DROPPED — the rendered list stays at the current selection (1 card).
+    await waitFor(() => expect(mockListPublished).toHaveBeenCalledTimes(2))
+    expect(screen.getAllByTestId("published-card")).toHaveLength(1)
+  })
 })
 
 describe("WorkflowsPage — drafts-above-published shelves + build-card", () => {

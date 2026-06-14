@@ -223,12 +223,24 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
 
+  // ── Latest-wins race guards (Phase 103-ux) ──────────────────────────────────
+  // Rapid project-filter clicks fire overlapping fetches; without a guard a SLOW
+  // earlier response can land AFTER a faster later one and paint a STALE list (the
+  // live symptom: "All projects" showed 7, a specific project showed 16, but the
+  // rendered list lagged the selection). Each fetch takes a monotonic ticket; only
+  // the most-recently-issued ticket is allowed to commit its result to state.
+  const publishedSeqRef = useRef(0)
+  const draftsSeqRef = useRef(0)
+
   const refetchPublished = useCallback(async () => {
     // "All projects" → no filter; "Unbound" → filter is not server-expressible as a
     // folder id, so we fetch all + narrow client-side to defs with no project_folder_id;
     // a real folder id → live ?project_folder_id= re-query (the narrows-only filter).
     const projectArg = selectedProjectId && selectedProjectId !== UNBOUND ? selectedProjectId : null
+    const seq = ++publishedSeqRef.current
     const rows = await listPublishedWorkflows(projectArg)
+    // Latest-wins: a stale (superseded) response NEVER paints over a newer selection.
+    if (seq !== publishedSeqRef.current) return
     if (selectedProjectId === UNBOUND) {
       setPublished(rows.filter((r) => !(r.definition as DefShape | undefined)?.project_folder_id))
     } else {
@@ -237,7 +249,11 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   }, [selectedProjectId])
 
   const refetchDrafts = useCallback(async () => {
-    setDrafts(await listDraftWorkflows())
+    const seq = ++draftsSeqRef.current
+    const rows = await listDraftWorkflows()
+    // Same latest-wins guard (drafts are re-fetched on mount + after publish/tweak).
+    if (seq !== draftsSeqRef.current) return
+    setDrafts(rows)
   }, [])
 
   useEffect(() => {
