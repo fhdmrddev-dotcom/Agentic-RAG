@@ -179,6 +179,33 @@ describe("WorkflowsPage — client-derived tier badge (D10, no extra fetch)", ()
   })
 })
 
+describe("WorkflowsPage — tier badge picks the STRICTEST emit policy (WR-03, order-independent)", () => {
+  it("a [flag, strict, partial] multi-emit def derives STRICT regardless of phase order", async () => {
+    // Old logic only overwrote on 'strict' after the first emit set the policy, so a
+    // 'partial' following a 'flag' was dropped and order mattered. The fix uses a
+    // deterministic stricter-wins comparison: the strict emit must win here.
+    const multiEmit = {
+      id: "pub-multi",
+      slug: "multi-emit",
+      name: "Multi emit",
+      definition: {
+        slug: "multi-emit",
+        version: 1,
+        project_folder_id: null,
+        phases: [
+          { slug: "e1", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "flag" } },
+          { slug: "e2", phase_index: 1, config: { phase_type: "llm_emit", citation_policy: "strict" } },
+          { slug: "e3", phase_index: 2, config: { phase_type: "llm_emit", citation_policy: "partial" } },
+        ],
+      },
+    }
+    mockListPublished.mockResolvedValue([multiEmit])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const card = await screen.findByTestId("published-card")
+    expect(within(card).getByTestId("tier-badge").getAttribute("data-tier")).toBe("STRICT")
+  })
+})
+
 describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
   it("Run opens the modal: a read-only folder chip + one textarea + a hint line", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
@@ -210,6 +237,24 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     fireEvent.click(screen.getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
     expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp")
+  })
+
+  it("WR-05: a double-tap of Run creates ONLY ONE launch (in-flight guard)", async () => {
+    // onLaunch resolves only when we release it — the second click while in flight
+    // must be ignored (one click = one thread).
+    let release: () => void = () => {}
+    const onLaunch = vi.fn().mockReturnValue(new Promise<void>((r) => (release = r)))
+    render(<WorkflowsPage folders={folders} onLaunch={onLaunch} />)
+    const cards = await screen.findAllByTestId("published-card")
+    fireEvent.click(within(cards[0]).getByTestId("published-run"))
+    const confirm = await screen.findByTestId("run-confirm")
+    fireEvent.click(confirm) // first click → launch starts (still pending)
+    fireEvent.click(confirm) // second tap while in flight → must be ignored
+    fireEvent.click(confirm)
+    expect(onLaunch).toHaveBeenCalledTimes(1)
+    expect(confirm).toBeDisabled()
+    release()
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
   })
 })
 

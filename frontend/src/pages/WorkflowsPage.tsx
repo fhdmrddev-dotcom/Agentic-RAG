@@ -25,7 +25,7 @@
  * live; the draft-CRUD affordances + the Workflows nav entry wear a net-new violet
  * flag.
  */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   listPublishedWorkflows,
   listDraftWorkflows,
@@ -73,6 +73,9 @@ interface DefShape {
   [k: string]: unknown
 }
 
+/** Sentinel for the "Unbound (no project)" filter (IR-04 — module-scope, not per-render). */
+const UNBOUND = "__unbound__"
+
 const ALL_VALIDATOR_KINDS: ReadonlySet<string> = new Set<ValidatorKind>([
   "citations_required",
   "output_file_valid",
@@ -80,6 +83,18 @@ const ALL_VALIDATOR_KINDS: ReadonlySet<string> = new Set<ValidatorKind>([
   "structure_check",
   "llm_judge_rubric",
 ])
+
+/**
+ * The citation_policy strictness order (loosest → strictest). Used to pick the
+ * STRICTEST declared policy across multiple emit phases deterministically (WR-03).
+ * Mirrors the deriveTier mapping intent — strict refines a workflow's whole tier up.
+ */
+const POLICY_ORDER: readonly CitationPolicy[] = ["draft", "partial", "flag", "strict"]
+
+/** Return the stricter of two citation policies (the higher POLICY_ORDER rank). */
+function stricterPolicy(a: CitationPolicy, b: CitationPolicy): CitationPolicy {
+  return POLICY_ORDER.indexOf(b) > POLICY_ORDER.indexOf(a) ? b : a
+}
 
 /**
  * Derive the strictness tier for a card from its REAL definition (D10): the
@@ -90,17 +105,16 @@ const ALL_VALIDATOR_KINDS: ReadonlySet<string> = new Set<ValidatorKind>([
  */
 function tierForDefinition(def: DefShape | null | undefined) {
   const phases = def?.phases ?? []
-  // Pick the citation_policy: the most-permissive→strict precedence is irrelevant
-  // here — deriveTier only needs the policy; take the emit phase's (the only place
-  // citation_policy lives). Default "draft" when there is no emit phase at all.
+  // Pick the STRICTEST citation_policy across all emit phases (WR-03 — deterministic
+  // "stricter wins" via POLICY_ORDER, not iteration-order-dependent). Default "draft"
+  // when there is no emit phase at all (the only place citation_policy lives).
   let citationPolicy: CitationPolicy = "draft"
   let sawEmit = false
   for (const p of phases) {
     if (p.config?.phase_type === "llm_emit") {
       const cp = p.config?.citation_policy
       if (cp === "strict" || cp === "flag" || cp === "partial" || cp === "draft") {
-        // Prefer the strictest declared policy across emit phases.
-        if (!sawEmit || cp === "strict") citationPolicy = cp
+        citationPolicy = sawEmit ? stricterPolicy(citationPolicy, cp) : cp
         sawEmit = true
       }
     }
@@ -202,12 +216,12 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   const [drafts, setDrafts] = useState<WorkflowDraftRow[]>([])
   const [runFor, setRunFor] = useState<PublishedWorkflow | null>(null)
   const [kickoff, setKickoff] = useState("")
+  // WR-05: in-flight guard so a double-tap of Run can't create two threads/runs.
+  const [runSubmitting, setRunSubmitting] = useState(false)
   // The draft the Builder opens (Build-card → null = fresh; Tweak → a forked draft).
   const [builderTweak, setBuilderTweak] = useState<{ slug: string; version: number } | null>(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
-
-  const UNBOUND = "__unbound__"
 
   const refetchPublished = useCallback(async () => {
     // "All projects" → no filter; "Unbound" → filter is not server-expressible as a
@@ -304,7 +318,14 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 <PublishGauntlet
                   definitionId={draftId}
                   onPublished={(version) =>
-                    onGauntletPublished(version, builderTweak?.slug ?? "workflow")
+                    // WR-04: for a FRESH build (builderTweak null) the just-built
+                    // definition's own slug is the correct lookup key — never the
+                    // hardcoded "workflow" literal (which finds nothing in `published`,
+                    // silently dropping the post-publish Run CTA).
+                    onGauntletPublished(
+                      version,
+                      builderTweak?.slug ?? (typeof _def.slug === "string" ? _def.slug : "workflow"),
+                    )
                   }
                 />
               ) : null
@@ -456,13 +477,24 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           wf={runFor}
           folderName={folderName((runFor.definition as DefShape | undefined)?.project_folder_id)}
           kickoff={kickoff}
+          submitting={runSubmitting}
           onKickoffChange={setKickoff}
-          onCancel={() => setRunFor(null)}
+          onCancel={() => {
+            if (runSubmitting) return
+            setRunFor(null)
+          }}
           onRun={async () => {
+            // WR-05: one click = one thread. Ignore re-entry while a launch is in flight.
+            if (runSubmitting) return
             const target = runFor
             const text = kickoff
-            setRunFor(null)
-            await onLaunch(target, text)
+            setRunSubmitting(true)
+            try {
+              await onLaunch(target, text)
+              setRunFor(null)
+            } finally {
+              setRunSubmitting(false)
+            }
           }}
         />
       )}
@@ -607,6 +639,7 @@ function RunModal({
   wf,
   folderName,
   kickoff,
+  submitting,
   onKickoffChange,
   onCancel,
   onRun,
@@ -614,14 +647,57 @@ function RunModal({
   wf: PublishedWorkflow
   folderName: string | null
   kickoff: string
+  submitting: boolean
   onKickoffChange: (v: string) => void
   onCancel: () => void
   onRun: () => void | Promise<void>
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+  // WR-06 (a11y): a lightweight focus contract for the aria-modal dialog —
+  // Escape-to-close, initial focus on the textarea, and Tab containment within the
+  // dialog (a minimal trap, no heavy dep / no shadcn Dialog rewrite).
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    // Initial focus lands inside the dialog (the kickoff textarea).
+    textareaRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        if (!submitting) onCancel()
+        return
+      }
+      if (e.key !== "Tab") return
+      // Simple focus containment: keep Tab/Shift+Tab inside the dialog.
+      const root = dialogRef.current
+      if (!root) return
+      const focusables = root.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [onCancel, submitting])
+
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`Run ${wf.name}`}
@@ -644,6 +720,7 @@ function RunModal({
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-foreground">What should this run work on?</span>
             <textarea
+              ref={textareaRef}
               data-testid="run-kickoff"
               value={kickoff}
               onChange={(e) => onKickoffChange(e.target.value)}
@@ -665,18 +742,21 @@ function RunModal({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+              disabled={submitting}
+              className="rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
-            {/* D-103-1: Run stays ENABLED even on empty input. */}
+            {/* D-103-1: Run stays ENABLED even on empty input; WR-05: disabled only
+                while a launch is in flight (one click = one thread). */}
             <button
               type="button"
               data-testid="run-confirm"
+              disabled={submitting}
               onClick={() => void onRun()}
-              className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
+              className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              ▶ Run workflow
+              {submitting ? "Running…" : "▶ Run workflow"}
             </button>
           </div>
         </div>
