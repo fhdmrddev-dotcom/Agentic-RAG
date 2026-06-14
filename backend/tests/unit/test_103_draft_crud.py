@@ -205,3 +205,68 @@ async def test_update_round_trips_and_delete_then_none():
                 )
     finally:
         await pool.close()
+
+
+# ── Plan 01 Task 3 fills this (route level) — GREEN against :54322 ─────────────
+@pytest.mark.asyncio
+async def test_route_round_trip_create_list_patch_delete():
+    """The full route round-trip (REQ-1): create_draft -> list_drafts shows it ->
+    update_draft round-trips -> delete_draft -> a re-list no longer shows it. The
+    route forces ``status='draft'`` server-side even when the body claims published
+    (T-103-01-03 — never trust the client)."""
+    import asyncpg
+
+    from app.api import workflows as wf_api
+    from app.db.workflows import get_definition
+    from app.models.harness import WorkflowDefinition
+
+    pool = await asyncpg.create_pool(dsn=_DSN, min_size=1, max_size=1)
+    try:
+        async with pool.acquire() as con:
+            owner = await con.fetchval("SELECT id FROM auth.users ORDER BY id LIMIT 1")
+        slug = f"draft-crud-route-{os.getpid()}"
+        body = _draft_definition(slug)
+        body["status"] = "published"  # the client LIES — the route must force 'draft'
+        current_user = {"id": str(owner)}
+
+        from unittest.mock import AsyncMock, patch
+
+        with patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=pool)):
+            created = await wf_api.create_draft(
+                body=WorkflowDefinition.model_validate(body), current_user=current_user
+            )
+            def_id = created.id
+            try:
+                # Server forced status='draft' despite the lying body:
+                stored = await get_definition(pool, def_id, user_id=owner)
+                assert stored["status"] == "draft"
+
+                # list_drafts shows it (owner-scoped):
+                drafts = await wf_api.list_drafts(current_user=current_user)
+                assert any(d.id == def_id for d in drafts)
+
+                # update_draft round-trips a rename:
+                body["name"] = "Route Renamed"
+                upd = await wf_api.update_draft(
+                    definition_id=def_id,
+                    body=WorkflowDefinition.model_validate(body),
+                    current_user=current_user,
+                )
+                assert upd.id == def_id
+                reread = await get_definition(pool, def_id, user_id=owner)
+                assert reread["name"] == "Route Renamed"
+
+                # delete_draft (204 -> returns None); a re-list no longer shows it:
+                result = await wf_api.delete_draft(
+                    definition_id=def_id, current_user=current_user
+                )
+                assert result is None
+                drafts_after = await wf_api.list_drafts(current_user=current_user)
+                assert all(d.id != def_id for d in drafts_after)
+            finally:
+                async with pool.acquire() as con:
+                    await con.execute(
+                        "DELETE FROM workflow_definitions WHERE slug = $1", slug
+                    )
+    finally:
+        await pool.close()

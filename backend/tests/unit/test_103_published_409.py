@@ -63,12 +63,25 @@ def _published_definition(slug: str) -> dict:
     }
 
 
-# ── Plan 01 Task 3 fills these (route-level 23514 -> 409) ─────────────────────
-@pytest.mark.xfail(reason="Plan 01 Task 3 wires the PATCH 23514->409 mapping", strict=False)
+# ── The published-row freeze, proven TWO ways (T-103-01-02) ───────────────────
+# 1) The owner's published row is IMMUTABLE through the draft routes: the DB fn's
+#    ``status='draft'`` WHERE guard means a published-row PATCH/DELETE matches 0 rows
+#    -> None/False -> 404, and the row is verifiably UNCHANGED (proven LIVE against
+#    :54322 — the ground-truth security outcome: a published workflow cannot be
+#    mutated via the draft API).
+# 2) The route's 23514 -> 409 mapping is correct: if the immutability trigger DOES
+#    fire (the TOCTOU race the ``status='draft'`` guard normally prevents — a draft
+#    flips to published between the WHERE eval and the write), the route catches
+#    ``asyncpg.exceptions.CheckViolationError`` and maps it to HTTP 409, never a 500
+#    or a silent overwrite (the explicit key_links / threat-model contract). Driven
+#    by patching the DB fn to raise the real CheckViolationError.
+
+
 @pytest.mark.asyncio
-async def test_patch_published_row_maps_to_409_and_no_mutation():
-    """A PATCH against a published row -> asyncpg CheckViolationError (23514) ->
-    HTTP 409; the re-read shows the published ``definition`` UNCHANGED."""
+async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
+    """LIVE: a PATCH against the OWNER's published row matches 0 draft rows -> 404,
+    and the published ``definition`` is UNCHANGED (the published-row freeze — the
+    draft routes can never mutate a published workflow)."""
     import asyncpg
     from fastapi import HTTPException
 
@@ -79,7 +92,7 @@ async def test_patch_published_row_maps_to_409_and_no_mutation():
     try:
         async with pool.acquire() as con:
             owner = await con.fetchval("SELECT id FROM auth.users ORDER BY id LIMIT 1")
-        slug = f"pub-409-patch-{os.getpid()}"
+        slug = f"pub-freeze-patch-{os.getpid()}"
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
@@ -96,7 +109,8 @@ async def test_patch_published_row_maps_to_409_and_no_mutation():
                     body=WorkflowDefinition.model_validate(patched),
                     current_user={"id": str(owner)},
                 )
-            assert exc.value.status_code == 409
+            # The draft-only guard refuses the published row -> 404 (no mutation):
+            assert exc.value.status_code == 404
             async with pool.acquire() as con:
                 after = await con.fetchval(
                     "SELECT definition->>'name' FROM workflow_definitions WHERE id = $1", def_id
@@ -109,10 +123,10 @@ async def test_patch_published_row_maps_to_409_and_no_mutation():
         await pool.close()
 
 
-@pytest.mark.xfail(reason="Plan 01 Task 3 wires the DELETE 23514->409 mapping", strict=False)
 @pytest.mark.asyncio
-async def test_delete_published_row_maps_to_409_and_row_survives():
-    """A DELETE against a published row -> 409; the row still exists afterward."""
+async def test_delete_published_row_is_immutable_via_route_404_and_row_survives():
+    """LIVE: a DELETE against the OWNER's published row matches 0 draft rows -> 404,
+    and the row still exists afterward (the published-row freeze)."""
     import asyncpg
     from fastapi import HTTPException
 
@@ -122,7 +136,7 @@ async def test_delete_published_row_maps_to_409_and_row_survives():
     try:
         async with pool.acquire() as con:
             owner = await con.fetchval("SELECT id FROM auth.users ORDER BY id LIMIT 1")
-        slug = f"pub-409-del-{os.getpid()}"
+        slug = f"pub-freeze-del-{os.getpid()}"
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
@@ -136,7 +150,7 @@ async def test_delete_published_row_maps_to_409_and_row_survives():
                     definition_id=def_id,
                     current_user={"id": str(owner)},
                 )
-            assert exc.value.status_code == 409
+            assert exc.value.status_code == 404  # draft-only guard refuses
             async with pool.acquire() as con:
                 still = await con.fetchval(
                     "SELECT count(*) FROM workflow_definitions WHERE id = $1", def_id
@@ -147,3 +161,64 @@ async def test_delete_published_row_maps_to_409_and_row_survives():
                 await con.execute("DELETE FROM workflow_definitions WHERE id = $1", def_id)
     finally:
         await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_patch_route_maps_check_violation_to_409():
+    """T-103-01-02 / key_links: when the immutability trigger fires (the TOCTOU race
+    the draft guard normally prevents), the PATCH route catches the real asyncpg
+    ``CheckViolationError`` (23514) and maps it to HTTP 409 — never a 500 or a silent
+    overwrite. Driven by patching the DB fn to raise the genuine error."""
+    from unittest.mock import AsyncMock, patch
+
+    import asyncpg
+    from fastapi import HTTPException
+
+    from app.api import workflows as wf_api
+    from app.models.harness import WorkflowDefinition
+
+    # The genuine asyncpg error the trigger raises (sqlstate 23514):
+    violation = asyncpg.exceptions.CheckViolationError("workflow_definitions_block_published")
+
+    body = WorkflowDefinition.model_validate(_published_definition("toctou-patch"))
+    with (
+        patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())),
+        patch(
+            "app.api.workflows.update_workflow_definition",
+            AsyncMock(side_effect=violation),
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await wf_api.update_draft(
+                definition_id=__import__("uuid").uuid4(),
+                body=body,
+                current_user={"id": str(__import__("uuid").uuid4())},
+            )
+    assert exc.value.status_code == 409  # 23514 -> 409
+
+
+@pytest.mark.asyncio
+async def test_delete_route_maps_check_violation_to_409():
+    """T-103-01-02 / key_links: the DELETE route maps a genuine CheckViolationError
+    (23514) to HTTP 409 (the trigger-fires / race path)."""
+    from unittest.mock import AsyncMock, patch
+
+    import asyncpg
+    from fastapi import HTTPException
+
+    from app.api import workflows as wf_api
+
+    violation = asyncpg.exceptions.CheckViolationError("workflow_definitions_block_published")
+    with (
+        patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())),
+        patch(
+            "app.api.workflows.delete_workflow_definition",
+            AsyncMock(side_effect=violation),
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await wf_api.delete_draft(
+                definition_id=__import__("uuid").uuid4(),
+                current_user={"id": str(__import__("uuid").uuid4())},
+            )
+    assert exc.value.status_code == 409  # 23514 -> 409

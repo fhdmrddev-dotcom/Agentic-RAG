@@ -14,12 +14,20 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+import asyncpg
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.dependencies import get_current_user, get_pg_pool, get_redis
-from app.db.workflows import list_published_workflows
+from app.db.workflows import (
+    create_workflow_definition,
+    delete_workflow_definition,
+    list_draft_workflows,
+    list_published_workflows,
+    update_workflow_definition,
+)
+from app.models.harness import WorkflowDefinition
 # Phase 102 (D-07): imported as a MODULE so the route's delegate stays patchable in
 # tests (mirrors the threads.py module-import-for-patchability discipline).
 from app.services.harness import publish_service
@@ -37,6 +45,23 @@ class PublishedWorkflow(BaseModel):
     id: UUID
     slug: str
     name: str
+
+
+# ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
+class DraftCreateResponse(BaseModel):
+    """The create/PATCH return — the new (or updated) draft id + its version."""
+
+    id: UUID
+    version: int
+
+
+class DraftRow(BaseModel):
+    """A drafts-shelf row (the caller's own drafts — D-103-4)."""
+
+    id: UUID
+    slug: str
+    version: int
+    name: str | None = None
 
 
 @router.get("/published", response_model=list[PublishedWorkflow])
@@ -141,3 +166,107 @@ async def publish_workflow(
     # A lint / structural-gate / judge block, or a success, returns 200 with the
     # machine-renderable verdict (the run is a real, browsable workflow_run).
     return PublishVerdict(**result)
+
+
+# ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD routes ─────────────────────────
+# G-5 RED LINE: these join THIS router (api/workflows.py), NEVER api/threads.py.
+# The Workflows page (Plan 06) + Builder (Plan 04) are clients of these routes.
+def _coerce_user_id(current_user: dict) -> UUID:
+    """The get_published_workflows boilerplate: the trusted owner id as a UUID."""
+    user_id = current_user["id"]
+    return UUID(user_id) if isinstance(user_id, str) else user_id
+
+
+@router.post("", response_model=DraftCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_draft(
+    body: WorkflowDefinition,
+    current_user: dict = Depends(get_current_user),
+) -> DraftCreateResponse:
+    """Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.
+
+    Server-forced invariants (T-103-01-03): ``status='draft'`` is forced on the body
+    server-side (never trusted from the client); the DB fn binds ``is_global=false`` +
+    ``created_by=user_id`` literally/by the trusted owner. A hallucinated/extra key in
+    the body is already a 422 (``WorkflowDefinition`` is ``extra='forbid'``).
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    # Force draft status server-side — never trust the client's ``status``:
+    body = body.model_copy(update={"status": "draft"})
+    row = await create_workflow_definition(pool, definition=body, user_id=user_id)
+    return DraftCreateResponse(**row)
+
+
+@router.get("/drafts", response_model=list[DraftRow])
+async def list_drafts(
+    current_user: dict = Depends(get_current_user),
+) -> list[DraftRow]:
+    """List the caller's OWN drafts (the drafts shelf — D-103-4).
+
+    Owner-scoped in the DB layer (``status='draft' AND created_by=$1``); a second
+    user's draft is absent (T-103-01-01). Declared as an explicit static segment
+    so it is never shadowed by a ``/{definition_id}`` path.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    rows = await list_draft_workflows(pool, user_id=user_id)
+    return [DraftRow(**r) for r in rows]
+
+
+@router.patch("/{definition_id}", response_model=DraftCreateResponse)
+async def update_draft(
+    definition_id: UUID,
+    body: WorkflowDefinition,
+    current_user: dict = Depends(get_current_user),
+) -> DraftCreateResponse:
+    """Update a DRAFT (REQ-1 PATCH) — returns ``{id, version}``.
+
+    A published-row PATCH hits the immutability trigger (Postgres ``23514``); we catch
+    ``asyncpg.exceptions.CheckViolationError`` -> HTTP 409 (mirroring the
+    ``already_published`` -> 409 mapping), never a silent overwrite or a 500
+    (T-103-01-02). A not-owned / non-draft / missing id returns ``None`` -> 404 (no
+    existence leak). ``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    body = body.model_copy(update={"status": "draft"})
+    try:
+        row = await update_workflow_definition(
+            pool, definition_id, definition=body, user_id=user_id
+        )
+    except asyncpg.exceptions.CheckViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="workflow is published and cannot be modified",
+        )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+    return DraftCreateResponse(**row)
+
+
+@router.delete("/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_draft(
+    definition_id: UUID,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a DRAFT (REQ-1 DELETE) -> 204.
+
+    A published-row DELETE hits the immutability trigger (``23514``); we catch
+    ``CheckViolationError`` -> HTTP 409 (no silent removal, no 500; T-103-01-02). A
+    not-owned / non-draft / missing id returns ``False`` -> 404 (no existence leak).
+
+    No return-type annotation (the delete_folder 204 precedent): a ``-> None`` makes
+    FastAPI build a response body field, which the 204 status forbids.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    try:
+        deleted = await delete_workflow_definition(pool, definition_id, user_id=user_id)
+    except asyncpg.exceptions.CheckViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="workflow is published and cannot be modified",
+        )
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+    return None

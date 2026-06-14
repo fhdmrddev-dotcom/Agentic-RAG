@@ -59,7 +59,6 @@ def _lint_failing_row() -> dict:
     }, user_id
 
 
-@pytest.mark.xfail(reason="Plan 01 Task 3 confirms the existing publish lint-block path", strict=False)
 @pytest.mark.asyncio
 async def test_lint_failing_draft_blocks_at_lint_with_lowercase_codes():
     """A lint-failing draft publishes with published=false, blocked_stage='lint',
