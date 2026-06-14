@@ -207,8 +207,8 @@ Plans:
   4. A published workflow can be browsed in a project-filtered library and run from a thread (the thread enters workflow mode; Deep is the resting default); definitions are immutable-on-publish + versioned.
 **Plans**: 6 plans in 3 waves
 Plans:
-- [ ] 103-01-PLAN.md — Backend foundation: additive PhaseSpec.name + harness_authoring_model knob + draft-CRUD DB fns/routes (23514->409) + Wave-0 tests (REQ-1, REQ-3) [Wave 1]
-- [ ] 103-02-PLAN.md — NL-gen backend: additive strict override on forced_emit + workflow_authoring service + POST /workflows/generate (REQ-2) [Wave 2]
+- [x] 103-01-PLAN.md — Backend foundation: additive PhaseSpec.name + harness_authoring_model knob + draft-CRUD DB fns/routes (23514->409) + Wave-0 tests (REQ-1, REQ-3) [Wave 1] ✅ 2026-06-14 (WFAUTH-01)
+- [x] 103-02-PLAN.md — NL-gen backend: additive strict override on forced_emit + workflow_authoring service + POST /workflows/generate (REQ-2) [Wave 2] ✅ 2026-06-14 (WFAUTH-02)
 - [ ] 103-03-PLAN.md — Frontend foundation: api.ts authoring fns/types + deriveTier()/TIERS + shared NAV_ITEMS + ActiveView + AppDock deletion (REQ-7 wiring) [Wave 2]
 - [ ] 103-04-PLAN.md — Builder + read-only PhaseSpineGraph + 400px form panel (REQ-4, REQ-5) [Wave 3]
 - [ ] 103-05-PLAN.md — Publish-gauntlet UI client: verbatim PublishVerdict + key-detection + judge hard wall (REQ-6) [Wave 3]
