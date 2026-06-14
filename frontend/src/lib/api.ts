@@ -1956,3 +1956,196 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
   if (!res.ok) throw new Error("Failed to load feedback stats")
   return res.json() as Promise<FeedbackStats>
 }
+
+// ── Workflow authoring API (Phase 103, REQ-1 / REQ-2 / REQ-6) ────────────────
+//
+// The client layer the Builder (Plan 04), the publish gauntlet (Plan 05), and
+// the Workflows page (Plan 06) all consume. Mirrors the new /workflows authoring
+// routes from Plans 01/02 (NEVER threads.py). The load-bearing contract is that
+// the client NEVER re-derives a server verdict and NEVER swallows a 409/404 as
+// success (threat T-103-03-01 / -04).
+
+/** A permissive `WorkflowDefinition` JSONB alias — the Builder (Plan 04) refines
+ *  the real shape. The authoring CRUD/generate fns pass it through opaquely. */
+export type WorkflowDefinitionJSON = Record<string, unknown>
+
+/** Mirror of the backend `PublishVerdict` (api/workflows.py:84-93). Rendered
+ *  VERBATIM by the publish-gauntlet UI — the client never re-derives any field.
+ *  `named_failures` is POLYMORPHIC across stages (lint `{code,phase,message}` /
+ *  judge `{criterion,score,evidence}` / `{summary}` / bare string) so it is typed
+ *  `unknown[]` and rendered by KEY-DETECTION in Plan 05 (D-103-CONF-3). */
+export interface PublishVerdict {
+  published: boolean
+  version: number | null
+  golden_run_id: string | null
+  blocked_stage: string | null
+  named_failures: unknown[]
+}
+
+/** A lint failure entry (the 5 LOWERCASE `LintError.code` literals:
+ *  bad_index / unsatisfiable_skip / orphan_phase / no_terminal / input_unsatisfied). */
+export interface LintError {
+  code: string
+  phase: string
+  message: string
+}
+
+/** A draft row from GET /workflows/drafts (owner-scoped on the backend). */
+export interface WorkflowDraftRow {
+  id: string
+  slug: string
+  version: number
+  name: string | null
+}
+
+/** The structured result of POST /workflows/generate. The route returns HTTP 200
+ *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
+export type GenerateResult =
+  | { ok: true; definition: WorkflowDefinitionJSON }
+  | { ok: false; error: string; detail?: string }
+
+/** The body of POST /workflows/generate (D-103-CONF-2 / D-103-3 template supply). */
+export interface GenerateWorkflowBody {
+  describe: string
+  project_folder_id?: string | null
+  template_asset_id?: string | null
+  template_placeholders?: string[]
+}
+
+/** The 4 distinguished outcomes of POST /workflows/{id}/publish. A binary
+ *  `200 = ok / else = error` handler is FORBIDDEN — a 200 can carry a BLOCK
+ *  (`published:false`), and 400/404/409 each mean something distinct. */
+export type PublishOutcome =
+  | { kind: "verdict"; verdict: PublishVerdict }
+  | { kind: "business_requirement"; verdict: PublishVerdict }
+  | { kind: "not_found" }
+  | { kind: "already_published" }
+
+/** A published-row mutation (or a cross-user attempt resolving to a published
+ *  row) → HTTP 409. Thrown (never swallowed) so the UI surfaces it instead of a
+ *  silent overwrite (T-103-03-04). */
+export class WorkflowConflictError extends Error {
+  constructor(message = "workflow is published and cannot be modified") {
+    super(message)
+    this.name = "WorkflowConflictError"
+  }
+}
+
+/** A draft mutation against a non-existent / non-owned definition → HTTP 404. */
+export class WorkflowNotFoundError extends Error {
+  constructor(message = "workflow not found") {
+    super(message)
+    this.name = "WorkflowNotFoundError"
+  }
+}
+
+/** POST /workflows — create a draft. Returns {id, version}. */
+export async function createWorkflowDraft(
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<{ id: string; version: number }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to create workflow draft (status ${res.status})`)
+  return (await res.json()) as { id: string; version: number }
+}
+
+/** GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side). */
+export async function listDraftWorkflows(signal?: AbortSignal): Promise<WorkflowDraftRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/drafts`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list draft workflows (status ${res.status})`)
+  return (await res.json()) as WorkflowDraftRow[]
+}
+
+/** PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
+ *  (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
+ *  NEVER swallowed as success (T-103-03-04). */
+export async function updateWorkflowDraft(
+  id: string,
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<WorkflowDefinitionJSON> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
+  return (await res.json()) as WorkflowDefinitionJSON
+}
+
+/** DELETE /workflows/{id} — delete a draft (204). Throws WorkflowConflictError on
+ *  409 (published/frozen) and WorkflowNotFoundError on 404. */
+export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}`, {
+    method: "DELETE",
+    headers,
+    signal,
+  })
+  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
+}
+
+/** POST /workflows/generate — NL one-shot structured generation. The route
+ *  returns HTTP 200 even on a FAILED generation (`ok:false`), so we read the body
+ *  and NEVER throw on `ok:false` (only on a real HTTP/network error). */
+export async function generateWorkflow(
+  body: GenerateWorkflowBody,
+  signal?: AbortSignal,
+): Promise<GenerateResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/generate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to generate workflow (status ${res.status})`)
+  return (await res.json()) as GenerateResult
+}
+
+/** POST /workflows/{id}/publish — run the 8-stage publish gauntlet. The client
+ *  distinguishes the 4 HTTP outcomes and reads the SERVER verdict verbatim:
+ *   - 200 → {kind:"verdict"}: the body tells pass (published:true) from BLOCK
+ *     (published:false / blocked_stage set) — we DO NOT re-derive it.
+ *   - 400 → {kind:"business_requirement"}: the verdict is in `detail`.
+ *   - 404 → {kind:"not_found"}.
+ *   - 409 → {kind:"already_published"}.
+ *   - anything else → throw.
+ *  A binary `200 = ok / else = error` handler is FORBIDDEN (T-103-03-01). */
+export async function publishWorkflow(
+  id: string,
+  golden_input: string,
+  signal?: AbortSignal,
+): Promise<PublishOutcome> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/publish`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ golden_input }),
+    signal,
+  })
+  if (res.status === 200) {
+    const verdict = (await res.json()) as PublishVerdict
+    return { kind: "verdict", verdict }
+  }
+  if (res.status === 400) {
+    const body = (await res.json().catch(() => ({}))) as { detail?: PublishVerdict }
+    return { kind: "business_requirement", verdict: body.detail as PublishVerdict }
+  }
+  if (res.status === 404) return { kind: "not_found" }
+  if (res.status === 409) return { kind: "already_published" }
+  throw new Error(`Failed to publish workflow (status ${res.status})`)
+}
