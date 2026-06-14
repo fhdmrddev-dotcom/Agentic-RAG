@@ -258,3 +258,59 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
     body2 = resp2.json()
     assert body2["ok"] is False
     assert body2["error"] == "could_not_generate"
+
+
+@pytest.mark.asyncio
+async def test_forced_emit_gets_user_settings_not_app_settings(monkeypatch):
+    """REGRESSION (UAT-103 live blocker): the forced authoring shot MUST receive a
+    per-USER settings object (``UserEffectiveSettings`` — it carries ``active_provider``,
+    which the gateway dereferences to resolve the provider key/endpoint), NOT the
+    app-level ``Settings``. The route passes the app ``Settings`` through as ``settings``;
+    if that same object reached ``forced_emit`` as ``user_settings`` the gateway raised
+    ``AttributeError('active_provider')`` → the backstop reported a generic
+    ``provider_error`` and NL generation silently failed. The other tests mock
+    ``forced_emit`` so they never exercised the gateway's settings contract — this pins it.
+    """
+    import app.services.workflow_authoring as wa
+    import app.models.user_settings as us
+
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+
+    # The per-user object the loader returns — it has active_provider (gateway contract).
+    class _Owner:
+        active_provider = "openai"
+
+    owner = _Owner()
+    # load_user_settings is imported function-locally FROM app.models.user_settings →
+    # patch it on the source module so the in-function import picks up the patch.
+    monkeypatch.setattr(us, "load_user_settings", lambda user_id: owner)
+
+    captured: dict = {}
+
+    async def _fake_forced_emit(**kwargs):
+        captured["user_settings"] = kwargs.get("user_settings")
+        return {"emitted": _valid_wd(), "failure": None}
+
+    import app.services.forced_emit as fe
+
+    monkeypatch.setattr(fe, "forced_emit", _fake_forced_emit)
+
+    # The app-level Settings the ROUTE passes — deliberately WITHOUT active_provider,
+    # mirroring the real app config object that caused the live failure.
+    class _AppSettings:
+        harness_authoring_model = "claude-opus-4-8"
+
+    app_settings = _AppSettings()
+
+    result = await wa.generate_workflow_definition(
+        describe="Fill the risk register weekly.",
+        supabase=object(),
+        user_id="u1",
+        settings=app_settings,
+    )
+    assert result["ok"] is True
+    # The gateway-bound settings must be the loaded OWNER object, never the app settings.
+    assert captured["user_settings"] is owner
+    assert hasattr(captured["user_settings"], "active_provider")
+    assert captured["user_settings"] is not app_settings

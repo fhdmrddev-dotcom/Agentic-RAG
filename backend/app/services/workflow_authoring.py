@@ -386,6 +386,23 @@ async def generate_workflow_definition(
             "detail": f"no provider for authoring model {authoring_model!r}",
         }
 
+    # The gateway resolves the provider key + active provider from a per-USER settings
+    # object (``UserEffectiveSettings.active_provider``) — NOT the app-level ``Settings``.
+    # The judge (publish_service) loads owner settings the same way. Passing the app
+    # ``Settings`` straight through made the forced shot raise
+    # ``AttributeError('active_provider')`` inside the gateway → the backstop reported a
+    # generic ``provider_error`` and NL authoring silently failed (UAT-103 live fix).
+    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
+
+    try:
+        owner_settings = load_user_settings(user_id)
+    except Exception:  # noqa: BLE001 — no resolvable user settings → honest fail, never a crash
+        return {
+            "ok": False,
+            "error": "could_not_generate",
+            "detail": "no user settings resolved for the authoring call",
+        }
+
     project_id_str = str(project_folder_id) if project_folder_id is not None else None
     grounded_prompt, tool_names, skill_ids = await _assemble_grounding(
         supabase=supabase,
@@ -410,7 +427,7 @@ async def generate_workflow_definition(
             provider=provider,
             emitter="emit_workflow_definition",
             tools=[EMIT_TOOL],
-            user_settings=settings,
+            user_settings=owner_settings,
             system_prompt=AUTHORING_SYSTEM_PROMPT,
             schema_model=WorkflowDefinition,
             strict=False,  # Pitfall 1: force-without-strict for the optional-heavy schema
