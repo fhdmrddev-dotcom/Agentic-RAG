@@ -311,11 +311,68 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
-  it("Tweak opens the Builder after the fork", async () => {
+  it("Tweak opens the FORKED copy's existing steps in the Builder (NOT the describe screen)", async () => {
+    // The fork mints draft id "new-draft" (beforeEach mock). The Builder must boot
+    // straight into the editing view on the forked definition's existing phases —
+    // never the empty describe box.
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
     fireEvent.click(within(cards[0]).getByTestId("published-tweak"))
-    // The Builder host renders (describe-first empty screen for the forked draft).
+    // The forked strict def's phases render as spine nodes (pull + emit).
+    expect(await screen.findByTestId("spine-node-pull")).toBeInTheDocument()
+    expect(screen.getByTestId("spine-node-emit")).toBeInTheDocument()
+    // And NOT the describe-first empty screen.
+    expect(screen.queryByTestId("describe-hint")).not.toBeInTheDocument()
+  })
+
+  it("Tweak seeds the Builder with the NEW forked draft id → its publish gauntlet mounts on that id", async () => {
+    // draftId is pre-seeded from the fork ("new-draft"), so the publish gauntlet (gated
+    // on a non-null draftId in renderPublish) renders immediately in the edit view.
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const cards = await screen.findAllByTestId("published-card")
+    fireEvent.click(within(cards[0]).getByTestId("published-tweak"))
+    await screen.findByTestId("spine-node-pull")
+    // The header carries the Tweak caption with the new version.
+    expect(screen.getByText(/Tweak · vendor-risk v3/)).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)", () => {
+  it("Open passes the draft's definition + id → the Builder shows its steps, not the describe box", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const draftCard = await screen.findByTestId("draft-card")
+    fireEvent.click(within(draftCard).getByTestId("draft-open"))
+    // The draftRow's existing phase ("draft" slug) renders as a spine node.
+    expect(await screen.findByTestId("spine-node-draft")).toBeInTheDocument()
+    // NOT the describe-first empty screen.
+    expect(screen.queryByTestId("describe-hint")).not.toBeInTheDocument()
+    // Edit-in-place: no fork (createWorkflowDraft) on Open.
+    expect(mockCreateDraft).not.toHaveBeenCalled()
+  })
+
+  it("the build-card opens a TRUE fresh build (the describe screen, no initial)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const draftsShelf = await screen.findByTestId("drafts-shelf")
+    fireEvent.click(within(draftsShelf).getByTestId("build-card"))
     expect(await screen.findByTestId("describe-hint")).toBeInTheDocument()
+    expect(screen.queryByTestId("spine-node-draft")).not.toBeInTheDocument()
+  })
+})
+
+describe("WorkflowsPage — back-nav refreshes the library lists", () => {
+  it("the ← Workflows back button refetches drafts + published", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    // Enter the Builder via a fresh build (does not itself refetch).
+    const draftsShelf = await screen.findByTestId("drafts-shelf")
+    fireEvent.click(within(draftsShelf).getByTestId("build-card"))
+    await screen.findByTestId("describe-hint")
+    mockListDrafts.mockClear()
+    mockListPublished.mockClear()
+    // Back to the library → both lists refresh (newly-created drafts appear w/o F5).
+    fireEvent.click(screen.getByTestId("builder-back"))
+    await waitFor(() => expect(mockListDrafts).toHaveBeenCalledTimes(1))
+    expect(mockListPublished).toHaveBeenCalledTimes(1)
+    // The library is back.
+    expect(await screen.findByTestId("drafts-shelf")).toBeInTheDocument()
   })
 })

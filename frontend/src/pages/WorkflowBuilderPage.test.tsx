@@ -12,7 +12,7 @@
  *    nodes (never a broken/partial draft — the G-6 silent-invalid-draft guard).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, within, waitFor } from "@testing-library/react"
 
 // Mock the authoring client fns the page consumes (Plan 03 seams + the 103-ux
 // folder/skill name fetch the form panel + project picker read).
@@ -191,5 +191,80 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
     await user.click(screen.getByRole("button", { name: /draft/i }))
     expect(await screen.findByTestId("generate-error")).toBeInTheDocument()
     expect(screen.queryByTestId("spine-node-gather")).not.toBeInTheDocument()
+  })
+})
+
+describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing view", () => {
+  it("with `initial` it starts DIRECTLY in drafted: spine nodes render, NO describe box", async () => {
+    render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
+    // The describe-first screen is SKIPPED — no describe box / no generate call.
+    expect(screen.queryByTestId("describe-hint")).not.toBeInTheDocument()
+    expect(mockGenerate).not.toHaveBeenCalled()
+    // The loaded definition's phases render as spine nodes immediately.
+    expect(await screen.findByTestId("spine-node-gather")).toBeInTheDocument()
+    expect(screen.getByTestId("spine-node-emit")).toBeInTheDocument()
+  })
+
+  it("seeds the bound-folder NAME in the header from the loaded definition", async () => {
+    mockListFolders.mockResolvedValue([
+      { id: "f9", user_id: "u", name: "Risk KB", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+    ])
+    const bound = { ...draft3, project_folder_id: "f9" }
+    render(<WorkflowBuilderPage initial={{ definition: bound, draftId: "draft-77" }} />)
+    const chip = await screen.findByTestId("builder-bound-folder")
+    expect(chip.textContent).toContain("Risk KB")
+    expect(chip.textContent).not.toContain("f9")
+  })
+
+  it("an edit on an opened draft PATCHes the SAME row (updateWorkflowDraft), never a duplicate create", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
+    await user.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1))
+    // PATCH targets the pre-seeded draft id — and createWorkflowDraft is NEVER called.
+    expect(mockUpdate.mock.calls[0][0]).toBe("draft-77")
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it("Save draft shows a transient 'Saved ✓' confirmation on success", async () => {
+    mockUpdate.mockResolvedValue({})
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
+    await user.click(screen.getByTestId("builder-save-draft"))
+    expect(await screen.findByTestId("builder-save-confirm")).toHaveTextContent("Saved ✓")
+  })
+
+  it("Save draft shows an honest error state when the persist fails", async () => {
+    mockUpdate.mockRejectedValue(new Error("409 published"))
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
+    await user.click(screen.getByTestId("builder-save-draft"))
+    expect(await screen.findByTestId("builder-save-error")).toBeInTheDocument()
+    expect(screen.queryByTestId("builder-save-confirm")).not.toBeInTheDocument()
+  })
+})
+
+describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE then PATCHes", () => {
+  it("first Save on a freshly-generated draft calls createWorkflowDraft, second Save PATCHes", async () => {
+    mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
+    mockCreate.mockResolvedValue({ id: "created-1", version: 1 })
+    mockUpdate.mockResolvedValue({})
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    render(<WorkflowBuilderPage />)
+    await user.type(screen.getByRole("textbox"), "summarize vendor risk")
+    await user.click(screen.getByRole("button", { name: /draft/i }))
+    await screen.findByTestId("spine-node-gather")
+    // First explicit Save → create exactly once.
+    await user.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId("builder-save-confirm")).toBeInTheDocument()
+    // Second Save → PATCH the now-known id, no second create.
+    await user.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything()))
+    expect(mockCreate).toHaveBeenCalledTimes(1)
   })
 })

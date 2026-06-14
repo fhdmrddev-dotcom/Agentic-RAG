@@ -33,7 +33,7 @@ import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/compone
 
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
-interface BuilderDefinition {
+export interface BuilderDefinition {
   slug?: string
   version?: number
   status?: string
@@ -41,6 +41,13 @@ interface BuilderDefinition {
   project_folder_id?: string | null
   phases: PhaseSpecJSON[]
   [k: string]: unknown
+}
+
+/** The OPEN/TWEAK seam payload — an existing definition + its row id (every save
+ *  PATCHes that row). Exported so WorkflowsPage builds + casts it at one place. */
+export interface BuilderInitial {
+  definition: BuilderDefinition
+  draftId: string
 }
 
 type BuilderState =
@@ -55,30 +62,54 @@ export interface WorkflowBuilderPageProps {
    *  a typed prop so Plan 05 can land independently without an import-before-exists
    *  break. */
   renderPublish?: (def: BuilderDefinition, draftId: string | null) => React.ReactNode
+  /** Phase 103-ux OPEN/TWEAK: when present, the Builder starts DIRECTLY in the
+   *  "drafted" editing view on this existing definition — it SKIPS the
+   *  describe/composing screen entirely. `draftId` seeds both state + the
+   *  draftIdRef so every edit PATCHes the SAME row (never a duplicate create):
+   *   - Open a draft → the draft's own id (edit-in-place).
+   *   - Tweak a published workflow → the freshly-forked v(N+1) draft id (the
+   *     frozen published row is never touched).
+   *  Absent → the existing describe-first FRESH build, byte-identical. */
+  initial?: BuilderInitial
 }
 
-export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps) {
+export function WorkflowBuilderPage({ renderPublish, initial }: WorkflowBuilderPageProps) {
   const [describe, setDescribe] = useState("")
-  const [state, setState] = useState<BuilderState>({ phase: "empty" })
+  // OPEN/TWEAK: when `initial` is provided, boot straight into the drafted editing
+  // view on the loaded definition (the describe/composing screen is skipped). A
+  // fresh build (no `initial`) starts "empty" exactly as before.
+  const [state, setState] = useState<BuilderState>(
+    initial ? { phase: "drafted", definition: initial.definition } : { phase: "empty" },
+  )
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
   // Phase 103-ux: the project (knowledge base) the generated workflow binds to.
   // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
-  // by name in the draft header afterwards.
-  const [projectFolderId, setProjectFolderId] = useState<string>("")
+  // by name in the draft header afterwards. When opening an existing definition,
+  // seed it from that definition's own binding so the header shows the bound KB.
+  const [projectFolderId, setProjectFolderId] = useState<string>(
+    typeof initial?.definition.project_folder_id === "string" ? initial.definition.project_folder_id : "",
+  )
   // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
   // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
   const [folderNames, setFolderNames] = useState<IdNameMap>({})
   const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
   const [skillNames, setSkillNames] = useState<IdNameMap>({})
-  // The persisted draft id (null until the first save). A generated draft is
-  // persisted via createWorkflowDraft on the FIRST edit/save, then PATCHed.
-  const [draftId, setDraftId] = useState<string | null>(null)
+  // The persisted draft id (null until the first save for a fresh build; pre-seeded
+  // from `initial.draftId` for Open/Tweak). A generated draft is persisted via
+  // createWorkflowDraft on the FIRST edit/save, then PATCHed.
+  const [draftId, setDraftId] = useState<string | null>(initial?.draftId ?? null)
   // Synchronous mirrors of the persist state. setDraftId is async, so several
   // onPersist calls can fire while draftId is still null and each would re-run
   // createWorkflowDraft → a UniqueViolation storm on (slug, version). The refs
-  // collapse the first save to EXACTLY ONE create (UAT-103 save-loop fix).
-  const draftIdRef = useRef<string | null>(null)
+  // collapse the first save to EXACTLY ONE create (UAT-103 save-loop fix). For
+  // Open/Tweak the ref is pre-seeded → every save PATCHes the existing row.
+  const draftIdRef = useRef<string | null>(initial?.draftId ?? null)
   const creatingRef = useRef(false)
+  // Phase 103-ux SAVE button: transient feedback for the explicit "Save draft"
+  // affordance ("idle" → "saving" → "saved" | "error"). Belt-and-suspenders over
+  // the implicit on-blur autosave (onPersist) — the user gets a visible "Saved ✓".
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const canDraft = describe.trim().length > 0 && state.phase !== "composing"
   const panelOpen = selectedSlug !== null
@@ -181,32 +212,60 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
   )
 
   // Persist the working draft. First save → createWorkflowDraft (then keep the id);
-  // subsequent saves → updateWorkflowDraft (PATCH). A 409/404 is surfaced by the
-  // thrown typed error (the page logs it; the conflict banner is Plan 06's Tweak fork).
-  const onPersist = useCallback(async () => {
-    if (state.phase !== "drafted") return
+  // subsequent saves → updateWorkflowDraft (PATCH). For Open/Tweak the ref is
+  // pre-seeded so this ALWAYS PATCHes the loaded row (never a duplicate create).
+  // Returns true on a confirmed write so the explicit Save button can show "Saved ✓"
+  // (and false / throw so it can show an honest error). The implicit on-blur
+  // autosave still calls this and ignores the result (belt-and-suspenders).
+  const onPersist = useCallback(async (): Promise<boolean> => {
+    if (state.phase !== "drafted") return false
     const def = state.definition as unknown as Record<string, unknown>
-    try {
-      if (draftIdRef.current === null) {
-        // First save: create EXACTLY ONCE. If a create is already in flight,
-        // skip — re-running it would collide on UNIQUE(slug, version) → 500.
-        if (creatingRef.current) return
-        creatingRef.current = true
-        try {
-          const created = await createWorkflowDraft(def)
-          draftIdRef.current = created.id // synchronous: subsequent calls PATCH
-          setDraftId(created.id)
-        } finally {
-          creatingRef.current = false
-        }
-      } else {
-        await updateWorkflowDraft(draftIdRef.current, def)
+    if (draftIdRef.current === null) {
+      // First save: create EXACTLY ONCE. If a create is already in flight,
+      // skip — re-running it would collide on UNIQUE(slug, version) → 500.
+      if (creatingRef.current) return false
+      creatingRef.current = true
+      try {
+        const created = await createWorkflowDraft(def)
+        draftIdRef.current = created.id // synchronous: subsequent calls PATCH
+        setDraftId(created.id)
+      } finally {
+        creatingRef.current = false
       }
-    } catch {
-      // A persist failure (409 / 404 / network) is non-fatal to the in-memory
-      // draft; the visible conflict surface is Plan 06 (Tweak→fork).
+    } else {
+      await updateWorkflowDraft(draftIdRef.current, def)
     }
+    return true
   }, [state])
+
+  // Phase 103-ux SAVE button: an EXPLICIT, obvious save with visible feedback.
+  // Drives the persist path (create-once-then-PATCH) and surfaces "Saved ✓" on
+  // success or an honest error state on failure (409/404/network). The implicit
+  // on-blur autosave (onPersist) stays; this is the user-facing affordance.
+  const onSaveDraft = useCallback(async () => {
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current)
+      savedTimerRef.current = null
+    }
+    setSaveState("saving")
+    try {
+      const ok = await onPersist()
+      setSaveState(ok ? "saved" : "error")
+    } catch {
+      // A 409 (published/frozen) / 404 / network failure is surfaced honestly —
+      // never silently swallowed as a success.
+      setSaveState("error")
+    }
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500)
+  }, [onPersist])
+
+  // Clean up the transient-confirmation timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
   if (state.phase === "empty" || state.phase === "composing" || state.phase === "error") {
@@ -314,9 +373,41 @@ export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps)
             </span>
           )}
         </div>
-        {renderPublish && (
-          <div className="shrink-0">{renderPublish(state.definition, draftId)}</div>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Phase 103-ux: explicit Save draft + transient confirmation. */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="builder-save-draft"
+              onClick={() => void onSaveDraft()}
+              disabled={saveState === "saving"}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saveState === "saving" ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
+                  />
+                  Saving…
+                </>
+              ) : (
+                "Save draft"
+              )}
+            </button>
+            {saveState === "saved" && (
+              <span data-testid="builder-save-confirm" role="status" className="text-[13px] font-medium text-success">
+                Saved ✓
+              </span>
+            )}
+            {saveState === "error" && (
+              <span data-testid="builder-save-error" role="alert" className="text-[13px] font-medium text-destructive">
+                Couldn't save
+              </span>
+            )}
+          </div>
+          {renderPublish && <div>{renderPublish(state.definition, draftId)}</div>}
+        </div>
       </header>
 
       <div

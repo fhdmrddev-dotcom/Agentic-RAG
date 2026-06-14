@@ -35,7 +35,7 @@ import {
   type WorkflowDefinitionJSON,
 } from "@/lib/api"
 import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/components/workflows/deriveTier"
-import { WorkflowBuilderPage } from "@/pages/WorkflowBuilderPage"
+import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 import type { Folder } from "@/types"
 
@@ -218,8 +218,15 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   const [kickoff, setKickoff] = useState("")
   // WR-05: in-flight guard so a double-tap of Run can't create two threads/runs.
   const [runSubmitting, setRunSubmitting] = useState(false)
-  // The draft the Builder opens (Build-card → null = fresh; Tweak → a forked draft).
-  const [builderTweak, setBuilderTweak] = useState<{ slug: string; version: number } | null>(null)
+  // What the Builder opens with:
+  //   null            → a TRUE fresh build (the describe-first screen).
+  //   { definition }  → an EXISTING definition loaded straight into the editing
+  //                     view (Open a draft = edit-in-place; Tweak a published =
+  //                     edit the freshly-forked copy). `draftId` is the row every
+  //                     save PATCHes; `label` is the header caption.
+  const [builderInitial, setBuilderInitial] = useState<
+    { definition: WorkflowDefinitionJSON; draftId: string; label: string } | null
+  >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
 
@@ -272,21 +279,29 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     [folders],
   )
 
-  // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row. ──
+  // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
+  //    then open the FORKED copy's existing steps in the Builder (NOT the describe
+  //    screen). The new draft id is captured so every save PATCHes the fork. ──
   const onTweak = useCallback(
     async (wf: PublishedWorkflow) => {
       const def = (wf.definition ?? {}) as Record<string, unknown>
       const currentVersion = typeof def.version === "number" ? (def.version as number) : 1
+      const nextVersion = currentVersion + 1
       const forked = {
         ...def,
         slug: wf.slug,
-        version: currentVersion + 1,
+        version: nextVersion,
         status: "draft",
       } as WorkflowDefinitionJSON
       try {
-        await createWorkflowDraft(forked)
+        const created = await createWorkflowDraft(forked)
         await refetchDrafts()
-        setBuilderTweak({ slug: wf.slug, version: currentVersion + 1 })
+        // Load the fork's existing definition into the editing view with its NEW id.
+        setBuilderInitial({
+          definition: forked,
+          draftId: created.id,
+          label: `Tweak · ${wf.slug} v${nextVersion}`,
+        })
         setPageView("builder")
       } catch (e) {
         console.error("[WorkflowsPage] Tweak fork failed", e)
@@ -295,10 +310,29 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     [refetchDrafts],
   )
 
-  const openBuilderFresh = useCallback(() => {
-    setBuilderTweak(null)
+  // ── Open a draft: load THAT draft's definition into the Builder editing view
+  //    (edit-in-place — saves PATCH the same row via its real id). ──
+  const onOpenDraft = useCallback((draft: WorkflowDraftRow) => {
+    setBuilderInitial({
+      definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
+      draftId: draft.id,
+      label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
+    })
     setPageView("builder")
   }, [])
+
+  const openBuilderFresh = useCallback(() => {
+    setBuilderInitial(null)
+    setPageView("builder")
+  }, [])
+
+  // ── Back to the library: refresh both shelves so a newly-created/edited draft
+  //    (or a tweaked fork) appears WITHOUT a manual browser refresh. ──
+  const backToLibrary = useCallback(() => {
+    setPageView("library")
+    refetchDrafts().catch(console.error)
+    refetchPublished().catch(console.error)
+  }, [refetchDrafts, refetchPublished])
 
   const onGauntletPublished = useCallback(
     (version: number, slug: string) => {
@@ -310,37 +344,53 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     [refetchPublished, refetchDrafts],
   )
 
-  // ── BUILDER host (the Build-card / Tweak destination — three-homes, no router). ──
+  // ── BUILDER host (the Build-card / Open / Tweak destination — three-homes, no router). ──
   if (pageView === "builder") {
     return (
       <div className="flex h-full flex-col bg-background">
         <div className="flex items-center gap-3 border-b border-border px-4 py-2">
           <button
             type="button"
-            onClick={() => setPageView("library")}
+            data-testid="builder-back"
+            onClick={backToLibrary}
             className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
           >
             ← Workflows
           </button>
           <span className="text-[13px] font-medium text-foreground">
-            {builderTweak ? `Tweak · ${builderTweak.slug} v${builderTweak.version}` : "Build a workflow"}
+            {builderInitial ? builderInitial.label : "Build a workflow"}
           </span>
           <NetNewFlag />
         </div>
         <div className="min-h-0 flex-1">
           <WorkflowBuilderPage
+            // OPEN/TWEAK: load the existing definition straight into the editing
+            // view with its real row id (saves PATCH it). Absent → fresh build.
+            // The api layer's definition JSONB is intentionally opaque
+            // (Record<string, unknown>); the Builder refines it internally, so the
+            // initial pair is built once + cast at this single seam.
+            initial={
+              builderInitial
+                ? ({ definition: builderInitial.definition, draftId: builderInitial.draftId } as BuilderInitial)
+                : undefined
+            }
             renderPublish={(_def, draftId) =>
               draftId ? (
                 <PublishGauntlet
                   definitionId={draftId}
                   onPublished={(version) =>
-                    // WR-04: for a FRESH build (builderTweak null) the just-built
-                    // definition's own slug is the correct lookup key — never the
-                    // hardcoded "workflow" literal (which finds nothing in `published`,
-                    // silently dropping the post-publish Run CTA).
+                    // WR-04: the definition's own slug is the lookup key (the loaded
+                    // definition carries it for Open/Tweak; the just-built draft
+                    // carries it for a fresh build) — never the hardcoded "workflow"
+                    // literal (which finds nothing in `published`, silently dropping
+                    // the post-publish Run CTA).
                     onGauntletPublished(
                       version,
-                      builderTweak?.slug ?? (typeof _def.slug === "string" ? _def.slug : "workflow"),
+                      typeof _def.slug === "string"
+                        ? _def.slug
+                        : typeof (builderInitial?.definition as { slug?: unknown } | null)?.slug === "string"
+                          ? ((builderInitial!.definition as { slug: string }).slug)
+                          : "workflow",
                     )
                   }
                 />
@@ -448,7 +498,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
               </button>
 
               {drafts.map((d) => (
-                <DraftCard key={d.id} draft={d} onOpen={() => { setBuilderTweak(null); setPageView("builder") }} />
+                <DraftCard key={d.id} draft={d} onOpen={() => onOpenDraft(d)} />
               ))}
             </div>
           </section>
