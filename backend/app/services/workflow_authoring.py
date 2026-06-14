@@ -132,8 +132,12 @@ def _skill_registry(supabase, user_id: str) -> list[dict]:
 
     Reproduces the spike's query shape (RESEARCH A3) — ``user_id.eq OR is_global`` +
     an ``is_enabled`` filter. ``skill_ref`` in a PhaseConfig is the skill ``id`` (a UUID),
-    so the caller builds the membership set from ``s["id"]``. Synchronous supabase-py is
-    wrapped in ``run_in_threadpool`` by the async caller (D-v2.5-01)."""
+    so the caller builds the membership set from ``s["id"]``.
+
+    BLOCKING-I/O CONTRACT (IR-01 / D-v2.5-01): this is a plain ``def`` and calls
+    synchronous ``supabase-py``. It MUST be invoked via ``run_in_threadpool`` (it is —
+    ``_assemble_grounding`` wraps it). NEVER call it directly from an async handler or the
+    blocking read lands on the event loop."""
     try:
         rows = (
             supabase.table("skills")
@@ -142,9 +146,24 @@ def _skill_registry(supabase, user_id: str) -> list[dict]:
             .execute()
             .data
         ) or []
-    except Exception:  # noqa: BLE001 — defensive: fall back to a full read + filter client-side
-        logger.warning("workflow_authoring: scoped skills read failed; filtering client-side")
-        rows = supabase.table("skills").select("id,name,is_global,user_id,is_enabled").execute().data or []
+    except Exception:  # noqa: BLE001 — CR-01: a scoped read miss must FAIL CLOSED, never widen scope.
+        # The service runs as service-role (RLS-bypassing). A bare full-table fallback
+        # would pull EVERY user's skill rows over the wire and lean on a Python-side
+        # filter — fragile and a scope-leak risk on orphaned/None user_id rows. Retry
+        # with the SAME owner+global predicate pushed down to the DB; if that also
+        # fails, return [] (no skill grounding) rather than a possibly-polluted set.
+        logger.warning("workflow_authoring: scoped skills read failed; retrying owner-scoped, else empty")
+        try:
+            rows = (
+                supabase.table("skills")
+                .select("id,name,is_global,user_id,is_enabled")
+                .or_(f"user_id.eq.{user_id},is_global.eq.true")
+                .execute()
+                .data
+            ) or []
+        except Exception:  # noqa: BLE001 — fail closed: no skills rather than cross-user names.
+            logger.warning("workflow_authoring: owner-scoped skills retry failed; using empty skill set")
+            rows = []
     return [
         r
         for r in rows
