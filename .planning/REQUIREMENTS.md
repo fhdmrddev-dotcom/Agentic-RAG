@@ -25,7 +25,8 @@
 - [x] **TMPL-03**: A filled template is validated before delivery — **re-opened with the same library to assert integrity** (a corrupt file can never reach the user as "done") — and rendering runs inside the sealed sandbox with `jinja2.sandbox.SandboxedEnvironment` (SSTI contained).
 
 ### WFAUTH — Workflow authoring & the Workflows page
-- [ ] **WFAUTH-01**: A user can create/edit a workflow as a draft (CRUD) via a new API + the new **Workflows page**, with publish-time structural lint (reachable, terminal, satisfiable inputs) blocking invalid publishes.
+- [x] **WFAUTH-01
+**: A user can create/edit a workflow as a draft (CRUD) via a new API + the new **Workflows page**, with publish-time structural lint (reachable, terminal, satisfiable inputs) blocking invalid publishes.
 - [ ] **WFAUTH-02**: A user can **describe a workflow in natural language** and receive a valid draft definition — one-shot structured generation over the strict `WorkflowDefinition` schema, grounded in the project folder tree + tool/skill registry + any uploaded template; invalid generations auto-retry against the validation error.
 - [ ] **WFAUTH-03**: The Workflows page renders a **read-only live graph** of a workflow's phases/edges (view, not drag-to-build).
 - [ ] **WFAUTH-04**: A published workflow can be browsed in a project-filtered library and **run from a thread** (the thread enters workflow mode; Deep is the resting default). Definitions are immutable-on-publish + versioned.
