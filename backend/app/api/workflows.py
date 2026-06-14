@@ -19,7 +19,8 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.dependencies import get_current_user, get_pg_pool, get_redis
+from app.config import settings
+from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
 from app.db.workflows import (
     create_workflow_definition,
     delete_workflow_definition,
@@ -28,8 +29,10 @@ from app.db.workflows import (
     update_workflow_definition,
 )
 from app.models.harness import WorkflowDefinition
-# Phase 102 (D-07): imported as a MODULE so the route's delegate stays patchable in
-# tests (mirrors the threads.py module-import-for-patchability discipline).
+# Phase 102 (D-07) / Phase 103 (REQ-2): imported as MODULES so the route's delegate
+# stays patchable in tests (mirrors the threads.py module-import-for-patchability
+# discipline). NEVER import the orchestration fns by name — patch the module attr.
+from app.services import workflow_authoring
 from app.services.harness import publish_service
 
 logger = logging.getLogger(__name__)
@@ -270,3 +273,52 @@ async def delete_draft(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
     return None
+
+
+# ── Phase 103 (REQ-2 / WFAUTH-02) — NL one-shot generation route ──────────────
+# G-5 RED LINE: joins THIS router (api/workflows.py), NEVER api/threads.py. The
+# orchestration (grounding assembly + forced_emit + retry + fidelity) lives in the
+# workflow_authoring service — the route is delegation ONLY. The returned draft is
+# NOT persisted (persistence is REQ-1's explicit POST /workflows create).
+class GenerateRequest(BaseModel):
+    """The NL-authoring body (D-103-CONF-2). ``describe`` is the plain-language task;
+    template grounding is OPTIONAL — a library ``template_asset_id`` OR a direct
+    ``template_placeholders`` list (never both required)."""
+
+    describe: str
+    project_folder_id: UUID | None = None
+    template_asset_id: UUID | None = None
+    template_placeholders: list[str] | None = None
+
+
+@router.post("/generate")
+async def generate_workflow(
+    body: GenerateRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase),
+):
+    """Generate a grounded ``WorkflowDefinition`` DRAFT from an NL description (REQ-2).
+
+    Delegates to ``workflow_authoring.generate_workflow_definition`` (the orchestration
+    stays OUT of the route body). Returns the service result dict directly:
+      - ``{ok: True, definition}`` -> a draft object the Builder loads (NOT persisted);
+      - ``{ok: False, error, detail}`` -> an HONEST "could not generate" (the UI
+        distinguishes on ``ok``). A service ``ok=False`` is returned as 200 with the
+        structured error body — it is not an HTTP error, it is an honest failure surface.
+
+    ``project_folder_id`` / ``template_asset_id`` are path/body ``UUID``s -> FastAPI 422
+    on a malformed value (V5).
+    """
+    pool = await get_pg_pool()
+    user_id = current_user["id"]
+    result = await workflow_authoring.generate_workflow_definition(
+        describe=body.describe,
+        supabase=supabase,
+        user_id=str(user_id),
+        settings=settings,
+        pool=pool,
+        project_folder_id=body.project_folder_id,
+        template_asset_id=body.template_asset_id,
+        template_placeholders=body.template_placeholders,
+    )
+    return result

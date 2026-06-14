@@ -203,14 +203,11 @@ async def test_honest_fail_on_second_none(monkeypatch):
     assert len(calls) == 2  # attempt 1 + retry, no 3rd
 
 
-@pytest.mark.xfail(reason="Task 3 of this plan adds POST /workflows/generate", strict=False)
 @pytest.mark.asyncio
 async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
     """POST /workflows/generate delegates to the service and returns a draft object
     WITHOUT persisting it; an ok=False service result returns 200 with the structured
-    error (persistence is REQ-1's explicit POST /workflows create).
-
-    The route lands in Task 3 of this plan; filled GREEN there."""
+    error (persistence is REQ-1's explicit POST /workflows create)."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
@@ -223,6 +220,12 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
 
     monkeypatch.setattr(wa, "generate_workflow_definition", _fake_generate)
 
+    # The route resolves a pool via get_pg_pool() in its body — stub it so no live DB.
+    async def _fake_pool():
+        return object()
+
+    monkeypatch.setattr(wf_api, "get_pg_pool", _fake_pool)
+
     # If the route ever tried to persist, this would be called — assert it is NOT.
     persisted: list = []
 
@@ -234,6 +237,7 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
 
     app = FastAPI()
     app.dependency_overrides[wf_api.get_current_user] = lambda: {"id": "u1"}
+    app.dependency_overrides[wf_api.get_supabase] = lambda: object()
     app.include_router(wf_api.router)
     client = TestClient(app)
 
