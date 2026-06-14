@@ -13,16 +13,11 @@
  *  - a field change calls onChange; a blur/save calls onPersist.
  */
 import { describe, it, expect, vi } from "vitest"
-import { render, screen, within } from "@testing-library/react"
-import { readFileSync } from "node:fs"
-import path from "node:path"
+import { render, screen } from "@testing-library/react"
+// Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
+import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel } from "./PhaseFormPanel"
 import type { PhaseSpecJSON } from "./PhaseSpineGraph"
-
-const SOURCE_PATH = path.resolve(
-  process.cwd(),
-  "src/components/workflows/PhaseFormPanel.tsx",
-)
 
 function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> = {}): PhaseSpecJSON {
   return {
@@ -236,7 +231,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms", () => {
   })
 
   it("the SOURCE is push (not overlay) — no position:absolute/fixed inset", () => {
-    const src = readFileSync(SOURCE_PATH, "utf8")
+    const src = phaseFormPanelSource
     expect(src).not.toMatch(/position:\s*(absolute|fixed)/)
     expect(src).not.toMatch(/fixed inset|absolute inset/)
   })

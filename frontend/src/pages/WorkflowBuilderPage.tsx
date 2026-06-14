@@ -1,0 +1,236 @@
+/**
+ * Phase 103-04 Task 3 (REQ-5 / WFAUTH-01/02, sketch 018-A + 019-D) —
+ * WorkflowBuilderPage: the describe-first authoring surface.
+ *
+ * The first screen is JUST the describe box — a 3-second read at rest: one
+ * `<textarea>`, one hint line, one DISABLED submit button, and NOTHING else (no
+ * grounding chip, strictness dial, folder picker, phase node, or left rail —
+ * grounding is revealed BY the draft, post-draft, never faked up front).
+ *
+ * On submit the page transitions through a single state union:
+ *   "empty" → "composing" → "drafted"   (ok:true)
+ *   "empty" → "composing" → "error"     (ok:false OR a thrown error)
+ *
+ * SINGLE STATE TRANSITION (the falsifiable bar): on `ok:true` the full draft
+ * definition AND the "drafted" state are committed in ONE React update, so the
+ * whole graph renders in one DOM batch — no per-node enter animation, no timed
+ * reveal, no incremental array push. The draft is built whole and rendered once
+ * (one-shot emission is proven — spike-097).
+ *
+ * On `ok:false` (or a thrown/network error) the page renders an honest
+ * "could not generate" surface and renders NO phase nodes — never a partial or
+ * broken draft (the G-6 silent-invalid-draft guard at the UI seam, T-103-04-01).
+ *
+ * Refinement is FORM-LED on a READ-ONLY vertical spine (no drag-canvas, no
+ * router): the read-only `PhaseSpineGraph` + the 400px push `PhaseFormPanel`,
+ * wired exactly like the app's existing ChatLayout push grid
+ * (`gridTemplateColumns: minmax(0,1fr) <44px|400px>`).
+ */
+import { useCallback, useMemo, useState } from "react"
+import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft } from "@/lib/api"
+import { PhaseSpineGraph, type PhaseSpecJSON } from "@/components/workflows/PhaseSpineGraph"
+import { PhaseFormPanel, type PhaseConfigPatch } from "@/components/workflows/PhaseFormPanel"
+
+/** The Builder's working definition shape (a refinement of the opaque
+ *  `WorkflowDefinitionJSON` the api layer returns). */
+interface BuilderDefinition {
+  slug?: string
+  version?: number
+  status?: string
+  business_requirement?: string
+  project_folder_id?: string | null
+  phases: PhaseSpecJSON[]
+  [k: string]: unknown
+}
+
+type BuilderState =
+  | { phase: "empty" }
+  | { phase: "composing" }
+  | { phase: "drafted"; definition: BuilderDefinition }
+  | { phase: "error"; message: string; detail?: string }
+
+export interface WorkflowBuilderPageProps {
+  /** Optional Plan-05 publish-gauntlet seam — the page composes it when present
+   *  (the gauntlet owns the publish-disabled-on-empty-golden_input rule). Left as
+   *  a typed prop so Plan 05 can land independently without an import-before-exists
+   *  break. */
+  renderPublish?: (def: BuilderDefinition, draftId: string | null) => React.ReactNode
+}
+
+export function WorkflowBuilderPage({ renderPublish }: WorkflowBuilderPageProps) {
+  const [describe, setDescribe] = useState("")
+  const [state, setState] = useState<BuilderState>({ phase: "empty" })
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
+  // The persisted draft id (null until the first save). A generated draft is
+  // persisted via createWorkflowDraft on the FIRST edit/save, then PATCHed.
+  const [draftId, setDraftId] = useState<string | null>(null)
+
+  const canDraft = describe.trim().length > 0 && state.phase !== "composing"
+  const panelOpen = selectedSlug !== null
+
+  // The current working definition (drafted state only).
+  const definition = state.phase === "drafted" ? state.definition : null
+
+  const selectedPhase = useMemo<PhaseSpecJSON | null>(() => {
+    if (!definition || selectedSlug === null) return null
+    return definition.phases.find((p) => p.slug === selectedSlug) ?? null
+  }, [definition, selectedSlug])
+
+  const onDraft = useCallback(async () => {
+    const text = describe.trim()
+    if (text.length === 0) return
+    setState({ phase: "composing" })
+    setSelectedSlug(null)
+    setDraftId(null)
+    try {
+      const result = await generateWorkflow({ describe: text })
+      if (result.ok) {
+        // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
+        // ONE setState. The graph renders whole, in one DOM batch (no timed reveal).
+        setState({ phase: "drafted", definition: result.definition as unknown as BuilderDefinition })
+      } else {
+        // ok:false is an HONEST failure — never a renderable broken draft.
+        setState({ phase: "error", message: result.error, detail: result.detail })
+      }
+    } catch (e) {
+      setState({
+        phase: "error",
+        message: "Couldn't generate the workflow.",
+        detail: e instanceof Error ? e.message : undefined,
+      })
+    }
+  }, [describe])
+
+  // Merge a phase-form patch into the selected phase's config (immutable).
+  const onPhaseChange = useCallback(
+    (patch: PhaseConfigPatch) => {
+      setState((prev) => {
+        if (prev.phase !== "drafted" || selectedSlug === null) return prev
+        const phases = prev.definition.phases.map((p) =>
+          p.slug === selectedSlug ? { ...p, config: { ...p.config, ...patch } } : p,
+        )
+        return { phase: "drafted", definition: { ...prev.definition, phases } }
+      })
+    },
+    [selectedSlug],
+  )
+
+  // Persist the working draft. First save → createWorkflowDraft (then keep the id);
+  // subsequent saves → updateWorkflowDraft (PATCH). A 409/404 is surfaced by the
+  // thrown typed error (the page logs it; the conflict banner is Plan 06's Tweak fork).
+  const onPersist = useCallback(async () => {
+    if (state.phase !== "drafted") return
+    const def = state.definition as unknown as Record<string, unknown>
+    try {
+      if (draftId === null) {
+        const created = await createWorkflowDraft(def)
+        setDraftId(created.id)
+      } else {
+        await updateWorkflowDraft(draftId, def)
+      }
+    } catch {
+      // A persist failure (409 published / 404 / network) is non-fatal to the
+      // in-memory draft; the visible conflict surface is Plan 06 (Tweak→fork).
+    }
+  }, [state, draftId])
+
+  // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
+  if (state.phase === "empty" || state.phase === "composing" || state.phase === "error") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-background px-6 py-8">
+        <div className="flex w-full max-w-[640px] flex-col gap-4">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span aria-hidden="true" className="text-3xl">
+              ✎
+            </span>
+            <h1 className="font-semibold text-foreground" style={{ fontSize: "1.5rem" }}>
+              What recurring work should this automate?
+            </h1>
+          </div>
+
+          <textarea
+            aria-label="business requirement"
+            value={describe}
+            onChange={(e) => setDescribe(e.target.value)}
+            placeholder="Describe the goal in plain language…"
+            rows={5}
+            disabled={state.phase === "composing"}
+            className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              disabled={!canDraft}
+              onClick={onDraft}
+              className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {state.phase === "composing" ? "Composing…" : "Draft the workflow"}
+            </button>
+
+            <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
+              You describe the goal — the AI <b className="font-medium text-foreground">drafts the phases</b>,{" "}
+              <b className="font-medium text-foreground">sets the strictness</b>, and{" "}
+              <b className="font-medium text-foreground">asks about anything it had to guess</b>.
+            </p>
+          </div>
+
+          {/* HONEST FAILURE — never a renderable broken draft (T-103-04-01). */}
+          {state.phase === "error" && (
+            <div
+              data-testid="generate-error"
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-[13px] text-foreground"
+            >
+              <p className="font-medium">Couldn't generate — {state.message}</p>
+              {state.detail && <p className="mt-1 text-[12px] text-muted-foreground">{state.detail}</p>}
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                Nothing was saved. Adjust your description and try again.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── DRAFTED: the read-only spine graph (left) + the 400px push form panel (right). ──
+  // The push grid mirrors the app's existing ChatLayout 2-state track exactly.
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
+            {state.definition.slug ?? "Untitled workflow"}
+          </span>
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+            draft
+          </span>
+        </div>
+        {renderPublish && (
+          <div className="shrink-0">{renderPublish(state.definition, draftId)}</div>
+        )}
+      </header>
+
+      <div
+        data-testid="builder-grid"
+        className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+        style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "400px" : "44px") }}
+      >
+        <PhaseSpineGraph
+          phases={state.definition.phases}
+          selectedSlug={selectedSlug}
+          onSelectNode={(slug) => setSelectedSlug((cur) => (cur === slug ? null : slug))}
+        />
+        <PhaseFormPanel
+          phase={selectedPhase}
+          open={panelOpen}
+          onChange={onPhaseChange}
+          onPersist={onPersist}
+        />
+      </div>
+    </div>
+  )
+}
+
+export default WorkflowBuilderPage

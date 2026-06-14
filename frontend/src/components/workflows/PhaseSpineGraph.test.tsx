@@ -13,14 +13,10 @@
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
-import { readFileSync } from "node:fs"
-import path from "node:path"
+// Read the component SOURCE via Vite's ?raw loader (the idiomatic vitest way —
+// typechecks under `vite/client`, no node:fs/process needed) for the G-5 grep.
+import phaseSpineGraphSource from "./PhaseSpineGraph?raw"
 import { PhaseSpineGraph, type PhaseSpecJSON } from "./PhaseSpineGraph"
-
-const SOURCE_PATH = path.resolve(
-  process.cwd(),
-  "src/components/workflows/PhaseSpineGraph.tsx",
-)
 
 /** A 3-phase draft (intentionally OUT of phase_index order in the array to prove
  *  the component sorts; the rendered order must be 0,1,2 regardless of input order). */
@@ -155,7 +151,7 @@ describe("PhaseSpineGraph — read-only vertical spine", () => {
   })
 
   it("the SOURCE never imports PhaseTimeline or PhaseCard (G-5)", () => {
-    const src = readFileSync(SOURCE_PATH, "utf8")
+    const src = phaseSpineGraphSource
     expect(src).not.toMatch(/PhaseTimeline/)
     expect(src).not.toMatch(/PhaseCard/)
     // No graph lib import either.
