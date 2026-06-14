@@ -191,6 +191,7 @@ class PhaseSpec(_StrictBase):
     phase_index: int
     config: PhaseConfig  # parsed via discriminator
     validators: list[ValidatorSpec] = Field(default_factory=list)
+    name: str | None = None  # REQ-3 — additive; serializes into the definition JSONB; pre-103 rows validate with it absent
 
 
 # ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──

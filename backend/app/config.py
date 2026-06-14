@@ -961,6 +961,10 @@ class Settings(BaseSettings):
     # override allowed (Plan 05).
     harness_judge_model: str | None = None
 
+    # Phase 103 (D-103-2 / WFAUTH-02) — the LLM authoring model for NL workflow generation.
+    # Settings-not-env (a model id is a VALUE, not a secret). None = a registry default resolved by resolve_authoring_model().
+    harness_authoring_model: str | None = None
+
     # Phase 102 (WR-04 / T-102-09-03 / QUAL-01) — the publish-level wall budget. The
     # synchronous publish endpoint drives a FULL golden run on the request thread; without
     # a deadline a wedged run holds the request indefinitely (a DoS / hours-long hold). The
