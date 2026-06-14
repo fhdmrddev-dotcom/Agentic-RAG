@@ -8,6 +8,13 @@
  * field CONDITIONING is unchanged (same fields per type); only the surface wording
  * + a few renderers (tool chips, folder/skill NAMES) changed.
  *
+ * Phase 103-ux helper line: every field ALSO renders a muted, always-visible
+ * one-line plain-English helper sentence directly under its label (the optional
+ * `help` prop on the shared field components → FieldLabel renders it). The hover-only
+ * ⓘ (which maps to the exact technical term like `prompt`/`folder_scope`) stays for
+ * power users, but the plain helper needs NO hover/click — a non-technical user knows
+ * what each parameter means at a glance.
+ *
  * The fixed-width 400px right-side form panel that REFINES one phase of a draft
  * by FORM. It is the SECOND column of the Builder's push grid (the parent owns
  * the `gridTemplateColumns` reflow) — it PUSHES the read-only spine graph, it
@@ -95,24 +102,39 @@ function InfoHint({ text }: { text: string }) {
   )
 }
 
-/** A friendly field label: plain text + optional grey "(qualifier)" + optional ⓘ. */
+/** A friendly field label: plain text + optional grey "(qualifier)" + optional ⓘ,
+ *  PLUS an ALWAYS-VISIBLE one-line plain-English helper sentence underneath (`help`).
+ *  The ⓘ stays for the precise technical term; the `help` line needs no hover/click —
+ *  it is the self-explanatory guidance a non-technical user reads at a glance. */
 function FieldLabel({
   htmlFor,
   text,
   qualifier,
   hint,
+  help,
 }: {
   htmlFor?: string
   text: string
   qualifier?: string
   hint?: string
+  help?: string
 }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1 flex items-center text-[11px] font-medium text-foreground">
-      <span>{text}</span>
-      {qualifier && <span className="ml-1 font-normal text-muted-foreground">{qualifier}</span>}
-      {hint && <InfoHint text={hint} />}
-    </label>
+    <>
+      <label
+        htmlFor={htmlFor}
+        className={`flex items-center text-[11px] font-medium text-foreground ${help ? "" : "mb-1"}`}
+      >
+        <span>{text}</span>
+        {qualifier && <span className="ml-1 font-normal text-muted-foreground">{qualifier}</span>}
+        {hint && <InfoHint text={hint} />}
+      </label>
+      {help && (
+        <p data-testid="field-help" className="mb-1 mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          {help}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -121,6 +143,7 @@ function TextField(props: {
   label: string
   qualifier?: string
   hint?: string
+  help?: string
   value: string
   onChange: (v: string) => void
   onPersist: () => void
@@ -133,7 +156,7 @@ function TextField(props: {
     "w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground focus:border-primary focus:outline-none"
   return (
     <div className={props.full ? "col-span-2" : ""}>
-      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} />
+      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} help={props.help} />
       {props.textarea ? (
         <textarea
           id={id}
@@ -162,6 +185,7 @@ function SelectField(props: {
   label: string
   qualifier?: string
   hint?: string
+  help?: string
   value: string
   options: readonly string[]
   onChange: (v: string) => void
@@ -173,7 +197,7 @@ function SelectField(props: {
   const id = useId()
   return (
     <div className={props.full ? "col-span-2" : ""}>
-      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} />
+      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} help={props.help} />
       <select
         id={id}
         value={props.value}
@@ -201,11 +225,18 @@ function SelectField(props: {
 /** A labeled READ-ONLY input (disabled) — a bound value the user can read but not
  *  edit (e.g. the emitter registry key). Carries a real <label htmlFor> so it is
  *  reachable by accessible name. */
-function ReadOnlyField(props: { label: string; qualifier?: string; hint?: string; value: string; full?: boolean }) {
+function ReadOnlyField(props: {
+  label: string
+  qualifier?: string
+  hint?: string
+  help?: string
+  value: string
+  full?: boolean
+}) {
   const id = useId()
   return (
     <div className={props.full ? "col-span-2" : ""}>
-      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} />
+      <FieldLabel htmlFor={id} text={props.label} qualifier={props.qualifier} hint={props.hint} help={props.help} />
       <input
         id={id}
         value={props.value}
@@ -222,13 +253,14 @@ function StaticField(props: {
   label: string
   qualifier?: string
   hint?: string
+  help?: string
   children: React.ReactNode
   testId?: string
   full?: boolean
 }) {
   return (
     <div className={props.full ? "col-span-2" : ""}>
-      <FieldLabel text={props.label} qualifier={props.qualifier} hint={props.hint} />
+      <FieldLabel text={props.label} qualifier={props.qualifier} hint={props.hint} help={props.help} />
       <div
         data-testid={props.testId}
         className="break-words rounded border border-border bg-muted px-2 py-1.5 text-[11px] text-foreground"
@@ -255,6 +287,7 @@ function FolderScopeField({
     <StaticField
       label="Folders it can read"
       hint="folder_scope — the knowledge-base folders this step is allowed to search."
+      help="The knowledge-base folders this step may search."
       testId="folder-scope-display"
       full
     >
@@ -302,6 +335,7 @@ function ToolsField({
         htmlFor={id}
         text="What this step can do"
         hint="available_tools — the tools the AI may use in this step (e.g. search_documents, execute_code)."
+        help="The tools the AI may use here."
       />
       {tools.length > 0 && (
         <div data-testid="tools-chips" className="mb-1.5 flex flex-wrap gap-1.5">
@@ -416,6 +450,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Function"
                 hint="fn — a key into the server-side function registry. This step runs deterministic code, not an AI."
+                help="The registered function this step runs."
                 value={asStr(cfg.fn)}
                 onChange={set("fn")}
                 onPersist={onPersist}
@@ -424,6 +459,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Inputs"
                 hint="input_keys — the named values this function reads (comma-separated)."
+                help="Which earlier outputs feed this function."
                 qualifier="(comma-separated)"
                 value={asList(cfg.input_keys).join(", ")}
                 onChange={(v) => onChange({ input_keys: v.split(",").map((s) => s.trim()).filter(Boolean) })}
@@ -439,6 +475,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Instructions"
                 hint="prompt — what you're telling the AI to do in this step."
+                help="What you want the AI to do in this step."
                 value={asStr(cfg.prompt)}
                 onChange={set("prompt")}
                 onPersist={onPersist}
@@ -449,6 +486,7 @@ export function PhaseFormPanel({
                 label="AI model"
                 qualifier="(optional — uses the default if blank)"
                 hint="model — pick a specific model, or leave blank to use the workspace default."
+                help="Leave blank to use the workspace default."
                 value={asStr(cfg.model)}
                 onChange={set("model")}
                 onPersist={onPersist}
@@ -456,6 +494,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Creativity"
                 hint="temperature — 0 is focused and repeatable, higher is more varied."
+                help="Higher = more varied wording; lower = more focused."
                 value={asStr(cfg.temperature)}
                 onChange={set("temperature")}
                 onPersist={onPersist}
@@ -472,6 +511,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Instructions"
                 hint="prompt — what you're telling the AI to do in this step."
+                help="What you want the AI to do in this step."
                 value={asStr(cfg.prompt)}
                 onChange={set("prompt")}
                 onPersist={onPersist}
@@ -482,6 +522,7 @@ export function PhaseFormPanel({
                 label="AI model"
                 qualifier="(optional — uses the default if blank)"
                 hint="model — pick a specific model, or leave blank to use the workspace default."
+                help="Leave blank to use the workspace default."
                 value={asStr(cfg.model)}
                 onChange={set("model")}
                 onPersist={onPersist}
@@ -489,6 +530,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions the AI may take before it must stop."
+                help="How many actions the AI may take before it stops."
                 value={asStr(cfg.max_steps, "12")}
                 onChange={set("max_steps")}
                 onPersist={onPersist}
@@ -503,6 +545,7 @@ export function PhaseFormPanel({
                 label="Time limit"
                 qualifier="(seconds, optional)"
                 hint="wall_clock_seconds — stop this step after this many seconds, even if it isn't finished."
+                help="Stop this step after this many seconds (optional)."
                 value={asStr(cfg.wall_clock_seconds)}
                 onChange={set("wall_clock_seconds")}
                 onPersist={onPersist}
@@ -519,6 +562,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Instructions"
                 hint="prompt — what you're telling the AI to do for each item it works on."
+                help="What you want the AI to do in this step."
                 value={asStr(cfg.prompt)}
                 onChange={set("prompt")}
                 onPersist={onPersist}
@@ -529,6 +573,7 @@ export function PhaseFormPanel({
                 label="AI model"
                 qualifier="(optional — uses the default if blank)"
                 hint="model — pick a specific model, or leave blank to use the workspace default."
+                help="Leave blank to use the workspace default."
                 value={asStr(cfg.model)}
                 onChange={set("model")}
                 onPersist={onPersist}
@@ -536,6 +581,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions each worker may take before it must stop."
+                help="How many actions the AI may take before it stops."
                 value={asStr(cfg.max_steps, "12")}
                 onChange={set("max_steps")}
                 onPersist={onPersist}
@@ -549,6 +595,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Parallel workers"
                 hint="max_parallel_agents — how many copies run at once (one per item, up to this many)."
+                help="How many copies run at once."
                 value={asStr(cfg.max_parallel_agents, "5")}
                 onChange={set("max_parallel_agents")}
                 onPersist={onPersist}
@@ -557,6 +604,7 @@ export function PhaseFormPanel({
               <SelectField
                 label="How to combine results"
                 hint="merge_strategy — how each worker's output is stitched into one result."
+                help="How the parallel results are merged."
                 value={asStr(cfg.merge_strategy, "concat")}
                 options={MERGE_STRATEGIES}
                 onChange={set("merge_strategy")}
@@ -572,6 +620,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Instructions"
                 hint="prompt — what the person is asked to review or decide at this pause."
+                help="What the person is asked to review or decide here."
                 value={asStr(cfg.prompt)}
                 onChange={set("prompt")}
                 onPersist={onPersist}
@@ -582,6 +631,7 @@ export function PhaseFormPanel({
                 label="Choices to offer the person"
                 qualifier="(comma-separated)"
                 hint="options — the buttons the person picks from (comma-separated)."
+                help="The options the person picks from when this pauses."
                 value={asList(cfg.options).join(", ")}
                 onChange={(v) => onChange({ options: v.split(",").map((s) => s.trim()).filter(Boolean) })}
                 onPersist={onPersist}
@@ -591,6 +641,7 @@ export function PhaseFormPanel({
                 label="Wait timeout"
                 qualifier="(seconds)"
                 hint="timeout_seconds — how long to wait for the person before the step times out."
+                help="How long to wait for the person before giving up."
                 value={asStr(cfg.timeout_seconds, "300")}
                 onChange={set("timeout_seconds")}
                 onPersist={onPersist}
@@ -605,6 +656,7 @@ export function PhaseFormPanel({
               <TextField
                 label="Instructions"
                 hint="prompt — what the AI should produce for the deliverable."
+                help="What you want the AI to do in this step."
                 value={asStr(cfg.prompt)}
                 onChange={set("prompt")}
                 onPersist={onPersist}
@@ -614,6 +666,7 @@ export function PhaseFormPanel({
               <ReadOnlyField
                 label="Output type"
                 hint="emitter — how the deliverable is produced (e.g. fill a template). Read-only."
+                help="How the deliverable is produced (read-only)."
                 value={asStr(cfg.emitter, "render_template")}
                 full
               />
@@ -621,6 +674,7 @@ export function PhaseFormPanel({
                 label="AI model"
                 qualifier="(optional — uses the default if blank)"
                 hint="model — pick a specific model, or leave blank to use the workspace default."
+                help="Leave blank to use the workspace default."
                 value={asStr(cfg.model)}
                 onChange={set("model")}
                 onPersist={onPersist}
@@ -630,6 +684,7 @@ export function PhaseFormPanel({
               <SelectField
                 label="Sourcing strictness"
                 hint="citation_policy — how strictly claims in the deliverable must be backed by sources."
+                help="How strictly the deliverable must cite its sources."
                 value={asStr(cfg.citation_policy, "strict")}
                 options={CITATION_POLICIES}
                 onChange={set("citation_policy")}
@@ -642,6 +697,7 @@ export function PhaseFormPanel({
                 label="File check"
                 qualifier="(coming in Phase 106)"
                 hint="integrity_policy — re-opens the produced file to confirm it's complete. Not wired yet."
+                help="Re-opens the produced file to confirm it's complete (coming in Phase 106)."
                 value={asStr(cfg.integrity_policy, "strict")}
                 options={INTEGRITY_POLICIES}
                 onChange={() => {}}
@@ -677,6 +733,7 @@ function SkillField({
         text="Skill"
         qualifier="(optional)"
         hint="skill_ref — a saved skill this step loads. Leave blank for none."
+        help="A saved skill to load for this step (optional)."
       />
       {name && (
         <div className="mb-1.5 flex items-center gap-1 text-[11px] text-foreground" data-testid="skill-name">
