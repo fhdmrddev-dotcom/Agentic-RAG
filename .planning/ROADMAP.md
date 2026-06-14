@@ -225,7 +225,11 @@ Plans:
   1. A PM flagship content pack ships — example templates (project charter / weekly status report / risk register) + workflow definitions + register schemas — authored entirely on the generic primitives (no PM-specific engine code).
   2. The headline demo runs end-to-end: a single template-fill produces a weekly status report from the project KB, cited and integrity-checked.
   3. A domain author can re-author or extend a pack workflow through the Workflows page without code changes.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 104-01-PLAN.md — Content artifacts: 2 docxtpl templates (status scalars + risk 9-col with inline P×I score) + 5-doc synthetic corpus + template-shape test [Wave 1]
+- [ ] 104-02-PLAN.md — Seed/provisioning script: corpus ingest + template upload + 2-phase published def JSONB (DELETE-then-INSERT, is_global=false) + seed-smoke/RLS/immutability test [Wave 2]
+- [ ] 104-03-PLAN.md — Live proof orchestration: cross-provider kickoff harness + finalized SC#10 scoreboard (VALIDATION.md) + HUMAN-UAT runbook + the human-verify SC#2/SC#1/SC#3/SC#10 checkpoint [Wave 3]
 **VALIDATION (SC#10)**: the flagship runs cross-provider — the 4-axis scoreboard is the acceptance bar for the demo.
 
 ### Phase 105: Scheduled/Recurring Triggers + Budget Caps (STRETCH)
