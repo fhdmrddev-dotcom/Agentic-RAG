@@ -183,7 +183,12 @@ async def list_published_workflows(
     compatible).
     """
     sql = (
-        "SELECT id, slug, name FROM workflow_definitions "
+        # Phase 103-06 (REQ-7 D9/D10): the Workflows page card derives the
+        # client-side strictness tier (deriveTier) + the phase-type chain from the
+        # REAL definition JSONB, so the list additionally returns ``definition``.
+        # This is purely ADDITIVE — the pre-103 id/slug/name picker callers ignore
+        # the extra column (asyncpg's pool codec decodes the JSONB to a dict).
+        "SELECT id, slug, name, definition FROM workflow_definitions "
         "WHERE status = 'published' AND (is_global = true OR created_by = $1)"
     )
     params: list = [user_id]
@@ -301,7 +306,10 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
     ``$N`` placeholders only. Returns the id/slug/version/name the shelf needs.
     """
     rows = await pool.fetch(
-        "SELECT id, slug, version, name FROM workflow_definitions "
+        # Phase 103-06 (REQ-7 D9/D10): also return ``definition`` so the drafts
+        # shelf card can derive the tier badge + phase chain client-side (additive;
+        # the pre-103 id/slug/version/name shelf callers ignore the extra column).
+        "SELECT id, slug, version, name, definition FROM workflow_definitions "
         "WHERE status = 'draft' AND created_by = $1 "
         "ORDER BY name",
         user_id,

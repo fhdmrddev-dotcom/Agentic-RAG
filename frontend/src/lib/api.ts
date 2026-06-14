@@ -1112,11 +1112,17 @@ export interface WorkflowPhaseState {
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py
- *  PublishedWorkflow). The minimum the Harness picker needs to list + kick off. */
+ *  PublishedWorkflow). The minimum the Harness picker needs to list + kick off.
+ *
+ *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
+ *  JSONB the Workflows page card uses to derive the client-side strictness tier
+ *  (deriveTier) + the phase-type chain. Optional — the composer Harness picker only
+ *  reads id/slug/name and ignores it (backward compatible). */
 export interface PublishedWorkflow {
   id: string
   slug: string
   name: string
+  definition?: WorkflowDefinitionJSON | null
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
@@ -1138,10 +1144,18 @@ export async function getThreadWorkflow(
  *  on the backend via the RLS-mirroring predicate — the frontend cannot widen
  *  the scope, T-092-17). */
 export async function listPublishedWorkflows(
+  /** Phase 103-06 (REQ-7): the project-folder filter rail. When a folder id is
+   *  given, the backend AND-appends `definition->>'project_folder_id'` to the
+   *  owner-scope clause — it can only NARROW, never widen (T-098-09). Omitting it
+   *  (or passing null) returns the full owner-scoped published list unchanged. */
+  projectFolderId?: string | null,
   signal?: AbortSignal,
 ): Promise<PublishedWorkflow[]> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/workflows/published`, { headers, signal })
+  const url = projectFolderId
+    ? `${API_BASE}/workflows/published?project_folder_id=${encodeURIComponent(projectFolderId)}`
+    : `${API_BASE}/workflows/published`
+  const res = await fetch(url, { headers, signal })
   if (!res.ok) throw new Error(`Failed to list published workflows (status ${res.status})`)
   return (await res.json()) as PublishedWorkflow[]
 }
@@ -1990,12 +2004,17 @@ export interface LintError {
   message: string
 }
 
-/** A draft row from GET /workflows/drafts (owner-scoped on the backend). */
+/** A draft row from GET /workflows/drafts (owner-scoped on the backend).
+ *
+ *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
+ *  JSONB the drafts-shelf card uses to derive the tier badge + phase chain
+ *  client-side. Optional — pre-103 shelf callers ignore it. */
 export interface WorkflowDraftRow {
   id: string
   slug: string
   version: number
   name: string | null
+  definition?: WorkflowDefinitionJSON | null
 }
 
 /** The structured result of POST /workflows/generate. The route returns HTTP 200

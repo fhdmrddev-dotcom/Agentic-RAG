@@ -40,14 +40,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 
+def _coerce_definition(raw: object) -> dict | None:
+    """Decode the ``definition`` JSONB column to a dict for the wire.
+
+    asyncpg returns the JSONB column as a raw JSON string when no pool codec is
+    registered (db/workflows.py:278) — mirror publish_service's defensive decode
+    (:103-109): a string is ``json.loads``-ed, a dict passes through, anything
+    unparseable degrades to ``None`` (the client tolerates a missing definition).
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            import json
+
+            decoded = json.loads(raw)
+            return decoded if isinstance(decoded, dict) else None
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 class PublishedWorkflow(BaseModel):
     """A picker row — the minimum the Deep/Harness toggle needs to list and start
     a workflow (id to kick off via MessageCreate.workflow_definition_id; name +
-    slug for display)."""
+    slug for display).
+
+    Phase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE — the Workflows page
+    card derives its client-side strictness tier + phase chain from the real
+    definition JSONB. It is optional so the pre-103 picker callers (the composer
+    Harness dropdown) keep validating against the id/slug/name shape unchanged."""
 
     id: UUID
     slug: str
     name: str
+    definition: dict | None = None
 
 
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
@@ -59,12 +88,17 @@ class DraftCreateResponse(BaseModel):
 
 
 class DraftRow(BaseModel):
-    """A drafts-shelf row (the caller's own drafts — D-103-4)."""
+    """A drafts-shelf row (the caller's own drafts — D-103-4).
+
+    Phase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE so the drafts-shelf
+    card can derive the tier badge + phase chain client-side; optional to keep the
+    pre-103 id/slug/version/name shelf shape valid."""
 
     id: UUID
     slug: str
     version: int
     name: str | None = None
+    definition: dict | None = None
 
 
 @router.get("/published", response_model=list[PublishedWorkflow])
@@ -94,7 +128,15 @@ async def get_published_workflows(
         user_id=UUID(user_id) if isinstance(user_id, str) else user_id,
         project_folder_id=project_folder_id,
     )
-    return [PublishedWorkflow(**r) for r in rows]
+    return [
+        PublishedWorkflow(
+            id=r["id"],
+            slug=r["slug"],
+            name=r["name"],
+            definition=_coerce_definition(r.get("definition")),
+        )
+        for r in rows
+    ]
 
 
 # ── Phase 102 (QUAL-01 / D-07) — the server-side publish path ─────────────────
@@ -213,7 +255,16 @@ async def list_drafts(
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
     rows = await list_draft_workflows(pool, user_id=user_id)
-    return [DraftRow(**r) for r in rows]
+    return [
+        DraftRow(
+            id=r["id"],
+            slug=r["slug"],
+            version=r["version"],
+            name=r.get("name"),
+            definition=_coerce_definition(r.get("definition")),
+        )
+        for r in rows
+    ]
 
 
 @router.patch("/{definition_id}", response_model=DraftCreateResponse)
