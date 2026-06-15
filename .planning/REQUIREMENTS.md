@@ -74,9 +74,9 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DMF-01 | Phase 110 — DM Foundations | Pending |
-| DMF-02 | Phase 110 — DM Foundations | Pending |
-| DMF-03 | Phase 110 — DM Foundations | Pending |
+| DMF-01 | Phase 110 — DM Foundations | Validated |
+| DMF-02 | Phase 110 — DM Foundations | Validated |
+| DMF-03 | Phase 110 — DM Foundations | Validated |
 | META-01 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
 | META-03 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
 | META-04 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |

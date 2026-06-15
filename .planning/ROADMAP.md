@@ -31,7 +31,7 @@
 
 ### Phases
 
-- [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ EXECUTED 2026-06-15 (2/2 plans; live-verified — ready for `/gsd:verify-work 110`)
+- [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ COMPLETE 2026-06-15 (2/2 plans; live-verified on :54322; gsd-verifier 7/7 PASSED; code review 0C/0W/3I — secure-phase pending)
 - [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
 - [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
 - [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
