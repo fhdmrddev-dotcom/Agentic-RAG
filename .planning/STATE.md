@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: executing
+status: ready_to_plan
 last_updated: "2026-06-15T01:00:00.000Z"
 last_activity: 2026-06-15 -- Phase 104 Plans 01+02 executed (PM pack templates+corpus, seed/provisioning script + manifest + integration tests green); Plan 03 = human-verify UAT gate pending
 progress:
   total_phases: 14
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 58
   completed_plans: 57
-  percent: 98
+  percent: 64
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 104 (pm-flagship-content-pack) — 3/3 plans EXECUTED + live UAT PASSED (2026-06-15); awaiting formal close-out gates
-Plan: 3 of 3 complete. Plan 03 human-verify gate PASSED live — ALL 5 proofs GREEN (Claude-driven).
-Status: 104-01/02/03 COMPLETE + the live human-verify UAT PASSED (all 5 success criteria proven; 104-HUMAN-UAT.md status=passed):
+Phase: 105
+Plan: Not started
+Status: Ready to plan
   • **SC#2** seeded Weekly Status Report → cited, integrity-checked `.docx` (run `66e49c53`, gpt-4o; `scripts/pm-pack/out/SC2-weekly-status-report.docx` opens clean, grounded). **SC#1/#3** Charter NL-authoring → TEXT deliverable (no template). **SC#3+QUAL-01** Tweak→v3 + live publish gauntlet — judge BLOCKS a weak golden run AND PASSES the clean one → v3 published, v1 frozen. **SC#10** 4-axis: 7-model sweep (4 FORCE clean `.docx`: gpt-4o/claude-opus-4-8/MiniMax-M2.7/glm-4.6 + honesty on all 7; deepseek/gemini honest-fail forcing; kimi honest-fail) · multi-tool · parallel-thread (2 concurrent clean) · long-message (`--long` complete, no truncation).
   • **2 BLOCKING engine bugs found + FIXED at the gate (commit `6a607169`)** — the double-gate over-rejection (Phase 104 is the FIRST def to attach the 102 `citations_required` + `output_file_valid` validators to an `llm_emit` phase; the emit success output didn't expose `retrieved_ids`/the integrity verdict to the post-phase validators → both over-rejected a correct already-rendered `.docx`). Additive; strict/internal paths byte-identical; +112 emit/validator/render tests + a regression test. **GUARDRAIL OVERRIDE (operator-approved): engine code in a content-only phase.** Also: corpus naming `w1/w2`→`week8/week9` (commit `6e2f383e`); harness stale IDs + `workspace_files` column fix (committed). Findings: `BUG-260615-01` (seed idempotency/FK-refresh + DeepSeek/Gemini forcing reliability + model-list curation).
 NEXT (formal close-out): code review of the engine fixes (`phase_types.py`/`validator_kinds.py`) → mark phase complete (ROADMAP line-52 + `phase.complete`) → **`/gsd:secure-phase 104`** (security_enforcement on; no 104-SECURITY.md yet). [STATE.md re-balloon during 104-01/02 exec — restored from clean base `7807b730` + small targeted edits since.]

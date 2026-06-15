@@ -49,7 +49,7 @@
 - [x] **Phase 101.1: Guaranteed Structured Emission Layer (Template-Fill Gap-Closure)** ✓ COMPLETE (2026-06-12) — verify-work 19/19 LIVE + secure-phase 36/36 threats closed (threats_open: 0). Shared forced-emission primitive (`llm_emit` + emitter registry + capability-tiered gateway forcing + native-path recovery + audit receipt) so ANY deliverable phase works cross-provider with the no-model-code/cited/reproducible guarantee; template-fill is its first instance, closing the GAP-A..D live 0-docx failure
 - [x] **Phase 102: Reusable Validation-Gate Library + Output-Quality Gate** ✓ COMPLETE (2026-06-13) - A library of validator kinds for any phase + a HARD publish-blocking output-quality judge gate (verify-work 7/7 LIVE + secure-phase 34/34 threats closed, threats_open: 0)
 - [x] **Phase 103: Workflows Page + Authoring API + NL Authoring** ✅ 2026-06-14 (live-UAT-hardened: full describe→draft→refine→publish→run journey verified in a live Chrome session; 9 real bugs found+fixed; open/tweak-loads-existing + Save + plain-language Builder added; secure-phase pending before milestone close) - Describe → draft → refine in a form → read-only graph → publish → run from a thread (no drag canvas)
-- [ ] **Phase 104: PM Flagship Content Pack** - PM templates + workflow defs + register schemas authored on the generic primitives; headline single template-fill demo
+- [x] **Phase 104: PM Flagship Content Pack** ✅ 2026-06-15 (3/3 plans; live UAT PASSED — all 5 proofs green: SC#2 cited .docx, SC#1/#3 Charter NL-authoring, SC#3+QUAL-01 Tweak→publish gauntlet, SC#10 4-axis cross-provider; 2 blocking double-gate engine bugs found+fixed at the gate, commit 6a607169; secure-phase pending before milestone close) - PM templates + workflow defs + register schemas authored on the generic primitives; headline single template-fill demo
 
 **STRETCH (optional — 105–109; ship only if CORE lands clean and budget remains):**
 
@@ -229,7 +229,7 @@ Plans:
 Plans:
 - [x] 104-01-PLAN.md — Content artifacts: 2 docxtpl templates (status scalars + risk 9-col with inline P×I score) + 5-doc synthetic corpus + template-shape test [Wave 1] ✅ 2026-06-14 (PM-01 — content/data only, ZERO engine code; weekly-status-report.docx exposes all 8 EmitFieldMap scalar keys; risk-register.docx grows rows via {%tr%} with 8 cited cols + an INLINE Jinja P×I Score (not {{ r.score }} — prod build_context has no numeric_hook); 5-doc Project Meridian markdown corpus (7 worded-P/I risks); 4-test oracle GREEN (Score renders 6 for High×Medium / 0 for unmapped, fixture mirrors build_context dict shape); no backend/app/** touched, no migration; commits 2fd1fff3/b5844629/f04f53de)
 - [x] 104-02-PLAN.md — Seed/provisioning script: corpus ingest + template upload + 2-phase published def JSONB (DELETE-then-INSERT, is_global=false) + seed-smoke/RLS/immutability test [Wave 2] ✅ 2026-06-15 (PM-01 — scripts/seed-pm-pack.py: the only substantive net-new code; per-account demo folder → corpus rows (sha256-dedup; embeddings gated behind SEED_PM_RUN_INGEST) → 2 templates to Storage {uid}/_library/<slug>.docx → 2 published 2-phase llm_agent(search_documents)→llm_emit(render_template) defs with assets[kind=template] + strict citations_required+output_file_valid(config:{}) gates + business_requirement + project_folder_id, render_template ABSENT from available_tools (emit resolves bound asset server-side); fail-closed assert_demo_uid RLS-owner pre-flight; emits pm_pack_ids.json; 4-test integration oracle GREEN against :54322 (no embeddings); 2 auto-fixed bugs (dedup matches documents_dedup_idx predicate so SEED_PM_RUN_INGEST=0 re-runs idempotently; test loads backend/.env override=True); no backend/app/** touched, no migration/route; commits 086755f0/5f3fe33e/b165482b)
-- [ ] 104-03-PLAN.md — Live proof orchestration: cross-provider kickoff harness + finalized SC#10 scoreboard (VALIDATION.md) + HUMAN-UAT runbook + the human-verify SC#2/SC#1/SC#3/SC#10 checkpoint [Wave 3]
+- [x] 104-03-PLAN.md — Live proof orchestration: cross-provider kickoff harness + finalized SC#10 scoreboard (VALIDATION.md) + HUMAN-UAT runbook + the human-verify SC#2/SC#1/SC#3/SC#10 checkpoint [Wave 3]
 **VALIDATION (SC#10)**: the flagship runs cross-provider — the 4-axis scoreboard is the acceptance bar for the demo.
 
 ### Phase 105: Scheduled/Recurring Triggers + Budget Caps (STRETCH)
@@ -300,7 +300,7 @@ Plans:
 | 101.1. Guaranteed Structured Emission Layer | 6/10 (build 01-05 + gap 06 done; gap-closure 07-10 planned from the live UAT) | Executing (gap closure) | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 4/5 | Executing (2026-06-12) | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 6/6 | Complete    | 2026-06-14 |
-| 104. PM Flagship Content Pack | 0/TBD | Not started | - |
+| 104. PM Flagship Content Pack | 3/3 | Complete    | 2026-06-15 |
 | 105. Scheduled/Recurring Triggers + Budget Caps (STRETCH) | 0/TBD | Not started | - |
 | 106. Citation-Traceable Grid Renderer (STRETCH) | 0/TBD | Not started | - |
 | 107. Per-Run Provenance Receipt View (STRETCH) | 0/TBD | Not started | - |

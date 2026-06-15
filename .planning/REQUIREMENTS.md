@@ -44,7 +44,7 @@
 - [x] **GOV-01**: Retrieval scope (`scope_folder_ids`) is resolved **server-side from the user's RLS context** at run start and bound to every retrieval call as a parameter the model cannot widen; retrieved `folder_id`s are asserted ⊆ scope (RLS as backstop). Read-untrusted-content and act/export stay separable across phases via the per-phase tool whitelist.
 
 ### PM — Flagship content pack
-- [ ] **PM-01**: A PM flagship content pack ships — example templates (project charter / weekly status report / risk register) + workflow definitions + register schemas — authored **entirely on the generic primitives** (domain-author-driven, NOT PM-hardcoded). Headline demo: a single template-fill (status report from the project KB).
+- [x] **PM-01**: A PM flagship content pack ships — example templates (project charter / weekly status report / risk register) + workflow definitions + register schemas — authored **entirely on the generic primitives** (domain-author-driven, NOT PM-hardcoded). Headline demo: a single template-fill (status report from the project KB).
 
 ---
 
@@ -121,7 +121,7 @@
 | WFAUTH-02 | Phase 103 | Pending |
 | WFAUTH-03 | Phase 103 | Pending |
 | WFAUTH-04 | Phase 103 | Complete |
-| PM-01 | Phase 104 | Pending |
+| PM-01 | Phase 104 | Complete |
 | SCHED-01 (STRETCH) | Phase 105 | Pending |
 | GRID-01 (STRETCH) | Phase 106 | Pending |
 | GOV-02 (STRETCH) | Phase 107 | Pending |
