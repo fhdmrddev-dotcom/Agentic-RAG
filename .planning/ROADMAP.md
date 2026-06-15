@@ -31,7 +31,7 @@
 
 ### Phases
 
-- [ ] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam).
+- [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ EXECUTED 2026-06-15 (2/2 plans; live-verified — ready for `/gsd:verify-work 110`)
 - [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
 - [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
 - [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
@@ -56,7 +56,7 @@
   5. A single DM capability flag (`app_settings`, default **on**) gates the new DM surfaces + tools so the whole capability can be cleanly toggled off; defaults on so v3.0 behavior is unchanged when unset. This is the feature-independence seam a future tier/entitlement system (SEED-080, v3.2) plugs into — no enforcement built here.
 **Plans**: 2 plans
   - [x] 110-01-PLAN.md — Author migration 071 (4 RLS tables + audit enum 11->19 + DM capability flag) + frozenset/boot-guard sync + flag read chain + 6 Wave-0 tests ✅ EXECUTED 2026-06-15 (4 commits; migration un-applied — Plan 02 applies + verifies live; DMF-01/02/03 stay Pending until phase verification)
-  - [ ] 110-02-PLAN.md — [BLOCKING] operator applies migration 071 + regen full-schema.sql + 4 live verification tests GREEN (SC#1-5)
+  - [x] 110-02-PLAN.md — Apply migration 071 to :54322 (operator-authorized CLI, no wipe) + regen full-schema.sql + fix document_relationships RLS (user-scoped, no is_global) + 27 live verification tests GREEN (SC#1-5) ✅ EXECUTED 2026-06-15 (commit `25844c67`; full-suite net-new=0)
 
 #### Phase 111: Metadata Enrichment — Extraction Backend
 **Goal**: Replace the thin fixed-schema/hardwired-`gpt-4o`/3k-char extraction with a configurable, model-flexible, confidence-scored enrichment pipeline — the spine the M-Files "metadata not folders" story rests on and the hard prerequisite for classification.
@@ -168,7 +168,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 110. DM Foundations | 0/? | Not started | - |
+| 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 0/? | Not started | - |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |

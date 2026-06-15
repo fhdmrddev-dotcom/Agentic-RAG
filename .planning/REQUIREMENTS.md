@@ -9,9 +9,12 @@
 ## v3.0 Requirements
 
 ### Foundations (DMF) — shared substrate, landed once
-- [ ] **DMF-01**: New document-management actions (view created, relationship added/removed, classification applied, metadata edited) are recorded in the immutable audit log. *(closes the closed-CHECK-enum silent-reject trap; verify live, not with mocks)*
-- [ ] **DMF-02**: All DM data (views, relationships, classification rules, custom-field definitions) is owner-private or intentionally global-shared with no cross-user leakage, and every new table carries a nullable `org_id` so the future multi-tenancy rewrite (v3.3) re-keys cleanly.
-- [ ] **DMF-03**: The v3.0 DM capability is gated behind a single feature flag (`app_settings`, default **on**) that cleanly enables/disables the new DM surfaces (views, relationships, classification, governance) + tools, and the metadata-enrichment change is backward-compatible / reversible. The flag is the seam a future entitlement/tier system plugs into (SEED-080, enforced at v3.2 Operator UX) — no entitlement *enforcement* is built in v3.0.
+- [x] **DMF-01
+**: New document-management actions (view created, relationship added/removed, classification applied, metadata edited) are recorded in the immutable audit log. *(closes the closed-CHECK-enum silent-reject trap; verify live, not with mocks)*
+- [x] **DMF-02
+**: All DM data (views, relationships, classification rules, custom-field definitions) is owner-private or intentionally global-shared with no cross-user leakage, and every new table carries a nullable `org_id` so the future multi-tenancy rewrite (v3.3) re-keys cleanly.
+- [x] **DMF-03
+**: The v3.0 DM capability is gated behind a single feature flag (`app_settings`, default **on**) that cleanly enables/disables the new DM surfaces (views, relationships, classification, governance) + tools, and the metadata-enrichment change is backward-compatible / reversible. The flag is the seam a future entitlement/tier system plugs into (SEED-080, enforced at v3.2 Operator UX) — no entitlement *enforcement* is built in v3.0.
 
 ### Metadata Enrichment (META) — built first; unblocks classification
 - [ ] **META-01**: User can define custom metadata fields (beyond the built-in title/author/date/type/topics/language/summary) that the system extracts on ingest.
