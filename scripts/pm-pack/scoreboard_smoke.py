@@ -68,12 +68,12 @@ import conc_probe as kit  # noqa: E402 — localhost-gated five-piece kit
 
 SCOREBOARD_MODELS: list[tuple[str, str, str]] = [
     # TIER-FORCE + strict
-    ("openai",   "gpt-5.4",          "FORCE+strict"),
+    ("openai",   "gpt-4o",           "FORCE+strict"),   # 104-03: served OpenAI forcing model (gpt-5.4 not in registry)
     ("deepseek", "deepseek-v4-pro",  "FORCE+strict"),
     # TIER-FORCE (no strict)
     ("anthropic", "claude-opus-4-8", "FORCE"),         # thinking off
     ("google",    "gemini-2.5-pro",  "FORCE"),
-    ("minimax",   "MiniMax-M3",      "FORCE"),          # PascalCase — case-miss watch
+    ("minimax",   "MiniMax-M2.7",    "FORCE"),          # PascalCase — case-miss watch (MiniMax-M3 not in registry; newest M2.x)
     ("zhipu",     "glm-4.6",         "FORCE"),
     # TIER-COERCE (unforceable)
     ("moonshot",  "kimi-k2.6",       "COERCE"),
@@ -94,7 +94,7 @@ _PROVIDER_KEY_ENV: dict[str, str] = {
 # (minimax-m3-invalid-tool-args-400); the exact PascalCase id mitigates the
 # case-drop path, but the forced-tool-args 400 is a separate live risk.
 _WATCH_NOTE: dict[str, str] = {
-    "MiniMax-M3": "watch: minimax-m3-invalid-tool-args-400 (forced tool args)",
+    "MiniMax-M2.7": "watch: minimax-m3-invalid-tool-args-400 (forced tool args)",
 }
 
 # The seeded Status def's free-text kickoff. Scope is BAKED INTO THE DEF
@@ -173,7 +173,10 @@ _SQL_GATE_EVENTS = (
     "WHERE run_id = %s GROUP BY event_type"
 )
 _SQL_PRODUCED_FILE = (
-    "SELECT file_path, file_name FROM workspace_files "
+    # 104-03: the real workspace_files columns are `path` + `mime_type` (there is no
+    # file_path/file_name) — the prior names raised UndefinedColumn and the harness
+    # reported produced_file=null even on success.
+    "SELECT path, mime_type FROM workspace_files "
     "WHERE thread_id = %s ORDER BY created_at DESC LIMIT 5"
 )
 
@@ -220,11 +223,12 @@ def capture_outcome(conn, thread_id: str, workflow_run_id: str,
     if isinstance(of, dict) and of.get("path"):
         produced_file = str(of["path"])
     if produced_file is None and files:
-        # Fall back to the most-recent .docx workspace_files row for the thread.
+        # Fall back to the most-recent .docx workspace_files row for the thread
+        # (104-03: the column is `path`, not file_path/file_name).
         for f in files:
-            name = (f.get("file_name") or "")
+            name = (f.get("path") or "")
             if name.lower().endswith((".docx", ".doc")):
-                produced_file = str(f.get("file_path") or name)
+                produced_file = str(name)
                 break
 
     truncated = bool(emit_out.get("is_truncated") or emit_out.get("truncated"))
