@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: completed
+status: planned
 last_updated: "2026-06-15T11:59:46.197Z"
-last_activity: 2026-06-15 — v3.0 roadmap created (re-sequence → research → requirements → roadmap)
+last_activity: 2026-06-15 — Phase 110 planned (2 plans, verification passed; ready to execute)
 progress:
   total_phases: 10
   completed_phases: 0
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 110 — DM Foundations (not started) — **v3.0 Document Management** (10 phases, 110-119)
-Plan: —
-Status: **Roadmap created — milestone set up.** v3.0 = SEED-005 Tier A as a first-class product surface (chosen over resuming Skill Studio → deferred v3.1). DONE: v3.x PRD re-sequence + `PRDs/SEQUENCE.md` (authoritative version map); 4-stream research (`research/v3.0-document-management/` — near-zero new deps, build order Foundations→Enrichment→Views→Relationships→Classification→Governance); `REQUIREMENTS.md` (24 functional reqs incl. **DMF-03 capability flag** for feature-independence + 2 UX); `ROADMAP.md` (10 phases 110-119, 24/24 mapped). **G-2 sketch-first** on UI phases 112 (document detail panel) / 114 (view builder) / 117 (relationship panel); **SC#10** cross-provider UAT on 111/115/116. Risk profile: ~90% additive; the only working-path change is metadata enrichment (111), kept backward-compatible + reversible behind the DMF-03 flag; Deep chat / agent loop / threads.py untouched (G-5). **NEXT = `/gsd:discuss-phase 110`** (DM Foundations is backend substrate — no sketch needed; sketch fires at 112). Recommend `/clear` before starting 110.
+Phase: 110 — DM Foundations (planned — 2 plans, ready to execute) — **v3.0 Document Management** (10 phases, 110-119)
+Plan: 110-01 (Wave 1, build) / 110-02 (Wave 2, apply+verify, `autonomous:false`)
+Status: **Phase 110 PLANNED — verification PASSED first iteration (0 revisions).** Pure backend substrate (no UI; G-2 doesn't fire — first sketch is 112). Artifacts: `110-RESEARCH.md` (HIGH conf, anchors re-read at HEAD; `27e643e7`), `110-VALIDATION.md` (Nyquist contract — SC#4 = live INSERT+SELECT of **all 8** audit types, not a subset), `110-PATTERNS.md`, `110-01/02-PLAN.md` (`e60ed5ea`). Plan 01 = migration `071_dm_foundations.sql` (4 RLS tables mirroring `skills` not `workflow_definitions`; audit CHECK 11→19; `document_management_enabled` flag default-on) + `VALID_ACTION_TYPES` frozenset sync + shared `assert_action_types_synced` helper + `main.py` boot guard (hard-`raise`) + flag read-chain w/ default-on-on-failure helper + 6 Wave-0 tests. Plan 02 = **[BLOCKING] operator pastes migration into Supabase SQL editor** (never `db push`/`db reset`) → `regenerate-full-schema.sh` (no `--reset`) → 4 live verification tests GREEN on `:54322` → commit migration+full-schema together. Open Qs resolved in-DDL: A3 `suggest_folder_id` ON DELETE **SET NULL**, A2 `mfd_reachable` CHECK. Security gate (ASVS L1): both plans carry `<threat_model>` — 0 unmitigated HIGH; silent-audit-drop bound to SC#3 drift guard + SC#4 live round-trip. Reqs DMF-01/02/03 = 3/3 covered. **NEXT = `/gsd:execute-phase 110`** — needs local Supabase up on `:54322` + operator available for the blocking migration-apply in 110-02. Recommend `/clear` first.
 Resume file: --resume-file
-Last activity: 2026-06-15 — v3.0 roadmap created (re-sequence → research → requirements → roadmap)
+Last activity: 2026-06-15 — Phase 110 planned (research + validation + patterns + 2 plans; checker passed)
 
 ---
 
