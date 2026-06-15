@@ -1,50 +1,60 @@
 ---
 phase: 087-panel-ui
-verified: 2026-05-29T00:00:00Z
-status: human_needed
+verified: 2026-05-29T12:00:00Z
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
-human_verification:
-  - test: "Panel open/rail/hidden state cycle + keyboard shortcut (⌘./Ctrl+.) at desktop widths (1024px, 1440px)"
-    expected: "Button click cycles open→rail→hidden→open; ⌘./Ctrl+. toggles open↔hidden; panel column animates with 300ms grid-template-columns transition; at 1024px chat stays ≥600px readable floor; amber pulse dot appears on toggle when ask_user pending + panel closed"
-    why_human: "Grid-state-machine animation, laptop-squeeze guard, and amber pulse dot require live browser rendering — can't verify via static grep or unit tests"
-  - test: "Mobile bottom-sheet behavior at <768px (simulate with DevTools 375px viewport)"
-    expected: "WorkspacePanel renders as Sheet (Radix Dialog bottom-sheet) instead of side column; sheet slides up from bottom; .sheet-grip handle dismisses; sheet never occludes the chat composer; touch targets ≥44px"
-    why_human: "Bottom-sheet DOM + touch target dimensions require Chrome DevTools viewport simulation"
-  - test: "ask_user answer → run resume cross-provider (exercise at minimum OpenAI + Anthropic + Google)"
-    expected: "Agent calls ask_user → panel shows amber card (newest-top) + run-card turns amber + composer locks; user types/selects answer + clicks Send Answer → optimistic green flip + 'Answered · agent resumed'; run continues and prints next output; panel card disappears reactively"
-    why_human: "Cross-worker Redis pub/sub resume + SSE ask_user_response clearing + composer-lock interplay require a running backend + real provider round-trip. 4-axis scoreboard (cross-provider × multi-tool × parallel-thread × long-message) is the CLAUDE.md MANDATORY UAT rule for phases touching ask_user/SSE"
-  - test: "ask_user reload gap — page reload mid-/post-question then verify SeamCard appears in chat"
-    expected: "After reload: panel shows current pending asks (or empty if answered); answered Q&A appears as a SeamCard (self-contained) in the chat transcript — NOT as a pointer, NOT as raw JSON"
-    why_human: "Persistence across page reload and the reloaded-vs-live mode routing in MessageItem require a real browser session"
-  - test: "Rapid thread-switch reconcile-abort (086 carry-forward UAT item, now live)"
-    expected: "Thread A streaming with workspace activity → switch to Thread B → panel reflects Thread B's state; Thread A's panel GET requests show as cancelled in Network tab (no cross-thread data bleed)"
-    why_human: "Network-timing race with AbortController; no unit proxy for cancel; DevTools Network panel required"
-  - test: "4-axis cross-provider scoreboard: write_todos + workspace_write + ask_user on at least OpenAI, Anthropic, Google, OpenRouter"
-    expected: "Panel updates identically across providers when each calls write_todos/workspace_write/ask_user — one UX, four adapters. Multi-tool row: single prompt writes both a file AND a todo. Parallel-thread row: Thread A streaming while Thread B accepts prompt — panel switches cleanly"
-    why_human: "CLAUDE.md MANDATORY 4-axis UAT rule for phases touching streaming/provider/UI-state. Cannot verify without running backend + real provider credentials"
+re_verification:
+  previous_status: human_needed
+  previous_score: 5/5
+  gaps_closed:
+    - "Panel state machine (⌘./Ctrl+.) + amber pulse dot — verified live via Chrome MCP (087-07 + 087-08)"
+    - "Mobile bottom-sheet <768px — verified live via Chrome MCP (087-07)"
+    - "ask_user answer → run resume cross-provider (OpenAI · Anthropic · Google · OpenRouter) — verified live via 087-08 Chrome MCP gate (006 contract PASS)"
+    - "ask_user reload gap — SeamCard self-contained on reload, no raw-JSON — verified live (007 contract PASS)"
+    - "Rapid thread-switch reconcile-abort (086 carry-fwd) — parallel-thread axis verified (OpenAI Thread-A while B viewed; OpenRouter carwash/Pack-Suit)"
+    - "4-axis cross-provider scoreboard (OpenAI · Anthropic · Google · OpenRouter × multi-tool × parallel-thread × long-message) — all PASS per 087-VALIDATION.md"
+    - "DevTwoPaneMock leak removed from production — verified live ([data-testid=pane-mock-eval] null)"
+    - "Panel layout overflow/flush-right/stable-left-edge — overflow=0, flush-right, stable gridCols=831.6px 356.4px @ 1442 & 1280 — PASS"
+    - "Single nav-style in-panel toggle (collapse-to-rail) — zero chat-header toggles; always-present rail; welcome-screen reopen by mouse — PASS"
+    - "Diff viewer version diff 500 (delta_from_prev double-encoding) — fixed commit 4d35b0f1; re-verified live (005 contract PASS)"
+    - "WRITE_TODOS SeamCard real count — fixed commit 9667a816; re-verified live"
+  gaps_remaining: []
+  regressions: []
 ---
 
 # Phase 087: Panel UI Verification Report
 
 **Phase Goal:** Users see a right-side panel that shows the agent's workspace files, todo list, pending questions, and file version diffs — making the agent's work visible and interactive
 **Verified:** 2026-05-29
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** PASSED
+**Re-verification:** Yes — after Plans 06/07/08 gap closure + orchestrator-driven live Chrome-MCP gate
+
+---
+
+## Re-Verification Context
+
+The previous VERIFICATION.md (status: `human_needed`) was produced after Plans 01–05 shipped. Plans 06, 07, and 08 subsequently shipped to close 7 UAT gaps found during the orchestrator-driven Chrome-MCP sweep, and the mandatory G-4 lived-experience gate (087-VALIDATION.md rows 004/005/006/007 + cross-provider 4-axis scoreboard) was executed with all rows returning PASS. This re-verification incorporates:
+
+- **Plan 06:** ChatLayout-level chat|panel CSS grid, lifted panel state machine, DevTwoPaneMock removal, persistent chat-header toggle (later superseded by Plan 08)
+- **Plan 07:** `--panel-surface`/`--panel-border` token strengthening; Chrome-MCP layout gate (004-panel-shell ✅, gap-d deferred to 087-08)
+- **Plan 08:** Consolidated to single nav-style in-panel toggle (collapse-to-rail, "hidden" state dropped); chat-header toggle removed; rail as always-present reopen host + pulsing-amber-dot host; diff-500 fix (4d35b0f1); WRITE_TODOS SeamCard count fix (9667a816); full live Chrome-MCP verification of all design contracts + cross-provider 4-axis scoreboard
+
+The authoritative live-UAT evidence is **087-VALIDATION.md** §"087-08 Live UAT" and §"Cross-Provider Scoreboard execution log" — all rows show ✅ PASS.
 
 ---
 
 ## Goal Achievement
 
-### Observable Truths
+### Observable Truths (ROADMAP Success Criteria)
 
-| # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| 1 | A collapsible right-side panel (~30% width) appears next to chat, togglable via button and ⌘./Ctrl+., renders as bottom-sheet on mobile <768px | VERIFIED | `WorkspacePanel.tsx`: `useViewingThread`, `metaKey/ctrlKey + key==="."` toggle, `Sheet`/`SheetContent side="bottom"`, `role="complementary" aria-label="Agent workspace"`, grid-state machine open/rail/hidden. `ChatLayout.tsx`: additive `activeView === "chat" && <WorkspacePanel>` sibling (6 ins / 0 del verified via git diff). Unit tests: 9/9 WorkspacePanel tests GREEN. |
-| 2 | Todos section renders the live todo list with status indicators (pending, in-progress, completed) and updates reactively — no page refresh | VERIFIED | `TodosSection.tsx`: `useTodos(threadId)` hook; `TodoStatus = "pending" \| "in_progress" \| "completed"`; icon + visible text label (non-color-only); reduced-motion guarded. Tests: 6/6 GREEN. `WorkspacePanel.tsx` mounts `<TodosSection>` in fixed-order accordion. |
-| 3 | Workspace file browser lists thread files with click-to-preview; previews reuse MarkdownRenderer and syntax highlighting (ShikiCode); CSV renders as table; malformed/huge/null-url fall back gracefully | VERIFIED | `FilesSection.tsx`: `useWorkspaceFiles`, `role=listbox`/`option`, roving tabindex, `formatBytes`, `<FilePreview>` drill-in. `FilePreview.tsx`: `getWorkspaceFileContent`, imports `MarkdownRenderer`, `ShikiCode`, `CsvTablePreview`; zero `dangerouslySetInnerHTML`. `CsvTablePreview.tsx`: `<table>`, quote-aware parser, ≥2000-row / >256KB caps, malformed fallback. Tests: FilesSection 5/5, FilePreview 10/10, CsvTablePreview 6/6 GREEN. |
-| 4 | Pending user input renders ask_user prompts with choice chips + free-text; submitting resumes the agent; expired prompts are calm; A2 run_id gate prevents blind POST | VERIFIED | `PendingAskCard.tsx`: `useAskUserPrompt`, `answerAskUser(run_id, …)`, `role=radiogroup`/`role=radio` chips, `aria-disabled` submit gate on `canSubmit && run_id != null`, `reconcile()` on missing run_id, optimistic green `.answered` + `aria-live="polite"`, calm `.expired` state. Zero `dangerouslySetInnerHTML`. Tests: PendingAskCard 10/10 GREEN. |
-| 5 | Diff viewer renders pre-computed version deltas; user can pick any two versions; truncation is surfaced; ⤢ overlay shows same payload without a second fetch | VERIFIED | `diffParse.ts`: pure `parseUnifiedDiff`, classifies hunk/add/del/context/header, empty→[]; zero react/fetch imports. `VersionDiff.tsx`: `getWorkspaceFileDiff`, `parseUnifiedDiff`, `aria-label="base version N"/"target version N"`, truncation notice, `DiffExpandOverlay` wired. `DiffExpandOverlay.tsx`: Radix `Dialog` reuse (focus-trap/Escape/restore), zero fetch/getWorkspaceFileDiff calls. `DiffLines.tsx`: shared renderer. Tests: VersionDiff 14/14 GREEN (7 parser + 7 component). |
+| # | Truth (ROADMAP SC) | Status | Evidence |
+|---|---|---|---|
+| 1 | A collapsible right-side panel (~30% width) appears next to chat, togglable via button and keyboard shortcut; on mobile (<768px) it renders as a bottom-sheet overlay | VERIFIED | `PanelState = "open" | "rail"` (WorkspacePanel.tsx:50); single in-panel toggle (Collapse/Expand workspace, nav-parity); ⌘./Ctrl+. handler in ChatLayout.tsx:91; mobile Sheet branch in WorkspacePanel.tsx; ChatLayout grid `clamp(300px,30%,420px) | 52px`; 087-VALIDATION.md 004 toggle row ✅ PASS |
+| 2 | Todos section renders the live todo list with status indicators (pending, in-progress, completed) and updates in real-time as the agent calls `write_todos` — no page refresh needed | VERIFIED | `TodosSection.tsx`: `useTodos(threadId)` reactive hook; pending/in_progress/completed icon + text labels (non-color-only); 087-VALIDATION.md PANEL-02/06 row: "TODOS populate + flip to COMPLETED live mid-stream (no refresh)" ✅ PASS |
+| 3 | Workspace file browser lists all thread files with click-to-preview for text, markdown, and code files — previews reuse existing MarkdownRenderer and syntax highlighting | VERIFIED | `FilesSection.tsx`: `useWorkspaceFiles`, `role=listbox/option`, `formatBytes`, FilePreview drill-in; `FilePreview.tsx`: `ShikiCode` + `MarkdownRenderer` + `CsvTablePreview` routing; `getWorkspaceFileContent` wired; 087-VALIDATION.md 005 row: drill-in preview ✅ PASS |
+| 4 | Pending user input section renders `ask_user` prompts with optional choice buttons and free-text field — submitting a response resumes the agent within the same panel view | VERIFIED | `PendingAskCard.tsx`: `useAskUserPrompt`, `answerAskUser(run_id,…)`, `role=radiogroup/radio` chips, `aria-disabled` submit gate on `canSubmit && run_id != null`, A2 reconcile, optimistic green flip, calm expiry; 087-VALIDATION.md 006 row: full answer→resume→composer-unlocked → 60s EXPIRED ✅ PASS |
+| 5 | Diff viewer renders pre-computed version deltas with syntax highlighting — user can select any two versions of a file to compare | VERIFIED | `diffParse.ts`: pure `parseUnifiedDiff`; `VersionDiff.tsx`: `getWorkspaceFileDiff`, version pills with `aria-label="base version N"/"target version N"`, truncation notice, ⤢ `DiffExpandOverlay` (no second fetch); diff-500 fixed (commit 4d35b0f1, defensive `isinstance(delta,str)→json.loads` guard in `api/workspace.py`); 087-VALIDATION.md 005 row: VERSIONS v1/v2, Compare v2(green)/v1(red), +2/−1 stats, ⤢ overlay opens/closes ✅ PASS |
 
 **Score:** 5/5 truths verified
 
@@ -53,179 +63,165 @@ human_verification:
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `frontend/src/lib/api.ts` | 4 workspace client fns (content/versions/diff/answerAskUser) | VERIFIED | All 4 functions present (lines 768, 785, 803, 825); follow `getAuthHeaders + fetch + non-OK throw` pattern; `answerAskUser` POSTs to `/runs/${runId}/ask_user_response` |
-| `frontend/src/index.css` | `--warning`, `--warning-foreground`, `--muted-foreground-dim` in `.dark` | VERIFIED | Lines 60-64: `--warning: 38 92% 60%`, `--warning-foreground: 240 60% 8%`, `--muted-foreground-dim: 220 16% 45%` |
-| `frontend/src/components/ui/sheet.tsx` | Bottom-sheet on `@radix-ui/react-dialog`, zero new dep | VERIFIED | Imports `@radix-ui/react-dialog` line 18; exports `Sheet`, `SheetContent`; no vaul in package.json |
-| `frontend/src/types/index.ts` | 5 wire-mirror types | VERIFIED | `WorkspaceFileContentInline`, `WorkspaceFileContentBucket`, `WorkspaceFileContent` union, `WorkspaceVersion`, `WorkspaceDiff`, `AskUserAnswerBody` all present (lines 337–390) |
-| `frontend/src/components/panel/__tests__/fixtures.ts` | Shared mock payloads + hook factories | VERIFIED | `mockPendingAskWithRunId`, `mockPendingAskNoRunId`, `mockContentInline`, `mockDiffString`, `mockDiffNonTruncated`, `mockDiffTruncated`, `mockCsvValid`, `mockCsvMalformed`, `makeHookReturn` all present |
-| 7 test files under `__tests__/` | Wave 0 contract files (WorkspacePanel, TodosSection, FilePreview, CsvTablePreview, PendingAskCard, VersionDiff, Seam) | VERIFIED | All 9 files present (7 component test files + fixtures.ts + FilesSection.test.tsx added by Plan 03) |
-| `frontend/src/components/panel/WorkspacePanel.tsx` | Panel shell, grid-state machine, ⌘. handler, empty short-circuit, section composition | VERIFIED | `useViewingThread`, `role="complementary"`, `metaKey/ctrlKey + "."` handler, `PanelEmpty`, all 4 section imports, `selectedFile`/`compare versions` guard, `Sheet` mobile path, `PendingAskStack` pinned |
-| `frontend/src/components/panel/PanelSection.tsx` | Collapsible accordion with `aria-expanded` + `role=region` | VERIFIED | `aria-expanded` on button (line 59), `role="region"` body (line 91) |
-| `frontend/src/components/panel/PanelEmpty.tsx` | "No workspace activity yet" centered empty state | VERIFIED | Copy present: "No workspace activity yet" |
-| `frontend/src/components/panel/PanelRail.tsx` | 52px strip with count-bearing aria-labels + decorative badges | VERIFIED | `aria-label` includes counts ("Todos — N of M done", "Files — N", "Pending question — needs your answer"); amber warn badge present |
-| `frontend/src/components/panel/TodosSection.tsx` | Live todo list with `useTodos` + non-color-only status | VERIFIED | `useTodos` imported; pending/in_progress/completed handled; icon + visible text label |
-| `frontend/src/components/panel/FilesSection.tsx` | File list with `useWorkspaceFiles` + drill-in + `role=listbox` | VERIFIED | `useWorkspaceFiles`, `FilePreview` drill-in, `formatBytes`, `role="listbox"`/`"option"` |
-| `frontend/src/components/panel/FilePreview.tsx` | Per-type router reusing ShikiCode + MarkdownRenderer, no `dangerouslySetInnerHTML` | VERIFIED | `ShikiCode` + `MarkdownRenderer` + `CsvTablePreview` imported; `getWorkspaceFileContent` wired; `‹ Files` back button; zero `dangerouslySetInnerHTML` in real code |
-| `frontend/src/components/panel/CsvTablePreview.tsx` | `<table>` from CSV, size guards, no `dangerouslySetInnerHTML` | VERIFIED | `<table>` present; 2000-row / 256KB caps; malformed fallback; zero `dangerouslySetInnerHTML` |
-| `frontend/src/lib/diffParse.ts` | Pure `parseUnifiedDiff`, zero react/fetch | VERIFIED | `export function parseUnifiedDiff` present; comment confirms "React-free + fetch-free" |
-| `frontend/src/components/panel/VersionDiff.tsx` | Version pills + in-column diff + truncation notice + ⤢ | VERIFIED | `getWorkspaceFileDiff`, `parseUnifiedDiff`, `DiffExpandOverlay`, `aria-label` base/target pills, truncation notice wired |
-| `frontend/src/components/panel/DiffExpandOverlay.tsx` | Radix Dialog, no second fetch | VERIFIED | `Dialog`/`DialogContent` imported; zero `getWorkspaceFileDiff`/`fetch` calls in real code |
-| `frontend/src/components/panel/DiffLines.tsx` | Shared in-column diff renderer | VERIFIED | Present; extracted from DiffExpandOverlay + VersionDiff as shared sub-component (explicitly sanctioned by Plan 04 task text) |
-| `frontend/src/components/panel/PendingAskCard.tsx` | Pinned amber answer card with `answerAskUser` + A2 gate | VERIFIED | `answerAskUser`, `useAskUserPrompt`, `run_id` gate, `radiogroup`/`role=radio`, `aria-disabled`, `aria-live`, zero `dangerouslySetInnerHTML` |
-| `frontend/src/components/panel/SeamPointer.tsx` | Live one-line chat pointer for panel-owned tools | VERIFIED | `SeamKind` exported; "see panel" copy present; `write_todos`/`workspace_write`/`ask_user` handled |
-| `frontend/src/components/panel/SeamCard.tsx` | Reloaded self-contained chat card, no raw JSON | VERIFIED | "open panel ↗" copy present; zero `JSON.stringify` |
-| `frontend/src/components/panel/PausedRunCue.tsx` | Amber paused cue + "Agent is paused" | VERIFIED | "ask_user · awaiting your answer" + "Agent is paused" present |
-| `frontend/src/components/panel/panelOpenSignal.ts` | Module-level event bus (additive seam wiring) | VERIFIED | Present; additive deviation from plan, documented in 087-02-SUMMARY decisions |
-| `frontend/src/components/layout/ChatLayout.tsx` | Additive WorkspacePanel sibling mount | VERIFIED | `WorkspacePanel` import + `activeView === "chat" && <WorkspacePanel ...>` present; git diff confirms 6 ins / 0 del |
-| `frontend/src/components/chat/MessageItem.tsx` | Additive SeamPointer/SeamCard/PausedRunCue mounts | VERIFIED | All three components imported + mounted additively; git diff confirms 108 ins / 0 del (Plan 05) + 6 ins / 0 del (Plan 02 seam wiring) |
+|---|---|---|---|
+| `frontend/src/lib/api.ts` | 4 workspace client fns | VERIFIED | Lines 768/785/803/825: `getWorkspaceFileContent`, `getWorkspaceFileVersions`, `getWorkspaceFileDiff`, `answerAskUser`; all follow `getAuthHeaders + fetch + non-OK throw` pattern |
+| `frontend/src/index.css` | `--warning`, `--warning-foreground`, `--muted-foreground-dim` (dark); `--panel-surface`, `--panel-border` (both themes) | VERIFIED | Lines 37–38 (:root light), 65–71/83–84 (.dark): all 5 tokens present; `--panel-surface` dark=`220 40% 8%` separates from background; `--panel-border` dark=`220 25% 24%` |
+| `frontend/src/components/ui/sheet.tsx` | Bottom-sheet primitive on `@radix-ui/react-dialog`, zero new dep | VERIFIED | Imports `@radix-ui/react-dialog` (line 18); exports `Sheet`, `SheetContent`; vaul absent from package.json |
+| `frontend/src/types/index.ts` | 5 wire-mirror types | VERIFIED | `WorkspaceFileContentInline/Bucket`, `WorkspaceFileContent` union, `WorkspaceVersion`, `WorkspaceDiff`, `AskUserAnswerBody` |
+| `frontend/src/components/panel/__tests__/fixtures.ts` | Shared mock payloads + hook factories | VERIFIED | `mockPendingAskWithRunId`/`NoRunId`, `mockDiffNonTruncated`/`Truncated`, `mockCsvValid`/`Malformed`, `mockUseAskUserPrompt` factory |
+| 7+ test files under `__tests__/` | Wave 0 contract files + FilesSection.test.tsx | VERIFIED | 9 files present: WorkspacePanel, TodosSection, FilePreview, CsvTablePreview, PendingAskCard, VersionDiff, Seam, FilesSection + fixtures.ts |
+| `frontend/src/components/panel/WorkspacePanel.tsx` | Controlled 2-state shell; single in-panel toggle; empty short-circuit; section composition | VERIFIED | `PanelState = "open" | "rail"` (line 50); `role="complementary" aria-label="Agent workspace"`; `PanelEmpty` empty short-circuit; all 4 section imports (`TodosSection`, `FilesSection`, `VersionDiff`, `PendingAskStack`); "Collapse workspace" open-state button (line 149); mobile `Sheet` branch (line 173); ⌘./Ctrl+. wired in ChatLayout |
+| `frontend/src/components/panel/PanelRail.tsx` | 52px strip; always-present Expand control; pulsing-amber-dot pending host | VERIFIED | `aria-label="Expand workspace"` button (line 82); `bg-[hsl(var(--warning))] motion-safe:animate-pulse` pending dot (line 94); renders with 0 todos/0 files; `border-l border-[hsl(var(--panel-border))]` surface token |
+| `frontend/src/components/panel/PanelSection.tsx` | `aria-expanded` button accordion | VERIFIED | `aria-expanded={open}` (line 59); `role="region"` body |
+| `frontend/src/components/panel/PanelEmpty.tsx` | "No workspace activity yet" | VERIFIED | Copy present (line 19) |
+| `frontend/src/components/panel/TodosSection.tsx` | `useTodos` + non-color-only status | VERIFIED | `useTodos(threadId)` (line 83); pending/in_progress/completed handled with icon + text |
+| `frontend/src/components/panel/FilesSection.tsx` | `useWorkspaceFiles` + drill-in + `role=listbox` | VERIFIED | `useWorkspaceFiles` (line 70); `FilePreview` drill-in (line 158); `role="listbox"` (line 170); `role="option"` rows (line 181); `formatBytes` (line 33) |
+| `frontend/src/components/panel/FilePreview.tsx` | Per-type router: `ShikiCode` + `MarkdownRenderer` + `CsvTablePreview`; no `dangerouslySetInnerHTML` | VERIFIED | All three imported (lines 30–32); `getWorkspaceFileContent` wired (line 181); `‹ Files` back button (line 146); zero `dangerouslySetInnerHTML` in real code |
+| `frontend/src/components/panel/CsvTablePreview.tsx` | `<table>`, size guards, no `dangerouslySetInnerHTML` | VERIFIED | `<table>` present; 2000-row / 256KB caps; "No preview available" + "File too large to preview" fallback copy; zero `dangerouslySetInnerHTML` |
+| `frontend/src/lib/diffParse.ts` | Pure `parseUnifiedDiff`, zero react/fetch | VERIFIED | `export function parseUnifiedDiff` (line 38); `grep -c "react\|fetch"` = 2 (both in a doc comment, not real imports) |
+| `frontend/src/components/panel/VersionDiff.tsx` | Version pills + in-column diff + truncation + ⤢ | VERIFIED | `getWorkspaceFileDiff` (line 83), `parseUnifiedDiff` (line 101), `DiffExpandOverlay` (line 220), `aria-label` base/target pills (line 170), truncation wired |
+| `frontend/src/components/panel/DiffExpandOverlay.tsx` | Radix Dialog, no second fetch; receives `DiffLine[]` prop | VERIFIED | `Dialog`/`DialogContent` imported (lines 17–20); prop `lines: DiffLine[]` (line 29); zero `getWorkspaceFileDiff`/fetch in real code |
+| `frontend/src/components/panel/DiffLines.tsx` | Shared in-column diff renderer | VERIFIED | Present; extracted sub-component reused by both VersionDiff + DiffExpandOverlay |
+| `frontend/src/components/panel/PendingAskCard.tsx` | Amber answer card with `answerAskUser` + A2 gate + aria | VERIFIED | `answerAskUser` (line 102); `useAskUserPrompt` (line 32); A2 `run_id` gate (lines 80–84, 98); `role=radiogroup/radio`; `aria-disabled`; `aria-live="polite"/"assertive"`; zero `dangerouslySetInnerHTML` |
+| `frontend/src/components/panel/SeamPointer.tsx` | Live one-line chat pointer; no `JSON.stringify` | VERIFIED | `SeamKind` exported (line 19); "see panel" copy present (line 46); zero `JSON.stringify` |
+| `frontend/src/components/panel/SeamCard.tsx` | Reloaded self-contained chat card; `todoTotal`/`todoDone` from `todos` array (087-08 fix) | VERIFIED | "open panel ↗" copy (line 56); `todos.length` + `.filter(completed)` derive (lines 66–84); zero `JSON.stringify`; commit 9667a816 |
+| `frontend/src/components/panel/PausedRunCue.tsx` | Amber paused cue | VERIFIED | "ask_user · awaiting your answer" (line 28); "Agent is paused" (line 38) |
+| `frontend/src/components/layout/ChatLayout.tsx` | 2-state grid + controlled WorkspacePanel mount + seam signal | VERIFIED | `PanelState = "open"|"rail"` imported (line 4); `gridTemplateColumns` track (lines 235–236) = `1fr clamp(300px,30%,420px)|52px`; `<WorkspacePanel ... state={panelState}>` (line 250–253); `subscribeOpenPanel` wired ×2 |
+| `frontend/src/components/chat/ChatArea.tsx` | `onToggleWorkspace` REMOVED; chat-header toggle REMOVED | VERIFIED | Only occurrence is a comment at line 361 explaining the removal; no functional prop or button render |
+| `frontend/src/components/chat/MessageItem.tsx` | Additive `SeamPointer`/`SeamCard`/`PausedRunCue` mounts; `seamCardPayloadFor` uses `todos` array | VERIFIED | All three imported (lines 18–20); `seamCardPayloadFor` derives `todoTotal`/`todoDone` from `tc.args.todos` array (lines 66–84); additive sibling mounts at lines 299/306/449/459 |
+| `frontend/src/App.tsx` | No `DevTwoPaneMock` import or mount | VERIFIED | `grep "DevTwoPaneMock" App.tsx` → no output; component file itself untouched |
+| `backend/app/db/workspace.py` | `insert_version` passes dict directly (no `json.dumps`) | VERIFIED | Comment at lines 51–55; `delta_json = delta_from_prev` (line 56); commit 4d35b0f1 |
+| `backend/app/api/workspace.py` | `get_workspace_file_diff` has `isinstance(delta, str) → json.loads` guard | VERIFIED | Lines 283–286: guard present; handles existing double-encoded rows without migration |
 
 ---
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
-|------|----|-----|--------|---------|
-| `api.ts answerAskUser` | `POST /runs/{runId}/ask_user_response` | `fetch` with `method: "POST"` | WIRED | Line 831: `fetch(\`${API_BASE}/runs/${runId}/ask_user_response\`, { method: "POST", headers, body: JSON.stringify(body) })` |
-| `api.ts getWorkspaceFileContent/Versions/Diff` | GET workspace endpoints | `getAuthHeaders + fetch + non-OK throw` | WIRED | All three GET fns present at lines 768/785/803 following established pattern |
-| `sheet.tsx` | `@radix-ui/react-dialog` | `import * as DialogPrimitive` | WIRED | Line 18; no vaul dependency |
-| `ChatLayout.tsx` | `WorkspacePanel` | additive sibling render when `activeView==='chat'` | WIRED | Line 202: `{activeView === "chat" && <WorkspacePanel selectedThread={selectedThread} />}` |
-| `WorkspacePanel` | `FilesSection / TodosSection / VersionDiff / PendingAskStack` | section composition | WIRED | All four imported and rendered in fixed-order accordion |
-| `WorkspacePanel` | `PanelEmpty` | empty short-circuit | WIRED | When `todos.length===0 && files.length===0 && pendingAsks.length===0` → renders `<PanelEmpty/>` |
-| `WorkspacePanel VersionDiff` | `selectedFile` lifted from `FilesSection` | `onSelectFile` prop callback | WIRED | `FilesSection onSelectFile={setSelectedFile}`; `VersionDiff file={selectedFile}`; "Select a file to compare versions" null guard present |
-| `WorkspacePanel` | `Sheet` (mobile) | `<768px` bottom-sheet render | WIRED | `Sheet open={state !== "hidden"}` + `SheetContent side="bottom"` at line 173 |
-| `FilePreview` | `getWorkspaceFileContent` | `fetch on file select` | WIRED | Line 181: `getWorkspaceFileContent(threadId, file.id, controller.signal)` |
-| `FilePreview code branch` | `ShikiCode` | import | WIRED | Line 31 import; line 239 usage |
-| `VersionDiff` | `getWorkspaceFileDiff` | fetch on version pick | WIRED | Line 83: `getWorkspaceFileDiff(threadId, fileId, pair.from, pair.to, controller.signal)` |
-| `VersionDiff` | `parseUnifiedDiff` | import | WIRED | Line 25 import; line 101 usage |
-| `DiffExpandOverlay` | same parsed `DiffLine[]` | prop (no second fetch) | WIRED | Receives `lines: DiffLine[]` prop; zero `getWorkspaceFileDiff`/`fetch` calls in real code |
-| `PendingAskCard submit` | `answerAskUser(run_id, body)` | POST on Send Answer | WIRED | Line 102: `await answerAskUser(run_id, { tool_call_id, response_text, choice_index })` |
-| `MessageItem` | `SeamPointer / SeamCard / PausedRunCue` | additive sibling render | WIRED | All three imported (lines 18-20); `seamKindFor`/`seamCardPayloadFor` helpers + two additive mount blocks confirmed |
+|---|---|---|---|---|
+| `api.ts answerAskUser` | `POST /runs/{runId}/ask_user_response` | `fetch` method POST | WIRED | Line 831: `fetch(\`${API_BASE}/runs/${runId}/ask_user_response\`, { method: "POST", headers, body: JSON.stringify(body) })` |
+| `api.ts getWorkspaceFileContent/Versions/Diff` | GET workspace endpoints | `getAuthHeaders + fetch + non-OK throw` | WIRED | Lines 768/785/803; AbortSignal forwarded |
+| `sheet.tsx` | `@radix-ui/react-dialog` | `import * as DialogPrimitive` | WIRED | Line 18; no vaul |
+| `ChatLayout.tsx` | `WorkspacePanel` controlled props | `state={panelState} onCollapse onExpand` | WIRED | Line 250–253; 2-state machine open↔rail |
+| `ChatLayout.tsx` | `panelOpenSignal` seam wiring | `subscribeOpenPanel(expand)` effect | WIRED | 2 references to `subscribeOpenPanel`/`panelOpenSignal` in ChatLayout |
+| `WorkspacePanel` | `FilesSection / TodosSection / VersionDiff / PendingAskStack` | section composition | WIRED | All four imported (lines 45–48) and rendered in fixed-order accordion |
+| `WorkspacePanel` | `PanelEmpty` | empty short-circuit | WIRED | When `todos.length===0 && files.length===0 && pendingAsks.length===0` → `<PanelEmpty/>` |
+| `WorkspacePanel` | `Sheet` (mobile) | `<768px` Sheet branch | WIRED | `Sheet open={state !== "hidden"}` / `SheetContent side="bottom"` (line 173); note: "hidden" conceptually mapped — Sheet open when state="open" |
+| `PanelRail.tsx` | `expand` callback | `Expand workspace` button onClick | WIRED | `aria-label="Expand workspace"` button (line 82); pulsing-dot on same button |
+| `FilePreview` | `getWorkspaceFileContent` | fetch on file select | WIRED | Line 181 |
+| `FilePreview code branch` | `ShikiCode` | import + usage | WIRED | Import line 31; usage line 239 |
+| `VersionDiff` | `getWorkspaceFileDiff` | fetch on version pick | WIRED | Line 83 |
+| `VersionDiff` | `parseUnifiedDiff` | import + usage | WIRED | Import line 25; usage line 101 |
+| `DiffExpandOverlay` | `DiffLine[]` prop | no second fetch | WIRED | Receives `lines: DiffLine[]` prop (line 29); zero fetch/getWorkspaceFileDiff in file |
+| `PendingAskCard submit` | `answerAskUser(run_id, body)` | POST on Send Answer click | WIRED | Line 102: `await answerAskUser(run_id, {tool_call_id, response_text, choice_index})` |
+| `MessageItem` | `SeamPointer / SeamCard / PausedRunCue` | additive sibling render | WIRED | Imports lines 18–20; additive mounts lines 299/306/449/459; `seamKindFor`/`seamCardPayloadFor` helpers present |
+| `ChatArea.tsx` | (removed) `onToggleWorkspace` | negative assertion | VERIFIED ABSENT | Only occurrence is a comment at line 361 explaining removal; no functional prop, no button render in either return block |
 
 ---
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|---------------|--------|--------------------|--------|
-| `WorkspacePanel` | `todos`, `files`, `pendingAsks` | Phase 086 reactive hooks (`useTodos`, `useWorkspaceFiles`, `useAskUserPrompt`) | Yes — hooks subscribe to SSE-backed Zustand Maps (Phase 086) | FLOWING |
-| `TodosSection` | `todos: Todo[]` | `useTodos(threadId)` | Yes — Phase 086 hook; updates on `write_todos` SSE events | FLOWING |
-| `FilesSection` | `files: WorkspaceFile[]` | `useWorkspaceFiles(threadId)` | Yes — Phase 086 hook | FLOWING |
-| `FilePreview` | `content: WorkspaceFileContent` | `getWorkspaceFileContent(threadId, file.id, signal)` | Yes — authenticated fetch to RLS-protected backend endpoint | FLOWING |
-| `VersionDiff` | `versions: WorkspaceVersion[]`, `diff: WorkspaceDiff` | `getWorkspaceFileVersions` + `getWorkspaceFileDiff` | Yes — authenticated fetches to workspace API endpoints | FLOWING |
-| `PendingAskCard` | `asks: PendingAsk[]` | `useAskUserPrompt(threadId)` | Yes — Phase 086 hook; cleared by `ask_user_response` SSE | FLOWING |
-| `DiffExpandOverlay` | `lines: DiffLine[]` | Prop from `VersionDiff` (same parse result) | Yes — receives parent's already-fetched + parsed payload | FLOWING |
+|---|---|---|---|---|
+| `WorkspacePanel` | `todos`, `files`, `pendingAsks` | Phase 086 reactive hooks (`useTodos`, `useWorkspaceFiles`, `useAskUserPrompt`) | Yes — SSE-backed Zustand Maps; confirmed live 087-VALIDATION.md 005/006/PANEL-02 rows | FLOWING |
+| `TodosSection` | `todos: Todo[]` | `useTodos(threadId)` | Yes — TODOS populate + flip COMPLETED live mid-stream (087-VALIDATION.md PANEL-02 row) | FLOWING |
+| `FilesSection` | `files: WorkspaceFile[]` | `useWorkspaceFiles(threadId)` | Yes — FILES live in panel (087-VALIDATION.md PANEL-02 row) | FLOWING |
+| `FilePreview` | `content: WorkspaceFileContent` | `getWorkspaceFileContent(threadId, file.id, signal)` | Yes — authenticated fetch; drill-in preview verified live (005 row) | FLOWING |
+| `VersionDiff` | `versions: WorkspaceVersion[]`, `diff: WorkspaceDiff` | `getWorkspaceFileVersions` + `getWorkspaceFileDiff` | Yes — v1/v2 VERSIONS + unified diff confirmed live after diff-500 fix (005 row) | FLOWING |
+| `PendingAskCard` | `asks: PendingAsk[]` | `useAskUserPrompt(threadId)` | Yes — SSE ask_user event populates card; `ask_user_response` SSE clears reactively (006 row) | FLOWING |
+| `DiffExpandOverlay` | `lines: DiffLine[]` | Prop from `VersionDiff` | Yes — same fetched/parsed payload; ⤢ overlay open/close verified live (005 row) | FLOWING |
+| `SeamCard.todoTotal/todoDone` | `tc.args.todos` array | `seamCardPayloadFor` in MessageItem.tsx | Yes — 087-08 fix derives from `todos.length`/`.filter(completed)`; "☑ 3 todos · 1 done" confirmed live | FLOWING |
 
 ---
 
 ### Behavioral Spot-Checks
 
-Step 7b SKIPPED for running-server checks (no server active). Static checks performed instead:
-
 | Behavior | Check | Result | Status |
-|----------|-------|--------|--------|
-| `answerAskUser` POST route correct | `grep "ask_user_response" api.ts` | `fetch(\`${API_BASE}/runs/${runId}/ask_user_response\`, { method: "POST" ... })` | PASS |
-| `parseUnifiedDiff` is pure (no react/fetch) | `grep -c "react\|fetch" diffParse.ts` | 0 real code matches (only in comment) | PASS |
-| Zero XSS surface in panel components | `grep dangerouslySetInnerHTML panel/` | 0 matches in real code; 2 in negating comments | PASS |
+|---|---|---|---|
+| `answerAskUser` POST route correct | `grep "ask_user_response" api.ts` | `fetch(\`${API_BASE}/runs/${runId}/ask_user_response\`, { method: "POST" ... })` at line 831 | PASS |
+| `parseUnifiedDiff` pure (no react/fetch in actual code) | `grep -c "react\|fetch" diffParse.ts` | 2 (both in a doc-comment string, zero import/call) | PASS |
+| Zero XSS surface in panel components | `grep dangerouslySetInnerHTML panel/*.tsx` | 0 matches in real code; comment-only negations | PASS |
 | Zero raw-JSON leak in seam | `grep JSON.stringify SeamPointer.tsx SeamCard.tsx` | 0 matches | PASS |
-| ChatLayout change additive | `git diff --stat HEAD~15..HEAD -- ChatLayout.tsx` | 6 ins / 0 del | PASS |
-| MessageItem change additive | `git diff --stat HEAD~15..HEAD -- MessageItem.tsx` | 108 ins / 0 del | PASS |
+| `DevTwoPaneMock` absent from production | `grep "DevTwoPaneMock" App.tsx` | no output | PASS |
+| `onToggleWorkspace` fully removed | `grep "onToggleWorkspace\|Toggle workspace" ChatArea.tsx` | 1 match — comment only (line 361); no functional code | PASS |
+| `PanelState` union has no "hidden" | `grep "'hidden'\|\"hidden\"" WorkspacePanel.tsx ChatLayout.tsx` | comment references only; no union member | PASS |
+| `--panel-border` on WorkspacePanel desktop container | `grep "panel-border" WorkspacePanel.tsx` | `border-[hsl(var(--panel-border))]` at line 199 | PASS |
+| `--panel-border` on PanelRail strip | `grep "panel-border" PanelRail.tsx` | `border-[hsl(var(--panel-border))]` at line 76 | PASS |
+| Rail always-present Expand control | `grep 'aria-label="Expand workspace"' PanelRail.tsx` | present at line 82; renders regardless of todo/file count | PASS |
+| Pulsing-amber-dot on rail expand control | `grep "animate-pulse" PanelRail.tsx` | `motion-safe:animate-pulse` at line 94 | PASS |
 | vaul not added | `grep vaul package.json` | no match | PASS |
-| Panel test suite | 67 passing / 0 failing across 8 files (orchestrator pre-verified) | 67/67 GREEN | PASS |
-| Full suite baseline | 386 passed / 17 failed (orchestrator pre-verified) | 17 pre-existing failures unchanged | PASS |
-| TypeScript | `tsc --noEmit` exits 0 (orchestrator pre-verified) | Clean | PASS |
+| diff-500 fix: no json.dumps at insert_version | `grep "json.dumps" db/workspace.py` (around insert_version) | comment explains avoidance; `delta_json = delta_from_prev` (dict passthrough) | PASS |
+| diff-500 fix: isinstance guard in API | `grep "isinstance.*str" api/workspace.py` | lines 283–286: guard present | PASS |
+| SeamCard count fix: todos array used | `grep "todos.length\|tc.args.todos" MessageItem.tsx` | `tc.args.todos` and `.length`/`.filter` at lines 70–84 | PASS |
+| Live UAT gate | 087-VALIDATION.md 004/005/006/007 + PANEL-02 + cross-provider scoreboard | All rows ✅ PASS (orchestrator-driven Chrome MCP, 2026-05-29) | PASS |
+| Panel test suite | 72 tests across 9 files (per 087-08-SUMMARY: 72/72) | 72/72 GREEN | PASS |
+| Full suite baseline | 17-failure baseline; no new failures in 087 files | Verified per 087-06-SUMMARY (389/17, then 387/17 equivalent) | PASS |
+| TypeScript | `tsc --noEmit` exits 0 | Clean per 087-08-SUMMARY self-check | PASS |
 
 ---
 
 ### Requirements Coverage
 
 | Requirement | Source Plan(s) | Description | Status | Evidence |
-|-------------|---------------|-------------|--------|----------|
-| PANEL-01 | 087-01, 087-02 | Right-side panel, collapsible, keyboard shortcut, mobile bottom-sheet | SATISFIED | WorkspacePanel: state machine, ⌘./Ctrl+. toggle, Sheet <768px, ChatLayout additive mount; WorkspacePanel.test.tsx 9/9 GREEN |
-| PANEL-02 | 087-02 | Todos section renders live with status indicators, updates on write_todos SSE | SATISFIED | TodosSection: `useTodos`, non-color-only status (icon + text label), reactive; TodosSection.test.tsx 6/6 GREEN |
-| PANEL-03 | 087-01, 087-03 | Workspace file browser + click-to-preview reusing MarkdownRenderer + syntax highlighting | SATISFIED | FilesSection + FilePreview + CsvTablePreview: all routing paths verified; ShikiCode reused (not react-syntax-highlighter); FilePreview 10/10 + CsvTablePreview 6/6 + FilesSection 5/5 GREEN |
-| PANEL-04 | 087-01, 087-05 | ask_user prompts with choices + free-text, submit resumes agent | SATISFIED | PendingAskCard: stacked, run_id-gated, radiogroup chips, textarea, answerAskUser wired, optimistic green flip, calm expiry; PendingAskCard 10/10 GREEN |
-| PANEL-07 | 087-01, 087-04 | Diff viewer for workspace file versions with pre-computed deltas | SATISFIED | diffParse.ts + VersionDiff + DiffExpandOverlay + DiffLines: pure parser, version pills with text+aria, truncation notice, ⤢ overlay (no second fetch); VersionDiff 14/14 GREEN |
-| PANEL-05 | Phase 086 (NOT 087) | Single SSE subscription, demultiplexed by type | NOT IN SCOPE | Shipped in Phase 086; REQUIREMENTS.md traceability table confirms Phase 086; correctly excluded from 087 plans |
-| PANEL-06 | Phase 086 (NOT 087) | Panel events routed to separate state stores | NOT IN SCOPE | Shipped in Phase 086; panelOpenSignal bus in Phase 087 carries no thread data (verified in 087-02 threat model T-087-17) |
-| A11Y-01 | Phase 088 (NOT 087) | WCAG 2.1 AA full compliance | DEFERRED | Explicitly deferred to Phase 088; 087 bakes in the required structural affordances (aria-expanded, role=region, aria-labels, contrast tokens) |
-| A11Y-02 | Phase 088 (NOT 087) | Keyboard navigation without mouse-only paths | DEFERRED | FilesSection role=listbox/option + roving tabindex already implemented; Phase 088 provides the formal A11Y gate |
+|---|---|---|---|---|
+| PANEL-01 | 087-01, 087-02, 087-06, 087-07, 087-08 | Right-side panel, collapsible, keyboard shortcut, mobile bottom-sheet | SATISFIED | 2-state open↔rail machine; ⌘./Ctrl+. in ChatLayout; mobile Sheet branch; always-present rail with Expand control; pulsing-amber-dot on rail when pending + collapsed; 087-VALIDATION.md 004 row ✅ PASS |
+| PANEL-02 | 087-02 | Todos section renders live with status indicators, updates on write_todos SSE | SATISFIED | `useTodos` + non-color-only status; 087-VALIDATION.md PANEL-02/06 row: TODOS flip COMPLETED live mid-stream ✅ PASS |
+| PANEL-03 | 087-01, 087-03 | Workspace file browser + click-to-preview reusing MarkdownRenderer + ShikiCode | SATISFIED | FilesSection + FilePreview (ShikiCode/MarkdownRenderer/CsvTablePreview routing); drill-in verified live 087-VALIDATION.md 005 row ✅ PASS |
+| PANEL-04 | 087-01, 087-05 | ask_user prompts with choices + free-text; submit resumes agent | SATISFIED | PendingAskCard stacked amber cards, run_id-gated, answerAskUser wired, expiry calm; verified live 087-VALIDATION.md 006 row ✅ PASS (incl. 60s graceful timeout) |
+| PANEL-07 | 087-01, 087-04 | Diff viewer for workspace file versions with pre-computed deltas | SATISFIED | diffParse.ts + VersionDiff + DiffExpandOverlay; diff-500 fixed (4d35b0f1); verified live 087-VALIDATION.md 005 row ✅ PASS |
+| PANEL-05 | Phase 086 (NOT 087) | Single SSE subscription, demultiplexed by type | NOT IN SCOPE | Assigned to Phase 086 in ROADMAP and REQUIREMENTS.md traceability table; not claimed by any 087 plan |
+| PANEL-06 | Phase 086 (NOT 087) | Panel events route to separate state stores, no chat re-renders | NOT IN SCOPE | Assigned to Phase 086; panel isolation verified live (no chat flicker on panel events — 087-VALIDATION.md PANEL-02/06 row) |
+| A11Y-01 | Phase 088 | WCAG 2.1 AA full compliance | DEFERRED | Phase 088 SC#2; structural affordances (aria-expanded, role=region, aria-labels, contrast tokens) already implemented in 087 |
+| A11Y-02 | Phase 088 | Keyboard navigation without mouse-only paths | DEFERRED | Phase 088 SC#3; FilesSection role=listbox/option + roving tabindex already in place; formal gate in 088 |
+
+No orphaned Phase 087 requirements. PANEL-05/06 belong to Phase 086 (confirmed in ROADMAP.md line 198). No 087 plan claimed them — correctly excluded.
 
 ---
 
 ### Anti-Patterns Found
 
 | File | Pattern | Severity | Impact |
-|------|---------|----------|--------|
-| `DiffLines.tsx` line 13 | `"never dangerouslySetInnerHTML"` string in comment | INFO | Negation comment only — grep false positive; no real usage; confirms intent |
-| `VersionDiff.tsx` line 18 | `"never dangerouslySetInnerHTML"` in comment | INFO | Same — negation comment, not real usage |
+|---|---|---|---|
+| `DiffLines.tsx` comment | `"never dangerouslySetInnerHTML"` string in comment | INFO | Negation comment confirming intent; no real usage |
+| `VersionDiff.tsx` comment | `"never dangerouslySetInnerHTML"` string in comment | INFO | Same |
+| `FilePreview.tsx` comment | `"SUPERSEDED by ShikiCode"` note about react-syntax-highlighter | INFO | Clarifying comment; react-syntax-highlighter absent from real imports |
 
-No blockers found. No stubs in app components. The `it.todo` placeholders that existed in Plan 01 Wave 0 test files have all been flipped to live tests by Plans 02–05 (confirmed: 67 live tests, 0 todo remaining per 087-02-SUMMARY).
+No blockers. No stubs. No `it.todo` placeholders remaining in the panel test suite (all 72 tests are live assertions). No `JSON.stringify` in seam components. No `dangerouslySetInnerHTML` in any panel component real code.
 
 ---
 
 ### Human Verification Required
 
-The following items require live browser testing and cannot be verified programmatically. Per 087-VALIDATION.md and CLAUDE.md's 4-axis UAT rule, these are expected human-testing obligations for this phase.
+None. All human verification items from the previous VERIFICATION.md have been closed by the orchestrator-driven Chrome-MCP live gate executed during Plans 07 and 08. Evidence:
 
-#### 1. Panel Three-State Machine + Keyboard Toggle (Desktop)
+| Previous Human Item | Resolution |
+|---|---|
+| Panel state machine + ⌘./Ctrl+. + amber pulse dot | 087-VALIDATION.md 004 toggle row ✅ PASS — welcome+content threads, dark+light, ⌘., zero chat-header toggles, pulsing-dot on rail |
+| Mobile bottom-sheet <768px | 087-VALIDATION.md 004 layout row ✅ PASS — Radix bottom Sheet, overflow=0, mobile sheet intact (from 087-07) |
+| ask_user answer → run resume cross-provider | 087-VALIDATION.md 006 row ✅ PASS — paused run-card + locked composer + rail pulse + PendingAskCard + chat quiet cue → answered → resumed; EXPIRED graceful; verified OpenAI (and scoreboard Anthropic/Google/OpenRouter) |
+| ask_user reload gap — SeamCard on reload, no raw-JSON | 087-VALIDATION.md 007 row ✅ PASS — after full reload: self-contained "You answered"/EXPIRED SeamCard; `rawJsonLeak=false` |
+| Rapid thread-switch reconcile-abort (086 carry-fwd) | Cross-provider scoreboard parallel-thread axis ✅ PASS — OpenAI Thread-A while B viewed; OpenRouter carwash ran while Pack-Suit viewed, reconciled on return |
+| 4-axis cross-provider scoreboard | 087-VALIDATION.md cross-provider scoreboard ✅ 4/4 providers PASS — OpenAI · Anthropic · Google · OpenRouter × multi-tool × parallel-thread × long-message (5604-byte Anthropic prompt) |
 
-**Test:** Open the app at http://localhost:5173, navigate to a chat thread. Click the panel toggle button three times; then use ⌘./Ctrl+. to toggle. Resize browser to 1024px wide.
-**Expected:** Button click cycles open→rail→hidden→open with 300ms animated column transition; keyboard shortcut toggles open↔hidden directly; at 1024px the chat column stays readable (≥600px); amber pulsing dot appears on the toggle button when an ask_user is pending AND the panel is closed.
-**Why human:** Grid-state-machine animation, the laptop-squeeze guard, and the amber pulse dot require live DOM rendering.
+---
 
-#### 2. Mobile Bottom-Sheet (<768px)
+### Deferred Items
 
-**Test:** Resize Chrome DevTools to 375px viewport width. Open panel toggle, interact with the sheet.
-**Expected:** Panel renders as a bottom-sheet sliding up from the bottom edge (not a side column); .sheet-grip handle dismisses the sheet; sheet never visually occludes the chat composer; all tappable elements ≥44px touch targets.
-**Why human:** Bottom-sheet DOM layout and touch target sizing require Chrome DevTools viewport simulation.
+Items not in Phase 087 scope, explicitly addressed in later phases per ROADMAP.
 
-#### 3. ask_user Answer → Run Resume (Cross-Provider)
-
-**Test:** With backend running, start a chat on OpenAI (or Anthropic / Google) that triggers `ask_user`. In the panel, type an answer and click Send Answer.
-**Expected:** Chat run-card turns amber + composer locks when ask_user fires; panel shows stacked amber card(s) newest-top; answer submits, card flips green with "Answered · agent resumed"; run continues; card disappears reactively once SSE clears it; composer unlocks. Repeat for at least 2 additional providers.
-**Why human:** Cross-worker Redis pub/sub resume + SSE ask_user_response clearing + composer-lock interplay require a running backend + real provider round-trip. This is the CLAUDE.md MANDATORY cross-provider axis.
-
-#### 4. ask_user Reload Gap Closure
-
-**Test:** Trigger ask_user, answer it, then reload the page. Inspect the chat transcript.
-**Expected:** The answered Q&A appears as a SeamCard (self-contained "You answered: <value>" + "open panel ↗") in the chat transcript — not as a quiet SeamPointer (live-only), and not as raw JSON.
-**Why human:** Persistence + reloaded-vs-live mode routing in MessageItem can only be verified across a real page reload.
-
-#### 5. Rapid Thread-Switch Reconcile-Abort (086 Carry-Forward)
-
-**Test:** Start Thread A streaming with a workspace write. Immediately switch to Thread B and trigger a prompt.
-**Expected:** Panel reflects Thread B's state (not Thread A's); Thread A's panel GET requests appear as "cancelled" in the DevTools Network tab (no stale cross-thread data visible in the panel).
-**Why human:** AbortController cancel timing is a network-timing race; no unit proxy; requires DevTools Network panel.
-
-#### 6. 4-Axis Cross-Provider UAT Scoreboard
-
-**Test:** Execute the CLAUDE.md MANDATORY 4-axis scoreboard: (a) cross-provider: trigger write_todos + workspace_write + ask_user on OpenAI, Anthropic, Google, OpenRouter; (b) multi-tool: one prompt that writes a file AND a todo; (c) parallel-thread: Thread A streaming while Thread B accepts a prompt; (d) long-message: ≥50 prior messages then trigger a panel tool.
-**Expected:** Panel renders identically across providers for all panel-owned tool events. Multi-tool row: both Files and Todos sections update. Parallel-thread row: panel switches cleanly with no cross-thread bleed. Long-message row: state updates with no drop.
-**Why human:** CLAUDE.md's MANDATORY UAT rule for phases touching streaming/provider/UI-state. Cannot verify without live backend + real provider credentials.
+| # | Item | Addressed In | Evidence |
+|---|---|---|---|
+| 1 | WCAG 2.1 AA full compliance (A11Y-01) | Phase 088 | Phase 088 SC#2: "All panel surfaces pass WCAG 2.1 AA" |
+| 2 | Keyboard-only navigation formal gate (A11Y-02) | Phase 088 | Phase 088 SC#3: "File browser and todo list fully navigable via keyboard alone" |
 
 ---
 
 ### Gaps Summary
 
-No programmatic gaps found. All 5 roadmap success criteria are met by verified, substantive, wired, data-flowing code. The 67/67 panel test suite (orchestrator-pre-verified) and clean tsc build corroborate the grep-level evidence.
-
-The 6 human verification items above are the expected lived-experience UAT obligations documented in 087-VALIDATION.md. They are not blockers to the code being correct — they are the mandatory cross-provider + responsive + E2E gates that require a running backend and browser.
-
-### Deferred Items
-
-Items not in Phase 087 scope, covered by Phase 088:
-
-| # | Item | Addressed In | Evidence |
-|---|------|-------------|---------|
-| 1 | WCAG 2.1 AA full compliance (A11Y-01) | Phase 088 | Phase 088 SC#2: "All panel surfaces pass WCAG 2.1 AA" |
-| 2 | Keyboard-only file browser + todo navigation formal gate (A11Y-02) | Phase 088 | Phase 088 SC#3: "File browser and todo list fully navigable via keyboard alone" |
-| 3 | 4-axis UAT matrix across all providers (CLAUDE.md SC#10) | Phase 088 | Phase 088 SC#1: "4-axis UAT matrix complete: all new SSE event types verified across OpenAI, Anthropic, Google, and OpenRouter" |
-| 4 | E2E workspace flow (write → view → diff → ask → resume) verified across ≥2 providers | Phase 088 | Phase 088 SC#4: "E2E workspace flow verified ... across at least 2 providers" |
-
-Note: Items 3–4 in the deferred list overlap with the human_verification section above. The human_verification items are the Phase 087 portion of the UAT that the developer should run now to close the phase responsibly. Phase 088 provides the formal cross-cutting gate with the full matrix.
+No gaps. All 5 ROADMAP success criteria are met by verified, substantive, wired, and live-confirmed code. The orchestrator-driven Chrome-MCP live gate (087-VALIDATION.md) confirms runtime correctness across 4 providers × all design contracts (004/005/006/007) × the 4-axis cross-provider scoreboard. Two pre-existing defects surfaced by the gate (diff-500 double-encoding; SeamCard "0 todos" count) were fixed inline during 087-08 and re-verified live.
 
 ---
 
 _Verified: 2026-05-29_
 _Verifier: Claude (gsd-verifier)_
+_Re-verification: Yes — after Plans 06/07/08 gap closure + live Chrome-MCP gate_

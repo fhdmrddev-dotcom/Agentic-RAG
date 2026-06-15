@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { MouseEvent } from "react"
 import { Loader2, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { fileIcon } from "@/lib/fileIcon"
 import { downloadSandboxOutput, DownloadError } from "@/lib/api"
 
 // D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
@@ -48,7 +49,18 @@ interface OutputFileCardProps {
      *  — closes BUG-260523-03's user-visible affordance side (backend dedup
      *  was Plan 03's deliverable; UI surfacing is this Plan 04 wave). */
     supersedes?: string
+    /** Phase 095 Plan 05 (D-08) — additive hero flag, kept on the shape for
+     *  back-compat with the persisted/emitted payload. Phase 095.1 D-095.1-06
+     *  REMOVED the hero presentation, so this card NO LONGER reads `is_hero`
+     *  (it stays written-but-unread, harmless and forward-compatible). */
+    is_hero?: boolean
   }
+  /** Phase 095.1 Plan 05 (D-095.1-06) — INERT layout flag. The hero/working
+   *  visual split was reversed (operator-approved CONTEXT.md decision), so this
+   *  prop no longer changes the rendered shape — every row renders the one quiet
+   *  uniform style. Kept optional + accepted (default "working") purely for
+   *  call-site back-compat so no other call site needs touching. */
+  variant?: "hero" | "working"
 }
 
 // Phase 067.3 (D-067.3-R2-03/04): JS blob fetch+download click intercept.
@@ -59,20 +71,31 @@ interface OutputFileCardProps {
 // The static <a href> is preserved so right-click "Save link as" still
 // has a real target — the resulting raw click will 401, which is an
 // accepted UX trade-off (rare in chat-history context).
-export function OutputFileCard({ file }: OutputFileCardProps) {
+export function OutputFileCard({ file, variant = "working" }: OutputFileCardProps) {
   // Hooks declared unconditionally so rules-of-hooks is trivially satisfied
   // regardless of whether the url-optional branch returns early below.
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
 
-  // Url-optional back-compat (D-075.2-05 / RESEARCH §Q4): render plain-filename
-  // row when url is missing (legacy finalOutputFiles entries persisted before
-  // url stamping was added). Hooks above are unused in this branch but their
-  // unconditional declaration keeps hook ordering stable across renders.
+  // Phase 095.1 Plan 05 (D-095.1-06): the per-extension icon (Plan 01 fileIcon,
+  // the ONE shared icon system — no second icon path). Uniform 30px glyph on
+  // every row — the hero 48px branch was removed with the hero split.
+  const icon = fileIcon(file.filename, 30)
+
+  // Url-less dead state (D-07 / 095-VALIDATION.md D-07 dead-link row): a file
+  // arriving without a `url` (older persisted entry, or a url-less emit) now
+  // renders the download affordance CLEARLY DISABLED (the sketch's `dl-btn.dead`
+  // state) rather than a silent plain filename with no affordance. This closes
+  // RESEARCH dead-link root #1 — no silent dead anchor. The "Download
+  // unavailable" copy + the disabled style make the missing link legible.
   if (!file.url) {
     return (
-      <div className="flex items-center gap-2.5 rounded-md ghost-border px-3 py-2 text-xs bg-muted/30">
-        <Download className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 opacity-40" />
+      <div
+        className="flex items-center gap-2.5 rounded-md ghost-border text-xs px-3 py-2 bg-muted/30"
+        data-variant={variant}
+        data-dead="true"
+      >
+        <span className="flex-shrink-0 opacity-70">{icon}</span>
         <span className="flex-1 min-w-0 flex flex-col">
           <span className="font-mono text-foreground/60 truncate">{file.filename}</span>
           {file.supersedes && (
@@ -80,6 +103,17 @@ export function OutputFileCard({ file }: OutputFileCardProps) {
               Replaces: {file.supersedes}
             </span>
           )}
+        </span>
+        <span
+          className={cn(
+            "flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium flex-shrink-0",
+            "border-red-500/40 bg-red-500/10 text-red-400 cursor-not-allowed",
+          )}
+          aria-disabled="true"
+          title="Download unavailable — this file has no link"
+        >
+          <Download className="w-3 h-3" />
+          Download unavailable
         </span>
       </div>
     )
@@ -114,19 +148,21 @@ export function OutputFileCard({ file }: OutputFileCardProps) {
       rel="noopener noreferrer"
       onClick={handleClick}
       aria-disabled={downloading}
+      data-variant={variant}
       className={cn(
-        "flex items-center gap-2.5 rounded-md ghost-border px-3 py-2 text-xs transition-colors group",
-        downloading ? "bg-muted/30 opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
+        // Phase 095.1 Plan 05 (D-095.1-06): the ONE quiet uniform row — the hero
+        // glow/gradient/large-icon/prominent-Download styling was removed with
+        // the hero split. Every file renders this same calm ghost-border row.
+        "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition-colors group ghost-border",
+        downloading ? "opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
         downloadError ? "border border-red-500/40" : "",
       )}
     >
-      {downloading ? (
-        <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
-      ) : (
-        <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-      )}
+      <span className="flex-shrink-0">{icon}</span>
       <span className="flex-1 min-w-0 flex flex-col">
-        <span className="font-mono text-foreground/80 truncate">{file.filename}</span>
+        <span className="font-mono truncate text-foreground/80">
+          {file.filename}
+        </span>
         {/* Plan 075.4-04 D-075.4-D2 — supersedes subline (closes BUG-260523-03 UI side).
             React auto-escapes text content; no XSS surface introduced. */}
         {file.supersedes && (
@@ -140,6 +176,11 @@ export function OutputFileCard({ file }: OutputFileCardProps) {
       </span>
       {file.size != null && (
         <span className="text-muted-foreground/50 flex-shrink-0">{formatBytes(file.size)}</span>
+      )}
+      {downloading ? (
+        <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
+      ) : (
+        <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
       )}
     </a>
   )

@@ -35,10 +35,28 @@
  */
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
-import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem } from "@/types"
+import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, Phase, EmitSubStep, EmitFailure } from "@/types"
 import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
+
+/**
+ * Phase 092 (MODE-01/02 — SC#3) — the per-thread workflow-lock record. Held in
+ * `workflowLockByThread` keyed by the OWNING thread id. Presence of a key means
+ * the thread is Harness-locked (a non-terminal workflow run owns its anchor);
+ * absence means Deep (unlocked). `capPaused`/`continuesRemaining` carry the
+ * Continue affordance state surfaced by the cap_paused SSE event + the
+ * getThreadWorkflow reconcile.
+ */
+export interface WorkflowLock {
+  /** The workflow_runs.id (active_workflow_run_id) that owns the lock. */
+  runId: string
+  mode: "harness"
+  /** True when the run is cap_paused (a Continue card is pending). */
+  capPaused: boolean
+  /** Continues remaining (max_continues_per_run - continues_used, D-06). */
+  continuesRemaining: number
+}
 
 export interface StreamsState {
   bucketsBySurface: Map<SurfaceId, Map<string, Message[]>>
@@ -66,6 +84,10 @@ export interface StreamsState {
   /** Per-thread reconcile error state (Plan 068.5 retry banner). Replaces the
    *  old global `reconcileError: { threadId; error } | null`. */
   reconcileErrors: Map<string, Error>
+  /** 099-08 (UAT L10): per-thread stashed prompt text from a kickoff/send
+   *  refusal, so ChatArea can feed it back to the composer via the existing
+   *  prefill seam. Cleared when consumed or when the banner is dismissed. */
+  failedSendDrafts: Map<string, string>
   /** Set of thread IDs whose loadMessages is currently in flight. Replaces
    *  the old global `loadingThreadId: string | null`. MessageList gates the
    *  cold-load skeleton on `loadingThreads.has(activeThreadId) &&
@@ -100,6 +122,37 @@ export interface StreamsState {
   /** Per-thread sub-agent task run index (keyed-by-sub_run_id upsert/status on
    *  the TASK-variant sub_agent_start / sub_agent_done SSE). */
   tasksByThread: Map<string, TaskRunIndexItem[]>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 092 (MODE-01 / MODE-02 — SC#3, the single highest-regression-risk
+  // surface). Per-thread keyed workflow-lock state. A thread holds a lock iff a
+  // non-terminal Harness workflow run owns its `active_workflow_run_id` anchor.
+  // MUST be a Map keyed by thread_id — NEVER a global boolean (a global flag here
+  // is the BUG-260523-01-class regression: Thread A's workflow would lock Thread
+  // B's composer). Mirrors the streamingThreads/subscriptionsByThread shape; the
+  // useWorkflowLockForThread selector (StreamsProvider.tsx) reads it keyed by the
+  // OWNING thread id (useMessages.ts:80-86 lesson). Populated by the mount-time
+  // getThreadWorkflow reconcile (D-v2.5-03 source of truth) + the live SSE
+  // (cap_paused / terminal); cleared (GC delete-the-key) on unlock. Ephemeral —
+  // never persisted (reconciled from the backend on every mount).
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Per-thread workflow lock. Absent key = Deep (unlocked). */
+  workflowLockByThread: Map<string, WorkflowLock>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the panel-only harness phase
+  // timeline slice. The 6 new harness lifecycle events (phase_started /
+  // phase_completed / phase_transition / gate_failed / run_failed /
+  // run_completed) — wire-emitted but DROPPED by api.ts today — demux into this
+  // ONE Map so a phase event NEVER mutates bucketsBySurface (the chat selector
+  // `useThreadMessages` reads bucketsBySurface EXCLUSIVELY → zero chat
+  // re-renders, PANEL-09). Mirrors the tasksByThread/workflowLockByThread shape:
+  // Map<threadId, Phase[]>, keyed by the OWNING thread id so a background harness
+  // run cannot corrupt the viewed thread's timeline (the SC#10 parallel-thread
+  // axis). EPHEMERAL — never persisted; reconciled from getThreadWorkflow on
+  // every mount (mirrors pendingAsksByThread/workspaceFilesByThread, NOT
+  // tasksByThread which persists). The chat side MUST NEVER read this Map.
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Per-thread harness phase timeline (panel-only). Absent key = no phases. */
+  phasesByThread: Map<string, Phase[]>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -116,11 +169,20 @@ export interface StreamsState {
         provider?: string
         agentMode?: string
         surfaceId?: SurfaceId
-        onTitleUpdate?: (t: string) => void
+        onTitleUpdate?: (threadId: string, title: string) => void
+        /** Phase 092 (MODE-01 / D-02) — Harness kickoff: when set, the backend
+         *  creates a workflow run + the producer drives run_workflow. Omitted on
+         *  a Deep send (byte-identical). */
+        workflowDefinitionId?: string
       },
     ) => Promise<void>
     reconcile: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
     stopStream: () => Promise<void>
+    /** SEED-064 — stop the active run on a SPECIFIC thread (not just the viewed
+     *  one). Powers the sidebar Stop + the cross-thread active-runs tray so a
+     *  backgrounded run can be cancelled without navigating into its thread.
+     *  No-op when the thread has no streaming run. */
+    stopThread: (threadId: string) => Promise<void>
     resumeFromFailed: (failedMessage: Message) => Promise<void>
     loadMessages: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
     // ──────────────────────────────────────────────────────────────────────────
@@ -157,6 +219,63 @@ export interface StreamsState {
     ) => void
     /** Full-state-replace of a thread's task run index (GET reconcile). */
     replaceTasksForThread: (threadId: string, tasks: TaskRunIndexItem[]) => void
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 092 (MODE-01/02 — SC#3) — per-thread workflow-lock mutators.
+    // Both copy-then-mutate the workflowLockByThread Map (new Map → set / GC
+    // delete-the-key). NEVER touch a global flag. Called from the mount-time
+    // getThreadWorkflow reconcile (D-v2.5-03) + the live SSE (cap_paused /
+    // terminal). No-op stubs here; the provider registers real bodies.
+    // ──────────────────────────────────────────────────────────────────────────
+    /** Set/replace a thread's workflow lock (mount reconcile + cap_paused SSE). */
+    setWorkflowLockForThread: (threadId: string, lock: WorkflowLock) => void
+    /** Clear a thread's workflow lock — GC delete-the-key (unlock / terminal). */
+    clearWorkflowLockForThread: (threadId: string) => void
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — panel-only phase-timeline
+    // mutators. Each copy-then-mutates the phasesByThread Map (new Map → set),
+    // keyed by the OWNING thread id (cross-thread isolation). NEVER touch
+    // bucketsBySurface. No-op stubs here; the provider registers real bodies in a
+    // mount-time useEffect (panel SSE can fire BEFORE that registers — Pitfall 5,
+    // so synchronous `() => {}` stubs, NOT notMounted).
+    // ──────────────────────────────────────────────────────────────────────────
+    /** Append a phase (phase_started) — no-op if its slug already present. */
+    appendPhaseForThread: (threadId: string, phase: Phase) => void
+    /** Patch a phase's status (+ optional fields) by slug (phase_completed /
+     *  gate_failed / run_failed / phase_transition). */
+    setPhaseStatusForThread: (
+      threadId: string,
+      slug: string,
+      status: Phase["status"],
+      patch?: Partial<Phase>,
+    ) => void
+    /** Full-state-replace of a thread's phase timeline (getThreadWorkflow reconcile). */
+    replacePhasesForThread: (threadId: string, phases: Phase[]) => void
+    /** Phase 101.1-09 (gap 6 / GAP-C / D-11) — patch a phase's emitSubStep/emitFailure
+     *  by slug (or phaseIndex when the slug is a placeholder) from a phase_substep
+     *  event. ADDITIVE + PANEL-ONLY: writes phasesByThread exclusively (never
+     *  bucketsBySurface), mirroring setPhaseStatusForThread's immutable update. The
+     *  PhaseCard render contract (Plan 04) consumes these fields. */
+    setPhaseEmitSubstepForThread: (
+      threadId: string,
+      slug: string,
+      phaseIndex: number,
+      patch: { emitSubStep?: EmitSubStep; emitFailure?: EmitFailure },
+    ) => void
+    /** Phase 098-UAT run-honesty fix (A) — on a SUCCESSFUL run_completed, flip every
+     *  non-terminal (running/retrying/pending) phase for the OWNING thread to "done".
+     *  The DB ground truth for a completed run is every phase completed, so this
+     *  self-heals a phase node stranded on "running" (its phase_completed SSE missed
+     *  across the ask_user pause / a consumer reattach) WITHOUT a thread-switch.
+     *  Scoped to the passed threadId (PANEL-09); writes phasesByThread ONLY. */
+    finalizeAllPhasesForThread: (threadId: string) => void
+    /** BUG-260609-01 mid-run fix — when a LATER phase goes live (phase_started for
+     *  index N), flip every EARLIER phase (phaseIndex < N) still in {running,retrying}
+     *  to "done". A sequential engine cannot start phase N until earlier phases
+     *  finished, so this is a forward-only backstop for a missed phase_completed —
+     *  matched BY INDEX so it survives a placeholder-slug mismatch. Never touches
+     *  skipped/failed/pending or the current/later phases. Scoped to threadId
+     *  (PANEL-09); writes phasesByThread ONLY. */
+    finalizeEarlierPhasesForThread: (threadId: string, beforeIndex: number) => void
   }
 }
 
@@ -186,6 +305,8 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   fallbackNotices: new Map<string, string>(),
   // Type: reconcileErrors: Map<string, Error>
   reconcileErrors: new Map<string, Error>(),
+  // Type: failedSendDrafts: Map<string, string> (099-08 / UAT L10)
+  failedSendDrafts: new Map<string, string>(),
   // Type: loadingThreads: Set<string>
   loadingThreads: new Set<string>(),
   // Type: subscriptionsByThread: Map<string, Set<string>>
@@ -204,6 +325,16 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   pendingAsksByThread: new Map<string, PendingAsk[]>(),
   // Type: tasksByThread: Map<string, TaskRunIndexItem[]>
   tasksByThread: readTasksSyncOrEmpty(),
+  // Phase 092 (SC#3): per-thread workflow lock — fresh empty Map. Ephemeral
+  // (never persisted); reconciled from getThreadWorkflow on every mount.
+  // Type: workflowLockByThread: Map<string, WorkflowLock>
+  workflowLockByThread: new Map<string, WorkflowLock>(),
+  // Phase 094 Plan 02 (PANEL-08/09): per-thread harness phase timeline — fresh
+  // empty Map. EPHEMERAL (no streamsCache/localStorage read — phases reconcile
+  // from getThreadWorkflow on every mount, mirroring pendingAsksByThread, NOT
+  // tasksByThread which persists). Panel-only — chat selectors never read it.
+  // Type: phasesByThread: Map<string, Phase[]>
+  phasesByThread: new Map<string, Phase[]>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -211,6 +342,7 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     sendMessage: notMounted,
     reconcile: notMounted,
     stopStream: notMounted,
+    stopThread: notMounted,
     resumeFromFailed: notMounted,
     loadMessages: notMounted,
     // Phase 086 Plan 01 (PATTERNS §1 Part C / RESEARCH Pitfall 5): synchronous
@@ -228,5 +360,18 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     setTaskForThread: () => {},
     updateTaskStatusForThread: () => {},
     replaceTasksForThread: () => {},
+    // Phase 092 (SC#3): synchronous no-op stubs — the cap_paused SSE / reconcile
+    // can fire before the provider's mount-time useEffect registers real bodies.
+    setWorkflowLockForThread: () => {},
+    clearWorkflowLockForThread: () => {},
+    // Phase 094 Plan 02 (PANEL-08/09): synchronous no-op stubs — a harness
+    // phase_* / gate_failed / run_failed SSE can fire BEFORE the provider's
+    // mount-time useEffect registers real bodies (Pitfall 5 — NOT notMounted).
+    appendPhaseForThread: () => {},
+    setPhaseStatusForThread: () => {},
+    replacePhasesForThread: () => {},
+    setPhaseEmitSubstepForThread: () => {},
+    finalizeAllPhasesForThread: () => {},
+    finalizeEarlierPhasesForThread: () => {},
   },
 })))

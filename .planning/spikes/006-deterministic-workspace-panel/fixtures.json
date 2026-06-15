@@ -1,0 +1,59 @@
+{
+  "_note": "REAL tool_call sequences captured 2026-06-06 from live runs via the authenticated app API (= persisted DB truth), plus two synthetic clean-case fixtures. execute_code descriptions for the anthropic run #2/#3 were reconstructed from the observed rendered result (the API capture truncated long args before the description field); #1 description is verbatim from capture.",
+  "fixtures": [
+    {
+      "id": "openai-3step",
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "run_status": "completed",
+      "note": "Model DID call write_todos (4x) with semantic labels + 3 execute_code",
+      "tool_calls": [
+        {"name": "write_todos", "todos": [{"content": "Print numbers 1 to 30", "status": "in_progress"}, {"content": "Create a CSV with 100 rows of random sample data", "status": "pending"}, {"content": "Make a simple PNG line chart", "status": "pending"}]},
+        {"name": "execute_code", "description": null, "status": "done"},
+        {"name": "write_todos", "todos": [{"content": "Print numbers 1 to 30", "status": "completed"}, {"content": "Create a CSV with 100 rows of random sample data", "status": "in_progress"}, {"content": "Make a simple PNG line chart", "status": "pending"}]},
+        {"name": "execute_code", "description": null, "status": "done"},
+        {"name": "write_todos", "todos": [{"content": "Print numbers 1 to 30", "status": "completed"}, {"content": "Create a CSV with 100 rows of random sample data", "status": "completed"}, {"content": "Make a simple PNG line chart", "status": "in_progress"}]},
+        {"name": "execute_code", "description": null, "status": "done"},
+        {"name": "write_todos", "todos": [{"content": "Print numbers 1 to 30", "status": "completed"}, {"content": "Create a CSV with 100 rows of random sample data", "status": "completed"}, {"content": "Make a simple PNG line chart", "status": "completed"}]}
+      ]
+    },
+    {
+      "id": "anthropic-3step",
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5",
+      "run_status": "completed",
+      "note": "Model NEVER called write_todos — narrated steps as text. But each execute_code carries a description.",
+      "tool_calls": [
+        {"name": "execute_code", "description": "Print numbers 1 to 30", "status": "done"},
+        {"name": "execute_code", "description": "Create a CSV with 100 rows of random sample data", "status": "done"},
+        {"name": "execute_code", "description": "Create a simple PNG line chart", "status": "done"}
+      ]
+    },
+    {
+      "id": "google-failed",
+      "provider": "google",
+      "model": "gemini-3.5-flash",
+      "run_status": "failed",
+      "note": "429 rate-limit (mislabeled as billing) before any tool call",
+      "tool_calls": []
+    },
+    {
+      "id": "simple-qa",
+      "provider": "any",
+      "model": "any",
+      "run_status": "completed",
+      "note": "SYNTHETIC: pure text answer, e.g. 'what is the capital of France' — 0 tool calls. MUST stay clean (no panel).",
+      "tool_calls": []
+    },
+    {
+      "id": "single-search",
+      "provider": "any",
+      "model": "any",
+      "run_status": "completed",
+      "note": "SYNTHETIC: one-shot doc lookup — 1 tool call. SHOULD stay clean (a single action needs no checklist).",
+      "tool_calls": [
+        {"name": "search_documents", "description": "Search documents for RPA success factors", "status": "done"}
+      ]
+    }
+  ]
+}

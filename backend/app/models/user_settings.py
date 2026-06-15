@@ -155,6 +155,11 @@ class UserEffectiveSettings(BaseModel):
     sub_agent_model: str
     llm_max_output_tokens: int  # 0 = auto (use per-model defaults)
 
+    # Ephemeral template TTL (Phase 100 TMPL-01 D-05; migration 068 app_settings col)
+    # Hours a kind='template_input' workspace file lives before the gated read-path
+    # hides it and the in-process janitor deletes it. Safe default 24 when absent/NULL.
+    template_ttl_hours: int = 24
+
     # OpenRouter tool calling strategy
     openrouter_tool_strategy: OpenRouterToolStrategy = OpenRouterToolStrategy.QUALITY
 
@@ -487,6 +492,7 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         sub_agent_max_output_tokens=int(_val(row, "sub_agent_max_output_tokens", "sub_agent_max_output_tokens", 8192)),
         sub_agent_model=str(_val(row, "sub_agent_model", "sub_agent_model", "")),
         llm_max_output_tokens=int(_val(row, "llm_max_output_tokens", "llm_max_output_tokens", 8192)),
+        template_ttl_hours=int(_val(row, "template_ttl_hours", "template_ttl_hours", 24)),
         openrouter_tool_strategy=OpenRouterToolStrategy(
             str(_val(row, "openrouter_tool_strategy", None, OpenRouterToolStrategy.QUALITY.value))
         ),

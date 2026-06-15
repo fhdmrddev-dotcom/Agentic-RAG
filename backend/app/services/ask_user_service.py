@@ -50,30 +50,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def subscribe_for_response(
+async def _subscribe_and_block(
     redis: "aioredis.Redis",
     run_id: UUID,
     tool_call_id: str,
     timeout_seconds: float,
+    *,
+    on_subscribed=None,
 ) -> "dict | None":
-    """Block until a PUBLISH arrives on ``ask_user:{run_id}:{tool_call_id}`` or
-    ``timeout_seconds`` elapses.
+    """SUBSCRIBE → SADD → (optional in-window hook) → block-on-message → cleanup.
 
-    Registers the channel in ``ask_user:channels:{run_id}`` SET on entry and
-    removes it on exit (so the cancel + shutdown sweep paths can find it).
+    The SINGLE-SOURCED block primitive shared by ``subscribe_for_response`` (the
+    live ask_user handler path) and ``resume_pending_prompt`` (the Plan 04 resume
+    path) so the subscribe/advertise/block/cleanup logic can NEVER drift between
+    the two. The ordering is load-bearing (Pitfall 2 — PUBLISH-before-SUBSCRIBE):
+    SUBSCRIBE happens FIRST, then SADD, then ``on_subscribed`` (the caller's
+    user-visible signal — e.g. the resume re-emit) runs INSIDE the subscribed
+    window so a fast answer can't be published into a no-subscriber gap and lost.
 
-    Returns:
-        Parsed JSON payload dict on PUBLISH (e.g. ``{"kind": "response",
-        "response_text": "yes", "choice_index": null}``), or ``None`` on timeout
-        / unparseable payload.
-
-    Pitfall mitigations:
-        - ``pubsub.get_message(timeout=1.0)`` — never 0 (Pitfall 1 — redis-py
-          spin-loops at 100% CPU when timeout is 0).
-        - ``asyncio.wait_for(pubsub.aclose(), timeout=2.0)`` in finally
-          (Pitfall 3 — aclose can hang on a half-dead Redis socket).
-        - All cleanup steps wrapped in their own try/except so a single failure
-          doesn't mask the rest (idempotent cleanup discipline).
+    Pitfall mitigations are unchanged from the original handler: get_message
+    timeout=1.0 (never 0 — Pitfall 1); aclose under a 2s wait_for (Pitfall 3);
+    each cleanup step in its own try/except (idempotent cleanup discipline).
     """
     channel = f"ask_user:{run_id}:{tool_call_id}"
     channels_set_key = f"ask_user:channels:{run_id}"
@@ -82,6 +79,11 @@ async def subscribe_for_response(
         await pubsub.subscribe(channel)                  # SUBSCRIBE first
         await redis.sadd(channels_set_key, channel)      # advertise to sweep paths
         await redis.expire(channels_set_key, 3600)       # safety TTL — auto-clear leaks
+
+        # In-window hook (subscribe-before-emit — Pitfall 2): the resume path
+        # re-emits the pending prompt HERE, AFTER the subscribe is registered.
+        if on_subscribed is not None:
+            await on_subscribed()
 
         async def _wait():
             while True:
@@ -115,6 +117,103 @@ async def subscribe_for_response(
             await redis.srem(channels_set_key, channel)
         except Exception:  # noqa: BLE001
             logger.exception("ask_user: SREM failed for %s", channels_set_key)
+
+
+async def subscribe_for_response(
+    redis: "aioredis.Redis",
+    run_id: UUID,
+    tool_call_id: str,
+    timeout_seconds: float,
+) -> "dict | None":
+    """Block until a PUBLISH arrives on ``ask_user:{run_id}:{tool_call_id}`` or
+    ``timeout_seconds`` elapses.
+
+    Registers the channel in ``ask_user:channels:{run_id}`` SET on entry and
+    removes it on exit (so the cancel + shutdown sweep paths can find it).
+
+    Returns:
+        Parsed JSON payload dict on PUBLISH (e.g. ``{"kind": "response",
+        "response_text": "yes", "choice_index": null}``), or ``None`` on timeout
+        / unparseable payload.
+
+    Delegates to the single-sourced ``_subscribe_and_block`` primitive (no
+    ``on_subscribed`` hook — this path's user-visible signal is owned by the
+    dispatcher handler that calls it). Externally-observable behavior is
+    UNCHANGED from the pre-refactor inline body.
+    """
+    return await _subscribe_and_block(
+        redis, run_id, tool_call_id, timeout_seconds
+    )
+
+
+async def _emit_ask_user_prompt(
+    redis: "aioredis.Redis",
+    run_id: UUID,
+    tool_call_id: str,
+    prompt: str,
+    options: "list | None",
+    timeout_seconds: float,
+) -> None:
+    """XADD an ``ask_user_prompt`` event to ``run:{run_id}`` (mirrors the engine _emit).
+
+    One canonical event so the reconnected frontend re-renders the question on
+    resume. Same stream/shape the live ``_exec_llm_human_input`` path emits.
+    """
+    await redis.xadd(
+        f"run:{run_id}",
+        {
+            "data": json.dumps(
+                {
+                    "type": "ask_user_prompt",
+                    "tool_call_id": tool_call_id,
+                    "prompt": prompt,
+                    "options": options or [],
+                    "timeout_seconds": timeout_seconds,
+                }
+            )
+        },
+        maxlen=10000,
+        approximate=True,
+    )
+
+
+async def resume_pending_prompt(
+    redis: "aioredis.Redis",
+    run_id: UUID,
+    tool_call_id: str,
+    prompt: str,
+    options: "list | None",
+    timeout_seconds: float,
+) -> "dict | None":
+    """Resume a still-PENDING ask_user prompt after a restart (HARNESS-03 / Plan 04).
+
+    Mirrors the LIVE ask_user flow EXCEPT it does NOT re-INSERT the durable prompt
+    row (it already exists — Plan 04 Task 1 fetched it via ``get_pending_ask_user``).
+    The ordering is the load-bearing correctness rule (Pitfall 2):
+
+      1. SUBSCRIBE ``ask_user:{run_id}:{tool_call_id}``  — the old subscriber died
+         with the worker; re-subscribe FIRST.
+      2. SADD ``ask_user:channels:{run_id}``             — re-advertise to the
+         cancel/shutdown sweeps.
+      3. (skip the durable prompt-row INSERT — it already exists.)
+      4. _emit ``ask_user_prompt``                       — re-render on the
+         reconnected frontend. MUST be AFTER (1) so a fast answer published in the
+         emit→subscribe window can't be lost.
+      5. block on get_message under ``asyncio.wait_for(timeout)``.
+
+    Steps 1/2/5 are the shared ``_subscribe_and_block`` primitive; step 4 runs in
+    its ``on_subscribed`` window (guaranteeing subscribe-before-emit). Returns the
+    parsed wake payload (response / cancel / shutdown) or ``None`` on timeout —
+    identical to ``subscribe_for_response``.
+    """
+    async def _reemit():
+        await _emit_ask_user_prompt(
+            redis, run_id, tool_call_id, prompt, options, timeout_seconds
+        )
+
+    return await _subscribe_and_block(
+        redis, run_id, tool_call_id, float(timeout_seconds), on_subscribed=_reemit
+    )
 
 
 async def publish_response(

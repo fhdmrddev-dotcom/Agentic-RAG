@@ -4,7 +4,7 @@ title: Generated-Files / Artifacts Model — Unify workspace_files vs sandbox-ou
 status: planted
 planted: 2026-05-29
 planted_by: orchestrator (087 scenario-matrix round-3 testing)
-trigger_when: Users are confused about "where did my file go" — OR an agent produces an artifact that lands in the chat (sandbox output link) when the user expected it in the panel (or vice-versa) — OR demand emerges for a single coherent "artifacts" view
+trigger_when: Users are confused about "where did my file go" — OR an agent produces an artifact that lands in the chat (sandbox output link) when the user expected it in the panel (or vice-versa) — OR demand emerges for a single coherent "artifacts" view — OR a WORKFLOW produces a final artifact with no panel/download home (093 re-UAT finding #4) — OR Phase 094/095 planning (confirm artifact + download coverage; the sub-agent-file-threading backend gap)
 priority: medium
 tags: [frontend/panel, artifacts, sandbox, execute_code, workspace, ux, design-question, phase-087]
 ---
@@ -43,6 +43,33 @@ Directions, picked by evidence/UX research:
 3. **Consistent surfacing** — at minimum, give sandbox outputs and workspace files the same card vocabulary and the same "open in panel" / download affordances so they feel like one concept.
 
 Note: this directly intersects the tool-panel-consistency concern and SEED-037 (download + viewing).
+
+## Phase 094 dimension — workflow artifacts + builder assets (operator, 2026-06-04, /gsd:sketch 094)
+
+The original seed framed the three surfaces around **Deep/chat** tools. The v2.8 harness + the
+v2.9 builder add **two more file moments** the unified model must cover:
+
+5. **Workflow FINAL artifacts** — a harness phase (`llm_agent` with `execute_code`, e.g.
+   `plan_execute_verify` / a template-fill phase) produces the deliverable (`.docx`/`.xlsx`/`.pdf`).
+   **Where does it render / download?** Per **D-094-UNIFY** the answer is the **panel FILES section**
+   (the single execution+artifact home) with download + preview, and a **link from the harness
+   provenance answer card** (sketch 010) + a quiet chat pointer (sketch 009) — NOT a separate place.
+   **BLOCKER (093 re-UAT finding #4, confirmed backend gap):** workflow/sub-agent `execute_code`
+   artifacts fire on the **sub-agent's** stream and are **never threaded up** to the harness producer
+   stream, so they don't reach the panel today (`final_output_files`/`code_execution_complete` on the
+   sub stream). Surfacing them is **backend plumbing** (thread sub-agent file events up), not just UI.
+6. **Workflow ASSETS (builder upload)** — a `WorkflowDefinition` owns uploaded templates/forms
+   (SEED-051): the builder (sketch 013) uploads them via an **Assets** strip; they're Storage-backed,
+   attached at authoring, used at run time to be filled. A *4th* file lifecycle (authoring-owned,
+   not per-run, not scratch, not KB) the unified model must place.
+
+**Locked design answer for where files live (sketch 094 direction):** ONE FILES home = the workspace
+panel FILES section (sketch 004/005) for **all** produced files — Deep `execute_code` outputs +
+workflow artifacts + `workspace_write` files — each with **download + preview**; chat keeps a quiet
+pointer; the harness answer card links its deliverables. KB `documents` stay their own store (read by
+`search_documents`), surfaced read-only. This makes SEED-037's download wire-up + this seed's
+unification a **094/095 confirm-at-planning item**, with the sub-agent-file-threading gap as the
+backend prerequisite.
 
 ## Related
 

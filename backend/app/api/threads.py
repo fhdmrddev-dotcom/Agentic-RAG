@@ -28,7 +28,10 @@ from app.dependencies import get_current_user, get_supabase, get_redis
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
 # probe → 503+Retry-After:10 fallback (mirrors runs.py:354-370 pattern).
-from redis.exceptions import RedisError
+# 101.1-08 (gap 4): ResponseError ('no such key') distinguishes a GC'd terminal-run
+# buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
+# RedisError subclass, so the specific branch is handled BEFORE the broad except.
+from redis.exceptions import RedisError, ResponseError
 from app.models.message import MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
@@ -36,7 +39,18 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_run, finalize_run, insert_assistant_message
+# Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
+# imports are cycle-safe (db/workflows.py imports only models). run_workflow +
+# _load_run_definition are imported LOCALLY inside the producer branch to keep
+# the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
+from app.db.workflows import create_workflow_run, list_published_workflows
+from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
 from app.utils.folder_utils import fetch_visible_folders
+from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset
+# 099 WFSKILL-01: imported as a MODULE (not bound names) so the kickoff helper calls
+# validate_skill_refs / materialize_skill_snapshots_if_needed through the module
+# object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
+from app.services.harness import skill_snapshot as _skill_snapshot
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
@@ -44,6 +58,35 @@ from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
+# Phase 089 Plan 01 (G-5 extraction): the three pure stream-drain / null-strip
+# helpers moved verbatim to agent_loop.py. Re-imported here so the still-in-place
+# agent_runner callers (drain loops + the persist functions that call _strip_nul)
+# resolve them until the loop body itself moves in Plan 03. `t.drain_step is
+# a.drain_step` holds — one definition, no duplicate.
+#
+# Phase 089 Plan 03 (THE verbatim move): run_agent_loop now owns the loop body.
+# The loop-body module-level helpers + _reconstruct_history MOVED to agent_loop.py
+# (re-imported here for backward-compat — existing `from app.api.threads import
+# _compute_confidence`/`SYSTEM_PROMPT`/`_reconstruct_history`/etc. call sites + test
+# imports keep resolving; one definition, no duplicate). run_agent_loop is imported
+# and called by agent_runner; the _terminal_status classifier + _shielded_finalize
+# STAY here (producer-shell concern).
+from app.services.agent_loop import (
+    drain_step,
+    _drain_stream_with_close_on_cancel,
+    _strip_nul,
+    run_agent_loop,
+    RunContext,
+    AgentLoopResult,
+    _is_transient_provider_error,
+    SYSTEM_PROMPT,
+    TOOL_USAGE_INSTRUCTIONS,
+    _format_tool_list,
+    CONFIDENCE_DISCLAIMER,
+    _compute_confidence,
+    _deduplicate_citations,
+    _reconstruct_history,
+)
 
 # Sandbox import — always available at module scope so per-request paths
 # (e.g. line ~1328 where get_or_create runs without re-importing) cannot
@@ -140,478 +183,15 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     )
 
 
-# Phase 075.1 Plan 02 Task 2 — pure drain step.
-# Deterministic, no async, no Docker. Extracted from the inline
-# accumulator in the sandbox drain loop (`while True` consumer near
-# the execute_code branch) so the line-buffer logic can be exercised
-# by deterministic unit tests at backend/tests/unit/test_075_1_drain_step.py
-# without requiring a running Docker daemon.
-#
-# Contract:
-#   item = {"type": "stdout_chunk"|"stderr_chunk", "content": str, "captured_at": float}
-#   state = {"stdout_partial": str, "stderr_partial": str}
-#   returns (emit_calls, new_state) where each emit_call is a tuple
-#   (event_type, content, captured_at). The caller is responsible for
-#   awaiting `_emit(redis, run_id, event_type, content=..., captured_at=...)`
-#   for each entry and merging new_state back into its loop-local state.
-#
-# Invariants:
-#   - captured_at on emitted tuples is item["captured_at"] verbatim —
-#     never a fresh time.time() reading. This preserves SC #2's
-#     monotonic-captured_at assertion in test_075_code_stdout_progressive.py.
-#   - CRLF normalises to LF before split so Windows-style line endings
-#     don't leak as bare '\r' (D-075-06 + PATTERNS.md §4).
-#   - Unknown item types are no-ops (state passes through unchanged) —
-#     the caller handles _done and other terminal items separately.
-def drain_step(
-    item: dict,
-    state: dict,
-) -> tuple[list[tuple[str, str, float]], dict]:
-    """Pure transform: chunk + state → emit calls + new state."""
-    emit_calls: list[tuple[str, str, float]] = []
-    stdout_partial = state.get("stdout_partial", "")
-    stderr_partial = state.get("stderr_partial", "")
-    item_type = item.get("type")
-    if item_type == "stdout_chunk":
-        captured_at = item["captured_at"]
-        combined = (stdout_partial + item["content"]).replace("\r\n", "\n")
-        lines = combined.split("\n")
-        stdout_partial = lines.pop()
-        for line in lines:
-            emit_calls.append(("code_stdout", line, captured_at))
-    elif item_type == "stderr_chunk":
-        captured_at = item["captured_at"]
-        combined = (stderr_partial + item["content"]).replace("\r\n", "\n")
-        lines = combined.split("\n")
-        stderr_partial = lines.pop()
-        for line in lines:
-            emit_calls.append(("code_stderr", line, captured_at))
-    return emit_calls, {
-        "stdout_partial": stdout_partial,
-        "stderr_partial": stderr_partial,
-    }
-
-
-# Phase 067.1 Plan 01 Track A: drain-into-queue helper.
-#
-# Why this exists: langsmith-py 0.2.3..0.8.2's `_TracedStream.__iter__` is a
-# generator (`yield from self.__ls__gen__`) wrapped in `except BaseException`.
-# When an outer `for chunk in stream:` loop exits via asyncio cancellation
-# (asyncio.timeout fires), Python's for-loop semantics call `iterator.close()`
-# on the generator AS PART OF THE LOOP'S OWN CLEANUP — `GeneratorExit` is
-# thrown INTO `_TracedStream.__iter__` at the `yield from` point, caught by
-# `except BaseException as e:`, and recorded via `_end_trace(error=e)`. By
-# the time control reaches our `except asyncio.TimeoutError:` block, the
-# trace has already been closed with `error=GeneratorExit`. Calling
-# `stream.close()` from the except handler is too late — Pitfall 1, Phase
-# 067.1 RESEARCH.md.
-#
-# The fix: own the iteration ourselves. Run the sync `for chunk in stream:`
-# loop on the default executor; the for-loop runs to natural StopIteration
-# when we close the underlying SDK stream from the OUTSIDE (main thread).
-# Our async-side timeout cancels OUR queue consumer (a clean asyncio
-# CancelledError caught locally) — the langsmith generator never sees a
-# close-from-outside, takes the `else: self._end_trace()` branch, and
-# closes the trace cleanly with `error=None`.
-async def _drain_stream_with_close_on_cancel(
-    stream,
-    timeout_seconds,
-    on_chunk_async,
-    close_fn=None,
-):
-    """Iterate ``stream`` under ``asyncio.timeout``; on cancel, close the
-    underlying SDK stream (sync, idempotent) BEFORE the producer's for-loop
-    cleanup propagates GeneratorExit into langsmith's _TracedStream.__iter__.
-
-    Args:
-        stream: A sync iterable (OpenAI ``Stream`` / langsmith ``_TracedStream``
-            wrapper / ``stream_anthropic`` generator). The for-loop runs in a
-            thread pool worker so its implicit cleanup is decoupled from our
-            async timeout.
-        timeout_seconds: Per-call deadline in seconds. ``asyncio.timeout``
-            wraps OUR queue consumer (the `await q.get()` line below). When
-            the deadline fires, we cancel the producer by closing the SDK
-            stream — NOT by raising into the producer thread.
-        on_chunk_async: Async callable invoked per chunk in the consumer loop.
-            Runs on the event-loop thread, so all ``_emit(...)`` / Supabase
-            calls Just Work.
-        close_fn: Optional sync callable to close the underlying SDK stream
-            on timeout. If None, falls back to ``stream.close()``. Anthropic
-            uses ``_ant_gen.close()`` (the wrapping generator) — pass that
-            here for the Anthropic branch. SYNC method (openai 2.28.0 /
-            anthropic 0.97.0); do NOT ``await``.
-    """
-    q: asyncio.Queue = asyncio.Queue(maxsize=64)
-    SENTINEL = object()
-    EXC_SENTINEL = object()
-    producer_exception: list[BaseException] = []
-
-    loop = asyncio.get_running_loop()
-
-    def _producer():
-        # Sync producer — drives _TracedStream.__iter__ to completion.
-        # When stream.close() is called from the consumer's except-block
-        # (main thread), the underlying httpx response closes; the
-        # `for chunk in stream:` loop exits via natural StopIteration;
-        # _TracedStream.__iter__ takes the `else: self._end_trace()`
-        # branch — clean trace closure with error=None.
-        try:
-            for chunk in stream:
-                # call_soon_threadsafe: queue is event-loop-bound; producer
-                # is on a thread, so put_nowait would race with the consumer.
-                fut = asyncio.run_coroutine_threadsafe(q.put(chunk), loop)
-                try:
-                    fut.result()  # block this worker thread until queued
-                except BaseException:
-                    # consumer-side cancellation observed by run_coroutine_threadsafe
-                    return
-        except BaseException as e:
-            producer_exception.append(e)
-        finally:
-            # Always signal end-of-stream. asyncio.run_coroutine_threadsafe
-            # is safe even if the loop is closing — fut.result() will raise
-            # but we ignore it; the consumer is already past q.get() at that
-            # point (cancel path) or will pick up the SENTINEL (clean path).
-            try:
-                fut = asyncio.run_coroutine_threadsafe(q.put(SENTINEL), loop)
-                fut.result(timeout=2.0)
-            except BaseException:
-                pass
-
-    producer_fut = loop.run_in_executor(None, _producer)
-
-    try:
-        async with asyncio.timeout(timeout_seconds):
-            while True:
-                chunk = await q.get()
-                if chunk is SENTINEL:
-                    break
-                await on_chunk_async(chunk)
-    except (asyncio.TimeoutError, asyncio.CancelledError):
-        # Close the underlying SDK stream from the MAIN THREAD. The producer
-        # thread's `for chunk in stream:` then exits via StopIteration —
-        # _TracedStream.__iter__ closes cleanly via `else: self._end_trace()`.
-        try:
-            (close_fn or stream.close)()
-        except Exception:
-            logger.debug(
-                "stream close raised during Track A drain cancel — non-fatal",
-                exc_info=True,
-            )
-        # Wait briefly for producer to drain & post SENTINEL — bounded so a
-        # genuinely-stuck SDK call cannot wedge the request handler.
-        try:
-            await asyncio.wait_for(asyncio.wrap_future(producer_fut), timeout=2.0)
-        except Exception:
-            logger.debug(
-                "producer await raised during Track A drain cancel — non-fatal",
-                exc_info=True,
-            )
-        raise
-    # Re-raise any non-cancel error captured from the producer thread.
-    if producer_exception:
-        raise producer_exception[0]
-
-
-def _is_transient_provider_error(e: APIError) -> bool:
-    """Return True if this is a transient provider failure safe to retry.
-
-    Checks status code, structured body (OpenRouter puts real code in e.body),
-    and message text. Never retries auth, billing, or parameter errors.
-    """
-    if e.status_code in (502, 503, 529):
-        return True
-    try:
-        code = e.body.get("error", {}).get("code")
-        if code in (502, 503, 529):
-            return True
-    except (AttributeError, TypeError):
-        pass
-    msg_lower = str(getattr(e, "message", "") or e).lower()
-    return any(kw in msg_lower for kw in (
-        "provider returned error", "upstream", "bad gateway", "service unavailable",
-    ))
-
-
-SYSTEM_PROMPT = (
-    "You are a helpful AI assistant with access to the user's document library.\n\n"
-
-    "## CRITICAL: Two operating modes\n"
-    "**Q&A / retrieval** (DEFAULT — use this unless the user explicitly requests a file): "
-    "The user asks a question and wants a text answer. Search or analyze documents, then respond with text. "
-    "After each tool call, check: do I have enough to answer? If yes — respond directly. "
-    "Do NOT call more tools to verify what you already have.\n"
-    "**File generation** (ONLY when the user explicitly asks you to CREATE, GENERATE, BUILD, or MAKE a downloadable file): "
-    "The user uses action verbs like 'create a PowerPoint', 'generate a PDF report', 'build me an Excel sheet', "
-    "'make a Word document'. Retrieve/analyze the required content, then call execute_code to produce the file.\n\n"
-
-    "**Disambiguation — when in doubt, default to Q&A.** "
-    "If the user says 'summarize the report' or 'what does the report say?' — that is Q&A, respond with text. "
-    "If the user says 'create a summary report as a Word doc' — that is file generation, use execute_code. "
-    "The presence of words like 'report', 'summary', 'analysis' does NOT mean file generation. "
-    "Only trigger execute_code when the user explicitly asks for a downloadable file.\n\n"
-
-    "## Tool selection guide\n"
-    "Pick the ONE tool that best fits the task:\n"
-    "- **search_documents** → reading passage content: finding facts, quotes, figures, or explanations *inside* documents. "
-    "The returned chunks are pre-extracted relevant passages — read them carefully. If they contain the answer, stop there. "
-    "Only add `metadata_filter` when the user explicitly asks to scope by author, date, or document type — never guess filter values.\n"
-    "- **query_documents** → metadata/structural questions: counts, lists, date-range filters, folder membership, file sizes "
-    "(e.g. 'how many PDFs from 2023?', 'list all documents by John', 'which files are in the Reports folder'). "
-    "These are SQL-style questions about document attributes, not about what documents say.\n"
-    "- **analyze_document** → full-document tasks: summarize, compare, or extract all key points from an entire document. "
-    "If the target document is ambiguous (user says 'the report' without specifying which), call search_documents or "
-    "query_documents first to identify it, then call analyze_document. "
-    "**Once analyze_document returns, never call read_document on that same document — the full content has already been processed.**\n"
-    "- **ls / tree** → browse folder structure and navigate the knowledge base\n"
-    "- **grep** → find documents containing a specific phrase or regex pattern\n"
-    "- **glob** → find documents by filename pattern (*.pdf, report-*, etc.)\n"
-    "- **read_document** → read a specific section when search chunks are cut off or incomplete; use start_line/end_line; "
-    "do NOT call more than once per document per question\n"
-    "- **web_search** → current events, software versions, or topics not covered in uploaded documents\n"
-    "- **execute_code** → create downloadable files (PowerPoint, PDF, Word, Excel, charts) when the user explicitly asks "
-    "for file creation. Also for calculations and data analysis that require Python. "
-    "Always pass `libraries` for non-stdlib packages. "
-    "Pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename}. "
-    "Write output files to /sandbox/output/ and list them in `output_files`.\n"
-    "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
-    "- **save_skill / read_skill_file** → skill management\n"
-    "- **query_tables** → structured table data from documents: 'show me the revenue table from Q3 Report', "
-    "'find rows where Region is APAC', 'what are the column headers in the summary table?'. "
-    "Use when the question is about specific values inside a document's tabular data.\n\n"
-
-    "**DO NOT use execute_code for:** answering questions, summarizing documents, explaining concepts, "
-    "listing information, comparing documents, or any task where a text response is appropriate. "
-    "Only use it when the user wants a downloadable file or needs Python computation.\n\n"
-
-    "**Tiebreaker — search_documents vs query_documents:** If the question is about *what a document says* (content), "
-    "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
-    "use query_documents.\n\n"
-
-    "**Hybrid fallback — do not stop on zero results:** If query_documents returns no rows, the identifier may exist "
-    "inside document content — call search_documents with the key term. If search_documents returns no chunks, the user "
-    "may be asking about metadata — call query_documents. Always try the other tool before giving up.\n\n"
-
-    "**Multi-document comparison:** Call analyze_document once per document, then synthesize across them in your response. "
-    "Do not call search_documents separately for each.\n\n"
-
-    "## Rules\n"
-    "- Always cite which document your answer comes from.\n"
-    "- Never call the same tool twice with the same arguments.\n"
-    "- If search_documents returns relevant chunks, answer from those — do NOT also call read_document on the same document.\n"
-    "- **Zero results from search_documents:** If the tool returns no chunks at all, try grep (if the user referenced a "
-    "specific phrase) or query_documents (to check whether the document exists). If still nothing, tell the user directly "
-    "— do not fabricate.\n"
-    "- **Zero results from query_documents:** If the SQL returns no rows, the identifier may appear inside document "
-    "content rather than in filenames or metadata. Fall back to search_documents with the key identifier as the query.\n"
-    "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
-    "on that document rather than answering from nothing — unless analyze_document was already called this turn.\n"
-    "- **Never loop on read_document:** If two consecutive read_document calls on the same document return no results, stop — do not call it a third time. Answer from what you have or use analyze_document once.\n"
-    "- **Web vs documents conflict:** If web_search results conflict with content in your documents, prioritize the "
-    "document content and flag the discrepancy explicitly to the user.\n"
-    "- **Tool call brevity:** When calling tools, do NOT narrate your plan or reasoning. Just call the tool. "
-    "Verbalizing your intent wastes output tokens and can cause the tool call to be cut off mid-stream.\n"
-    "- **After analyze_document (file generation task):** If the user asked for a downloadable file, call execute_code "
-    "with complete Python code. Do not write long preambles before the tool call — keep text minimal to preserve "
-    "output token budget for the code.\n"
-    "- **After analyze_document (Q&A task):** Respond with your findings in text. Do not call execute_code.\n"
-    "- **Never call execute_code in the same response as search_documents, analyze_document, read_document, or web_search.** "
-    "Retrieve content first; call execute_code only in the NEXT iteration after you have received the retrieved data. "
-    "Calling execute_code before reading documents produces fabricated content.\n"
-    "- **Keep execute_code scripts under 200 lines.** Use data-driven loops and helper functions instead of hardcoding "
-    "each slide, section, or page. Monolithic scripts are slow to generate and error-prone. "
-    "If the task requires more than 200 lines, split into multiple execute_code calls.\n\n"
-
-    "## Multi-step intent\n"
-    "When the user requests a multi-step pipeline — for example:\n"
-    "- 'search for X and write a report'\n"
-    "- 'find Y, analyze it, then make a chart and a docx'\n"
-    "- 'research Z and produce a one-pager'\n"
-    "Execute the FULL pipeline end-to-end. The user named the deliverables; deliver them. "
-    "After each tool call, continue to the next step in the user's named sequence rather than "
-    "asking 'If you want, I can also...', 'Shall I proceed to...', or 'Let me know if you'd "
-    "like me to...'. When the pipeline completes, summarize what you produced in your final "
-    "text response.\n"
-    "- **When you are working through multiple steps or a task list, ALWAYS call write_todos** "
-    "to record the task list — do not just narrate the steps in text. The user sees the todo "
-    "list in their workspace panel; a narrated list they cannot see is not tracking. Call "
-    "write_todos at the START of multi-step work and again to flip a todo's status as you "
-    "complete it.\n\n"
-
-    "EXCEPTIONS (still ask for clarification):\n"
-    "- The intent is genuinely ambiguous (e.g. 'make me a report' — about what? from which "
-    "documents? what format?).\n"
-    "- The next step requires information the user did not provide and you cannot infer "
-    "from the documents (e.g. specific names, date ranges, file format preferences when "
-    "the document corpus has many).\n"
-    "- The action would be irreversible or destructive in a way the user might not have "
-    "intended (e.g. overwriting / deleting existing artifacts when an alternative path "
-    "exists).\n"
-    "**In these cases — when you need information only the user has, or must confirm an "
-    "ambiguous or destructive action before proceeding — call the ask_user tool rather than "
-    "guessing or narrating the question in prose.** Only do this for a genuine blocker; when "
-    "the intent is clear and safe, proceed without asking.\n\n"
-
-    "## Confidence & hedging\n"
-    "search_documents results include a `similarity` score (0–1). If ALL returned chunks have "
-    "similarity below 0.38, the answer is likely not in the documents — say so explicitly: "
-    "\"I couldn't find reliable information about this in your documents. The closest match was "
-    "[document name] but the similarity was low.\" Do not fabricate an answer from weak matches.\n\n"
-
-    "## Citation format\n"
-    "When citing document content, use this format:\n"
-    "**[Document Name]** — [section or chapter if identifiable, otherwise omit]\n"
-    "Example: **Fahed Mrad Chapters 1-4.docx** — Chapter 3.4\n"
-    "Never cite a document you did not retrieve in this response.\n\n"
-
-    "## execute_code output\n"
-    "- Inline output (stdout/stderr) is shown in the terminal panel — summarize key findings in your text response; "
-    "do not repeat raw output verbatim.\n"
-    "- Output files (.pptx, .docx, .pdf, .png, etc.) are automatically shown as download cards in the UI — "
-    "do NOT write markdown links or URLs for them. Mention the filename naturally: "
-    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'.\n\n"
-
-    # Phase 075.1 Plan 04 (B-260519-08 + B-260519-09) — sandbox conventions.
-    # Applies uniformly to OpenAI, Anthropic, Google, OpenRouter, Ollama —
-    # all providers see this same SYSTEM_PROMPT (unification principle).
-    "## Code execution conventions\n"
-    "- Always write output files (charts, documents, decks, etc.) to `/sandbox/output/`. "
-    "Files written elsewhere are NOT harvested into the download panel — the user can't access them. "
-    "Use absolute paths: `/sandbox/output/chart.png`, NOT `chart.png` or `/tmp/chart.png`.\n"
-    "- If you hit `ImportError` or `ModuleNotFoundError`, install the missing package first via "
-    "`pip install <pkg>` (use `!pip install <pkg>` or `subprocess.run(['pip', 'install', '<pkg>'])` inside the cell) "
-    "then retry the code. Do NOT give up after the first import failure. "
-    "Common packages are pre-installed (python-pptx, matplotlib, numpy, pandas); "
-    "other packages can be installed at runtime in seconds.\n"
-)
-
-
-TOOL_USAGE_INSTRUCTIONS = """
-
-## Tool Usage Format
-
-When you need to use a tool, output a JSON block in this exact format:
-
-```json
-{{"tool": "TOOL_NAME", "arguments": {{"arg1": "value1", "arg2": "value2"}}}}
-```
-
-Available tools:
-{tool_list}
-
-Rules:
-1. Output ONLY the JSON block — do not describe your plan or say "Now I'll search..."
-2. Use the exact tool name from the list above
-3. Include ALL required arguments
-4. If you don't need a tool, respond normally with text
-"""
-
-
-def _format_tool_list(tools: list[dict]) -> str:
-    """Format tool schemas as a human-readable list for structured mode prompts."""
-    lines = []
-    for tool in tools:
-        fn = tool.get("function", {})
-        name = fn.get("name", "unknown")
-        desc = fn.get("description", "")
-        params = fn.get("parameters", {})
-        props = params.get("properties", {})
-        required = params.get("required", [])
-
-        lines.append(f"- **{name}**: {desc}")
-        if props:
-            arg_lines = []
-            for arg_name, arg_info in props.items():
-                req_flag = " (required)" if arg_name in required else ""
-                arg_desc = arg_info.get("description", "")
-                arg_type = arg_info.get("type", "any")
-                arg_lines.append(f"  - `{arg_name}` ({arg_type}){req_flag}: {arg_desc}")
-            lines.extend(arg_lines)
-    return "\n".join(lines)
-
-
-CONFIDENCE_DISCLAIMER = (
-    "This answer is based on limited or weakly-matched evidence. "
-    "Please verify with the source documents."
-)
-
-
-def _compute_confidence(avg_similarity: float) -> str:
-    """Map average cosine similarity to confidence level (D-10).
-
-    Thresholds calibrated for text-embedding-3-small. Phase 076 recalibration
-    (2026-05-25, N=121 queries, 100 audit_log + 21 synthetic) adjusted from
-    0.55/0.40 to 0.54/0.38: post-071.3 extraction stack (camelot tables +
-    pymupdf_full images + legacy text) shifted the score distribution lower
-    (median 0.4861 vs prior era). New thresholds restore D-04 target bucket
-    balance -- high 30.6% / medium 45.5% / low 24.0% (target ~30%/45%/25%).
-
-    Prior calibration: Phase 32.5 (2026-04-18) lowered from 0.70/0.50 to
-    0.55/0.40 because text-embedding-3-small produces lower absolute scores
-    than expected.
-    """
-    if avg_similarity >= 0.54:
-        return "high"
-    elif avg_similarity >= 0.38:
-        return "medium"
-    return "low"
-
-
-def _deduplicate_citations(citations: list[dict]) -> list[dict]:
-    """Deduplicate citations by (document_id, chunk_index), preserving order (D-14)."""
-    seen: set[tuple] = set()
-    unique: list[dict] = []
-    for c in citations:
-        key = (c["document_id"], c.get("chunk_index"))
-        if key not in seen:
-            seen.add(key)
-            unique.append(c)
-    return unique
-
-
-def _accumulate_chunk_usage(
-    chunk,
-    provider: str,
-    input_total: int | None,
-    output_total: int | None,
-) -> tuple[int | None, int | None]:
-    """Provider-aware usage accumulator for OpenAI-compat streaming chunks.
-
-    Phase 075.3 D-075.3-03 + D-075.3-01-probe-locked (2026-05-22, verdict =
-    CUMULATIVE, pinned in 075.3-01-PLAN.md ``<probe_result>``).
-
-    - **Google** (OpenAI-compat) emits ``chunk.usage`` with **cumulative
-      running totals** on every chunk (alongside ``delta.content`` /
-      ``delta.tool_calls``). The Google branch **overwrites** the running
-      total each chunk (last-wins). Summing via ``+=`` would over-count
-      by 2-3× (silent billing-accounting corruption).
-    - **OpenAI** emits ``chunk.usage`` only on the final chunk with empty
-      ``choices=[]`` (Phase 073 D-073-08). The OpenAI branch sums via
-      ``+=`` (initialised from None on first usage chunk).
-    - **OpenRouter** is forward-compatible per Pitfall 8 (deprecation 2026
-      — always returns usage now). Same ``+=`` branch — if a stray
-      mid-stream usage chunk ever appears alongside the final emission,
-      the sum is correct.
-    - Unknown / ollama / empty / anthropic-via-compat / made-up provider
-      names fall through to ``+=`` (safe default matching OpenAI shape).
-
-    Pure function: no I/O, no closure capture. Trivially unit-testable;
-    see ``backend/tests/unit/test_chunk_handler_provider_aware.py``.
-    """
-    u = getattr(chunk, "usage", None)
-    if u is None:
-        return input_total, output_total
-    _i = getattr(u, "prompt_tokens", 0) or 0
-    _o = getattr(u, "completion_tokens", 0) or 0
-    if provider == "google":
-        # D-075.3-01 probe-locked: cumulative running totals → overwrite-last-wins.
-        # Re-flip to the ``+=`` branch ONLY if the probe verdict in
-        # 075.3-01-PLAN.md <probe_result> changes to DELTA on a future re-run.
-        return _i, _o
-    # OpenAI / OpenRouter / Ollama / Anthropic-via-compat / unknown → += sum.
-    if input_total is None:
-        return _i, _o
-    return input_total + _i, (output_total or 0) + _o
+# Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
+# SYSTEM_PROMPT, TOOL_USAGE_INSTRUCTIONS, _format_tool_list, CONFIDENCE_DISCLAIMER,
+# _compute_confidence, _deduplicate_citations MOVED verbatim to
+# app.services.agent_loop and are re-imported at the top of this module (see the
+# agent_loop import block). Definitions removed here to keep one canonical copy (no
+# duplicate). _reconstruct_history (further down) moved with them.
+# Phase 092.5 Wave 4 (D-04): _accumulate_chunk_usage moved AGAIN — from agent_loop
+# into app.services.provider_gateway.openai_compat (the OpenAI-compat adapter owns
+# the provider-aware usage helper now); no longer re-exported through threads.py.
 
 
 # Phase 063 (D-063-01): the module-level `event_consumer` async generator that
@@ -674,9 +254,18 @@ async def _enrich_messages_with_runs(
     runs_select_own (migration 035 lines 47-49). Mirrors list_active_runs
     at threads.py:543-551 (D-062-12).
     """
+    # Phase 095.1-03 (D-04/D-05): ADDITIVE-SELECT-ONLY on this G-5 hot file.
+    # The SELECT gains 4 COLUMNS (model, provider, started_at, completed_at) so
+    # the run-sub can show `{provider} · {model} · turn N` (D-04 model
+    # attribution) and the RunCard timer can derive the TRUE duration
+    # completed_at − started_at (D-05). The WHERE clause is UNCHANGED
+    # (.eq thread_id + .eq user_id + RLS runs_select_own) → no widened row set,
+    # no IDOR (T-095.1-03-02). No migration, no new write — runs.model/provider
+    # are NOT NULL and started_at DEFAULTs now(); completed_at is written on
+    # finalize. Flows to BOTH /messages and /snapshot (shared helper).
     runs_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, message_id, status")
+        .select("run_id, message_id, status, model, provider, started_at, completed_at")
         .eq("thread_id", thread_id)
         .eq("user_id", user_id)
         .order("started_at", desc=True)
@@ -696,6 +285,13 @@ async def _enrich_messages_with_runs(
         run = runs_by_message.get(m["id"])
         m["run_id"] = run["run_id"] if run else None
         m["run_status"] = run["status"] if run else None
+        # Phase 095.1-03 (D-04/D-05): additive stamps. A message with no matched
+        # run (legacy / pre-run-backed) gets None for all 4 — graceful, never a
+        # fabricated value (the honesty rule).
+        m["model"] = run["model"] if run else None
+        m["provider"] = run["provider"] if run else None
+        m["started_at"] = run["started_at"] if run else None
+        m["completed_at"] = run["completed_at"] if run else None
 
     return messages
 
@@ -847,6 +443,27 @@ async def get_snapshot(
                 redis.xinfo_stream(f"run:{rid}"),
                 timeout=2.0,
             )
+        except ResponseError as e:
+            # 101.1-08 (gap 4 backend): a GC'd run buffer raises
+            # ResponseError('no such key') — that run is simply terminal, not a
+            # Redis outage. Degrade to skipping its cursor (the DB reconcile is the
+            # source of truth, D-v2.5-03) instead of 503-ing the whole snapshot. A
+            # real connection-level RedisError still returns 503 below. A
+            # non-missing-key ResponseError is still a real fault — re-raise it into
+            # the broad handler's 503 path.
+            if "no such key" in str(e).lower():
+                # T-073-04 / D-074-03: identifier-only log (run id, no content).
+                logger.debug(
+                    "Snapshot skipping GC'd run buffer on GET /threads/%s/snapshot run=%s",
+                    thread_id, rid,
+                )
+                continue
+            logger.exception("Redis unreachable on GET /threads/%s/snapshot", thread_id)
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Streaming infrastructure unavailable"},
+                headers={"Retry-After": "10"},
+            )
         except (RedisError, asyncio.TimeoutError, OSError):
             # T-073-04 / D-074-03: identifier-only log format string —
             # never log message/args content.
@@ -989,6 +606,55 @@ async def delete_thread(
 _SINGLE_MODEL_PROVIDERS = frozenset({"deepseek", "moonshot", "minimax", "zhipu", "ollama"})
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Remove <think>...</think> reasoning blocks (closed) and any unclosed trailing
+    <think> from text. Reasoning providers (minimax inline, GLM-4.6+) emit <think>
+    in message.content rather than a separate reasoning_content field, which would
+    otherwise bury or replace a generated title."""
+    out = text or ""
+    lower = out.lower()
+    while "<think>" in lower and "</think>" in lower:
+        start = lower.find("<think>")
+        end = lower.find("</think>", start)
+        if end == -1:
+            break
+        out = out[:start] + out[end + len("</think>"):]
+        lower = out.lower()
+    idx = out.lower().find("<think>")  # unclosed trailing think (ran out of budget mid-reasoning)
+    if idx != -1:
+        out = out[:idx]
+    return out
+
+
+def _derive_title_from_message(msg: str) -> str:
+    """Deterministic fallback title from the first user message — used when the LLM
+    returned reasoning-only / empty / a refusal. Returns a clean short title (first
+    line, first ~8 words, <=50 chars) instead of the bare 'New Chat' sentinel."""
+    text = (msg or "").strip()
+    if not text:
+        return "New Chat"
+    first_line = text.splitlines()[0].strip()
+    title = " ".join(first_line.split()[:8])[:50].strip()
+    return title or "New Chat"
+
+
+def _clean_llm_title(raw: str, first_user_message: str) -> str:
+    """Extract a usable title from raw LLM output. Strips <think> blocks + markdown/
+    quotes; falls back to a title derived from the user message (NOT bare 'New Chat')
+    when the model returned reasoning-only / empty / a refusal. Closes the title-gen
+    'stuck on New Chat' bug on reasoning providers (deepseek/moonshot/google/minimax)
+    whose tiny token budget left content empty after hidden reasoning."""
+    cleaned = _strip_think_blocks(raw or "")
+    cleaned = cleaned.strip().strip('"').strip("'").strip("*").strip()
+    if (
+        not cleaned
+        or len(cleaned) > 60
+        or cleaned.startswith(("I ", "I'", "**", "Sorry", "As ", "<"))
+    ):
+        return _derive_title_from_message(first_user_message)
+    return cleaned
+
+
 def generate_thread_title(
     first_user_message: str,
     user_settings=None,
@@ -1025,9 +691,13 @@ def generate_thread_title(
                     or (user_settings.llm_model if user_settings else settings.llm_model)
                 )
 
-        # Google models need more token budget for 4-6 word titles.
-        # Other providers work fine at 30.
-        _title_max_tokens = 60 if provider == "google" else 30
+        # Google (Gemini) is verbose and truncates a title at 60 — give it room
+        # for a full 4-6 word title. Other providers keep 30: non-reasoning models
+        # emit a short title fine, and reasoning models (deepseek/moonshot/minimax/
+        # zhipu) would burn any larger budget on hidden reasoning while BLOCKING the
+        # producer spawn — so we keep their budget small (fast empty return) and let
+        # _clean_llm_title fall back to a derived title. No added first-message latency.
+        _title_max_tokens = 160 if provider == "google" else 30
         token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
         title_messages = [
             {
@@ -1042,24 +712,22 @@ def generate_thread_title(
             stream=False,
             **{token_param: _title_max_tokens},
         )
-        raw_title = (response.choices[0].message.content or "").strip()
-        # Guard against models returning refusals or markdown instead of a title
-        if len(raw_title) > 60 or raw_title.startswith(("I ", "I'", "**", "Sorry", "As ")):
-            return first_user_message[:40].strip() or "New Chat", None
-        return raw_title or "New Chat", None
+        # _clean_llm_title strips <think> blocks, markdown/quotes, and refusals,
+        # falling back to a derived title (never bare 'New Chat') on empty content.
+        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), None
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
         if provider in _SINGLE_MODEL_PROVIDERS:
             # Single-model provider and the model 404'd -- no fallback available
-            return first_user_message[:40].strip() or "New Chat", None
+            return _derive_title_from_message(first_user_message), None
         fallback = (
             _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
             or (user_settings.llm_model if user_settings else settings.llm_model)
         )
         if not fallback or fallback == model:
-            return first_user_message[:40].strip() or "New Chat", None
+            return _derive_title_from_message(first_user_message), None
         fallback_info = {"original_model": model, "fallback_model": fallback}
-        _title_max_tokens_fb = 60 if provider == "google" else 30
+        _title_max_tokens_fb = 160 if provider == "google" else 30
         token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
         title_messages = [
             {
@@ -1074,13 +742,13 @@ def generate_thread_title(
             stream=False,
             **{token_param2: _title_max_tokens_fb},
         )
-        return (response.choices[0].message.content or "").strip() or "New Chat", fallback_info
+        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), fallback_info
     except Exception as e:
         logger.warning(
             "title_generation_failed: %s", e,
             exc_info=True,
         )
-        return first_user_message[:40].strip() or "New Chat", None
+        return _derive_title_from_message(first_user_message), None
 
 
 @router.get("/{thread_id}/messages", response_model=list[MessageResponse])
@@ -1132,93 +800,74 @@ async def get_messages(
     return messages
 
 
-def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
-    """
-    Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
+# Phase 089 Plan 03 (G-5 verbatim move): _reconstruct_history MOVED verbatim to
+# app.services.agent_loop (co-located there per the operator-approved SEAM.md —
+# the loop calls it from its own setup block; keep-and-import was rejected because
+# agent_loop -> threads reintroduces the cycle). Re-imported at the top of this
+# module so `from app.api.threads import _reconstruct_history` (e.g.
+# test_tool_memory.py) keeps resolving. Definition removed here (one canonical copy).
 
-    For assistant messages that have tool_calls with tool_call_id:
-      Emits 3 entries: (1) assistant+tool_calls, (2) tool result(s), (3) assistant text.
-    For old assistant messages without tool_call_id (backward compat) or with no
-    tool_calls: emits a plain {"role": "assistant", "content": ...}.
-    User messages pass through unchanged.
 
-    Phase 075.5 D-075.5-01 (supersedes 075.4-02 D-075.4-C3): ``thought_signature`` is
-    echoed as a TOP-LEVEL field on each rebuilt tool_call dict when the stored row
-    carries one. The Google native SDK path in google_service.py reads this and
-    attaches the signature to the function_call Part so Gemini-3+ round-trips it
-    correctly (closes BUG-260523-02 for real — the old extra_content shape didn't
-    survive openai-python's serialization through Google's OpenAI-compat endpoint).
-    The ``active_provider`` arg is kept for back-compat but is no longer load-bearing
-    (non-Google providers ignore the field). No schema change: ``messages.tool_calls``
-    is already ``jsonb``.
+async def _ensure_skill_snapshots(
+    *, definition, run_id, supabase, user_id, definition_id=None, skill_snapshots=None
+):
+    """099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot) — the kickoff seam.
+
+    Delegates ALL gate/copy logic to ``skill_snapshot.py`` (G-5: the hot file gains
+    only this thin wrapper + the import — no inline skill-resolution query or Storage
+    call). 099-07: grafts the persisted snapshots (the ``skill_snapshots`` sibling
+    column, NOT the locked ``definition`` JSONB) onto the parsed definition FIRST, so a
+    2nd+ kickoff hands the materializer a fully-snapshotted definition → idempotent
+    early-return (no persist, no 23514); a ``None`` map is a no-op (first kickoff).
+    Then runs the D-10 publish gate (``ValueError → HTTPException 400``, the exact shape
+    the 098 ``assert_folder_scopes_subset`` call-site uses — never a silent run on a
+    disabled/missing/non-visible skill) and materializes the immutable snapshot at FIRST
+    kickoff (idempotent, keyed by ``definition_id`` for the persist-back). An UNEXPECTED
+    materializer failure (anything that is NOT the ValueError→400 gate) maps to a
+    structured ``HTTPException(500)`` — never a naked ASGI traceback (the reported blank-
+    thread symptom); the fail-closed ordering (before the user-message insert) is
+    unchanged. Returns the (possibly snapshot-augmented) definition so the caller
+    reassigns it for the downstream run. A no-skill workflow is byte-identical: graft +
+    validate are no-ops and materialize returns the definition unchanged.
+
+    The service functions are called THROUGH the module object (``_skill_snapshot.``)
+    so the seam stays patchable. Structured so the Phase-103 publish endpoint can call
+    the same materializer at true publish time.
     """
-    messages: list[dict] = []
-    for msg in history_rows:
-        tool_calls_data = msg.get("tool_calls")
-        if (
-            msg["role"] == "assistant"
-            and tool_calls_data
-            and isinstance(tool_calls_data, list)
-            and len(tool_calls_data) > 0
-        ):
-            # Only reconstruct if all entries have tool_call_id (new format)
-            if all(tc.get("tool_call_id") for tc in tool_calls_data):
-                # 1. Assistant message announcing tool calls
-                messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [
-                        {
-                            "id": tc["tool_call_id"],
-                            "type": "function",
-                            "function": {
-                                "name": tc["name"],
-                                "arguments": json.dumps(tc.get("args", {})),
-                            },
-                            # Phase 075.5 D-075.5-01 — echo thought_signature as a
-                            # top-level field. google_service._convert_messages_to_google
-                            # reads this and attaches it to the function_call Part for
-                            # native SDK round-trip. Non-Google providers ignore unknown
-                            # fields, so this is safe across all paths (provider-gating
-                            # removed — simpler + correct for reload-after-Google-run case).
-                            **(
-                                {"thought_signature": tc["thought_signature"]}
-                                if tc.get("thought_signature")
-                                else {}
-                            ),
-                        }
-                        for tc in tool_calls_data
-                    ],
-                })
-                # 2. Tool result messages (one per tool call)
-                for tc in tool_calls_data:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["tool_call_id"],
-                        "content": tc.get("result") or "",
-                    })
-                # 3. Assistant text response (only if content is non-empty)
-                if msg.get("content"):
-                    messages.append({
-                        "role": "assistant",
-                        "content": msg["content"],
-                        **({"reasoning_content": msg["reasoning_content"]} if msg.get("reasoning_content") else {}),
-                    })
-            else:
-                # Old message without tool_call_id — emit as plain assistant message
-                messages.append({
-                    "role": msg["role"],
-                    "content": msg.get("content") or "",
-                    **({"reasoning_content": msg["reasoning_content"]} if msg.get("reasoning_content") else {}),
-                })
-        else:
-            # User messages, plain assistant messages, or messages with null/empty tool_calls
-            messages.append({
-                "role": msg["role"],
-                "content": msg.get("content") or "",
-                **({"reasoning_content": msg["reasoning_content"]} if msg["role"] == "assistant" and msg.get("reasoning_content") else {}),
-            })
-    return messages
+    # 099-07: graft persisted snapshots (sibling column) onto the parsed definition
+    # BEFORE validate/materialize. On a 2nd+ kickoff every phase is already
+    # snapshotted → materialize early-returns (no persist, no 23514). A None map is
+    # a no-op (first kickoff). Delegated to skill_snapshot.py (G-5: thin wrapper).
+    definition = _skill_snapshot.graft_skill_snapshots(definition, skill_snapshots)
+    try:
+        await _skill_snapshot.validate_skill_refs(
+            definition, supabase=supabase, user_id=user_id
+        )
+    except ValueError as _skill_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(_skill_err),
+        )
+    try:
+        return await _skill_snapshot.materialize_skill_snapshots_if_needed(
+            definition,
+            run_id=run_id,
+            supabase=supabase,
+            user_id=user_id,
+            definition_id=definition_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as _mat_err:   # noqa: BLE001 — structured fail-closed (099-07)
+        # An unexpected materializer failure (e.g. a DB trigger edge) must return
+        # structured JSON, NOT a naked ASGI traceback. 500 (not 503): a true server
+        # fault, not a transient upstream — the operator wants a stable error body
+        # so the kickoff dies cleanly BEFORE the user-message insert (no blank
+        # thread). The fail-closed ordering is unchanged.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"skill snapshot materialization failed: {_mat_err}",
+        )
 
 
 @router.post("/{thread_id}/messages")
@@ -1231,13 +880,129 @@ async def send_message(
 ):
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id")
+        .select("id, active_workflow_run_id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
     )
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
+    # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
+    # only — D-05). The anchor + its run's terminal-state decide whether a send is
+    # allowed and whether it kicks off a workflow. Done BEFORE the user-message
+    # INSERT so a refused send writes nothing.
+    _existing_anchor = (thread_resp.data or {}).get("active_workflow_run_id")
+    _kickoff_definition = None          # parsed WorkflowDefinition when kicking off
+    _kickoff_definition_id = None       # workflow_definitions.id for the kickoff
+    if _existing_anchor is not None:
+        # A run currently holds the lock — is it still live (non-terminal)?
+        _pool = await get_pg_pool()
+        _anchor_status = await _pool.fetchval(
+            "SELECT status FROM workflow_runs WHERE id = $1",
+            UUID(_existing_anchor) if isinstance(_existing_anchor, str) else _existing_anchor,
+        )
+        _TERMINAL_WORKFLOW = ("completed", "failed", "cancelled")
+        if _anchor_status is not None and _anchor_status not in _TERMINAL_WORKFLOW:
+            # The lock holds. Refuse a Deep send AND a different-workflow send
+            # (SC#2 / MODE-02 — the binding 409, not just a grayed button). A
+            # send is only allowed if it targets THE SAME active run (continuation
+            # of the locked workflow). Since the kickoff field carries a
+            # *definition* id (not the run id), any kickoff against a locked thread
+            # is a different-workflow attempt → refuse. The lock is cleared by
+            # cancel / natural terminal (Plan 03), never by this handler.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Thread is workflow-locked — cancel the active workflow to "
+                    "switch back to Deep mode."
+                ),
+            )
+        # else: anchor is set but its run is terminal/absent (a stale lock). We do
+        # NOT clear it here (the GET reconcile reports lock_is_stale; cancel/terminal
+        # owns the clear). A fresh kickoff below will re-point the anchor atomically.
+
+    if body.workflow_definition_id is not None:
+        # Resolve+parse the published definition UNDER THE USER'S RLS (T-092-05 IDOR
+        # mitigation): only a published, owned-or-global definition may be kicked
+        # off. A non-owned / private / unpublished id is refused 404 (never leaks
+        # existence) — a user cannot start another user's private workflow.
+        _def_resp = await aexec(
+            supabase.table("workflow_definitions")
+            .select("id, definition, status, is_global, created_by, skill_snapshots")
+            .eq("id", str(body.workflow_definition_id))
+            .or_(f"is_global.eq.true,created_by.eq.{current_user['id']}")
+            .maybe_single()
+        )
+        _def_row = _def_resp.data if _def_resp is not None else None
+        if not _def_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found",
+            )
+        if _def_row.get("status") != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow is not published",
+            )
+        from app.models.harness import WorkflowDefinition
+        _raw_def = _def_row["definition"]
+        if isinstance(_raw_def, str):
+            _raw_def = json.loads(_raw_def)
+        _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
+        _kickoff_definition_id = _def_row["id"]
+        # 099-07: the materialized snapshots live in the skill_snapshots SIBLING column
+        # (not the locked definition JSONB) → load them so the kickoff seam can graft
+        # them back onto the parsed definition (idempotent 2nd-kickoff). May arrive as a
+        # JSON string via PostgREST — mirror the definition parse (json imported above).
+        _kickoff_skill_snapshots = _def_row.get("skill_snapshots")
+        if isinstance(_kickoff_skill_snapshots, str):
+            _kickoff_skill_snapshots = json.loads(_kickoff_skill_snapshots)
+        # 098 (D-07 DB half — GOV-01): a non-⊆ declared phase scope is a definition
+        # VALIDITY error that must fail LOUDLY at run-start (NOT a silent runtime
+        # clip — Pitfall 5). Resolve the project subtree and assert every per-phase
+        # folder_scope ⊆ it; surface the ValueError as a 400 (a bad definition, not
+        # a runtime degrade). Owner-scoped via current_user["id"].
+        try:
+            await assert_folder_scopes_subset(
+                _kickoff_definition, supabase=supabase, user_id=current_user["id"]
+            )
+        except ValueError as _scope_err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(_scope_err),
+            )
+
+        # 099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot): validate every phase
+        # skill_ref resolves to a visible, enabled skill (ValueError → 400, same as the
+        # 098 scope assert — never a silent run on a disabled/missing skill), then
+        # materialize the immutable snapshot at FIRST kickoff (idempotent: subsequent
+        # runs reuse the persisted snapshot, keyed by definition id). Drafts can't reach
+        # here (status='published' enforced above), so first-kickoff IS the first moment
+        # a snapshot is needed. The seam delegates ALL gate/copy logic to
+        # skill_snapshot.py (G-5: no inline query/Storage call in this hot file). The
+        # materialized definition rides the phase configs the downstream run reads.
+        _kickoff_definition = await _ensure_skill_snapshots(
+            definition=_kickoff_definition,
+            run_id=None,
+            supabase=supabase,
+            user_id=current_user["id"],
+            definition_id=str(_kickoff_definition_id),
+            skill_snapshots=_kickoff_skill_snapshots,
+        )
+
+        # 100 D-09 run-pin: extend each template_input file's expiry to cover this
+        # run's wall-clock cap so it can't die mid-flight from template expiry (D-09).
+        # Thin delegating call — ALL logic (the extend-only expiry write + the cap
+        # formula) lives in template_service (G-5: no inline query/Storage call in this
+        # hot file). D-11: a thread with no template_input row → the write no-ops.
+        from app.services import template_service as _template_service
+        await _template_service.pin_templates_for_run(
+            pool=await get_pg_pool(),
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            run_wall_clock_cap=_template_service.run_cap_seconds(_kickoff_definition),
+        )
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new
@@ -1370,6 +1135,30 @@ async def send_message(
             pass
         raise
 
+    # ── Phase 092 MODE-01 — kickoff: create the workflow run + set the anchor ──
+    # AFTER the producer-shell `runs` row exists (two-rows model, RESEARCH A2 /
+    # Landmine 5: the `runs` row carries SSE-terminal consistency; this
+    # `workflow_runs` row is the engine's row) and BEFORE the producer spawns, so
+    # agent_runner reads a non-null anchor and branches to the harness engine.
+    # create_workflow_run sets threads.active_workflow_run_id atomically (FK-ordered).
+    _active_workflow_run_id = None
+    if _kickoff_definition is not None:
+        _active_workflow_run_id = await create_workflow_run(
+            await get_pg_pool(),
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            definition_id=(
+                UUID(_kickoff_definition_id)
+                if isinstance(_kickoff_definition_id, str)
+                else _kickoff_definition_id
+            ),
+            definition=_kickoff_definition,
+            inputs={"kickoff_prompt": body.content},   # SEED-047
+            model=_resolved_model,                      # SEED-047
+            # Phase 092-05 F1: persist the run-owner so harness_audit writes
+            # (NOT NULL user_id) and the resume path resolve a real user.
+            user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
+        )
+
     # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
     # but BEFORE the agent producer task starts (asyncio.create_task at the bottom
     # of this handler). Title is derived from the user message alone — independent
@@ -1469,1519 +1258,260 @@ async def send_message(
             # runs INSERT could populate model/provider before producer spawn).
             user_settings = _user_settings
 
-            # Load thread's folder scope
-            thread_data = await aexec(
-                supabase.table("threads")
-                .select("folder_id")
-                .eq("id", thread_id)
-                .single()
-            )
-            thread_folder_id: str | None = thread_data.data.get("folder_id") if thread_data.data else None
+            # Phase 089 Plan 03 (G-5 THE verbatim move): the entire agent loop —
+            # the B1 setup block, the Category-D accumulators, the nested persist
+            # functions, the multi-iteration loop with the three provider
+            # chunk-handlers, the tool-dispatch round, the inner try/except, the
+            # post-loop emits, and the suggestion-gen + stream_end — MOVED verbatim
+            # into app.services.agent_loop.run_agent_loop. agent_runner now: build
+            # the frozen RunContext, call run_agent_loop, consume the AgentLoopResult.
+            # The _terminal_status classifier (except branches below) + the shielded
+            # finalizer STAY here (producer-shell concern). Behavior-preserving — file
+            # location changes only (D-089-03).
+            _agent_loop_result: AgentLoopResult | None = None
+            # 089-03: per-iteration timeout context surfaced by the loop so the
+            # `except asyncio.TimeoutError` classifier below can format the
+            # byte-identical `timed_out: …` error string (Phase 066 D-066-07). The
+            # loop writes last_iteration / last_model_id / last_per_call_budget into
+            # this dict before each provider stream block (was an agent_runner-scope
+            # local captured by closure pre-move).
+            _timeout_ctx: dict = {
+                "last_iteration": _last_iteration,
+                "last_model_id": _last_model_id,
+                "last_per_call_budget": _last_per_call_budget,
+            }
+            # 089-03: finalizer-needed outputs surfaced by the loop on EVERY exit
+            # path (incl. exception) so _shielded_finalize can persist the
+            # (possibly partial) assistant message + token totals + system
+            # warnings exactly as the pre-move closure-scoped finalizer did. The
+            # loop populates this in its outer `finally`; the by-reference dict is
+            # the cycle-free surface that survives a re-raise (the return value
+            # below is unavailable when the loop exits via an exception).
+            _result_sink: dict = {}
 
-            # Resolve folder subtree if scoped
-            folder_subtree_ids: list[str] | None = None
-            scoped_folder_path: str | None = None
-            if thread_folder_id:
-                all_folders = await fetch_visible_folders(supabase, current_user["id"])
-
-                def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
-                    result = [root_id]
-                    for f in folders:
-                        if f["parent_id"] == root_id:
-                            result.extend(_get_subtree(f["id"], folders))
-                    return result
-
-                folder_subtree_ids = _get_subtree(thread_folder_id, all_folders)
-
-                # Build scoped folder path for ls/tree/grep default path
-                folder_map = {f["id"]: f for f in all_folders}
-                path_parts = []
-                current_fid: str | None = thread_folder_id
-                while current_fid:
-                    f = folder_map.get(current_fid)
-                    if not f:
-                        break
-                    path_parts.append(f.get("name", ""))
-                    current_fid = f.get("parent_id")
-                # Only set a meaningful path — if traversal found nothing, leave as None
-                # so the scope note is not injected with a confusing "/" root path.
-                scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
-
-            # Load full message history (includes just-inserted user message)
-            history_resp = await aexec(
-                supabase.table("messages")
-                .select("role, content, tool_calls, reasoning_content")
-                .eq("thread_id", thread_id)
-                .eq("user_id", current_user["id"])
-                .order("created_at")
-            )
-
-            # Select system prompt, tools, and iteration limit based on agent mode
-            if body.agent_mode == "explorer":
-                active_system_prompt = EXPLORER_SYSTEM_PROMPT
-                active_tools = get_explorer_tools()
-                max_iterations = 8   # GEN-04: was 6
-            else:
-                active_system_prompt = SYSTEM_PROMPT
-                active_tools = None  # None = use default get_tools() in create_streaming_chat
-                max_iterations = 15  # GEN-04: was 8
-
-            # Augment system prompt with folder scope context so LLM generates scoped queries
-            if scoped_folder_path:
-                folder_scope_note = (
-                    f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
-                    f"All tool calls should be restricted to this folder and its subfolders. "
-                    f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
-                    f"When using query_documents, always include a folder filter (e.g., "
-                    f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
-                    f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
-                )
-                active_system_prompt = active_system_prompt + folder_scope_note
-
-            # Inject enabled skills catalog (General Mode only) — SKIL-09
-            if body.agent_mode != "explorer":
-                _skills_resp = await aexec(
-                    supabase.table("skills")
-                    .select("name, description")
-                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                    .eq("is_enabled", True)
-                    .order("name")
-                )
-                enabled_skills = _skills_resp.data or []
-
-                if enabled_skills:
-                    catalog_lines = "\n".join(
-                        f"- **{s['name']}**: {s['description']}" for s in enabled_skills
+            try:  # middle try/finally — guarantees persist even on GeneratorExit (client disconnect)
+                # ── Phase 092 MODE-01 — producer mode-branch (SC#1) ────────────
+                # The ONE additive branch: Harness iff the thread holds a live
+                # workflow anchor (set by create_workflow_run above), else Deep.
+                # MUST live here (above the loop, inside this try) — NEVER inside a
+                # provider streaming branch (075.x cascade rule). The Deep `else`
+                # is BYTE-IDENTICAL to the pre-092 call. The surrounding except +
+                # finally:_shielded_finalize stay mode-agnostic (untouched). The
+                # harness branch's `run_workflow` owns the workflow_runs terminal
+                # write internally; the producer-shell `runs` row still finalizes
+                # via _shielded_finalize for SSE-terminal consistency (the lock-clear
+                # is Plan 03's single-clear-site concern — this plan only SETS it).
+                if _active_workflow_run_id is not None:        # Harness
+                    # Engine ctx is NOT RunContext (Landmine 7) — build the loose
+                    # SimpleNamespace bag the engine threads through, mirroring
+                    # harness_engine._build_resume_context.
+                    from types import SimpleNamespace
+                    from app.services.harness_engine import (
+                        run_workflow,
+                        _load_run_definition,
+                        _emit as _harness_emit,
                     )
-                    catalog_note = (
-                        f"\n\n## Available Skills\n"
-                        f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
-                        f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
-                        f"description similarity — wait for an explicit request:\n{catalog_lines}"
+                    # D-04 (site 1): the shared resolve-never-mutate (D-05) wrapper —
+                    # resolve the effective ctx model from the run owner's active
+                    # provider (a stale cross-provider llm_model falls back to the
+                    # provider default rather than leaking to the wrong client). Lazy
+                    # import inside the harness branch (matches the pattern above);
+                    # threaded onto wf_ctx.model below. Phase-level precedence is
+                    # unchanged downstream: phase.config.model or ctx.model.
+                    from app.services.sub_agent_models import resolve_workflow_ctx_model
+                    _wf_pool = await get_pg_pool()
+                    _wf_definition = await _load_run_definition(
+                        _wf_pool, _active_workflow_run_id
                     )
-                    active_system_prompt = active_system_prompt + catalog_note
-
-                # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
-                _memory_resp = await aexec(
-                    supabase.table("user_memory")
-                    .select("key, value")
-                    .eq("user_id", current_user["id"])
-                    .order("updated_at", desc=True)
-                    .limit(10)
-                )
-                memory_rows = _memory_resp.data or []
-
-                if memory_rows:
-                    memory_lines = "\n".join(
-                        f"- {r['key']}: {r['value']}" for r in memory_rows
-                    )
-                    memory_note = (
-                        "\n\n## User Memory\n"
-                        "(Preferences and facts you've remembered about this user across conversations)\n"
-                        f"{memory_lines}"
-                    )
-                    active_system_prompt = active_system_prompt + memory_note
-
-                # Inform the agent about tools disabled via user settings so it
-                # doesn't attempt to call them or ask clarifying questions about them.
-                # WR-06: getattr defaults guard against older user_settings rows
-                # that predate one of these flags — without the default, a schema
-                # gap would AttributeError mid-request.
-                disabled_tools: list[str] = []
-                if not getattr(user_settings, "web_search_enabled", True):
-                    disabled_tools.append("web_search (disabled in Settings › Integrations › Web Search)")
-                if not getattr(user_settings, "sandbox_enabled", True):
-                    disabled_tools.append("execute_code (disabled in Settings › Integrations › Code Execution)")
-                if disabled_tools:
-                    disabled_note = (
-                        "\n\n## Disabled Tools\n"
-                        "The following tools are currently disabled by the user and are NOT available. "
-                        "Do not attempt to call them. If a task requires one of these tools, "
-                        "clearly tell the user it is disabled and how to enable it:\n"
-                        + "\n".join(f"- {t}" for t in disabled_tools)
-                    )
-                    active_system_prompt = active_system_prompt + disabled_note
-
-            messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-            # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature
-            # as a top-level field; google_service.py reads it in
-            # _convert_messages_to_google. active_provider is passed for back-compat
-            # but no longer load-bearing (non-Google providers ignore the field).
-            messages.extend(
-                _reconstruct_history(
-                    history_resp.data,
-                    active_provider=(getattr(user_settings, "active_provider", "") or "").lower(),
-                )
-            )
-
-            # Trim conversation history to fit context window before the first LLM call
-            messages = trim_messages_to_fit(
-                messages,
-                max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
-                reserve_recent=settings.context_window_reserve_recent,
-            )
-            logger.debug(
-                "Pre-loop trim: ~%d tokens in %d messages",
-                estimate_messages_tokens(messages),
-                len(messages),
-            )
-
-            full_content = ""
-            full_reasoning_content = ""
-            persisted_tool_calls: list[dict] = []
-            # Plan 075.4-03 D-075.4-E1 — closure-local per-run system warning
-            # accumulator. Each entry: {kind: "context_truncated" |
-            # "iteration_cap_dropped_tool_calls", message: <user-visible text>}.
-            # Drained at _shielded_finalize time into `messages` rows so the
-            # warning survives reload (RLS-bound to thread owner).
-            # FORWARD-REF #6: the `kind` field is the structured retrofit
-            # hook for Phase 082.5 unified error sink.
-            # NOTE: persistence requires migration 048 to widen the
-            # messages_role_check CHECK constraint to allow role='system'.
-            # Pre-migration the INSERT fails-silent (logged) and the SSE
-            # event remains the user-visible signal.
-            _persisted_system_warnings: list[dict] = []
-            # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
-            # Both default to None — D-073-09 NULL sentinel if NO iteration produced
-            # a usage payload. First successful usage event flips None to int; subsequent
-            # ones add on top (multi-iteration SUM). Read by _shielded_finalize step 3.
-            input_tokens_total: int | None = None
-            output_tokens_total: int | None = None
-            source_refs: list[dict] = []  # {"document_id": str, "filename": str}
-            unique_sources: list[dict] = []
-            retrieved_citations: list[dict] = []    # Full citation objects per D-04
-            similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
-            unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
-            _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
-            _message_persisted = False  # guard against double-insert
-            _empty_retries = 0  # tracks empty-response retries across all iterations
-
-            async def _persist_assistant_message() -> str | None:
-                """Insert the assistant message row. Idempotent — only runs once.
-
-                Phase 061 (D-061-05): returns the inserted message_id (or the
-                cached one on subsequent calls) so the producer's shielded
-                finalizer can populate runs.message_id in the UPDATE.
-
-                Phase 061.1 IN-03 (D-061.1-09): the cached id lives on the
-                function object as `_persist_assistant_message._cached_id`
-                instead of a `nonlocal` slot in send_message scope. The
-                shielded finalizer captures the return value into its own
-                local — no second nonlocal reaches into send_message.
-                """
-                nonlocal _message_persisted
-                if _message_persisted:
-                    return getattr(_persist_assistant_message, "_cached_id", None)
-                _message_persisted = True
-                if not full_content and not persisted_tool_calls:
-                    logger.warning(
-                        "Agent loop produced no content for thread %s — persisting empty assistant message",
-                        thread_id,
-                    )
-                row: dict = {
-                    "thread_id": thread_id,
-                    "user_id": current_user["id"],
-                    "role": "assistant",
-                    "content": _strip_nul(full_content),
-                }
-                if persisted_tool_calls:
-                    completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
-                    if completed_tools:
-                        row["tool_calls"] = _strip_nul(completed_tools)
-                if unique_citations:
-                    row["source_refs"] = unique_citations   # Full citation objects (D-13)
-                elif unique_sources:
-                    row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
-                if _confidence_slot:
-                    c = _confidence_slot[0]
-                    row["confidence_level"] = c["level"]
-                    row["confidence_avg_similarity"] = c["avg_similarity"]
-                    row["confidence_disclaimer"] = c["disclaimer"]
-                _cached_id: str | None = None
-                try:
-                    # Phase 073 D-073-04 SITE #3 — messages INSERT flips to asyncpg.
-                    # JSONB codec on the pool (Plan 01 _init_pg_connection) means
-                    # tool_calls / source_refs flow as plain Python lists — no
-                    # per-call json.dumps. Reads field values out of the already-
-                    # constructed `row` dict via .get() so conditional-set semantics
-                    # (lines above) carry over without rebuilding kwargs.
-                    _inserted_id = await insert_assistant_message(
-                        await get_pg_pool(),
-                        thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-                        user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
-                        content=_strip_nul(full_content),
-                        tool_calls=row.get("tool_calls"),
-                        source_refs=row.get("source_refs"),
-                        confidence_level=row.get("confidence_level"),
-                        confidence_avg_similarity=row.get("confidence_avg_similarity"),
-                        confidence_disclaimer=row.get("confidence_disclaimer"),
-                        reasoning_content=_strip_nul(full_reasoning_content) or None,
-                    )
-                    _cached_id = str(_inserted_id) if _inserted_id else None
-                except Exception as e:
-                    logger.error("Failed to persist assistant message: %s", e)
-                _persist_assistant_message._cached_id = _cached_id  # type: ignore[attr-defined]
-                return _cached_id
-
-            def _strip_nul(obj):
-                """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
-                if isinstance(obj, str):
-                    return obj.replace('\x00', '')
-                if isinstance(obj, dict):
-                    return {k: _strip_nul(v) for k, v in obj.items()}
-                if isinstance(obj, list):
-                    return [_strip_nul(item) for item in obj]
-                return obj
-
-            async def _persist_system_messages(warnings: list[dict]) -> None:
-                """Plan 075.4-03 D-075.4-E1 — persist system_warning rows.
-
-                Each warning becomes a separate ``messages`` row with
-                ``role='system'`` so it survives reload. The structured
-                ``kind`` field is the FORWARD-REF #6 retrofit hook for
-                Phase 082.5's unified error sink (keep names stable).
-
-                CRITICAL: requires migration 048 to widen the
-                ``messages_role_check`` CHECK constraint to allow
-                ``role='system'``. Pre-migration the INSERT will fail
-                with PostgrestAPIError; we catch and log so the warning's
-                SSE event (already emitted) remains the user-visible
-                signal — fail-silent is intentional here, NOT a bug.
-                """
-                for w in warnings:
+                    # F5 (092-07) + 098 (GOV-01/PROJ-02 — site 1 kickoff): resolve the
+                    # run-start retrieval scope. For a BOUND workflow
+                    # (_kickoff_definition.project_folder_id set) the scope is the
+                    # PROJECT subtree, sourced from the binding the model cannot supply
+                    # (GOV-01) — NOT the thread folder. For an UNBOUND/legacy workflow
+                    # the scope stays the thread-folder subtree (unchanged — SC#1). Both
+                    # branches resolve through the shared scope.resolve_project_subtree
+                    # helper, so the inline recursive subtree walk is REMOVED
+                    # (G-5: threads.py must shrink, not grow). The scoped_folder_path is
+                    # the human-readable ls/tree/grep default-path hint (display only —
+                    # the real scope enforcement is folder_subtree_ids).
+                    _wf_folder_subtree_ids: list[str] | None = None
+                    _wf_scoped_folder_path: str | None = None
                     try:
-                        # Hand-rolled INSERT via supabase client (the
-                        # asyncpg insert_assistant_message helper is
-                        # role-bound to 'assistant'). Encode the kind
-                        # field into tool_calls jsonb so the frontend
-                        # MessageList can render it as a small neutral
-                        # banner via the existing `kind:` consumer pattern
-                        # (D-075.4-E1 + Phase 082.5 retrofit shape).
-                        await aexec(
-                            supabase.table("messages").insert({
-                                "thread_id": thread_id,
-                                "user_id": current_user["id"],
-                                "role": "system",
-                                "content": _strip_nul(w.get("message", "")),
-                                "tool_calls": [{"kind": w.get("kind", "")}],
-                            })
-                        )
-                    except Exception as e:
-                        # Fail-silent: SSE event already shipped; persistence
-                        # is best-effort until migration 048 widens the role
-                        # CHECK. Log at WARNING so operators can grep for
-                        # the migration-needed signal.
-                        logger.warning(
-                            "system_warning persist failed (kind=%s) — "
-                            "migration 048 may be unapplied: %s",
-                            w.get("kind", "?"), e,
-                        )
-
-            # GEN-03: Tool results stored in full — no character caps.
-            # Context budget managed by trim_messages_to_fit() which drops OLDER messages
-            # when total context exceeds the model's budget.
-
-            try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
-              try:
-                # Pre-inject tool instructions only for OpenRouter XML strategy — the one
-                # deterministic structured-mode path. All other providers use native tool
-                # calling; unknown models get post-creation injection (next iteration).
-                _needs_pre_injection = (
-                    getattr(user_settings, "active_provider", "") == "openrouter"
-                    and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
-                )
-                _structured_tools_injected = False
-
-                # Plan 075.4-03 D-075.4-D1/D2 — closure-local per-run dict
-                # keyed by SHA-256 content hash → meta dict {filename, url,
-                # size, iteration}. PATTERNS.md S5 SHA-256 + S2 closure-local
-                # per-run state. Pivot from set[str] (filename-only) to
-                # dict[content_hash, meta] structurally closes BUG-260523-03
-                # (OpenRouter dup outputs), BUG-260522-02 (no url/size in
-                # final_output_files emit), and BUG-260521-02 (no download
-                # link in pinned panel — auto-closes via re_open_trigger).
-                # Per Plan 04 (Wave 2): emit carries `supersedes: <prev_fname>`
-                # when iteration N produces a different hash for the same
-                # filename — OutputFileCard reads this for the "Replaces:"
-                # affordance. Plan 04 Wave 0 historical context:
-                # B-260519-11 + BUG-260514-01 (per-run cumulative state).
-                _previous_files_in_run: dict[str, dict] = {}
-
-                # Phase 085 D-085-15 — per-run task() concurrency semaphore.
-                # Initialized ONCE per top-level run (outside the iteration loop) so
-                # all _handle_task spawns in this run share the same gate. Bound to
-                # settings.task_per_run_concurrency (default 3). Sub-agents inherit
-                # this same semaphore via task_service so a runaway sub-agent + parent
-                # combo can't dodge the per-run cap.
-                _per_run_task_semaphore = asyncio.Semaphore(settings.task_per_run_concurrency)
-
-                for iteration in range(max_iterations):
-                    # D-04 (Phase 56): emit iteration_start at the top of every iteration.
-                    # Frontend uses this to increment the "Step N" counter (D-03).
-                    # iteration is 0-indexed; frontend adds +1 for display (Pitfall 1).
-                    await _emit(redis, run_id, 'iteration_start', iteration=iteration)
-                    # Between tool-call rounds: signal to the frontend that the agent
-                    # is deciding its next action (all prior tools are done).
-                    if iteration > 0:
-                        await _emit(redis, run_id, 'planning', iteration=iteration)
-
-                    # Plan 075.4-03 D-075.4-E1 — context-truncated warning.
-                    # Capture pre-len so we can detect silent message drops
-                    # post-trim. Sub-agent results can balloon messages
-                    # length per iteration; trim_messages_to_fit drops OLDER
-                    # messages atomically (tool-pair preserved). Pre-Plan-03
-                    # the drop was silent — user saw no signal that earlier
-                    # context was gone. Now: SSE system_warning kind=
-                    # context_truncated + persisted messages row.
-                    _pre_trim_len = len(messages)
-                    # Re-trim after tool results have been appended (context grows each iteration)
-                    messages = trim_messages_to_fit(
-                        messages,
-                        max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
-                        reserve_recent=settings.context_window_reserve_recent,
-                    )
-                    if len(messages) < _pre_trim_len:
-                        _dropped = _pre_trim_len - len(messages)
-                        _trim_msg = (
-                            f"⚠ Earlier messages dropped to fit context window "
-                            f"({_dropped} message(s) removed)."
-                        )
-                        await _emit(redis, run_id, 'system_warning',
-                                    kind="context_truncated",
-                                    message=_trim_msg)
-                        _persisted_system_warnings.append({
-                            "kind": "context_truncated",
-                            "message": _trim_msg,
-                        })
-                        logger.info(
-                            "context_truncated run=%s iteration=%d dropped=%d",
-                            run_id, iteration, _dropped,
-                        )
-                    logger.debug(
-                        "Agent iteration %d: ~%d tokens in %d messages",
-                        iteration,
-                        estimate_messages_tokens(messages),
-                        len(messages),
-                    )
-
-                    # On the final iteration force a text response to avoid an infinite loop
-                    force_no_tools = (iteration == max_iterations - 1)
-                    tool_choice = "none" if force_no_tools else "auto"
-                    _provider_retries = 0
-                    _MAX_PROVIDER_RETRIES = 2
-                    _retry_delays = [0.5, 1.5]
-
-                    # OpenRouter XML: inject tool-format instructions BEFORE stream creation
-                    # so the model sees them on the very first call.
-                    if _needs_pre_injection and not _structured_tools_injected and tool_choice == "auto":
-                        _tl_text = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
-                        for _si, _sm in enumerate(messages):
-                            if _sm.get("role") == "system":
-                                messages[_si] = {
-                                    "role": "system",
-                                    "content": _sm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_text),
-                                }
-                                _structured_tools_injected = True
-                                break
-
-                    while True:
-                        try:
-                            active_provider_name = getattr(user_settings, "active_provider", "") or ""
-
-                            # Plan 075.4-02 audit (Site 4): gate is operator-intent via
-                            # active_provider. Models routed through OpenRouter that
-                            # happen to be Claude variants are intentionally NOT pushed
-                            # through the native Anthropic path (operator chose OpenRouter
-                            # for a reason — routing, billing, fallbacks). Registry-aware
-                            # secondary gate considered + rejected; no code change required.
-                            if active_provider_name == "anthropic":
-                                # --- Anthropic native SDK path (GEN-02) ---
-                                from app.services.openai_service import _resolve_max_tokens
-                                _ant_max_tokens = _resolve_max_tokens(None, user_settings)
-                                _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
-                                _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
-                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution (DB > env > static > default)
-                                _model_id = body.model or user_settings.llm_model
-                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
-                                # Phase 066 D-066-07: capture for outer-except error format
-                                _last_iteration = iteration
-                                _last_model_id = _model_id
-                                _last_per_call_budget = per_call_budget
-                                _ant_gen = stream_anthropic(
-                                    messages=messages,
-                                    tools=_ant_tools,
-                                    system_prompt=active_system_prompt,
-                                    model=_model_id,
-                                    api_key=_ant_api_key,
-                                    max_tokens=_ant_max_tokens,
-                                    force_no_tools=force_no_tools,
-                                )
-                                tool_calls_buffer: dict = {}
-                                finish_reason: str | None = None
-                                _announced_tools_ant: set[int] = set()
-
-                                # Phase 067.1 Plan 01 Track A: drain-into-queue
-                                # parity with the OpenAI branch (PATTERNS.md
-                                # parity rule). The Anthropic path is NOT
-                                # langsmith-wrapped today (anthropic_service.py
-                                # uses raw anthropic.Anthropic — see
-                                # SUMMARY.md "Symmetry check"), so the
-                                # GeneratorExit-trace pollution is OpenAI-only;
-                                # but symmetric structure prevents future
-                                # langsmith-anthropic adoption from regressing
-                                # to the inline-for-loop shape.
-                                #
-                                # On timeout the helper closes _ant_gen
-                                # (`_ant_gen.close()` raises GeneratorExit
-                                # inside anthropic_service.py's `with` block
-                                # → MessageStream.__exit__ → response.close());
-                                # SYNC method (anthropic 0.97.0); do NOT
-                                # `await`. The outer agent_runner's
-                                # `except asyncio.TimeoutError` catches the
-                                # propagated TimeoutError and sets
-                                # _terminal_status='timed_out' (Phase 066
-                                # D-066-06/07).
-                                async def _on_chunk_anthropic(_ant_event):
-                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                                    _etype = _ant_event.get("type")
-                                    # Phase 073 TOKEN-COL-01 (D-073-08): usage events from Plan 03's
-                                    # anthropic_service.stream_anthropic yields. message_start to "usage";
-                                    # message_delta to "usage_delta" (Pitfall 9: usage_delta.output_tokens
-                                    # is FINAL CUMULATIVE for THAT Message; accumulator adds it ONCE per
-                                    # Message, which is what stream_anthropic guarantees).
-                                    if _etype == "usage":
-                                        _i = _ant_event.get("input_tokens", 0) or 0
-                                        _o = _ant_event.get("output_tokens", 0) or 0
-                                        if input_tokens_total is None:
-                                            input_tokens_total = _i
-                                            output_tokens_total = _o
-                                        else:
-                                            input_tokens_total += _i
-                                            output_tokens_total += _o
-                                        return
-                                    elif _etype == "usage_delta":
-                                        _o = _ant_event.get("output_tokens", 0) or 0
-                                        if output_tokens_total is None:
-                                            # rare: usage_delta without prior message_start (partial stream)
-                                            output_tokens_total = _o
-                                        else:
-                                            output_tokens_total += _o
-                                        return
-                                    if _etype == "delta":
-                                        _text = _ant_event.get("content", "")
-                                        if _text:
-                                            full_content += _text
-                                            await _emit(redis, run_id, 'delta', content=_text)
-                                    elif _etype == "tool_preparing":
-                                        # D-01 (Phase 56.1, corrected): fired at content_block_start when
-                                        # tool name is first known — before arguments finish streaming.
-                                        _idx = _ant_event.get("index", len(tool_calls_buffer))
-                                        if _idx not in _announced_tools_ant:
-                                            _announced_tools_ant.add(_idx)
-                                            await _emit(redis, run_id, 'tool_preparing', name=_ant_event['name'], index=_idx)
-                                    elif _etype == "tool_args_progress":
-                                        # Phase 075 D-075-10: route Anthropic-path
-                                        # tool_args_progress yields from
-                                        # anthropic_service.stream_anthropic to
-                                        # _emit. Filter logic (execute_code skip)
-                                        # already applied at the producer side;
-                                        # this dispatch is a straight pass-through.
-                                        # Phase 075.6 Plan 01 / Req #1: forward
-                                        # `code_so_far` so the additive field
-                                        # rides the wire end-to-end.
-                                        # WR-01 (2026-05-24): defensive .get for
-                                        # the additive field — if a future
-                                        # adapter drops code_so_far from its
-                                        # yield, the consumer sees "" instead
-                                        # of a KeyError tearing down the run.
-                                        await _emit(
-                                            redis, run_id, "tool_args_progress",
-                                            tool_index=_ant_event["tool_index"],
-                                            name=_ant_event["name"],
-                                            args_so_far=_ant_event["args_so_far"],
-                                            total_args_bytes_so_far=_ant_event["total_args_bytes_so_far"],
-                                            code_so_far=_ant_event.get("code_so_far", ""),
-                                        )
-                                    elif _etype == "tool_start":
-                                        # Fired at content_block_stop — arguments now complete.
-                                        # tool_preparing was already emitted above; just populate buffer.
-                                        _idx = len(tool_calls_buffer)
-                                        tool_calls_buffer[_idx] = {
-                                            "id": _ant_event["id"],
-                                            "name": _ant_event["name"],
-                                            "arguments": json.dumps(_ant_event.get("args", {})),
-                                        }
-                                    elif _etype == "finish":
-                                        finish_reason = _ant_event.get("finish_reason", "stop")
-
-                                await _drain_stream_with_close_on_cancel(
-                                    _ant_gen,
-                                    per_call_budget,
-                                    _on_chunk_anthropic,
-                                    close_fn=_ant_gen.close,
-                                )
-                                break  # stream completed
-
-                            elif active_provider_name == "google":
-                                # --- Google native SDK path (Phase 075.5 D-075.5-01) ---
-                                # Mirrors the Anthropic branch above. Native google-genai
-                                # SDK round-trips thought_signature automatically — no more
-                                # extra_content.google.thought_signature serialization hack
-                                # through openai-python (which silently dropped it through
-                                # Google's OpenAI-compat endpoint).
-                                from app.services.openai_service import _resolve_max_tokens
-                                _g_max_tokens = _resolve_max_tokens(None, user_settings)
-                                _g_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
-                                _g_tools = active_tools if active_tools is not None else get_tools(user_settings)
-                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution
-                                _model_id = body.model or user_settings.llm_model
-                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
-                                _last_iteration = iteration
-                                _last_model_id = _model_id
-                                _last_per_call_budget = per_call_budget
-                                _g_gen = stream_google(
-                                    messages=messages,
-                                    tools=_g_tools,
-                                    system_prompt=active_system_prompt,
-                                    model=_model_id,
-                                    api_key=_g_api_key,
-                                    max_tokens=_g_max_tokens,
-                                    force_no_tools=force_no_tools,
-                                )
-                                tool_calls_buffer: dict = {}
-                                finish_reason: str | None = None
-                                _announced_tools_g: set[int] = set()
-
-                                async def _on_chunk_google(_g_event):
-                                    """Normalized-event callback mirroring _on_chunk_anthropic.
-
-                                    Event schema is identical (see google_service.py docstring),
-                                    so this is structurally a copy of the Anthropic branch — kept
-                                    inline for readability and so future provider-specific event
-                                    additions can branch without touching the Anthropic path.
-                                    """
-                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                                    _etype = _g_event.get("type")
-                                    # Phase 073 TOKEN-COL-01 — usage / usage_delta accounting.
-                                    # Google's SDK emits cumulative usage_metadata on every chunk;
-                                    # google_service.py normalizes that into one initial 'usage'
-                                    # + per-chunk 'usage_delta' (output_tokens incremental).
-                                    if _etype == "usage":
-                                        _i = _g_event.get("input_tokens", 0) or 0
-                                        _o = _g_event.get("output_tokens", 0) or 0
-                                        if input_tokens_total is None:
-                                            input_tokens_total = _i
-                                            output_tokens_total = _o
-                                        else:
-                                            input_tokens_total += _i
-                                            output_tokens_total += _o
-                                        return
-                                    elif _etype == "usage_delta":
-                                        _o = _g_event.get("output_tokens", 0) or 0
-                                        if output_tokens_total is None:
-                                            output_tokens_total = _o
-                                        else:
-                                            output_tokens_total += _o
-                                        return
-                                    if _etype == "delta":
-                                        _text = _g_event.get("content", "")
-                                        if _text:
-                                            full_content += _text
-                                            await _emit(redis, run_id, 'delta', content=_text)
-                                    elif _etype == "tool_preparing":
-                                        _idx = _g_event.get("index", len(tool_calls_buffer))
-                                        if _idx not in _announced_tools_g:
-                                            _announced_tools_g.add(_idx)
-                                            await _emit(redis, run_id, 'tool_preparing', name=_g_event['name'], index=_idx)
-                                    elif _etype == "tool_args_progress":
-                                        # Phase 075 D-075-10 parity — pass-through to SSE.
-                                        # Phase 075.6 Plan 01 / Req #1: forward
-                                        # `code_so_far` so the additive field
-                                        # rides the wire end-to-end (Google axis).
-                                        # WR-01 (2026-05-24): defensive .get for
-                                        # the additive field — mirrors the
-                                        # Anthropic dispatch hardening above.
-                                        await _emit(
-                                            redis, run_id, "tool_args_progress",
-                                            tool_index=_g_event["tool_index"],
-                                            name=_g_event["name"],
-                                            args_so_far=_g_event["args_so_far"],
-                                            total_args_bytes_so_far=_g_event["total_args_bytes_so_far"],
-                                            code_so_far=_g_event.get("code_so_far", ""),
-                                        )
-                                    elif _etype == "tool_start":
-                                        _idx = len(tool_calls_buffer)
-                                        # Preserve thought_signature on the buffer entry so the
-                                        # NEXT iteration's _convert_messages_to_google call can
-                                        # attach it to the function_call Part for the SDK to
-                                        # round-trip. Without this, Gemini-3 400s on round 2+.
-                                        tool_calls_buffer[_idx] = {
-                                            "id": _g_event["id"],
-                                            "name": _g_event["name"],
-                                            "arguments": json.dumps(_g_event.get("args", {})),
-                                            # google_service.stream_google attaches the sig to
-                                            # the corresponding finish event's tool_calls list,
-                                            # but we also include it here as a hint. The
-                                            # authoritative copy is set below in the finish branch.
-                                        }
-                                    elif _etype == "finish":
-                                        finish_reason = _g_event.get("finish_reason", "stop")
-                                        # D-075.5-01: hydrate thought_signature onto each
-                                        # tool_calls_buffer entry from the finish event's
-                                        # tool_calls list. stream_google guarantees the order
-                                        # matches insertion order (idx == position).
-                                        _fin_tcs = _g_event.get("tool_calls", []) or []
-                                        for _i, _ftc in enumerate(_fin_tcs):
-                                            if _i in tool_calls_buffer and _ftc.get("thought_signature"):
-                                                tool_calls_buffer[_i]["thought_signature"] = _ftc["thought_signature"]
-
-                                await _drain_stream_with_close_on_cancel(
-                                    _g_gen,
-                                    per_call_budget,
-                                    _on_chunk_google,
-                                    close_fn=_g_gen.close,
-                                )
-                                break  # stream completed
-
-                            else:
-                                # --- OpenAI / OpenRouter / Ollama path (unchanged) ---
-                                stream, calling_mode = create_adaptive_streaming_chat(
-                                    messages=messages,
-                                    model=body.model,
-                                    user_settings=user_settings,
-                                    tool_choice=tool_choice,
-                                    tools_override=active_tools,
-                                )
-
-                                # Fallback: inject for other structured-mode models (unknown models).
-                                # Happens after the first call; subsequent iterations will have instructions.
-                                if calling_mode == CallingMode.STRUCTURED and tool_choice == "auto" and not _structured_tools_injected:
-                                    _tl_fb = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
-                                    for _fi, _fm in enumerate(messages):
-                                        if _fm.get("role") == "system":
-                                            messages[_fi] = {
-                                                "role": "system",
-                                                "content": _fm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_fb),
-                                            }
-                                            _structured_tools_injected = True
-                                            break
-
-                                tool_calls_buffer: dict = {}
-                                finish_reason: str | None = None
-                                _in_think_block: bool = False  # BUG-260526-02: Kimi/Moonshot <think> tag state machine
-                                _announced_tools: set[int] = set()
-                                # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary
-                                # counter for tool_args_progress emits. Resets alongside
-                                # tool_calls_buffer / _announced_tools at each agent-loop
-                                # iteration to prevent cross-round leakage (a stale boundary
-                                # from iteration N would silence the emit in iteration N+1).
-                                #
-                                # Phase 075.6 Plan 01 / Req #3 / RESEARCH L1 mitigation:
-                                # OpenAI native and OpenRouter share this _on_chunk_openai
-                                # callback (both go through the OpenAI Python SDK with
-                                # different base_url) but MUST maintain INDEPENDENT
-                                # 5KB-boundary state per SPEC §Constraints:
-                                # "OpenRouter adapter remains independent of the OpenAI
-                                # adapter (no shared code path) so upstream format
-                                # divergence doesn't silently break". A dedicated
-                                # OpenRouter service module does NOT exist —
-                                # independence is achieved via per-provider boundary
-                                # dicts branched on active_provider_name captured at
-                                # L:2100 below.
-                                _emit_boundary_openai_native: dict[int, int] = {}
-                                _emit_boundary_openrouter: dict[int, int] = {}
-                                # Phase 075.10: tool_args_progress emit boundary now
-                                # config-backed via
-                                # app_settings.chat_tool_args_progress_emit_boundary_bytes
-                                # (default 256). Captured ONCE per iteration (alongside
-                                # the per-provider boundary state above) so the
-                                # async chunk callback below reads a local int
-                                # instead of re-walking the settings cache per chunk.
-                                # Defensive helper falls back to pre-075.10 5120 if
-                                # the settings read fails. Tail slice widens
-                                # proportionally so `args_so_far` still ships
-                                # meaningful cumulative context (full cumulative
-                                # buffer continues to flow via `code_so_far`
-                                # per Plan 075.6 Req #1).
-                                from app.models.user_settings import tool_args_progress_emit_boundary_bytes  # noqa: PLC0415 — narrow runtime import to avoid module-load-time cycle
-                                _emit_boundary_bytes = tool_args_progress_emit_boundary_bytes()
-                                _emit_tail_bytes = max(5120, _emit_boundary_bytes * 4)
-
-                                # Phase 066 D-066-02 + D-066-03 + D-066-11: per-LLM-call
-                                # timer + close-then-raise. Resolve budget before each
-                                # iteration so per-iteration reset is honored
-                                # (asyncio.timeout creates a fresh deadline per `async with`).
-                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution
-                                _model_id = body.model or user_settings.llm_model
-                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
-                                # Phase 066 D-066-07: capture for outer-except error format
-                                _last_iteration = iteration
-                                _last_model_id = _model_id
-                                _last_per_call_budget = per_call_budget
-
-                                # Phase 075.3 D-075.3-03: capture the active provider name
-                                # ONCE here (outside the per-chunk closure) so
-                                # ``_accumulate_chunk_usage`` can branch on it without
-                                # re-looking up MODEL_CAPABILITIES per chunk. Sourced
-                                # from the same registry used elsewhere in this file
-                                # for provider gating (mirrors the
-                                # ``get_model_capability(_resolved_model).get("provider", "unknown")``
-                                # pattern at line ~1160).
-                                _active_cap = await get_model_capability_async(_model_id) or {}
-                                active_provider_name = (_active_cap.get("provider") or "unknown").lower()
-
-                                # Phase 067.1 Plan 01 Track A: drain-into-queue.
-                                # Wraps the per-chunk body so that the sync
-                                # `for chunk in stream:` loop runs in a thread
-                                # pool worker — when timeout fires, we close
-                                # the underlying SDK stream from outside the
-                                # for-loop, so _TracedStream.__iter__ takes
-                                # the `else: self._end_trace()` clean-closure
-                                # branch (no GeneratorExit recorded). Variables
-                                # `_last_iteration` / `_last_model_id` /
-                                # `_last_per_call_budget` (captured above) are
-                                # consumed by the outer agent_runner's
-                                # `except asyncio.TimeoutError` formatter.
-                                async def _on_chunk_openai(chunk):
-                                    nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total, _in_think_block
-                                    # Phase 075.3 D-075.3-03 + D-075.3-04: defensive provider-aware
-                                    # accumulator. Google emits ``usage`` on EVERY chunk alongside
-                                    # ``delta.content`` / ``delta.tool_calls`` (per quick-task
-                                    # 260522-gdg live capture + D-075.3-01 probe verdict CUMULATIVE).
-                                    # OpenAI / OpenRouter / Anthropic-via-compat emit ``usage`` only
-                                    # on the final ``choices=[]`` chunk (Phase 073 D-073-08).
-                                    # Branch inside ``_accumulate_chunk_usage``; DO NOT early-return
-                                    # on ``chunk.usage`` — chunks with both ``usage`` and
-                                    # ``delta.content`` / ``delta.tool_calls`` must flow through to
-                                    # the delta processing below (Google's shape).
-                                    input_tokens_total, output_tokens_total = _accumulate_chunk_usage(
-                                        chunk,
-                                        active_provider_name,
-                                        input_tokens_total,
-                                        output_tokens_total,
-                                    )
-                                    if not chunk.choices:
-                                        return
-                                    choice = chunk.choices[0]
-                                    delta = choice.delta
-
-                                    if choice.finish_reason:
-                                        finish_reason = normalize_finish_reason(choice.finish_reason)
-
-                                    if delta.content:
-                                        _content = delta.content
-                                        # BUG-260526-02 (D-06): Kimi/Moonshot thinking content filter.
-                                        # Kimi wraps chain-of-thought reasoning inside <think>...</think>
-                                        # tags in delta.content (unlike DeepSeek which uses a separate
-                                        # reasoning_content field). Strip thinking tags from visible
-                                        # content and route to reasoning_content instead.
-                                        # DeepSeek included for defense-in-depth (some models via
-                                        # OpenRouter may also use <think> tags in content).
-                                        if active_provider_name in ("moonshot", "deepseek"):
-                                            _visible = ""
-                                            _reasoning = ""
-                                            _remaining = _content
-                                            while _remaining:
-                                                if _in_think_block:
-                                                    end_idx = _remaining.find("</think>")
-                                                    if end_idx != -1:
-                                                        _reasoning += _remaining[:end_idx]
-                                                        _remaining = _remaining[end_idx + len("</think>"):]
-                                                        _in_think_block = False
-                                                    else:
-                                                        _reasoning += _remaining
-                                                        _remaining = ""
-                                                else:
-                                                    start_idx = _remaining.find("<think>")
-                                                    if start_idx != -1:
-                                                        _visible += _remaining[:start_idx]
-                                                        _remaining = _remaining[start_idx + len("<think>"):]
-                                                        _in_think_block = True
-                                                    else:
-                                                        _visible += _remaining
-                                                        _remaining = ""
-                                            if _reasoning:
-                                                full_reasoning_content += _reasoning
-                                                await _emit(redis, run_id, 'reasoning_delta', content=_reasoning)
-                                            if _visible:
-                                                full_content += _visible
-                                                await _emit(redis, run_id, 'delta', content=_visible)
-                                        else:
-                                            full_content += _content
-                                            await _emit(redis, run_id, 'delta', content=_content)
-
-                                    # DeepSeek thinking mode: accumulate reasoning_content + emit SSE
-                                    _rc = getattr(delta, 'reasoning_content', None)
-                                    if _rc:
-                                        full_reasoning_content += _rc
-                                        await _emit(redis, run_id, 'reasoning_delta', content=_rc)
-
-                                    if delta.tool_calls:
-                                        for tc in delta.tool_calls:
-                                            idx = tc.index
-                                            if idx not in tool_calls_buffer:
-                                                tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                            if tc.id:
-                                                tool_calls_buffer[idx]["id"] = tc.id
-                                            if tc.function and tc.function.name:
-                                                tool_calls_buffer[idx]["name"] = tc.function.name
-                                                # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
-                                                # before arguments finish streaming. Fires exactly once per tool index.
-                                                if idx not in _announced_tools:
-                                                    _announced_tools.add(idx)
-                                                    await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
-                                            # Phase 075.5 D-075.5-03: the OpenAI-compat
-                                            # extra_content.google.thought_signature
-                                            # capture is REMOVED. Google now goes through
-                                            # the native SDK path at line ~1918 above —
-                                            # this branch only handles OpenAI / OpenRouter /
-                                            # Ollama, none of which use thought_signature.
-                                            if tc.function and tc.function.arguments:
-                                                tool_calls_buffer[idx]["arguments"] += tc.function.arguments
-                                                # Phase 075 D-075-09/10/11: emit tool_args_progress
-                                                # on every 5KB cumulative-byte boundary. STRUCTURED
-                                                # mode is still skipped (args arrive at
-                                                # finish_reason parse time, not progressively —
-                                                # there's no streaming accumulator to walk).
-                                                #
-                                                # Phase 075.6 Plan 01 / Req #2: the prior
-                                                # execute_code-tool-name skip filter is REMOVED.
-                                                # The frontend live panel (Plan 02
-                                                # <ToolArgsLivePanel>) renders streaming
-                                                # execute_code args as the LLM types them — the
-                                                # exact moment users most need progress feedback.
-                                                _tool_name = tool_calls_buffer[idx]["name"]
-                                                if (
-                                                    _tool_name
-                                                    and calling_mode != CallingMode.STRUCTURED
-                                                ):
-                                                    # Phase 075.6 Plan 01 / Req #3: select
-                                                    # per-provider boundary dict so OpenRouter
-                                                    # aggregation cadence cannot be polluted by
-                                                    # OpenAI native boundary state and vice versa.
-                                                    # `active_provider_name` is captured at L:2100
-                                                    # (outside this closure) and closure-captured.
-                                                    _emit_boundary = (
-                                                        _emit_boundary_openrouter
-                                                        if active_provider_name == "openrouter"
-                                                        else _emit_boundary_openai_native
-                                                    )
-                                                    _bytes_total = len(
-                                                        tool_calls_buffer[idx]["arguments"].encode("utf-8")
-                                                    )
-                                                    # Phase 075.10: boundary lowered from
-                                                    # hardcoded 5120 to config-backed default
-                                                    # 256 via
-                                                    # chat_tool_args_progress_emit_boundary_bytes.
-                                                    # Resolved once outside the closure into
-                                                    # _emit_boundary_bytes (closure-captured).
-                                                    _new_boundary = _bytes_total // _emit_boundary_bytes
-                                                    _last_boundary = _emit_boundary.get(idx, 0)
-                                                    if _new_boundary > _last_boundary:
-                                                        _emit_boundary[idx] = _new_boundary
-                                                        # D-075-09 + Phase 075.10: args_so_far is
-                                                        # the LAST _emit_tail_bytes of the
-                                                        # cumulative accumulator (sliding-window
-                                                        # tail, capped at max(5120, boundary*4)).
-                                                        # UTF-8-aware byte slice + decode
-                                                        # errors="ignore" drops any invalid
-                                                        # trailing codepoint bytes left by the
-                                                        # byte boundary.
-                                                        _tail_bytes = tool_calls_buffer[idx]["arguments"].encode("utf-8")[-_emit_tail_bytes:]
-                                                        _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
-                                                        await _emit(
-                                                            redis, run_id, "tool_args_progress",
-                                                            tool_index=idx,
-                                                            name=_tool_name,
-                                                            args_so_far=_args_so_far,
-                                                            total_args_bytes_so_far=_bytes_total,
-                                                            # Phase 075.6 Plan 01 / Req #1: full
-                                                            # cumulative concatenated args (not
-                                                            # the 5 KB tail) — additive field.
-                                                            code_so_far=tool_calls_buffer[idx]["arguments"],
-                                                        )
-
-                                await _drain_stream_with_close_on_cancel(
-                                    stream,
-                                    per_call_budget,
-                                    _on_chunk_openai,
-                                    # openai 2.28.0 Stream.close() is sync and
-                                    # idempotent (closes underlying httpx
-                                    # response). Bound here so the helper's
-                                    # except-block calls it from the main
-                                    # thread BEFORE the producer's for-loop
-                                    # cleanup ever propagates GeneratorExit
-                                    # into _TracedStream.__iter__.
-                                    close_fn=stream.close,
-                                )
-
-                                # Parse tool calls based on calling mode
-                                if calling_mode == CallingMode.STRUCTURED:
-                                    structured_calls = parse_structured_tool_calls(full_content)
-                                    if structured_calls:
-                                        # Convert to tool_calls_buffer format for uniform execution
-                                        for idx, call in enumerate(structured_calls):
-                                            tool_calls_buffer[idx] = {
-                                                "id": call.id,
-                                                "name": call.function.name,
-                                                "arguments": call.function.arguments,
-                                            }
-                                        # D-05 (Phase 56.1): emit tool_preparing for each structured call.
-                                        # Structured mode has no streaming name delivery; this fires immediately
-                                        # after parse returns, before the tool execution loop.
-                                        for idx, call in enumerate(structured_calls):
-                                            await _emit(redis, run_id, 'tool_preparing', name=call.function.name, index=idx)
-                                        # Yield control so the SSE flush reaches the client before
-                                        # execution begins — otherwise preparing and running arrive in
-                                        # the same TCP packet and the preparing state is never rendered.
-                                        await asyncio.sleep(0)
-                                        # Clear content since it was a tool call, not a user-facing response
-                                        full_content = ""
-                                        finish_reason = "tool_calls"
-                                    elif full_content.strip():
-                                        # Log parse failure for observability
-                                        logger.warning(
-                                            "structured_tool_parse_failed",
-                                            extra={
-                                                "model": body.model,
-                                                "provider": user_settings.active_provider if user_settings else "unknown",
-                                                "content_preview": full_content[:200],
-                                            }
-                                        )
-
-                                break  # stream completed successfully
-
-                        except (APIError, AnthropicAPIError) as provider_err:
-                            # Detect "request too large" 429 — distinct from a rate-limit 429.
-                            # This fires when the account's TPM ceiling (e.g. OpenAI Tier-1: 30k)
-                            # is smaller than the single request size. This is an account plan
-                            # limitation, not a model or app issue — do NOT trim content.
-                            _err_str = str(provider_err).lower()
-                            _is_request_too_large = (
-                                getattr(provider_err, "status_code", None) == 429
-                                and ("request too large" in _err_str or "tokens per min" in _err_str)
+                        if _kickoff_definition.project_folder_id is not None:
+                            _wf_scope_root = str(_kickoff_definition.project_folder_id)
+                        else:
+                            _wf_thread_data = await aexec(
+                                supabase.table("threads")
+                                .select("folder_id")
+                                .eq("id", thread_id)
+                                .single()
                             )
-                            if _is_request_too_large:
-                                _tpm_msg = (
-                                    "*This document is too large for your current OpenAI account plan. "
-                                    "gpt-4.1 supports up to 1M tokens, but your account's TPM limit "
-                                    "rejected this request. To fix: upgrade to OpenAI Tier 2 at "
-                                    "platform.openai.com/account/rate-limits, switch to Anthropic "
-                                    "(claude-sonnet-4-6), or use OpenRouter which has higher limits.*"
-                                )
-                                full_content += _tpm_msg
-                                await _emit(redis, run_id, 'delta', content=_tpm_msg)
-                                break
-
-                            if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
-                                _provider_retries += 1
-                                delay = _retry_delays[_provider_retries - 1]
-                                logger.warning(
-                                    "Transient provider error on iteration %d (thread %s), "
-                                    "attempt %d/%d — retrying in %.1fs. status=%s",
-                                    iteration, thread_id,
-                                    _provider_retries, _MAX_PROVIDER_RETRIES + 1,
-                                    delay, getattr(provider_err, "status_code", "unknown"),
-                                )
-                                await asyncio.sleep(delay)
-                                continue
-                            raise  # non-retryable or retries exhausted → caught by outer except APIError
-
-                    logger.debug(
-                        "Iteration %d finish_reason=%r tool_calls_buffered=%d",
-                        iteration, finish_reason, len(tool_calls_buffer),
-                    )
-
-                    # Plan 075.4-03 T-075.4-05 — iteration-cap silent-drop guard.
-                    # When force_no_tools=True (final iteration) the agent sent
-                    # tool_choice="none"; if the model produced tool calls anyway,
-                    # there's no NEXT iteration to feed their results into the
-                    # model's user-facing answer. Pre-Plan-03 we silently ran
-                    # them and dropped the results on the floor; trust-erosion
-                    # class T-075.4 mitigates this by surfacing inline + log.
-                    # Belt-and-suspenders: clear the buffer so the downstream
-                    # `if not tool_calls_buffer:` short-circuit fires and the
-                    # tool execution round is skipped (avoids billing for
-                    # tool runs whose output never influences the answer).
-                    if force_no_tools and tool_calls_buffer:
-                        _dropped_count = len(tool_calls_buffer)
-                        _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
-                        logger.warning(
-                            "iteration_cap_dropped_tool_calls run=%s iteration=%d dropped=%d tool_names=%s",
-                            run_id, iteration, _dropped_count, _tool_names,
+                            _wf_scope_root = (
+                                _wf_thread_data.data.get("folder_id")
+                                if _wf_thread_data.data else None
+                            )
+                        if _wf_scope_root:
+                            _wf_folder_subtree_ids = await resolve_project_subtree(
+                                _wf_scope_root, supabase=supabase, user_id=current_user["id"]
+                            )
+                            _wf_all_folders = await fetch_visible_folders(
+                                supabase, current_user["id"]
+                            )
+                            _wf_folder_map = {f["id"]: f for f in _wf_all_folders}
+                            _wf_path_parts: list[str] = []
+                            _wf_current_fid = _wf_scope_root
+                            while _wf_current_fid:
+                                _f = _wf_folder_map.get(_wf_current_fid)
+                                if not _f:
+                                    break
+                                _wf_path_parts.append(_f.get("name", ""))
+                                _wf_current_fid = _f.get("parent_id")
+                            _wf_scoped_folder_path = (
+                                "/" + "/".join(reversed(_wf_path_parts))
+                                if _wf_path_parts else None
+                            )
+                    except Exception:
+                        # WR-03 (098 secure-phase): a scope-resolution failure must not
+                        # silently widen a BOUND workflow to the whole KB. The Plan-05
+                        # clip + scope_violation emit are gated on
+                        # `folder_subtree_ids is not None`, so on a None fallback neither
+                        # narrows nor fires — the degradation would be INVISIBLE. Kickoff
+                        # is the one site where the run has NOT started yet, so for a
+                        # bound workflow we fail CLOSED (emit + raise → a clean `failed`
+                        # terminal via the producer's outer `except Exception` below)
+                        # rather than run unscoped. An UNBOUND/legacy workflow keeps the
+                        # historical fall-through to whole-KB (SC#1 — losing the
+                        # thread-folder default hint is not a governance violation).
+                        _wf_bound = _kickoff_definition.project_folder_id is not None
+                        logger.exception(
+                            "harness run-start scope resolution failed for thread %s "
+                            "(bound=%s)", thread_id, _wf_bound,
                         )
-                        await _emit(redis, run_id, 'system_warning',
-                                    kind="iteration_cap_dropped_tool_calls",
-                                    message=f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.")
-                        _persisted_system_warnings.append({
-                            "kind": "iteration_cap_dropped_tool_calls",
-                            "message": f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.",
-                        })
-                        tool_calls_buffer = {}   # belt-and-suspenders — skip the tool execution round
-
-                    if finish_reason == "length" and tool_calls_buffer:
-                        # length limit hit while streaming tool arguments — discard partial call
-                        err_msg = "*The conversation grew too large for this model's context window. Start a new chat and try the generation request again.*"
-                        full_content += err_msg
-                        await _emit(redis, run_id, 'delta', content=err_msg)
-                        await _emit(redis, run_id, 'error', message='finish_reason=length during tool streaming')
-                        break
-
-                    if finish_reason == "length":
-                        # Detect "prose-before-code" anti-pattern: model wrote text instead of calling
-                        # execute_code, consumed the full token budget, and never made the tool call.
-                        # Recovery: inject a corrective user message and continue the loop so the model
-                        # can call execute_code on the next iteration.
-                        _generation_keywords = ("powerpoint", "pptx", "ppt", "presentation", "pdf",
-                                                "word", "excel", "report", "chart", "generate", "create",
-                                                "build", "python", "execute_code")
-                        _content_lower = full_content.lower()
-                        _looks_like_prose_not_code = (
-                            iteration > 0
-                            and not tool_calls_buffer
-                            and any(kw in _content_lower for kw in _generation_keywords)
-                            and len(full_content) > 500
-                        )
-                        if _looks_like_prose_not_code:
-                            # Strip the truncated prose — inject a recovery prompt instead
-                            full_content = ""
-                            _recovery = (
-                                "You wrote a text response but hit the output token limit before calling execute_code. "
-                                "Do NOT write any more text. Call execute_code NOW with complete Python code to produce the file."
+                        if _wf_bound:
+                            try:
+                                await _harness_emit(
+                                    redis,
+                                    _active_workflow_run_id,
+                                    "scope_resolution_failed",
+                                    site="kickoff",
+                                    bound=True,
+                                    detail=(
+                                        "project-scope resolution failed at run start; "
+                                        "failing closed to avoid whole-KB retrieval"
+                                    ),
+                                )
+                            except Exception:  # noqa: BLE001 — emit is best-effort
+                                logger.debug(
+                                    "kickoff: scope_resolution_failed emit failed for run %s",
+                                    _active_workflow_run_id,
+                                )
+                            raise RuntimeError(
+                                "bound workflow scope resolution failed at run start "
+                                "(failing closed to avoid whole-KB retrieval)"
                             )
-                            messages.append({"role": "assistant", "content": "[Response truncated — token limit reached before execute_code was called]"})
-                            messages.append({"role": "user", "content": _recovery})
-                            logger.warning("prose_before_code_recovery: iteration %d hit length limit without tool call — injecting recovery prompt", iteration)
-                            continue  # retry this iteration
-                        truncation_note = "\n\n*[Response truncated — output token limit reached. Start a new chat or reduce document length.]*"
-                        full_content += truncation_note
-                        await _emit(redis, run_id, 'delta', content=truncation_note)
-                        break
-
-                    # Execute tools if any were buffered, regardless of finish_reason.
-                    # Anthropic's compat layer sends "end_turn" (not "tool_calls") even when
-                    # tool calls are present — checking finish_reason alone would silently drop them.
-                    if not tool_calls_buffer:
-                        if finish_reason not in ("tool_calls", "stop", "end_turn", None):
-                            logger.warning(
-                                "Unexpected finish_reason %r on iteration %d — treating as stop",
-                                finish_reason, iteration,
-                            )
-                        # Guard: if LLM returned stop with no content and no tools at any
-                        # iteration, retry once — handles transient hiccups and reasoning
-                        # models (e.g. Kimi K2.5) that exhaust output budget on thinking
-                        # tokens and return empty content after a tool call.
-                        if not full_content and _empty_retries < 1:
-                            _empty_retries += 1
-                            logger.warning(
-                                "LLM returned empty response on iteration %d (thread %s) — retrying once",
-                                iteration, thread_id,
-                            )
-                            continue
-                        break
-
-                    # --- Tool execution round ---
-                    tool_calls = list(tool_calls_buffer.values())
-
-                    messages.append({
-                        "role": "assistant",
-                        "tool_calls": [
-                            {
-                                "id": tc["id"],
-                                "type": "function",
-                                "function": {"name": tc["name"], "arguments": tc["arguments"]},
-                                # Phase 075.5 D-075.5-01/03: carry thought_signature as a
-                                # top-level field on the tool_call dict. google_service.py
-                                # `_convert_messages_to_google` reads this and attaches it
-                                # to the Part so the native SDK round-trips it on the next
-                                # round. The OpenAI-compat extra_content.google.* shape
-                                # (Phase 075.4-02 attempt) is OBSOLETE — openai-python's
-                                # serialization silently dropped that field, causing
-                                # Gemini-3+ 400 INVALID_ARGUMENT on multi-tool rounds.
-                                # The native SDK + this top-level field round-trip is
-                                # proven by the end-to-end smoke test executed at adoption
-                                # time (see GAP-075.4-01 hotfix history).
-                                **(
-                                    {"thought_signature": tc["thought_signature"]}
-                                    if tc.get("thought_signature")
-                                    else {}
-                                ),
-                            }
-                            for tc in tool_calls
-                        ],
-                        # Phase 076.2 D-03: narration text before tool calls
-                        **({"content": full_content} if full_content else {}),
-                        # Phase 076.2 D-03: DeepSeek thinking mode requires reasoning_content
-                        # round-trip on tool-call turns. Without this, the second LLM call
-                        # fails with 400 "reasoning_content must be passed back to the API".
-                        # Anti-pattern: do NOT include for non-tool-call turns (ignored by
-                        # DeepSeek, but unnecessary). Do NOT include for non-DeepSeek providers
-                        # (harmless — the conditional spread prevents empty key).
-                        **({"reasoning_content": full_reasoning_content} if full_reasoning_content else {}),
-                    })
-
-                    # Phase 076.2 Pitfall 1: reset accumulators after consuming them.
-                    # Without this, iteration 2's reasoning would carry iteration 1's
-                    # content concatenated. Same pattern as full_content resets at lines
-                    # 2339 and 2447.
-                    full_content = ""
-                    full_reasoning_content = ""
-
-                    # Phase 083 D-01: construct ToolContext once per iteration.
-                    # All tool-specific logic delegates through dispatch_tool().
-                    tool_ctx = ToolContext(
+                        # unbound → fall through to unscoped (None) search (unchanged)
+                    wf_ctx = SimpleNamespace(
+                        run_id=_active_workflow_run_id,
+                        # Facet A (092-07): the producer runs.run_id is the FK target
+                        # for sub-agent parent_run_id; ctx.run_id stays the workflow_run
+                        # id for audit/terminal/definition/resume-match.
+                        producer_run_id=run_id,
+                        thread_id=thread_id,
+                        current_user=current_user,
+                        user_settings=user_settings,
+                        # D-04 (site 1): the effective ctx model resolved from the run
+                        # owner's active provider (resolve-never-mutate, D-05). user_settings
+                        # is the live request's effective settings — resolve from it so a
+                        # stale cross-provider llm_model cannot leak to the wrong client.
+                        # Phase-level precedence stays phase.config.model or ctx.model
+                        # (phase_types._effective_model) — this only sets ctx.model.
+                        model=resolve_workflow_ctx_model(user_settings),
+                        # F8 (092-07): the consumption half of SEED-047. create_workflow_run
+                        # STORED the user's kickoff question in workflow_runs.inputs.kickoff_prompt
+                        # (:995 above) but the phase executors never read it — the FIRST phase
+                        # (research) ran with an empty user turn and asked "send me the topic…".
+                        # Mirror EXACTLY what was persisted so live ctx.inputs == the durable
+                        # inputs jsonb the resume builders read back. phase_types._exec_llm_*
+                        # use ctx.inputs["kickoff_prompt"] as the first phase's user turn /
+                        # sub-agent task; programmatic split_topic reads ctx.inputs at :178.
+                        inputs={"kickoff_prompt": body.content},
                         redis=redis,
+                        pool=_wf_pool,
+                        emit=_harness_emit,
+                        retry_feedback=None,
+                        # F5 (092-07): the tool-context fields every Supabase tool
+                        # reads via ctx.<field> (search_documents/hybrid/ls/tree/grep/
+                        # glob/fetch_document/skills/code-exec logging). Sourced from
+                        # the SAME in-scope values the Deep RunContext + run_agent_loop
+                        # use: supabase=supabase (threads.py:1190), spawn=_spawn
+                        # (threads.py:1198, the module-level _spawn). Without these
+                        # _build_phase_tool_context forwards None → ctx.supabase.rpc
+                        # raises AttributeError on the first search_documents (F5).
+                        supabase=supabase,
+                        folder_subtree_ids=_wf_folder_subtree_ids,
+                        scoped_folder_path=_wf_scoped_folder_path,
+                        spawn=_spawn,
+                        # Per-run task() concurrency gate — mirrors the Deep
+                        # run_agent_loop local (_per_run_task_semaphore,
+                        # agent_loop.py:1234). A fresh per-run semaphore is correct
+                        # (this is a fresh top-level workflow run).
+                        per_run_task_semaphore=asyncio.Semaphore(
+                            settings.task_per_run_concurrency
+                        ),
+                    )
+                    await run_workflow(
+                        _active_workflow_run_id,
+                        _wf_definition,
+                        wf_ctx,
+                        pool=_wf_pool,
+                        redis=redis,
+                        # Facet B (092-07): route engine SSE events to the producer
+                        # stream the frontend watches (run:{producer_run_id}).
+                        stream_run_id=run_id,
+                    )
+                    # ── 093-05 D-11: answer surfacing now lives in run_workflow ──────
+                    # The F6/F7 surfacing (delta + sources/citations/confidence emit +
+                    # the assistant-message persist) was moved INTO the shared helper
+                    # `harness_engine._surface_final_answer`, which run_workflow invokes
+                    # on its success terminal BEFORE the terminal `run_completed` (D-11,
+                    # Pitfall 5). That helper is THE single surfacing site + single
+                    # persist owner for ALL THREE entry paths (live kickoff here, resume
+                    # via _build_resume_context, Continue via _harness_continuation) —
+                    # so resumed/Continue'd workflows surface identically and there is
+                    # exactly ONE persisted assistant message per path (Landmine 5).
+                    # Therefore the live-kickoff branch surfaces NOTHING inline and
+                    # installs NO harness persist callable into `_result_sink`:
+                    # `_shielded_finalize` reads `_result_sink.get("persist")` and is a
+                    # no-op when it is absent (threads.py:1529) → no double-persist /
+                    # duplicate assistant message. The Deep `else` branch +
+                    # run_agent_loop + the Deep `_result_sink` flow stay byte-identical
+                    # (D-14).
+                else:                                          # Deep — byte-identical
+                    ctx = RunContext(
                         run_id=run_id,
                         thread_id=thread_id,
-                        supabase=supabase,
-                        pool=await get_pg_pool(),
-                        user_settings=user_settings,
                         current_user=current_user,
-                        folder_subtree_ids=folder_subtree_ids,
-                        scoped_folder_path=scoped_folder_path,
+                        user_settings=user_settings,
+                        body=body,
+                        redis=redis,
+                        supabase=supabase,
+                        resolved_model=_resolved_model,
+                        resolved_provider=_resolved_provider,
+                    )
+                    _agent_loop_result = await run_agent_loop(
+                        ctx,
                         emit=_emit,
+                        emit_terminal=_emit_terminal,
                         spawn=_spawn,
-                        model=body.model or settings.llm_model,
-                        previous_files_in_run=_previous_files_in_run,
-                        iteration=iteration,
-                        # Phase 085 additions —
-                        # parent_run_id is None at the top-level run; task_service
-                        # overrides it inside sub-agent ToolContexts so _handle_task
-                        # can short-circuit the 1-level nesting cap (D-085-12).
-                        # available_tools is the tool-NAME list exposed to the LLM
-                        # this iteration — _handle_task uses it for sub-agent toolset
-                        # subset validation (D-085-09).
-                        parent_run_id=None,
-                        per_run_task_semaphore=_per_run_task_semaphore,
-                        available_tools=[
-                            t["function"]["name"]
-                            for t in (active_tools or get_tools(user_settings))
-                        ],
+                        timeout_ctx=_timeout_ctx,
+                        result_sink=_result_sink,
                     )
-
-                    for tool_index, tc in enumerate(tool_calls):
-                        tool_name = tc["name"]
-                        sub_agent_record: dict | None = None
-                        llm_tool_content: str | None = None
-                        try:
-                            args = json.loads(tc["arguments"])
-                            await _emit(redis, run_id, 'tool_start', name=tool_name, args=args)
-
-                            # Phase 083 D-01/D-03: single dispatch_tool() call replaces
-                            # the ~780 LOC elif chain (G-5 mandated extraction).
-                            tool_ctx.tool_index = tool_index
-                            # Phase 085 D-085-01 — populate per-tool-call id so ask_user
-                            # can derive its Redis pub/sub channel name and so any
-                            # future per-tool-call ctx state has a stable identifier.
-                            tool_ctx.tool_call_id = tc.get("id", "")
-                            _tool_result = await dispatch_tool(tool_name, args, tool_ctx)
-                            tool_result = _tool_result.result
-                            llm_tool_content = _tool_result.llm_content
-                            sub_agent_record = _tool_result.sub_agent_record
-
-                            # Accumulate side effects from dispatcher
-                            if _tool_result.source_refs:
-                                source_refs.extend(_tool_result.source_refs)
-                            if _tool_result.citations:
-                                retrieved_citations.extend(_tool_result.citations)
-                            if _tool_result.similarity_score is not None:
-                                similarity_scores.append(_tool_result.similarity_score)
-
-                        except json.JSONDecodeError:
-                            tool_result = "Error parsing tool arguments"
-                            args = {}
-                        except (ValueError, RuntimeError) as e:
-                            logger.error("Tool %s failed: %s", tool_name, e)
-                            tool_result = f"Tool error: {e}"
-                        except Exception as e:
-                            logger.error("Tool %s unexpected error: %s", tool_name, e)
-                            tool_result = f"Tool execution failed: {e}"
-
-                        await _emit(redis, run_id, 'tool_end', name=tool_name, result=tool_result[:2000])
-
-                        # GEN-03: Store full tool result -- no character cap.
-                        _tool_message_content = llm_tool_content if llm_tool_content is not None else tool_result
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc["id"],
-                            "content": _tool_message_content,
-                        })
-
-                        # Persist tool call -- for execute_code rebuild from tool_result
-                        # so output_files (with signed URLs) are never lost by string truncation.
-                        if tool_name == "execute_code":
-                            try:
-                                _r = json.loads(tool_result)
-                                persisted_result = json.dumps({
-                                    "status": _r.get("status", "done"),
-                                    "exit_code": _r.get("exit_code", 0),
-                                    "duration_ms": _r.get("duration_ms", 0),
-                                    "output_files": _r.get("output_files", []),
-                                    "stdout": (_r.get("stdout", ""))[:800],
-                                    "stderr": (_r.get("stderr", ""))[:200],
-                                })
-                            except (json.JSONDecodeError, AttributeError):
-                                persisted_result = tool_result[:2000]
-                        else:
-                            persisted_result = tool_result[:2000]
-
-                        persisted_tool_calls.append({
-                            "tool_call_id": tc["id"],
-                            "name": tool_name,
-                            "args": args,
-                            "result": persisted_result,
-                            "status": "done",
-                            **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
-                            **({"sub_agent_model": sub_agent_record.get("effective_model", "")} if sub_agent_record else {}),
-                            **({"thought_signature": tc.get("thought_signature")} if tc.get("thought_signature") else {}),
-                        })
-                    # Continue to next iteration to let LLM respond with tool results in context
-
-                # Plan 075.4-03 D-075.4-D1/D2 — pinned final-outputs panel emit.
-                # After the agent loop terminates (break or natural end), emit
-                # the cumulative file set so the frontend can render a single
-                # "Final outputs" panel below the per-cell delta panels.
-                #
-                # The list comprehension iterates ``_previous_files_in_run.values()``
-                # (per-hash meta dicts) and projects filename + url + size — this
-                # NATURALLY closes BUG-260522-02 (pre-fix the emit was filename-only,
-                # leaving the frontend pinned panel with no download URL) AND
-                # auto-closes BUG-260521-02 per its re_open_trigger.
-                #
-                # Historical context (B-260519-11 + BUG-260514-01): closes the
-                # cumulative-repeat symptom (12 download links for 1 desired file).
-                if _previous_files_in_run:
-                    await _emit(
-                        redis,
-                        run_id,
-                        'final_output_files',
-                        files=[
-                            {"filename": meta["filename"], "url": meta["url"], "size": meta["size"]}
-                            for meta in _previous_files_in_run.values()
-                        ],
-                    )
-
-                # Fallback: if the loop ended with no content produced, emit a safe message
-                if not full_content:
-                    # GEN-07: two distinct messages — context overflow vs empty model response
-                    # Context overflow is caught earlier (finish_reason == "length").
-                    # This branch = model returned empty content after all iterations/retries.
-                    # Plan 075.4-03 BUG-260522-01 — use the actual iteration
-                    # count, not max_iterations. The model typically returns
-                    # empty after ONE iteration (Google 15-iter loop bug at
-                    # the chunk-handler), not after exhausting the cap. The
-                    # `iteration` loop variable is in scope from the
-                    # enclosing `for iteration in range(max_iterations):`.
-                    fallback = (
-                        f"*The model returned an empty response after {iteration + 1} iteration(s). "
-                        "Try breaking the request into smaller steps or switching to a different model.*"
-                    )
-                    full_content += fallback
-                    await _emit(redis, run_id, 'delta', content=fallback)
-
-              except (asyncio.TimeoutError, asyncio.CancelledError):
-                  # Phase 066 Plan 04 Rule 1 fix: TimeoutError + CancelledError MUST
-                  # propagate past this inner try so the outer partition-guard branches
-                  # (lines ~2237 / ~2258) can set the correct _terminal_status
-                  # ('timed_out' / 'cancelled'). Without this re-raise the broad
-                  # `except Exception as e:` below would swallow them, leaving
-                  # _terminal_status at its default 'completed' — D-066-05 partition
-                  # guard violation. The outer handler is also responsible for
-                  # `_ant_gen.close()` / `stream.close()` (already done in the inner
-                  # `async with asyncio.timeout(...)` blocks at lines 1240/1327
-                  # before re-raise — see D-066-11).
-                  raise
-              except (APIError, anthropic.APIError, google_errors.APIError) as e:
-                  # Phase 075.5 T-260523-05 — broadened from openai-only to
-                  # also include native Anthropic + Google SDK error classes,
-                  # so the actionable keyword-mapped messages below fire for
-                  # ALL providers, not just OpenAI/OpenRouter.
-                  logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
-                  err_str = str(e)
-                  err_lower = err_str.lower()
-                  # Map common API errors to actionable user messages
-                  if any(kw in err_lower for kw in ("credit balance", "billing", "quota", "insufficient_quota", "rate limit", "rate_limit")):
-                      user_msg = (
-                          "*API billing or rate-limit error: your account has insufficient credits "
-                          "or has hit a usage limit. Please check your provider's billing dashboard.*"
-                      )
-                  elif any(kw in err_lower for kw in ("invalid api key", "invalid_api_key", "authentication", "unauthorized", "401")):
-                      user_msg = (
-                          "*Authentication error: the API key for this provider is invalid or expired. "
-                          "Please check your API key in Settings.*"
-                      )
-                  elif any(kw in err_lower for kw in ("unsupported parameter", "unsupported_parameter")):
-                      user_msg = (
-                          f"*Model parameter error: {err_str}. "
-                          "This model may not support the current configuration.*"
-                      )
-                  elif any(kw in err_lower for kw in ("context", "maximum", "too long", "too large", "token limit", "overloaded")):
-                      user_msg = (
-                          "*The conversation has grown too long for this model's context window. "
-                          "Please start a new chat or reduce the amount of history.*"
-                      )
-                  elif isinstance(e, APIError) and _is_transient_provider_error(e):
-                      # isinstance guard: _is_transient_provider_error reads
-                      # openai-specific attrs (e.body.get, .status_code shape).
-                      # For Anthropic/Google we skip the transient classification
-                      # rather than risk an AttributeError inside the catch.
-                      user_msg = (
-                          "*The AI provider is temporarily unavailable. Please try again in a moment.*"
-                      )
-                  else:
-                      user_msg = f"*LLM API error: {err_str}*"
-                  # Phase 075.5 T-260523-05 — always emit the actionable message
-                  # as a delta. The prior `if not full_content` guard meant that
-                  # provider errors mid-run (after several successful tool calls)
-                  # were silently swallowed: the user saw a "long pause" instead
-                  # of "your Anthropic credit is exhausted". Preserve prior
-                  # streamed content AND append the error explanation so the
-                  # final assistant message tells the user what happened.
-                  full_content += user_msg
-                  await _emit(redis, run_id, 'delta', content=user_msg)
-                  await _emit(redis, run_id, 'error', message=err_str)
-                  # Phase 066 Plan 04 Rule 1 fix: re-raise so the OUTER classifier
-                  # at lines ~2249-2294 sets _terminal_status='failed' on
-                  # provider-side APIErrors. Mirrors the broad Exception
-                  # handler below — friendly SSE events first, then propagate.
-                  raise
-              except Exception as e:
-                  logger.error("Unexpected error in event stream (thread %s): %s [%s]", thread_id, e, type(e).__name__, exc_info=True)
-                  user_msg = f"*An unexpected error occurred ({type(e).__name__}). Please try again.*"
-                  if not full_content:
-                      full_content += user_msg
-                      await _emit(redis, run_id, 'delta', content=user_msg)
-                  await _emit(redis, run_id, 'error', message='An unexpected error occurred')
-                  # Phase 066 Plan 04 Rule 1 fix: re-raise so the OUTER classifier
-                  # at lines ~2249-2294 sets _terminal_status='failed' (not the
-                  # default 'completed'). Without this re-raise the producer's
-                  # runs row UPDATE writes status='completed' on real producer
-                  # failures — D-066-05 partition guard violation. The friendly
-                  # `delta` + `error` SSE events above are still flushed first
-                  # (consumers see the user-visible message), then the outer
-                  # `except Exception as e` branch sets the terminal lifecycle
-                  # state correctly per D-066-07.
-                  raise
-
-              # Emit sources SSE event (deduplicated by document_id)
-              if source_refs:
-                  unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
-                  await _emit(redis, run_id, 'sources', sources=unique_sources)
-
-              # Emit citations event (D-03, D-07: after sources, before confidence)
-              unique_citations[:] = _deduplicate_citations(retrieved_citations)
-              if unique_citations:
-                  # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
-                  sse_citations = []
-                  for c in unique_citations:
-                      sse_c = dict(c)
-                      if sse_c.get("passage") and len(sse_c["passage"]) > 400:
-                          sse_c["passage"] = sse_c["passage"][:400]
-                      sse_citations.append(sse_c)
-                  await _emit(redis, run_id, 'citations', citations=sse_citations)
-
-              # Emit confidence event (D-05, D-07: after citations, before title)
-              if similarity_scores:
-                  final_avg = sum(similarity_scores) / len(similarity_scores)
-                  level = _compute_confidence(final_avg)
-                  disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
-                  _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
-                  await _emit(redis, run_id, 'confidence', level=level, avg_similarity=round(final_avg, 4), disclaimer=disclaimer)
-
-              # Persist assistant message (normal path — before [DONE])
-              await _persist_assistant_message()
-
-              # Touch thread so it rises in updated_at ordering
-              try:
-                  await aexec(supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id))
-              except Exception:
-                  pass
-
-              # D-067.2-05: title generation moved to send_message handler (fires
-              # AFTER the user-message INSERT, BEFORE this producer task spawns).
-              # See the hoisted block at the bottom of send_message (just before
-              # `async def agent_runner`). Title now persists regardless of run
-              # outcome — success / failure / timeout / cancellation / exception.
-              # The original block that previously lived here only fired on the
-              # success path (between _persist_assistant_message and the 'done'
-              # _emit), causing "stuck on 'New Chat' forever after a failed/
-              # cancelled run" (D-067.2-05a + D-067.2-05b). Deleted in plan
-              # 067.2-02 so title cannot fire twice on success.
-
-              # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
-              # Phase 067.4 (D-067.4-R3-03): wrap sync call in run_in_threadpool per CLAUDE.md D-v2.5-01.
-              # Phase 067.4 (D-067.4-R3-02): always emit, even when empty — removes SSE-replay ambiguity.
-              # Phase 067.4 (Rule 3 deviation): the suggestion block moved BEFORE the 'done'
-              # emit. `done` is in TERMINAL_TYPES (threads.py:88) so the SSE replay consumer
-              # (runs.py replay_tail_consumer:170) returns immediately after yielding 'done',
-              # which previously made suggestion events emitted-after-done invisible to SSE
-              # consumers. Producer-side ordering is now suggestions → done → stream_end so
-              # the wire delivers suggestions to the SSE-replay reader.
-              try:
-                  from app.services.suggestion_service import generate_suggestions
-                  questions, sugg_fallback = await run_in_threadpool(
-                      generate_suggestions,
-                      body.content,         # user_message (positional, mirrors the title pattern at threads.py:1028)
-                      full_content,         # assistant_response
-                      user_settings,        # user_settings
-                  )
-                  if sugg_fallback:
-                      await _emit(redis, run_id, 'fallback_model', **sugg_fallback)
-                  # D-067.4-R3-02: unconditional emit (frontend gate at MessageItem.tsx:93-98 already
-                  # short-circuits empty arrays via `message.suggestions.length > 0` clause).
-                  await _emit(redis, run_id, 'suggestions', questions=questions[:3])
-                  if not questions:
-                      logger.info(
-                          "suggestions empty for run %s — generate_suggestions returned [] "
-                          "(emitted as empty list; not an error)",
-                          run_id,
-                      )
-              except (openai.APIError, openai.APIConnectionError, openai.APITimeoutError,
-                      openai.BadRequestError, openai.RateLimitError, openai.InternalServerError) as e:
-                  # D-067.4-R3-01 branch (a): narrowed catch for known OpenAI API
-                  # error classes. SUG-04 invariant preserved — no re-raise; the
-                  # producer continues to 'done' + 'stream_end'.
-                  logger.warning(
-                      "suggestion generation API error for run %s: %s",
-                      run_id, type(e).__name__,
-                      exc_info=True,
-                  )
-              except Exception:
-                  # Final safety net — unknown exception class. Logged at ERROR
-                  # severity so operator gets paged; SUG-04 invariant still
-                  # preserved (no re-raise).
-                  logger.error(
-                      "suggestion generation UNEXPECTED for run %s — investigate",
-                      run_id,
-                      exc_info=True,
-                  )
-
-              # Plan 075.4-03 T-075.4-04 — terminal-status race fix.
-              # The legacy inline emit of the 'done' SSE event that used to
-              # live here was REMOVED because it fired BEFORE the _shielded_finalize
-              # block ran (which is the writer of runs.status='completed').
-              # The race window: frontend saw `done` SSE arrive while a
-              # fresh GET /threads/{id}/snapshot still returned
-              # status='streaming' for ~tens-of-ms (spikes 100ms+ on slow
-              # hosts). Phase 075.4-03 swaps the _shielded_finalize step
-              # order (finalize_run UPDATE BEFORE _emit_terminal sentinel)
-              # so the terminal sentinel SSE event (which is itself
-              # discriminated as 'done' via TERMINAL_TYPES at line 93) now
-              # implies DB-committed state by construction.
-              # Phase 067.4 Rule 3 invariant PRESERVED: suggestion events
-              # at lines ~3138-3145 above still fire BEFORE the terminal
-              # sentinel because they run in the agent-loop body that
-              # always completes before this `finally:` triggers
-              # _shielded_finalize. See test_075_4_terminal_race.py for
-              # the source-order assertion.
-
-              # Phase 32: True stream end — frontend returns from streamMessage.
-              # Plan 075.4-03 note: this event is NOT in TERMINAL_TYPES
-              # (the consumer breaks on `done`/`error`/`cancelled`/
-              # `timed_out` sentinel, not on `stream_end`) so its placement
-              # here is informational only. The terminal sentinel inside
-              # _shielded_finalize is the wire-authority terminator.
-              await _emit(redis, run_id, 'stream_end')
+                # Mirror the loop-surfaced timeout context back onto the
+                # producer-shell locals the classifier reads (keeps the
+                # timed_out error string byte-identical — Phase 066 D-066-07).
+                _last_iteration = _timeout_ctx.get("last_iteration", _last_iteration)
+                _last_model_id = _timeout_ctx.get("last_model_id", _last_model_id)
+                _last_per_call_budget = _timeout_ctx.get("last_per_call_budget", _last_per_call_budget)
 
             except asyncio.TimeoutError:
                 # Phase 066 D-066-05 + D-066-07: per-LLM-call asyncio.timeout
@@ -2990,6 +1520,15 @@ async def send_message(
                 # iteration start (closure variables initialized to defaults
                 # at top of agent_runner so an early TimeoutError before the
                 # loop iterates won't UnboundLocalError).
+                # 089-03: the loop now lives in run_agent_loop, so it surfaces
+                # the per-iteration context via the by-reference _timeout_ctx
+                # dict (mutated even when the TimeoutError propagates out of the
+                # loop, before the post-call mirror above runs). Read it here so
+                # the timed_out error string carries the real iteration/model —
+                # byte-identical to the pre-move closure-captured behavior.
+                _last_iteration = _timeout_ctx.get("last_iteration", _last_iteration)
+                _last_model_id = _timeout_ctx.get("last_model_id", _last_model_id)
+                _last_per_call_budget = _timeout_ctx.get("last_per_call_budget", _last_per_call_budget)
                 # Strict partition guard: timer fire = system = 'timed_out'.
                 # The user-Stop write at runs.py stays 'cancelled' (UNCHANGED).
                 # The format mirrors the contract documented in CONTEXT.md
@@ -3038,10 +1577,27 @@ async def send_message(
                     # return value here as a local — no nonlocal reaches into
                     # send_message scope. Idempotency is preserved via the
                     # _message_persisted guard inside _persist_assistant_message.
+                    #
+                    # 089-03: the persist callables + accumulators now live inside
+                    # run_agent_loop. They are surfaced to this finalizer via the
+                    # by-reference _result_sink (populated by the loop's outer
+                    # `finally` on EVERY exit path, incl. exception). The
+                    # persist→persist_system_warnings→finalize_run→sentinel→expire→
+                    # zrem step order is byte-identical to the pre-move finalizer
+                    # (I10 / Pitfall 5). When the loop never ran (defensive: sink
+                    # empty), the persist callables are absent — we skip the
+                    # persist + system-warning steps and still finalize the runs
+                    # row so the run reaches a terminal status.
+                    _persist = _result_sink.get("persist")
+                    _persist_sys = _result_sink.get("persist_system_warnings")
+                    _sink_system_warnings = _result_sink.get("persisted_system_warnings") or []
+                    _input_tokens_total = _result_sink.get("input_tokens_total")
+                    _output_tokens_total = _result_sink.get("output_tokens_total")
                     # 1. SHIELDED PERSIST — preserves 058/059 contract.
                     _msg_id_for_runs: str | None = None
                     try:
-                        _msg_id_for_runs = await _persist_assistant_message()
+                        if _persist is not None:
+                            _msg_id_for_runs = await _persist()
                     except BaseException:
                         logger.exception("Shielded persist failed for run %s", run_id)
 
@@ -3051,8 +1607,8 @@ async def send_message(
                     # 048 rejects role='system' — INSERT fails-silent; SSE
                     # event remains the user-visible signal regardless.
                     try:
-                        if _persisted_system_warnings:
-                            await _persist_system_messages(_persisted_system_warnings)
+                        if _persist_sys is not None and _sink_system_warnings:
+                            await _persist_sys(_sink_system_warnings)
                     except BaseException:
                         logger.exception("Shielded system-warning persist failed for run %s", run_id)
 
@@ -3086,7 +1642,7 @@ async def send_message(
                     # due to JSON-over-the-wire encoding. asyncpg uses the Postgres binary
                     # protocol — pass datetime objects directly.
                     try:
-                        if input_tokens_total is None and output_tokens_total is None:
+                        if _input_tokens_total is None and _output_tokens_total is None:
                             logger.warning(
                                 "runs.usage missing for run=%s provider=%s model=%s",
                                 run_id, _resolved_provider, _resolved_model,
@@ -3098,8 +1654,8 @@ async def send_message(
                             error=_terminal_error,
                             completed_at=datetime.now(timezone.utc),
                             message_id=UUID(_msg_id_for_runs) if _msg_id_for_runs else None,
-                            input_tokens=input_tokens_total,
-                            output_tokens=output_tokens_total,
+                            input_tokens=_input_tokens_total,
+                            output_tokens=_output_tokens_total,
                         )
                     except BaseException:
                         logger.exception("runs row UPDATE failed for run %s", run_id)
@@ -3132,6 +1688,69 @@ async def send_message(
                         await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
                     except BaseException:
                         logger.exception("ZREM failed for run %s", run_id)
+
+                    # 6. Phase 092-05 F2: a HARNESS run that escapes via
+                    # exception/timeout/cancel never reached run_workflow's own
+                    # finish_run, so workflow_runs would stay 'active' and the
+                    # thread is wedged locked (lock_is_stale=false, no UI recovery).
+                    # Terminalize the workflow_runs row + clear the anchor here on
+                    # any NON-completed terminal status. Idempotent: finish_run
+                    # no-ops the anchor-clear if run_workflow already cleared it on
+                    # its own internal failure path. A natural-success run
+                    # (_terminal_status=='completed') is SKIPPED — run_workflow
+                    # already wrote finish_run(..., 'completed'). Deep runs
+                    # (_active_workflow_run_id is None) skip this entirely
+                    # (byte-identical).
+                    #
+                    # 096-09 (UAT Test 2 restart-resumability fix): on a GRACEFUL
+                    # app shutdown, do NOT terminalize — leaving workflow_runs
+                    # 'active' + the thread anchor intact is PRECISELY what makes
+                    # the boot-time resume sweep re-claim and re-drive this run
+                    # (the active phase's output was never durable → re-running it
+                    # from the top is the correct, idempotent resume). Terminalizing
+                    # here (the pre-fix behavior) is what stranded the run. The gate
+                    # is the ONLY change: user-Stop / crash / timeout (flag False)
+                    # still terminalize exactly as before — byte-identical. Deep
+                    # runs are unaffected (_active_workflow_run_id is None).
+                    from app.services.harness_engine import is_app_shutting_down
+                    if (
+                        _active_workflow_run_id is not None
+                        and _terminal_status != "completed"
+                        and not is_app_shutting_down()
+                    ):
+                        try:
+                            from app.db.workflows import finish_run as _finish_wf
+                            await _finish_wf(
+                                await get_pg_pool(),
+                                _active_workflow_run_id,
+                                # v2.8-audit cancel-honesty fix: a user Stop sets
+                                # _terminal_status='cancelled' (:1379) and the
+                                # workflow_runs CHECK + every terminal-status
+                                # consumer (_TERMINAL_WORKFLOW_STATUSES here and
+                                # in panel.py, PhaseTimeline, RunCard) already
+                                # handle 'cancelled' — record the true intent.
+                                # Every OTHER non-completed escape (timed_out is
+                                # NOT in the workflow_runs CHECK, failed, crash)
+                                # keeps writing 'failed' verbatim.
+                                "cancelled"
+                                if _terminal_status == "cancelled"
+                                else "failed",
+                            )
+                        except BaseException:
+                            logger.exception(
+                                "F2 harness-failure terminalize failed for run %s",
+                                _active_workflow_run_id,
+                            )
+                    elif (
+                        _active_workflow_run_id is not None
+                        and _terminal_status != "completed"
+                    ):
+                        # Shutdown path — left resumable on purpose.
+                        logger.info(
+                            "F2 skipped for workflow run %s — app shutting down, "
+                            "left active for the boot-time resume sweep (096-09)",
+                            _active_workflow_run_id,
+                        )
 
                 try:
                     await asyncio.shield(_shielded_finalize())
@@ -3182,5 +1801,344 @@ async def send_message(
         content={
             "message_id": str(_user_msg_id),
             "run_id": str(run_id),
+            # Phase 095.1-07 (GAP-2): surface the ALREADY-resolved model/provider
+            # (computed at L921-954 before insert_run, and written to the runs row)
+            # so the live assistant placeholder shows `{provider} · {model}` in the
+            # LIVE moment — not only after a reload re-reads them via the Plan-03
+            # enrich SELECT. Additive keys ONLY; no re-resolution, no SSE/chunk-path
+            # change. These are the SAME values the reload enrich reads back.
+            "model": _resolved_model,
+            "provider": _resolved_provider,
         },
     )
+
+
+# Phase 092 (SC#5 / D-v2.5-03) — reconcile mode/lock/phase/Continue state.
+# Realtime is a hint, not truth: the frontend fetches this on (re)connect /
+# thread-switch to reconcile the per-thread workflow lock + Continue affordance.
+_TERMINAL_WORKFLOW_STATUSES = ("completed", "failed", "cancelled")
+_MAX_CONTINUES_PER_RUN = 3  # D-06 (mirror of config.max_continues_per_run; Plan 03 wires the knob)
+
+
+@router.get("/{thread_id}/workflow", response_model=ThreadWorkflowState)
+async def get_thread_workflow(
+    thread_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+) -> ThreadWorkflowState:
+    """PURE READ — reconcile a thread's Deep/Harness mode + lock + phase + Continue.
+
+    Ownership-gated FIRST (T-092-04 — 404, never leak existence). Then a joined
+    read over the thread anchor -> workflow_runs -> workflow_definitions ->
+    workflow_phases, plus the latest non-terminal `runs` row for the Deep-run
+    cap_paused case (RESEARCH Q3). NEVER writes — the lock-clear is owned by the
+    cancel/terminal path (Plan 03); `lock_is_stale` is a diagnostic self-heal
+    signal only, so a thread is never stuck Harness-locked with a terminal/absent
+    run.
+    """
+    # 1. Ownership gate — fetch the anchor in the same SELECT (threads.py:341 idiom).
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id, active_workflow_run_id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = thread_resp.data if thread_resp is not None else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    active_workflow_run_id = row.get("active_workflow_run_id")
+    pool = await get_pg_pool()
+
+    # 2. Workflow-run state (joined: run -> definition -> current phase + total).
+    run_status = None
+    definition_slug = None
+    definition_name = None
+    current_phase_slug = None
+    current_phase_index = None
+    total_phases = None
+    wf_continues_used = 0
+    phases_list: list[WorkflowPhaseState] | None = None
+    if active_workflow_run_id is not None:
+        wf_row = await pool.fetchrow(
+            """
+            SELECT wr.status,
+                   wr.continues_used,
+                   wd.slug  AS definition_slug,
+                   wd.name  AS definition_name,
+                   cp.slug  AS current_phase_slug,
+                   cp.phase_index AS current_phase_index,
+                   (SELECT count(*) FROM workflow_phases wp
+                     WHERE wp.workflow_run_id = wr.id) AS total_phases
+            FROM workflow_runs wr
+            JOIN workflow_definitions wd ON wd.id = wr.definition_id
+            LEFT JOIN workflow_phases cp ON cp.id = wr.current_phase_id
+            WHERE wr.id = $1
+            """,
+            UUID(active_workflow_run_id) if isinstance(active_workflow_run_id, str) else active_workflow_run_id,
+        )
+        if wf_row is not None:
+            run_status = wf_row["status"]
+            wf_continues_used = wf_row["continues_used"] or 0
+            definition_slug = wf_row["definition_slug"]
+            definition_name = wf_row["definition_name"]
+            current_phase_slug = wf_row["current_phase_slug"]
+            current_phase_index = wf_row["current_phase_index"]
+            total_phases = wf_row["total_phases"]
+
+    # mode / locked / lock_is_stale derive from the anchor + run terminality.
+    mode = "harness" if active_workflow_run_id is not None else "deep"
+    locked = (
+        active_workflow_run_id is not None
+        and run_status is not None
+        and run_status not in _TERMINAL_WORKFLOW_STATUSES
+    )
+    # SC#5 heal: anchor set BUT the run row is missing OR terminal -> stale lock.
+    lock_is_stale = active_workflow_run_id is not None and (
+        run_status is None or run_status in _TERMINAL_WORKFLOW_STATUSES
+    )
+
+    # Phase 092-05 F2 backstop: even if workflow_runs.status somehow lagged at a
+    # non-terminal value (e.g. a crash between run_workflow's two writes), if the
+    # underlying producer `runs` row for this thread is terminal/missing the lock
+    # is stale — surface it so the F3 frontend treats the thread as unlocked
+    # (self-heals a future stranded lock on reconcile). PURE READ — no writes
+    # (the test_thread_workflow_endpoint.py pure-read invariant must hold).
+    producer_terminal = False
+    # Facet C (092-07): surface the thread's latest producer runs.run_id WHEN live
+    # (non-terminal) so the StreamsProvider reconcile re-attaches a startup-sweep-
+    # resumed run's live stream (GET /runs/{id}/stream) on mount with no page
+    # action. We REUSE the existing F2 self-heal SELECT — add `run_id` to it (no
+    # new query, no write — the 092-05 pure-read F2 invariant holds).
+    latest_producer_run_id = None
+    if active_workflow_run_id is not None and not lock_is_stale:
+        prod_row = await pool.fetchrow(
+            "SELECT run_id, status FROM runs WHERE thread_id = $1 "
+            "ORDER BY started_at DESC LIMIT 1",
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        prod_status = prod_row["status"] if prod_row is not None else None
+        producer_terminal = prod_status in (
+            "completed", "failed", "cancelled", "timed_out"
+        )
+        # Only point the frontend at a stream that is still being written (live).
+        if prod_row is not None and not producer_terminal:
+            latest_producer_run_id = prod_row["run_id"]
+    lock_is_stale = lock_is_stale or producer_terminal
+
+    # 3. cap_paused / continues: a workflow run carries it on workflow_runs; a
+    # Deep run carries it on the latest non-terminal `runs` row (RESEARCH Q3 —
+    # report from whichever run holds the pause).
+    cap_paused = run_status == "cap_paused"
+    continues_used = wf_continues_used
+    if not cap_paused:
+        # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
+        deep_row = await pool.fetchrow(
+            """
+            SELECT status, continues_used
+            FROM runs
+            WHERE thread_id = $1 AND status = 'cap_paused'
+            ORDER BY started_at DESC
+            LIMIT 1
+            """,
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        if deep_row is not None:
+            cap_paused = True
+            continues_used = deep_row["continues_used"] or 0
+
+    # Phase 098-UAT run-honesty fix (B) — surface the run's DURABLE per-phase status
+    # array so the frontend reconcile floor can rebuild an HONEST timeline on
+    # revisit/reload. A COMPLETED harness run CLEARS the thread anchor (mode flips
+    # back to "deep"), so the timeline previously vanished on revisit — the panel
+    # had no run reference at all. Resolve the phases from the active anchor when
+    # set, ELSE from the thread's LATEST workflow_run (by thread_id) so a finished
+    # workflow thread still yields its historical timeline. mode/locked/lock_is_stale
+    # stay anchor-based and UNCHANGED — this is a pure additive read used only by the
+    # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
+    phases_source_run_id = active_workflow_run_id
+    if phases_source_run_id is None:
+        latest_wf = await pool.fetchrow(
+            "SELECT id FROM workflow_runs WHERE thread_id = $1 "
+            "ORDER BY created_at DESC LIMIT 1",
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        if latest_wf is not None:
+            phases_source_run_id = latest_wf["id"]
+    if phases_source_run_id is not None:
+        phase_rows = await pool.fetch(
+            "SELECT slug, phase_index, status FROM workflow_phases "
+            "WHERE workflow_run_id = $1 ORDER BY phase_index",
+            UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
+        )
+        if phase_rows:
+            phases_list = [
+                WorkflowPhaseState(
+                    slug=r["slug"], phase_index=r["phase_index"], status=r["status"]
+                )
+                for r in phase_rows
+            ]
+
+    return ThreadWorkflowState(
+        thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        mode=mode,
+        locked=locked,
+        active_workflow_run_id=(
+            UUID(active_workflow_run_id)
+            if isinstance(active_workflow_run_id, str)
+            else active_workflow_run_id
+        ),
+        run_status=run_status,
+        definition_slug=definition_slug,
+        definition_name=definition_name,
+        current_phase_slug=current_phase_slug,
+        current_phase_index=current_phase_index,
+        total_phases=total_phases,
+        lock_is_stale=lock_is_stale,
+        cap_paused=cap_paused,
+        continues_used=continues_used,
+        continues_remaining=max(0, _MAX_CONTINUES_PER_RUN - continues_used),
+        latest_producer_run_id=(
+            UUID(latest_producer_run_id)
+            if isinstance(latest_producer_run_id, str)
+            else latest_producer_run_id
+        ),
+        phases=phases_list,
+    )
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 092 (092-03 / CONT-01) — Deep-run continuation spawner.
+# POST /runs/{id}/continue (runs.py) calls this to re-drive the SAME run_id
+# within a FRESH bounded budget, CONSUMING the persisted dropped tool calls
+# (SC#4). NET-NEW (PATTERNS.md "No Analog Found"): the Deep-run continuation.
+# Mirrors agent_runner's _shielded_finalize ordering (persist → finalize_run →
+# sentinel → expire → zrem); the only twist is the cap_paused disposition —
+# if the continuation hits the cap AGAIN, it re-pauses (no terminal sentinel)
+# so the next Continue can resume, instead of finalizing terminal.
+# ───────────────────────────────────────────────────────────────────────
+async def spawn_continuation_run(
+    *,
+    run_id: _uuid_mod.UUID,
+    thread_id: str,
+    current_user: dict,
+    redis,
+    supabase,
+    dropped_tool_calls: list[dict],
+) -> None:
+    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4)."""
+
+    async def _continuation() -> None:
+        _terminal_status = "completed"
+        _terminal_error: str | None = None
+        _result_sink: dict = {}
+        try:
+            user_settings = load_user_settings(current_user["id"])
+            resolved_model = user_settings.llm_model
+            resolved_provider = user_settings.active_provider
+            # Minimal MessageCreate carrier — the loop reads body.model/.provider/
+            # .agent_mode/.content; a continuation carries no new user content.
+            body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
+            ctx = RunContext(
+                run_id=run_id,
+                thread_id=thread_id,
+                current_user=current_user,
+                user_settings=user_settings,
+                body=body,
+                redis=redis,
+                supabase=supabase,
+                resolved_model=resolved_model,
+                resolved_provider=resolved_provider,
+                resume_dropped_tool_calls=True,
+                dropped_tool_calls=tuple(dropped_tool_calls),
+            )
+            try:
+                await run_agent_loop(
+                    ctx,
+                    emit=_emit,
+                    emit_terminal=_emit_terminal,
+                    spawn=_spawn,
+                    result_sink=_result_sink,
+                )
+            except asyncio.CancelledError:
+                _terminal_status = "cancelled"
+                raise
+            except Exception as e:  # noqa: BLE001 — mirror agent_runner classifier
+                _terminal_status = "failed"
+                _terminal_error = f"failed: {type(e).__name__}: {(str(e) or '')[:200]}"
+                logger.exception("Continuation run %s failed", run_id)
+        finally:
+            # cap_disposition override — if the cap fired AGAIN, stay non-terminal.
+            _cap = _result_sink.get("cap_disposition")
+            if _cap == "cap_paused":
+                _terminal_status = "cap_paused"
+
+            async def _finalize() -> None:
+                _persist = _result_sink.get("persist")
+                _persist_sys = _result_sink.get("persist_system_warnings")
+                _sink_warnings = _result_sink.get("persisted_system_warnings") or []
+                _in_tok = _result_sink.get("input_tokens_total")
+                _out_tok = _result_sink.get("output_tokens_total")
+                _msg_id: str | None = None
+                try:
+                    if _persist is not None:
+                        _msg_id = await _persist()
+                except BaseException:
+                    logger.exception("Continuation persist failed for run %s", run_id)
+                try:
+                    if _persist_sys is not None and _sink_warnings:
+                        await _persist_sys(_sink_warnings)
+                except BaseException:
+                    logger.exception("Continuation sys-warning persist failed for run %s", run_id)
+                try:
+                    await finalize_run(
+                        await get_pg_pool(),
+                        run_id=run_id,
+                        status=_terminal_status,
+                        error=_terminal_error,
+                        completed_at=datetime.now(timezone.utc),
+                        message_id=UUID(_msg_id) if _msg_id else None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
+                    )
+                except BaseException:
+                    logger.exception("Continuation runs UPDATE failed for run %s", run_id)
+                # cap_paused is NON-terminal — NO terminal sentinel (Landmine 6).
+                # The agent_loop already emitted the non-terminal cap_paused event.
+                if _terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE:
+                    try:
+                        await _emit_terminal(
+                            redis, run_id,
+                            _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status],
+                            error=_terminal_error,
+                        )
+                    except BaseException:
+                        logger.exception("Continuation sentinel XADD failed for run %s", run_id)
+                _ttl = 600 if _terminal_status == "completed" else 60
+                try:
+                    await redis.expire(f"run:{run_id}", _ttl)
+                except BaseException:
+                    logger.exception("Continuation EXPIRE failed for run %s", run_id)
+                # cap_paused keeps the run in the active sorted sets (re-attachable);
+                # a true terminal status ZREMs them.
+                if _terminal_status != "cap_paused":
+                    try:
+                        await redis.zrem("runs:active", str(run_id))
+                        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
+                    except BaseException:
+                        logger.exception("Continuation ZREM failed for run %s", run_id)
+
+            try:
+                await asyncio.shield(_finalize())
+            except asyncio.CancelledError:
+                raise
+            finally:
+                RUN_TASKS.pop(run_id, None)
+
+    task = asyncio.create_task(_continuation())
+    RUN_TASKS[run_id] = task
+
+    def _evict(_t, _rid=run_id):
+        RUN_TASKS.pop(_rid, None)
+    task.add_done_callback(_evict)

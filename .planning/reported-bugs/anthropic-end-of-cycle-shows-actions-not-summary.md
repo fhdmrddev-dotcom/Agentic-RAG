@@ -8,7 +8,7 @@ status: deferred
 affected_areas: [backend/agent-loop, backend/system-prompts, frontend/chat-surface, provider/anthropic-native-sdk]
 folded_into: null
 related_seeds: []
-re_open_trigger: "v2.7 Agent Workspace milestone planning OR a focused Anthropic-path system-prompt / agent-loop terminal-frame phase reaches design phase — at that point re-litigate root cause (system-prompt vs frontend block-ordering of mixed text+tool_use). Reviewed again during /gsd:plan-phase 075.6 (2026-05-23) — deferred again per D-075.6-D2: orthogonal to 075.6's SSE wire-format + frontend rendering-component surface; folding would ~3x phase size and cross into prompt engineering. Consistent with prior deferrals D-075-15 (2026-05-18) and D-074-10 (2026-05-17)."
+re_open_trigger: "v2.7 Agent Workspace milestone planning OR a focused Anthropic-path system-prompt / agent-loop terminal-frame phase reaches design phase — at that point re-litigate root cause (system-prompt vs frontend block-ordering of mixed text+tool_use). Reviewed again during /gsd:plan-phase 075.6 (2026-05-23) — deferred again per D-075.6-D2: orthogonal to 075.6's SSE wire-format + frontend rendering-component surface; folding would ~3x phase size and cross into prompt engineering. Consistent with prior deferrals D-075-15 (2026-05-18) and D-074-10 (2026-05-17). RE-DEFERRED at /gsd:discuss-phase 093 (2026-06-01): Phase 093 rescoped to HARNESS cross-provider hardening (PARITY-02); PARITY-01 (Deep-mode polish) re-deferred — Deep is provider-robust on all 7 and this is NOT currently reproducing for the operator. Re-open via a focused Deep-mode terminal-frame UX phase OR if it re-reproduces."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7

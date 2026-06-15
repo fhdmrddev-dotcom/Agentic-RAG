@@ -28,10 +28,11 @@ import inspect
 import re
 
 import app.api.threads as threads_module
+import app.services.agent_loop as agent_loop_module
 
 
 def test_generate_suggestions_is_wrapped_in_run_in_threadpool():
-    """Assert agent_runner source contains `run_in_threadpool(\\n    generate_suggestions,`
+    """Assert the agent-loop source contains `run_in_threadpool(\\n    generate_suggestions,`
     (or equivalent inline form).
 
     D-067.4-R3-03 / CLAUDE.md D-v2.5-01: the synchronous LLM round-trip must
@@ -40,8 +41,12 @@ def test_generate_suggestions_is_wrapped_in_run_in_threadpool():
     RED on master (pre-Plan 01): the call is `generate_suggestions(...)`
     directly inside async agent_runner. After Plan 01 the call site is
     `await run_in_threadpool(generate_suggestions, ...)`.
+
+    Phase 089-03 (G-5 verbatim move): the suggestion-gen block (incl. the
+    run_in_threadpool wrap) moved with the loop body into
+    agent_loop.py::run_agent_loop — grep there.
     """
-    source = inspect.getsource(threads_module)
+    source = inspect.getsource(agent_loop_module)
 
     # The literal substring that must appear post-fix. Two acceptable forms:
     # (a) multi-line:  await run_in_threadpool(\n    generate_suggestions,

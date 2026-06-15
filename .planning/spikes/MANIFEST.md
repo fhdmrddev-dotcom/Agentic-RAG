@@ -19,6 +19,8 @@ Both must come back positive to justify a future v3.x phase. Either negative clo
 | 003 | pdfplumber-figures | pdfplumber.images is a viable drop-in (target ≥30) | VALIDATED — 61 figures, comparable to pymupdf_full (engines walk same xref graph) | seed-021, pdfplumber, drop-in-alternative |
 | 004 | marker-cpu-smoke | Marker recall on CPU (conditional on 002+003 union <40) | SKIPPED — conditional gate not triggered (union = 69) | seed-021, marker, gpl, skipped |
 | 005 | retrieval-value-smoke | 5-10 figure-grounded queries: cap=20 baseline vs cap=100 lifted | NOT RUN — operator closed SEED-021 on (a) alone (2026-05-16) | seed-021, retrieval, leg-b, human-judgment, not-run |
+| 006 | deterministic-workspace-panel | smart gate + activity-derivation fills panel cross-provider (incl. no-write_todos), keeps simple chats clean | **VALIDATED (7/7)** — Anthropic-derived panel ≈ OpenAI write_todos plan; simple Q&A stays clean | phase-095, pre-096, cross-provider, workspace-panel, deterministic, smart-gate |
+| 007 | execcode-label-fallback | description-less execute_code still gets a meaningful label via code heuristic | **VALIDATED (6/6)** — label chain write_todos > description > code-inferred > "Run code" | phase-095, pre-096, cross-provider, fallback, deterministic |
 
 ## Topline finding (2026-05-16)
 
@@ -38,3 +40,37 @@ SEED-021's image-axis re-open trigger is RESOLVED via the (a) findings alone. Th
 - **Phase 072 CONTEXT.md** `<deferred>` block: documents the vision_sweep retraction and points here
 - **Reference fixture**: `backend/tests/fixtures/extraction/friendly_real.pdf` (arXiv 2605.15184v1, CC-BY 4.0, ~59 visible figures ground truth)
 - **Project memory**: `[[feedback-extraction-root-cause-not-plumbing]]`, `[[feedback-research-landscape-completeness]]`, `[[feedback-preserve-engine-optionality]]`, `[[feedback-docling-skepticism]]`
+
+---
+
+## Idea — Deterministic workspace-panel population (2026-06-06, spikes 006-007)
+
+**Pre-096 cross-provider concern.** Live UAT proved `write_todos` compliance is
+inconsistent across (and within) providers — so the workspace todos/tasks panel
+filled only for OpenAI. Operator direction: fill it by a DETERMINISTIC mechanism
+(smart + natural, NOT mandatory, NOT prompt-instructed), provider-independent,
+honoring the per-provider gateway separation (092.5).
+
+**Question:** can a deterministic smart-gate + activity-derivation fill the panel
+consistently for all providers, keep simple chats clean, and stay semantically
+meaningful — without depending on the model calling write_todos?
+
+## Topline finding (2026-06-06)
+
+**YES — approach (A) activity-derivation + smart gate is a complete, deterministic,
+cross-provider mechanism.** Validated on REAL captured runs:
+- `execute_code` already carries a model-written `description` → derived panels are
+  semantically rich (Anthropic's derived panel ≈ OpenAI's write_todos plan).
+- Smart gate is implicit in activity: 0-tool Q&A / 1-tool lookup → clean; ≥2
+  meaningful steps OR an explicit write_todos → populate. Never forced.
+- Label-source precedence: `write_todos` > `execute_code.description` >
+  code-inferred (spike 007) > `"Run code"`. Degrades gracefully.
+- A dedicated planner sub-agent (B) is OPTIONAL (upfront-plan UX only), NOT required
+  for correctness → keeps cost/latency at zero for the common case.
+
+**Signal for the build (pre-096 phase "Cross-Provider Run Honesty & Workspace
+Parity"):** implement the panel as a shared activity-derived projection with the
+smart gate + label-precedence chain; keep it on the provider-agnostic SSE layer
+(no per-model rules). Verify live across all 8 providers.
+
+## Status: COMPLETE (2026-06-06) — feeds the pre-096 phase

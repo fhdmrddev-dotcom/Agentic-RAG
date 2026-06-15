@@ -1,0 +1,125 @@
+# Phase 093 — Deferred Items (out-of-scope discoveries during execution)
+
+## From Plan 093-03 (sub-agent model resolver field fix)
+
+### Pre-existing test failure (NOT caused by 093-03) — `test_infer_openai_from_gpt_prefix`
+
+- **File:** `backend/tests/unit/test_get_model_capability_inference.py::test_infer_openai_from_gpt_prefix`
+- **Symptom:** `assert cap["llm_call_timeout_seconds"] == 90` fails with `300 == 90`.
+- **Discovered:** during the 093-03 baseline run (BEFORE any edit) — confirmed pre-existing.
+- **Root cause (likely):** the `get_model_capability` inference safe-default for an
+  unknown `gpt-*` model now returns a 300s `llm_call_timeout_seconds`, but the test
+  still pins the old 90s expectation. This is in `config.py`'s capability-inference
+  defaults — NOT in `_SUB_AGENT_MODEL_DEFAULTS` and NOT in the model resolver this
+  plan touches.
+- **Scope:** out of scope for 093-03 (files_modified = sub_agent_models.py, config.py
+  `_SUB_AGENT_MODEL_DEFAULTS` only, test_sub_agent_routing.py). Left untouched per the
+  executor scope boundary. Candidate for a `/gsd:quick` test-pin update.
+
+## From Plan 093-04 (ask_user F10 fallback + Continue ctx-model thread)
+
+### Pre-existing live-DB integration failures (NOT caused by 093-04) — runs-table FK / Redis-stream env
+
+- **Files:** `test_061_producer_survives_disconnect.py`, `test_061_runs_table.py`,
+  `test_062_delete_happy.py`, `test_062_multi_consumer_fanout.py`,
+  `test_062_stream_replay.py`, `test_063_post_contract.py` (2 cases),
+  `test_063_post_then_subscribe.py` — 8 failures total in the runs/sse-stream surface.
+- **Symptom:** `asyncpg.exceptions.ForeignKeyViolationError: insert or update on table
+  "runs" violates foreign key constraint "runs_thread_id_fkey"` — these live-DB tests
+  seed `runs` rows against `thread_id`s that are not present in the current local DB
+  (test-data setup assumption that no longer holds against the live local Supabase).
+- **Discovered:** during the 093-04 regression sweep (`pytest tests/integration -k
+  "ask_user or continue or 092 or 063 or runs or 062"`).
+- **Why NOT a 093-04 regression:** the FK-violation signature is a test-data/environment
+  issue at run-INSERT time. 093-04's diff is confined to (a) a fallback branch in
+  `submit_ask_user_response` that engages ONLY after the Step-1 runs SELECT 404s, and
+  (b) the Continue branch's wf_ctx model threading. None of these 8 tests exercise the
+  ask_user_response endpoint or the Continue endpoint — they hit run-creation / SSE
+  producer-stream paths that 093-04 does not touch. The `test_093_ask_user_workflow_run_live.py`
+  suite (5 cases) + the `test_092_*` ownership/continue tests all pass.
+- **Scope:** out of scope for 093-04 (files_modified = runs.py ask_user/continue paths +
+  the 093 live test). Left untouched per the executor scope boundary. Likely the same
+  live-DB test-data hygiene class already noted for Phase 091; candidate for a dedicated
+  integration-test-fixture revival pass (relates to SEED-049 E2E-suite revival).
+
+## From Plan 093-05 (shared surfacing helper + D-04 sites 1/2 + D-12 draft)
+
+### Pre-existing test-ordering pollution (NOT caused by 093-05) — harness registry leak
+
+- **Files:** `test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts`
+  (and, in some orderings, `test_harness_engine.py::test_phase_dispatch_routes_each_of_5_types`).
+- **Symptom:** `test_bounded_retry...` → `assert _audit_failures(...) == 3` fails with
+  `0 == 3`; `test_phase_dispatch...` → `set(PHASE_TYPE_REGISTRY) == {5 types}` differs
+  when run AFTER the gate/resume tests that override the registry.
+- **Discovered:** during the 093-05 regression sweep. **Confirmed PRE-EXISTING** by
+  stashing ALL 093-05 edits and re-running the same 3-file set — both failures reproduce
+  identically on baseline (commit `a7828abb`). `test_bounded_retry...` also fails in
+  ISOLATION on baseline (independent of my change).
+- **Why NOT a 093-05 regression:** the failures are cross-file `PHASE_TYPE_REGISTRY`
+  state pollution (the `_registry`/`_restore_registry` helpers in the gate/resume tests)
+  + a gate-audit recording mismatch in the mock pool — neither is in 093-05's files_modified
+  (harness_engine.py, threads.py, phase_types.py, panel.py, api.ts, test_093_surfacing.py)
+  and neither relates to the surfacing helper / ctx-model threading / draft carry. Every
+  093-05 file passes in isolation and the full touched-surface sweep shows 0 net-new
+  failures vs baseline.
+- **Scope:** out of scope for 093-05 (test-isolation hygiene, not a behavioral regression).
+  Candidate for a `/gsd:quick` test-isolation pass (registry reset autouse fixture) —
+  relates to the broader test-fixture-hygiene class already noted for 093-04.
+
+## From Plan 093-07 (finish-event hydration + runs.usage persistence)
+
+### Pre-existing model-resolver failures (NOT caused by 093-07) — `test_085_sub_agent_cross_provider`
+
+- **File:** `backend/tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun`
+  — 4 parametrized cases (`anthropic`, `google`, `deepseek`, `moonshot`).
+- **Symptom:** `AssertionError: BUG-260528-01 reproduced for provider='moonshot': resolver
+  returned stale cross-provider model 'gpt-4.1'` — `assert 'gpt-4.1' != 'gpt-4.1'`.
+- **Discovered:** during the 093-07 Task 3 full-suite net-new audit.
+- **PROVEN PRE-EXISTING (relative to this plan):** checked out the pre-plan `task_service.py`
+  (commit `a0c0603e`, the 093-06 head, BEFORE any 093-07 edit) and re-ran the test — all 4
+  cases fail IDENTICALLY. So these are NOT a 093-07 regression.
+- **Root cause:** the SAME 093-03 model-resolver field migration already logged above
+  (`available_models` is now the real field the resolver reads). This integration test's
+  `_StubSettings`/fixture still feeds the model list as a `llm_models` CSV string the
+  resolver no longer reads — so the safety net can't see the active model list and the
+  stale `gpt-4.1` candidate passes through. The companion UNIT test (`test_085_task_service.py`)
+  was already fixed in 093-03 to the real `available_models` field; this INTEGRATION sibling
+  was missed. It is in the model-resolver surface (093-03's territory), NOT in 093-07's
+  `_drain` / assistant-replay / `finalize_run`-usage diff.
+- **Why NOT a 093-07 regression:** 093-07 touched only the finish/usage consumption in
+  `_drain`, the assistant tool-call replay message round-trip, and the `finalize_run` usage
+  args — none of which affect `resolve_sub_agent_model_safely`. `git diff a0c0603e~1..HEAD`
+  on `sub_agent_models.py` shows ZERO 093-07 change there; the full `test_085_task_service.py`
+  suite (43 cases incl. the new Test093FinishEvent) is GREEN.
+- **Scope:** out of scope for 093-07 (model-resolver fixture hygiene — extends the 093-03
+  `test_infer_openai_from_gpt_prefix` deferral). Fix = update this integration test's fixture
+  to the real `available_models` field (same one-line shape 093-03 applied to the unit stub).
+  Candidate for the same `/gsd:quick` test-pin pass as the other 093-03 deferral.
+
+## From Plan 093-08 (intentional harness sub-agent model resolution — D-18/S3)
+
+### Still-pre-existing model-resolver failures (NOT caused by 093-08) — `test_085_sub_agent_cross_provider`
+
+- **File:** `backend/tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun`
+  — the SAME 4 parametrized cases (`anthropic`, `google`, `deepseek`, `moonshot`) already
+  logged under 093-07 above. Carried forward — still the only touched-surface failures.
+- **Symptom (unchanged):** `AssertionError: BUG-260528-01 reproduced for provider='...':
+  resolver returned stale cross-provider model 'gpt-4.1'` — stale `llm_models` CSV fixture
+  the resolver no longer reads (the real field is `available_models`, migrated in 093-03).
+- **RE-PROVEN PRE-EXISTING relative to 093-08:** reverted `task_service.py` to the plan's
+  parent (commit `893de428~1` = `ed57e258` head, BEFORE the Task-1 `_resolve_sub_agent_effective_model`
+  helper) and re-ran — all 4 cases fail IDENTICALLY (4 failed / 3 passed). So they are NOT a
+  093-08 regression. The full-suite delta is **111 failed / 1119 passed** (vs the documented
+  093-07 baseline of 111 failed / 1110 passed — the +9 passing are 093-08's new
+  `Test093IntentionalSubAgentResolution` cases; ZERO net-new failures).
+- **Why NOT a 093-08 regression:** 093-08 added a PURE helper (`_resolve_sub_agent_effective_model`)
+  that wraps the SHIPPED `resolve_sub_agent_model_safely` + a narrow per-provider-default guard,
+  and rewired `run_task_sub_agent` to call it. It did NOT change `resolve_sub_agent_model_safely`
+  itself (`git diff ed57e258..HEAD` on `sub_agent_models.py` = ZERO) nor the integration test's
+  stale fixture. The guard only fires when the candidate equals the global default AND the
+  provider is non-openai/flexible/unknown — orthogonal to the `gpt-4.1` stale-fixture path the
+  integration test exercises.
+- **Scope:** out of scope for 093-08 (files_modified = task_service.py + test_sub_agent_routing.py).
+  Same model-resolver fixture-hygiene class as the 093-03 + 093-07 deferrals — fix is the same
+  one-line `available_models` fixture update. Candidate for the consolidated `/gsd:quick` test-pin
+  pass covering all three model-resolver deferrals.

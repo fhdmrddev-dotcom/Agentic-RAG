@@ -3,7 +3,9 @@ import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
+import { RunStatusStrip } from "./RunStatusStrip"
 import { outerBannerLabel } from "@/lib/toolMeta"
+import { unifiedStepCount } from "@/lib/stepCount"
 import { categorizeError } from "@/lib/errorCategories"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
@@ -80,22 +82,98 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     setUserExpanded(v => !v)
   }
 
-  // Timer: recompute elapsed seconds every 250ms during streaming.
-  // Freezes when streaming ends.
-  const startedAtRef = useRef<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
+  // ---- D-06 persistent timer (Phase 095 Plan 02 — the ROOT vanish fix) ----
+  // SKETCH-CONSISTENCY §B: "never-vanishes is a timer-derivation fix, not a
+  // placement choice." The old impl gated the WHOLE timer on a
+  // streaming-OR-nonzero-elapsed condition with a perf-clock baseline set
+  // inside a streaming-gated effect — so a long Kimi/Moonshot run that never
+  // ticked, a transient stream_end, a backgrounded tab, or a temp-id→DB-id
+  // remount dropped the timer entirely (BUG-260528-01). The fix:
+  //
+  //   1. Derive elapsed from `Date.parse(message.created_at)` — a STABLE
+  //      wall-clock baseline that survives the 083 temp-id→DB-id remount
+  //      (RESEARCH A2: the reconcile placeholder sets created_at = run.started_at).
+  //      Using created_at actively REINFORCES the 083 fix (BUG-260526-04) —
+  //      it never regresses it.
+  //   2. Recompute `elapsed = (frozenEnd ?? now) - start` EACH tick — never an
+  //      accumulator — so background-tab setInterval throttling only coarsens
+  //      the tick, it can never freeze/skew the value (the immune-to-throttle
+  //      guarantee).
+  //   3. Render CONTINUOUSLY whenever `start` parses (Number.isFinite) — no
+  //      nonzero-elapsed gate. Freeze at a TRUE terminal by capturing frozenEnd
+  //      to Date.now() exactly ONCE on the streaming→terminal edge.
+  // ---- Plan 095.1-03 (D-05 true reload timer) — the BUG-260606-02 fix ----
+  // The OLD impl froze a terminal run at `Date.now()` captured at first render
+  // (`frozenEndRef`) and measured from `created_at`. On RELOAD of a day-old run
+  // that first render is already terminal, so the freeze captured the CURRENT
+  // clock against a day-old created_at → a fabricated "1440m" duration.
+  //
+  // D-05 honesty rule: a FINISHED run's duration is the persisted wall-clock
+  // `completedAt − startedAt` (identical live and on reload). A finished run
+  // with NO completedAt shows NO duration — never a current-clock fabrication.
+  // The live streaming tick is unchanged (the 095 never-vanishes behavior must
+  // not regress).
+  //
+  // Baselines:
+  //   - `runStartMs` = the run's true start (message.startedAt) if present,
+  //     else `created_at` (the live-tick baseline that survives the 083
+  //     temp-id→DB-id remount). Used for BOTH the live tick AND the true duration.
+  const runStartMs = message.startedAt ? Date.parse(message.startedAt) : Date.parse(message.created_at)
+  const hasStart = Number.isFinite(runStartMs)
+  const completedMs = message.completedAt ? Date.parse(message.completedAt) : NaN
+  const hasTrueEnd = Number.isFinite(completedMs)
+  const [now, setNow] = useState(() => Date.now())
+  // frozenEndRef is kept ONLY as the live→terminal transition fallback: a run
+  // that terminates THIS session (was streaming, then flipped terminal) before a
+  // persisted completedAt arrives still needs a frozen end. A RELOADED terminal
+  // run mounts already-terminal — it was NEVER streaming this session — so it
+  // must NOT capture Date.now() (that is the BUG-260606-02 "1440m" lie). The
+  // `wasStreamingRef` gate is what distinguishes the two: only a run we actually
+  // watched stream gets a same-session frozen end; a reloaded terminal run with
+  // no completedAt simply shows NO duration (the honesty rule).
+  const frozenEndRef = useRef<number | null>(null)
+  const wasStreamingRef = useRef<boolean>(false)
+  if (isStreamingNow) {
+    wasStreamingRef.current = true
+    if (frozenEndRef.current != null) frozenEndRef.current = null  // re-arm (defensive)
+  } else if (
+    wasStreamingRef.current &&
+    frozenEndRef.current == null &&
+    hasStart &&
+    !hasTrueEnd
+  ) {
+    // Observed streaming→terminal this session with no persisted completedAt →
+    // a legitimate same-session end-time.
+    frozenEndRef.current = Date.now()
+  }
   useEffect(() => {
     if (!isStreamingNow) return
-    if (startedAtRef.current == null) startedAtRef.current = performance.now()
-    const id = window.setInterval(() => {
-      if (startedAtRef.current != null) {
-        setElapsedMs(performance.now() - startedAtRef.current)
-      }
-    }, 250)
+    const id = window.setInterval(() => setNow(Date.now()), 250)
     return () => window.clearInterval(id)
   }, [isStreamingNow])
 
-  const elapsedSeconds = (elapsedMs / 1000).toFixed(1)
+  // Duration derivation, honesty-gated:
+  //   - streaming → live tick from runStartMs to now (never-vanishes).
+  //   - terminal + persisted completedAt → TRUE duration completedMs − runStartMs.
+  //   - terminal + no completedAt but a same-session frozenEnd → that frozen end
+  //     (a run that JUST finished live this session — a real end-time, not the
+  //     current clock against a stale created_at).
+  //   - terminal + no completedAt + no frozenEnd → NO duration (the honesty rule).
+  let elapsedMs: number | null = null
+  if (hasStart) {
+    if (isStreamingNow) {
+      elapsedMs = now - runStartMs
+    } else if (hasTrueEnd) {
+      elapsedMs = completedMs - runStartMs
+    } else if (frozenEndRef.current != null) {
+      elapsedMs = frozenEndRef.current - runStartMs
+    }
+  }
+  // `hasElapsed` gates the timer render — a terminal run with no honest end-time
+  // shows nothing rather than a fabricated value. `elapsedLabel` is "" when null
+  // so legacy render sites that interpolate it produce no duration text.
+  const hasElapsed = elapsedMs != null
+  const elapsedLabel = hasElapsed ? formatElapsed(elapsedMs as number) : ""
 
   // Phase 076.1-04: Cumulative file count from completed tool call results.
   // Parses tc.result JSON for output_files arrays across all tool calls.
@@ -109,30 +187,65 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     return sum
   }, 0)
 
-  // Header copy is runStatus-aware (075.7-DEBUG fix — Bug A):
-  //   - streaming → outerBannerLabel (per-tool active-state taxonomy from
-  //     Phase 067.1; fallback "Synthesizing answer…" between tools).
-  //   - terminal + tools → static `Run · N tool calls · ✓ done` mirroring the
-  //     collapsed-row copy (sketch live-run-container D5 + UI-SPEC §8.2).
-  //   - terminal + no tools → just the status word.
-  // outerBannerLabel was authored as a streaming-only helper (toolMeta.ts:68);
-  // calling it on terminal turns returned the streaming-phase fallback string
-  // and is the root cause of the "Synthesizing answer…" persistence bug.
   const lastTool = message.tool_calls?.[message.tool_calls.length - 1] ?? null
   const activeTool =
     lastTool && (lastTool.status === "running" || lastTool.status === "preparing")
       ? lastTool
       : null
-  const headerTitle = isStreamingNow
-    ? outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
-    : hasTools
-      ? `Run · ${message.tool_calls?.length ?? 0} tool${(message.tool_calls?.length ?? 0) === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus, message.runError)}`
-      : statusWord(message.runStatus, message.runError)
 
-  // Step subtitle: `Step N` derived from the 0-based iterationCount stamped
-  // by the iteration_start SSE event (CONTEXT interfaces — display as N+1).
-  const stepLabel =
-    message.iterationCount != null ? `Step ${message.iterationCount + 1}` : null
+  // ---- D-04 unified step count (Phase 095 Plan 02) ----
+  // ALL THREE RunCard count sites — the header title, the RunStatusStrip "Step N",
+  // and the collapsed-row "N steps" — read this ONE integer so they can never
+  // disagree (SKETCH-CONSISTENCY §A "row numbering is load-bearing").
+  // `unifiedStepCount` is PERSISTED (it reads the deduped `tool_calls`, which a
+  // DB reload reconstructs) whereas `iterationCount` is OMITTED on reload by
+  // `_mapMessageResponse` — so the step label now survives next-day reopen
+  // (RESEARCH correction #5) AND is cross-provider-safe (ignores the diverging
+  // iteration_start semantics).
+  const stepCount = unifiedStepCount(message)
+  // The raw iteration index is still forwarded to ToolCallPanel for its in-panel
+  // per-iteration ("Round N") divider — but it NEVER drives a visible RunCard
+  // step number anymore (that is now stepCount). Destructured here so no RunCard
+  // count site reads the raw iteration field to derive a displayed number.
+  const { iterationCount: panelIterationCount } = message
+
+  // ---- Plan 07 (GAP-095-03 MED): single verb + calm run-identity title ----
+  // The activity verb USED to occupy the title line (the streaming branch derived
+  // the verb here) while the strip's `activityVerb` ALSO derived it — the verb
+  // rendered TWICE. The operator-locked fix: the verb lives in the STRIP ONLY; the
+  // title becomes a calm, deterministic run identity for BOTH streaming and
+  // terminal. The status word is NOT carried here — it already lives honestly on
+  // the collapsed-row (`Run · N steps · ✓ done · elapsed`); the expanded terminal
+  // header reads the title + the now-`.done` (success-toned, verb=null) strip,
+  // which is sufficient. The verb helper is now invoked from exactly ONE site
+  // (the strip's `activityVerb` below).
+  const headerTitle = hasTools
+    ? `Run · ${stepCount} step${stepCount === 1 ? "" : "s"}`
+    : "Agent run"
+
+  // ---- Plan 095.1-03 (D-04 model attribution): the honest `{provider} · {model} · turn N` run-sub ----
+  // 095-07 left this as a "model OMITTED" stub because the Message type carried
+  // no model/provider field. D-04 now threads the REAL resolved runs.model /
+  // runs.provider through the additive enrich → message.model / message.provider,
+  // so the run-sub shows WHICH model actually answered (e.g. `google · gemini-3.5-flash`).
+  // GRACEFUL: a legacy / pre-run-backed message (no run row) has no model/provider
+  // → the run-sub falls back to just `turn N`. All values render as React text
+  // children only — never innerHTML (T-095.1-03-01 XSS mitigation).
+  //
+  // ---- Plan 095.1-07 (GAP-2) turn reconciliation: live == reload ----
+  // The run-sub describes ONE run = ONE turn. It used to read message.iterationCount
+  // (a WITHIN-run agent-loop iteration, NOT a conversation turn) → the live path
+  // showed `turn {iterationCount+1}` while a reload (iterationCount omitted by
+  // _mapMessageResponse) showed `turn 1` — the same run disagreed live vs reload
+  // (095.1-UAT 6b). The reload value (`turn 1` for a single exchange) is the
+  // operator-accepted intended value, so render a STABLE turn that is identical
+  // live and on reload. The raw iterationCount is still forwarded to
+  // ToolCallPanel's per-iteration "Round N" divider (panelIterationCount) — that
+  // consumer is unchanged; only the run-sub stops reading it.
+  const turnNumber = 1
+  const runSub = message.provider && message.model
+    ? `${message.provider} · ${message.model} · turn ${turnNumber}`
+    : `turn ${turnNumber}`
 
   return (
     <div
@@ -174,29 +287,38 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           <Bot className="w-4 h-4 text-white" />
         </div>
 
-        {/* Title + subtitle stack. */}
+        {/* Title + the ONE RunStatusStrip (header placement). Per SKETCH §B the
+            strip rides the header while the run is in view (Plan 04 adds the
+            floating placement on scroll-away). The strip composes the D-06
+            continuous timer + the D-04 unifiedStepCount + the activity verb —
+            replacing the old separate `stepLabel` subtitle and the gated timer
+            span (both removed; this is the single source for elapsed/step/verb). */}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-foreground truncate">
             {headerTitle}
           </div>
-          {stepLabel && (
-            <div className="text-xs font-mono text-muted-foreground truncate">
-              {stepLabel}
-            </div>
+          {/* Plan 095.1-03 (D-04 model attribution): the run-sub subline UNDER
+              the calm title (sketch HTML: title + run-sub + hdr-strip). Shows the
+              REAL resolved `{provider} · {model} · turn N` (message.provider/model
+              from the additive enrich); falls back to `turn N` for legacy/no-run
+              messages. Rendered as React text children only (T-095.1-03-01). */}
+          <div className="font-mono text-xs text-muted-foreground/70 truncate">
+            {runSub}
+          </div>
+          {hasStart && (
+            <RunStatusStrip
+              placement="header"
+              elapsedLabel={elapsedLabel}
+              showElapsed={hasElapsed}
+              stepCount={stepCount}
+              activityVerb={
+                isStreamingNow
+                  ? outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
+                  : null
+              }
+            />
           )}
         </div>
-
-        {/* Timer — JetBrains Mono via font-mono (UI-SPEC §4). Shown while
-            streaming OR when at least one tick was recorded so the final
-            elapsed time stays visible briefly after terminal. */}
-        {(isStreamingNow || elapsedMs > 0) && (
-          <span
-            className="text-xs font-mono text-muted-foreground flex-shrink-0 tabular-nums"
-            aria-live="polite"
-          >
-            {elapsedSeconds}s
-          </span>
-        )}
 
         {/* Phase 076.1-04: Cumulative file count badge — grows during multi-batch runs. */}
         {fileCount > 0 && (
@@ -228,19 +350,24 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           aria-label="Expand run details"
         >
           <Bot className="w-4 h-4 text-primary/60 flex-shrink-0" />
+          {/* D-04: same unifiedStepCount as the header + strip — relabeled
+              "N tool calls" → "N steps" per SKETCH-CONSISTENCY (the three
+              sites can never disagree). */}
           <span>
-            Run · {message.tool_calls?.length ?? 0} tool
-            {" "}
-            {(message.tool_calls?.length ?? 0) === 1 ? "call" : "calls"}
+            Run · {stepCount} step{stepCount === 1 ? "" : "s"}
           </span>
           <span aria-hidden="true">·</span>
           <span title={message.runError || undefined}>
             {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
-          {elapsedMs > 0 && (
+          {/* D-095.1-05 honesty rule: only show the elapsed segment when there
+              is a TRUE duration (persisted completedAt − startedAt, or a
+              same-session frozen end). A terminal run with no real end-time
+              shows the status word but NO fabricated duration. */}
+          {hasElapsed && (
             <>
               <span aria-hidden="true">·</span>
-              <span className="font-mono">{(elapsedMs / 1000).toFixed(1)}s</span>
+              <span className="font-mono">{elapsedLabel}</span>
             </>
           )}
           <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
@@ -293,9 +420,9 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               <span className="flex-1 truncate">
                 Thinking · planning next step
               </span>
-              {elapsedMs > 0 && (
+              {hasElapsed && (
                 <span className="font-mono opacity-60 tabular-nums">
-                  {(elapsedMs / 1000).toFixed(1)}s
+                  {elapsedLabel}
                 </span>
               )}
             </div>
@@ -304,7 +431,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             toolCalls={message.tool_calls ?? []}
             subAgent={message.sub_agent}
             isPlanning={message.isPlanning}
-            iterationCount={message.iterationCount}
+            iterationCount={panelIterationCount}
             activatedSkills={message.activatedSkills}
           />
           {/* Phase 075.8 Task 5 (sketch 001 D4 — Next-up footer).
@@ -325,7 +452,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
                 {nextHint(message, activeTool)}
               </span>
               <span className="opacity-50 flex-shrink-0 font-mono tabular-nums">
-                {`${Math.floor(elapsedMs / 1000)}s`}
+                {elapsedLabel}
               </span>
             </div>
           )}
@@ -358,6 +485,18 @@ function nextHint(message: Message, activeTool: ToolCall | null): string {
   if (activeTool) return ""
   if (message.isPlanning) return "planning next step…"
   return "deciding next step…"
+}
+
+// Phase 095 Plan 02 (D-06) — format the continuous elapsed duration.
+// Short runs read `X.Xs` (the existing 1-decimal form); once a run crosses a
+// minute it reads the compact `Xm Ys` form the sketch shows (`3m12s`-style),
+// so a long Kimi/Moonshot run never shows an unwieldy `192.4s`.
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, ms) / 1000
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = Math.floor(totalSeconds % 60)
+  return `${minutes}m ${seconds}s`
 }
 
 // File-local helpers — UI-SPEC §8.2 copy contract.

@@ -4,12 +4,12 @@ title: Non-Anthropic providers show generic task descriptions during code genera
 reported: 2026-05-28
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, backend/streaming]
-folded_into: null
+folded_into: "095.1"
 verified_closed_by: null
 related_seeds: [SEED-034]
-re_open_trigger: "Reviewed at Phase 088 discuss (2026-05-29): cross-provider display-polish — tool_args_progress task-description extraction is wired for Anthropic but not other providers. OUT of 088 fix-scope (088 = verification + a11y + tool-USE reliability, not tool-panel display polish). 088's cross-provider UAT may observe it; defer to v2.8 (streaming polish, or alongside SEED-034 per-provider work)."
+re_open_trigger: "ADDRESSED-BY-DESIGN, folded into Phase 095.1 at discuss-phase (2026-06-06): D-095.1-02's label-precedence chain — write_todos > execute_code.description > CODE-INFERRED (spike-007 leading-comment + keyword heuristic) > 'Run code' — gives non-Anthropic, description-less code steps a meaningful label by construction. Verify at 095.1 UAT that non-Anthropic providers show specific code task labels (CSV/chart/docx/…) not 'Run code'. Re-open if generic descriptions still appear after 095.1. PRIOR: Reviewed at Phase 088 discuss (2026-05-29): cross-provider display-polish — tool_args_progress task-description extraction is wired for Anthropic but not other providers. OUT of 088 fix-scope (088 = verification + a11y + tool-USE reliability, not tool-panel display polish). 088's cross-provider UAT may observe it; defer to v2.8 (streaming polish, or alongside SEED-034 per-provider work). RE-DEFERRED at /gsd:discuss-phase 093 (2026-06-01): PARITY-01 re-deferred (093 rescoped to harness hardening / PARITY-02); operator confirms this tool-card display issue is NOT currently reproducing. Natural future home = Phase 095 (Chat Tool-Card Unification, CHAT-04) — the tool-card display surface — OR a Deep-mode streaming-polish phase. Re-open if it reproduces."
 reproduces_on:
   branch: v2.5-dev
   commit: b660664

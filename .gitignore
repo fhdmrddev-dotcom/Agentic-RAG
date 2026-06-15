@@ -60,3 +60,7 @@ claude-code-agentic-rag-masterclass/
 
 # Phase 071.3 UAT scratch (machine-readable per-fixture counts; consumed then deleted)
 .planning/phases/071.3-docling-demotion-table-engine-full-rip/uat_scratch.json
+
+# Phase 089 SC#3 SSE baselines (local-only run captures; not committed)
+scripts/.sse_baseline/
+scripts/.sse_after/

@@ -4,13 +4,16 @@ title: Pinned "Final outputs" panel renders filenames as plain text, no download
 reported: 2026-05-21
 surface: Agentic-RAG
 severity: minor
-status: partial-closed
+status: closed
 affected_areas: [frontend/components/chat/MessageItem]
 folded_into: "075.2"
+verified_closed_by: "089"
 related_seeds: []
-re_open_trigger: "Backend SSE final_output_files payload now carries url + size (see BUG-260522-02) — re-verify pinned panel click-to-download via Chrome MCP."
+re_open_trigger: null
 related: [BUG-260522-02]
 closed_partial_on: 2026-05-22
+closed_on: 2026-05-30
+closed_note: "089 CF-01 C3 verified via Chrome MCP: OutputFileCard renders a clickable download link (bar_chart.png -> http://localhost:8000/sandbox-outputs/.../bar_chart.png with download attr) — the working link, NOT the opacity-40 url-absent fallback. SEED-037 (in-panel office/PDF viewing) stays a separate later quick (D-089-14: download works)."
 reproduces_on:
   branch: v2.5-dev
   commit: 0cd7990

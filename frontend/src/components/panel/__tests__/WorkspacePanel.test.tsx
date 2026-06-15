@@ -24,18 +24,60 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
-import type { Todo, WorkspaceFile, PendingAsk } from "@/types"
+import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
+import type { DerivedPanelItem } from "@/lib/workspacePanel"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
 const useTodos = vi.fn()
 const useWorkspaceFiles = vi.fn()
 const useAskUserPrompt = vi.fn()
 const useViewingThread = vi.fn()
+// Phase 094 (PANEL-08): WorkspacePanel now also reads usePhases + the workflow
+// lock to gate the Workflow timeline section. Default to no harness activity
+// (empty phases, null lock) so the existing Todos/Files/Versions assertions are
+// unaffected; a dedicated test sets them to exercise the timeline mount.
+const usePhases = vi.fn()
+// Phase 094 WR-01: WorkspacePanel now also reads useTasks to gate the batch
+// Sub-results section. Default to no tasks (empty) so existing assertions are
+// unaffected; a dedicated test sets them to exercise the BatchResultList mount.
+const useTasks = vi.fn()
+const useWorkflowLockForThread = vi.fn()
+// Phase 095.1 Plan 06 (GAP-1): WorkspacePanel now also reads useDerivedPanel to
+// gate the derived-panel signal in hasActivity. Default to [] (no derived panel)
+// so the existing PanelEmpty short-circuit + populated assertions are unaffected;
+// the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
+// (which renders the REAL TodosSection — this file sentinel-mocks it).
+const useDerivedPanel = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
+  usePhases: (...a: unknown[]) => usePhases(...a),
+  useTasks: (...a: unknown[]) => useTasks(...a),
+  useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
+  useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+}))
+
+// Stub the heavy timeline child (it reads the real provider hooks); the panel
+// only mounts it when a harness run is active. A test that exercises the mount
+// asserts on this stub's presence.
+vi.mock("@/components/panel/PhaseTimeline", () => ({
+  PhaseTimeline: () => <div data-testid="phase-timeline">timeline</div>,
+}))
+
+// Stub the batch sub-results list (it reads the real useTasks hook); the panel
+// mounts it only when the timeline shows AND tasks exist (WR-01). A dedicated
+// test asserts on this stub's presence/absence.
+vi.mock("@/components/panel/BatchResultList", () => ({
+  BatchResultList: () => <div data-testid="batch-result-list">sub-results</div>,
+}))
+
+// Phase 100 (D-01): WorkspacePanel renders the REAL TemplateUpload inside the
+// empty short-circuit (it reads useStreamActions, which this file's
+// StreamsProvider mock omits) — sentinel-mock it like the other section bodies.
+vi.mock("@/components/panel/TemplateUpload", () => ({
+  TemplateUpload: () => <div data-testid="template-upload">upload</div>,
 }))
 
 vi.mock("@/components/panel/TodosSection", () => ({
@@ -67,11 +109,28 @@ function setHooks({
   files = mockWorkspaceFiles,
   asks = [] as PendingAsk[],
   viewing = "thread-1" as string | null,
-}: { todos?: Todo[]; files?: WorkspaceFile[]; asks?: PendingAsk[]; viewing?: string | null }) {
+  phases = [] as Phase[],
+  tasks = [] as TaskRunIndexItem[],
+  lock = null as { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null,
+  derived = [] as DerivedPanelItem[],
+}: {
+  todos?: Todo[]
+  files?: WorkspaceFile[]
+  asks?: PendingAsk[]
+  viewing?: string | null
+  phases?: Phase[]
+  tasks?: TaskRunIndexItem[]
+  lock?: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
+  derived?: DerivedPanelItem[]
+}) {
   useTodos.mockReturnValue({ data: todos, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkspaceFiles.mockReturnValue({ data: files, isLoading: false, error: null, reconcile: vi.fn() })
   useAskUserPrompt.mockReturnValue({ data: asks, isLoading: false, error: null, reconcile: vi.fn() })
   useViewingThread.mockReturnValue(viewing)
+  usePhases.mockReturnValue({ data: phases, isLoading: false, error: null, reconcile: vi.fn() })
+  useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
+  useWorkflowLockForThread.mockReturnValue(lock)
+  useDerivedPanel.mockReturnValue(derived)
 }
 
 function setViewport(width: number) {
@@ -185,6 +244,22 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(screen.queryByTestId("files-section")).toBeNull()
   })
 
+  // Phase 100 (D-01) reachability: the empty short-circuit must still carry the
+  // template-upload affordance when a thread is open — otherwise the first
+  // template upload on a fresh thread is structurally impossible (G-4 UAT gap).
+  it("keeps the template-upload affordance reachable inside the empty state when a thread is open (Phase 100 D-01)", () => {
+    setHooks({ todos: [], files: [], asks: [] })
+    renderPanel({ state: "open" })
+    expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
+    expect(screen.getByTestId("template-upload")).toBeInTheDocument()
+  })
+
+  it("omits the template-upload affordance in the empty state when no thread is viewed", () => {
+    setHooks({ todos: [], files: [], asks: [], viewing: null })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("template-upload")).toBeNull()
+  })
+
   it("pins the pending ask_user stack to the very top of the panel scroll", () => {
     setHooks({ asks: [mockPendingAskWithRunId] })
     renderPanel({ state: "open" })
@@ -216,6 +291,73 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(useTodos).toHaveBeenCalledWith("thread-1")
     expect(useWorkspaceFiles).toHaveBeenCalledWith("thread-1")
     expect(useAskUserPrompt).toHaveBeenCalledWith("thread-1")
+  })
+
+  // Phase 094 (PANEL-08) — the Workflow timeline section mounts only for a harness
+  // run (server-truth lock) OR when phases exist; a Deep / no-run thread never
+  // sees it (the empty short-circuit / PanelEmpty stays the calm default).
+  it("mounts the Workflow timeline section when a harness run holds the lock", () => {
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("mounts the Workflow timeline section when phases exist even without a lock", () => {
+    setHooks({
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "running", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("does NOT mount the Workflow timeline for a Deep / no-run thread", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+  })
+
+  // Phase 094 WR-01 (D-06 / SC#6) — the batch Sub-results section surfaces the
+  // honest per-subtopic sub_agent_done.summary rows. It mounts beneath the
+  // timeline ONLY when the timeline shows (harness/phases) AND tasks exist; a
+  // Deep / no-run thread or a harness run with zero sub-agents never sees it
+  // (never an empty box).
+  const mockTask = {
+    sub_run_id: "sub-1",
+    parent_run_id: "wr-1",
+    status: "completed",
+    model: "m",
+    provider: "p",
+    description: "Sub-question: topic A",
+    summary: "Result A",
+  } as TaskRunIndexItem
+
+  it("mounts the batch Sub-results section when a harness run has tasks", () => {
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+      tasks: [mockTask],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("batch-result-list")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Sub-results/i })).toBeInTheDocument()
+  })
+
+  it("does NOT mount the batch Sub-results section when the harness run has no tasks", () => {
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+      tasks: [],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("batch-result-list")).not.toBeInTheDocument()
+  })
+
+  it("does NOT mount the batch Sub-results section for a Deep / no-run thread even if tasks somehow exist", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null, tasks: [mockTask] })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("batch-result-list")).not.toBeInTheDocument()
   })
 
   // Phase 088-01 (D-13a) — structural a11y regression gate on the panel

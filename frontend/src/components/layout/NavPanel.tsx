@@ -13,16 +13,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  MessageSquare, FileText, Activity, Zap, Settings,
+  MessageSquare,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
   Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
-  AlertCircle,
+  AlertCircle, Square,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { Folder, Thread } from "@/types"
+// Phase 103 (REQ-7) — the single shared nav source (kills the triplication).
+import { NAV_ITEMS } from "@/lib/nav-items"
+// SEED-064: cross-thread run visibility + Stop.
+import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
+import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
 
 interface Props {
-  // From AppDock
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
   onSignOut: () => void
@@ -37,14 +41,6 @@ interface Props {
   theme: "light" | "dark"
   onToggleTheme: () => void
 }
-
-const NAV_ITEMS = [
-  { view: "chat" as ActiveView,           icon: MessageSquare, label: "Chat" },
-  { view: "documents" as ActiveView,      icon: FileText,      label: "Documents" },
-  { view: "library-health" as ActiveView, icon: Activity,      label: "Library Health" },
-  { view: "skills" as ActiveView,         icon: Zap,           label: "Skills" },
-  { view: "settings" as ActiveView,       icon: Settings,      label: "Settings" },
-] as const
 
 export function NavPanel({
   activeView,
@@ -72,6 +68,11 @@ export function NavPanel({
       return next
     })
   }
+
+  // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
+  // + the cross-thread stop action.
+  const streamingThreadIds = useStreamingThreadIds()
+  const streamActions = useStreamActions()
 
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -118,6 +119,8 @@ export function NavPanel({
           const isMenuOpen = menuOpenId === thread.id
           const isHovered = hoveredId === thread.id
           const showActions = isHovered || isMenuOpen
+          // SEED-064: live run on this thread?
+          const isRunning = streamingThreadIds.has(thread.id)
 
           return (
             <div
@@ -163,16 +166,42 @@ export function NavPanel({
                     )}
                   </div>
 
-                  {/* Dots button overlaid on right */}
-                  {showActions && (
+                  {/* SEED-064: resting running dot — ambient "this chat is working"
+                      signal. A short gradient scrim keeps it clear of a long title.
+                      Hidden while hovered (the Stop button takes its place). */}
+                  {isRunning && !showActions && (
                     <div
-                      className="absolute inset-y-0 right-0 flex items-center pr-1.5"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setMenuOpenId(isMenuOpen ? null : thread.id)
-                      }}
+                      className="absolute inset-y-0 right-0 flex items-center pl-6 pr-3 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none"
+                      aria-label="Run in progress"
                     >
-                      <span className="p-0.5 rounded-md bg-accent hover:bg-muted inline-flex transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    </div>
+                  )}
+
+                  {/* Actions on hover: Stop (if running) + the rename/delete menu.
+                      The gradient scrim fades a long title out behind the buttons so
+                      they never visually collide with the text (SEED-064 polish). */}
+                  {showActions && (
+                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg">
+                      {isRunning && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void streamActions.stopThread(thread.id)
+                          }}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
+                          aria-label="Stop run"
+                        >
+                          <Square className="h-2.5 w-2.5 fill-current" />
+                        </button>
+                      )}
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpenId(isMenuOpen ? null : thread.id)
+                        }}
+                      >
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </span>
                     </div>
@@ -302,6 +331,9 @@ export function NavPanel({
                     Chats
                   </span>
                   <div className="flex items-center gap-1">
+                    {/* SEED-064: cross-thread active-runs counter + Stop tray
+                        (renders null when nothing is running). */}
+                    <ActiveRunsTray threads={threads} />
                     <button
                       onClick={() => {
                         onNewThread(selectedFolderId)

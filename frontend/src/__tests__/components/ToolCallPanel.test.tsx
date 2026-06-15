@@ -2,24 +2,30 @@
  * Phase 075.6 Plan 03 / Req #7 — step-list collapse + iteration-divider
  * preservation tests for ToolCallPanel.
  *
- * Updated for Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
- *   The prior single aggregate "Show N earlier steps" summary row
- *   (data-testid="collapsed-steps-summary") is replaced by per-step
- *   inline result-summary rows (data-testid="step-summary-row"), one
- *   per collapsed past step. The iteration-divider preservation
- *   invariant (Pitfall 6 / Landmine L5) is unchanged.
+ * Updated for Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate):
+ *   The prior single shared `stepsCollapsed` boolean — where ONE click on any
+ *   collapsed summary row expanded ALL finished cards (the #1 felt bug) — is
+ *   replaced by a per-step `expandedSteps` Set keyed on the same `stepKeyOf`
+ *   identity the rail/dedup use. Expanding ONE finished essence row reveals
+ *   ONLY that row's body; the others stay one-line essence rows. The >=3
+ *   collapse gate is gone — EVERY finished step before the active one folds to
+ *   an essence row (Focus Mode from step 1). Each expanded earlier step can
+ *   re-fold independently (the Set shrinks for that key only). The
+ *   iteration-divider preservation invariant (Pitfall 6 / Landmine L5) is
+ *   unchanged.
  *
- * Covers three invariants:
- *   1. 5 done + 1 active across iter-0+iter-1+iter-2 → collapsed view
- *      renders 5 per-step summary rows + the active step row; the
- *      iteration divider above the active step still fires because
- *      prevToolIteration is derived from the LAST collapsed item
- *      (Pitfall 6 / Landmine L5 mitigation).
- *   2. Clicking any per-step summary row expands to all 6 tool rows
- *      with EXACTLY 2 iteration dividers (iter-0 → iter-1, iter-1 → iter-2).
- *   3. Fewer than 3 completed tool calls preceding the active step →
- *      no collapse; all rows render individually; per-step summary
- *      rows absent.
+ * Covers the per-step invariants:
+ *   1. 5 done + 1 active across iter-0+iter-1+iter-2 → 5 per-step essence
+ *      rows + the active step row; the iteration divider above the active
+ *      step still fires (prevToolIteration from the LAST collapsed item).
+ *   2. Clicking ONE essence row expands ONLY that row's body — the other
+ *      essence rows stay folded (closes GAP-095-01).
+ *   3. Clicking a second essence row expands it too; the first stays expanded
+ *      (the Set grows).
+ *   4. A single finished step before the active tool STILL folds to an
+ *      essence row (proves the >=3 un-gate, GAP-095-03).
+ *   5. A per-row re-collapse affordance returns one expanded row to its
+ *      essence (the Set shrinks for that key only).
  */
 import { describe, it, expect } from "vitest"
 import { render, fireEvent } from "@testing-library/react"
@@ -53,8 +59,8 @@ function mkActiveTool(overrides: Partial<ToolCall> & { id: string; iteration: nu
   } as ToolCall
 }
 
-describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", () => {
-  it("collapses 5 done + 1 active (iter-0+iter-1+iter-2) into 5 per-step summary rows + active row by default", () => {
+describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)", () => {
+  it("folds 5 done + 1 active into 5 per-step essence rows + active row by default", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -65,27 +71,23 @@ describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", (
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // Phase 075.8 Task 4: exactly 5 per-step summary rows replace the
-    // 5 collapsed completed items (1 row each, not 1 aggregate row).
+    // 5 per-step essence rows for the finished steps before the active one.
     const summaries = container.querySelectorAll("[data-testid='step-summary-row']")
     expect(summaries.length).toBe(5)
-    // First row carries the iteration-min hint so future readers can see the
-    // collapse window boundary without re-deriving it.
+    // First still-collapsed row carries the iteration-min hint.
     expect(summaries[0]?.getAttribute("data-iteration-min")).toBe("0")
 
     // The old aggregate row no longer exists.
     expect(container.querySelectorAll("[data-testid='collapsed-steps-summary']").length).toBe(0)
 
-    // The iteration divider above the active step (iter-2) still fires
-    // because prevToolIteration is derived from the LAST collapsed item
-    // (iter-1). Pitfall 6 / L5 — the iter-N → iter-(N+1) boundary survives
-    // the per-step-summary collapse.
+    // The iteration divider above the active step (iter-2) still fires because
+    // prevToolIteration is derived from the LAST collapsed item (iter-1).
     const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
     expect(dividers.length).toBe(1)
     expect(dividers[0]?.getAttribute("data-iteration")).toBe("2")
   })
 
-  it("clicking a per-step summary row expands to all 6 rows with EXACTLY 2 iteration dividers", () => {
+  it("expands ONLY the clicked essence row — the others stay folded (GAP-095-01)", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -96,28 +98,51 @@ describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", (
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // Pre-click: 5 summary rows present.
+    // Pre-click: 5 essence rows present.
     expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(5)
 
-    // Click the first summary row to expand.
+    // Click the FIRST essence row.
     const firstSummary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
     expect(firstSummary).toBeTruthy()
     fireEvent.click(firstSummary!)
 
-    // Post-click: per-step summary rows gone, all 6 tool items render.
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(0)
-
-    // EXACTLY 2 iteration dividers in expanded view:
-    //   between rows 3-4 (iter-0 → iter-1 boundary)
-    //   between rows 5-6 (iter-1 → iter-2 boundary)
-    // D-067-03 invariant: NEVER a divider above the first item.
-    const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
-    expect(dividers.length).toBe(2)
-    const iterations = Array.from(dividers).map((d) => d.getAttribute("data-iteration"))
-    expect(iterations).toEqual(["1", "2"])
+    // Post-click: only ONE row expanded → 4 essence rows remain (the others
+    // stay folded). This is the core fold-all fix: NOT all 5 expand.
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(4)
   })
 
-  it("does NOT collapse when fewer than 3 completed tool calls precede the active step", () => {
+  it("clicking a second essence row expands it too; the first stays expanded (the Set grows)", () => {
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkDoneTool({ id: "t2", iteration: 0 }),
+      mkDoneTool({ id: "t3", iteration: 0 }),
+      mkDoneTool({ id: "t4", iteration: 1 }),
+      mkDoneTool({ id: "t5", iteration: 1 }),
+      mkActiveTool({ id: "t6", iteration: 2 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // Expand the first essence row → 4 remain.
+    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(4)
+
+    // Expand the next still-folded essence row → 3 remain (both stay expanded).
+    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(3)
+  })
+
+  it("folds a SINGLE finished step before the active tool — proves the >=3 un-gate (GAP-095-03)", () => {
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkActiveTool({ id: "t2", iteration: 0 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // 1 finished step → it STILL folds to an essence row (no >=3 gate).
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(1)
+  })
+
+  it("re-collapses one expanded earlier step back to its essence (the Set shrinks for that key only)", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -125,13 +150,144 @@ describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", (
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // No per-step summary rows (collapse threshold N=3 not met).
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(0)
-    // And no legacy aggregate row either.
-    expect(container.querySelectorAll("[data-testid='collapsed-steps-summary']").length).toBe(0)
+    // 2 finished steps fold (un-gated).
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(2)
 
-    // No iteration dividers (all 3 share iteration 0).
-    expect(container.querySelectorAll("[data-testid='iteration-divider']").length).toBe(0)
+    // Expand the first → 1 essence row remains, and a per-row re-collapse
+    // control appears for the expanded step.
+    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(1)
+    const recollapse = container.querySelector("[data-testid='step-recollapse']") as HTMLButtonElement | null
+    expect(recollapse).toBeTruthy()
+
+    // Click the re-collapse control → the row folds back to its essence (2 again).
+    fireEvent.click(recollapse!)
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(2)
+  })
+})
+
+describe("ToolCallPanel — 095 Plan 06 Task 2: single essence line for finished cards", () => {
+  it("rests a finished (all-done) card as ONE essence row — result, not args + separate result", () => {
+    // No active tool → activeIndex === -1 → the all-done / reload case.
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // The resting state is ONE essence/result line (the tool-result-summary
+    // element), not a separate head-row-with-args plus a separate result row.
+    const essences = container.querySelectorAll("[data-testid='tool-result-summary']")
+    expect(essences.length).toBe(1)
+    // The essence carries the result arrow, not the args-in-quotes summary as a
+    // separate visible row.
+    expect(essences[0]?.textContent).toMatch(/→/)
+  })
+
+  it("clicking the essence line expands the finished card's full body", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "execute_code",
+        id: "x1",
+        args: { code: "print(2)" },
+        status: "done",
+        result: JSON.stringify({ stdout: "2", exit_code: 0 }),
+        startedAt: 1_700_000_000_000,
+        endedAt: 1_700_000_000_100,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // At rest: essence line, no editor body.
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(0)
+    const essence = container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement | null
+    expect(essence).toBeTruthy()
+
+    // Click → the full execute_code body (editor) renders.
+    fireEvent.click(essence!)
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(1)
+  })
+})
+
+describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider", () => {
+  it("renders the divider as 'Round N', never 'Step N' (D-04 relabel)", () => {
+    // 3 done across iter-0 + 1 done in iter-1 + active iter-2 → 2 dividers
+    // (iter-0→1, iter-1→2). The divider label must read "Round N".
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkDoneTool({ id: "t2", iteration: 0 }),
+      mkDoneTool({ id: "t3", iteration: 1 }),
+      mkActiveTool({ id: "t4", iteration: 2 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // With 3 done before the active step, Focus Mode collapses past steps; the
+    // divider above the active step still fires (Pitfall 6 / L5). Expand to see
+    // both dividers.
+    const summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
+    if (summary) fireEvent.click(summary)
+
+    const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
+    expect(dividers.length).toBeGreaterThanOrEqual(1)
+    dividers.forEach((d) => {
+      expect(d.textContent).toMatch(/Round \d+/)
+      expect(d.textContent).not.toMatch(/Step \d+/)
+    })
+  })
+
+  it("renders each deduped tool on a numbered status-node rail (snum + node)", () => {
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkDoneTool({ id: "t2", iteration: 0 }),
+      mkActiveTool({ id: "t3", iteration: 0 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Phase 095 Plan 06: the 2 finished steps before the active one fold to
+    // one-line essence rows (Focus Mode from step 1), so only the active step
+    // renders its full StepRow rail node at rest. Expand the essence rows to
+    // see all 3 rails — the snum numbering + node-state mapping is the point.
+    let summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
+    while (summary) {
+      fireEvent.click(summary)
+      summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
+    }
+    // One rail node + one snum per deduped tool (3 tools → 3 of each).
+    const nodes = container.querySelectorAll("[data-testid='step-node']")
+    const snums = container.querySelectorAll("[data-testid='step-snum']")
+    expect(nodes.length).toBe(3)
+    expect(snums.length).toBe(3)
+    // Numbering is 1-based and sequential.
+    const numbers = Array.from(snums).map((s) => s.textContent)
+    expect(numbers).toEqual(["1", "2", "3"])
+    // The running tool's node is the ACTIVE state; the done tools are done.
+    const states = Array.from(nodes).map((n) => n.getAttribute("data-node-state"))
+    expect(states).toEqual(["done", "done", "active"])
+  })
+
+  it("dedups the rail: two snapshots of the same logical tool render ONE numbered row (D-05 structural)", () => {
+    const stableClientKey = "anthropic|msg-1|search_documents|1700000000000|0"
+    const toolCalls: ToolCall[] = [
+      {
+        name: "search_documents",
+        id: "tu_a",
+        clientKey: stableClientKey,
+        args: { query: "x" },
+        status: "preparing",
+        iteration: 0,
+      } as ToolCall,
+      {
+        name: "search_documents",
+        id: "tu_b", // provider mutated the id
+        clientKey: stableClientKey,
+        args: { query: "x" },
+        status: "running",
+        startedAt: 1_700_000_000_500,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Shared dedup collapses them → exactly ONE rail node/snum (no dup row).
+    expect(container.querySelectorAll("[data-testid='step-node']").length).toBe(1)
+    expect(container.querySelectorAll("[data-testid='step-snum']")[0]?.textContent).toBe("1")
   })
 })
 
@@ -218,6 +374,12 @@ describe("ToolCallPanel — Phase 075.9 T3 clientKey dedup", () => {
       } as ToolCall,
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Phase 095 Plan 06 (GAP-095-03 essence): a DONE execute_code now rests as
+    // a single essence line, not the full editor body. Expand it to reveal the
+    // editor — dedup must still leave exactly ONE card/editor (not two).
+    const essence = container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement | null
+    expect(essence).toBeTruthy()
+    fireEvent.click(essence!)
     // Exactly one execute_code body rendered (the execute_code body has a
     // tc-editor inset only when args.code is present — both entries have
     // it, but dedup should leave only one).

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
@@ -7,21 +7,23 @@ import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
+import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, FileText, Activity, Zap, Settings, Plus } from "lucide-react"
-
-const NAV_ITEMS_MOBILE = [
-  { view: "chat" as ActiveView,           icon: MessageSquare, label: "Chat" },
-  { view: "documents" as ActiveView,      icon: FileText,      label: "Documents" },
-  { view: "library-health" as ActiveView, icon: Activity,      label: "Library Health" },
-  { view: "skills" as ActiveView,         icon: Zap,           label: "Skills" },
-  { view: "settings" as ActiveView,       icon: Settings,      label: "Settings" },
-] as const
+import { MessageSquare, Plus } from "lucide-react"
+// Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
+// shared NAV_ITEMS const (incl. the Workflows home + its distinct icon) — the
+// local NAV_ITEMS_MOBILE triplicate is gone (NavPanel already consumes it; this
+// is the third + final consumer that kills the triplication).
+import { NAV_ITEMS } from "@/lib/nav-items"
+// Phase 103-06: the Run-from-page launch reuses the EXISTING kickoff path —
+// createThread + sendMessage(workflow_definition_id) — NEVER a bespoke
+// /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
+import { createThread, postMessage, type PublishedWorkflow } from "@/lib/api"
 
 interface Props {
   onSignOut: () => void
@@ -47,15 +49,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
 
-  const selectedThreadRef = useRef(selectedThread)
-  useEffect(() => {
-    selectedThreadRef.current = selectedThread
-  }, [selectedThread])
-
+  // Title cross-wiring fix (parallel chats): apply a generated title to the run's
+  // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
+  // — NOT the currently VIEWED thread, which under fast nav / concurrent runs was
+  // the wrong chat (the long run getting a short chat's title).
   const handleTitleUpdate = useCallback(
-    (title: string) => {
-      const thread = selectedThreadRef.current
-      if (thread) updateThreadTitle(thread.id, title)
+    (threadId: string, title: string) => {
+      updateThreadTitle(threadId, title)
     },
     [updateThreadTitle],
   )
@@ -67,6 +67,27 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
+
+  // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
+  //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
+  //    thread, kicks off a REAL server-side run by REUSING the existing kickoff
+  //    (POST /threads → POST /threads/{id}/messages with workflow_definition_id —
+  //    NO bespoke /workflows/{id}/run; threads.py byte-identical), then selects +
+  //    views the thread and switches to Chat. active_workflow_run_id is set
+  //    server-side atomically (create_workflow_run); GET /threads/{id}/workflow ->
+  //    "harness" is the proof a real run was kicked off (NOT a view-only switch).
+  //    The free-text kickoff becomes inputs={"kickoff_prompt": content}; project
+  //    scope is BAKED INTO the published definition (we never pass a folder here). ──
+  const doRun = useCallback(
+    async (def: PublishedWorkflow, kickoff: string) => {
+      const thread = await createThread(def.name)
+      await postMessage(thread.id, kickoff, { workflowDefinitionId: def.id })
+      await loadThreads()
+      selectThread(thread)
+      onNavigate("chat")
+    },
+    [loadThreads, selectThread, onNavigate],
+  )
 
   // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
   //    split is a single ChatLayout-level CSS grid; the single in-panel toggle +
@@ -193,7 +214,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
           </div>
           {/* Nav icon row (bottom, fixed) */}
           <div className="border-t border-border/20 px-2 py-3 flex items-center justify-around">
-            {NAV_ITEMS_MOBILE.map(({ view, icon: Icon, label }) => {
+            {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
               const isActive = activeView === view
               return (
                 <button
@@ -262,6 +283,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             <SkillsPage onTryInChat={handleTryInChat} />
           ) : activeView === "settings" ? (
             <SettingsPage />
+          ) : activeView === "workflows" ? (
+            // Phase 103-06 (REQ-7): the Workflows page mounts here (additive branch
+            // BEFORE the trailing KnowledgeHealthPage else — the existing chat +
+            // documents/skills/settings render paths are untouched). It hosts the
+            // Builder + the publish gauntlet as intra-view state (three-homes, no
+            // router); onLaunch = doRun (the existing-kickoff launcher).
+            <WorkflowsPage folders={folders} onLaunch={doRun} />
           ) : (
             <KnowledgeHealthPage />
           )}

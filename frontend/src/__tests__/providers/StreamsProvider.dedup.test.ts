@@ -149,3 +149,115 @@ describe("StreamsProvider — BUG-260521-01 reducer dedup + WR-01 id-match", () 
     }
   })
 })
+
+describe("StreamsProvider — Phase 095 Plan 03 D-05 sub-agent zero-duplicate root fix", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function countSubAgents(m: Message): number {
+    return (m.tool_calls ?? []).filter((tc) => tc.sub_agent != null).length
+  }
+
+  it("stamps the sub-agent onto the OWNING analyze_document tool_call — exactly ONE sub-agent block, never a second message-scoped slot", () => {
+    const { callbacks, current } = makeHarness()
+    // The agent calls analyze_document; tool_start lands its owner entry.
+    callbacks.onToolStart!("analyze_document", { document_id: "doc-1" })
+    expect(current().tool_calls).toHaveLength(1)
+    const ownerKey = current().tool_calls![0].clientKey
+    expect(ownerKey).toBeTruthy()
+
+    // WHILE that tool runs, the legacy sub_agent_* bookend events fire.
+    callbacks.onSubAgentStart!("thesis.pdf", "summarize chapter 3")
+    callbacks.onSubAgentDelta!("Chapter 3 covers ")
+    callbacks.onSubAgentDelta!("the methodology.")
+    callbacks.onSubAgentDone!()
+
+    // EXACTLY ONE tool_call carries the sub-agent — no separate slot, no second
+    // entry. One SubAgentBlock would render (the dual-render ROOT is gone).
+    expect(current().tool_calls).toHaveLength(1)
+    expect(countSubAgents(current())).toBe(1)
+    // It is stamped onto the SAME owner (clientKey identity preserved).
+    expect(current().tool_calls![0].clientKey).toBe(ownerKey)
+    expect(current().tool_calls![0].name).toBe("analyze_document")
+    const sa = current().tool_calls![0].sub_agent!
+    expect(sa.filename).toBe("thesis.pdf")
+    expect(sa.task).toBe("summarize chapter 3")
+    expect(sa.content).toBe("Chapter 3 covers the methodology.")
+    expect(sa.status).toBe("done")
+    // The legacy single-slot message.sub_agent is NOT written by the live path.
+    expect(current().sub_agent).toBeUndefined()
+  })
+
+  it("creates a stable-identity owner entry when sub_agent_start arrives BEFORE tool_start (provider ordering)", () => {
+    const { callbacks, current } = makeHarness()
+    // sub_agent_start arrives first — no owner yet. Create one with ONE stable
+    // makeToolKey identity from frame 1 (mirrors onToolStart).
+    callbacks.onSubAgentStart!("report.docx", "extract findings")
+    expect(current().tool_calls).toHaveLength(1)
+    expect(current().tool_calls![0].name).toBe("analyze_document")
+    expect(current().tool_calls![0].clientKey).toBeTruthy()
+    expect(current().tool_calls![0].sub_agent!.status).toBe("running")
+
+    callbacks.onSubAgentDelta!("Finding 1.")
+    callbacks.onSubAgentDone!()
+    // Still exactly ONE entry, ONE sub-agent — no duplicate.
+    expect(current().tool_calls).toHaveLength(1)
+    expect(countSubAgents(current())).toBe(1)
+    expect(current().tool_calls![0].sub_agent!.content).toBe("Finding 1.")
+    expect(current().tool_calls![0].sub_agent!.status).toBe("done")
+  })
+
+  it("content-append invariant: sub_agent stamping never touches m.content", () => {
+    const { callbacks, current, snapshots } = makeHarness()
+    const startingContent = current().content
+    callbacks.onToolStart!("analyze_document", { document_id: "doc-2" })
+    callbacks.onSubAgentStart!("a.pdf", "t")
+    callbacks.onSubAgentDelta!("body text")
+    callbacks.onSubAgentDone!()
+    for (const snap of snapshots) {
+      expect(snap[0].content).toBe(startingContent)
+    }
+  })
+
+  it("per-thread demux: THREAD_A sub_agent_start leaves THREAD_B's message bucket untouched", () => {
+    // Two independent reducers, each closing over its OWN assistantId/threadId.
+    let messagesA: Message[] = [
+      { ...initialAssistantMessage(), id: "assistant-A", thread_id: "thread-A" },
+    ]
+    let messagesB: Message[] = [
+      { ...initialAssistantMessage(), id: "assistant-B", thread_id: "thread-B" },
+    ]
+    const cbA = makeStreamCallbacks({
+      assistantId: "assistant-A",
+      threadId: "thread-A",
+      setMessages: (u) => {
+        messagesA = typeof u === "function" ? u(messagesA) : u
+      },
+    })
+    const cbB = makeStreamCallbacks({
+      assistantId: "assistant-B",
+      threadId: "thread-B",
+      setMessages: (u) => {
+        messagesB = typeof u === "function" ? u(messagesB) : u
+      },
+    })
+    // Drive a full sub-agent sequence on THREAD_A only.
+    cbA.onToolStart!("analyze_document", { document_id: "doc-A" })
+    cbA.onSubAgentStart!("a.pdf", "task A")
+    cbA.onSubAgentDelta!("A content")
+    cbA.onSubAgentDone!()
+    // THREAD_A populated.
+    expect(messagesA[0].tool_calls).toHaveLength(1)
+    expect(messagesA[0].tool_calls![0].sub_agent!.content).toBe("A content")
+    // THREAD_B is COMPLETELY untouched — no bleed.
+    expect(messagesB[0].tool_calls).toHaveLength(0)
+    expect(messagesB[0].sub_agent).toBeUndefined()
+    // Also feed a B sub_agent — A must not change.
+    cbB.onToolStart!("analyze_document", { document_id: "doc-B" })
+    cbB.onSubAgentStart!("b.pdf", "task B")
+    cbB.onSubAgentDelta!("B content")
+    expect(messagesB[0].tool_calls![0].sub_agent!.content).toBe("B content")
+    expect(messagesA[0].tool_calls![0].sub_agent!.content).toBe("A content")
+  })
+})

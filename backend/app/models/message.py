@@ -10,6 +10,12 @@ class MessageCreate(BaseModel):
     model: str | None = None
     provider: str | None = None   # override active provider for this request
     agent_mode: str = "default"   # "default" | "explorer"
+    # Phase 092 D-02 (MODE-01): when set, THIS message kicks off the named
+    # published workflow — the next chat message IS the workflow input. The
+    # send_message handler resolves+parses the definition under the user's RLS,
+    # calls create_workflow_run (which sets threads.active_workflow_run_id), and
+    # the producer branches to the harness engine. None = ordinary Deep send.
+    workflow_definition_id: UUID | None = None
 
 
 class MessageResponse(BaseModel):
@@ -45,3 +51,14 @@ class MessageResponse(BaseModel):
     # Phase 076.2 D-01: DeepSeek thinking mode reasoning_content. Nullable --
     # only present on assistant messages from thinking-enabled providers.
     reasoning_content: str | None = None
+    # Phase 095.1-03 (D-04 model attribution + D-05 true reload timer): the
+    # resolved run's model/provider and persisted wall-clock timestamps, stamped
+    # additively by _enrich_messages_with_runs from the SAME runs↔messages join.
+    # All nullable — a legacy / pre-run-backed assistant message (no run row)
+    # returns null for all 4 (graceful), mirroring run_id/run_status above. The
+    # frontend api.ts mapper converts to camelCase model/provider/startedAt/
+    # completedAt on the Message type. NO migration — runs already carries these.
+    model: str | None = None
+    provider: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None

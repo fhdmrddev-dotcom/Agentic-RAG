@@ -102,6 +102,14 @@ single shared prompt is tuned for the strongest models and under-serves weaker/n
 - A **new-model onboarding checklist**: register in `MODEL_CAPABILITIES`, run the eval harness,
   record pass/fail per capability, set any needed overlay flag — so "added" means "validated at
   full capability," not "wired up and hoped for."
+  - **Evidence-gate the `native_tools` flag (added 2026-05-31):** before flipping ANY model's
+    `native_tools` override to `True` — especially an **ollama / local model** served via a
+    heterogeneous endpoint — VALIDATE through this cross-provider eval harness that the model
+    emits **real** tool calls, not narrated/faked ones. A model that confidently narrates tool
+    use without emitting the call is worse than one we never sent tools to (zero execution,
+    looks done). The flag flip must be **evidence-gated, not assumed**. The per-model write
+    surface for these overrides is [[SEED-040]] (model-registry self-service); its 2026-05-31
+    update names the ollama per-model `native_tools` toggle as the canonical Layer-2 use case.
 - Pairs with `SEED-035` (tool-count/toolbox budget — Google warns >20 tools; weak models also
   degrade with large toolboxes) and `SEED-032` (deepseek reasoning-content round-trip).
 

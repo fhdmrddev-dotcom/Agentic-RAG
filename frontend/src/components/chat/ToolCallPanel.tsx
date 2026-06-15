@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import {
-  ChevronDown, ChevronRight, CheckCircle2, Loader2,
+  ChevronDown, ChevronRight, ChevronUp, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
   BookOpen, Zap, Clock, Code2, Terminal,
@@ -13,10 +13,17 @@ import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { StatusPill, type ToolStatus } from "./StatusPill"
+import { dedupToolCalls } from "@/lib/stepCount"
 
 interface Props {
   toolCalls: ToolCall[]
-  subAgent?: SubAgentState  // live sub-agent state during streaming
+  /**
+   * Phase 095 Plan 03 (D-05): no longer read. The legacy analyze_document
+   * sub-agent now lives on its owning tool_call (`tc.sub_agent`), stamped by
+   * StreamsProvider — collapsing the dual render source. RunCard still passes
+   * `message.sub_agent` for back-compat; the field is accepted but unused.
+   */
+  subAgent?: SubAgentState
   isPlanning?: boolean      // agent finished tool round, deciding next action
   /** Phase 56 D-03: 0-based iteration index from iteration_start SSE event. Display as `Step ${N + 1}`. */
   iterationCount?: number
@@ -137,8 +144,12 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
 // this file. `ToolResultBlock` stays inline per CONTEXT deferred list;
 // only its inner dispatch was swapped to use the registry.
 
-function ToolResultBlock({ tc }: { tc: ToolCall }) {
-  const [open, setOpen] = useState(false)
+function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; defaultOpen?: boolean }) {
+  // Phase 095 Plan 06: when the parent card is already expanded (its key is in
+  // expandedSteps), the resting essence line is the ToolEssenceLine above; this
+  // block should open straight to the body, not show a redundant nested
+  // `→ summary` essence row. defaultOpen=true is passed in that case.
+  const [open, setOpen] = useState(defaultOpen)
 
   let parsed: any = null
   try {
@@ -293,9 +304,131 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
   )
 }
 
+// ---- Step rail (Phase 095 Plan 03 Task 2, sketch 014 — unified-card-frame) ----
+//
+// The borderless step-numbered status-node rail. Each deduped tool renders on
+// a 2-column grid: a rail column (node + connecting line + `snum`) and the
+// step main column (the EXISTING per-tool head + body — REUSED verbatim, no
+// second body system; G4). Node state derives from (index, status):
+//   done   = a finished step (filled-success node, success snum)
+//   active = the step running now (pulsing-primary ring node, primary snum)
+//   queued = not-yet-started (dim outline node)
+// Numbering makes the D-04 count + D-05 zero-dup structural (a dup = two
+// same-numbered rows). Reuse-only CSS — no new keyframes.
+
+type NodeState = "done" | "active" | "queued"
+
+// ---- Essence line (Phase 095 Plan 06, sketch 014 — GAP-095-03 essence) ----
+//
+// A FINISHED (done/interrupted) tool's resting state is ONE line:
+//   {icon} {tool} → {result} {pill} {chev}
+// The resting text is the RESULT (summarizeToolCall), NOT the args summary —
+// "finished essence recedes" so the result uses text-muted-foreground. The
+// whole row is the click target that expands this card's full body. Replaces
+// the prior two-row resting state (head row with args-in-quotes + a SEPARATE
+// ToolResultBlock result row) with a single essence line. Used for every
+// non-execute_code finished tool; execute_code reuses it for its done resting
+// line so a done code card shows ONE result-bearing line, not args + a
+// separate result row.
+function ToolEssenceLine({
+  tc,
+  onExpand,
+}: {
+  tc: ToolCall
+  onExpand: () => void
+}) {
+  const result = summarizeToolCall(tc) || "View results"
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      data-testid="tool-result-summary"
+      aria-label="Expand this step"
+      className="w-full flex items-center gap-2.5 text-left group"
+    >
+      <span
+        className={cn(
+          "flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300",
+          toolIconColor(tc.name, tc.status),
+        )}
+      >
+        {toolIcon(tc.name)}
+      </span>
+      <span className="flex-1 min-w-0 text-xs truncate">
+        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+        <span className="mx-1 text-muted-foreground/50">→</span>
+        <span className="text-muted-foreground">{result}</span>
+      </span>
+      <StatusPill
+        status={pillStatus(tc.status)}
+        duration={
+          tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
+        }
+      />
+      <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+    </button>
+  )
+}
+
+function StepRow({
+  snum,
+  node,
+  isLast,
+  children,
+}: {
+  snum: number
+  node: NodeState
+  isLast: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="grid grid-cols-[28px_1fr] min-w-0">
+      {/* Rail column: connecting line + status node + step number */}
+      <div className="relative flex flex-col items-center" aria-hidden="true">
+        {/* the spine — fills success up to the active node; hidden on the last row */}
+        {!isLast && (
+          <div
+            data-testid="step-rail-line"
+            className={cn(
+              "absolute top-5 bottom-0 w-px left-1/2 -translate-x-1/2",
+              node === "queued" ? "bg-border" : "bg-success/60",
+              node === "active" && "bg-gradient-to-b from-success/60 to-primary",
+            )}
+          />
+        )}
+        {/* the status node */}
+        <span
+          data-testid="step-node"
+          data-node-state={node}
+          className={cn(
+            "relative z-[1] mt-2.5 w-2.5 h-2.5 rounded-full border-2 flex-shrink-0",
+            node === "done" && "bg-success border-success",
+            node === "active" &&
+              "bg-card border-primary animate-pulseGlow shadow-[0_0_0_3px_hsl(var(--primary)/0.15)]",
+            node === "queued" && "bg-card border-border",
+          )}
+        />
+        {/* the step number */}
+        <span
+          data-testid="step-snum"
+          className={cn(
+            "mt-1 font-mono text-[10px] tabular-nums leading-none",
+            node === "active" ? "text-primary font-bold" : "text-success/80",
+            node === "queued" && "text-muted-foreground/50",
+          )}
+        >
+          {snum}
+        </span>
+      </div>
+      {/* Step main column: the reused per-tool head + body */}
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
+export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   // Phase 075.7 Bug D fix: `isPlanning` and `iterationCount` props are still
   // declared in the Props interface (RunCard.tsx passes them) but are no
   // longer consumed here. RunCard owns run-level chrome (timer, counter,
@@ -306,32 +439,13 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
   // ordering so the timeline / displayItems sort below behaves the same;
   // only the duplicate suffix entries get dropped.
   //
-  // Phase 075.9 T3: PREFER `tc.clientKey` over `tc.id`. The provider-emitted
-  // `tc.id` mutates across the preparing→running transition on some
-  // providers (Anthropic, OpenRouter), so two snapshots of the same logical
-  // tool can produce two distinct dedup keys → both render mid-stream. The
-  // stable `clientKey` stamped by StreamsProvider on creation closes this
-  // root cause. Fallback chain: clientKey > id > composite (for in-flight
-  // tests / DB-loaded messages without a clientKey stamp).
-  //
-  // The composite fallback (`${name}-${startedAt}-${idx}`) is kept ONLY for
-  // the migration window — once every consumer is on clientKey and historical
-  // DB messages get backfilled (or accept clientKey-less rendering), this
-  // can collapse to `tc.clientKey ?? tc.id`.
-  const deduplicatedToolCalls = useMemo(() => {
-    const seen = new Set<string>()
-    const result: ToolCall[] = []
-    ;(toolCalls ?? []).forEach((tc, idx) => {
-      // REMOVE after migration window: composite fallback for tools without
-      // a clientKey stamp (DB-loaded historical messages, in-flight test
-      // fixtures). New live-SSE tools always have clientKey.
-      const key = tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
-      if (seen.has(key)) return
-      seen.add(key)
-      result.push(tc)
-    })
-    return result
-  }, [toolCalls])
+  // Phase 095 Plan 03 Task 2 (D-04 single dedup home): import the ONE shared
+  // dedup from @/lib/stepCount (Plan 01) instead of an inline copy. The shared
+  // helper is byte-identical to the prior inline derivation (same
+  // clientKey > id > composite fallback chain, first-occurrence ordering) —
+  // the point is ONE source so the panel count and the RunCard headline count
+  // (which also reads unifiedStepCount → dedupToolCalls) can never drift.
+  const deduplicatedToolCalls = useMemo(() => dedupToolCalls(toolCalls), [toolCalls])
 
   if (!deduplicatedToolCalls || deduplicatedToolCalls.length === 0) return null
 
@@ -353,6 +467,26 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
     ...deduplicatedToolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.status === "preparing" ? Infinity : (tc.startedAt ?? Date.now()) })),
     ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
   ].sort((a, b) => a.t - b.t)
+
+  // Phase 095 Plan 03 Task 2 (sketch 014 rail): per-tool 1-based step number,
+  // assigned in deduped-tool order. The snum is the rail's load-bearing
+  // numbering — it maps 1:1 to unifiedStepCount and makes D-05 zero-dup
+  // structural (a duplicate = two same-numbered rows). Keyed on the stable
+  // clientKey > id > composite identity (the SAME key dedupToolCalls uses).
+  const toolStepNumber = new Map<string, number>()
+  deduplicatedToolCalls.forEach((tc, idx) => {
+    const key = tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+    toolStepNumber.set(key, idx + 1)
+  })
+  const stepKeyOf = (tc: ToolCall, idx: number) =>
+    tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+  // Node state from (status): the running/preparing tool is the active node;
+  // a finished tool is done; anything else (rare) is queued.
+  const nodeStateOf = (tc: ToolCall): NodeState => {
+    if (tc.status === "running" || tc.status === "preparing") return "active"
+    if (tc.status === "done" || tc.status === "interrupted") return "done"
+    return "queued"
+  }
 
   // 075.6 Plan 02 / SPEC Req #4: default-expand-for-active-preparing rule.
   // The LAST tool in displayItems whose status === "preparing" is the
@@ -398,16 +532,30 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
           (it): it is Extract<DisplayItem, { kind: "tool" }> =>
             it.kind === "tool" && it.tc.status === "done",
         )
-  // 2026-05-24 fix: collapsed-summary count uses TOTAL items before active
-  // (any kind: tool + skill), not only completed tools. Prior to this fix
-  // the label said e.g. "Completed 3 steps" while the active row was
-  // labelled "Step 7" because skill rows / undefined-status tools were
-  // excluded from the count. The visible "Step N" header is derived from
-  // `tc.iteration + 1` (line ~805) so the count needs to reflect every
-  // row the user can see being hidden by collapse, not a subset.
-  const hiddenStepsCount = activeIndex === -1 ? 0 : activeIndex
-  const shouldCollapse = hiddenStepsCount >= 3
-  const [stepsCollapsed, setStepsCollapsed] = useState(true)
+  // Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate): replace the
+  // single shared collapse boolean — where one click on ANY collapsed summary
+  // row toggled the whole flag and expanded EVERY finished card (the #1 felt
+  // bug, violates D-01 click-to-expand) — with a per-step expanded Set keyed
+  // on the SAME `stepKeyOf` identity the rail snum + dedup use. Membership in
+  // the Set means "this finished step is expanded to its full body"; absence
+  // means "folded to its one-line essence". The prior >=3 collapse gate is
+  // GONE — EVERY finished step folds from step 1 (Focus Mode from the very
+  // first finished tool). The identity scheme survives the
+  // preparing->running->done id mutation (075.9) and a reload (state is
+  // reconstructed from `toolCalls` each render). State stays component-local
+  // and provider-agnostic — no StreamsProvider/api.ts/backend change.
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set())
+  const expandStep = (key: string) => setExpandedSteps((prev) => new Set(prev).add(key))
+  const collapseStep = (key: string) =>
+    setExpandedSteps((prev) => {
+      const n = new Set(prev)
+      n.delete(key)
+      return n
+    })
+  // Skill collapsed rows have no stepKey identity in toolStepNumber; give them
+  // a stable composite key so a skill row is individually expandable too and a
+  // tool-row click NEVER expands a skill row (or any other tool row).
+  const skillStepKey = (activation: SkillActivation) => `skill-${activation.occurredAt}`
 
   // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
   // collapsed items) as data-iteration-min so future readers can see the
@@ -419,62 +567,55 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
     return iters.length > 0 ? Math.min(...iters) : undefined
   })()
 
+  // Phase 095 Plan 06: under interleaved partial-expand the contiguous
+  // collapsed block can break, so the data-iteration-min hint can no longer be
+  // hard-coded at i === 0. Compute the FIRST still-collapsed earlier step
+  // (i < activeIndex, kind === 'tool', not in expandedSteps) and put the hint
+  // on that row only.
+  const firstCollapsedToolIndex = (() => {
+    if (activeIndex === -1) return -1
+    for (let i = 0; i < activeIndex; i++) {
+      const it = displayItems[i]
+      if (it.kind === "tool" && !expandedSteps.has(stepKeyOf(it.tc, i))) return i
+    }
+    return -1
+  })()
+
   // Phase 075.7 UAT fix (Bug D): RunCard.tsx wraps this component and owns
   // the outer rounded frame, sticky header (run summary + timer + counter +
   // brand-pulse avatar), expand/collapse state, and shimmer. ToolCallPanel
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
-              Per-step result-summary rows replace the prior aggregate
-              "Show N earlier steps" toggle. Collapsed past steps render
-              as one-line `→ {summary}` rows inline (the sketch D3
-              behavior — "while a run is in flight, completed tool calls
-              auto-collapse to a one-line summary showing their result,
-              not their args"). The aggregate Show-toggle is dropped per
-              PLAN.md Task 4 pick.
-              The "Hide earlier steps" toggle remains visible only when
-              the user has opted into the full-expanded view, so they
-              can re-fold without losing the affordance. */}
-          {shouldCollapse && !stepsCollapsed && (
-            <div
-              key="expanded-steps-collapse"
-              data-testid="expanded-steps-collapse"
-              className="pt-2.5"
-            >
-              <button
-                type="button"
-                onClick={() => setStepsCollapsed(true)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
-              >
-                <ChevronDown className="w-3.5 h-3.5" />
-                <span>Hide earlier steps</span>
-              </button>
-            </div>
-          )}
+          {/* Phase 095 Plan 06 (GAP-095-01 + GAP-095-03 un-gate):
+              EVERY finished step before the active one folds to a one-line
+              `→ {result}` essence row (Focus Mode from step 1 — no >=3 gate).
+              Clicking ONE essence row adds ONLY that row's key to
+              `expandedSteps`, so it alone expands to its full body; the other
+              finished essence rows stay folded (closes the fold-all bug). The
+              prior aggregate "Hide earlier steps" toggle (re-folded ALL) is
+              gone — each expanded earlier step gets its own per-row re-collapse
+              control instead (rendered in the full-body branch below). The
+              iteration divider above the active step still derives
+              prevToolIteration from the LAST collapsed-but-rendered item
+              (Pitfall 6 / Landmine L5 mitigation preserved). */}
           {displayItems.map((item, i) => {
-            // Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
-            // When shouldCollapse + stepsCollapsed, past steps
-            // (positions 0..activeIndex-1) render as one-line result-
-            // summary rows via summarizeToolCall(tc). Clicking the row
-            // expands the full view (sets stepsCollapsed=false).
-            // The iteration divider above the active step still derives
-            // prevToolIteration from displayItems[i-1] (the LAST
-            // collapsed-but-rendered item) — the iter-N → iter-(N+1)
-            // boundary above the active step continues to fire
-            // (Pitfall 6 / Landmine L5 mitigation preserved).
-            if (shouldCollapse && stepsCollapsed && i < activeIndex) {
+            if (
+              i < activeIndex &&
+              (item.kind !== "tool" || !expandedSteps.has(stepKeyOf(item.tc, i)))
+            ) {
               if (item.kind === 'tool') {
                 const collapsedTc = item.tc
+                const collapsedKey = stepKeyOf(collapsedTc, i)
                 const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
                 return (
                   <button
-                    key={`step-summary-${i}-${collapsedTc.clientKey ?? collapsedTc.id ?? collapsedTc.name}`}
+                    key={`step-summary-${i}-${collapsedKey}`}
                     type="button"
-                    onClick={() => setStepsCollapsed(false)}
+                    onClick={() => expandStep(collapsedKey)}
                     data-testid="step-summary-row"
-                    data-iteration-min={i === 0 ? collapsedIterationMin : undefined}
-                    aria-label={`Expand to view ${hiddenStepsCount} earlier steps`}
+                    data-iteration-min={i === firstCollapsedToolIndex ? collapsedIterationMin : undefined}
+                    aria-label="Expand this step"
                     className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
                   >
                     <span className="opacity-50 flex-shrink-0">→</span>
@@ -484,12 +625,13 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
               }
               // Skill rows in collapsed Focus Mode: keep them visible as a
               // single compact line so the user still sees the activation
-              // happened mid-run.
+              // happened mid-run. A skill row expands ONLY its own composite
+              // key — a tool-row click never reaches it.
               return (
                 <button
                   key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
                   type="button"
-                  onClick={() => setStepsCollapsed(false)}
+                  onClick={() => expandStep(skillStepKey(item.activation))}
                   className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
                 >
                   <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
@@ -499,6 +641,9 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                 </button>
               )
             }
+            // Phase 095 Plan 06: a skill row whose key IS in expandedSteps (or
+            // any skill row at/after the active index) falls through to the
+            // full SkillRow render below.
             if (item.kind === 'skill') {
               return (
                 <div key={`skill-${i}-${item.activation.occurredAt}`}>
@@ -523,13 +668,15 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             const tc = item.tc
             // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
-            // 075.6 Plan 03 / Req #6: drop the narrow `tc.name === "analyze_document"`
-            // gate. Any sub-agent run's live `m.sub_agent.content` (already accumulated
-            // server-side via sub_agent_delta events for ALL sub-agent kinds) now
-            // surfaces inside the parent tool row that triggered it. Precedence rule
-            // unchanged: tool-scoped tc.sub_agent wins over message-scoped subAgent prop.
-            const agentState: SubAgentState | undefined =
-              tc.sub_agent ?? subAgent
+            // Phase 095 Plan 03 Task 1 (D-05 root fix): the sub-agent now lives
+            // ONLY on its owning tool_call (StreamsProvider onSubAgentStart stamps
+            // it onto the analyze_document owner; the single-slot message-scoped
+            // live-write is gone). The old dual source (tool-scoped OR the
+            // message-scoped prop fallback) was the double-render ROOT — collapsed
+            // to the tool-scoped value alone so a sub-agent body can never render
+            // twice (once as the tool body, once via the message-scoped fallback).
+            // The message-scoped `subAgent` prop is no longer read on this path.
+            const agentState: SubAgentState | undefined = tc.sub_agent
 
             // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
             // Applied to the per-tool wrapper when the tool is running or
@@ -537,6 +684,33 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             // + soft gradient backdrop); the bottom shimmer reuses
             // .tool-progress-bar positioned absolute at the wrapper's bottom.
             const isToolActive = tc.status === "running" || tc.status === "preparing"
+
+            // Phase 095 Plan 03 Task 2 (sketch 014 rail): this tool's step
+            // number + node state for the StepRow wrapper. `isLastTool` hides
+            // the connecting spine on the final rail row.
+            const stepKey = stepKeyOf(tc, i)
+            const snum = toolStepNumber.get(stepKey) ?? 0
+            const node = nodeStateOf(tc)
+            const isLastTool = snum === deduplicatedToolCalls.length
+
+            // Phase 095 Plan 06: an EARLIER finished step (i < activeIndex)
+            // that the user expanded out of its essence row. It renders its
+            // full body here and gets a per-row re-collapse control so it can
+            // fold back to its essence independently (the Set shrinks for this
+            // key only — no aggregate "Hide earlier steps" anymore).
+            const isExpandedEarlierStep =
+              activeIndex !== -1 && i < activeIndex && expandedSteps.has(stepKey)
+
+            // Phase 095 Plan 06 (GAP-095-03 essence): a finished tool that is
+            // NOT individually expanded rests as a single essence line
+            // (sketch 014 D-01). This covers the all-done / reload case
+            // (activeIndex === -1) and any finished tool after the active one —
+            // the in-flight earlier-step fold is handled by the collapsed
+            // branch above. Active/preparing tools never collapse (the live
+            // head + streaming body always render). Mutually exclusive with
+            // isExpandedEarlierStep (that requires the key IN expandedSteps).
+            const isFinished = tc.status === "done" || tc.status === "interrupted"
+            const isFinishedCollapsed = isFinished && !expandedSteps.has(stepKey)
 
             return (
               <div
@@ -563,15 +737,58 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                     data-iteration={tc.iteration}
                   >
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                    {/* Phase 095 Plan 03 Task 2 (D-04 relabel): "Round N", not
+                        "Step N". This within-run divider groups agent ROUNDS
+                        (tc.iteration); after D-04, "Step" means exactly one
+                        visible action (the rail snum / unifiedStepCount), so
+                        the round divider is relabeled to free that word. */}
                     <span className="text-[10px] font-semibold text-muted-foreground/70 tracking-wider uppercase">
-                      Step {tc.iteration + 1}
+                      Round {tc.iteration + 1}
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
                   </div>
                 ) : i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
-                {tc.name === "execute_code" ? (
+                {/* Phase 095 Plan 03 Task 2: the EXISTING tool head + body
+                    (reused verbatim — no second body system, G4) rendered onto
+                    the borderless numbered status-node rail (sketch 014). */}
+                <StepRow snum={snum} node={node} isLast={isLastTool}>
+                {/* Phase 095 Plan 06: per-row re-collapse for an earlier step
+                    the user expanded out of its essence. Folds THIS row back to
+                    its one-line essence (the Set shrinks for this key only). */}
+                {isExpandedEarlierStep && (
+                  <button
+                    type="button"
+                    onClick={() => collapseStep(stepKey)}
+                    data-testid="step-recollapse"
+                    aria-label="Hide this step"
+                    className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  >
+                    <ChevronUp className="w-3 h-3" />
+                    <span>Hide</span>
+                  </button>
+                )}
+                {isFinishedCollapsed ? (
+                  /* Phase 095 Plan 06 (GAP-095-03 essence): the single
+                     essence line for a finished, not-expanded tool. Clicking
+                     it expands this card's full body (adds its key to
+                     expandedSteps). Replaces the old head-row + separate
+                     ToolResultBlock resting pair with ONE result-bearing line.
+                     Covers execute_code too (a done code card rests as one
+                     result line, not args + a separate result row). */
+                  <>
+                    <ToolEssenceLine tc={tc} onExpand={() => expandStep(stepKey)} />
+                    {/* Phase 075.1 Atom D transparency line stays visible at
+                        rest — a silent sub-agent model downgrade is a trust
+                        signal, not a detail to hide behind a click. */}
+                    {tc.sub_agent_model && (
+                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground/70 italic font-mono">
+                        Sub-agent: {tc.sub_agent_model}
+                      </div>
+                    )}
+                  </>
+                ) : tc.name === "execute_code" ? (
                   // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL
                   // execute_code statuses (preparing/running/done). Previously
                   // the `tc.status !== "preparing"` guard caused a full
@@ -616,7 +833,14 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                           </span>
                         ) : (
                           <>
-                            <span className="font-semibold text-foreground/80">
+                            {/* Phase 095 Plan 06 (sketch 014 bloom): the ACTIVE
+                                (running) step's verb text leans PRIMARY (the
+                                sketch `.step.active .ess-text { color: primary }`);
+                                a finished/expanded verb stays the calm foreground. */}
+                            <span className={cn(
+                              "font-semibold",
+                              tc.status === "running" ? "text-primary" : "text-foreground/80",
+                            )}>
                               {tc.status === "running" ? `Running ${toolLabel(tc.name)}` : toolLabel(tc.name)}
                             </span>
                             {summary && (
@@ -745,15 +969,20 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                     {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
 
-                    {/* Result block (all tools) */}
+                    {/* Result block (all tools). Phase 095 Plan 06: a finished
+                        tool reaches this branch only when it is EXPANDED (its
+                        key is in expandedSteps; the resting essence line is
+                        ToolEssenceLine above). Open the result body directly so
+                        there is no redundant nested `→ summary` essence row. */}
                     {(tc.status === "done" || tc.status === "interrupted") && tc.result && !agentState && (
-                      <ToolResultBlock tc={tc} />
+                      <ToolResultBlock tc={tc} defaultOpen={expandedSteps.has(stepKey)} />
                     )}
 
                     {/* Sub-agent block (live or restored) */}
                     {agentState && <SubAgentBlock agent={agentState} />}
                   </>
                 )}
+                </StepRow>
                 {/* Phase 075.8 Task 3 (sketch 002 D6): bottom progress shimmer
                     on every active tool — both the execute_code branch and the
                     generic-tool branch. Absolute-positioned against the

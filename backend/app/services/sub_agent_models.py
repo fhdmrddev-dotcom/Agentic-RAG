@@ -7,7 +7,7 @@ so task_service.py can use the same safety net WITHOUT modifying sub_agent_servi
 The rule: when a user switches active_provider but doesn't update sub_agent_model,
 the stale picker would route (e.g.) a Google model name through an OpenAI client → 400.
 This helper validates the resolved candidate against the active provider's
-llm_models list and falls back to a provider-safe default if it doesn't match.
+available_models list and falls back to a provider-safe default if it doesn't match.
 
 Phase 085 Plan 05 (BUG-260528-01): hardened so the safety check fires on EVERY
 resolution path — not just when override_model is truthy. The production call
@@ -17,11 +17,26 @@ user toggled Settings → active_provider="anthropic" but user_settings.llm_mode
 was still "gpt-4.1" (stale-cross-provider), the resolver leaked that name
 through to the Anthropic client → 404.
 
+Phase 093 Plan 03 (D-06): the safety net was STILL silently dead — it read a
+``user_settings`` attribute that does NOT exist on ``UserEffectiveSettings``
+(the real field is ``available_models: list[str]``).
+``getattr`` always returned ``None`` → ``_active_models_list`` was always ``[]``
+→ the validation branch never fired → ``_SUB_AGENT_MODEL_DEFAULTS`` never engaged.
+This module now reads the real ``available_models`` list, so the cross-provider
+mismatch fallback finally works.
+
 Fix shape: ALWAYS validate the final candidate against _active_models_list.
 If validation fails AND _SUB_AGENT_MODEL_DEFAULTS has a non-empty entry for
 the active provider, return that provider default. If the provider's default
 is intentionally empty (openrouter, ollama), keep the candidate as best-effort
-with a WARNING log — those providers are flexible by design.
+with a WARNING log — those providers are flexible by design. When
+``available_models`` is empty (fresh settings row) there is nothing to validate
+against, so the candidate passes through unchanged — the fallback fires ONLY on
+a genuine cross-provider mismatch (a known available_models list that excludes
+the candidate), never on an unrecognised id with no list to check it against.
+
+Phase 093 also adds ``resolve_workflow_ctx_model`` — the resolve-never-mutate
+(D-05) wrapper that the Wave-2 ctx-build sites thread onto ``wf_ctx.model``.
 """
 from __future__ import annotations
 
@@ -53,7 +68,7 @@ def resolve_sub_agent_model_safely(
 
     Args:
         user_settings: per-user effective settings (carries active_provider +
-            llm_model + llm_models comma-separated list).
+            llm_model + available_models: list[str]).
         override_model: explicit sub-agent model the caller wants to use, if any.
             ``None`` is the production call path (D-085-11 — no LLM-controlled
             override in v1).
@@ -67,16 +82,16 @@ def resolve_sub_agent_model_safely(
         / ``settings.llm_model`` is non-empty.
     """
     _active_provider = (user_settings.active_provider if user_settings else "") or ""
+    # D-06: read the REAL field. ``available_models`` is already list[str] on
+    # UserEffectiveSettings (models/user_settings.py:100) — no comma-split needed.
+    # The old code read a ``user_settings`` attribute that does not exist on the
+    # model, so this list was always empty and the validation below never fired.
     _active_models = (
-        user_settings.llm_models
-        if (user_settings and getattr(user_settings, "llm_models", None))
-        else ""
-    )
-    _active_models_list = (
-        [m.strip() for m in _active_models.split(",") if m.strip()]
-        if _active_models
+        user_settings.available_models
+        if (user_settings and getattr(user_settings, "available_models", None))
         else []
     )
+    _active_models_list = list(_active_models)
     _provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(_active_provider, "")
 
     # 1. Build candidate via the existing precedence chain.
@@ -114,6 +129,41 @@ def resolve_sub_agent_model_safely(
         )
         return candidate
 
-    # 3. Candidate validates (or no llm_models list is available to validate
-    #    against — common for fresh user_settings rows). Return as-is.
+    # 3. Candidate validates (or no available_models list is available to
+    #    validate against — common for fresh user_settings rows). Return as-is.
     return candidate
+
+
+def resolve_workflow_ctx_model(user_settings: "UserEffectiveSettings | None") -> str:
+    """Effective model for a workflow ctx, resolved from the active provider (D-04).
+
+    Resolve, NEVER mutate (D-05): does NOT touch saved ``llm_model`` /
+    ``override_provider`` / ``available_models`` on the passed object. It only
+    reads them and returns a safely-resolved model string.
+
+    The Wave-2 plans (093-04 live kickoff, 093-05 resume + Continue) thread this
+    return value onto ``wf_ctx.model`` at the 3 ctx-build sites. Phase-level
+    precedence is unchanged downstream: ``phase.config.model or ctx.model``
+    (phase_types._effective_model) — this resolves ``ctx.model`` itself.
+
+    ``user_settings`` is ``None`` on resume / Continue today (Open Q2, deferred
+    to the Wave-2 plans) → returns ``""`` → only ``phase.config.model`` applies
+    on those paths until the owner's effective settings are loaded there.
+
+    Args:
+        user_settings: the run owner's effective settings, or ``None``.
+
+    Returns:
+        A safely-resolved model name string, or ``""`` when ``user_settings`` is
+        ``None``. The returned string runs through
+        ``resolve_sub_agent_model_safely`` so a stale cross-provider
+        ``llm_model`` falls back to the active provider's default rather than
+        leaking to the wrong client.
+    """
+    if user_settings is None:
+        return ""
+    return resolve_sub_agent_model_safely(
+        user_settings,
+        override_model=None,
+        fallback_model=getattr(user_settings, "llm_model", None),
+    )

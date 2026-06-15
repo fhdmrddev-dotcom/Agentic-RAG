@@ -100,6 +100,59 @@ async def get_thread_todos(
     ]
 
 
+# Terminal workflow_runs statuses (byte-matched to threads.py:815
+# _TERMINAL_WORKFLOW and the workflow_runs_status_check CHECK constraint).
+_TERMINAL_WORKFLOW_STATUSES = ("completed", "failed", "cancelled")
+
+
+async def _prompt_run_is_live(pool, run_id_text: str | None) -> bool:
+    """D-06 (BUG-260605-01): liveness of the run that owns an ask_user prompt.
+
+    The prompt payload's ``run_id`` lives in ONE of two ID namespaces (the F10
+    dual namespace, runs.py:521-567): a ``workflow_runs.id`` (harness
+    llm_human_input prompts) or a ``runs.run_id`` (Deep ask_user prompts).
+    Resolve in that order and apply the namespace's own liveness rule:
+
+      - harness: live iff status is non-terminal AND the run is still the
+        thread's ``active_workflow_run_id`` anchor — mirroring the runs.py
+        anchor-confirm a submit would hit (a non-anchor prompt 404s there, so
+        serving it is dishonest).
+      - Deep: live iff ``runs.status = 'streaming'`` (a pending Deep prompt
+        only exists while the agent loop blocks inside a streaming run).
+      - unknown/legacy (neither namespace resolves, or no run_id at all):
+        fail OPEN — never break legacy prompts (Pitfall 6).
+
+    This only NARROWS the owner-scoped row set the caller already fetched
+    (ownership gate runs first, unchanged); the lookups read run STATUS for
+    prompts the user owns — no cross-user reads (T-096-03-02). Constant query
+    strings, $-parameterized ids only (T-096-03-03); the uuid columns are
+    compared via ``::text`` casts so malformed ids can never raise.
+    """
+    if not run_id_text:
+        return True  # legacy prompt rows carry no run_id — fail-open
+    wf_row = await pool.fetchrow(
+        """
+        SELECT wr.status, t.active_workflow_run_id
+        FROM workflow_runs wr
+        LEFT JOIN threads t ON t.id = wr.thread_id
+        WHERE wr.id::text = $1
+        """,
+        run_id_text,
+    )
+    if wf_row is not None:
+        if wf_row["status"] in _TERMINAL_WORKFLOW_STATUSES:
+            return False
+        anchor = wf_row["active_workflow_run_id"]
+        return anchor is not None and str(anchor) == str(run_id_text)
+    deep_row = await pool.fetchrow(
+        "SELECT status FROM runs WHERE run_id::text = $1",
+        run_id_text,
+    )
+    if deep_row is not None:
+        return deep_row["status"] == "streaming"
+    return True  # unknown namespace — fail-open (never eat legacy prompts)
+
+
 @router.get("/ask_user/pending")
 async def get_pending_ask_user(
     thread_id: str,
@@ -141,6 +194,13 @@ async def get_pending_ask_user(
     for r in rows:
         tcs = r["tool_calls"] or []
         payload = tcs[0] if tcs else {}
+        # D-06 (BUG-260605-01): liveness filter — never return a prompt whose
+        # owning run is dead (BOTH ID namespaces; legacy prompts fail open).
+        # Closes every historical orphan the terminal-site cleanup (new runs,
+        # harness_engine.py) can never touch. Pending prompts per thread are
+        # ~0-2, so the per-prompt status lookups are negligible.
+        if not await _prompt_run_is_live(pool, payload.get("run_id")):
+            continue
         result.append({
             "message_id": str(r["id"]),
             "tool_call_id": payload.get("tool_call_id"),
@@ -148,6 +208,9 @@ async def get_pending_ask_user(
             "options": payload.get("options"),
             "timeout_seconds": payload.get("timeout_seconds"),
             "run_id": payload.get("run_id"),
+            # D-12: the prior-phase draft the user is confirming (defensive .get —
+            # older prompt rows predate the draft field → None, harmless).
+            "draft": payload.get("draft"),
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
         })
     return result

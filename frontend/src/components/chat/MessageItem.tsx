@@ -1,7 +1,17 @@
-import { memo, useRef } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
+import { memo, useRef, useState } from "react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
+// Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
+// workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
+// thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered
+// from /messages, BUG-260528-01) via the cap_paused SSE + the mount reconcile.
+import { useWorkflowLockForThread } from "@/providers/StreamsProvider"
+// Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
+// producer runs row + returns its id; re-subscribe its live stream (per-thread
+// keyed, additive — mirrors panelOpenSignal).
+import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
+import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
@@ -42,6 +52,34 @@ function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
     toolCalls?.some(
       (tc) => tc.name === "ask_user" && (tc.status === "running" || tc.status === "interrupted"),
     ) ?? false
+  )
+}
+
+/**
+ * Phase 095.1 Plan 05 (D-095.1-06) — the FLAT "Generated files" list.
+ *
+ * REVERSES the 095-05/08 hero/working split (operator-approved CONTEXT.md
+ * decision): no hero crown caption, no hero/working split, no collapse
+ * group. Output files render as ONE equal flat list — every file an equal
+ * `OutputFileCard` row, all visible, all downloadable. The frontend IGNORES the
+ * backend `is_hero` flag entirely (no read here) — it stays WRITTEN-BUT-UNREAD,
+ * harmless and forward-compatible (no backend change). The url-less "Download
+ * unavailable" dead-state affordance is an ORTHOGONAL honesty fix that lives in
+ * OutputFileCard and is KEPT. No local collapse state, so this sub-component no
+ * longer perturbs MessageItem's hook order in any new way.
+ */
+type FinalOutputFile = NonNullable<Message["finalOutputFiles"]>[number]
+
+function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3.5" data-testid="final-outputs-panel">
+      <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted-foreground mb-2.5">Generated files</div>
+      <div className="space-y-1.5">
+        {files.map((f, i) => (
+          <OutputFileCard key={`gen-${i}`} file={f} />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -96,6 +134,11 @@ interface Props {
   onSendMessage?: (content: string) => void
   /** Phase 063 (Pattern 4 / D-063-04): handler for the Resume button shown only on failed assistant runs. */
   onResume?: (message: Message) => void
+  /** Phase 092 (CONT-01 / D-07): true when this is the last assistant message —
+   *  gates the inline Continue card (cap_paused is delivered out-of-band on the
+   *  thread lock, not on this message's runStatus) so it appears once, at the
+   *  bottom where the run paused. */
+  isLastAssistant?: boolean
 }
 
 /**
@@ -150,8 +193,14 @@ function dedupParagraphs(text: string): string {
 // only when the message actually changed. Named inner function preserves
 // DevTools display name. Target: ≥30% MessageItem render-cost reduction on
 // 50-message thread during streaming (verified via React DevTools profiler).
-export const MessageItem = memo(function MessageItem({ message, isStreaming, onSendMessage, onResume }: Props) {
+export const MessageItem = memo(function MessageItem({ message, isStreaming, onSendMessage, onResume, isLastAssistant }: Props) {
   const isUser = message.role === "user"
+  // Phase 092 (CONT-01 / D-07): the per-thread workflow lock for THIS message's
+  // owning thread (out-of-band cap_paused state). The Continue card renders only
+  // on the last assistant message when the lock reports cap_paused.
+  const workflowLock = useWorkflowLockForThread(message.thread_id ?? null)
+  const [continuePending, setContinuePending] = useState(false)
+  const [continueExhausted, setContinueExhausted] = useState(false)
 
   if (isUser) {
     return (
@@ -171,6 +220,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
   const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
   const allToolsDone = hasAnyTools && !hasRunningTools
+  // Phase 095.1 Plan 05 (D-095.1-07): deliverable-aware Resume gate predicate.
+  // True when this run already produced execute_code output files (persisted +
+  // reload-reconstructed onto finalOutputFiles, api.ts) before a later iteration
+  // failed/timed_out — so Resume must NOT be offered (the user's work is already
+  // on disk). Closes BUG-260518-01.
+  const producedDeliverables = (message.finalOutputFiles?.length ?? 0) > 0
   // Phase 067.1 Plan 02: extend activeTool to include "preparing" so outerBannerLabel
   // can render the ~2s sandbox-warmup copy ("Preparing code…") before tool_start fires.
   // Mirror of ToolCallPanel.tsx:540 active-tool detection (PATTERNS.md).
@@ -228,7 +283,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const stickyLabelRef = useRef<string | null>(null)
   const isMessageStreaming = message.runStatus === "streaming"
   const computedLabel = isMessageStreaming
-    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
+    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false, workflowLock != null)
     : null
   if (isMessageStreaming && computedLabel !== null) {
     stickyLabelRef.current = computedLabel
@@ -337,8 +392,17 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 stopped), completed, streaming, or undefined (DB-loaded
                 historical messages without run metadata). Same onResume
                 callback re-POSTs the original prompt with full conversation
-                context (today's failed-state Resume code path). */}
-            {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && (
+                context (today's failed-state Resume code path).
+
+                Phase 095.1 Plan 05 (D-095.1-07): deliverable-aware. A run that
+                already produced its deliverables (execute_code output files,
+                persisted + reload-reconstructed onto finalOutputFiles) before a
+                later iteration failed/timed_out does NOT falsely offer Resume —
+                the work the user wanted is already on disk. Closes
+                BUG-260518-01 (the genuine-terminal case 075 didn't cover).
+                "Deliverables" = execute_code output files specifically; we do
+                NOT count workspace_write files here (out of scope). */}
+            {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && !producedDeliverables && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -350,12 +414,74 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 Resume
               </Button>
             )}
+
+            {/* Phase 092 (CONT-01 / D-07): inline Continue card — ADDITIVE
+                SIBLING of the Resume button. Gated on cap_paused delivered
+                OUT-OF-BAND via the thread lock (NOT message.runStatus — the
+                role='system' carrier row is filtered from /messages,
+                BUG-260528-01). Renders once, on the last assistant message
+                where the run paused. Amber = paused/needs-you (design skill).
+                When 0 continues remain, show the stop message instead of a
+                clickable button (the 3-cap, D-06). */}
+            {message.role === "assistant" &&
+              isLastAssistant &&
+              workflowLock?.capPaused && (
+                <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2">
+                  <span className="text-xs text-amber-400">
+                    {continueExhausted || workflowLock.continuesRemaining <= 0
+                      ? "Reached the Continue limit — this run is stopped. Start a new message to keep going."
+                      : "Reached the iteration limit — some tools haven't run yet."}
+                  </span>
+                  {!continueExhausted && workflowLock.continuesRemaining > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={continuePending}
+                      onClick={async () => {
+                        if (!workflowLock.runId) return
+                        setContinuePending(true)
+                        try {
+                          const res = await continueRun(workflowLock.runId)
+                          if (res.status === "refused") {
+                            // D-06: the 3-cap was hit — show the stop message, no throw.
+                            setContinueExhausted(true)
+                          } else if (res.producer_run_id && message.thread_id) {
+                            // Facet C (092-07): the Harness re-drive minted a FRESH
+                            // producer runs row (the original stream EXPIREd) — the
+                            // /continue 200 body carries its id. Re-subscribe its
+                            // live stream (per-thread keyed, idempotent) so the panel
+                            // shows the resumed run's events with no page action.
+                            requestProducerResubscribe({
+                              threadId: message.thread_id,
+                              producerRunId: res.producer_run_id,
+                            })
+                          }
+                        } catch (err) {
+                          console.error("continueRun failed:", err)
+                        } finally {
+                          setContinuePending(false)
+                        }
+                      }}
+                      className="self-start text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-400/10"
+                      aria-label="Continue run"
+                      data-testid="continue-run"
+                    >
+                      {continuePending ? (
+                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                      ) : (
+                        <Play className="w-3 h-3 mr-1.5" />
+                      )}
+                      Continue ({workflowLock.continuesRemaining} left)
+                    </Button>
+                  )}
+                </div>
+              )}
           </div>
         ) : isStreaming && !hasAnyTools ? (
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false)}</span>
+            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null)}</span>
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
@@ -420,27 +546,17 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             inside ToolCallPanel / tool-bodies/ExecuteCodeBody (Phase 075.7
             rename). Closes the 12-download-
             links-for-1-desired-file cumulative-repeat symptom. */}
+        {/* Phase 095.1 Plan 05 (D-095.1-06) — FLAT "Generated files" list.
+            FinalOutputsPanel renders every file as ONE equal OutputFileCard row
+            (no hero crown, no hero/working split, no collapse group) — reverses
+            the 095-05/08 visual per the operator-approved CONTEXT.md decision.
+            ALL files are present + downloadable; the backend `is_hero` flag is
+            IGNORED by the frontend (written-but-unread, no backend change). The
+            empty-state guard (`finalOutputFiles.length > 0`) and the
+            `data-testid="final-outputs-panel"`
+            are preserved (D-075.2-07 + the existing test). */}
         {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
-          <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
-            <div className="text-xs font-semibold mb-2 text-foreground/80">Final outputs</div>
-            {/* Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): swap the
-                plain <li>{filename}</li> rows for the shared OutputFileCard so
-                the pinned panel matches the per-cell ExecuteCodeBody card
-                (Phase 075.7 rename of the legacy execute-code wrapper)
-                (icon + filename + size badge + ghost-border + hover state +
-                Bearer-fetch download). OutputFileCard renders a plain-filename
-                row (no anchor, no download) for legacy entries that lack
-                `url` (D-075.2-05 back-compat / RESEARCH §Q4). The empty-state
-                guard above (`finalOutputFiles.length > 0`) is preserved per
-                D-075.2-07 — panel does not render when the array is absent
-                or empty. data-testid="final-outputs-panel" is preserved for
-                the existing Plan04 frontend test. */}
-            <div className="space-y-1.5">
-              {message.finalOutputFiles.map((f, i) => (
-                <OutputFileCard key={i} file={f} />
-              ))}
-            </div>
-          </div>
+          <FinalOutputsPanel files={message.finalOutputFiles} />
         )}
         {/* Phase 087-05 (D-05 / chat-panel-seam.md D3) — ADDITIVE reload seam.
             On a rehydrated/terminal message the panel won't replay history, so

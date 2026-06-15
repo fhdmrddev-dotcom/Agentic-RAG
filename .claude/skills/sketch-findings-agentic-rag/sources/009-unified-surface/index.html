@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 009 — Unified Surface (Deep + Harness in one panel)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 009 — Unified Surface (D-094-UNIFY)
+   Q: How do BOTH Deep and Harness live in the one panel, and what is
+      left in the chat? (chat = prompt + final answer + quiet pointer;
+      panel = the live run record — for BOTH modes.)
+   Deliberately REVERSES sketch-001 (Deep's run-card was in the chat).
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+
+.shell { display: grid; grid-template-columns: 52px 1fr clamp(320px, 34%, 440px); height: calc(100vh - 52px); overflow: hidden; }
+.nav-rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.nav-rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.nav-rail .nav-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); cursor: pointer; }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow-y: auto; padding: var(--space-6) var(--space-8) 72px; gap: var(--space-4); }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; }
+.bubble-user { align-self: flex-end; max-width: 78%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); }
+
+/* working line (live) */
+.working { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); }
+.working .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); animation: brandPulse 1.5s var(--ease-out) infinite; flex-shrink: 0; }
+
+/* final answer */
+.answer { display: flex; gap: var(--space-3); }
+.answer .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; }
+.answer .body { font-size: var(--text-sm); line-height: 1.65; color: var(--color-text); }
+.answer .body b { color: var(--color-text); }
+
+/* ── A: whisper pointer ── */
+.whisper { display: inline-flex; align-items: center; gap: 7px; margin-top: var(--space-3); font-size: var(--text-xs); color: var(--color-text-dim); cursor: pointer; padding: 3px 0; border-top: 1px dashed var(--color-border-soft); }
+.whisper:hover { color: var(--color-primary); }
+.whisper .pin { font-family: var(--font-mono); }
+.whisper .arrow { color: var(--color-primary); }
+
+/* ── B: receipt card ── */
+.receipt { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-md); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); max-width: 92%; }
+.receipt:hover { border-color: var(--color-primary-glow); background: var(--color-surface-hi); }
+.receipt.harness { border-left: 3px solid var(--color-warning); }
+.receipt.deep { border-left: 3px solid var(--color-primary); }
+.receipt .r-main { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.receipt .r-title { font-weight: 600; font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); }
+.receipt .r-meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.receipt .phase-dots { display: inline-flex; gap: 3px; }
+.receipt .pd { width: 7px; height: 7px; border-radius: 50%; }
+.receipt .open-link { font-size: var(--text-xs); color: var(--color-primary); white-space: nowrap; }
+
+/* ── C: live status line ── */
+.livestatus { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid hsl(38 92% 60% / .35); background: var(--color-warning-dim); border-radius: var(--radius-md); max-width: 92%; cursor: pointer; }
+.livestatus.deep { border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+.livestatus .ls-spark { width: 8px; height: 8px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.2s infinite; flex-shrink: 0; }
+.livestatus.deep .ls-spark { background: var(--color-primary); }
+.livestatus .ls-text { flex: 1; font-size: var(--text-sm); color: var(--color-text); }
+.livestatus .ls-text .mono { color: var(--color-text-muted); font-size: var(--text-xs); }
+.livestatus .ls-open { font-size: var(--text-xs); color: var(--color-primary); }
+
+.mode-badge { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: var(--radius-full); }
+.mb-harness { color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); }
+.mb-deep { color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+
+/* ── Panel ── */
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: pulseGlow 1.6s infinite; }
+.panel-head .spacer { flex: 1; }
+.panel-head .head-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); padding-bottom: 72px; }
+
+.run-banner { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+.run-banner .wf-row { display: flex; align-items: center; gap: var(--space-2); }
+.run-banner .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.run-banner .wf-meta { font-size: var(--text-xs); color: var(--color-text-dim); }
+.count-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--space-2); }
+.chip { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border-radius: var(--radius-full); background: var(--color-muted); color: var(--color-text-muted); border: 1px solid var(--color-border-soft); }
+.chip.primary { color: var(--color-primary); background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+
+.st-ico { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--font-mono); }
+.st-done { background: var(--color-success-dim); color: var(--color-success); border: 1.5px solid var(--color-success); }
+.st-run { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); animation: pulseGlow 1.4s infinite; }
+.st-lock { background: transparent; color: var(--color-text-dim); border: 1.5px dashed var(--color-text-dim); }
+.type-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); background: var(--color-secondary); padding: 1px 5px; border-radius: var(--radius-sm); text-transform: uppercase; }
+.tool-chip { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-muted); border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm); }
+
+/* spine cards (from 008-D) */
+.tlD { list-style: none; margin: 0; padding: 0; }
+.tlD > li { position: relative; padding-left: 32px; padding-bottom: 14px; }
+.tlD > li:last-child { padding-bottom: 0; }
+.tlD > li::before { content: ''; position: absolute; left: 11px; transform: translateX(-1px); top: 24px; bottom: -16px; width: 2px; z-index: 0; background: var(--color-border); }
+.tlD > li:last-child::before { display: none; }
+.tlD > li.s-done::before { background: var(--color-success); }
+.tlD > li.s-run::before { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.tlD > li.s-lock::before { background: transparent; border-left: 2px dashed var(--color-text-dim); width: 0; }
+.nodeD { position: absolute; left: 1px; top: 7px; width: 20px; height: 20px; z-index: 2; display: grid; place-items: center; border-radius: 50%; background: hsl(220 40% 8%); }
+.cardD { border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden; }
+.cardD.run { border-color: hsl(38 92% 60% / .5); box-shadow: 0 0 22px hsl(38 92% 60% / .12); }
+.cardD.locked { background: transparent; border: 1px dashed var(--color-border); opacity: .72; }
+.cardD-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); }
+.cardD-head .cb-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.cardD-head .cb-name.dim { color: var(--color-text-dim); font-weight: 500; }
+.cardD-head .cb-sum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.cardD-body { padding: 0 var(--space-3) var(--space-3) var(--space-3); }
+.subrows { display: flex; flex-direction: column; gap: 5px; border-left: 1px solid var(--color-border-soft); }
+.subrow { display: flex; align-items: center; gap: var(--space-2); padding: 5px var(--space-2); border-radius: var(--radius-sm); background: var(--color-surface-hi); font-size: 11.5px; }
+.subrow.run { background: var(--color-warning-dim); }
+.subrow .sa-name { flex: 1; }
+.subrow .sa-stats { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+
+/* Deep RunCard in panel */
+.deepcard { border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden; }
+.deepcard.run { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+.deepcard-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+.deepcard-head .dc-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.toolrow { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: 12px; border-bottom: 1px solid var(--color-border-soft); }
+.toolrow:last-child { border-bottom: none; }
+.toolrow .tr-name { font-family: var(--font-mono); font-size: 11px; color: var(--color-text); }
+.toolrow .tr-sum { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.toolrow.run { background: var(--color-primary-dim); }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3); margin-top: var(--space-4); border-top: 1px dashed var(--color-border-soft); line-height: 1.5; }
+.callout b { color: var(--color-primary); }
+
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); }
+
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 009 · Unified Surface</span>
+  <button class="variant-tab" data-v="A" onclick="setVariant('A')">A · Whisper pointer</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Receipt card</button>
+  <button class="variant-tab active" data-v="C" onclick="setVariant('C')">C · Live-status → resolves ★</button>
+</nav>
+
+<div class="shell">
+  <div class="nav-rail">
+    <div class="logo"></div>
+    <div class="nav-ico active">💬</div>
+    <div class="nav-ico">⚙</div>
+    <div class="nav-ico">▤</div>
+  </div>
+  <div class="chat" id="chatCol"></div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="pulse-dot" id="panelDot"></span>
+      <span class="ph-title">Workspace</span>
+      <span class="spacer"></span>
+      <span class="head-tag" id="panelTag">harness run</span>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+</div>
+
+<div role="status" aria-live="polite" class="sr-only" id="announcer"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">run</span>
+  <div class="toolbar-toggle" id="rtToggle">
+    <button data-rt="harness" class="on" onclick="setRT('harness')">Harness</button>
+    <button data-rt="deep" onclick="setRT('deep')">Deep</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <span style="opacity:.6">state</span>
+  <div class="toolbar-toggle" id="stToggle">
+    <button data-st="live" class="on" onclick="setST('live')">Live</button>
+    <button data-st="done" onclick="setST('done')">Done</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ─── data ─── */
+const RUN = {
+  harness: {
+    badge: ['mb-harness','Harness'], promptKB: 'Literature review · DBA corpus',
+    prompt: 'Review the literature on leadership style, organizational culture, and employee engagement.',
+    name: 'Literature review', meta: 'DBA · Fahed Mrad Chapters 1-4',
+    counts: ['3 phases','4 agents','48 sources','18s'], dots: ['done','done','done'],
+    livePhase: 'Review (2 / 3)',
+    answer: '<b>Integrated literature review.</b> Across the three constructs, the corpus converges on transformational leadership as the strongest correlate of engagement, mediated by culture strength… <span class="text-dim">(48 sources)</span>',
+  },
+  deep: {
+    badge: ['mb-deep','Deep'], promptKB: 'Deep chat',
+    prompt: 'Summarise the demographics in my dissertation and chart the age distribution.',
+    name: 'Assistant turn', meta: 'General · gpt-5.4',
+    counts: ['6 tools','24 sources','12s'], dots: null,
+    livePhase: 'execute_code',
+    answer: '<b>Demographics summary.</b> The sample skews 35–44 (38%) with a male majority (61%). I generated an age-distribution chart — see <span class="text-dim">distribution_chart.png</span> in Files.',
+  },
+};
+
+let CUR_V='C', CUR_RT='harness', CUR_ST='live';
+
+/* ─── panel render (SAME panel, two drivers) ─── */
+function renderPanelHarness(live){
+  const phases = [
+    { name:'Split topic', type:'server step', st: 'done', sum:'4 subtopics · 0.1s' },
+    { name:'Review', type:'parallel agents', st: live?'run':'done', sum: live?'running…':'4 agents · 48 src · 12.3s' },
+    { name:'Merge', type:'AI write', st: live?'lock':'done', sum: live?'locked · queued':'1 call · 4.8s' },
+  ];
+  const subs = [['Leadership style','done'],['Organizational culture','run'],['Employee engagement','run'],['Style × culture','done']];
+  const ico = s => `<span class="st-ico ${ {done:'st-done',run:'st-run',lock:'st-lock'}[s] }">${ {done:'✓',run:'●',lock:'○'}[s] }</span>`;
+  const li = (p) => {
+    if (p.st==='lock') return `<li class="s-lock"><span class="nodeD">${ico('lock')}</span><div class="cardD locked"><div class="cardD-head"><span class="cb-name dim">${p.name}</span><span class="type-tag">${p.type}</span><span class="cb-sum">${p.sum}</span></div></div></li>`;
+    const body = (p.name==='Review' && p.st==='run')
+      ? `<div class="cardD-body"><div class="subrows">${subs.map(s=>`<div class="subrow ${s[1]==='run'?'run':''}">${ico(s[1])}<span class="sa-name">${s[0]}</span></div>`).join('')}</div></div>` : '';
+    return `<li class="s-${p.st}"><span class="nodeD">${ico(p.st)}</span><div class="cardD ${p.st==='run'?'run':''}"><div class="cardD-head"><span class="cb-name">${p.name}</span><span class="type-tag">${p.type}</span><span class="cb-sum">${p.sum}</span></div>${body}</div></li>`;
+  };
+  const r = RUN.harness;
+  return `<div class="run-banner"><div class="wf-row"><span class="mode-badge mb-harness">Harness</span><span class="wf-name">${r.name}</span></div>
+    <div class="wf-meta">${r.meta}</div>
+    <div class="count-strip">${(live?['Phase 2/3','4 agents','3 searches','26 sources']:r.counts.concat('6 searches','16 tool calls')).map(c=>`<span class="chip">${c}</span>`).join('')}</div></div>
+    <ol class="tlD" aria-label="Phases">${phases.map(li).join('')}</ol>
+    <div class="callout"><b>One surface, two drivers.</b> A Harness run renders as the locked phase spine (sketch 008-D). A Deep run renders in this same panel — switch the toolbar to <b>Deep</b>.</div>`;
+}
+function renderPanelDeep(live){
+  const tools = [
+    ['search_documents','done','24 results'],
+    ['search_documents','done','+ 8 results'],
+    ['execute_code', live?'run':'done', live?'running…':'distribution_chart.png'],
+  ];
+  const ico = s => `<span class="st-ico ${ {done:'st-done',run:'st-run'}[s] }">${ {done:'✓',run:'●'}[s] }</span>`;
+  const r = RUN.deep;
+  return `<div class="run-banner"><div class="wf-row"><span class="mode-badge mb-deep">Deep</span><span class="wf-name">${r.name}</span></div>
+    <div class="wf-meta">${r.meta}</div>
+    <div class="count-strip">${(live?['3 tools so far','iteration 3','12 sources']:r.counts).map(c=>`<span class="chip">${c}</span>`).join('')}</div></div>
+    <div class="deepcard ${live?'run':''}">
+      <div class="deepcard-head">${ico(live?'run':'done')}<span class="dc-name">Agent loop</span><span class="cb-sum" style="font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)">${live?'iteration 3':'3 iterations'}</span></div>
+      ${tools.map(t=>`<div class="toolrow ${t[1]==='run'?'run':''}">${ico(t[1])}<span class="tr-name">${t[0]}</span><span class="tr-sum">${t[2]}</span></div>`).join('')}
+    </div>
+    <div class="callout"><b>The reversal.</b> Deep's tool calls used to live as a Run-Card inside the chat (sketch 001). Now they live HERE, in the same panel as Harness — the chat stays pure conversation. Switch to <b>Harness</b> to see the same panel host a workflow.</div>`;
+}
+
+/* ─── chat render (three seam treatments) ─── */
+function chatHTML(){
+  const r = RUN[CUR_RT];
+  const live = CUR_ST==='live';
+  let head = `<div class="chat-head">Thread · ${r.promptKB}</div><div class="bubble-user">${r.prompt}</div>`;
+
+  if (live) {
+    // Live: chat is quiet; the run is READ in the panel. Variant C shows a richer live pointer.
+    if (CUR_V==='C') {
+      return head + `<div class="livestatus ${CUR_RT==='deep'?'deep':''}" onclick="flashPanel()">
+        <span class="ls-spark"></span>
+        <span class="ls-text">Running in workspace — <b>${r.livePhase}</b> <span class="mono">· panel is live</span></span>
+        <span class="ls-open">Open ▸</span></div>`;
+    }
+    return head + `<div class="working"><div class="bot"></div><span>Working in workspace… <span style="color:var(--color-primary);cursor:pointer" onclick="flashPanel()">▸ see panel</span></span></div>`;
+  }
+
+  // Done: prompt + final answer + seam treatment
+  const answer = `<div class="answer"><div class="bot"></div><div class="body">${r.answer}${ CUR_V==='A' ? whisperHTML() : '' }</div></div>`;
+  if (CUR_V==='B') return head + receiptHTML() + answer;            // receipt above answer
+  if (CUR_V==='C') return head + answer + receiptHTML(true);        // resolves to a receipt under the answer
+  return head + answer;                                             // A: whisper is inside the answer body
+}
+function whisperHTML(){
+  const r = RUN[CUR_RT];
+  return `<div class="whisper" onclick="flashPanel()"><span class="pin">↳ ran in workspace · ${r.counts.join(' · ')}</span><span class="arrow">▸</span></div>`;
+}
+function receiptHTML(compact){
+  const r = RUN[CUR_RT];
+  const dots = r.dots ? `<span class="phase-dots">${r.dots.map(()=>'<span class="pd" style="background:var(--color-success)"></span>').join('')}</span>` : '';
+  return `<div class="receipt ${CUR_RT}" onclick="flashPanel()">
+    <div class="r-main">
+      <div class="r-title"><span class="mode-badge ${r.badge[0]}">${r.badge[1]}</span> ${r.name} ${dots}</div>
+      <div class="r-meta">${r.counts.join('  ·  ')}</div>
+    </div>
+    <span class="open-link">Open in workspace ▸</span>
+  </div>`;
+}
+
+/* ─── driver ─── */
+function render(){
+  document.getElementById('chatCol').innerHTML = chatHTML();
+  const live = CUR_ST==='live';
+  document.getElementById('panelBody').innerHTML = CUR_RT==='harness' ? renderPanelHarness(live) : renderPanelDeep(live);
+  document.getElementById('panelDot').style.display = live ? 'block' : 'none';
+  document.getElementById('panelTag').textContent = (CUR_RT==='harness'?'harness':'deep') + (live?' · live':' · done');
+  document.getElementById('announcer').textContent = live ? ('Running in workspace, '+RUN[CUR_RT].livePhase) : 'Run complete';
+}
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); render(); }
+function setRT(rt){ CUR_RT=rt; document.querySelectorAll('#rtToggle button').forEach(b=>b.classList.toggle('on',b.dataset.rt===rt)); render(); }
+function setST(st){ CUR_ST=st; document.querySelectorAll('#stToggle button').forEach(b=>b.classList.toggle('on',b.dataset.st===st)); render(); }
+function flashPanel(){ const p=document.querySelector('.panel'); p.style.transition='box-shadow .3s'; p.style.boxShadow='inset 0 0 0 2px var(--color-primary)'; setTimeout(()=>p.style.boxShadow='',500); }
+render();
+</script>
+</body>
+</html>

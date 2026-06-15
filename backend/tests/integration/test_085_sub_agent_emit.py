@@ -283,3 +283,84 @@ async def test_sub_ctx_previous_files_is_fresh_dict():
     assert sub_ctx.previous_files_in_run is not parent.previous_files_in_run
     # Parent's dict must NOT have been touched
     assert parent.previous_files_in_run == {"sentinel": {"filename": "parent.png"}}
+
+
+# ── WR-04 (091-08) — tools_override reaches the model's schema list ───────────
+
+@pytest.mark.asyncio
+async def test_tools_override_replaces_schema_list_seen_by_model():
+    """When tools_override is given, _stream_one_iteration receives THOSE schemas
+    (not the get_tools-rebuilt list) — so the harness budget cap reaches the model."""
+    from app.services.task_service import run_task_sub_agent
+
+    parent = _parent_ctx()
+    override = [
+        {"type": "function", "function": {"name": "search_documents", "description": "x"}}
+    ]
+    seen_tools = {}
+
+    async def fake_stream(**kwargs):
+        seen_tools["tools"] = kwargs.get("tools")
+        return ("done", [])
+
+    # get_tools would normally rebuild a list; assert the override wins (and get_tools
+    # is NOT consulted for the schema list on this path).
+    get_tools_called = {"n": 0}
+
+    def fake_get_tools(_us):
+        get_tools_called["n"] += 1
+        return [{"type": "function", "function": {"name": "OTHER", "description": "y"}}]
+
+    with patch("app.services.task_service.get_pg_pool", AsyncMock(return_value=MagicMock())), \
+         patch("app.services.task_service.insert_run", AsyncMock()), \
+         patch("app.services.task_service.finalize_run", AsyncMock()), \
+         patch("app.services.task_service.get_tools", side_effect=fake_get_tools), \
+         patch("app.services.task_service._stream_one_iteration", side_effect=fake_stream):
+        await run_task_sub_agent(
+            parent_ctx=parent,
+            description="do x",
+            instructions=None,
+            allowed_tools=["search_documents"],
+            max_steps=5,
+            tools_override=override,
+        )
+
+    assert seen_tools["tools"] is override, "the model must see the override schemas (WR-04)"
+    assert get_tools_called["n"] == 0, "tools_override skips the get_tools rebuild"
+
+
+@pytest.mark.asyncio
+async def test_tools_override_none_is_byte_identical_rebuild():
+    """tools_override=None → the sub-agent rebuilds the allowed_tools-filtered list
+    via get_tools (Deep-Mode/tasks path unchanged — SC#2 byte-identical)."""
+    from app.services.task_service import run_task_sub_agent
+
+    parent = _parent_ctx()
+    seen_tools = {}
+
+    async def fake_stream(**kwargs):
+        seen_tools["tools"] = kwargs.get("tools")
+        return ("done", [])
+
+    def fake_get_tools(_us):
+        return [
+            {"type": "function", "function": {"name": "search_documents", "description": "x"}},
+            {"type": "function", "function": {"name": "NOT_ALLOWED", "description": "y"}},
+        ]
+
+    with patch("app.services.task_service.get_pg_pool", AsyncMock(return_value=MagicMock())), \
+         patch("app.services.task_service.insert_run", AsyncMock()), \
+         patch("app.services.task_service.finalize_run", AsyncMock()), \
+         patch("app.services.task_service.get_tools", side_effect=fake_get_tools), \
+         patch("app.services.task_service._stream_one_iteration", side_effect=fake_stream):
+        await run_task_sub_agent(
+            parent_ctx=parent,
+            description="do x",
+            instructions=None,
+            allowed_tools=["search_documents"],
+            max_steps=5,
+            # tools_override omitted → None (existing callers' behavior)
+        )
+
+    names = [t["function"]["name"] for t in seen_tools["tools"]]
+    assert names == ["search_documents"], "None rebuilds the allowed_tools-filtered list"

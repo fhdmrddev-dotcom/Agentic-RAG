@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -7,6 +7,20 @@ export interface SkillImportResult {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
+
+/** Phase 092 (092-06 / F3): a status-carrying error so the send path can
+ *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
+ *  from a generic failure. Mirrors the existing DownloadError idiom (status +
+ *  name). Thrown only by postMessage — the rest of api.ts keeps its generic
+ *  throws (additive, minimal diff). */
+export class ApiError extends Error {
+  readonly status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+    this.name = "ApiError"
+  }
+}
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
@@ -56,6 +70,12 @@ type MessageResponseDTO = Message & {
   run_id?: string | null
   run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
   reasoning_content?: string | null  // Phase 076.2: DeepSeek thinking mode reasoning_content from backend
+  // Phase 095.1-03 (D-04 model attribution + D-05 true reload timer): the runs
+  // enrich adds these 4 snake fields; the mapper coerces them null → undefined.
+  model?: string | null
+  provider?: string | null
+  started_at?: string | null
+  completed_at?: string | null
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -78,6 +98,13 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     run_id,
     run_status,
     reasoning_content,  // Phase 076.2: DeepSeek thinking mode
+    // Phase 095.1-03 (D-04/D-05): destructure the 4 enrich fields so the snake
+    // started_at/completed_at do NOT leak through ...rest, and coerce null →
+    // undefined (mirroring the runId/runStatus idiom).
+    model,
+    provider,
+    started_at,
+    completed_at,
     ...rest
   } = m
   const mapped: Message = {
@@ -86,6 +113,11 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     runId: run_id ?? undefined,
     runStatus: run_status ?? undefined,
     reasoningContent: reasoning_content ?? undefined,  // Phase 076.2
+    // Phase 095.1-03 (D-04 model attribution + D-05 true reload timer)
+    model: model ?? undefined,
+    provider: provider ?? undefined,
+    startedAt: started_at ?? undefined,
+    completedAt: completed_at ?? undefined,
   }
   if (confidence_level) {
     mapped.confidence = {
@@ -98,7 +130,10 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
   // so reloaded messages display output file download links in the Final Outputs panel.
   // The persisted execute_code result contains output_files with {filename, url}.
   if (mapped.tool_calls?.length) {
-    const outputFiles: { filename: string; url?: string }[] = []
+    // Phase 095 Plan 05 (D-08): carry the persisted `is_hero` flag through reload
+    // reconstruction so a chat reopened the next day re-heroes the same file
+    // (the backend persists it onto each execute_code output_files entry).
+    const outputFiles: { filename: string; url?: string; size?: number; is_hero?: boolean }[] = []
     for (const tc of mapped.tool_calls) {
       if (tc.name === "execute_code" && tc.result) {
         try {
@@ -106,7 +141,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
           if (Array.isArray(r.output_files)) {
             for (const f of r.output_files) {
               if (f.filename) {
-                outputFiles.push({ filename: f.filename, url: f.url })
+                outputFiles.push({ filename: f.filename, url: f.url, size: f.size, is_hero: f.is_hero })
               }
             }
           }
@@ -179,6 +214,13 @@ export async function renameThread(id: string, title: string): Promise<Thread> {
 export interface PostMessageResponse {
   message_id: string
   run_id: string
+  // Phase 095.1-07 (GAP-2): the already-resolved model/provider the backend
+  // wrote to the runs row, surfaced ADDITIVELY on the dispatch response so the
+  // live assistant placeholder shows `{provider} · {model}` in the LIVE moment
+  // (not only after a reload re-reads them via the Plan-03 enrich SELECT).
+  // Optional + nullable to match the wire shape; legacy callers are unaffected.
+  model?: string | null
+  provider?: string | null
 }
 
 /** Phase 062 ActiveRunResponse mirror. Always status='streaming' per D-062-02. */
@@ -276,7 +318,7 @@ export interface StreamCallbacks {
    * `finalOutputFiles`; MessageItem renders the pinned "Final outputs"
    * panel below the per-cell delta panels. Backend wire event type is
    * `final_output_files`. Payload shape: { filename: string; url?: string }[]. */
-  onFinalOutputFiles?: (files: { filename: string; url?: string }[]) => void
+  onFinalOutputFiles?: (files: { filename: string; url?: string; size?: number; is_hero?: boolean }[]) => void
   onSources?: (sources: SourceReference[]) => void
   onCitations?: (citations: Citation[]) => void
   onConfidence?: (
@@ -288,6 +330,18 @@ export interface StreamCallbacks {
   onPlanning?: (iteration: number) => void
   onIterationStart?: (iteration: number) => void
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void
+  /** Phase 092 (CONT-01 / D-07) — NON-terminal `cap_paused` SSE event. The
+   *  iteration cap fired WITH buffered tool calls; the run is paused (NOT
+   *  terminal) and a Continue card should appear. Delivered out-of-band (the
+   *  durable carrier row is a role='system' message filtered from /messages —
+   *  BUG-260528-01), so the consumer renders the Continue affordance from this
+   *  callback + the mount-time getThreadWorkflow reconcile. */
+  onCapPaused?: (info: {
+    runId: string
+    toolNames: string[]
+    continuesUsed: number
+    continuesRemaining: number
+  }) => void
   // ──────────────────────────────────────────────────────────────────────────
   // Phase 086 Plan 01 (PANEL-05) — agent-panel SSE callbacks. The 6 new event
   // types (Phases 084/085) demux to these. Field names are VERIFIED against
@@ -316,6 +370,46 @@ export interface StreamCallbacks {
   /** sub_agent_done TASK variant (has sub_run_id) — distinct from the legacy
    *  analyze_document onSubAgentDone no-arg path. */
   onTaskDone?: (subRunId: string, status: string, summary: string) => void
+  // ──────────────────────────────────────────────────────────────────────────
+  // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle SSE
+  // callbacks. The 6 new event types (phase_started / phase_completed /
+  // phase_transition / gate_failed / run_failed / run_completed) are
+  // wire-emitted by harness_engine.py (FLAT fields, verified) but DROPPED today
+  // (api.ts had ZERO phase branches). They demux to these panel-only callbacks
+  // → a new phasesByThread store slice. ADDITIVE ONLY: the dispatch branches sit
+  // AFTER the Deep switch (cap_paused) and carry NO `return` (cursor-advance
+  // still fires), so every Deep branch stays byte-identical. Provider-agnostic
+  // (honest producer events; no provider branching). Mirror the onCapPaused
+  // typed-object shape.
+  // ──────────────────────────────────────────────────────────────────────────
+  /** phase_started SSE — a phase begins (FLAT phase/phase_index/phase_type). */
+  onPhaseStarted?: (p: { phase: string; phaseIndex: number; phaseType: string }) => void
+  /** phase_completed SSE — a phase finished (FLAT phase/phase_index). */
+  onPhaseCompleted?: (phase: string, phaseIndex: number) => void
+  /** 101.1 review WR-01: phase_failed SSE — a phase ended FAILED (an honest emit
+   *  failure flipped workflow_phases.status='failed'; the engine no longer emits
+   *  phase_completed for it). FLAT phase/phase_index/failure. Panel-only — the
+   *  handler writes phasesByThread, never bucketsBySurface. */
+  onPhaseFailed?: (phase: string, phaseIndex: number, failure?: string) => void
+  /** phase_transition SSE — moved between phases (FLAT from_phase/to_phase/via;
+   *  via==="skip_to_phase" marks the from-phase skipped). */
+  onPhaseTransition?: (from: string, to: string, via: string) => void
+  /** gate_failed SSE — a validation gate failed (FLAT phase/attempt/error). A
+   *  non-terminal attempt → retrying; a terminal one precedes run_failed. */
+  onGateFailed?: (g: { phase: string; attempt: number; error: string }) => void
+  /** run_failed SSE — the run failed (FLAT reason; may be empty → reason_unknown). */
+  onRunFailed?: (reason?: string) => void
+  /** run_completed SSE — the run finished (FLAT status; the done phase already
+   *  flipped via phase_completed — no-op on phase status). */
+  onRunCompleted?: (status?: string) => void
+  /** Phase 101.1-09 (gap 6 / GAP-C / D-11): phase_substep SSE — a discrete emit
+   *  sub-step (forcing → emitting → [recovering] → validating → rendering →
+   *  validated) OR a terminal emit failure. The backend emits all 12 via
+   *  _emit_phase_substep (phase_types.py); Plan 04 shipped the PhaseCard render
+   *  contract but deferred this demux (the G-5 StreamsProvider hot file). FLAT
+   *  payload {phase, phase_index, status?, failure?}. Panel-only (writes
+   *  phasesByThread); the branch carries NO return (cursor still advances). */
+  onPhaseSubstep?: (p: { phase: string; phaseIndex: number; status?: EmitSubStep; failure?: EmitFailure }) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -342,6 +436,11 @@ export async function postMessage(
     model?: string
     provider?: string
     agentMode?: string
+    /** Phase 092 (MODE-01 / D-02) — when set, this send is a Harness kickoff:
+     *  the backend atomically creates a workflow run (create_workflow_run) and
+     *  the producer drives run_workflow instead of the Deep agent loop. Only
+     *  sent when a workflow is picked — a Deep send omits it (byte-identical). */
+    workflowDefinitionId?: string
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -353,9 +452,27 @@ export async function postMessage(
       model: options.model,
       provider: options.provider,
       agent_mode: options.agentMode ?? "default",
+      // D-02: include the kickoff field only when a workflow is selected.
+      ...(options.workflowDefinitionId
+        ? { workflow_definition_id: options.workflowDefinitionId }
+        : {}),
     }),
   })
-  if (!res.ok) throw new Error("Failed to send message")
+  // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
+  // distinguishable in StreamsProvider.sendMessage's catch (roll back both
+  // optimistic bubbles + surface a per-thread error instead of leaving ghosts).
+  // 099-08 (UAT L10 fix): read the body BEFORE throwing so FastAPI's {detail}
+  // (the actionable gate message, e.g. a disabled skill_ref) survives. The
+  // downstream 409 branch matches on status and overrides this message with
+  // fixed copy → byte-equivalent for 409. Generic fallback when no string
+  // detail (unparseable body, or detail is a non-string FastAPI validation array).
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      typeof body?.detail === "string" ? body.detail : "Failed to send message",
+      res.status,
+    )
+  }
   return (await res.json()) as PostMessageResponse
 }
 
@@ -522,8 +639,10 @@ export async function subscribeToRun(
         // The reducer in StreamsProvider stamps it on the assistant message
         // as `finalOutputFiles`; MessageItem renders the pinned panel.
         else if (t === "final_output_files" && callbacks.onFinalOutputFiles)
+          // Phase 095 Plan 05 (D-08): the additive `is_hero` field flows through
+          // untouched as an extra key on each file dict — no dispatch change.
           callbacks.onFinalOutputFiles(
-            (parsed.files ?? []) as { filename: string; url?: string }[],
+            (parsed.files ?? []) as { filename: string; url?: string; size?: number; is_hero?: boolean }[],
           )
         else if (t === "sources" && callbacks.onSources)
           callbacks.onSources((parsed.sources ?? []) as SourceReference[])
@@ -567,6 +686,9 @@ export async function subscribeToRun(
             prompt: parsed.prompt as string,
             options: (parsed.options ?? []) as string[],
             timeout_seconds: parsed.timeout_seconds as number,
+            // D-12 (Phase 093): additive — the prior-phase draft the user confirms.
+            // Optional; absent on older streams → undefined (harmless).
+            draft: parsed.draft as string | undefined,
           })
         else if (t === "ask_user_response" && callbacks.onAskUserResponse)
           callbacks.onAskUserResponse(parsed.tool_call_id as string)
@@ -613,7 +735,74 @@ export async function subscribeToRun(
             parsed.original_model as string,
             parsed.fallback_model as string,
           )
+        } else if (t === "cap_paused" && callbacks.onCapPaused) {
+          // Phase 092 (CONT-01 / D-07) — NON-terminal pause. NOT a terminal
+          // sentinel (Landmine 6): the stream stays attachable for Continue.
+          // Mirror the fallback_model branch (no `return`).
+          callbacks.onCapPaused({
+            runId,
+            toolNames: (parsed.tool_names ?? []) as string[],
+            continuesUsed: (parsed.continues_used ?? 0) as number,
+            continuesRemaining: (parsed.continues_remaining ?? 0) as number,
+          })
         }
+        // ──────────────────────────────────────────────────────────────────
+        // Phase 094 Plan 02 (PANEL-08/09) — additive harness phase-lifecycle
+        // branches. These are the LAST else-if branches of the switch, AFTER
+        // cap_paused and BEFORE the cursor-advance block (676-679). They read
+        // the FLAT producer payload verbatim (harness_engine.py: phase /
+        // phase_index / phase_type / attempt / error / reason / from_phase /
+        // to_phase / via / status) and carry NO `return` — so the cursor-advance
+        // still fires, exactly like todo_updated / cap_paused. The Deep dispatch
+        // above (delta / reasoning_delta / tool_* / sub_agent_* / code_* /
+        // sources / citations / confidence / ask_user_* / the terminal sentinels
+        // / planning / iteration_start / fallback_model / cap_paused) is
+        // BYTE-IDENTICAL — none of these new branches touches it. Panel-only,
+        // provider-agnostic.
+        else if (t === "phase_started" && callbacks.onPhaseStarted)
+          callbacks.onPhaseStarted({
+            phase: parsed.phase as string,
+            phaseIndex: parsed.phase_index as number,
+            phaseType: parsed.phase_type as string,
+          })
+        else if (t === "phase_completed" && callbacks.onPhaseCompleted)
+          callbacks.onPhaseCompleted(parsed.phase as string, parsed.phase_index as number)
+        // 101.1 review WR-01: a phase that ended FAILED gets its own event (the
+        // engine no longer emits phase_completed for it). NO return (cursor still
+        // advances, exactly like phase_completed). Panel-only.
+        else if (t === "phase_failed" && callbacks.onPhaseFailed)
+          callbacks.onPhaseFailed(
+            parsed.phase as string,
+            parsed.phase_index as number,
+            parsed.failure as string | undefined,
+          )
+        else if (t === "phase_transition" && callbacks.onPhaseTransition)
+          callbacks.onPhaseTransition(
+            parsed.from_phase as string,
+            parsed.to_phase as string,
+            parsed.via as string,
+          )
+        else if (t === "gate_failed" && callbacks.onGateFailed)
+          callbacks.onGateFailed({
+            phase: parsed.phase as string,
+            attempt: parsed.attempt as number,
+            error: parsed.error as string,
+          })
+        else if (t === "run_failed" && callbacks.onRunFailed)
+          callbacks.onRunFailed(parsed.reason as string | undefined)
+        else if (t === "run_completed" && callbacks.onRunCompleted)
+          callbacks.onRunCompleted(parsed.status as string | undefined)
+        // Phase 101.1-09 (gap 6): the phase_substep branch Plan 04 deferred.
+        // Reads the FLAT payload verbatim (parsed.phase / phase_index / status /
+        // failure); NO return (cursor still advances, exactly like phase_started).
+        // Panel-only — the callback writes phasesByThread, never bucketsBySurface.
+        else if (t === "phase_substep" && callbacks.onPhaseSubstep)
+          callbacks.onPhaseSubstep({
+            phase: parsed.phase as string,
+            phaseIndex: parsed.phase_index as number,
+            status: parsed.status as EmitSubStep | undefined,
+            failure: parsed.failure as EmitFailure | undefined,
+          })
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
         // type-specific callback so the consumer's lastSeenOffsetRef only
@@ -841,7 +1030,7 @@ export async function answerAskUser(
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(`Failed to submit ask_user answer (status ${res.status})`)
+  if (!res.ok) throw new ApiError("Failed to submit ask_user answer", res.status)
 }
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the
@@ -864,6 +1053,149 @@ export async function cancelRun(runId: string, signal?: AbortSignal): Promise<vo
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to cancel run (status ${res.status})`)
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 092 (MODE-01 / MODE-02 / CONT-01) — dual-mode + Continue clients.
+// Backend contracts: 092-02-SUMMARY (GET /threads/{id}/workflow, GET
+// /workflows/published) + 092-03-SUMMARY (POST /runs/{id}/continue).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Phase 092 (SC#5 / D-v2.5-03) — the reconcile-via-fetch contract mirroring
+ *  the backend `ThreadWorkflowState` Pydantic model (backend/app/models/thread.py).
+ *  GET /threads/{id}/workflow is a PURE READ — the source of truth for a thread's
+ *  Deep/Harness mode + workflow lock + current phase + Continue budget. NEVER
+ *  trust a Realtime/SSE hint alone (D-v2.5-03). */
+export interface ThreadWorkflowState {
+  thread_id: string
+  /** harness iff active_workflow_run_id IS NOT NULL. */
+  mode: "deep" | "harness"
+  /** True iff a non-terminal workflow run holds the lock. */
+  locked: boolean
+  active_workflow_run_id: string | null
+  /** workflow_runs.status; null when the run row is absent. */
+  run_status: string | null
+  definition_slug: string | null
+  definition_name: string | null
+  current_phase_slug: string | null
+  current_phase_index: number | null
+  total_phases: number | null
+  /** SC#5 heal: anchor set BUT the run row is missing or terminal. */
+  lock_is_stale: boolean
+  /** CONT-01 / D-06 — a Continue affordance is currently pending. */
+  cap_paused: boolean
+  continues_used: number
+  /** max_continues_per_run - continues_used (D-06). */
+  continues_remaining: number
+  /** Facet C (092-07) — the thread's latest producer `runs.run_id` WHEN live
+   *  (non-terminal). The StreamsProvider reconcile re-subscribes
+   *  GET /runs/{id}/stream to re-attach a startup-sweep-resumed run's live stream
+   *  on mount with no page action. null when the latest producer row is
+   *  terminal/absent. PURE additive read (no new query, no write — the 092-05 F2
+   *  invariant holds). */
+  latest_producer_run_id?: string | null
+  /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
+   *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
+   *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
+   *  blanked the timeline on revisit/reload of a finished workflow thread). null
+   *  for Deep / no run. Statuses are DB-native (pending/active/completed/failed/
+   *  skipped); reconcilePhases maps them to the Phase status union. */
+  phases?: WorkflowPhaseState[] | null
+}
+
+/** Phase 098-UAT run-honesty fix (B) — one workflow_phases row's durable per-phase
+ *  status (mirrors backend WorkflowPhaseState). status is DB-native. */
+export interface WorkflowPhaseState {
+  slug: string
+  phase_index: number
+  status: string
+}
+
+/** A picker row from GET /workflows/published (backend/app/api/workflows.py
+ *  PublishedWorkflow). The minimum the Harness picker needs to list + kick off.
+ *
+ *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
+ *  JSONB the Workflows page card uses to derive the client-side strictness tier
+ *  (deriveTier) + the phase-type chain. Optional — the composer Harness picker only
+ *  reads id/slug/name and ignores it (backward compatible). */
+export interface PublishedWorkflow {
+  id: string
+  slug: string
+  name: string
+  definition?: WorkflowDefinitionJSON | null
+}
+
+/** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
+ *  Returns the authoritative mode/lock/phase/Continue state for a thread. Used on
+ *  thread mount to reconcile the composer lock + Continue card from truth (never a
+ *  stale SSE hint). Ownership-gated 404 on the backend. (getThreadPendingAsks shape.) */
+export async function getThreadWorkflow(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<ThreadWorkflowState> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workflow`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to load thread workflow state (status ${res.status})`)
+  return (await res.json()) as ThreadWorkflowState
+}
+
+/** Phase 092 (MODE-01 / D-01) — GET /workflows/published. The Harness-mode
+ *  picker feed: published workflow definitions the user may start (owner-scoped
+ *  on the backend via the RLS-mirroring predicate — the frontend cannot widen
+ *  the scope, T-092-17). */
+export async function listPublishedWorkflows(
+  /** Phase 103-06 (REQ-7): the project-folder filter rail. When a folder id is
+   *  given, the backend AND-appends `definition->>'project_folder_id'` to the
+   *  owner-scope clause — it can only NARROW, never widen (T-098-09). Omitting it
+   *  (or passing null) returns the full owner-scoped published list unchanged. */
+  projectFolderId?: string | null,
+  signal?: AbortSignal,
+): Promise<PublishedWorkflow[]> {
+  const headers = await getAuthHeaders()
+  const url = projectFolderId
+    ? `${API_BASE}/workflows/published?project_folder_id=${encodeURIComponent(projectFolderId)}`
+    : `${API_BASE}/workflows/published`
+  const res = await fetch(url, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list published workflows (status ${res.status})`)
+  return (await res.json()) as PublishedWorkflow[]
+}
+
+/** The POST /runs/{id}/continue response (092-03). `status:"ok"` resumes the
+ *  SAME run with a fresh bounded budget; `status:"refused"` means the 3-cap is
+ *  exhausted (a clean 200 refusal — surface the message, do NOT throw). */
+export interface ContinueRunResult {
+  status: "ok" | "refused"
+  run_id?: string
+  /** Facet C (092-07) — on a Harness re-drive the backend mints a FRESH producer
+   *  `runs` row (the original stream EXPIREd) and returns its id here so the
+   *  frontend re-subscribes GET /runs/{producer_run_id}/stream. Absent on the Deep
+   *  consume path (same run_id) and on a `refused` response. */
+  producer_run_id?: string
+  message?: string
+  continues_used: number
+  continues_remaining: number
+}
+
+/** Phase 092 (CONT-01 / D-06) — POST /runs/{id}/continue. Resumes a cap_paused
+ *  run with a fresh bounded budget that CONSUMES the dropped tool calls (Deep) or
+ *  re-drives the active phase (Harness). The backend refuses the (max+1)-th
+ *  Continue with a clean 200 `{status:"refused"}` payload — we DON'T throw on that
+ *  (it is the expected exhausted-cap path, D-06); we only throw on a real HTTP
+ *  error. (cancelRun mutation shape.) */
+export async function continueRun(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<ContinueRunResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/runs/${runId}/continue`, {
+    method: "POST",
+    headers,
+    signal,
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to continue run (status ${res.status})`)
+  }
+  return (await res.json()) as ContinueRunResult
 }
 
 export async function listDocuments(): Promise<Document[]> {
@@ -889,6 +1221,36 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
   }
   const doc = await res.json() as Document
   return { doc, isDuplicate: res.status === 200 }
+}
+
+// Phase 100 (TMPL-01 / D-01): upload an ephemeral OOXML template into the
+// thread's workspace via POST /threads/{tid}/workspace/files (workspace.py
+// `upload_template`). Mirrors uploadDocument's FormData + Bearer shape — the
+// NO-Content-Type detail is load-bearing so the browser sets the multipart
+// boundary itself. The server is the real gate (validate_ooxml magic-byte
+// check, Plan 100-04); the panel reconciles by upserting the returned row.
+export async function uploadWorkspaceTemplate(
+  threadId: string,
+  file: File,
+): Promise<WorkspaceFile> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }))
+    throw new Error((err as { detail: string }).detail ?? "Upload failed")
+  }
+  // WR-08 (100-REVIEW): the backend route returns write_file's dict whose key is
+  // `file_id` (no `id`). Map it at the API boundary instead of a blind cast so the
+  // optimistically upserted store row carries a real id — 088-05 D-16 history:
+  // missing workspace-file ids caused live `/files//content` 404s.
+  const row = (await res.json()) as WorkspaceFile & { file_id?: string }
+  return { ...row, id: row.id ?? row.file_id }
 }
 
 // Phase 067.3 (D-067.3-R2-01/02/04): JS blob fetch+download for
@@ -966,6 +1328,62 @@ export async function downloadSandboxOutput(
   } finally {
     // Revoke after a short delay — some browsers are async about the
     // download trigger and revoking immediately can race the save dialog.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+  }
+}
+
+// Phase 101.1-09 (gap 3): the 067.3 blob-download pattern for a workspace
+// deliverable. A produced docx/pptx/xlsx is stored INLINE, so its bytes are NOT
+// reachable via the /content route (which str-decodes inline content and corrupts
+// the binary). This helper hits the raw-bytes route (workspace.py
+// /files/{id}/raw) with the Bearer token, blobs the EXACT bytes, and triggers a
+// programmatic <a download> click — mirroring downloadSandboxOutput's contract
+// (DownloadError on 401/404/5xx; the missing-and-IDOR-collapsed 404 maps to the
+// same "File not found"). Closes the "Download is dead text" last mile of TMPL-02.
+export async function downloadWorkspaceFile(
+  threadId: string,
+  fileId: string,
+  filename: string,
+): Promise<void> {
+  let token: string
+  try {
+    token = await getAuthToken()
+  } catch {
+    throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+  }
+
+  const url = `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/raw`
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch {
+    throw new DownloadError("network", "Download failed — try again.")
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+    }
+    if (res.status === 404) {
+      // Backend collapses missing-and-IDOR-and-expired to 404 (existence-leak rule).
+      throw new DownloadError(404, "File not found.")
+    }
+    throw new DownloadError(res.status, "Download failed — try again.")
+  }
+
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement("a")
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
   }
 }
@@ -1551,4 +1969,210 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
   const res = await fetch(`${API_BASE}/feedback/stats`, { headers })
   if (!res.ok) throw new Error("Failed to load feedback stats")
   return res.json() as Promise<FeedbackStats>
+}
+
+// ── Workflow authoring API (Phase 103, REQ-1 / REQ-2 / REQ-6) ────────────────
+//
+// The client layer the Builder (Plan 04), the publish gauntlet (Plan 05), and
+// the Workflows page (Plan 06) all consume. Mirrors the new /workflows authoring
+// routes from Plans 01/02 (NEVER threads.py). The load-bearing contract is that
+// the client NEVER re-derives a server verdict and NEVER swallows a 409/404 as
+// success (threat T-103-03-01 / -04).
+
+/** A permissive `WorkflowDefinition` JSONB alias — the Builder (Plan 04) refines
+ *  the real shape. The authoring CRUD/generate fns pass it through opaquely. */
+export type WorkflowDefinitionJSON = Record<string, unknown>
+
+/** Mirror of the backend `PublishVerdict` (api/workflows.py:84-93). Rendered
+ *  VERBATIM by the publish-gauntlet UI — the client never re-derives any field.
+ *  `named_failures` is POLYMORPHIC across stages (lint `{code,phase,message}` /
+ *  judge `{criterion,score,evidence}` / `{summary}` / bare string) so it is typed
+ *  `unknown[]` and rendered by KEY-DETECTION in Plan 05 (D-103-CONF-3). */
+export interface PublishVerdict {
+  published: boolean
+  version: number | null
+  golden_run_id: string | null
+  blocked_stage: string | null
+  named_failures: unknown[]
+}
+
+/** A lint failure entry (the 5 LOWERCASE `LintError.code` literals:
+ *  bad_index / unsatisfiable_skip / orphan_phase / no_terminal / input_unsatisfied). */
+export interface LintError {
+  code: string
+  phase: string
+  message: string
+}
+
+/** A draft row from GET /workflows/drafts (owner-scoped on the backend).
+ *
+ *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
+ *  JSONB the drafts-shelf card uses to derive the tier badge + phase chain
+ *  client-side. Optional — pre-103 shelf callers ignore it. */
+export interface WorkflowDraftRow {
+  id: string
+  slug: string
+  version: number
+  name: string | null
+  definition?: WorkflowDefinitionJSON | null
+}
+
+/** The structured result of POST /workflows/generate. The route returns HTTP 200
+ *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
+export type GenerateResult =
+  | { ok: true; definition: WorkflowDefinitionJSON }
+  | { ok: false; error: string; detail?: string }
+
+/** The body of POST /workflows/generate (D-103-CONF-2 / D-103-3 template supply). */
+export interface GenerateWorkflowBody {
+  describe: string
+  project_folder_id?: string | null
+  template_asset_id?: string | null
+  template_placeholders?: string[]
+}
+
+/** The 4 distinguished outcomes of POST /workflows/{id}/publish. A binary
+ *  `200 = ok / else = error` handler is FORBIDDEN — a 200 can carry a BLOCK
+ *  (`published:false`), and 400/404/409 each mean something distinct. */
+export type PublishOutcome =
+  | { kind: "verdict"; verdict: PublishVerdict }
+  | { kind: "business_requirement"; verdict: PublishVerdict }
+  | { kind: "not_found" }
+  | { kind: "already_published" }
+
+/** A published-row mutation (or a cross-user attempt resolving to a published
+ *  row) → HTTP 409. Thrown (never swallowed) so the UI surfaces it instead of a
+ *  silent overwrite (T-103-03-04). */
+export class WorkflowConflictError extends Error {
+  constructor(message = "workflow is published and cannot be modified") {
+    super(message)
+    this.name = "WorkflowConflictError"
+  }
+}
+
+/** A draft mutation against a non-existent / non-owned definition → HTTP 404. */
+export class WorkflowNotFoundError extends Error {
+  constructor(message = "workflow not found") {
+    super(message)
+    this.name = "WorkflowNotFoundError"
+  }
+}
+
+/** POST /workflows — create a draft. Returns {id, version}. */
+export async function createWorkflowDraft(
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<{ id: string; version: number }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to create workflow draft (status ${res.status})`)
+  return (await res.json()) as { id: string; version: number }
+}
+
+/** GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side). */
+export async function listDraftWorkflows(signal?: AbortSignal): Promise<WorkflowDraftRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/drafts`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list draft workflows (status ${res.status})`)
+  return (await res.json()) as WorkflowDraftRow[]
+}
+
+/** PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
+ *  (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
+ *  NEVER swallowed as success (T-103-03-04). */
+export async function updateWorkflowDraft(
+  id: string,
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<WorkflowDefinitionJSON> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
+  return (await res.json()) as WorkflowDefinitionJSON
+}
+
+/** DELETE /workflows/{id} — delete a draft (204). Throws WorkflowConflictError on
+ *  409 (published/frozen) and WorkflowNotFoundError on 404. */
+export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}`, {
+    method: "DELETE",
+    headers,
+    signal,
+  })
+  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
+}
+
+/** POST /workflows/generate — NL one-shot structured generation. The route
+ *  returns HTTP 200 even on a FAILED generation (`ok:false`), so we read the body
+ *  and NEVER throw on `ok:false` (only on a real HTTP/network error). */
+export async function generateWorkflow(
+  body: GenerateWorkflowBody,
+  signal?: AbortSignal,
+): Promise<GenerateResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/generate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to generate workflow (status ${res.status})`)
+  return (await res.json()) as GenerateResult
+}
+
+/** POST /workflows/{id}/publish — run the 8-stage publish gauntlet. The client
+ *  distinguishes the 4 HTTP outcomes and reads the SERVER verdict verbatim:
+ *   - 200 → {kind:"verdict"}: the body tells pass (published:true) from BLOCK
+ *     (published:false / blocked_stage set) — we DO NOT re-derive it.
+ *   - 400 → {kind:"business_requirement"}: the verdict is in `detail`.
+ *   - 404 → {kind:"not_found"}.
+ *   - 409 → {kind:"already_published"}.
+ *   - anything else → throw.
+ *  A binary `200 = ok / else = error` handler is FORBIDDEN (T-103-03-01). */
+export async function publishWorkflow(
+  id: string,
+  golden_input: string,
+  signal?: AbortSignal,
+): Promise<PublishOutcome> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/publish`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ golden_input }),
+    signal,
+  })
+  if (res.status === 200) {
+    const verdict = (await res.json()) as PublishVerdict
+    return { kind: "verdict", verdict }
+  }
+  if (res.status === 400) {
+    // WR-02: defend against a detail-less / mistyped 400 body. The backend rides the
+    // full PublishVerdict in `detail` (api/workflows.py:209), but a malformed body must
+    // NEVER cast `undefined` to PublishVerdict — the gauntlet would then crash on
+    // `verdict.named_failures.length`. Verify the shape; otherwise throw an honest error.
+    const body = (await res.json().catch(() => ({}))) as { detail?: unknown }
+    const detail = body.detail
+    if (detail && typeof detail === "object" && "published" in detail) {
+      return { kind: "business_requirement", verdict: detail as PublishVerdict }
+    }
+    throw new Error("business_requirement block: malformed verdict body (no PublishVerdict in detail)")
+  }
+  if (res.status === 404) return { kind: "not_found" }
+  if (res.status === 409) return { kind: "already_published" }
+  throw new Error(`Failed to publish workflow (status ${res.status})`)
 }

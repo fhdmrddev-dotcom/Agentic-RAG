@@ -47,7 +47,7 @@ async def test_completed_run_expires_600s(redis_client):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             return_value=(iter(_fast_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -94,7 +94,7 @@ async def test_failed_run_expires_60s(redis_client):
 
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=_failing_llm,
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

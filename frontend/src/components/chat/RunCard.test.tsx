@@ -86,9 +86,27 @@ describe("RunCard", () => {
     expect(html).not.toMatch(/animate-brandPulse/)
   })
 
-  it("iteration counter: renders Step {iterationCount + 1} when iterationCount provided", () => {
-    render(<RunCard message={makeMessage({ iterationCount: 4 })} isStreaming={true} />)
-    expect(screen.getByText("Step 5")).toBeInTheDocument()
+  // Phase 095 Plan 02 (D-04): the step number is now driven by
+  // unifiedStepCount(message) — the DEDUPED tool count — NOT iterationCount.
+  // The fixture below has 3 deduped tools spread across iterationCount=4, so the
+  // strip shows "Step 3" (the honest count), never "Step 5".
+  it("D-04: Step number reads unifiedStepCount, NOT iterationCount", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          iterationCount: 4,
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "running", startedAt: Date.now() },
+            { id: "tc-2", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+            { id: "tc-3", name: "read_document", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip")
+    expect(strip.textContent).toMatch(/Step 3/)
+    expect(strip.textContent).not.toMatch(/Step 5/)
   })
 
   it("active-glow: outer frame has primary border + shadow during streaming", () => {
@@ -186,7 +204,10 @@ describe("RunCard", () => {
     expect(screen.queryByTestId("run-card-collapsed")).toBeNull()
   })
 
-  it("collapsed-row copy: shows tool-call count + status word", () => {
+  // Phase 095 Plan 02 (D-04): the collapsed-row copy was relabeled
+  // "N tool calls" → "N steps" and now reads the SAME unifiedStepCount as the
+  // header + strip (SKETCH-CONSISTENCY — the three sites can never disagree).
+  it("collapsed-row copy: shows N steps (unifiedStepCount) + status word", () => {
     render(
       <RunCard
         message={makeMessage({
@@ -201,7 +222,8 @@ describe("RunCard", () => {
       />,
     )
     const collapsed = screen.getByTestId("run-card-collapsed")
-    expect(collapsed.textContent).toMatch(/3 tool calls/)
+    expect(collapsed.textContent).toMatch(/3 steps/)
+    expect(collapsed.textContent).not.toMatch(/tool calls/)
     expect(collapsed.textContent).toMatch(/failed/)
   })
 
@@ -215,5 +237,338 @@ describe("RunCard", () => {
     expect(screen.queryByTestId("run-card-collapsed")).toBeNull()
     // Without tools, RunCard still mounts (MessageItem gates that) but body is expanded
     expect(screen.getByTestId("run-card").querySelector(".p-3")).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 095 Plan 02 — D-06 persistent timer + D-04 unified count
+// ---------------------------------------------------------------------------
+
+describe("RunCard — D-06 persistent timer (the never-vanishes fix)", () => {
+  // The ROOT bug (BUG-260528-01): under the old `isStreamingNow || elapsedMs > 0`
+  // gate, a run that flipped terminal before any 250ms tick had elapsedMs === 0
+  // and the WHOLE timer vanished. The D-06 fix renders the strip continuously
+  // whenever created_at parses, regardless of isStreamingNow / elapsedMs.
+  it("timer is STILL rendered when a run flips terminal with a real persisted duration (no vanish)", () => {
+    // Phase 095.1-03 (D-05): a terminal run carries the persisted started_at /
+    // completed_at (the TRUE wall-clock). The strip + the ⏱ duration both render
+    // — the never-vanishes guarantee, now honest (completedAt − startedAt), not
+    // a now−created_at fabrication.
+    const now = Date.now()
+    render(
+      <RunCard
+        message={makeMessage({
+          created_at: new Date(now).toISOString(),
+          runStatus: "completed",
+          startedAt: new Date(now - 100).toISOString(),
+          completedAt: new Date(now).toISOString(), // ≈0.1s true duration
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "[]" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // The strip (which carries the ⏱ elapsed segment) must still be present.
+    const strip = screen.getByTestId("run-status-strip")
+    expect(strip).toBeInTheDocument()
+    expect(strip.textContent).toMatch(/⏱/)
+    // And it shows a real seconds value (never NaN), even at ~0 elapsed.
+    expect(strip.textContent).toMatch(/\d+(\.\d+)?s/)
+  })
+
+  it("freezes elapsed at a terminal — shows the TRUE persisted completedAt − startedAt", () => {
+    // Phase 095.1-03 (D-05): started_at 5s before completed_at → the frozen
+    // elapsed is the TRUE 5s persisted duration, identical live and on reload
+    // (never now − created_at). The created_at here is ~now to prove the source
+    // is started_at/completed_at, NOT created_at.
+    const now = Date.now()
+    render(
+      <RunCard
+        message={makeMessage({
+          created_at: new Date(now).toISOString(),
+          runStatus: "completed",
+          startedAt: new Date(now - 5000).toISOString(),
+          completedAt: new Date(now).toISOString(),
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip")
+    const match = strip.textContent?.match(/([\d.]+)s/)
+    expect(match).not.toBeNull()
+    const seconds = parseFloat(match![1])
+    // The TRUE 5s persisted duration, bounded — not an unbounded wall-clock.
+    expect(seconds).toBeGreaterThanOrEqual(4.5)
+    expect(seconds).toBeLessThan(10)
+  })
+
+  it("renders no elapsed segment when created_at is unparseable (never NaN)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          // a deliberately unparseable created_at to exercise the Number.isFinite guard
+          created_at: "not-a-date",
+          runStatus: "completed",
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // Number.isFinite(startMs) is false → the strip is not rendered at all,
+    // and nothing renders "NaNs".
+    expect(screen.queryByTestId("run-status-strip")).toBeNull()
+    expect(screen.getByTestId("run-card").textContent).not.toMatch(/NaN/)
+  })
+
+  it("the activity verb shows while streaming and is gone (terminal) once done", () => {
+    const streaming = render(
+      <RunCard message={makeMessage({ runStatus: "streaming" })} isStreaming={true} />,
+    )
+    // streaming → strip carries a primary activity verb segment.
+    expect(streaming.getByTestId("run-status-strip").textContent).toMatch(/Searching|Running|Thinking|Synthesizing|Setting up|Working/)
+    streaming.unmount()
+
+    const terminal = render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "completed",
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // terminal → activityVerb is null → no live verb in the (header) strip.
+    // The header strip lives inside the header element; the collapsed-row is a
+    // separate surface. Read the header strip specifically.
+    const header = terminal.getByTestId("run-card").querySelector("header")
+    const headerStrip = header?.querySelector("[data-testid='run-status-strip']")
+    expect(headerStrip).not.toBeNull()
+    expect(headerStrip!.textContent).not.toMatch(/Searching|Running code|Synthesizing/)
+  })
+})
+
+describe("RunCard — D-04 unified count agrees across all three sites", () => {
+  it("header, strip, and collapsed-row all read the SAME unifiedStepCount (N, not M)", () => {
+    // 2 deduped tools (by clientKey) but a duplicate 3rd entry → unifiedStepCount
+    // dedups to 2; iterationCount=7 (M ≠ N). All sites must show 2.
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "completed",
+          iterationCount: 7,
+          tool_calls: [
+            { id: "tc-1", clientKey: "k1", name: "search_documents", args: {}, status: "done", result: "" },
+            { id: "tc-2", clientKey: "k2", name: "execute_code", args: {}, status: "done", result: "" },
+            { id: "tc-3", clientKey: "k1", name: "search_documents", args: {}, status: "done", result: "" }, // dup of k1
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // Collapsed by default (terminal + tools) → header strip + collapsed-row visible.
+    const header = screen.getByTestId("run-card").querySelector("header")!
+    expect(header.textContent).toMatch(/Run · 2 steps/) // header title
+    const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
+    expect(headerStrip.textContent).toMatch(/Step 2/) // strip
+    expect(headerStrip.textContent).not.toMatch(/Step 7/) // never iterationCount
+    const collapsed = screen.getByTestId("run-card-collapsed")
+    expect(collapsed.textContent).toMatch(/2 steps/) // collapsed-row
+  })
+
+  it("DB-loaded message WITHOUT iterationCount still shows a Step number (next-day reopen fix)", () => {
+    // Simulate a reloaded historical message: no iterationCount field at all,
+    // but the persisted tool_calls survive → unifiedStepCount still works.
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      tool_calls: [
+        { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "" },
+        { id: "tc-2", name: "read_document", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    // strip iterationCount entirely (DB reload omits it)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const header = screen.getByTestId("run-card").querySelector("header")!
+    const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
+    expect(headerStrip.textContent).toMatch(/Step 2/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 095 Plan 07 — GAP-095-03 MED: single verb + calm title + run-sub
+// ---------------------------------------------------------------------------
+
+describe("RunCard — Plan 07 single verb (the activity verb lives in the strip, not the title)", () => {
+  it("the activity verb renders EXACTLY ONCE in the header (in the strip, never the title line)", () => {
+    // While streaming, a search_documents tool → the verb "Searching knowledge
+    // base…". It must appear once total in the header (the strip), NOT twice
+    // (the old double-verb bug rendered it in both the title and the strip).
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    const verb = "Searching knowledge base"
+    const occurrences = (header.textContent ?? "").split(verb).length - 1
+    expect(occurrences).toBe(1)
+
+    // And the single occurrence is INSIDE the strip, not the title.
+    const strip = header.querySelector("[data-testid='run-status-strip']") as HTMLElement
+    expect(strip.textContent).toMatch(/Searching knowledge base/)
+
+    // The title line (first child div of the flex-1 column) must NOT carry the verb.
+    const titleColumn = strip.parentElement as HTMLElement // the flex-1 min-w-0 column
+    const titleLine = titleColumn.querySelector("div") as HTMLElement // first div = title
+    expect(titleLine.textContent).not.toMatch(/Searching knowledge base/)
+    // The title is a calm run identity (no activity verb).
+    expect(titleLine.textContent).toMatch(/Run · 1 step|Agent run/)
+  })
+
+  it("the title is a calm run identity, NOT the verb, even between tools (synthesizing)", () => {
+    // Between tools (no active tool, isPlanning false) the OLD title would read
+    // "Synthesizing answer…" — the verb in the title. Now the title is calm.
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          isPlanning: false,
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "[]" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip") as HTMLElement
+    const titleColumn = strip.parentElement as HTMLElement
+    const titleLine = titleColumn.querySelector("div") as HTMLElement
+    expect(titleLine.textContent).not.toMatch(/Synthesizing/)
+    expect(titleLine.textContent).toMatch(/Run · 1 step|Agent run/)
+  })
+})
+
+describe("RunCard — Plan 095.1-07 GAP-2 run-sub turn reconciliation (live == reload)", () => {
+  // Helper: extract the run-sub subline text (the font-mono row UNDER the title,
+  // BEFORE the RunStatusStrip) so the live-vs-reload guard compares the exact
+  // string both states render.
+  function runSubText(host: HTMLElement): string {
+    // The run-sub is the LEAF div whose text is exactly `... turn N` (the
+    // font-mono subline). Prefer the div with NO child element (the leaf) so we
+    // don't grab the title-column wrapper that concatenates title + sub + strip.
+    const candidates = Array.from(host.querySelectorAll("div")).filter(
+      (d) => /turn \d+/.test(d.textContent ?? "") && d.querySelector("div") === null,
+    )
+    return candidates[0]?.textContent ?? ""
+  }
+
+  // RETARGETED (095.1-07): the run-sub turn is reconciled to a stable `1` — it no
+  // longer reads iterationCount (a within-run agent-loop iteration). A LIVE-shaped
+  // message (model+provider+iterationCount present, streaming) now reads `turn 1`,
+  // NOT `turn {iterationCount+1}`.
+  it("a LIVE message (model+provider+iterationCount, streaming) shows a stable `turn 1`", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          iterationCount: 5, // would have been `turn 6` under the old divergence
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/openai · gpt-5\.4-mini · turn 1/)
+    expect(header.textContent).not.toMatch(/turn 6/)
+  })
+
+  // RETARGETED (095.1-07): changing iterationCount no longer changes the run-sub
+  // turn — it is decoupled from the agent-loop iteration entirely.
+  it("the run-sub turn does NOT track iterationCount (iterationCount 2 → still `turn 1`)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          iterationCount: 2, // old behavior would render `turn 3`
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/turn 1/)
+    expect(header.textContent).not.toMatch(/turn 3/)
+  })
+
+  it("defaults to `turn 1` when iterationCount is absent (DB-loaded reopen)", () => {
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      tool_calls: [
+        { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/turn 1/)
+  })
+
+  // THE DECISIVE GUARD (GAP-2): a LIVE-shaped message (model+provider present,
+  // iterationCount present, terminal-this-session) and a RELOAD-shaped message
+  // (same model+provider, iterationCount ABSENT) for the SAME run must render the
+  // IDENTICAL run-sub string — `{provider} · {model} · turn 1`. This is the
+  // live==reload consistency contract: it FAILS before the reconciliation (live
+  // would read `turn {iterationCount+1}`) and PASSES after.
+  it("live and reload render the IDENTICAL run-sub for the same run", () => {
+    const attribution = { provider: "openai", model: "gpt-5.4-mini" } as const
+
+    const live = makeMessage({
+      runStatus: "completed",
+      ...attribution,
+      iterationCount: 5, // a multi-iteration run that JUST finished live
+      tool_calls: [
+        { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      ...attribution,
+      tool_calls: [
+        { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+
+    const { unmount } = render(<RunCard message={live} isStreaming={false} />)
+    const liveSub = runSubText(screen.getByTestId("run-card"))
+    unmount()
+
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const reloadSub = runSubText(screen.getByTestId("run-card"))
+
+    expect(liveSub).toBe("openai · gpt-5.4-mini · turn 1")
+    expect(reloadSub).toBe("openai · gpt-5.4-mini · turn 1")
+    expect(liveSub).toBe(reloadSub) // live == reload — the GAP-2 contract
   })
 })

@@ -109,6 +109,39 @@ async def finalize_run(
     )
 
 
+async def load_cap_paused_tool_calls(
+    pool: asyncpg.Pool, thread_id: UUID
+) -> list[dict]:
+    """The persisted dropped tool calls from the LATEST cap-pause carrier row.
+
+    Phase 092 (092-03 / SC#4). At the iteration cap, ``persist_cap_paused``
+    (agent_loop.py) writes a durable ``role='system'`` carrier row whose
+    ``tool_calls`` jsonb tags each dropped call ``kind='iteration_cap_paused'``
+    (name + arguments + tool_call_id). The Continue endpoint reads them back here
+    so the continuation CONSUMES the EXACT calls (re-executes them) instead of
+    re-dropping or starting fresh — SC#4.
+
+    Scans the carrier the /pending way (system rows are filtered from /snapshot),
+    keyed by the run's thread, newest first. Returns ``[]`` when no carrier exists.
+    ``$N`` placeholders only (T-073-02).
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT tool_calls
+        FROM messages
+        WHERE thread_id = $1
+          AND role = 'system'
+          AND tool_calls @> '[{"kind": "iteration_cap_paused"}]'::jsonb
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        thread_id,
+    )
+    if row is None:
+        return []
+    return list(row["tool_calls"] or [])
+
+
 async def insert_assistant_message(
     pool: asyncpg.Pool,
     *,

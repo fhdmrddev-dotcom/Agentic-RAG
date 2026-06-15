@@ -517,6 +517,55 @@ async def submit_ask_user_response(
         .maybe_single()
     )
     row = row_resp.data if row_resp is not None else None
+
+    if not row:
+        # ── F10 (093 / D-07 / D-08): harness ask_user workflow_run-id fallback ──
+        # A harness ``llm_human_input`` prompt's durable row carries
+        # ``run_id = ctx.run_id`` — the WORKFLOW_RUN id (NOT a ``runs`` row) — and
+        # the executor subscribes on ``ask_user:{workflow_run_id}:{tcid}``
+        # (phase_types.py passes ctx.run_id to subscribe_for_response). The Step-1
+        # SELECT above therefore MISSES for harness. Resolve the id as a
+        # ``workflow_runs`` row UNDER THE CALLER'S OWNERSHIP + thread-anchor confirm
+        # (T-093-IDOR: never trust the path id; owner-scoped + the row's thread must
+        # have this id as its live ``active_workflow_run_id``). 404 — NEVER 403 — on
+        # missing / not-yours / non-anchor, so the response is INDISTINGUISHABLE for
+        # "doesn't exist" and "not yours" (no existence leak). This is the EXACT
+        # owner-scoped, anchor-confirmed pattern the Continue endpoint already uses
+        # (see continue_run Step-1 fallback). BRANCH, never replace (D-08): the
+        # Step-1 ``runs`` SELECT above stays FIRST and unchanged — Deep's runs-keyed
+        # ask_user path is byte-identical and still returns 200; this fallback only
+        # engages AFTER that SELECT misses. Once ``row`` is synthesized, Steps 2-4
+        # (persist / emit / PUBLISH) run UNCHANGED under ``run_id`` = the workflow_run
+        # id, so ``publish_response`` hits ``ask_user:{workflow_run_id}:{tcid}`` —
+        # the SAME channel ``subscribe_for_response`` blocks on (and the same channel
+        # ``resume_pending_prompt`` re-subscribes on after a worker restart).
+        wf_self_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, thread_id")
+            .eq("id", str(run_id))
+            .eq("user_id", current_user["id"])  # owner-scoped — no existence leak
+            .maybe_single()
+        )
+        wf_self = wf_self_resp.data if wf_self_resp is not None else None
+        if wf_self:
+            anchor_resp = await aexec(
+                supabase.table("threads")
+                .select("active_workflow_run_id")
+                .eq("id", wf_self["thread_id"])
+                .eq("user_id", current_user["id"])  # thread-anchor confirm
+                .maybe_single()
+            )
+            _anchor = (anchor_resp.data if anchor_resp is not None else None) or {}
+            if str(_anchor.get("active_workflow_run_id")) == str(run_id):
+                # Synthesize the Step-1 row so Steps 2-4 persist/emit/PUBLISH under
+                # the workflow_run id (status is never read post-Step-1, but mirror
+                # the SELECT shape for parity with the Continue fallback).
+                row = {
+                    "run_id": str(run_id),
+                    "thread_id": wf_self["thread_id"],
+                    "status": None,
+                }
+
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -586,6 +635,419 @@ async def submit_ask_user_response(
         )
 
     return {"status": "ok"}
+
+
+# ───────────────────────────────────────────────────────────────────────
+# POST /runs/{run_id}/continue — CONT-01 / D-06 / D-08 (Phase 092 / 092-03).
+# At the iteration cap a run pauses cap_paused with its dropped tool calls
+# persisted (agent_loop.persist_cap_paused). Continue resumes the SAME run with
+# a FRESH bounded budget:
+#   - Deep run:    CONSUMES the persisted dropped calls (re-executes them) —
+#                  SC#4 (consume, not re-drop, not restart).
+#   - Harness run: re-reads the active phase's available_tools from the parsed
+#                  definition (D-08) + re-drives run_workflow.
+# The (max_continues_per_run)-th Continue is refused server-side (D-06). The
+# durable continues_used column (migration 063) survives WORKER_COUNT=2.
+# ───────────────────────────────────────────────────────────────────────
+def resolve_phase_available_tools(definition, active_slug: str) -> list:
+    """Re-read the active phase's available_tools from the parsed definition (D-08).
+
+    available_tools lives in the definition JSONB (per-phase config), NOT a
+    workflow_phases column — so a Harness Continue MUST re-read it from the parsed
+    WorkflowDefinition before resuming, never trust a stale row. Tool-bearing
+    phase configs (llm_agent / llm_batch_agents) carry the whitelist; other phase
+    types (llm_single / programmatic / llm_human_input) have none → empty list.
+    """
+    for ps in definition.phases:
+        if ps.slug == active_slug:
+            return list(getattr(ps.config, "available_tools", []) or [])
+    return []
+
+
+@router.post("/{run_id}/continue", status_code=200)
+async def continue_run(
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Resume a cap_paused run within a fresh bounded budget (CONT-01)."""
+    # ── Step 1: ownership SELECT → 404 (never leak existence; T-092-09) ──
+    row_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, status, thread_id, continues_used")
+        .eq("run_id", str(run_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = row_resp.data if row_resp is not None else None
+
+    if not row:
+        # Facet C (092-07) Continue-404 repair: after a page reload
+        # workflowLock.runId carries the WORKFLOW_RUN id (StreamsProvider seeds it
+        # from wf.active_workflow_run_id on reconcile), which is NOT a `runs` row →
+        # the SELECT above 404s before the harness branch ever runs. Resolve it as
+        # a workflow_runs.id UNDER THE CALLER'S OWNERSHIP (T-092-07-02: the resolve
+        # stays owner-scoped — never trust the path id alone, never leak existence)
+        # and confirm it is the thread's live anchor, then synthesize the Step-1 row
+        # so the existing harness branch drives it.
+        wf_self_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, thread_id, continues_used")
+            .eq("id", str(run_id))
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+        )
+        wf_self = wf_self_resp.data if wf_self_resp is not None else None
+        if wf_self:
+            # Confirm this workflow_run is the thread's CURRENT live anchor (only
+            # Continue the thread's active workflow — owner-scoped thread read).
+            anchor_resp = await aexec(
+                supabase.table("threads")
+                .select("active_workflow_run_id")
+                .eq("id", wf_self["thread_id"])
+                .eq("user_id", current_user["id"])
+                .maybe_single()
+            )
+            _anchor = (anchor_resp.data if anchor_resp is not None else None) or {}
+            if str(_anchor.get("active_workflow_run_id")) == str(run_id):
+                row = {
+                    "run_id": str(run_id),
+                    "status": None,
+                    "thread_id": wf_self["thread_id"],
+                    "continues_used": wf_self.get("continues_used") or 0,
+                }
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    thread_id = row["thread_id"]
+
+    # ── Step 2: detect Deep vs Harness — read continues_used from the row that
+    # carries the cap. A Harness run's cap lives on workflow_runs (via the
+    # thread anchor); a Deep run's cap lives on the runs row. ──
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("active_workflow_run_id")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    _thread = thread_resp.data if thread_resp is not None else None
+    active_workflow_run_id = (_thread or {}).get("active_workflow_run_id")
+
+    continues_used = row.get("continues_used") or 0
+    wf_row = None
+    if active_workflow_run_id is not None:
+        wf_resp = await aexec(
+            supabase.table("workflow_runs")
+            # F8 (092-07): pull `inputs` too so the re-driven first phase can read
+            # the original kickoff_prompt back (Continue resume path).
+            .select("id, continues_used, definition_id, inputs")
+            .eq("id", str(active_workflow_run_id))
+            .maybe_single()
+        )
+        wf_row = wf_resp.data if wf_resp is not None else None
+        if wf_row is not None:
+            continues_used = wf_row.get("continues_used") or 0
+
+    # ── Step 3: refuse the 4th Continue server-side (D-06 / T-092-10) ──
+    # Durable counter — never an in-memory count (WORKER_COUNT=2). No spawn.
+    if continues_used >= settings.max_continues_per_run:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "refused",
+                "message": (
+                    f"All {settings.max_continues_per_run} Continues used — "
+                    "this run is stopped. Start a new message to keep going."
+                ),
+                "continues_used": continues_used,
+                "continues_remaining": 0,
+            },
+        )
+
+    # ── Step 4: transactionally increment continues_used on the carrying row ──
+    _new_used = continues_used + 1
+    try:
+        if active_workflow_run_id is not None:
+            await aexec(
+                supabase.table("workflow_runs")
+                .update({"continues_used": _new_used})
+                .eq("id", str(active_workflow_run_id))
+            )
+        else:
+            await aexec(
+                supabase.table("runs")
+                .update({"continues_used": _new_used, "status": "streaming"})
+                .eq("run_id", str(run_id))
+            )
+    except Exception:
+        logger.exception("continue: continues_used increment failed for run %s", run_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record continue",
+        )
+
+    # ── Step 5: branch — Harness re-drive vs Deep consume ──
+    if active_workflow_run_id is not None:
+        # Harness: re-read available_tools from the definition (D-08) + re-drive.
+        from app.services.harness_engine import (  # noqa: PLC0415
+            run_workflow, _load_run_definition, _emit as _harness_emit,
+        )
+        from app.db.workflows import get_active_phase  # noqa: PLC0415
+        from types import SimpleNamespace  # noqa: PLC0415
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        from app.api.threads import RUN_TASKS as _RUN_TASKS  # noqa: PLC0415
+        # F5 (092-07): the same module-level _spawn the Deep RunContext uses
+        # (threads.py:105 / :1198) — gives a re-driven sub-agent task() the same
+        # fire-and-forget spawn surface Deep has.
+        from app.api.threads import _spawn as _spawn_harness_resume  # noqa: PLC0415
+        import asyncio as _asyncio  # noqa: PLC0415
+        # 098 (GOV-01/PROJ-02 — site 3 Continue): the shared run-start scope resolver
+        # + DB-aware ⊆ validator so a re-driven bound workflow stays inside its project.
+        from app.services.harness.scope import (  # noqa: PLC0415
+            assert_folder_scopes_subset as _assert_folder_scopes_subset,
+            resolve_project_subtree as _resolve_project_subtree,
+        )
+
+        from app.db.runs import insert_run as _insert_run, finalize_run as _finalize_run  # noqa: PLC0415
+        from uuid import uuid4 as _uuid4  # noqa: PLC0415
+        from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
+
+        pool = await get_pg_pool()
+        wf_run_uuid = (
+            UUID(active_workflow_run_id)
+            if isinstance(active_workflow_run_id, str)
+            else active_workflow_run_id
+        )
+        definition = await _load_run_definition(pool, wf_run_uuid)
+        active_phase = await get_active_phase(pool, wf_run_uuid)
+        # D-08: re-read the active phase's whitelist from the PARSED definition.
+        _available_tools = (
+            resolve_phase_available_tools(definition, active_phase["slug"])
+            if (definition is not None and active_phase is not None) else []
+        )
+        logger.info(
+            "continue: harness re-drive run=%s phase=%s available_tools=%s",
+            wf_run_uuid, (active_phase or {}).get("slug"), _available_tools,
+        )
+
+        # Facet C (092-07): mint a fresh producer-shell `runs` row (same as the
+        # startup-sweep resume) so the re-driven sub-agents' parent_run_id FK
+        # resolves (Facet A) and events route to run:{producer} (Facet B). The
+        # original producer id is finalized/EXPIREd; no producer-id column persists.
+        _thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
+        _producer_id = _uuid4()
+        await _insert_run(
+            pool,
+            run_id=_producer_id,
+            thread_id=_thread_uuid,
+            user_id=(
+                UUID(current_user["id"])
+                if isinstance(current_user["id"], str) else current_user["id"]
+            ),
+            status="streaming",
+            model="unknown", provider="unknown",  # NOT NULL; shell makes no LLM call
+            parent_run_id=None,
+        )
+
+        # F8 (092-07): rehydrate the original kickoff_prompt from the persisted
+        # workflow_runs.inputs jsonb so a re-driven first phase still acts on the
+        # user's question. supabase-py decodes jsonb to a dict, but parse
+        # defensively (str → json.loads) to match the startup-sweep resume builder.
+        import json as _json_harness_resume  # noqa: PLC0415
+        _wf_inputs = (wf_row or {}).get("inputs") or {}
+        if isinstance(_wf_inputs, str):
+            try:
+                _wf_inputs = _json_harness_resume.loads(_wf_inputs)
+            except (ValueError, TypeError):
+                _wf_inputs = {}
+        if not isinstance(_wf_inputs, dict):
+            _wf_inputs = {}
+
+        # D-04 (site 3 — Continue) + Open Q2: thread the resolved ctx model onto the
+        # continuation wf_ctx. The continuation previously set user_settings=None +
+        # no model, so the resolver never fired on Continue (only phase.config.model
+        # applied). Load the run OWNER's effective settings (the owner is verified at
+        # the Step-1 ownership SELECT — current_user["id"]) using the SAME loader the
+        # kickoff path uses (threads.py:900 load_user_settings), then resolve via the
+        # resolve-never-mutate wrapper (D-05): a stale cross-provider llm_model falls
+        # back to the active provider's default instead of leaking to the wrong client
+        # (T-093-MISROUTE). Phase-level precedence is unchanged downstream:
+        # phase.config.model or ctx.model (phase_types._effective_model) — this only
+        # sets ctx.model. If loading the owner's settings fails for any reason, fall
+        # back to None settings + "" model (resolve_workflow_ctx_model(None) -> "");
+        # phase-level model still applies — never block the Continue on this.
+        from app.models.user_settings import load_user_settings  # noqa: PLC0415
+        from app.services.sub_agent_models import resolve_workflow_ctx_model  # noqa: PLC0415
+        try:
+            _owner_settings = load_user_settings(current_user["id"])
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "continue: owner effective-settings load failed for run %s "
+                "(falling back to phase-level model only)", wf_run_uuid,
+            )
+            _owner_settings = None
+        _ctx_model = resolve_workflow_ctx_model(_owner_settings)
+
+        # 098 (GOV-01 / PROJ-02 — site 3 Continue): pre-resolve the run-start retrieval
+        # scope from the run's PROJECT binding BEFORE the async continuation closure
+        # (the closure runs in a background task — compute the value here, then close
+        # over it). Closes the folder_subtree_ids=None whole-KB bypass at the wf_ctx
+        # below so a bound workflow stays inside its project across a Continue. Owner-
+        # scoped via current_user["id"] (the verified run owner from the Step-1 ownership
+        # SELECT). An UNBOUND definition (project_folder_id None) resolves to None →
+        # whole-KB unchanged. Best-effort: a resolution failure must NEVER block the
+        # Continue (fall back to None + log, matching the never-block-the-Continue
+        # posture of the owner-settings load above).
+        _cont_subtree: "list[str] | None" = None
+        # getattr (not attribute access) defends the sentinel definitions some tests
+        # inject via a stubbed _load_run_definition; a real WorkflowDefinition always
+        # has the field. An unbound workflow (None) skips resolution → whole-KB.
+        _cont_project_folder_id = getattr(definition, "project_folder_id", None)
+        if _cont_project_folder_id is not None:
+            try:
+                await _assert_folder_scopes_subset(
+                    definition, supabase=supabase, user_id=current_user["id"]
+                )
+                _cont_subtree = await _resolve_project_subtree(
+                    _cont_project_folder_id,
+                    supabase=supabase,
+                    user_id=current_user["id"],
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "continue: project-scope resolution failed for run %s "
+                    "(falling back to unscoped search)", wf_run_uuid,
+                )
+                _cont_subtree = None
+                # WR-03 (098 secure-phase): EMIT scope_resolution_failed so the
+                # fall-open is OBSERVABLE in the run timeline — otherwise a bound
+                # workflow silently degrades to whole-KB on a transient failure (the
+                # Plan-05 clip + scope_violation are gated on
+                # `folder_subtree_ids is not None` and never fire on this None
+                # fallback). This except only runs inside the bound branch
+                # (_cont_project_folder_id is not None), so bound=True always holds.
+                # Continue is an in-flight re-drive → stays fail-OPEN (never block the
+                # Continue); the emit is the security signal, not a block.
+                try:
+                    await _harness_emit(
+                        redis,
+                        wf_run_uuid,
+                        "scope_resolution_failed",
+                        site="continue",
+                        bound=True,
+                        detail=(
+                            "project-scope resolution failed; "
+                            "retrieval degraded to whole-KB"
+                        ),
+                    )
+                except Exception:  # noqa: BLE001 — emit is best-effort
+                    logger.debug(
+                        "continue: scope_resolution_failed emit failed for run %s",
+                        wf_run_uuid,
+                    )
+
+        async def _harness_continuation():
+            wf_ctx = SimpleNamespace(
+                run_id=wf_run_uuid,
+                # Facet C (092-07): the fresh producer runs id (FK target + stream).
+                producer_run_id=_producer_id,
+                thread_id=thread_id,
+                current_user=current_user,
+                # D-04 (site 3): owner effective settings + resolved ctx model so the
+                # re-driven phases resolve a non-stale model from the active provider.
+                user_settings=_owner_settings,
+                model=_ctx_model,
+                # F8 (092-07): the persisted inputs (kickoff_prompt) for the re-driven run.
+                inputs=_wf_inputs,
+                redis=redis,
+                pool=pool,
+                emit=_harness_emit,
+                retry_feedback=None,
+                # F5 (092-07): the tool-context fields every Supabase tool reads via
+                # ctx.<field>. The Continue endpoint HAS the request supabase
+                # (Depends(get_supabase), runs.py:622) in scope — pass it so a
+                # re-driven phase's search_documents resolves (without it ctx.supabase
+                # is None → AttributeError on the first RPC). Owner-scoped retrieval is
+                # preserved: search_documents filters by current_user["id"] (this run's
+                # verified owner from the Step-1 ownership SELECT). 098 (GOV-01): folder
+                # scope is now resolved from the run's project binding (_cont_subtree,
+                # pre-resolved above) so a bound workflow stays inside its project across
+                # a Continue; an unbound workflow stays None (unscoped, unchanged). spawn
+                # + a fresh per-run semaphore complete the tool substrate.
+                supabase=supabase,
+                folder_subtree_ids=_cont_subtree,
+                scoped_folder_path=None,
+                spawn=_spawn_harness_resume,
+                per_run_task_semaphore=_asyncio.Semaphore(
+                    settings.task_per_run_concurrency
+                ),
+            )
+            _failed = False
+            try:
+                await run_workflow(
+                    wf_run_uuid, definition, wf_ctx, pool=pool, redis=redis,
+                    stream_run_id=_producer_id,
+                )
+            except Exception:
+                _failed = True
+                logger.exception("Harness continuation failed for run %s", wf_run_uuid)
+            finally:
+                # Facet C: terminalize the fresh producer shell on EVERY exit path
+                # (no stranded streaming row → the F2 self-heal is never defeated),
+                # BEFORE the _RUN_TASKS.pop.
+                try:
+                    await _finalize_run(
+                        pool,
+                        run_id=_producer_id,
+                        status="failed" if _failed else "completed",
+                        error="continuation failed" if _failed else None,
+                        completed_at=_dt.now(_tz.utc),
+                        message_id=None,
+                        input_tokens=None,
+                        output_tokens=None,
+                    )
+                except Exception:
+                    logger.exception(
+                        "continue: producer-shell finalize failed for %s", _producer_id
+                    )
+                _RUN_TASKS.pop(wf_run_uuid, None)
+
+        _t = _asyncio.create_task(_harness_continuation())
+        _RUN_TASKS[wf_run_uuid] = _t
+        _t.add_done_callback(lambda _x, _r=wf_run_uuid: _RUN_TASKS.pop(_r, None))
+    else:
+        # Deep: CONSUME the persisted dropped tool calls (SC#4).
+        from app.db.runs import load_cap_paused_tool_calls  # noqa: PLC0415
+        from app.api.threads import spawn_continuation_run  # noqa: PLC0415
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+        pool = await get_pg_pool()
+        thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
+        dropped = await load_cap_paused_tool_calls(pool, thread_uuid)
+        await spawn_continuation_run(
+            run_id=run_id,
+            thread_id=thread_id,
+            current_user=current_user,
+            redis=redis,
+            supabase=supabase,
+            dropped_tool_calls=dropped,
+        )
+
+    _resp = {
+        "status": "ok",
+        "run_id": str(run_id),
+        "continues_used": _new_used,
+        "continues_remaining": max(0, settings.max_continues_per_run - _new_used),
+    }
+    # Facet C (092-07): surface the fresh producer id so the frontend re-subscribes
+    # GET /runs/{producer_run_id}/stream (the original producer stream EXPIREd). Only
+    # the Harness re-drive mints one; the Deep consume path keeps the same run_id.
+    if active_workflow_run_id is not None:
+        _resp["producer_run_id"] = str(_producer_id)
+    return _resp
 
 
 # ───────────────────────────────────────────────────────────────────────
@@ -710,6 +1172,25 @@ async def cancel_run(
     except Exception:
         logger.exception(
             "Zombie heal Postgres UPDATE failed for run %s", run_id
+        )
+
+    # Phase 092 (092-03 / SC#2, MODE-02) — clear the per-thread workflow lock
+    # anchor on cancel so a cancelled Harness/cap_paused run never strands the
+    # thread Harness-locked. Keyed by the thread (a cancel knows its thread_id,
+    # not necessarily the workflow_runs id the anchor points at). Best-effort,
+    # symmetric with the zombie-heal Redis ops (D-062-13). The happy-path live
+    # cancel reaches the same clear via the engine's finish_run (the single
+    # authoritative workflow_runs-side site); this is the zombie-heal sibling.
+    try:
+        await aexec(
+            supabase.table("threads")
+            .update({"active_workflow_run_id": None})
+            .eq("id", thread_id)
+        )
+    except Exception:
+        logger.exception(
+            "Zombie heal anchor-clear failed for thread %s (run %s)",
+            thread_id, run_id,
         )
 
     # 2. Synthetic terminal sentinel — gives any attached consumer the event

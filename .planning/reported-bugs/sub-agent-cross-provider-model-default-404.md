@@ -8,6 +8,7 @@ status: closed
 affected_areas: [backend/sub-agent, backend/agent-loop, cross-provider]
 folded_into: "085"
 verified_closed_by: "085"
+reconfirmed_by: "089 CF-01 C2 — 2026-05-30: eval google cells all run_status=completed, no secondary-model 404"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

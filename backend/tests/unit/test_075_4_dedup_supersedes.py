@@ -190,7 +190,7 @@ def test_sha256_hex_is_64_char_string_for_5mb_payload() -> None:
 def test_previous_files_in_run_closure_shape() -> None:
     """The closure-local var at threads.py:~1630 region MUST be typed as
     ``dict[str, dict]`` with empty-dict initializer (D-075.4-D1/D2)."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
     # canonical shape (allow extra whitespace, optional trailing comment)
     assert re.search(

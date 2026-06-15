@@ -162,9 +162,17 @@ def test_get_todos_orders_by_order_index_then_created_at(client, mock_builder):
 
 
 def _make_mock_pool(rows):
-    """Build a mock asyncpg pool whose fetch() returns the given rows."""
+    """Build a mock asyncpg pool whose fetch() returns the given rows.
+
+    Phase 096 (D-06): /ask_user/pending now runs a per-prompt liveness lookup
+    via ``pool.fetchrow`` (dual-namespace run-status check). Returning ``None``
+    here means "neither namespace resolves" → the filter FAILS OPEN, so these
+    seeds (whose run_ids like 'rid-1' are not real runs) stay visible and the
+    pre-096 expectations hold unchanged.
+    """
     mock_pool = MagicMock()
     mock_pool.fetch = AsyncMock(return_value=rows)
+    mock_pool.fetchrow = AsyncMock(return_value=None)
     return mock_pool
 
 
@@ -279,13 +287,16 @@ def test_get_pending_ask_user_extracts_payload_from_tool_calls(
 
     assert resp.status_code == 200
     row = resp.json()[0]
+    # D-12 (Phase 093): the additive `draft` field is now part of the /pending
+    # payload (None on rows without an upstream draft — like this seed).
     assert set(row.keys()) == {
         "message_id", "tool_call_id", "prompt", "options",
-        "timeout_seconds", "run_id", "created_at",
+        "timeout_seconds", "run_id", "draft", "created_at",
     }
     assert row["tool_call_id"] == "tcid-2"
     assert row["prompt"] == "what?"
     assert row["options"] is None
+    assert row["draft"] is None  # additive: absent on this seed row → None
 
 
 # ---------------------------------------------------------------------------

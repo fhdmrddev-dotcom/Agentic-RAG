@@ -154,10 +154,17 @@ def install_mock():
     Redis and asyncpg stay REAL — they're the actual multi-worker
     contracts being validated.
     """
-    # 1. Patch the LLM entry point on the threads module
+    # 1. Patch the LLM entry point. Phase 089 Plan 03 (G-5 verbatim move): the
+    # agent loop moved from threads.py into app.services.agent_loop, so the loop
+    # now reads ``agent_loop.create_adaptive_streaming_chat`` (its own
+    # ``from openai_service import ...`` binding). Patch THAT binding — patching
+    # the threads.py binding no longer intercepts the loop (Pitfall 1). Patch
+    # both bindings defensively so any residual threads.py caller is also mocked.
+    import app.services.agent_loop as agent_loop_mod
+    agent_loop_mod.create_adaptive_streaming_chat = mock_create_adaptive_streaming_chat
     import app.api.threads as threads_mod
     threads_mod.create_adaptive_streaming_chat = mock_create_adaptive_streaming_chat
-    logger.info("Patched create_adaptive_streaming_chat with deterministic mock")
+    logger.info("Patched create_adaptive_streaming_chat with deterministic mock (agent_loop + threads bindings)")
 
     # 2. Override auth + supabase dependencies
     from app.main import app

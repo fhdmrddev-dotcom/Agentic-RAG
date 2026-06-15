@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 011 — Mode &amp; Composer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 011 — Mode & Composer
+   Q: How does the composer simplify, how is mode made unambiguous,
+      and how is a running workflow shown once the Deep/Harness toggle
+      and workflow-picker LEAVE the composer (D-092-UX)?
+   Kills finding #5 (toggle wrongly reads "Deep" mid-Harness-run) by
+      construction: there's no mode toggle left to mislabel.
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { display: grid; grid-template-columns: 52px 1fr clamp(300px, 30%, 400px); height: calc(100vh - 52px); overflow: hidden; }
+.nav-rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.nav-rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.nav-rail .nav-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); cursor: pointer; position: relative; }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+.nav-rail .nav-ico.wf:hover { background: var(--color-accent); color: var(--color-text); }
+
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow: hidden; }
+.chat-scroll { flex: 1; overflow-y: auto; padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-4); }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; }
+.bubble-user { align-self: flex-end; max-width: 78%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); }
+.answer { display: flex; gap: var(--space-3); } .answer .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; } .answer .body { font-size: var(--text-sm); line-height: 1.6; }
+
+/* ── composer dock ── */
+.composer-dock { border-top: 1px solid var(--color-border); background: var(--color-bg-elev1); padding: var(--space-3) var(--space-4) var(--space-4); }
+
+/* cap_paused Continue card (always a MessageItem card, never the composer) */
+.continue-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); margin-bottom: var(--space-3); border: 1px solid hsl(38 92% 60% / .35); background: var(--color-warning-dim); border-radius: var(--radius-md); }
+.continue-card .cc-text { flex: 1; font-size: var(--text-sm); color: var(--color-text); }
+.continue-card .cc-text .mono { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); display: block; margin-top: 2px; }
+.continue-btn { font-size: var(--text-sm); font-weight: 600; padding: 7px var(--space-4); border-radius: var(--radius-md); background: var(--color-warning); color: hsl(240 60% 8%); border: none; cursor: pointer; }
+
+/* run-status chip (variant A) */
+.runchip { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-2); border-radius: var(--radius-md); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); font-size: var(--text-sm); }
+.runchip .rc-ico { color: var(--color-warning); }
+.runchip .rc-name { color: var(--color-text); font-weight: 500; }
+.runchip .rc-phase { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.runchip .spacer { flex: 1; }
+.runchip .cancel { font-size: var(--text-xs); color: var(--color-danger); cursor: pointer; padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid hsl(0 72% 51% / .35); }
+
+/* run BAR (variant B — composer transforms) */
+.runbar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .45); }
+.runbar .rb-ico { width: 30px; height: 30px; border-radius: 50%; background: var(--color-warning-dim); border: 1.5px solid var(--color-warning); color: var(--color-warning); display: grid; place-items: center; animation: pulseGlow 1.6s infinite; }
+.runbar .rb-main { flex: 1; }
+.runbar .rb-name { font-weight: 600; font-size: var(--text-sm); }
+.runbar .rb-prog { height: 4px; border-radius: 2px; background: hsl(38 92% 60% / .2); overflow: hidden; margin-top: 5px; position: relative; }
+.runbar .rb-prog > i { display: block; height: 100%; width: 62%; background: var(--color-warning); border-radius: 2px; }
+.runbar .rb-meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); margin-top: 3px; }
+.runbar .cancel { font-size: var(--text-xs); color: var(--color-danger); cursor: pointer; padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid hsl(0 72% 51% / .35); }
+
+/* textarea row */
+.ta-wrap { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-3); transition: border-color var(--dur-fast); }
+.ta-wrap.focus { border-color: var(--color-primary-glow); }
+.ta-wrap.disabled { opacity: .62; }
+.ta { width: 100%; background: transparent; border: none; outline: none; color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: none; min-height: 24px; }
+.ta::placeholder { color: var(--color-text-dim); }
+.pill-row { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 5px var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-bg-elev1); color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast); }
+.pill:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+.pill .ic { font-family: var(--font-mono); opacity: .8; }
+.pill .grp { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); margin-right: 2px; }
+.pill.disabled { opacity: .45; cursor: not-allowed; }
+.pill-row .spacer { flex: 1; }
+.send-btn { width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border: none; display: grid; place-items: center; cursor: pointer; font-size: 15px; }
+.send-btn.disabled { background: var(--color-muted); color: var(--color-text-dim); cursor: not-allowed; }
+.send-btn.stop { background: var(--color-danger); color: #fff; }
+
+/* old composer (before) */
+.before-box { border: 1px dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3); background: hsl(0 72% 51% / .05); }
+.before-box .bb-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-danger); margin-bottom: var(--space-2); font-family: var(--font-mono); }
+.pill.old { border-style: solid; }
+.pill.bug { border-color: var(--color-danger); color: var(--color-danger); background: var(--color-danger-dim); }
+
+/* axis clarity callout */
+.axes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3); }
+.axis-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); }
+.axis-card .ac-h { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-family: var(--font-mono); margin-bottom: 6px; }
+.axis-card.deepaxis .ac-h { color: var(--color-primary); }
+.axis-card.workaxis .ac-h { color: var(--color-warning); }
+.axis-card .ac-opts { display: flex; gap: 6px; margin-bottom: 6px; }
+.axis-card .ac-opt { font-size: 11px; padding: 3px 8px; border-radius: var(--radius-full); background: var(--color-muted); color: var(--color-text-muted); }
+.axis-card .ac-desc { font-size: 11px; color: var(--color-text-dim); line-height: 1.45; }
+.axis-where { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); margin-top: 6px; }
+
+/* panel */
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.mode-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: var(--radius-full); margin-left: auto; }
+.mode-tag.harness { color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); }
+.mode-tag.deep { color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); font-size: 12px; color: var(--color-text-dim); }
+.panel-note { line-height: 1.5; }
+.panel-note b { color: var(--color-primary); }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3); margin-top: var(--space-3); border-top: 1px dashed var(--color-border-soft); line-height: 1.5; }
+.callout b { color: var(--color-primary); }
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+/* this sketch's star is the bottom composer — move the floating toolbar up so it never collides */
+.sketch-toolbar { bottom: auto; top: 60px; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 011 · Mode &amp; Composer</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Status chip + Cancel ★</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Composer → run bar</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Panel-owned, composer quiets</button>
+</nav>
+
+<div class="shell">
+  <div class="nav-rail">
+    <div class="logo"></div>
+    <div class="nav-ico active">💬</div>
+    <div class="nav-ico wf" title="Workflows page (launch from here)">⚙</div>
+    <div class="nav-ico wf">▤</div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-scroll" id="chatScroll"></div>
+    <div class="composer-dock" id="composerDock"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="ph-title">Workspace</span>
+      <span class="mode-tag" id="modeTag">deep</span>
+    </div>
+    <div class="panel-body"><div class="panel-note" id="panelNote"></div></div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">state</span>
+  <div class="toolbar-toggle" id="stToggle">
+    <button data-st="rest" class="on" onclick="setST('rest')">Rest · Deep</button>
+    <button data-st="running" onclick="setST('running')">Harness running</button>
+    <button data-st="cappaused" onclick="setST('cappaused')">cap_paused</button>
+    <button data-st="askpaused" onclick="setST('askpaused')">ask_user</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <button id="beforeBtn" onclick="toggleBefore()">show OLD composer</button>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+let CUR_V='A', CUR_ST='rest', SHOW_BEFORE=false;
+
+/* the simplified 2-pill composer (D-092-UX target) — Provider folded INTO Model */
+function pills(disabled){
+  const d = disabled ? 'disabled' : '';
+  return `<div class="pill-row">
+    <span class="pill ${d}" title="Provider folded into Model"><span class="ic">⌘</span><span class="grp">openai/</span>gpt-5.4 ▾</span>
+    <span class="pill ${d}" title="How the agent thinks — a per-message Deep axis"><span class="ic">⊙</span>General ▾</span>
+    <span class="spacer"></span>
+    ${ disabled
+        ? '<button class="send-btn stop" title="Cancel run">■</button>'
+        : '<button class="send-btn">↑</button>' }
+  </div>`;
+}
+
+/* the OLD composer (before) — 5 pills + the finding-#5 bug */
+function oldComposer(){
+  return `<div class="before-box">
+    <div class="bb-label">✕ before — 5 pills, and the mode toggle wrongly reads “Deep” mid-Harness-run (finding #5)</div>
+    <div class="pill-row" style="flex-wrap:wrap;gap:6px">
+      <span class="pill old"><span class="ic">▤</span>OpenAI ▾</span>
+      <span class="pill old"><span class="ic">⌘</span>gpt-5.4 ▾</span>
+      <span class="pill old"><span class="ic">⊙</span>General ▾</span>
+      <span class="pill old bug"><span class="ic">⚙</span>Deep ▾ ← says “Deep” while a workflow runs</span>
+      <span class="pill old"><span class="ic">⚙</span>pick workflow ▾ ← orphan-launch risk</span>
+    </div>
+  </div>`;
+}
+
+/* axis clarity — the 2×2 the four-pills row blurred */
+function axes(){
+  return `<div class="axes">
+    <div class="axis-card deepaxis">
+      <div class="ac-h">how it thinks</div>
+      <div class="ac-opts"><span class="ac-opt">General</span><span class="ac-opt">Explorer</span></div>
+      <div class="ac-desc">A per-message choice. Stays in the composer.</div>
+      <div class="axis-where">agent_mode · sent per message</div>
+    </div>
+    <div class="axis-card workaxis">
+      <div class="ac-h">free chat vs locked workflow</div>
+      <div class="ac-opts"><span class="ac-opt">Deep</span><span class="ac-opt">Harness</span></div>
+      <div class="ac-desc">Not a toggle. Deep = no workflow running. Harness = you launched one (from the Workflows page).</div>
+      <div class="axis-where">active_workflow_run_id · run-scoped</div>
+    </div>
+  </div>`;
+}
+
+function composerHTML(){
+  const st = CUR_ST;
+  let html = '';
+  if (SHOW_BEFORE) html += oldComposer();
+
+  // cap_paused → a MessageItem-style Continue card ABOVE the composer (never the composer itself)
+  if (st==='cappaused') {
+    html += `<div class="continue-card">
+      <div class="cc-text">Reached the step-budget cap before finishing.<span class="mono">harness · literature_review · merge phase · cap_paused</span></div>
+      <button class="continue-btn">Continue (2 left)</button>
+    </div>`;
+  }
+
+  if (st==='rest') {
+    // clean 2-pill composer; no mode toggle, no picker
+    html += `<div class="ta-wrap focus"><textarea class="ta" rows="1" placeholder="Message…  (Deep is the resting default — just type)">Summarise the key themes in my dissertation</textarea>${pills(false)}</div>`;
+    return html;
+  }
+
+  if (st==='running') {
+    if (CUR_V==='A') {
+      html += `<div class="runchip"><span class="rc-ico">⚙</span><span class="rc-name">Harness · Literature review</span><span class="rc-phase">phase 2/3 · Review</span><span class="spacer"></span><span class="cancel">⏹ Cancel</span></div>`;
+      html += `<div class="ta-wrap disabled"><textarea class="ta" rows="1" placeholder="Workflow running — Cancel to type a new message" disabled></textarea>${pills(true)}</div>`;
+    } else if (CUR_V==='B') {
+      html += `<div class="runbar"><span class="rb-ico">⚙</span><div class="rb-main"><div class="rb-name">Literature review · running</div><div class="rb-prog"><i></i></div><div class="rb-meta">phase 2/3 · Review · 4 agents · 26 sources</div></div><span class="cancel">⏹ Cancel</span></div>`;
+    } else { // C — composer just quiets, mode lives in the panel
+      html += `<div class="ta-wrap disabled"><textarea class="ta" rows="1" placeholder="Running in workspace — follow along in the panel ▸" disabled></textarea>${pills(true)}</div>`;
+    }
+    return html;
+  }
+
+  if (st==='cappaused') {
+    html += `<div class="ta-wrap disabled"><textarea class="ta" rows="1" placeholder="Paused at the step cap — Continue above to resume" disabled></textarea>${pills(true)}</div>`;
+    return html;
+  }
+
+  if (st==='askpaused') {
+    html += `<div class="ta-wrap disabled"><textarea class="ta" rows="1" placeholder="Paused — answer the question in the workspace panel ▸" disabled></textarea>${pills(true)}</div>`;
+    return html;
+  }
+  return html;
+}
+
+function chatHTML(){
+  let html = `<div class="chat-head">Thread · ${CUR_ST==='rest'?'Deep chat':'Literature review'}</div>`;
+  if (CUR_ST==='rest') {
+    html += `<div class="bubble-user">What does the dissertation say about engagement drivers?</div>
+      <div class="answer"><div class="bot"></div><div class="body">Engagement is driven primarily by job and personal resources (UWES framing)… <span class="text-dim">(12 sources)</span></div></div>`;
+    html += `<div style="margin-top:var(--space-4)">${axes()}</div>`;
+  } else {
+    html += `<div class="bubble-user">Review the literature on leadership style, organizational culture, and employee engagement.</div>`;
+  }
+  return html;
+}
+
+function render(){
+  document.getElementById('chatScroll').innerHTML = chatHTML();
+  document.getElementById('composerDock').innerHTML = composerHTML();
+  const harness = (CUR_ST!=='rest');
+  const mt = document.getElementById('modeTag');
+  mt.textContent = harness ? 'harness' : 'deep';
+  mt.className = 'mode-tag ' + (harness?'harness':'deep');
+  const notes = {
+    rest: `<b>Deep is the resting default.</b> No workflow running → the thread is Deep. The composer is just <span class="mono">[Model ▾] [General/Explorer ▾]</span> + your message. To run a workflow you go to the <b>Workflows page</b> (nav ⚙) and hit Run — that puts THIS thread into Harness. There is no Deep/Harness toggle to mislabel, and no picker to orphan-launch.`,
+    running: `<b>Harness — Literature review running.</b> The authoritative mode + live timeline live HERE in the panel (sketch 008). The composer doesn't try to show mode; it just can't accept a new message until the run ends or you Cancel.`,
+    cappaused: `<b>cap_paused.</b> The run hit its step budget. Continue lives as a card in the thread (amber, “Continue (2 left)”), NOT in the composer — so it reads as a thread event, not a setting.`,
+    askpaused: `<b>ask_user paused.</b> The question + draft are answered in the panel (sketch 006/010). The composer stays locked and points you to the panel — it is never the answer surface.`,
+  };
+  document.getElementById('panelNote').innerHTML = notes[CUR_ST] + `<div class="callout"><b>Why this kills finding #5:</b> the bug was the composer's “Deep/Harness” pill reading “Deep” during a Harness run. Removing the pill entirely (mode is server truth, shown in the panel) makes the mislabel impossible.</div>`;
+}
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); render(); }
+function setST(st){ CUR_ST=st; document.querySelectorAll('#stToggle button').forEach(b=>b.classList.toggle('on',b.dataset.st===st)); render(); }
+function toggleBefore(){ SHOW_BEFORE=!SHOW_BEFORE; document.getElementById('beforeBtn').textContent = SHOW_BEFORE?'hide OLD composer':'show OLD composer'; render(); }
+render();
+</script>
+</body>
+</html>

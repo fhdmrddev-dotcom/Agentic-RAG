@@ -22,6 +22,26 @@ logging.getLogger("asyncio").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
+# Phase 093 D-20 — opt-in backend file log-sink. Runs AFTER load_dotenv (so
+# os.environ carries LOG_FILE_PATH) and AFTER the asyncio suppressor above. Unset
+# env var = no handler = byte-identical console-only logging. Imports only stdlib
+# + os, so a top-level import forms no cycle.
+from app.services.logging_sink import install_file_log_sink
+
+# WR-02 (093 gap-closure review): belt-and-suspenders — the installer is itself
+# fail-safe (returns None on a filesystem error), but guard the call site too so
+# a diagnostic sink can never block startup, matching the best-effort posture of
+# every other hook in this module.
+try:
+    _log_sink_path = install_file_log_sink()
+    if _log_sink_path:
+        logger.info("backend file log-sink active: %s", _log_sink_path)
+except Exception:  # noqa: BLE001
+    logger.warning(
+        "backend file log-sink failed to install; continuing console-only",
+        exc_info=True,
+    )
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -210,7 +230,61 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
+    # Phase 091 HARNESS-03 — resume runs left `active` by a restart. CLAIMS each
+    # run (CAS) so WORKER_COUNT=2 workers never double-execute (Pitfall 7), and
+    # resumes a mid-ask_user phase correctly (answered → proceed; pending →
+    # re-subscribe+re-emit, subscribe-before-emit). Spawned as a BACKGROUND task so
+    # a slow resume never blocks startup; best-effort (logs + continues on error).
+    async def _resume_stranded():
+        try:
+            from app.services.harness_engine import resume_stranded_workflows
+            from app.dependencies import get_redis
+            count = await resume_stranded_workflows(
+                pool=await get_pg_pool(), redis=get_redis()
+            )
+            if count:
+                logger.info("Harness resume sweep re-ran %d stranded run(s)", count)
+        except Exception:
+            logger.exception("Harness resume sweep failed (app continues)")
+
+    asyncio.create_task(_resume_stranded())
+
+    # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
+    # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
+    # the app continues; the NEXT cadence re-runs). Idempotent by construction
+    # (sweep_expired SELECTs only `expires_at <= now()` and DELETE-rowcount-skips a
+    # row a sibling worker raced), so WORKER_COUNT=2 is safe with NO lock — every
+    # worker can run its own sweep harmlessly. ALL sweep logic lives in
+    # template_service (this is a thin call-through). The guarantee is the read
+    # filter (Plans 03/04); this sweep is pure garbage collection.
+    async def _sweep_expired_templates():
+        while True:
+            try:
+                from app.services.template_service import sweep_expired
+                from app.dependencies import get_supabase
+                n = await sweep_expired(pool=await get_pg_pool(), supabase=get_supabase())
+                if n:
+                    logger.info("Template sweep deleted %d expired template(s)", n)
+            except Exception:
+                logger.exception("Template sweep failed (app continues)")
+            await asyncio.sleep(15 * 60)   # D-07 ~15 min cadence
+
+    asyncio.create_task(_sweep_expired_templates())
+
     yield
+
+    # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
+    # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
+    # the producer-cancel loop below. Set first so there is NO wake-ordering race:
+    # any paused harness producer that the sentinel/cancel wakes will observe the
+    # flag and leave its workflow_runs row active+anchored for the next-boot resume
+    # sweep, instead of terminalizing to 'failed'. Deep runs are unaffected.
+    # Best-effort: a failed import never blocks shutdown.
+    try:
+        from app.services.harness_engine import set_app_shutting_down
+        set_app_shutting_down(True)
+    except Exception:  # noqa: BLE001
+        logger.exception("set_app_shutting_down failed at lifespan shutdown")
 
     # Phase 085 D-085-07 — broadcast ask_user shutdown sentinel BEFORE cancelling
     # the producer tasks below (RESEARCH §A.6 PUBLISH-first ordering). Allows
@@ -321,7 +395,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -337,6 +411,7 @@ app.include_router(sandbox_outputs.router)
 app.include_router(workspace.router)
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
+app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

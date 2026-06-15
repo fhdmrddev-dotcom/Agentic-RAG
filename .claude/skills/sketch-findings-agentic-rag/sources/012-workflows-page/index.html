@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 012 — Workflows Page (library + launcher)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 012 — Workflows Page (BUILD NOW: library + launcher)
+   Q: Where do you browse + launch a workflow, and how does Run hand
+      off INTO a chat thread? (workflows = a mode of a thread, never
+      page-resident — the page redirects into a thread that streams.)
+   Real content = the 4 seed workflows (BRIEF §3).
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { display: grid; grid-template-columns: 220px 1fr; height: calc(100vh - 52px); overflow: hidden; }
+.shell.in-thread { grid-template-columns: 52px 1fr clamp(320px,32%,420px); }
+
+/* full nav (page mode) */
+.nav { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); padding: var(--space-3); display: flex; flex-direction: column; gap: 2px; }
+.nav .logo { width: 32px; height: 32px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin: 0 0 var(--space-4) var(--space-2); }
+.nav-item { display: flex; align-items: center; gap: var(--space-3); padding: 9px var(--space-3); border-radius: var(--radius-md); color: var(--color-text-muted); font-size: var(--text-sm); cursor: pointer; }
+.nav-item:hover { background: var(--color-accent); color: var(--color-text); }
+.nav-item.active { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; }
+.nav-item .ic { width: 18px; text-align: center; }
+/* collapsed rail (thread mode) */
+.rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.rail .rico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); }
+.rail .rico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+/* page */
+.page { overflow-y: auto; padding: var(--space-8) var(--space-10) 72px; }
+.page-head { display: flex; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-2); }
+.page-head h1 { font-family: var(--font-headline); font-size: var(--text-2xl); margin: 0; }
+.page-head .sub { color: var(--color-text-dim); font-size: var(--text-sm); flex: 1; }
+.build-new { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); padding: 8px var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border: none; cursor: pointer; font-weight: 600; }
+.section-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--color-text-dim); margin: var(--space-6) 0 var(--space-3); font-family: var(--font-mono); }
+
+/* workflow card */
+.wf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
+.wf-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); transition: all var(--dur-fast) var(--ease-out); }
+.wf-card:hover { border-color: var(--color-primary-glow); box-shadow: var(--shadow-md); }
+.wf-card .wf-top { display: flex; align-items: flex-start; gap: var(--space-3); }
+.wf-icon { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: var(--color-primary-dim); color: var(--color-primary); }
+.wf-card .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.wf-card .wf-purpose { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.5; }
+.wf-tags { display: flex; gap: 5px; align-items: center; }
+.scope-tag { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-full); border: 1px solid var(--color-border-soft); color: var(--color-text-dim); }
+.scope-tag.global { color: var(--color-success); border-color: hsl(142 71% 45% / .4); }
+.scope-tag.seed { color: var(--color-success); border-color: hsl(142 71% 45% / .4); }
+.scope-tag.draft { color: var(--color-warning); border-color: hsl(38 92% 60% / .4); }
+.scope-tag.published { color: var(--color-primary); border-color: var(--color-primary-glow); }
+.scope-tag.shared { color: var(--color-accent-violet); border-color: hsl(258 90% 66% / .4); }
+/* search + filter toolbar */
+.wf-toolbar { display:flex; align-items:center; gap:var(--space-3); margin:var(--space-5) 0 var(--space-4); }
+.wf-search { flex:1; max-width:380px; display:flex; align-items:center; gap:var(--space-2); background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:8px var(--space-3); }
+.wf-search input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-family:inherit; font-size:var(--text-sm); }
+.wf-search input::placeholder { color:var(--color-text-dim); }
+.wf-filters { display:flex; gap:4px; }
+.wf-filter { font-size:var(--text-xs); padding:6px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.wf-filter:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.wf-filter.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.wf-count { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.wf-empty { padding:var(--space-8); text-align:center; color:var(--color-text-dim); font-size:var(--text-sm); }
+
+/* phase chain (mini) */
+.chain { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.chain .ph { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--color-muted); border: 1px solid var(--color-border-soft); font-size: 11px; }
+.chain .ph .pt { font-family: var(--font-mono); font-size: 8.5px; color: var(--color-text-dim); text-transform: uppercase; }
+.chain .arrow { color: var(--color-text-dim); font-size: 10px; }
+.chain .ph.t-prog { border-left: 2px solid var(--color-text-dim); }
+.chain .ph.t-single { border-left: 2px solid var(--color-primary); }
+.chain .ph.t-agent { border-left: 2px solid var(--color-success); }
+.chain .ph.t-batch { border-left: 2px solid var(--color-accent-violet); }
+.chain .ph.t-human { border-left: 2px solid var(--color-warning); }
+.tool-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.tool-chip { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-muted); border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm); }
+
+.wf-foot { display: flex; align-items: center; gap: var(--space-3); margin-top: auto; padding-top: var(--space-2); border-top: 1px solid var(--color-border-soft); }
+.wf-input-hint { flex: 1; font-size: 11px; color: var(--color-text-dim); }
+.wf-input-hint .mono { font-family: var(--font-mono); color: var(--color-text-muted); }
+.run-btn { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 600; padding: 7px var(--space-4); border-radius: var(--radius-md); background: var(--color-warning); color: hsl(240 60% 8%); border: none; cursor: pointer; }
+.run-btn:hover { filter: brightness(1.08); }
+.view-btn { font-size: var(--text-sm); padding: 7px var(--space-3); border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); cursor: pointer; }
+
+.build-card { border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: transparent; padding: var(--space-4); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); text-align: center; min-height: 180px; }
+.build-card .bc-icon { font-size: 22px; color: var(--color-primary); }
+.build-card .bc-title { font-weight: 600; font-size: var(--text-sm); }
+.build-card .bc-sub { font-size: 11px; color: var(--color-text-dim); }
+.v29-pill { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--color-accent-violet); color: #fff; }
+
+/* master-detail (B) */
+.md-grid { display: grid; grid-template-columns: 260px 1fr; gap: var(--space-5); }
+.md-list { display: flex; flex-direction: column; gap: 4px; }
+.md-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); cursor: pointer; border: 1px solid transparent; }
+.md-item:hover { background: var(--color-surface); }
+.md-item.active { background: var(--color-surface); border-color: var(--color-primary-glow); }
+.md-item .md-name { font-weight: 500; font-size: var(--text-sm); }
+.md-detail { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-5); }
+.md-detail .dt-name { font-family: var(--font-headline); font-size: var(--text-lg); margin-bottom: 4px; }
+.md-detail .dt-purpose { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+.dt-section { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); margin: var(--space-4) 0 var(--space-2); font-family: var(--font-mono); }
+
+/* compact list (C) */
+.cl-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-row { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow: hidden; }
+.cl-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; }
+.cl-head:hover { background: var(--color-surface-hi); }
+.cl-head .cl-name { font-weight: 600; font-size: var(--text-sm); }
+.cl-head .cl-purpose { color: var(--color-text-dim); font-size: 12px; flex: 1; }
+.cl-head .caret { color: var(--color-text-dim); transition: transform var(--dur-fast); }
+.cl-row.open .caret { transform: rotate(90deg); }
+.cl-body { display: none; padding: 0 var(--space-4) var(--space-4) 60px; flex-direction: column; gap: var(--space-3); }
+.cl-row.open .cl-body { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+/* launch modal */
+.modal-backdrop { position: fixed; inset: 0; z-index: 9000; background: rgba(3,5,12,.66); backdrop-filter: blur(3px); display: none; place-items: center; padding: var(--space-6); }
+.modal-backdrop.open { display: grid; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.modal { width: min(560px, 92%); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
+.modal-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
+.modal-head .mh-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); flex: 1; }
+.modal-head .close { cursor: pointer; color: var(--color-text-dim); padding: 4px 8px; border-radius: 6px; }
+.modal-body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.field-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 5px; display: block; }
+.field-label .req { color: var(--color-warning); }
+.field-input { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: vertical; }
+.field-select { display: flex; align-items: center; gap: var(--space-2); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
+.modal-foot { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+.modal-foot .hint { flex: 1; font-size: 11px; color: var(--color-text-dim); }
+
+/* in-thread redirect view */
+.redirect-toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 9500; background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / .4); color: var(--color-success); padding: 8px var(--space-4); border-radius: var(--radius-full); font-size: var(--text-sm); box-shadow: var(--shadow-md); display: none; }
+.redirect-toast.show { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow-y: auto; padding: var(--space-6) var(--space-8); }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; margin-bottom: var(--space-4); }
+.bubble-user { align-self: flex-end; max-width: 78%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); }
+.working { display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--text-sm); margin-top: var(--space-4); }
+.working .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); animation: brandPulse 1.5s infinite; flex-shrink: 0; }
+.runchip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); padding: 3px 9px; border-radius: var(--radius-full); }
+/* 009-C live-status seam (the SELECTED 009 winner) — used in the landed thread for consistency */
+.livestatus { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border:1px solid hsl(38 92% 60% / .35); background:var(--color-warning-dim); border-radius:var(--radius-md); max-width:92%; cursor:pointer; margin-top:var(--space-4); }
+.livestatus .ls-spark { width:8px; height:8px; border-radius:50%; background:var(--color-warning); animation:dotBounce 1.2s infinite; flex-shrink:0; }
+.livestatus .ls-text { flex:1; font-size:var(--text-sm); color:var(--color-text); }
+.livestatus .ls-text .mono { color:var(--color-text-muted); font-size:var(--text-xs); }
+.livestatus .ls-open { font-size:var(--text-xs); color:var(--color-primary); }
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .pd { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: pulseGlow 1.6s infinite; }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .mode-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); padding: 2px 7px; border-radius: var(--radius-full); margin-left: auto; }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); }
+.mini-tl { list-style: none; margin: 0; padding: 0; }
+.mini-tl li { position: relative; padding-left: 28px; padding-bottom: 12px; }
+.mini-tl li::before { content:''; position:absolute; left:9px; top:22px; bottom:-12px; width:2px; background: var(--color-border); }
+.mini-tl li:last-child::before { display:none; }
+.mini-tl li.done::before { background: var(--color-success); }
+.mini-tl li.run::before { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.mini-node { position:absolute; left:0; top:6px; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:700; font-family:var(--font-mono); }
+.mini-node.done { background: var(--color-success-dim); color: var(--color-success); border:1.5px solid var(--color-success); }
+.mini-node.run { background: var(--color-warning-dim); color: var(--color-warning); border:1.5px solid var(--color-warning); }
+.mini-node.lock { color: var(--color-text-dim); border:1.5px dashed var(--color-text-dim); }
+.mini-tl .mn { font-weight: 500; font-size: 12.5px; }
+.mini-tl .ms { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); margin-left: 6px; }
+
+/* ── landed thread renders the REAL winning designs (008-D + 009-C + 011-A) ── */
+.thread-banner { display:flex; flex-direction:column; gap:4px; padding-bottom:var(--space-3); margin-bottom:var(--space-3); border-bottom:1px solid var(--color-border-soft); }
+.thread-banner .wf-row { display:flex; align-items:center; gap:var(--space-2); }
+.tb-badge { font-family:var(--font-mono); font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; padding:2px 7px; border-radius:var(--radius-full); color:var(--color-warning); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); }
+.tb-name { font-family:var(--font-headline); font-weight:600; font-size:var(--text-md); }
+.tb-meta { font-size:var(--text-xs); color:var(--color-text-dim); }
+.tb-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+.tb-chip { font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:var(--radius-full); background:var(--color-muted); color:var(--color-text-muted); border:1px solid var(--color-border-soft); }
+.st-ico2 { width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700; font-family:var(--font-mono); }
+.si-done { background:var(--color-success-dim); color:var(--color-success); border:1.5px solid var(--color-success); }
+.si-run { background:var(--color-warning-dim); color:var(--color-warning); border:1.5px solid var(--color-warning); animation:pulseGlow 1.4s infinite; }
+.si-lock { color:var(--color-text-dim); border:1.5px dashed var(--color-text-dim); }
+.ttag { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); background:var(--color-secondary); padding:1px 5px; border-radius:var(--radius-sm); text-transform:uppercase; }
+.spine { list-style:none; margin:0; padding:0; }
+.spine > li { position:relative; padding-left:32px; padding-bottom:12px; }
+.spine > li:last-child { padding-bottom:0; }
+.spine > li::before { content:''; position:absolute; left:11px; transform:translateX(-1px); top:24px; bottom:-14px; width:2px; z-index:0; background:var(--color-border); }
+.spine > li:last-child::before { display:none; }
+.spine > li.s-done::before { background:var(--color-success); }
+.spine > li.s-run::before { background:linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.spine > li.s-lock::before { background:transparent; border-left:2px dashed var(--color-text-dim); width:0; }
+.sp-node { position:absolute; left:1px; top:7px; width:20px; height:20px; z-index:2; display:grid; place-items:center; border-radius:50%; background:hsl(220 40% 8%); }
+.sp-card { border-radius:var(--radius-lg); border:1px solid var(--color-border); background:var(--color-surface); overflow:hidden; }
+.sp-card.run { border-color:hsl(38 92% 60% / .5); box-shadow:0 0 22px hsl(38 92% 60% / .12); }
+.sp-card.locked { background:transparent; border:1px dashed var(--color-border); opacity:.72; }
+.sp-card-head { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3); }
+.sp-card-head .spc-name { font-weight:600; font-size:var(--text-sm); flex:1; }
+.sp-card-head .spc-name.dim { color:var(--color-text-dim); font-weight:500; }
+.sp-card-head .spc-sum { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.sp-card-body { padding:0 var(--space-3) var(--space-3); }
+.sp-subrows { display:flex; flex-direction:column; gap:5px; border-left:1px solid var(--color-border-soft); }
+.sp-subrow { display:flex; align-items:center; gap:var(--space-2); padding:5px var(--space-2); border-radius:var(--radius-sm); background:var(--color-surface-hi); font-size:11.5px; }
+.sp-subrow.run { background:var(--color-warning-dim); }
+.sp-subrow .sa-n { flex:1; } .sp-subrow .sa-s { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); }
+.reuse-note { font-size:10px; color:var(--color-text-dim); margin-top:var(--space-3); padding-top:var(--space-2); border-top:1px dashed var(--color-border-soft); line-height:1.5; }
+.reuse-note b { color:var(--color-primary); }
+/* 011-A composer in the landed thread */
+.tcomposer { border-top:1px solid var(--color-border); background:var(--color-bg-elev1); padding:var(--space-3) var(--space-4) var(--space-4); }
+.t-runchip { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); margin-bottom:var(--space-2); border-radius:var(--radius-md); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); font-size:var(--text-sm); }
+.t-runchip .rc-name { color:var(--color-text); font-weight:500; }
+.t-runchip .rc-phase { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.t-runchip .sp { flex:1; }
+.t-runchip .cancel { font-size:var(--text-xs); color:var(--color-danger); cursor:pointer; padding:3px 8px; border-radius:var(--radius-sm); border:1px solid hsl(0 72% 51% / .35); }
+.t-ta { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:var(--space-3); opacity:.62; }
+.t-ta .ta-ph { color:var(--color-text-dim); font-size:var(--text-sm); }
+.t-pills { display:flex; gap:var(--space-2); margin-top:var(--space-3); }
+.t-pill { font-size:var(--text-xs); padding:5px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:var(--color-bg-elev1); color:var(--color-text-dim); }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3) var(--space-10); line-height: 1.5; border-top: 1px dashed var(--color-border-soft); }
+.callout b { color: var(--color-primary); }
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 012 · Workflows Page</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Card grid ★</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Master-detail</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Compact list</button>
+</nav>
+
+<div class="redirect-toast" id="toast">✓ Opened new thread — workflow running</div>
+<div id="root"></div>
+
+<!-- launch modal -->
+<div class="modal-backdrop" id="launchModal" onclick="if(event.target===this) closeLaunch()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><span class="wf-icon" id="mIcon">📚</span><span class="mh-name" id="mName">Literature review</span><span class="close" onclick="closeLaunch()">✕</span></div>
+    <div class="modal-body">
+      <div id="mChain"></div>
+      <div>
+        <label class="field-label" id="mInputLabel">Topics to review <span class="req">*</span></label>
+        <textarea class="field-input" id="mInput" rows="2"></textarea>
+      </div>
+      <div>
+        <label class="field-label">Knowledge base scope</label>
+        <div class="field-select">📁 DBA · Fahed Mrad Chapters 1-4 (843 chunks) ▾</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint">Run opens a <b style="color:var(--color-text-muted)">new chat thread</b> and streams there.</span>
+      <button class="view-btn" onclick="closeLaunch()">Cancel</button>
+      <button class="run-btn" onclick="doRun()">▶ Run workflow</button>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">flow</span>
+  <div class="toolbar-toggle" id="flowToggle">
+    <button data-f="browse" class="on" onclick="setFlow('browse')">1 · Browse</button>
+    <button data-f="launch" onclick="setFlow('launch')">2 · Launch dialog</button>
+    <button data-f="thread" onclick="setFlow('thread')">3 · In thread</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const PT = { programmatic:['t-prog','server'], llm_single:['t-single','AI write'], llm_agent:['t-agent','agent'], llm_batch_agents:['t-batch','parallel'], llm_human_input:['t-human','human'] };
+const WORKFLOWS = [
+  { id:'b3', icon:'📚', name:'Literature review', source:'seed', purpose:'Split a topic into subtopics, review each in parallel, merge into one integrated, cited review.',
+    inputLabel:'Topics to review', inputPlaceholder:'leadership style; organizational culture; employee engagement',
+    phases:[['Split','programmatic',[]],['Review','llm_batch_agents',['search_documents']],['Merge','llm_single',[]]] },
+  { id:'b1', icon:'🔎', name:'Research → Summarize', source:'seed', purpose:'Research a question against your KB + the web, then write a cited summary.',
+    inputLabel:'Your question', inputPlaceholder:'What does the literature say about engagement drivers?',
+    phases:[['Research','llm_agent',['search_documents','web_search']],['Summarize','llm_single',[]]] },
+  { id:'b2', icon:'🛠️', name:'Plan → Execute → Verify', source:'seed', purpose:'Draft a plan, execute it with code, then self-verify the result.',
+    inputLabel:'The task', inputPlaceholder:'Analyse the demographics table and chart the age distribution',
+    phases:[['Plan','llm_single',[]],['Execute','llm_agent',['search_documents','execute_code']],['Verify','llm_single',[]]] },
+  { id:'b4', icon:'💬', name:'Doc Q&A', source:'seed', purpose:'Draft an answer from the KB, ask you to confirm or correct it, then finalize.',
+    inputLabel:'Your question', inputPlaceholder:'What was the sample size and composition?',
+    phases:[['Draft','llm_agent',['search_documents']],['Confirm','llm_human_input',[]],['Finalize','llm_single',[]]] },
+  { id:'u1', icon:'📄', name:'Contract clause review', source:'draft', purpose:'Extract key clauses from an uploaded contract, flag risks against your playbook, draft a memo.',
+    inputLabel:'Contract file', inputPlaceholder:'(attach the contract to review)',
+    phases:[['Extract','llm_agent',['search_documents']],['Assess risk','llm_single',[]],['Draft memo','llm_agent',['execute_code']]] },
+  { id:'u2', icon:'📝', name:'RFP response draft', source:'published', purpose:'Draft an RFP response from your KB + a response template, with a human review gate before finalizing.',
+    inputLabel:'RFP requirements', inputPlaceholder:'paste the RFP requirements',
+    phases:[['Gather','llm_agent',['search_documents']],['Draft','llm_single',[]],['Your review','llm_human_input',[]],['Finalize','llm_agent',['execute_code']]] },
+  { id:'s1', icon:'📋', name:'Onboarding packet', source:'shared', purpose:'Assemble a new-hire onboarding packet from shared templates + the HR knowledge base.',
+    inputLabel:'New-hire role', inputPlaceholder:'e.g. Senior Analyst, Finance',
+    phases:[['Collect','llm_agent',['search_documents']],['Assemble','llm_agent',['execute_code']]] },
+];
+const SOURCE_LABEL = { seed:'seed', draft:'draft', published:'published', shared:'shared' };
+function sourceTag(s){ return `<span class="scope-tag ${s}">${SOURCE_LABEL[s]||s}</span>`; }
+function matchSource(w){ return FILTER==='all' || w.source===FILTER || (FILTER==='yours' && (w.source==='draft'||w.source==='published')); }
+function matchSearch(w){ const q=SEARCH.trim().toLowerCase(); return !q || w.name.toLowerCase().includes(q) || w.purpose.toLowerCase().includes(q); }
+function filteredWorkflows(){ return WORKFLOWS.filter(w=>matchSource(w)&&matchSearch(w)); }
+
+let CUR_V='A', FLOW='browse', SELECTED=WORKFLOWS[0], SEARCH='', FILTER='all';
+
+function chainHTML(w, big){
+  return `<div class="chain">${w.phases.map((p,i)=>{
+    const [cls,label]=PT[p[1]];
+    const tools = p[2].length? `<span class="tool-chips">${p[2].map(t=>`<span class="tool-chip">${t}</span>`).join('')}</span>`:'';
+    return `${i>0?'<span class="arrow">→</span>':''}<span class="ph ${cls}"><span>${p[0]}</span><span class="pt">${label}</span>${big?tools:''}</span>`;
+  }).join('')}</div>`;
+}
+
+function cardHTML(w){
+  return `<div class="wf-card">
+    <div class="wf-top"><div class="wf-icon">${w.icon}</div>
+      <div style="flex:1"><div class="wf-name">${w.name}</div></div>
+      <div class="wf-tags">${sourceTag(w.source)}</div>
+    </div>
+    <div class="wf-purpose">${w.purpose}</div>
+    ${chainHTML(w)}
+    <div class="wf-foot">
+      <span class="wf-input-hint">needs <span class="mono">${w.inputLabel.toLowerCase()}</span></span>
+      <button class="view-btn" onclick="openLaunch('${w.id}')">View</button>
+      <button class="run-btn" onclick="openLaunch('${w.id}')">▶ Run</button>
+    </div>
+  </div>`;
+}
+
+function renderBrowse(){
+  const buildCard = `<div class="build-card">
+    <div class="bc-icon">＋</div><div class="bc-title">Build a workflow</div>
+    <div class="bc-sub">Describe it in plain English → AI drafts it</div>
+    <span class="v29-pill">v2.9 · sketch 013</span></div>`;
+
+  if (CUR_V==='A') {
+    return `<div class="page">
+      <div class="page-head"><h1>Workflows</h1><span class="sub">Repeatable, locked automations — pick one and Run.</span>
+        <button class="build-new">＋ Build new</button></div>
+      <div class="wf-toolbar">
+        <div class="wf-search"><span>🔎</span><input id="wfSearch" placeholder="Search workflows…" oninput="onSearch(this.value)" value="${SEARCH}"></div>
+        <div class="wf-filters">${['all','seed','yours','shared'].map(f=>`<button class="wf-filter ${FILTER===f?'on':''}" data-f="${f}" onclick="setFilter('${f}')">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}</div>
+      </div>
+      <div id="wfGridMount">${gridCards()}</div>
+    </div>`;
+  }
+  if (CUR_V==='B') {
+    const w = SELECTED;
+    return `<div class="page">
+      <div class="page-head"><h1>Workflows</h1><span class="sub">Repeatable, locked automations — pick one and Run.</span>
+        <button class="build-new">＋ Build new</button></div>
+      <div class="md-grid" style="margin-top:var(--space-4)">
+        <div class="md-list">
+          ${WORKFLOWS.map(x=>`<div class="md-item ${x.id===w.id?'active':''}" onclick="selectWf('${x.id}')"><span class="wf-icon" style="width:28px;height:28px;font-size:13px">${x.icon}</span><span class="md-name">${x.name}</span></div>`).join('')}
+          <div class="md-item" style="opacity:.7"><span class="wf-icon" style="width:28px;height:28px;font-size:13px;background:transparent;border:1px dashed var(--color-border)">＋</span><span class="md-name">Build new <span class="v29-pill">v2.9</span></span></div>
+        </div>
+        <div class="md-detail">
+          <div class="dt-name">${w.icon} ${w.name}</div>
+          <div class="dt-purpose">${w.purpose}</div>
+          <div class="dt-section">Locked phase sequence</div>
+          ${chainHTML(w,true)}
+          <div class="dt-section">Collects at launch</div>
+          <div class="wf-input-hint" style="font-size:12px"><span class="mono">${w.inputLabel.toLowerCase()}</span> · KB folder scope</div>
+          <div style="margin-top:var(--space-5);display:flex;gap:var(--space-3)"><button class="run-btn" onclick="openLaunch('${w.id}')">▶ Run workflow</button></div>
+        </div>
+      </div></div>`;
+  }
+  // C compact list
+  return `<div class="page">
+    <div class="page-head"><h1>Workflows</h1><span class="sub">Repeatable, locked automations — pick one and Run.</span>
+      <button class="build-new">＋ Build new</button></div>
+    <div class="section-label" style="margin-top:var(--space-5)">Available (4)</div>
+    <div class="cl-list">
+      ${WORKFLOWS.map(w=>`<div class="cl-row ${w.id===SELECTED.id?'open':''}">
+        <div class="cl-head" onclick="toggleRow(this.parentElement,'${w.id}')">
+          <div class="wf-icon" style="width:30px;height:30px;font-size:14px">${w.icon}</div>
+          <span class="cl-name">${w.name}</span><span class="cl-purpose">${w.purpose}</span>
+          <button class="run-btn" onclick="event.stopPropagation(); openLaunch('${w.id}')">▶ Run</button>
+          <span class="caret">▸</span>
+        </div>
+        <div class="cl-body">${chainHTML(w,true)}<div class="wf-input-hint" style="font-size:12px">needs <span class="mono">${w.inputLabel.toLowerCase()}</span> · scoped to a KB folder</div></div>
+      </div>`).join('')}
+    </div></div>`;
+}
+
+/* in-thread redirect view — renders the REAL winning designs (008-D + 009-C + 011-A), not a new one */
+function renderThread(){
+  const w = SELECTED;
+  const kickoff = (document.getElementById('mInput') && document.getElementById('mInput').value) || w.inputPlaceholder;
+  const ic = s => `<span class="st-ico2 ${ {done:'si-done',run:'si-run',lock:'si-lock'}[s] }">${ {done:'✓',run:'●',lock:'○'}[s] }</span>`;
+  const subs = [['Leadership style','done'],['Organizational culture','run'],['Employee engagement','run'],['Style × culture','lock']];
+
+  // PANEL = sketch 008-D (banner + RunCards on a spine)
+  const panel = `
+    <div class="thread-banner"><div class="wf-row"><span class="tb-badge">Harness</span><span class="tb-name">${w.name}</span></div>
+      <div class="tb-meta">DBA · Fahed Mrad Chapters 1-4</div>
+      <div class="tb-chips"><span class="tb-chip">Phase 2/3</span><span class="tb-chip">4 agents</span><span class="tb-chip">3 searches</span><span class="tb-chip">9 tool calls</span><span class="tb-chip">26 sources</span></div>
+    </div>
+    <ol class="spine">
+      <li class="s-done"><span class="sp-node">${ic('done')}</span><div class="sp-card"><div class="sp-card-head"><span class="spc-name">Split</span><span class="ttag">server</span><span class="spc-sum">4 subtopics · 0.1s</span></div></div></li>
+      <li class="s-run"><span class="sp-node">${ic('run')}</span><div class="sp-card run"><div class="sp-card-head"><span class="spc-name">Review</span><span class="ttag">parallel</span><span class="spc-sum">running…</span></div><div class="sp-card-body"><div class="sp-subrows">${subs.map(s=>`<div class="sp-subrow ${s[1]==='run'?'run':''}">${ic(s[1])}<span class="sa-n">${s[0]}</span></div>`).join('')}</div></div></div></li>
+      <li class="s-lock"><span class="sp-node">${ic('lock')}</span><div class="sp-card locked"><div class="sp-card-head"><span class="spc-name dim">Merge</span><span class="ttag">AI write</span><span class="spc-sum">queued</span></div></div></li>
+    </ol>
+    <div class="reuse-note">↳ this thread renders the designs you already picked — <b>008-D</b> (timeline) · <b>009-C</b> (chat seam) · <b>011-A</b> (composer). 012 only adds the <b>page</b> you launched from.</div>`;
+
+  // CHAT = sketch 009-C (quiet: prompt + live pointer) ; COMPOSER = sketch 011-A (status chip)
+  return `<div class="rail">
+      <div class="logo"></div>
+      <div class="rico active">💬</div><div class="rico">⚙</div><div class="rico">▤</div>
+    </div>
+    <div class="chat" style="padding:0;display:flex;flex-direction:column">
+      <div style="flex:1;overflow-y:auto;padding:var(--space-6) var(--space-8)">
+        <div class="chat-head">New thread · ${w.name}</div>
+        <div class="bubble-user">${kickoff}</div>
+        <div class="livestatus"><span class="ls-spark"></span><span class="ls-text">Running in workspace — <b>Review (2 / 3)</b> <span class="mono">· panel is live</span></span><span class="ls-open">Open ▸</span></div>
+      </div>
+      <div class="tcomposer">
+        <div class="t-runchip"><span style="color:var(--color-warning)">⚙</span><span class="rc-name">Harness · ${w.name}</span><span class="rc-phase">phase 2/3 · Review</span><span class="sp"></span><span class="cancel">⏹ Cancel</span></div>
+        <div class="t-ta"><span class="ta-ph">Workflow running — Cancel to type a new message</span><div class="t-pills"><span class="t-pill">⌘ openai/gpt-5.4 ▾</span><span class="t-pill">⊙ General ▾</span></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="pd"></span><span class="ph-title">Workspace</span><span class="mode-tag">harness</span></div>
+      <div class="panel-body">${panel}</div>
+    </div>`;
+}
+
+function gridCards(){
+  const list = filteredWorkflows();
+  const showBuild = (FILTER==='all' || FILTER==='yours');
+  const buildCard = showBuild ? `<div class="build-card">
+    <div class="bc-icon">＋</div><div class="bc-title">Build a workflow</div>
+    <div class="bc-sub">Describe it in plain English → AI drafts it</div>
+    <span class="v29-pill">v2.9 · sketch 013</span></div>` : '';
+  const empty = (list.length===0 && !showBuild) ? `<div class="wf-empty">No workflows match “${SEARCH||FILTER}”.</div>` : '';
+  return `<div class="section-label">${list.length} workflow${list.length===1?'':'s'}${FILTER==='all'?'':' · '+FILTER}</div>
+    <div class="wf-grid">${list.map(cardHTML).join('')}${buildCard}</div>${empty}`;
+}
+function onSearch(v){ SEARCH=v; const m=document.getElementById('wfGridMount'); if(m) m.innerHTML=gridCards(); }
+function setFilter(f){ FILTER=f; document.querySelectorAll('.wf-filter').forEach(b=>b.classList.toggle('on', b.dataset.f===f)); const m=document.getElementById('wfGridMount'); if(m) m.innerHTML=gridCards(); }
+
+function render(){
+  const root = document.getElementById('root');
+  const shell = (FLOW==='thread') ? 'shell in-thread' : 'shell';
+  root.innerHTML = `<div class="${shell}">${ FLOW==='thread' ? renderThread() : navHTML() + renderBrowse() }</div>`;
+  if (FLOW!=='thread') document.getElementById('root').insertAdjacentHTML('beforeend', `<div class="callout"><b>Launch hands off INTO a thread.</b> Run → creates a new chat thread, sets <span style="font-family:var(--font-mono)">active_workflow_run_id</span>, and redirects you into it (step 3) with the workflow already streaming in the panel. Workflows are a <b>mode of a thread</b>, never page-resident. Lowest-cost path reuses the existing send endpoint with the workflow attached.</div>`);
+  // modal visibility
+  document.getElementById('launchModal').classList.toggle('open', FLOW==='launch');
+}
+function navHTML(){
+  return `<nav class="nav">
+    <div class="logo"></div>
+    <div class="nav-item"><span class="ic">💬</span> Chats</div>
+    <div class="nav-item active"><span class="ic">⚙</span> Workflows</div>
+    <div class="nav-item"><span class="ic">▤</span> Documents</div>
+    <div class="nav-item"><span class="ic">✦</span> Skills</div>
+    <div class="nav-item"><span class="ic">⚙</span> Settings</div>
+  </nav>`;
+}
+
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); if(FLOW==='launch')FLOW='browse'; syncFlowBtns(); render(); }
+function setFlow(f){ FLOW=f; syncFlowBtns(); render(); }
+function syncFlowBtns(){ document.querySelectorAll('#flowToggle button').forEach(b=>b.classList.toggle('on',b.dataset.f===FLOW)); }
+function selectWf(id){ SELECTED=WORKFLOWS.find(w=>w.id===id); render(); }
+function toggleRow(el,id){ SELECTED=WORKFLOWS.find(w=>w.id===id); el.classList.toggle('open'); }
+function openLaunch(id){ SELECTED=WORKFLOWS.find(w=>w.id===id); FLOW='launch'; syncFlowBtns();
+  document.getElementById('mIcon').textContent=SELECTED.icon;
+  document.getElementById('mName').textContent=SELECTED.name;
+  document.getElementById('mChain').innerHTML=chainHTML(SELECTED,true);
+  document.getElementById('mInputLabel').innerHTML=SELECTED.inputLabel+' <span class="req">*</span>';
+  document.getElementById('mInput').value=SELECTED.inputPlaceholder;
+  render(); }
+function closeLaunch(){ FLOW='browse'; syncFlowBtns(); render(); }
+function doRun(){ FLOW='thread'; syncFlowBtns(); render();
+  const t=document.getElementById('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'&&FLOW==='launch') closeLaunch(); });
+render();
+</script>
+</body>
+</html>

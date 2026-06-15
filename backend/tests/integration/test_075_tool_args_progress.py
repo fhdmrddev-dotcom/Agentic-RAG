@@ -337,7 +337,7 @@ async def _capture_run_events(
     """POST a message + GET the SSE stream; return all parsed events.
 
     Patches:
-      - app.api.threads.create_adaptive_streaming_chat → returns (chunks, mode);
+      - app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat → returns (chunks, mode);
         the threads.py agent loop drives chunks through _on_chunk_openai.
       - generate_thread_title / suggestion_service → no-op.
       - load_user_settings → force active_provider="openai" + llm_model="gpt-4o"
@@ -392,7 +392,7 @@ async def _capture_run_events(
             return (_ClosableIterator(stop_only), calling_mode)
 
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=_adaptive_streaming_side_effect,
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -503,7 +503,9 @@ async def _capture_anthropic_events(events_iter, seeded_thread_info: dict):
             return _ClosableIterator(stop_only)
 
         with patch(
-            "app.api.threads.stream_anthropic",
+            # 092.5 Wave 2: the Anthropic adapter (provider_gateway.anthropic)
+            # now owns the stream_anthropic call — patch it THERE.
+            "app.services.provider_gateway.anthropic.stream_anthropic",
             side_effect=_stream_anthropic_side_effect,
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -836,7 +838,9 @@ async def _capture_google_events(events_iter, seeded_thread_info: dict):
             return _ClosableIterator(stop_only)
 
         with patch(
-            "app.api.threads.stream_google",
+            # 092.5 Wave 2: the Google adapter (provider_gateway.google) now owns
+            # the stream_google call — patch it THERE.
+            "app.services.provider_gateway.google.stream_google",
             side_effect=_stream_google_side_effect,
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

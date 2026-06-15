@@ -36,16 +36,23 @@ import {
   useWorkspaceFiles,
   useAskUserPrompt,
   useViewingThread,
+  usePhases,
+  useTasks,
+  useWorkflowLockForThread,
+  useDerivedPanel,
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "./PanelSection"
 import { PanelEmpty } from "./PanelEmpty"
+import { TemplateUpload } from "./TemplateUpload"
 import { PanelRail } from "./PanelRail"
 import { TodosSection } from "./TodosSection"
 import { FilesSection } from "./FilesSection"
 import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
+import { PhaseTimeline } from "./PhaseTimeline"
+import { BatchResultList } from "./BatchResultList"
 
 export type PanelState = "open" | "rail"
 
@@ -85,6 +92,26 @@ export function WorkspacePanel({
   const { data: todos } = useTodos(threadId)
   const { data: files } = useWorkspaceFiles(threadId)
   const { data: pendingAsks } = useAskUserPrompt(threadId)
+  // Phase 094 (PANEL-08): the harness phase-timeline slice + the server-truth
+  // workflow lock (presence ⇒ harness mode). The Workflow section mounts when
+  // mode==="harness" OR phases exist (DATA-CONTRACT §6), else PanelEmpty.
+  const { data: phases } = usePhases(threadId)
+  // Phase 094 WR-01 (D-06 / SC#6): the run-level sub-agent rows (the honest
+  // per-subtopic `sub_agent_done.summary` source). Mounted thread-scoped beneath
+  // the live timeline so batch sub-results become VISIBLE before the merge — under
+  // the same harness/phases-exist gate as the timeline, AND only when tasks exist.
+  const { data: tasks } = useTasks(threadId)
+  // Phase 095.1 Plan 06 (GAP-1 / WORKSPACE-PARITY): the activity-derived workspace
+  // panel signal. REUSE the existing Plan-02 hook — it already applies the smart
+  // gate (write_todos OR ≥2 deduped MEANINGFUL tools) internally and returns the
+  // stable EMPTY ref when the thread doesn't qualify (so reading it never churns a
+  // chat re-render — PANEL-06 preserved). `derived.length > 0` is the correct
+  // "earns a derived panel" signal; do NOT re-derive the gate here.
+  const derived = useDerivedPanel(threadId)
+  const workflowLock = useWorkflowLockForThread(threadId)
+  const isHarness = workflowLock != null
+  const showTimeline = isHarness || phases.length > 0
+  const showBatchResults = showTimeline && tasks.length > 0
 
   const isMobile = useIsMobile()
 
@@ -92,8 +119,17 @@ export function WorkspacePanel({
   // sets it and VersionDiff consumes it — never orphaned).
   const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null)
 
+  // Phase 095.1 Plan 06 (GAP-1, D-095.1-01/02): include the derived signal so a
+  // thread with ONLY tool-call activity that earns a derived panel (the
+  // no-write_todos cross-provider parity case) renders the panel body instead of
+  // short-circuiting to <PanelEmpty/> — letting TodosSection (precedence 2) show
+  // the derived rows. Without this the derivation was structurally unreachable.
   const hasActivity =
-    todos.length > 0 || files.length > 0 || pendingAsks.length > 0
+    todos.length > 0 ||
+    files.length > 0 ||
+    pendingAsks.length > 0 ||
+    phases.length > 0 ||
+    derived.length > 0
 
   const todosDone = useMemo(
     () => todos.filter((t) => t.status === "completed").length,
@@ -112,10 +148,22 @@ export function WorkspacePanel({
 
       {!hasActivity ? (
         // Empty short-circuit (D3): ONE calm centered state, never four headers.
-        <PanelEmpty />
+        // Phase 100 (D-01): the template-upload affordance must stay reachable on
+        // a no-activity thread — without this, the FilesSection copy of the button
+        // is structurally unreachable exactly where a template-fill flow starts.
+        <PanelEmpty>{threadId ? <TemplateUpload /> : null}</PanelEmpty>
       ) : (
         <>
-          <PanelSection title="Todos" count={{ done: todosDone, total: todos.length }}>
+          {/* Phase 095.1 Plan 06 (GAP-1): keep the Todos count badge HONEST. With
+              derived-only activity there are no REAL todos, so a {done:0,total:0}
+              badge would render a misleading "0/0". Omit the count badge entirely
+              when there are no real todos (PanelSection renders no badge when count
+              is undefined — same omission idiom the Files section uses); the
+              "derived from activity" marker inside TodosSection signals the state. */}
+          <PanelSection
+            title="Todos"
+            count={todos.length > 0 ? { done: todosDone, total: todos.length } : undefined}
+          >
             <TodosSection />
           </PanelSection>
 
@@ -132,6 +180,29 @@ export function WorkspacePanel({
               </p>
             )}
           </PanelSection>
+
+          {/* Phase 094 (PANEL-08): the harness phase-timeline — the 5th section,
+              mounted only for a harness run (server-truth lock) OR when phases
+              exist. Deep / no-run threads never see it (reuses PanelEmpty above). */}
+          {showTimeline && (
+            <PanelSection title="Workflow" count={phases.length || undefined}>
+              <PhaseTimeline threadId={threadId} />
+            </PanelSection>
+          )}
+
+          {/* Phase 094 WR-01 (D-06 / SC#6): the batch sub-results section — the
+              per-subtopic sub_agent_done.summary rows, readable BEFORE the merge.
+              Sibling block beneath the live timeline; mounted only for a harness
+              run/phases-exist context AND when tasks exist (never in Deep mode,
+              never an empty box). Thread-scoped via useTasks (PANEL-09 isolation —
+              the chat never re-renders). */}
+          {showBatchResults && (
+            <PanelSection title="Sub-results" count={tasks.length || undefined}>
+              <div className="px-2 pb-2">
+                <BatchResultList threadId={threadId} />
+              </div>
+            </PanelSection>
+          )}
         </>
       )}
     </div>

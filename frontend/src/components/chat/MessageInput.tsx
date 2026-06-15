@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, Layers, Square } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, Layers, Square, Sparkles, Workflow } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,10 +18,22 @@ interface Provider {
   is_active: boolean
 }
 
+/** Phase 092 (MODE-01 / D-01) — a published workflow the Harness picker can start. */
+interface WorkflowOption {
+  id: string
+  slug: string
+  name: string
+}
+
 interface Props {
   onSend: (content: string) => void
   onStop?: () => void
   disabled: boolean
+  /** 099-08 follow-up (per-thread drafts): the thread this composer is serving.
+   *  Switching threads saves the current text under the OUTGOING thread and
+   *  restores the INCOMING thread's saved draft (new chat = empty). Without
+   *  this, one global composer value follows the user across threads. */
+  threadId?: string | null
   providers?: Provider[]
   selectedProvider?: string
   onProviderChange?: (providerId: string) => void
@@ -32,6 +44,32 @@ interface Props {
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
   onClearPrefill?: () => void
+  // ───────────────────────────────────────────────────────────────────────────
+  // Phase 092 (MODE-01/02 — D-01/D-02/D-03/D-05) — dual-mode toggle + picker.
+  // ───────────────────────────────────────────────────────────────────────────
+  /** "deep" = the existing General/Explorer agent loop; "harness" reveals the
+   *  workflow picker. Undefined = the toggle is hidden (back-compat). This is the
+   *  LAUNCH-toggle state (the user's intent for the NEXT kickoff) — it drives the
+   *  dropdown selection + the kickoff staging, NOT the displayed badge label. */
+  workflowMode?: "deep" | "harness"
+  onWorkflowModeChange?: (mode: "deep" | "harness") => void
+  /** Phase 094 (D-02 — server truth): the DISPLAYED mode-pill label. Derived by
+   *  the parent from `workflowLocked` (reconciled from `active_workflow_run_id`),
+   *  NOT from the stale `workflowMode` launch toggle — this kills finding #5 (a
+   *  running Harness workflow mislabeled "Deep"). Defaults to `workflowMode` when
+   *  absent (back-compat). The dropdown items + kickoff staging keep reading
+   *  `workflowMode`; only the badge TEXT reads this. */
+  displayedMode?: "deep" | "harness"
+  /** Published workflows the Harness picker lists (D-01). */
+  publishedWorkflows?: WorkflowOption[]
+  /** The staged workflow id — sent as workflow_definition_id on the next send (D-02). */
+  selectedWorkflowId?: string | null
+  onWorkflowSelect?: (workflowId: string) => void
+  /** D-03/D-05 — true while this thread is workflow-locked. When true, BOTH the
+   *  Deep/Harness toggle AND the General/Explorer selector are disabled-with-
+   *  tooltip (NOT hidden — avoids the layout jump). Derived by the parent from
+   *  useWorkflowLockForThread(owningThreadId) — never a global flag (SC#3). */
+  workflowLocked?: boolean
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -42,10 +80,23 @@ const PROVIDER_LABELS: Record<string, string> = {
   ollama: "Ollama",
 }
 
+// Per-thread unsent composer drafts (session-scoped, Slack-style). Keyed by
+// thread id; the pre-creation "new chat" composer uses NEW_CHAT_DRAFT_KEY.
+// Module-level on purpose: survives MessageInput re-renders and thread
+// navigation without persisting anything.
+const NEW_CHAT_DRAFT_KEY = "__new__"
+const composerDraftsByThread = new Map<string, string>()
+
+/** Test-only: reset the module-scoped draft map between test cases. */
+export function _resetComposerDraftsForTest() {
+  composerDraftsByThread.clear()
+}
+
 export function MessageInput({
   onSend,
   onStop,
   disabled,
+  threadId,
   providers = [],
   selectedProvider,
   onProviderChange,
@@ -56,9 +107,37 @@ export function MessageInput({
   onAgentModeChange,
   prefillMessage,
   onClearPrefill,
+  workflowMode = "deep",
+  onWorkflowModeChange,
+  displayedMode,
+  publishedWorkflows = [],
+  selectedWorkflowId,
+  onWorkflowSelect,
+  workflowLocked = false,
 }: Props) {
+  // Phase 094 (D-02): the DISPLAYED badge reads server truth. Back-compat: when
+  // the parent passes no `displayedMode`, fall back to the launch toggle.
+  const labelMode = displayedMode ?? workflowMode
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
+  // text and restore the incoming thread's stash (or empty). First mount is a
+  // no-op (prevDraftKeyRef seeds to the current key). valueRef mirrors `value`
+  // so the switch effect reads the LATEST text, not a stale closure.
+  const draftKey = threadId ?? NEW_CHAT_DRAFT_KEY
+  const prevDraftKeyRef = useRef(draftKey)
+  const valueRef = useRef(value)
+  valueRef.current = value
+  useEffect(() => {
+    const prevKey = prevDraftKeyRef.current
+    if (prevKey === draftKey) return
+    const outgoing = valueRef.current
+    if (outgoing.trim()) composerDraftsByThread.set(prevKey, outgoing)
+    else composerDraftsByThread.delete(prevKey)
+    setValue(composerDraftsByThread.get(draftKey) ?? "")
+    prevDraftKeyRef.current = draftKey
+  }, [draftKey])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -76,9 +155,14 @@ export function MessageInput({
 
   const handleSend = () => {
     const trimmed = value.trim()
-    if (!trimmed || disabled) return
+    // Phase 092 (092-06 / F3 — D-05): a locked thread cannot type/send. The
+    // client disable is a COURTESY; the server 409 lock-refusal stays the
+    // authority (StreamsProvider rolls back both optimistic bubbles on a 409).
+    if (!trimmed || disabled || workflowLocked) return
     onSend(trimmed)
     setValue("")
+    // Per-thread drafts: a successful hand-off consumes the draft.
+    composerDraftsByThread.delete(draftKey)
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
@@ -91,7 +175,8 @@ export function MessageInput({
     }
   }
 
-  const canSend = !disabled && value.trim().length > 0
+  // Phase 092 (092-06 / F3): Send is also gated on the per-thread workflow lock.
+  const canSend = !disabled && !workflowLocked && value.trim().length > 0
   const showProviderSelector = providers.length > 1 && selectedProvider && onProviderChange
   const showModelSelector = models.length > 1 && selectedModel && onModelChange
 
@@ -120,8 +205,11 @@ export function MessageInput({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything…"
-              disabled={disabled}
+              // Phase 092 (092-06 / F3 — D-05): a locked thread shows the
+              // "cancel to switch back" hint instead of the usual prompt.
+              placeholder={workflowLocked ? "Workflow running — Cancel to switch back" : "Ask anything…"}
+              title={workflowLocked ? "Workflow running — Cancel to switch back" : undefined}
+              disabled={disabled || workflowLocked}
               rows={1}
               className="w-full resize-none overflow-hidden min-h-[36px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm placeholder:text-muted-foreground/50"
             />
@@ -235,16 +323,25 @@ export function MessageInput({
                 )
               )}
 
-              {/* Agent mode selector */}
+              {/* Agent mode selector (General/Explorer) — D-03: disabled-with-
+                  tooltip while workflow-locked (controlled by the active
+                  workflow), NOT hidden (avoids the layout jump). */}
               {onAgentModeChange && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <DropdownMenuTrigger asChild disabled={workflowLocked}>
                     <button
+                      disabled={workflowLocked}
+                      title={
+                        workflowLocked
+                          ? "Controlled by the active workflow"
+                          : undefined
+                      }
                       className={cn(
                         "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium",
                         "text-muted-foreground hover:text-foreground hover:bg-muted/60",
                         "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         agentMode === "explorer" && "text-primary bg-primary/10",
+                        workflowLocked && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground",
                       )}
                       data-testid="agent-mode-selector"
                     >
@@ -270,6 +367,111 @@ export function MessageInput({
                       Explorer
                       {agentMode === "explorer" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
                     </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* Phase 092 (D-01/D-05): Deep/Harness toggle — sibling of the
+                  agent-mode selector, same rounded-full idiom. Disabled-with-
+                  tooltip while workflow-locked (Cancel to switch back), NOT
+                  hidden (D-05). Harness = amber accent (paused/needs-you color
+                  language); active iff a workflow run is/will be driven. */}
+              {onWorkflowModeChange && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild disabled={workflowLocked}>
+                    <button
+                      disabled={workflowLocked}
+                      title={
+                        workflowLocked
+                          ? "Workflow running — Cancel to switch back"
+                          : undefined
+                      }
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium",
+                        "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                        "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        workflowMode === "harness" && "text-amber-400 bg-amber-400/10",
+                        workflowLocked && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground",
+                      )}
+                      data-testid="workflow-mode-selector"
+                    >
+                      <Workflow className="h-3 w-3 shrink-0" />
+                      {/* Phase 094 (D-02): displayed label = server truth
+                          (labelMode), NOT the stale workflowMode launch toggle.
+                          The dropdown items below keep reading workflowMode. */}
+                      <span>{labelMode === "harness" ? "Harness" : "Deep"}</span>
+                      <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" className="min-w-[180px] mb-1">
+                    <DropdownMenuItem
+                      onSelect={() => onWorkflowModeChange("deep")}
+                      className={cn("text-xs cursor-pointer gap-2", workflowMode === "deep" && "font-medium bg-accent")}
+                    >
+                      <Sparkles className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      Deep
+                      {workflowMode === "deep" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => onWorkflowModeChange("harness")}
+                      className={cn("text-xs cursor-pointer gap-2", workflowMode === "harness" && "font-medium bg-accent")}
+                    >
+                      <Workflow className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      Harness
+                      {workflowMode === "harness" && <span className="ml-auto text-[10px] text-amber-400 font-semibold">active</span>}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* Phase 092 (D-01/D-02): published-workflow picker — only when
+                  Harness is chosen and not locked. Selecting a workflow stages
+                  its id; the next send carries workflow_definition_id (no auto-
+                  start, no inputs form). */}
+              {onWorkflowModeChange && workflowMode === "harness" && !workflowLocked && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium",
+                        "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                        "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        selectedWorkflowId && "text-amber-400 bg-amber-400/10",
+                      )}
+                      data-testid="workflow-picker"
+                    >
+                      <Layers className="h-3 w-3 shrink-0" />
+                      <span>
+                        {publishedWorkflows.find((w) => w.id === selectedWorkflowId)?.name ??
+                          "Pick workflow…"}
+                      </span>
+                      <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" className="min-w-[220px] mb-1 max-h-[280px] overflow-y-auto">
+                    {publishedWorkflows.length === 0 ? (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground/60">
+                        No published workflows yet
+                      </div>
+                    ) : (
+                      publishedWorkflows.map((w) => (
+                        <DropdownMenuItem
+                          key={w.id}
+                          onSelect={() => onWorkflowSelect?.(w.id)}
+                          className={cn(
+                            "text-xs cursor-pointer gap-2",
+                            w.id === selectedWorkflowId && "font-medium bg-accent",
+                          )}
+                          data-testid={`workflow-option-${w.slug}`}
+                        >
+                          <Workflow className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          {w.name}
+                          {w.id === selectedWorkflowId && (
+                            <span className="ml-auto text-[10px] text-amber-400 font-semibold">picked</span>
+                          )}
+                        </DropdownMenuItem>
+                      ))
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

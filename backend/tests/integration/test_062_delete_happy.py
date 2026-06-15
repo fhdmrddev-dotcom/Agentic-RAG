@@ -97,7 +97,7 @@ async def test_cancels_in_flight_producer(redis_client):
         # delay=0.5 × count=20 = ~10s of producer wall-time so DELETE
         # reliably observes a still-running producer.
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (
                 iter(_slow_chunks(delay=0.5, count=20)),
                 CallingMode.NATIVE,

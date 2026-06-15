@@ -27,7 +27,7 @@ def test_iteration_trim_emits_system_warning_when_messages_dropped() -> None:
     """The iteration-level trim_messages_to_fit caller MUST be guarded:
     capture pre-len, call trim, compare post-len, emit system_warning when
     len decreased."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Canonical kind identifier present
@@ -61,7 +61,7 @@ def test_iteration_trim_emits_system_warning_when_messages_dropped() -> None:
 def test_persisted_system_warnings_closure_var_present() -> None:
     """The closure-local accumulator for system warnings (so they can be
     persisted at finalize time) MUST be declared in send_message scope."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Plan-locked variable name: _persisted_system_warnings
@@ -82,7 +82,7 @@ def test_persist_system_message_helper_or_inline_insert_present() -> None:
     on the CHECK constraint; the code SHOULD wrap in try/except and log
     on failure (fail-silent — SSE event remains the user-visible signal).
     """
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Either a helper name OR a hand-rolled INSERT path with role="system"

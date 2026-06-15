@@ -8,11 +8,21 @@ import {
   useLoadingForThread,
   useReconcileErrorForThread,
   useFallbackNoticeForThread,
+  useFailedSendDraftForThread,
+  useWorkflowLockForThread,
+  useStreamActions,
 } from "@/providers/StreamsProvider"
-import { getProviders } from "@/lib/api"
+import {
+  getProviders,
+  getThreadWorkflow,
+  listPublishedWorkflows,
+  ApiError,
+  type PublishedWorkflow,
+} from "@/lib/api"
 import type { Folder, Message, Thread } from "@/types"
 import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
 import { toolLabel } from "@/lib/toolMeta"
+import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
 
 interface Provider {
   id: string
@@ -24,7 +34,7 @@ interface Provider {
 interface Props {
   thread: Thread | null
   onCreateThread: (folderId?: string | null) => Promise<Thread>
-  onTitleUpdate?: (title: string) => void
+  onTitleUpdate?: (threadId: string, title: string) => void
   folders: Folder[]
   prefillMessage?: string | null
   onClearPrefill?: () => void
@@ -53,6 +63,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
+  // Phase 092 (MODE-01 — D-01/D-02): Deep/Harness toggle + published-workflow
+  // picker state. workflowMode toggles the composer between the Deep agent loop
+  // (General/Explorer) and the Harness picker; selectedWorkflowId is the staged
+  // kickoff id sent as workflow_definition_id on the next send.
+  const [workflowMode, setWorkflowMode] = useState<"deep" | "harness">("deep")
+  const [publishedWorkflows, setPublishedWorkflows] = useState<PublishedWorkflow[]>([])
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
   // (BUG-260523-01 close), MessageList streaming prop, and reconcile/
@@ -61,6 +78,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const isStreaming = useStreamingForThread(thread?.id ?? null)
   const fallbackNotice = useFallbackNoticeForThread(thread?.id ?? null)
   const reconcileError = useReconcileErrorForThread(thread?.id ?? null)
+  // 099-08 (UAT L10): refusals the user cannot fix by retrying the SAME send —
+  // the gate-refusal status set (400/403/404/422) + the 409 lock-refusal. The
+  // banner hides Retry for these (Retry on a gate refusal is misleading).
+  const NON_RETRYABLE = new Set([400, 403, 404, 409, 422])
+  const hideRetry =
+    reconcileError instanceof ApiError && NON_RETRYABLE.has(reconcileError.status)
+  // 099-08 (UAT L10): the per-thread stashed prompt from a send refusal. When
+  // present it pre-fills the composer (preferred over the parent prefill prop)
+  // so the user's typed prompt is recoverable, then is cleared on consume.
+  const failedDraft = useFailedSendDraftForThread(thread?.id ?? null)
+  // Phase 092 (MODE-02 — SC#3): the per-thread workflow lock, keyed by the
+  // OWNING thread id (thread?.id) — never viewedThreadId or a global flag, so a
+  // background workflow on another thread cannot lock THIS composer. Drives the
+  // disable-with-tooltip on both selectors (D-03/D-05).
+  const workflowLock = useWorkflowLockForThread(thread?.id ?? null)
+  const workflowLocked = workflowLock !== null
+  const streamActions = useStreamActions()
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when
   // we're actually waiting on data (not on new/empty threads with no fetch).
@@ -83,16 +117,33 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors clear.
     if (!thread) return
     useStreamsStore.setState((s) => {
-      if (!s.reconcileErrors.has(thread.id)) return {}
-      const next = new Map(s.reconcileErrors)
-      next.delete(thread.id)
-      return { reconcileErrors: next }
+      const hasErr = s.reconcileErrors.has(thread.id)
+      // 099-08 (UAT L10): clear the stashed draft symmetrically so dismissing
+      // the banner does not leave a stale draft that re-fills the composer.
+      const hasDraft = s.failedSendDrafts.has(thread.id)
+      if (!hasErr && !hasDraft) return {}
+      const patch: Partial<typeof s> = {}
+      if (hasErr) {
+        const next = new Map(s.reconcileErrors)
+        next.delete(thread.id)
+        patch.reconcileErrors = next
+      }
+      if (hasDraft) {
+        const nextDrafts = new Map(s.failedSendDrafts)
+        nextDrafts.delete(thread.id)
+        patch.failedSendDrafts = nextDrafts
+      }
+      return patch
     })
   }, [thread])
 
   useEffect(() => {
     setAgentMode("default")
     setScopeFolderId(null)
+    // Phase 092: reset the picker on thread switch — the mount reconcile below
+    // re-derives the true Harness/Deep state from GET /threads/{id}/workflow.
+    setWorkflowMode("deep")
+    setSelectedWorkflowId(null)
   }, [thread?.id])
 
   useEffect(() => {
@@ -111,6 +162,46 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       })
       .catch(console.error)
   }, [])
+
+  // Phase 092 (D-01): load the published-workflow picker feed once on mount.
+  useEffect(() => {
+    listPublishedWorkflows()
+      .then(setPublishedWorkflows)
+      .catch(console.error)
+  }, [])
+
+  // Phase 092 (SC#5 / D-v2.5-03): mount-time reconcile of the workflow lock +
+  // Continue state from GET /threads/{id}/workflow — the SOURCE OF TRUTH, never
+  // a stale Realtime/SSE hint. Runs on every thread switch. A locked, non-stale
+  // run sets the per-thread lock (keyed by THIS thread id); a stale/terminal
+  // anchor or Deep mode clears it. This is what survives a page reload (SC#5).
+  useEffect(() => {
+    const tid = thread?.id
+    if (!tid) return
+    const controller = new AbortController()
+    getThreadWorkflow(tid, controller.signal)
+      .then((state) => {
+        if (controller.signal.aborted) return
+        if (state.locked && !state.lock_is_stale && state.active_workflow_run_id) {
+          streamActions.setWorkflowLockForThread(tid, {
+            runId: state.active_workflow_run_id,
+            mode: "harness",
+            capPaused: state.cap_paused,
+            continuesRemaining: state.continues_remaining,
+          })
+        } else {
+          // Deep, or a stale/terminal anchor (SC#5 self-heal) — never leave a
+          // dangling lock on this thread.
+          streamActions.clearWorkflowLockForThread(tid)
+        }
+      })
+      .catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("getThreadWorkflow reconcile failed:", err)
+        }
+      })
+    return () => controller.abort()
+  }, [thread?.id, streamActions])
 
   // Update model list when provider changes
   const handleProviderChange = (providerId: string) => {
@@ -234,6 +325,19 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       // dropped — the empty-until-end-of-run user-observable failure.
       setViewingThread(activeThread.id)
     }
+    // Phase 092 (D-02): a Harness send carries the picked workflow id as the
+    // kickoff field; a Deep send omits it (byte-identical). Stage-then-clear so
+    // a workflow only starts once per pick.
+    const kickoffWorkflowId =
+      workflowMode === "harness" && selectedWorkflowId ? selectedWorkflowId : undefined
+    if (kickoffWorkflowId) {
+      // Phase 094 (PANEL-08): entering Harness Mode auto-opens the workspace
+      // panel to the phase timeline (the ChatLayout expand seam is already
+      // subscribed via subscribeOpenPanel). Fire ONLY on the harness branch —
+      // a Deep send must NOT force the panel open. Scoped to the panel-open
+      // seam so Plan 05's mode-label edit on this file layers cleanly.
+      requestOpenPanel()
+    }
     await sendMessage(
       activeThread.id,
       content,
@@ -241,8 +345,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onTitleUpdate,
       agentMode,
       selectedProvider || undefined,
+      kickoffWorkflowId,
     )
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
+    if (kickoffWorkflowId) {
+      // The workflow is now running; clear the staged pick so the next send is
+      // a normal turn (the lock — derived from the mount/SSE reconcile — keeps
+      // the picker disabled while the run is live).
+      setSelectedWorkflowId(null)
+    }
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, workflowMode, selectedWorkflowId])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -272,6 +383,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onSend={handleSend}
       onStop={stopStreaming}
       disabled={isStreaming}
+      threadId={thread?.id ?? null}
       providers={providers}
       selectedProvider={selectedProvider}
       onProviderChange={handleProviderChange}
@@ -280,8 +392,33 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onModelChange={setSelectedModel}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
-      prefillMessage={prefillMessage}
-      onClearPrefill={onClearPrefill}
+      prefillMessage={failedDraft ?? prefillMessage}
+      onClearPrefill={() => {
+        // 099-08 (UAT L10): clear the stashed draft once the composer consumes
+        // it so it pre-fills exactly once per refusal (not on every render).
+        if (thread?.id) {
+          useStreamsStore.setState((s) => {
+            if (!s.failedSendDrafts.has(thread.id)) return {}
+            const next = new Map(s.failedSendDrafts)
+            next.delete(thread.id)
+            return { failedSendDrafts: next }
+          })
+        }
+        onClearPrefill?.()
+      }}
+      workflowMode={workflowMode}
+      onWorkflowModeChange={setWorkflowMode}
+      // Phase 094 (D-02 — server truth): the DISPLAYED mode badge derives from
+      // workflowLocked (reconciled from active_workflow_run_id at :161-167),
+      // never the stale launch-toggle useState. A running Harness workflow shows
+      // "Harness" regardless of what the local toggle was set to — kills
+      // finding #5. The launch toggle (workflowMode) still drives the dropdown
+      // selection + the :307 kickoff staging, unchanged.
+      displayedMode={workflowLocked ? "harness" : "deep"}
+      publishedWorkflows={publishedWorkflows}
+      selectedWorkflowId={selectedWorkflowId}
+      onWorkflowSelect={setSelectedWorkflowId}
+      workflowLocked={workflowLocked}
     />
   )
 
@@ -382,20 +519,35 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       {reconcileError && (
         <div
           className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1 flex items-center justify-between"
-          data-testid="reconcile-error-banner"
+          data-testid={
+            reconcileError instanceof ApiError && reconcileError.status === 409
+              ? "workflow-lock-error-banner"
+              : "reconcile-error-banner"
+          }
           role="status"
           aria-live="polite"
         >
-          <span>Couldn&apos;t load latest messages. Showing cached version.</span>
+          {/* 099-08 (UAT L10): any ApiError (the 409 lock copy OR a server gate
+              detail, e.g. a disabled-skill 400) shows its server-provided
+              message. Rendered as React text children — never HTML
+              (T-099-08-01). A plain reconcile Error (no status) keeps the
+              cached-version copy + Retry. */}
+          <span>
+            {reconcileError instanceof ApiError
+              ? reconcileError.message
+              : "Couldn't load latest messages. Showing cached version."}
+          </span>
           <span className="flex gap-2 items-center">
-            <button
-              type="button"
-              onClick={handleRetryReconcile}
-              className="underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
-              aria-label="Retry loading messages"
-            >
-              Retry
-            </button>
+            {!hideRetry && (
+              <button
+                type="button"
+                onClick={handleRetryReconcile}
+                className="underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
+                aria-label="Retry loading messages"
+              >
+                Retry
+              </button>
+            )}
             <button
               type="button"
               onClick={dismissReconcileError}

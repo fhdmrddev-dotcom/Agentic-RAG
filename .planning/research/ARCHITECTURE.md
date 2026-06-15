@@ -1,637 +1,451 @@
-# Architecture: Agent Workspace & Panel Integration
+# Architecture Research
 
-**Project:** Agentic RAG v2.7
-**Researched:** 2026-05-27
-**Confidence:** HIGH (all integration points verified against live source files)
+**Domain:** State-machine workflow runtime ("harness") + dual Deep/Harness mode, layered onto an existing multi-provider Agentic-RAG platform (FastAPI + Supabase/Postgres + Redis Streams + React/Zustand)
+**Researched:** 2026-05-30
+**Confidence:** HIGH (every integration claim grounded in the real files named below; the few forward-looking pieces are flagged MEDIUM)
 
----
-
-## 1. Executive Summary
-
-v2.7 adds three surfaces to the existing architecture: (1) a per-thread workspace filesystem backed by a new `workspace_files` table + Supabase Storage hybrid, (2) three new LLM tools (`write_todos`, `task`, `ask_user`) with a `todos` table and a new `ask_user_response` endpoint, and (3) a right-side panel UI consuming the same `<StreamsProvider>` Context via event-type demultiplexing. The harness engine (state machine) and plugin contract are also scoped in the PRD but are architecturally independent modules that extend the same integration seams.
-
-The critical architectural insight: **v2.6 already built the substrate v2.7 needs.** The `<StreamsProvider>` Context was explicitly designed as a multi-consumer surface (SEED-007). New SSE event types ride existing `run:{run_id}` Redis Streams via the same `_emit()` XADD path. The panel is a second consumer of the same EventSource, not a new subscription. No new Redis key patterns. No new background processes.
-
-The riskiest integration point is `backend/app/api/threads.py` (the ~3500 LOC god file), which already has 9+ phases on it and G-5 fires. The `ask_user` tool requires the first-ever **pause/resume mechanism** inside `agent_runner` -- a fundamentally new control flow pattern. Everything else is extension of existing patterns.
+> **Scope note.** This answers "how does the harness state-machine integrate end-to-end with our EXISTING architecture." It validates/refines the v2.7 PRD §3 Theme B design against the *actually-shipped* substrate (which differs materially from what the PRD assumed — see the **PRD-vs-reality deltas** callouts). Plugin Contract (Theme E) is OUT OF SCOPE per D-v2.8-01. The 5 migration numbers/range in the PRD (125-139) are **stale fiction** — the real head is `055_todos_table.sql`, so v2.8 renumbers from **056**.
 
 ---
 
-## 2. Integration Map: New vs Modified Components
+## Standard Architecture
 
-### 2.1 New Backend Modules (create from scratch)
+### System Overview — where the harness sits
 
-| Module | Purpose | Depends On |
-|--------|---------|------------|
-| `backend/app/services/workspace_service.py` | CRUD for workspace_files + versions; hybrid storage (inline bytea vs Storage bucket); diff generation via `difflib` | `get_pg_pool`, `get_supabase` (Storage bucket) |
-| `backend/app/services/harness_engine.py` | State machine: phase registry, transition logic, validator dispatch, tool-whitelist enforcement, audit emit | `get_pg_pool`, `_emit()` |
-| `backend/app/services/todo_service.py` | `write_todos` persistence layer; full-state-replace semantics on `todos` table | `get_pg_pool` |
-| `backend/app/services/workspace_file_loader.py` | Hybrid storage adapter: transparent read from `content_inline` bytea or `content_storage_url` signed-URL | `get_supabase` (Storage) |
-| `backend/app/services/tool_dispatcher.py` | Extracted tool dispatch -- moves the ~800 LOC `elif tool_name ==` chain out of `agent_runner`. Required by G-5. | All tool services, `_emit()` |
-| `backend/plugins/registries.py` | TOOL_PLUGIN_REGISTRY, PANEL_RENDERER_PLUGIN_REGISTRY, PHASE_TYPE_REGISTRY, FILE_PREVIEW_REGISTRY, DATA_SOURCE_REGISTRY, SECRETS_ADAPTER_REGISTRY | None |
-| `backend/plugins/manifest_schema.json` | JSON-Schema for plugin manifests; validated on install and at lifespan startup | None |
-| `frontend/src/components/panel/WorkspacePanel.tsx` | Right-side panel root: collapsible, 4 sections, responsive bottom-sheet on mobile | `useStreamsStore` |
-| `frontend/src/components/panel/TodoSection.tsx` | Todo list display with nesting (parent_id indentation) | `useTodos` hook |
-| `frontend/src/components/panel/WorkspaceFileBrowser.tsx` | File browser for workspace_files; click to preview/diff | `useWorkspaceFiles` hook |
-| `frontend/src/components/panel/WorkflowIndicator.tsx` | Phase indicator for harness mode (hidden in Deep Mode) | `useWorkflow` hook |
-| `frontend/src/components/panel/AskUserPrompt.tsx` | Actionable prompt with choice buttons + free-text; submits to POST endpoint | `useAskUserPrompt` hook |
-| `frontend/src/components/panel/DiffViewer.tsx` | File version diff display using `delta_from_prev` or fetch-both | api.ts workspace endpoints |
-| `frontend/src/hooks/useTodos.ts` | Per-thread todo state from `<StreamsProvider>` Context + reconcile fetch | `useStreamsStore` |
-| `frontend/src/hooks/useWorkspaceFiles.ts` | Per-thread workspace file list from Context + reconcile fetch | `useStreamsStore` |
-| `frontend/src/hooks/useWorkflow.ts` | Per-thread workflow run state from Context + reconcile fetch | `useStreamsStore` |
-| `frontend/src/hooks/useAskUserPrompt.ts` | Per-thread pending ask_user prompt from Context | `useStreamsStore` |
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  FRONTEND (React / Vite / Zustand)                                         │
+│  ┌───────────────┐   ┌─────────────────────────────────────────────────┐  │
+│  │  Chat surface │   │  WorkspacePanel (v2.7)                           │  │
+│  │ (MessageList) │   │  Todos │ Files │ Tasks │ Asks │ ◀NEW▶ Phases     │  │
+│  └──────┬────────┘   └───────────────────────┬─────────────────────────┘  │
+│         │  reads bucketsBySurface            │  reads per-thread Maps      │
+│         └──────────────┬─────────────────────┘  (PANEL-06 isolation)      │
+│                  StreamsProvider  — ONE EventSource per run,               │
+│                  demuxes SSE by event.type → chat bucket OR panel Map      │
+│                  ◀NEW▶ workflow_phase_* handlers → phasesByThread Map      │
+└──────────────────────────────┬───────────────────────────────────────────┘
+                               │ GET /runs/{run_id}/stream?since=N  (replay+tail)
+┌──────────────────────────────┴───────────────────────────────────────────┐
+│  BACKEND (FastAPI, WORKER_COUNT=2)                                         │
+│                                                                            │
+│   threads.py  POST /threads/{id}/messages ── spawns ──▶ agent_runner()     │
+│      (3,186 LOC, G-5 FIRING)                              producer task    │
+│                                                              │             │
+│   ◀NEW EXTRACTION SEAM▶                                       │             │
+│   app/services/agent_loop.py  ◀── run_agent_loop(ctx)  ◀──────┘            │
+│      (the iteration loop + tool-dispatch block, lifted verbatim)           │
+│                          │                                                 │
+│         ┌────────────────┴───────────────┐                                 │
+│   Deep Mode path                   ◀NEW▶ Harness Mode path                 │
+│   (free chat, no gating)          app/services/harness_engine.py           │
+│                                    run_workflow(workflow_run) drives        │
+│                                    phases → calls into:                     │
+│   ┌─────────────────────────────────────────────────────────────────┐     │
+│   │ PHASE EXECUTORS (PHASE_TYPE_REGISTRY)                            │     │
+│   │  programmatic    → PROGRAMMATIC_PHASE_REGISTRY[fn] (no LLM)      │     │
+│   │  llm_single      → 1 drained LLM call (task_service helper)      │     │
+│   │  llm_agent       → run_agent_loop() w/ phase whitelist          │     │
+│   │  llm_batch_agents→ N× run_task_sub_agent() + merge              │     │
+│   │  llm_human_input → ask_user_service pause/resume (verbatim)     │     │
+│   └─────────────────────────────────────────────────────────────────┘     │
+│                          │                                                 │
+│   tool_dispatcher.dispatch_tool(name, args, ctx)  ◀── per-phase whitelist  │
+│      reads ctx.available_tools  (precedent: _handle_task subset gate)      │
+│      ◀NEW▶ refuses tool ∉ whitelist → "tool_not_available_in_phase"        │
+│                          │                                                 │
+│   _emit(redis, run_id, type, **fields) ── XADD ──▶ run:{run_id} Stream     │
+└──────────────────────────────┬───────────────────────────────────────────┘
+                               │
+┌──────────────┬───────────────┴──────────────┬─────────────────────────────┐
+│  Postgres    │  Redis                        │  Supabase Storage           │
+│  runs        │  run:{run_id}  (XADD buffer)  │  workspace-files bucket     │
+│  threads     │  runs_by_thread:{tid}         │                             │
+│  ◀NEW▶       │  runs:active                  │                             │
+│  workflow_*  │  ask_user:{rid}:{tcid}        │                             │
+│  todos,ws_*  │  tasks:global:active          │                             │
+└──────────────┴───────────────────────────────┴─────────────────────────────┘
+```
 
-### 2.2 Modified Backend Files (extend existing)
+### Component Responsibilities
 
-| File | Current LOC | What Changes | Risk |
-|------|-------------|--------------|------|
-| `backend/app/api/threads.py` | ~3500 | (1) Tool dispatch chain extracted to `tool_dispatcher.py` (G-5 mandated refactor). (2) `ask_user` pause/resume: new `asyncio.Event` wait inside tool execution round. (3) Harness mode: pre-check `threads.active_workflow_run_id` before tool dispatch to enforce `workflow_phases.available_tools` whitelist. (4) `_emit()` calls for new SSE event types. (5) New `ASK_USER_EVENTS` module-level registry (same pattern as `RUN_TASKS` at line 92). | **CRITICAL** -- G-5 fires (9+ phases). The `ask_user` pause mechanism is a fundamentally new control flow. Tool dispatch extraction MUST happen first. |
-| `backend/app/services/openai_service.py` | ~570 | (1) Register 8 new tool definitions (workspace_write/read/list/diff/delete + write_todos + task + ask_user). (2) Plugin tool merge: `get_tools()` gains a `+ plugin_tools` extension point. | **MODERATE** -- `get_tools()` at line 514 is a simple list append; adding 8 more dicts is mechanical. |
-| `backend/app/services/sub_agent_service.py` | ~150 | `run_sub_agent` generalized as the implementation backing the `task` tool. Existing function signature preserved as backward-compat alias. New parameters: `model_override`, `system_prompt_override`, `tools` (subset), `max_steps`. Each `task` invocation creates its own `run:{sub_run_id}` Redis Stream. | **MODERATE** -- existing sub-agent pattern is proven; generalization adds kwargs without breaking callers. |
-| `backend/app/main.py` | ~100 | Lifespan extended: `PLUGINS_BOOTSTRAP` env var parsing + `plugin_registry` upsert at startup. | **LOW** |
-| `backend/app/models/thread.py` | ~30 | Add `deep_mode_metadata: dict | None` and `active_workflow_run_id: str | None` fields. | **LOW** |
-| `frontend/src/lib/api.ts` | ~540 | (1) New `StreamCallbacks` fields: `onTodoUpdated`, `onWorkspaceFileWritten`, `onWorkspaceFileDeleted`, `onWorkflowPhaseStart`, `onWorkflowTransition`, `onAskUserPrompt`, `onAskUserResponse`, etc. (2) New API functions: `getWorkspaceFiles()`, `getWorkspaceFileDiff()`, `getWorkflowState()`, `postAskUserResponse()`, `getTodos()`. (3) `subscribeToRun` parser gains ~12 new `else if` arms for the new event types. | **MODERATE** -- follows established pattern. |
-| `frontend/src/stores/streamsStore.ts` | ~130 | Add panel-related state: `todosByThread: Map<string, Todo[]>`, `workspaceFilesByThread: Map<string, WorkspaceFile[]>`, `workflowStateByThread: Map<string, WorkflowState>`, `askUserPromptByThread: Map<string, AskUserPrompt | null>`. | **MODERATE** -- follows the per-thread Map pattern from Phase 075.4 (D-075.4-A1). |
-| `frontend/src/providers/StreamsProvider.tsx` | ~1600 | (1) `makeStreamCallbacks` factory gains callback implementations for all new event types. (2) Reconcile function extended to fetch workspace/todo/workflow state on mount. | **MODERATE** -- additive callbacks following the exact pattern of existing 20+ callbacks. |
-| `frontend/src/components/layout/ChatLayout.tsx` | ~200 | Layout: `<main>` wrapper for chat view splits into chat (~70%) + `<WorkspacePanel>` (~30%, conditionally rendered). Panel toggle button in header. | **MODERATE** -- layout reflow needs responsive breakpoint care. |
-
-### 2.3 New Database Tables (11 migrations, range 125-135)
-
-| Table | Key Columns | RLS Pattern | Notes |
-|-------|-------------|-------------|-------|
-| `workspace_files` | `id, thread_id, path, content_inline, content_storage_url, size_bytes, mime_type, created_by` | Via FK chain: `auth.uid() = (SELECT user_id FROM threads WHERE id = thread_id)` | UNIQUE on `(thread_id, path)`. Hybrid storage: inline bytea <= 256KB, bucket for larger. |
-| `workspace_file_versions` | `id, workspace_file_id, version, content_inline, content_storage_url, delta_from_prev` | Inherits via workspace_file_id FK | Auto-version on every write. `delta_from_prev` is jsonb structured diff (null for v1). |
-| `workflow_definitions` | `id, slug, version, phases (jsonb), entry_phase, published_at` | Owner private + org-shared | Immutable-on-publish (DB trigger). Semver mirrors D-PRD-13 skill versioning. |
-| `workflow_runs` | `id, workflow_definition_id, thread_id, run_id, current_phase_id, status` | Via thread FK | Piggybacks on existing `runs` table + Redis Stream. |
-| `workflow_phases` | `id, workflow_run_id, phase_index, phase_slug, phase_type, status, available_tools[]` | Via workflow_run FK | `available_tools text[]` is the canonical whitelist the dispatcher reads. |
-| `todos` | `id, thread_id, todo_id, content, status, parent_id` | Via thread FK | UNIQUE on `(thread_id, todo_id)`. Full state replace on each `write_todos` call. |
-| `plugin_registry` | `id, slug, version, manifest (jsonb), installed_by, enabled` | super_admin writes; operators read | D-PRD-14 permission tier. JSON-Schema validated on install. |
-| `plugin_extension_points` | `id, plugin_id, extension_type, config, priority, enabled` | Via plugin FK | 6 extension types. Priority for deterministic ordering. |
-| `harness_audit` | `id, workflow_run_id, phase_slug, event_type, details, created_at` | Via workflow_run FK | INSERT-only. Records phase transitions + gate checks + tool refusals. |
-
-Modified tables:
-- `threads` -- add `deep_mode_metadata jsonb`, `active_workflow_run_id uuid FK` (migration 133)
-- `skills` -- add `harness_required` key to `skill_modes jsonb` (migration 134)
-
-### 2.4 New API Routes
-
-| Route | Method | Purpose | Auth |
-|-------|--------|---------|------|
-| `/threads/{thread_id}/workspace/files` | GET | List workspace files for thread | JWT (owner via thread RLS) |
-| `/threads/{thread_id}/workspace/files/{file_id}/versions` | GET | List versions for a file | JWT |
-| `/threads/{thread_id}/workspace/files/{file_id}/diff` | GET | Diff between two versions (`?from=N&to=M`) | JWT |
-| `/threads/{thread_id}/workflow` | GET | Current workflow run state | JWT |
-| `/threads/{thread_id}/workflow/cancel` | POST | Cancel active workflow | JWT |
-| `/threads/{thread_id}/todos` | GET | Current todo list for thread | JWT |
-| `/runs/{run_id}/ask_user_response` | POST | User response to active `ask_user_prompt` | JWT |
-| `/admin/plugins` | GET | List installed plugins | JWT (operator+) |
-| `/admin/plugins` | POST | Install plugin | JWT (super_admin only) |
-| `/admin/plugins/{plugin_id}` | PATCH | Enable/disable plugin | JWT (super_admin only) |
-| `/admin/plugins/{plugin_id}` | DELETE | Uninstall plugin | JWT (super_admin only) |
-
-### 2.5 New SSE Event Types (all ride existing `run:{run_id}` Stream)
-
-| Event Type | Theme | Payload | Consumer |
-|------------|-------|---------|----------|
-| `workspace_file_written` | A | `{path, version, size_bytes, mime_type}` | Panel file browser |
-| `workspace_file_deleted` | A | `{path}` | Panel file browser |
-| `todo_updated` | C | `{todos: Todo[]}` | Panel todo section |
-| `ask_user_prompt` | C | `{prompt, options?, timeout_seconds?}` | Panel ask-user section |
-| `ask_user_response` | C | `{response_text, choice_index?}` | Panel (dismisses prompt) |
-| `workflow_phase_start` | B | `{phase_slug, phase_type, index, available_tools}` | Panel workflow indicator |
-| `workflow_phase_progress` | B | `{phase_slug, detail}` | Panel workflow indicator |
-| `workflow_phase_gate_check` | B | `{phase_slug, validator_results}` | Panel workflow indicator |
-| `workflow_phase_end` | B | `{phase_slug, status, output_summary}` | Panel workflow indicator |
-| `workflow_transition` | B | `{from_phase, to_phase}` | Panel workflow indicator |
-| `workflow_run_complete` | B | `{status, final_artifact_path}` | Panel workflow indicator |
+| Component | Responsibility | Status | Implementation |
+|-----------|----------------|--------|----------------|
+| `harness_engine.py` | Drive a `workflow_run` through ordered phases; own ALL phase transitions; persist phase state to Postgres before/after each phase; emit `workflow_*` SSE | **NEW** | Plain-Python state machine (no LangGraph). Reads `workflow_phases` rows, dispatches to `PHASE_TYPE_REGISTRY` |
+| `agent_loop.py` | The iteration loop + per-iteration tool-dispatch block (lifted from `threads.py:1818-2779`) | **NEW (extracted)** | Called by both Deep Mode (today's path) AND harness `llm_agent` phase |
+| `tool_dispatcher.py` | Route tool call → handler; **enforce per-phase whitelist** | **MODIFIED (1 add)** | Add a pre-check in `dispatch_tool()` reading `ctx.available_tools`; precedent: `_handle_task` already gates on it |
+| `task_service.py` | Spawn child sub-agent (own run row + stream + concurrency caps) | **REUSED/generalized** | `run_task_sub_agent` IS a complete mini agent-loop — `llm_agent`/`llm_batch_agents` build on it |
+| `ask_user_service.py` | Cross-worker pause/resume via Redis pub/sub | **REUSED verbatim** | `llm_human_input` phase calls the existing `_handle_ask_user` flow |
+| `threads.py` | HTTP route + producer-task lifecycle (`_emit`, `_spawn`, `agent_runner` shell, shielded finalize) | **MODIFIED (slimmed)** | Keeps route + finalize; delegates the loop body to `agent_loop.py`; branches Deep vs Harness |
+| `StreamsProvider.tsx` | Demux SSE by event type → chat bucket vs panel Maps | **MODIFIED (+1 Map)** | Add `workflow_phase_*` handlers → `phasesByThread` Map (mirrors the 7 Phase-086 panel handlers) |
+| `WorkspacePanel` | Render todos/files/tasks/asks + **NEW phase timeline** | **MODIFIED (+1 section)** | New `<PhaseTimeline>` reads `usePhases(threadId)` |
+| `panel.py` | GET reconcile endpoints for panel state | **MODIFIED (+routes)** | Add `GET /threads/{id}/workflow` (current run + phases) |
+| Postgres `workflow_definitions/_runs/_phases` | Versioned templates + run instances + per-run phase state (resumable) | **NEW (3 tables)** | RLS via `threads.user_id` FK chain (proven pattern, migration 054/055) |
 
 ---
 
-## 3. Data Flow Diagrams
-
-### 3.1 Workspace Write Flow
+## Recommended Project Structure
 
 ```
-User prompt: "Write a plan"
-    |
-    v
-agent_runner (threads.py:1381) -- LLM returns tool_call: workspace_write("/plan.md", "...")
-    |
-    v
-Tool dispatch (tool_dispatcher.py) -- dispatch_tool("workspace_write", args, ctx)
-    |
-    v
-workspace_service.write_file(thread_id, path, content)
-    |-- content <= 256KB? --> INSERT/UPSERT workspace_files (content_inline = bytea)
-    |-- content > 256KB?  --> Upload to workspace-files bucket
-    |                         INSERT/UPSERT workspace_files (content_storage_url)
-    |
-    v
-workspace_service.create_version(file_id, version_n, content, delta)
-    |-- delta_from_prev = difflib.unified_diff(prev_content, new_content)
-    |
-    v
-_emit(redis, run_id, 'workspace_file_written', path="/plan.md", version=2, ...)
-    |
-    v
-Redis Stream run:{run_id} -- XADD
-    |
-    v
-GET /runs/{run_id}/stream?since=N -- SSE consumer reads XREAD
-    |
-    v
-subscribeToRun parser (api.ts:393) -- else if (t === "workspace_file_written")
-    |
-    v
-callbacks.onWorkspaceFileWritten(path, version, ...) -- in makeStreamCallbacks
-    |
-    v
-streamsStore.workspaceFilesByThread.set(threadId, updatedFiles) -- Zustand update
-    |
-    v
-<WorkspaceFileBrowser> re-renders with new file entry
-```
+backend/app/
+├── api/
+│   ├── threads.py          # MODIFIED: route + finalize stay; loop body extracted; Deep|Harness branch
+│   ├── runs.py             # MODIFIED: + POST /runs/{id}/ask_user_response already exists (reuse for human_input)
+│   ├── panel.py            # MODIFIED: + GET /threads/{id}/workflow ; + POST .../workflow/cancel
+│   └── workflows.py        # NEW: CRUD for workflow_definitions (publish=immutable), POST start a run
+├── services/
+│   ├── agent_loop.py       # NEW (G-5 EXTRACTION): run_agent_loop(loop_ctx) — the lifted iteration loop
+│   ├── harness_engine.py   # NEW: run_workflow() state machine + transition + validator dispatch + audit emit
+│   ├── harness/            # NEW package
+│   │   ├── phase_types.py      # PHASE_TYPE_REGISTRY: 5 executors
+│   │   ├── programmatic.py     # PROGRAMMATIC_PHASE_REGISTRY (typed pure-Python phase fns)
+│   │   ├── validators.py       # VALIDATOR_REGISTRY: json_schema / regex / file_exists / programmatic
+│   │   └── models.py           # Pydantic: PhaseConfig, ValidatorSpec, WorkflowDefinition (config validation)
+│   ├── tool_dispatcher.py  # MODIFIED: + whitelist pre-check in dispatch_tool()
+│   ├── task_service.py     # REUSED: run_task_sub_agent generalizes llm_agent/llm_batch_agents
+│   └── ask_user_service.py # REUSED VERBATIM: llm_human_input
+├── db/
+│   └── workflows.py        # NEW: typed asyncpg helpers (insert_workflow_run, advance_phase, ...) — mirrors db/runs.py
+└── models/
+    └── workflow.py         # NEW: API request/response Pydantic models
 
-### 3.2 ask_user Pause/Resume Flow (New Control Flow Pattern)
-
-```
-agent_runner iteration N -- LLM returns tool_call: ask_user("Which folder?", ["A","B"])
-    |
-    v
-Tool dispatch -- elif tool_name == "ask_user":
-    |
-    v
-_emit(redis, run_id, 'ask_user_prompt', prompt="Which folder?", options=["A","B"])
-    |
-    v
-Redis pub/sub SUBSCRIBE on channel ask_user:{run_id}
-    |                        (producer task suspended; run status = "awaiting_user")
-    |
-    v [Panel renders prompt with choice buttons]
-    |
-User clicks "A" in AskUserPrompt panel section
-    |
-    v
-POST /runs/{run_id}/ask_user_response {response_text: "A", choice_index: 0}
-    |
-    v
-Endpoint does PUBLISH to Redis channel ask_user:{run_id}
-    |
-    v
-Producer's SUBSCRIBE receives message -- agent_runner RESUMES
-    |
-    v
-tool_result = json.dumps({"response_text": "A", "choice_index": 0})
-    |
-    v
-messages.append({"role": "tool", "content": tool_result, ...})
-    |
-    v
-Next iteration continues normally
-```
-
-**Multi-worker safety:** The `ask_user` pause uses Redis pub/sub (not `asyncio.Event`) because with `WORKER_COUNT=2`, the POST endpoint may land on a different worker than the one hosting the producer task. Redis pub/sub is the lightest cross-worker signaling primitive -- one SUBSCRIBE + one PUBLISH per `ask_user` invocation.
-
-### 3.3 Right-Side Panel as Second Stream Consumer
-
-```
-                    <StreamsProvider>
-                         |
-            +-----------+-----------+
-            |                       |
-     Chat surface (70%)     Panel surface (30%)
-            |                       |
-    useThreadMessages()     useTodos(threadId)
-                            useWorkspaceFiles(threadId)
-                            useWorkflow(threadId)
-                            useAskUserPrompt(threadId)
-            |                       |
-     [existing hooks]        [new hooks -- same store]
-            |                       |
-   reads bucketsBySurface   reads todosByThread,
-   Map<"chat", Map<tid,     workspaceFilesByThread,
-   Message[]>>              workflowStateByThread, etc.
-
-Both read from the SAME Zustand store (streamsStore.ts).
-Both receive updates from the SAME EventSource (one per run).
-The StreamsProvider's makeStreamCallbacks factory routes
-events by type to the correct store fields.
-No new subscriptions. No new EventSource connections.
-```
-
-**Why this works:** The existing `subscribeToRun` function in `api.ts` already ignores unknown event types (they fall through the `else if` chain silently). Adding new `else if` arms for workspace/todo/workflow/ask_user events is purely additive. The `StreamsProvider` already manages one SSE connection per active run; panel events piggyback on the same connection.
-
-### 3.4 Harness Engine Tool-Whitelist Enforcement
-
-```
-agent_runner iteration -- about to dispatch tool_name = "execute_code"
-    |
-    v
-Pre-check: threads.active_workflow_run_id IS NOT NULL?
-    |-- NO  --> Deep Mode: dispatch tool normally (existing behavior)
-    |-- YES --> Harness Mode:
-                    |
-                    v
-                Read cached whitelist for current phase
-                (in-memory cache per run_id; refreshed on phase transition)
-                    |
-                    v
-                "execute_code" in available_tools?
-                    |-- YES --> dispatch normally
-                    |-- NO  --> tool_result = {"error": "tool_not_available_in_phase",
-                                              "phase": "research", "allowed": [...]}
-                                _emit(redis, run_id, 'tool_refused', ...)
-                                harness_audit INSERT
-```
-
----
-
-## 4. Component Boundary Definitions
-
-### 4.1 Backend Boundaries
-
-```
-backend/
-  app/
-    api/
-      threads.py              -- MODIFIED: agent_runner calls tool_dispatcher; ask_user
-                                  pause via Redis pub/sub; harness pre-check delegate
-      workspace.py             -- NEW: REST endpoints for workspace files/versions/diff
-      workflow.py              -- NEW: REST endpoints for workflow state + cancel
-      admin_plugins.py         -- NEW: REST endpoints for plugin CRUD
-      runs.py                  -- MODIFIED (minimal): ask_user_response POST endpoint
-    services/
-      tool_dispatcher.py             -- NEW: extracted tool dispatch from threads.py
-      workspace_service.py           -- NEW: workspace CRUD + hybrid storage + versioning
-      workspace_file_loader.py       -- NEW: transparent read from inline or bucket
-      harness_engine.py              -- NEW: state machine + phase registry + validators
-      todo_service.py                -- NEW: todos table CRUD
-      openai_service.py              -- MODIFIED: register 8 new tools + plugin tool merge
-      sub_agent_service.py           -- MODIFIED: generalize run_sub_agent for task tool
-    db/
-      runs.py                  -- EXISTING (no change)
-      workspace.py             -- NEW: asyncpg helpers for workspace tables
-      workflow.py              -- NEW: asyncpg helpers for workflow tables
-      todos.py                 -- NEW: asyncpg helpers for todos table
-    models/
-      thread.py                -- MODIFIED: add deep_mode_metadata + active_workflow_run_id
-      workspace.py             -- NEW: Pydantic models for workspace files/versions
-      workflow.py              -- NEW: Pydantic models for workflow definitions/runs/phases
-      todo.py                  -- NEW: Pydantic model for Todo
-      plugin.py                -- NEW: Pydantic models for plugin manifest/registry
-  plugins/
-    manifest_schema.json       -- NEW: JSON-Schema for plugin manifests
-    registries.py              -- NEW: 6 extension-type registries
-```
-
-### 4.2 Frontend Boundaries
-
-```
 frontend/src/
-  components/
-    panel/
-      WorkspacePanel.tsx              -- NEW: root panel component (collapsible, 4 sections)
-      TodoSection.tsx                 -- NEW: todo list with nesting
-      WorkspaceFileBrowser.tsx        -- NEW: file tree + click-to-preview
-      WorkflowIndicator.tsx           -- NEW: phase progress indicator
-      AskUserPrompt.tsx               -- NEW: actionable prompt UI
-      DiffViewer.tsx                  -- NEW: file version diff display
-    layout/
-      ChatLayout.tsx                  -- MODIFIED: split main area into chat + panel
-  hooks/
-    useTodos.ts                       -- NEW: per-thread todos from store
-    useWorkspaceFiles.ts              -- NEW: per-thread workspace files from store
-    useWorkflow.ts                    -- NEW: per-thread workflow state from store
-    useAskUserPrompt.ts               -- NEW: per-thread pending prompt from store
-  stores/
-    streamsStore.ts                   -- MODIFIED: add panel-related per-thread Maps
-  providers/
-    StreamsProvider.tsx               -- MODIFIED: add callbacks for new event types
-  lib/
-    api.ts                            -- MODIFIED: new StreamCallbacks + parser arms + API fns
-  types/
-    index.ts                          -- MODIFIED: add Todo, WorkspaceFile, WorkflowState types
+├── providers/StreamsProvider.tsx   # MODIFIED: + workflow_phase_* handlers → phasesByThread Map
+├── stores/streamsStore.ts          # MODIFIED: + phasesByThread Map + actions
+├── components/panel/
+│   ├── WorkspacePanel.tsx          # MODIFIED: + <PhaseTimeline> section (auto-open on Harness)
+│   └── PhaseTimeline.tsx           # NEW: locked/current/done glyphs + gate badges + ARIA landmarks
+├── hooks/usePhases.ts              # NEW: reads phasesByThread, reconciles via GET /workflow
+└── lib/api.ts                      # MODIFIED: + workflow_* arms in subscribeToRun SSE parser
 ```
+
+### Structure Rationale
+
+- **`agent_loop.py` extracted FIRST (G-5).** `threads.py` is 3,186 LOC and on the hot-file ledger (9+ phases). The harness must NOT bolt onto it. Extracting the loop body gives both Deep Mode and the `llm_agent` phase ONE shared loop — no fork, no drift.
+- **`harness/` is a package, not one file.** The 5 phase types + 4 validators + Pydantic config models are distinct concerns. `harness_engine.py` owns transitions only; phase *execution* lives in `harness/phase_types.py`.
+- **`db/workflows.py` mirrors the shipped `db/runs.py`** (typed asyncpg helpers owning SQL strings) — keeps blocking-I/O discipline (D-v2.5-01) and asyncpg-pool hot paths (D-073).
 
 ---
 
-## 5. Patterns to Follow
+## Architectural Patterns
 
-### 5.1 SSE Event Emission (proven pattern -- follow exactly)
+### Pattern 1: Per-phase tool whitelist enforcement (the state-machine lock)
 
-Every new event type uses the existing `_emit()` at threads.py:115:
+**What:** The dispatcher refuses any tool call not in the active phase's `available_tools`. This is the headline "LLM cannot skip/reorder/escape phases" guarantee.
+
+**Evidence — the precedent already ships.** `tool_dispatcher.ToolContext.available_tools` exists (line 88) and `_handle_task` already enforces a per-subset refusal (lines 1091-1110): `invalid = [t for t in requested_tools if t not in available ...]`. The harness generalizes this from sub-agent-toolset to per-phase-toolset.
+
+**Minimal, shared-path-safe wiring (the critical cross-provider question):**
 
 ```python
-await _emit(redis, run_id, 'workspace_file_written',
-            path="/plan.md", version=2, size_bytes=1234, mime_type="text/markdown")
+# tool_dispatcher.py — add ONE guard at the top of dispatch_tool(). Additive;
+# zero behavioral change when phase_whitelist is None (Deep Mode).
+async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
+    if ctx.phase_whitelist is not None and tool_name not in ctx.phase_whitelist:
+        return ToolResult(result=json.dumps({
+            "error": "tool_not_available_in_phase",
+            "tool": tool_name,
+            "allowed": sorted(ctx.phase_whitelist),
+        }))
+    handler = _TOOL_REGISTRY.get(tool_name)
+    if handler is None:
+        return ToolResult(result=f"Unknown tool: {tool_name}")
+    return await handler(args, ctx)
 ```
 
-This XADD to `run:{run_id}` is consumed by `GET /runs/{run_id}/stream?since=N`. The frontend's `subscribeToRun` parser adds new `else if` arms. Zero new infrastructure.
+Add `phase_whitelist: frozenset[str] | None = None` as a NEW optional field on `ToolContext`. In Deep Mode it stays `None` → the guard is a no-op → **the shared path is byte-equivalent for all 9 providers.** The refusal rides the existing `tool_result` message append (`threads.py:2700-2708`) — the LLM sees it as a normal tool result, exactly like `_handle_task`'s refusal strings already do. No new SSE event type required, no provider branch.
 
-### 5.2 Per-Thread State in Zustand Store (proven pattern from Phase 075.4)
+> **Why this is cross-provider-safe (075.x lesson):** the guard lives at the *single* dispatch entry, BELOW the provider-specific streaming/parsing code. It never touches `threads.py`'s chunk handlers, the SSE emitter, or any `anthropic_service`/`openai_service` path — the exact shared-path edits that caused the 075.3 cascade. The refusal is a string in a tool_result, the most provider-agnostic surface that exists.
 
-Phase 075.4 (D-075.4-A1) established the pattern of replacing global booleans with per-thread Maps/Sets in `streamsStore.ts`. All new panel state follows this:
+**When the whitelist gets set:** `agent_loop.py` builds `ToolContext` once per iteration (today at `threads.py:2632`). In a harness `llm_agent` phase the loop is invoked with `phase_whitelist=frozenset(phase.available_tools)`. The two ALSO interact with `get_tools()` composition — see Pattern 6.
 
-```typescript
-// In streamsStore.ts
-todosByThread: Map<string, Todo[]>
-workspaceFilesByThread: Map<string, WorkspaceFile[]>
-workflowStateByThread: Map<string, WorkflowState | null>
-askUserPromptByThread: Map<string, AskUserPrompt | null>
+**Trade-offs:** A per-phase whitelist read could add Postgres latency per tool call. Mitigation: the whitelist is passed *into* the loop as a frozenset (resolved once when the phase starts), NOT re-queried per tool call. The PRD §6 row-1 "in-memory cache per run_id" concern is over-engineered — the phase's `available_tools` is a fixed list for the phase's lifetime; pass it by value.
+
+### Pattern 2: Phase types map onto existing primitives (no new orchestration framework)
+
+**What:** All 5 phase types are thin wrappers over already-shipped code. This is the single most important finding — the harness is ~80% composition, ~20% new state machine.
+
+| Phase type | Maps onto | Evidence |
+|---|---|---|
+| `programmatic` | `PROGRAMMATIC_PHASE_REGISTRY[name](input, ctx) -> output` | NEW dict, mirrors `_TOOL_REGISTRY` shape (tool_dispatcher.py:1465). Pure Python, no LLM. |
+| `llm_single` | One drained LLM call | `task_service._stream_one_iteration` (lines 162-193) already does exactly this — `create_adaptive_streaming_chat` + drain in threadpool. Extract/reuse. |
+| `llm_agent` | `run_agent_loop(ctx, phase_whitelist=...)` | The extracted loop (Pattern 1). OR, for an isolated sub-context, `run_task_sub_agent` (task_service.py:196) which is ALREADY a complete max_steps-bounded agent loop with its own run row + stream. |
+| `llm_batch_agents` | N× `run_task_sub_agent` + deterministic merge | `task_service.run_task_sub_agent` (line 196) spawns a child with own `run:{sub_run_id}` stream + per-run `Semaphore(3)` + global Redis-Lua cap (20). Fan out N, `asyncio.gather`, merge by `phase_config.merge_strategy`. |
+| `llm_human_input` | `ask_user_service` pause/resume | `_handle_ask_user` (tool_dispatcher.py:1273) + `subscribe_for_response` + `POST /runs/{id}/ask_user_response` (runs.py:496) ALL exist. The phase emits the prompt and blocks on the SAME pub/sub channel. |
+
+> **PRD-vs-reality delta (major, favorable):** The PRD §3 says `llm_agent` "Mirrors `agent_runner` (threads.py:1059)". Reality is *better* — `task_service.run_task_sub_agent` is a self-contained, cross-provider-safe agent loop with its OWN run row, stream, model resolution, and tool dispatch (it already calls `dispatch_tool` with a constrained `available_tools`). `llm_agent` and `llm_batch_agents` should be built on **`run_task_sub_agent`**, not on the buried `agent_runner`. This means the harness can produce per-phase agent loops *today* by passing `allowed_tools=phase.available_tools` and `max_steps=phase.max_steps`. The whitelist enforcement is already wired into that path (sub_ctx.available_tools + `_SUB_AGENT_EXCLUDED`).
+
+**When to use which loop for `llm_agent`:** Use `run_task_sub_agent` when the phase is a bounded unit (most cases) — it gives isolation + concurrency accounting for free. Use the extracted `run_agent_loop` only when the phase needs the FULL chat history + all the streaming-reliability machinery (transient-reattach, snapshot, etc.) that the top-level loop has and the sub-agent loop intentionally omits.
+
+**`programmatic` example:**
+```python
+# harness/programmatic.py
+PROGRAMMATIC_PHASE_REGISTRY: dict[str, Callable[[dict, "PhaseRunCtx"], Awaitable[dict]]] = {}
+
+def register_programmatic(name: str):
+    def deco(fn): PROGRAMMATIC_PHASE_REGISTRY[name] = fn; return fn
+    return deco
+
+@register_programmatic("schema_validate")
+async def _schema_validate(input: dict, ctx) -> dict:
+    # pure Python — e.g. jsonschema.validate(input["payload"], input["schema"])
+    return {"valid": True, ...}
 ```
 
-### 5.3 Hybrid Storage (proven pattern from Phase 067.4 sandbox-outputs)
+### Pattern 3: Resumable phase state via Postgres (survives uvicorn restart)
 
-The `workspace-files` Supabase Storage bucket mirrors `sandbox-outputs` bucket at `backend/app/api/sandbox_outputs.py:48-67`:
+**What:** Every phase transition writes to `workflow_phases` (Postgres) BEFORE the next phase starts. A worker restart re-reads the row and resumes. This is the D-PRD-08 multi-worker requirement.
+
+**When:** `harness_engine.run_workflow` loops: read current phase row → execute → validate gate → UPSERT phase status + output → advance `workflow_runs.current_phase_id` → emit `workflow_transition`. The write precedes the SSE emit (PRD §6 row-2 ordering; consumers tolerate lag via D-v2.5-03 reconcile).
+
+**Trade-offs:** Phase output stored as `jsonb`. Large outputs (e.g. a generated report) go to `workspace_files` (the bucket) and the phase stores only the path — mirrors the workspace hybrid-storage decision. Don't bloat `workflow_phases.output` with multi-KB blobs.
+
+**Resumption invariant:** On producer (re)spawn for a thread with `threads.active_workflow_run_id IS NOT NULL`, `harness_engine` reads the run + phases and resumes at `status IN ('pending','active')`. A phase that was `active` mid-LLM-call is re-run from the top (LLM calls aren't checkpointed mid-stream — D-v2.5-05 "no auto-retry of paid calls" applies, so re-running a partially-completed `llm_agent` phase needs an idempotency guard or operator confirm; flag as PITFALL).
+
+### Pattern 4: New SSE event types ride the EXISTING run stream (zero new substrate)
+
+**What:** All `workflow_phase_*` / `workflow_transition` / `workflow_run_complete` events go through the same `_emit(redis, run_id, type, **fields)` → XADD → `run:{run_id}` path (`threads.py:109`). The panel consumes via the same `GET /runs/{id}/stream?since=N`.
+
+**Evidence:** This is exactly how Phase 086/087 added `todo_updated`, `workspace_file_written/deleted`, `ask_user_prompt/response`, `sub_agent_start/done`. The wire vocabulary is shared across all providers (one UX, N adapters — `feedback_provider_uniform_ux`).
+
+**Frontend demux (mirrors the 7 Phase-086 handlers at StreamsProvider.tsx:674-702):**
+```ts
+// StreamsProvider.tsx makeStreamCallbacks — ADD alongside onTodoUpdated etc.
+onWorkflowPhaseStart: (phase) =>
+  useStreamsStore.getState().actions.upsertPhaseForThread(threadId, phase),
+onWorkflowTransition: (from, to) =>
+  useStreamsStore.getState().actions.advancePhaseForThread(threadId, from, to),
+onWorkflowRunComplete: (status, artifactPath) =>
+  useStreamsStore.getState().actions.completeWorkflowForThread(threadId, status, artifactPath),
+```
+These write to a NEW `phasesByThread: Map<threadId, PhaseTimeline>` — **never** to `bucketsBySurface`, preserving PANEL-06 (panel events trigger zero chat re-renders, verified pattern). Add `EMPTY_PHASES` module constant for stable empty-reference (StreamsProvider.tsx:101-104 precedent).
+
+**Reconcile-on-mount:** `usePhases(threadId)` fetches `GET /threads/{id}/workflow` on mount (D-v2.5-03 — Realtime/SSE is a hint, fetch is truth), exactly as `useTodos`/`useWorkspaceFiles` reconcile via `panel.py` GET endpoints.
+
+### Pattern 5: Dual-mode wiring (where mode lives, how the lock works)
+
+**What:** Mode is a per-thread property, not per-message. Deep Mode (default) = today's free chat. Harness Mode = a `workflow_run` is active and locks the thread.
+
+**Where mode lives:** `threads.active_workflow_run_id uuid NULL` (NEW column, migration in v2.8). `NULL` = Deep Mode; non-null = Harness Mode. This is the single source of truth the agent_runner branch reads.
+
+**Mode dispatch (in `agent_runner` after history load, ~threads.py:1519):**
+```python
+if thread_row["active_workflow_run_id"]:        # Harness Mode
+    await harness_engine.resume_or_run(workflow_run_id, loop_ctx)
+    return
+# else fall through to today's Deep Mode loop (unchanged)
+```
+
+**Workflow-lock enforcement:** `POST /threads/{id}/workflow/cancel` is the ONLY way to clear `active_workflow_run_id` while a run is `active`/`paused`. Deep→Harness is allowed (spawns a `workflow_run` row, sets the column); Harness→Deep is refused at the API layer until the run reaches a terminal status OR is explicitly cancelled (PRD Theme F / Q-v2.7-05 "allowed with lock").
+
+> **PRD-vs-reality delta:** PRD Theme F proposes `threads.deep_mode_metadata jsonb`. **Drop it for v2.8** — it has no consumer in the locked scope (it was a v3.0 Skill-Studio convenience). The single `active_workflow_run_id` column is sufficient for the dual-mode lock. Adding unused columns violates the lean gate.
+
+### Pattern 6: `get_tools()` composition with the per-phase whitelist
+
+**What:** `get_tools(user_settings)` (openai_service.py:768) returns the full tool SCHEMA list (the JSON the LLM sees). The per-phase whitelist filters this.
+
+**Two distinct surfaces — keep them separate:**
+1. **Tool schemas** (what the LLM is *told* exists) — filter `get_tools()` output by the phase whitelist before passing as `tools_override` to `create_adaptive_streaming_chat`. Precedent: `task_service.py:304-308` already does `sub_tool_schemas = [t for t in get_tools(...) if t["function"]["name"] in allowed_tools]`.
+2. **Tool dispatch** (what the dispatcher *executes*) — `ctx.phase_whitelist` guard (Pattern 1). Belt-and-suspenders: even if a model hallucinates a tool not in its schema list, the dispatcher refuses it.
 
 ```python
-# Write: threshold-gated
-if len(content) <= settings.workspace_inline_threshold_bytes:
-    # UPSERT workspace_files SET content_inline = $content, content_storage_url = NULL
-else:
-    path = f"{thread_id}/{file_id}/v{version}.bin"
-    supabase.storage.from_("workspace-files").upload(path, content)
-    signed_url = supabase.storage.from_("workspace-files").create_signed_url(path, 3600)
-    # UPSERT workspace_files SET content_storage_url = $signed_url, content_inline = NULL
-
-# Read: transparent via workspace_file_loader
-async def load_file_content(file_row) -> bytes:
-    if file_row["content_inline"]:
-        return file_row["content_inline"]
-    else:
-        return await fetch_from_storage(file_row["content_storage_url"])
+# In an llm_agent phase:
+phase_tools = [t for t in get_tools(user_settings)
+               if t["function"]["name"] in phase.available_tools]   # surface 1
+loop_ctx.phase_whitelist = frozenset(phase.available_tools)          # surface 2
 ```
 
-### 5.4 Tool Registration (proven pattern -- follow exactly)
+> **SEED-035 folds in here:** the tool-count budget guard wraps `get_tools()` at this same composition site (cap the number of schemas advertised). Natural home — the whitelist already filters here.
 
-New tool dicts follow the exact shape of existing tools in `openai_service.py`:
+**Trade-offs:** This is the ONE place the harness touches `openai_service`. The change is *additive* (filter an existing list) — no provider branch, no shared-path mutation.
 
-```python
-WORKSPACE_WRITE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "workspace_write",
-        "description": "Write or update a file in the thread's workspace filesystem.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path starting with /"},
-                "content": {"type": "string", "description": "File content to write"},
-            },
-            "required": ["path", "content"],
-        },
-    },
-}
+---
+
+## Data Flow
+
+### Harness run lifecycle
+
+```
+User toggles Harness Mode (or invokes harness-required skill)
+    ↓
+POST /threads/{id}/workflow {definition_id}   (api/workflows.py)
+    ↓ INSERT workflow_runs (status=active) + N workflow_phases (status=pending)
+    ↓ SET threads.active_workflow_run_id = run.id
+POST /threads/{id}/messages  → agent_runner producer spawns
+    ↓ reads active_workflow_run_id → branches to harness_engine.run_workflow()
+    ↓
+┌── for each phase (ordered by phase_index) ──────────────────────────┐
+│  UPSERT phase.status = active ; emit workflow_phase_start            │
+│  dispatch by phase_type → PHASE_TYPE_REGISTRY[type](phase, ctx)      │
+│     programmatic   → pure Python                                     │
+│     llm_single     → 1 drained call                                  │
+│     llm_agent      → run_task_sub_agent(allowed=whitelist, max_steps)│
+│     llm_batch_agents → gather(N× run_task_sub_agent) → merge         │
+│     llm_human_input→ emit ask_user_prompt ; block on pub/sub         │
+│  VALIDATOR_REGISTRY gate → pass? advance : on_failure handler        │
+│  UPSERT phase.status = completed ; output=jsonb ; emit phase_end     │
+│  advance workflow_runs.current_phase_id ; emit workflow_transition   │
+└─────────────────────────────────────────────────────────────────────┘
+    ↓ all phases done
+UPDATE workflow_runs.status=completed ; CLEAR threads.active_workflow_run_id
+emit workflow_run_complete{status, final_artifact_path}
+    ↓ (shielded finalize — threads.py:158-255 block, reused)
 ```
 
-Added to `get_tools()` unconditionally (workspace tools are always available in both modes).
+### RLS data flow (how the new tables RLS against threads)
 
-### 5.5 Reconcile-on-Mount (D-v2.5-03 rule)
+```
+workflow_runs.thread_id  ──FK──▶ threads.id ──user_id──▶ auth.uid()
+   RLS:  USING (auth.uid() = (SELECT user_id FROM threads WHERE id = thread_id))
+   ↑ EXACT pattern shipped in 054_workspace_files.sql:41 + 055_todos_table.sql:25
 
-All new panel hooks fetch state on mount, not only from SSE events:
+workflow_phases.workflow_run_id ──FK──▶ workflow_runs.id ──FK──▶ threads
+   RLS:  USING (auth.uid() = (SELECT t.user_id FROM threads t
+                              JOIN workflow_runs wr ON wr.thread_id = t.id
+                              WHERE wr.id = workflow_run_id))
+   ↑ EXACT 2-hop JOIN pattern from 054:58-66 (workspace_file_versions)
 
-```typescript
-export const useTodos = (threadId: string | null) => {
-  const todos = useStreamsStore((s) =>
-    threadId ? s.todosByThread.get(threadId) ?? [] : []
-  )
-  useEffect(() => {
-    if (!threadId) return
-    getTodos(threadId).then((fetched) => {
-      useStreamsStore.setState((s) => {
-        const next = new Map(s.todosByThread)
-        next.set(threadId, fetched)
-        return { todosByThread: next }
-      })
-    })
-  }, [threadId])
-  return todos
-}
+workflow_definitions  ── NO thread FK (templates are reusable) ──▶
+   RLS:  USING (auth.uid() = created_by OR org_id IS NULL-shared)
+   ↑ owner-private + future org-shared; mirrors skills table ownership
 ```
 
-### 5.6 asyncpg for Hot Paths, aexec for Cold Paths (D-073-04)
+> **Concrete RLS recommendation:** `workflow_runs` and `workflow_phases` RLS against `threads.user_id` via the FK chain — the **proven** pattern (zero new RLS thinking required). `workflow_definitions` is the only table NOT thread-scoped (it's a template); use the skills-style owner/global ownership. All tables carry `org_id uuid NULL` from day 1 (D-PRD-02 forward-compat) but RLS predicates stay user-scoped for v2.8.
 
-New workspace/todo writes that happen inside the agent loop (hot path) use the asyncpg pool via new `backend/app/db/workspace.py` helpers. REST endpoint reads (cold path) can use `aexec` with supabase-py.
+### State management (frontend)
 
----
-
-## 6. Anti-Patterns to Avoid
-
-### 6.1 DO NOT add more tool branches to threads.py inline
-
-The tool dispatch chain at threads.py:2548+ is already ~800 LOC of `elif tool_name == "..."` branches. Adding 8 more tools inline would push it past 1000 LOC. **Extract tool dispatch to a separate module** before adding new tools. This is the G-5 refactor that `threads.py` (9+ phases) owes before more feature work.
-
-### 6.2 DO NOT create a separate EventSource for panel events
-
-The panel MUST consume from the same `subscribeToRun` SSE connection as chat. Creating a second EventSource per run would double the browser's SSE connection count, create event ordering drift, and violate PANEL-STREAMS-01.
-
-### 6.3 DO NOT use asyncio.Event for ask_user cross-worker signaling
-
-`asyncio.Event` is process-local. With `WORKER_COUNT=2`, the POST endpoint may land on a different worker than the producer. Use Redis pub/sub (`SUBSCRIBE`/`PUBLISH` on channel `ask_user:{run_id}`) for cross-worker safety.
-
-### 6.4 DO NOT store workflow phase state in-memory only
-
-Harness phases MUST persist to Postgres (`workflow_phases` table). With multi-worker uvicorn, in-memory state is process-local and lost on restart. Required by HARNESS-RUN-01 and Q-v2.7-04.
-
-### 6.5 DO NOT add harness whitelist checks inline in the tool dispatch chain
-
-The whitelist enforcement should be a single pre-dispatch gate in `tool_dispatcher.py`, not duplicated inside each tool branch. The dispatcher checks once before routing to the tool handler.
-
-### 6.6 DO NOT poll for workspace file changes in the panel
-
-The panel receives workspace file updates via SSE events (`workspace_file_written`/`workspace_file_deleted`). On mount it does a single reconcile fetch (D-v2.5-03 rule). It MUST NOT poll the REST endpoint on an interval.
-
----
-
-## 7. The ask_user Pause/Resume Mechanism (Deep Dive)
-
-This is the most architecturally novel addition. The existing `agent_runner` has no concept of "pause" -- it runs tool calls synchronously within the iteration loop and only stops on `break` (natural completion) or exception.
-
-### 7.1 Recommended Design: Redis Pub/Sub
-
-```python
-# Inside tool_dispatcher.py, when tool_name == "ask_user":
-async def handle_ask_user(args, ctx):
-    prompt = args["prompt"]
-    options = args.get("options")
-    timeout = args.get("timeout_seconds", 3600)
-
-    # 1. Emit SSE event so panel renders the prompt
-    await _emit(ctx.redis, ctx.run_id, 'ask_user_prompt',
-                prompt=prompt, options=options, timeout_seconds=timeout)
-
-    # 2. Update run status
-    await ctx.pool.execute(
-        "UPDATE runs SET status = 'awaiting_user' WHERE run_id = $1", ctx.run_id)
-
-    # 3. Subscribe to Redis channel for the response
-    pubsub = ctx.redis.pubsub()
-    await pubsub.subscribe(f"ask_user:{ctx.run_id}")
-    try:
-        response = None
-        async with asyncio.timeout(timeout):
-            async for message in pubsub.listen():
-                if message["type"] == "message":
-                    response = json.loads(message["data"])
-                    break
-    except asyncio.TimeoutError:
-        response = {"error": "User did not respond within timeout"}
-    finally:
-        await pubsub.unsubscribe(f"ask_user:{ctx.run_id}")
-        await ctx.pool.execute(
-            "UPDATE runs SET status = 'streaming' WHERE run_id = $1", ctx.run_id)
-
-    # 4. Emit response event so panel can dismiss the prompt
-    await _emit(ctx.redis, ctx.run_id, 'ask_user_response', **response)
-
-    return json.dumps(response)
+```
+run:{run_id} SSE ──▶ StreamsProvider demux (by event.type)
+   chat events     → bucketsBySurface Map  → MessageList re-renders
+   workflow events → phasesByThread Map    → PhaseTimeline re-renders ONLY
+                     (PANEL-06: chat selectors never read phasesByThread)
+GET /threads/{id}/workflow ──▶ usePhases reconcile-on-mount (truth source)
 ```
 
-```python
-# In runs.py or a new ask_user.py router:
-@router.post("/runs/{run_id}/ask_user_response")
-async def ask_user_response(run_id: UUID, body: AskUserResponseBody, redis=Depends(get_redis)):
-    # Verify the run exists and is in 'awaiting_user' status
-    # ...
-    payload = {"response_text": body.response_text, "choice_index": body.choice_index}
-    await redis.publish(f"ask_user:{run_id}", json.dumps(payload))
-    return {"ok": True}
-```
+---
 
-### 7.2 Why Redis Pub/Sub Over Alternatives
+## Build Order (dependency-ordered — the deliverable)
 
-| Approach | Cross-Worker Safe | Latency | Complexity | Verdict |
-|----------|-------------------|---------|------------|---------|
-| `asyncio.Event` | NO | ~0ms | Low | Fails with WORKER_COUNT=2 |
-| Redis pub/sub | YES | ~1ms | Low | **Recommended** |
-| Postgres row + polling | YES | 100-500ms | Medium | Wasteful CPU |
-| Redis Stream (existing) | YES | ~1ms | Medium | Overengineered for 1 message |
-| Sticky sessions | YES | ~0ms | High | Requires LB config |
+> Respects the quality gate: extraction → engine → phase types → mode → panel. Each step ships independently behind the `active_workflow_run_id IS NULL` no-op (Deep Mode stays byte-identical throughout).
 
-Redis pub/sub is the lightest option: 1 SUBSCRIBE, 1 PUBLISH, then the channel is gone. The existing `redis.asyncio` client already supports pub/sub. No new infrastructure.
+**Phase A — G-5 Extraction (BLOCKING, ships first, zero feature).**
+Extract `agent_runner`'s loop body (`threads.py:1818-2779`) into `app/services/agent_loop.py::run_agent_loop(loop_ctx)`. `threads.py` keeps the route, producer spawn, `_emit`/`_spawn`, shielded finalize. **Acceptance bar: Deep Mode is byte-identical** — full cross-provider UAT (the 4-axis scoreboard) BEFORE any harness code lands. This satisfies G-5 (the harness sits in a clean module, not bolted onto 3,186 LOC). *No dependency.*
+
+**Phase B — Schema + RLS.**
+Migrations `056_workflow_definitions.sql`, `057_workflow_runs.sql`, `058_workflow_phases.sql`, `059_threads_active_workflow_run_id.sql`. RLS via the 054/055 FK-chain pattern. Pydantic config models (`harness/models.py`) + jsonschema (4.26.0, installed) validator for phase configs. Immutable-on-publish trigger on `workflow_definitions` (mirrors skill-version immutable trigger). *Depends on: nothing (parallel with A).*
+
+**Phase C — Harness engine + 5 phase types + validators.**
+`harness_engine.py` (transition loop, resumable, audit emit) + `harness/phase_types.py` (5 executors wiring to `run_task_sub_agent`/`ask_user_service`/`PROGRAMMATIC_PHASE_REGISTRY`) + `harness/validators.py` (4 kinds). New `workflow_*` SSE events through `_emit`. *Depends on: A (uses `run_agent_loop`/sub-agent loop), B (tables).*
+
+**Phase D — Whitelist enforcement.**
+Add `phase_whitelist` to `ToolContext` + the one guard in `dispatch_tool()` + the `get_tools()` filter at the composition site (folds SEED-035). *Depends on: C (engine sets the whitelist per phase). Can land inside C.*
+
+**Phase E — Dual-mode wiring.**
+`agent_runner` branch on `active_workflow_run_id`; `api/workflows.py` (start run, CRUD); `POST /threads/{id}/workflow/cancel` lock enforcement; folds SEED-029 (Continue button = the per-phase `max_steps` resume affordance). *Depends on: C, D.*
+
+**Phase F — Panel phase-timeline + StreamsProvider extension.**
+`phasesByThread` Map + actions in `streamsStore`; `workflow_phase_*` handlers in `makeStreamCallbacks`; `subscribeToRun` parser arms in `lib/api.ts`; `<PhaseTimeline>` section in `WorkspacePanel` (ARIA landmarks per Theme H); `GET /threads/{id}/workflow` reconcile endpoint; `usePhases` hook. *Depends on: C/E (events to render).*
+
+**Phase G — Eval-harness regression gate + verification.**
+Fold SEED-034 (`scripts/eval_cross_provider.py`) as the CI regression gate; cross-provider × multi-tool × parallel-thread × long-message scoreboard (CLAUDE.md SC#10) on the harness surface; uvicorn-restart-mid-workflow resumability UAT; SEED-036a (`task()` global fair-share for `llm_batch_agents`). *Depends on: all.*
+
+**Critical path:** A → C → E → F. B parallels A. D folds into C. G is the verify wave.
 
 ---
 
-## 8. threads.py God-File Extraction Strategy
+## Anti-Patterns
 
-The PRD section 9 row 5 claims: "v2.7 adds phase-dispatcher pre-check logic to `threads.py:1059` -- adds ~30 LOC, NOT a major compound." This is optimistic. The real additions are:
+### Anti-Pattern 1: Editing the shared streaming/parsing path to add phase logic
+**What people do:** Add phase-whitelist checks or workflow branching inside `threads.py`'s chunk handlers (`_on_chunk_openai`), the SSE emitter, or `anthropic_service`.
+**Why it's wrong:** This is *exactly* the 075.3 cross-provider cascade (`feedback_no_cross_provider_regressions`). Every shared-path edit risks breaking a working provider.
+**Do this instead:** All harness logic lives ABOVE the loop (`harness_engine`) or at the SINGLE dispatch entry (`dispatch_tool` guard) — both provider-agnostic. The whitelist refusal is a tool_result string, the most neutral surface.
 
-- 8 new tool branches in the dispatch chain (~200 LOC)
-- ask_user pause/resume mechanism (~50 LOC)
-- Harness whitelist pre-check per tool call (~30 LOC)
-- Harness phase transition calls (~40 LOC)
+### Anti-Pattern 2: Building the harness on `agent_runner` directly (skipping extraction)
+**What people do:** Call into the 3,186-LOC `threads.py` loop from the engine, or copy-paste the loop.
+**Why it's wrong:** G-5 violation; two divergent loops; the next streaming bug must be fixed twice.
+**Do this instead:** Extract once (Phase A); the `llm_agent` phase reuses `run_task_sub_agent` (already a clean loop) or the extracted `run_agent_loop`.
 
-**Recommended extraction (must happen BEFORE any feature work):**
+### Anti-Pattern 3: New Redis namespace / new SSE substrate for workflow events
+**What people do:** A `workflow:{id}` stream parallel to `run:{run_id}`.
+**Why it's wrong:** Breaks the single-EventSource-per-run discipline; the panel would need a second subscription; replay/reconcile machinery duplicated.
+**Do this instead:** `workflow_*` events XADD to `run:{run_id}` via `_emit`. Panel demuxes by type (Phase 086 pattern). Zero new substrate (D-v2.5-08).
 
-1. **Extract tool dispatch** -- move the ~800 LOC `elif tool_name ==` chain (threads.py:2548-3360) to `backend/app/services/tool_dispatcher.py`. Define a `ToolContext` dataclass carrying `redis`, `run_id`, `thread_id`, `supabase`, `pool`, `user_settings`, `current_user`, `folder_subtree_ids`, `scoped_folder_path`. The `agent_runner` calls `result = await dispatch_tool(tool_name, args, tool_ctx)` where `dispatch_tool` routes to per-tool handler functions.
+### Anti-Pattern 4: Querying the whitelist per tool call
+**What people do:** `SELECT available_tools FROM workflow_phases WHERE ...` inside `dispatch_tool`.
+**Why it's wrong:** Postgres roundtrip per tool call; the PRD §6 even proposed an in-memory cache to "fix" this.
+**Do this instead:** Resolve `available_tools` ONCE when the phase starts; pass the frozenset by value into the loop's `ToolContext`. No per-call query, no cache.
 
-2. **Extract ask_user registry** -- the `ASK_USER_EVENTS` dict (if using in-memory fallback) or the Redis pub/sub pattern goes into `tool_dispatcher.py` alongside the `ask_user` handler.
-
-3. **Keep agent_runner in threads.py** -- the iteration loop, LLM streaming, context window management, and finalization logic stay. The refactor extracts dispatch, not the loop.
-
-4. **Harness whitelist enforcement** -- a single gate function `check_tool_allowed(run_id, tool_name) -> bool` in `harness_engine.py`, called by `tool_dispatcher.py` before routing to the handler.
-
-This directly addresses G-5 (refactor between feature waves) on the hot-file ledger for `threads.py`.
-
----
-
-## 9. Suggested Build Order
-
-Based on dependency analysis and risk ordering:
-
-### Wave 0 -- Foundation (no feature dependencies)
-
-| Phase | Goal | Approx Plans | Risk |
-|-------|------|-------------|------|
-| Schema migrations (125-135) | All 11 migrations + RLS + indexes + Storage bucket | 3 | LOW |
-| threads.py tool-dispatch extraction | G-5 mandated. Extract tool dispatch chain to `tool_dispatcher.py`. | 3-4 | MODERATE (large refactor, must preserve all existing behavior) |
-
-### Wave 1 -- Backend Workspace + Tools (after Wave 0)
-
-| Phase | Goal | Approx Plans | Risk |
-|-------|------|-------------|------|
-| Workspace filesystem backend | `workspace_service.py`, `workspace_file_loader.py`, 5 workspace tools, workspace REST endpoints, SSE events | 3 | MODERATE |
-| Three new LLM tools | `todo_service.py`, `task` generalization, `ask_user` pause/resume (Redis pub/sub) | 4 | HIGH (ask_user is novel) |
-
-### Wave 2 -- Frontend Panel (after Wave 1 backend events exist)
-
-| Phase | Goal | Approx Plans | Risk |
-|-------|------|-------------|------|
-| StreamsProvider extension + hooks | New event types in api.ts parser + StreamCallbacks. Panel state in streamsStore.ts. 4 new hooks. | 3 | MODERATE |
-| Panel UI scaffold | WorkspacePanel + ChatLayout split. 4 sections. Responsive. | 5 | MODERATE |
-| Diff viewer + file preview | DiffViewer.tsx, default text/markdown preview, file_preview extension point. | 3 | LOW |
-
-### Wave 3 -- Harness + Plugin (parallelizable with Wave 2)
-
-| Phase | Goal | Approx Plans | Risk |
-|-------|------|-------------|------|
-| Harness engine | harness_engine.py, 5 phase types, validators, tool-whitelist enforcement | 5 | HIGH (complex state machine) |
-| Plugin contract | Manifest schema, 6 registries, loader, /admin/plugins endpoints | 5 | MODERATE |
-| Dual-mode UX | Deep/Harness toggle, skill_modes.harness_required, panel auto-open | 3 | MODERATE |
-
-### Wave 4 -- Reference + Verification
-
-| Phase | Goal | Approx Plans | Risk |
-|-------|------|-------------|------|
-| Reference plugin (PPTX preview) | Validates contract end-to-end | 2 | LOW |
-| Seed workflows | 2-3 example workflow_definitions | 2 | LOW |
-| Cross-cutting verification | E2E flows, accessibility, cross-PRD edits | 3 | LOW |
-
-### Build Order Rationale
-
-- **Tool dispatch extraction FIRST** because every subsequent phase adds to threads.py. Doing it after features ship means a painful rebase.
-- **Workspace before panel** because the panel needs backend events to render. The panel is purely a consumer.
-- **ask_user is the highest-risk tool** because it introduces a pause/resume control flow. Ship it WITH the other tools so the tool dispatcher contract is settled.
-- **Harness after workspace/tools** because the harness extends the tool dispatcher (whitelist enforcement). Building the dispatcher extraction + basic tools first means the harness has clean hooks to plug into.
-- **Plugin contract parallelizes with Wave 2** (panel) since it's primarily backend registry + API work with no frontend dependency until the reference plugin.
+### Anti-Pattern 5: Mid-LLM-call checkpointing for resumability
+**What people do:** Try to resume a paid LLM call from the exact token where uvicorn died.
+**Why it's wrong:** Impossible (provider state is gone) and violates D-v2.5-05 (no auto-retry of paid calls).
+**Do this instead:** Checkpoint at PHASE boundaries only. A phase that was `active` mid-call re-runs from the top with an idempotency guard (or operator confirm for expensive phases). Document the cost.
 
 ---
 
-## 10. Scalability Considerations
+## Scaling Considerations
 
-| Concern | Current Scale | v2.7 Impact | Mitigation |
-|---------|---------------|-------------|------------|
-| workspace_files rows | 0 | ~20 files/thread x 100 threads = 2K rows | Index on thread_id. Trivial. |
-| workspace_file_versions | 0 | ~50 writes/thread x 100 threads = 5K rows/month | No cleanup policy in v2.7. Deferred to v3.4 TTL. Monitor row count. |
-| Storage bucket objects | sandbox-outputs only | workspace-files bucket adds ~10 large files/thread | Supabase Storage scales independently. Signed-URL expiry = 1hr. |
-| SSE events per run | ~50-500 | +5-20 workspace/todo/workflow events per run | MAXLEN~10000 on XADD handles this. |
-| Tool dispatch latency | ~1ms | +1 Postgres round-trip for harness whitelist | Cache whitelist in-memory per run_id; refresh on phase transition. |
-| ask_user pause duration | N/A | Producer task suspended 0-3600s | Redis SUBSCRIBE is zero-CPU. Concern: run_id held in RUN_TASKS during pause -- cleanup if abandoned. |
-| Plugin enumeration | N/A | 1 query per get_tools() call at ~10 plugins | In-memory cache per worker with 60s TTL. |
-| llm_batch_agents fan-out | N/A | N parallel sub-agents per phase | `max_parallel_agents` config (default 5). At 50 concurrent workflow runs x 5 = 250 sub-runs within AnyIO ceiling (200 per worker x 2 workers). |
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 0-100s users | Monolith fine. `workflow_phases` rows are tiny (100s users × 5 runs × 10 phases ≈ 5k rows). Index on `(workflow_run_id, phase_index)`. |
+| 100s-1k users | `llm_batch_agents` fan-out is the pressure point: N sub-agents × M parallel runs can exceed the AnyIO ceiling (~200) + global task cap (20, Redis-Lua). **SEED-036a fair-share folds in here.** Per-phase `max_parallel_agents` config (default 5). |
+| 1k+ users | Multi-worker (WORKER_COUNT=2 default, D-PRD-12) already handles producer distribution. Workflow resumability is cross-worker-safe (Postgres phase state). HNSW index migration (deferred) for RAG, orthogonal to harness. |
 
----
-
-## 11. Risk Assessment
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| threads.py G-5 compounding (9+ phases) | **CRITICAL** | Extract tool dispatch BEFORE adding tools. This research doc explicitly recommends it as Phase 0 work. |
-| ask_user multi-worker race condition | **HIGH** | Redis pub/sub channel per run_id. Test with WORKER_COUNT=2. |
-| Harness state machine complexity | **HIGH** | 5 phase types is ambitious. Ship `llm_single` + `llm_agent` + `llm_human_input` first; `programmatic` + `llm_batch_agents` in a follow-up phase. |
-| Panel re-render storms from high-frequency SSE events | **MODERATE** | Throttle store updates for workspace events (same `makeThrottle` pattern from StreamsProvider line 80). |
-| ChatLayout responsive breakpoints | **MODERATE** | Panel width must not crush chat below readable width. Test at 768px, 1024px, 1440px. Mobile = bottom-sheet, not side panel. G-2 sketch-before-plan fires. |
-| Branch D-3 clearMessages guard regression | **MODERATE** | Panel is a SECOND consumer, not a modification to chat's read path. Vitest unit must verify guard survives. |
-| Workspace file versioning unbounded growth | **LOW (deferred)** | No TTL in v2.7. Document for v3.4. Monitor via admin query. |
-| Plugin manifest validation crash at startup | **LOW** | Per-plugin try/except in lifespan bootstrap. Failed plugins logged + skipped. |
+### Scaling Priorities
+1. **First bottleneck:** `llm_batch_agents` concurrency — bounded by `max_parallel_agents` + the existing global `tasks:global:active` Redis-Lua cap (task_service.py:58). Already enforced.
+2. **Second bottleneck:** `workflow_phases.output jsonb` bloat if large outputs stored inline. Mitigation: spill to `workspace-files` bucket, store path only.
 
 ---
 
-## 12. Sources
+## Integration Points
 
-**Live source files verified (2026-05-27):**
-- `backend/app/api/threads.py` -- `_emit()` at line 115, `agent_runner` at line 1381, tool dispatch at line 2548, `RUN_TASKS` registry at line 92, `TERMINAL_TYPES` at line 100
-- `backend/app/services/openai_service.py` -- `get_tools()` at line 514, tool dict shapes at lines 16-52
-- `backend/app/services/sub_agent_service.py` -- `run_sub_agent` at line 20
-- `backend/app/api/sandbox_outputs.py` -- Storage bucket pattern at line 48-67
-- `backend/app/db/runs.py` -- asyncpg helper pattern
-- `frontend/src/App.tsx` -- `<StreamsProvider>` wrap at line 30
-- `frontend/src/providers/StreamsProvider.tsx` -- 1600 LOC, named hooks at line 1540+
-- `frontend/src/stores/streamsStore.ts` -- per-thread Maps at line 47-79, StreamsState interface at line 43
-- `frontend/src/lib/api.ts` -- `StreamCallbacks` at line 186, `subscribeToRun` parser at line 380+, ~30 existing event type arms
-- `frontend/src/components/layout/ChatLayout.tsx` -- current layout at line 184-196 (single `<main>` element)
+### Internal Boundaries
 
-**PRD:**
-- `.planning/PRDs/v2.7.md` -- Themes A-H, 11 migrations (125-135), 11 phases, ~38 plans, section 5 (Architecture) + section 6 (Compatibility)
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `harness_engine` ↔ `agent_loop` | Direct call `run_agent_loop(ctx, phase_whitelist=...)` | The extracted loop is the shared substrate for Deep + `llm_agent`. |
+| `harness_engine` ↔ `task_service` | Direct call `run_task_sub_agent(allowed_tools=..., max_steps=...)` | `llm_agent`/`llm_batch_agents`; concurrency caps inherited for free. |
+| `harness_engine` ↔ `ask_user_service` | Redis pub/sub `ask_user:{run_id}:{tcid}` | `llm_human_input` reuses the verbatim flow + existing `POST /runs/{id}/ask_user_response`. |
+| `harness_engine` ↔ `tool_dispatcher` | `ToolContext.phase_whitelist` field | The ONLY dispatcher change: 1 additive guard. |
+| `harness_engine` ↔ `_emit`/Redis | XADD to `run:{run_id}` | Same stream as all SSE; zero new substrate. |
+| `agent_runner` ↔ `harness_engine` | Branch on `threads.active_workflow_run_id` | Single source of mode truth. |
+| StreamsProvider ↔ panel | `phasesByThread` Map (NEW) | PANEL-06 isolation preserved; chat never reads it. |
 
-**Project context:**
-- `.planning/PROJECT.md` -- Current schema (lines 232-246), agent modes (lines 248-250), key decisions, hot-file ledger in CLAUDE.md
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| 9 LLM providers | Via `create_adaptive_streaming_chat` (unchanged) | Harness adds NO provider code; phases call the existing adaptive-chat entry. Cross-provider parity is preserved because the harness never touches the streaming/parsing path. |
+| Supabase Storage | `workspace-files` bucket (existing) | Large phase outputs spill here; signed-URL pattern from sandbox-outputs/workspace. |
+| Redis | `run:{run_id}` (events), `ask_user:*` (human_input), `tasks:global:active` (batch caps) | All existing key conventions; no new namespace. |
+
+---
+
+## Key Findings Summary (for the synthesizer)
+
+1. **The harness is ~80% composition.** All 5 phase types wrap already-shipped, cross-provider-tested code: `run_task_sub_agent` (a complete mini agent-loop with own run/stream/concurrency caps) for `llm_agent`+`llm_batch_agents`, `ask_user_service` verbatim for `llm_human_input`, a new `PROGRAMMATIC_PHASE_REGISTRY` dict (mirrors `_TOOL_REGISTRY`) for `programmatic`, and `task_service._stream_one_iteration` for `llm_single`. The genuinely-new code is the state machine (`harness_engine.py`) + Pydantic phase config + 4 validators.
+
+2. **Per-phase whitelist enforcement is a 1-line additive guard at `dispatch_tool()`** reading a new `ToolContext.phase_whitelist` frozenset — the precedent (`_handle_task`'s subset gate, lines 1091-1110) already ships. In Deep Mode the field is `None` → no-op → shared path byte-identical for all 9 providers → **zero cross-provider regression risk** (the guard lives below the streaming/parsing code, the surface that caused the 075.x cascade).
+
+3. **G-5 extraction MUST ship first.** `agent_runner` is buried in `threads.py:1818-2779` (3,186-LOC, hot-file ledger, 9+ phases). Extract the loop body to `app/services/agent_loop.py::run_agent_loop()` BEFORE harness code, with full cross-provider UAT proving Deep Mode is byte-identical. Both Deep Mode and `llm_agent` then share ONE loop.
+
+4. **New tables RLS via the proven `threads.user_id` FK chain.** `workflow_runs`/`workflow_phases` use the EXACT pattern shipped in `054_workspace_files.sql:41` + `055_todos_table.sql:25` (1-hop) and `054:58-66` (2-hop JOIN). `workflow_definitions` is the only non-thread-scoped table (owner/global like skills). Migration head is **055** → renumber **056-059** (PRD's 125-139 is stale fiction).
+
+5. **All workflow SSE rides the existing `run:{run_id}` stream; the panel demuxes into a new `phasesByThread` Map** exactly as Phase 086 added the 7 todo/file/ask/task handlers (StreamsProvider.tsx:674-702). PANEL-06 isolation (panel events → zero chat re-renders) is preserved by writing to a dedicated Map, never `bucketsBySurface`. Zero new Redis namespace, zero new substrate (D-v2.5-08).
+
+6. **Mode lives in `threads.active_workflow_run_id` (1 new column).** NULL=Deep, non-null=Harness + locked. `agent_runner` branches on it. The lock is enforced at `POST /threads/{id}/workflow/cancel` (only exit while active). **Drop the PRD's `deep_mode_metadata jsonb`** — no consumer in v2.8 scope.
+
+7. **`get_tools()` composition is the ONE `openai_service` touch** — filter the existing schema list by the phase whitelist before `tools_override` (precedent: `task_service.py:304-308`). Additive, no provider branch. SEED-035 tool-count budget folds in at this same site.
+
+8. **Build order:** A (extract loop) → B (schema/RLS, parallel) → C (engine + 5 types + validators) → D (whitelist guard, folds into C) → E (dual-mode + SEED-029) → F (panel timeline + StreamsProvider) → G (eval gate + SEED-034/036a + resumability UAT). Deep Mode stays a byte-identical no-op behind `active_workflow_run_id IS NULL` at every step.
+
+## Sources
+
+- **Real substrate files (HIGH — read directly):** `backend/app/services/tool_dispatcher.py` (ToolContext.available_tools:88, `_handle_task` subset gate:1091-1110, `dispatch_tool`:1495, registry:1465), `backend/app/services/task_service.py` (`run_task_sub_agent`:196 — the complete sub-agent loop; global cap Lua:58; `_stream_one_iteration`:162), `backend/app/services/ask_user_service.py` (pub/sub pause/resume), `backend/app/api/threads.py` (`agent_runner`:1423, ToolContext build:2632, dispatch call:2677, `_emit`:109, finalize:158), `backend/app/services/openai_service.py` (`get_tools`:768, `create_adaptive_streaming_chat`:1124), `frontend/src/providers/StreamsProvider.tsx` (Phase-086 panel handlers:674-702, per-thread Map demux), `supabase/migrations/054_workspace_files.sql` + `055_todos_table.sql` (RLS FK-chain pattern), `backend/app/api/panel.py` (reconcile endpoints), `backend/app/api/runs.py` (`/ask_user_response`:496, `replay_tail_consumer`).
+- **Design source (validated/refined):** `.planning/PRDs/v2.7.md` §3 Theme B + §5 (harness design — sound on tables/phase-config/SSE; corrected on migration numbers, `llm_agent` substrate, and `deep_mode_metadata`).
+- **Decisions:** `.planning/PROJECT.md` Key Decisions (D-v2.5-08 run-backed streaming, D-085 task/ask_user caps, PANEL-06, D-v2.8-01 scope, D-PRD-08 multi-worker).
+- **Library versions (HIGH — verified in venv):** pydantic 2.12.5, jsonschema 4.26.0, fastapi 0.115.6, redis>=5.2, asyncpg>=0.29, anthropic>=0.97.0, openai>=2.0.0.
+- **Memory:** `feedback_no_cross_provider_regressions`, `feedback_provider_uniform_ux`, `feedback_workflow_guardrails` (G-5), `feedback_regressions_during_075_3_uat`.
+
+---
+*Architecture research for: harness state-machine integration with the Agentic-RAG platform*
+*Researched: 2026-05-30*

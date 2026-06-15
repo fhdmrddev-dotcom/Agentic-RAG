@@ -10,12 +10,14 @@ Probe verdict (D-075.3-01 locked 2026-05-22 in 075.3-01-PLAN.md <probe_result>):
     (their usage emission is final-chunk-only per Phase 073 D-073-08).
 
 The helper-under-test is the module-level pure function
-``app.api.threads._accumulate_chunk_usage(chunk, provider, input_total,
-output_total) -> tuple[int | None, int | None]`` extracted from
-``_on_chunk_openai`` in Task 3 (Wave 1).
+``app.services.provider_gateway.openai_compat._accumulate_chunk_usage(chunk,
+provider, input_total, output_total) -> tuple[int | None, int | None]``.
 
-Until Task 3 lands, all tests in this module FAIL with ``ImportError`` —
-that is the desired RED state for TDD.
+Phase 092.5 Wave 4 (D-04): the helper MOVED with the entangled OpenAI-compat
+adapter — from ``app.api.threads`` (075.3) → ``app.services.agent_loop`` (089) →
+``app.services.provider_gateway.openai_compat`` (092.5). The Google-vs-OpenAI
+assertions below ARE the I8 usage-accounting guard; they pass unchanged because
+the fn moved VERBATIM (both branches byte-for-byte).
 """
 from __future__ import annotations
 
@@ -23,25 +25,17 @@ from types import SimpleNamespace
 
 import pytest
 
-# Helper under test — added by Task 3 (Wave 1). Imported lazily inside
-# ``_call()`` so pytest can COLLECT all 7 tests even before Task 3 lands
-# (collection-only must succeed; runtime is the desired RED state until
-# Task 3 makes the symbol importable).
-#
-# Deviation (Rule 1 — Bug): Plan 01 expected ``collected 7 items`` while
-# the top-level import would ImportError. Pytest cannot collect a module
-# that fails to import. Lazy-import inside ``_call`` is the standard
-# pattern for "module exists but symbol arriving later" TDD scaffolds.
+# Helper under test — imported lazily inside ``_call()`` (kept from the 075.3
+# scaffold idiom; harmless now that the symbol exists). Phase 092.5 Wave 4
+# repointed the import to the OpenAI-compat adapter's new home.
 
 
 def _call(chunk, provider, input_total, output_total):
-    """Lazy-import wrapper so test collection succeeds before Task 3 lands.
-
-    After Task 3 (Wave 1) extracts ``_accumulate_chunk_usage`` as a module
-    -level symbol in ``app.api.threads``, this wrapper resolves it and
+    """Lazy-import wrapper. Resolves ``_accumulate_chunk_usage`` from its
+    Phase 092.5 home (``app.services.provider_gateway.openai_compat``) and
     forwards arguments verbatim.
     """
-    from app.api.threads import _accumulate_chunk_usage  # noqa: PLC0415
+    from app.services.provider_gateway.openai_compat import _accumulate_chunk_usage  # noqa: PLC0415
     return _accumulate_chunk_usage(chunk, provider, input_total, output_total)
 
 

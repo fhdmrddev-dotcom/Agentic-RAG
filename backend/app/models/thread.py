@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -42,3 +43,63 @@ class ThreadSnapshotResponse(BaseModel):
     messages: list[MessageResponse]
     active_runs: list[ActiveRunResponse]
     since_cursors: dict[str, str]
+
+
+class WorkflowPhaseState(BaseModel):
+    """Phase 098-UAT run-honesty fix (B) — one ``workflow_phases`` row's durable
+    per-phase status, surfaced so the frontend reconcile floor can rebuild an
+    HONEST timeline for a terminal (completed/failed/cancelled) run instead of
+    blanking it. ``status`` is DB-native (``pending`` / ``active`` / ``completed``
+    / ``failed`` / ``skipped``); the frontend maps it to its Phase status union
+    (``active`` -> ``running``, ``completed`` -> ``done``). Additive read.
+    """
+
+    slug: str
+    phase_index: int
+    status: str
+
+
+class ThreadWorkflowState(BaseModel):
+    """Phase 092 (SC#5 / D-v2.5-03) — the reconcile-via-fetch contract for a
+    thread's Deep/Harness mode + workflow lock + current phase + Continue budget.
+
+    Returned by ``GET /threads/{id}/workflow``. A PURE READ — the endpoint never
+    writes the anchor (the lock-clear is owned by the cancel/terminal path, Plan
+    03); ``lock_is_stale`` is a diagnostic self-heal signal only, so a thread is
+    never stuck Harness-locked with a terminal/absent run.
+    """
+
+    thread_id: UUID
+    # harness iff active_workflow_run_id IS NOT NULL.
+    mode: Literal["deep", "harness"]
+    # True iff a non-terminal workflow run holds the lock.
+    locked: bool
+    active_workflow_run_id: UUID | None
+    # workflow_runs.status; None when the run row is absent.
+    run_status: str | None
+    definition_slug: str | None
+    definition_name: str | None
+    current_phase_slug: str | None
+    current_phase_index: int | None
+    total_phases: int | None
+    # SC#5 heal: anchor set BUT the run row is missing or terminal.
+    lock_is_stale: bool
+    # CONT-01 / D-06 — a Continue affordance is currently pending.
+    cap_paused: bool
+    continues_used: int
+    # 3 - continues_used (max_continues_per_run, D-06).
+    continues_remaining: int
+    # Facet C (092-07) — the thread's latest producer `runs.run_id` WHEN it is live
+    # (non-terminal). The frontend re-subscribes GET /runs/{id}/stream to re-attach
+    # a startup-sweep-resumed run's live stream on mount/reconcile with no page
+    # action. None when the latest producer row is terminal/absent. Surfaced as a
+    # PURE additive read (reuses the existing F2 self-heal SELECT — no new query,
+    # no write; the 092-05 F2 invariant holds). Owner-scoped via the existing
+    # get_thread_workflow ownership check.
+    latest_producer_run_id: UUID | None = None
+    # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
+    # (ordered by phase_index), so the frontend reconcile floor can rebuild an
+    # honest timeline for a TERMINAL run (which previously returned [] / blanked).
+    # None for Deep / no run. Additive PURE read (one extra ordered SELECT on
+    # workflow_phases, owner-scoped via the existing ownership gate; no write).
+    phases: list[WorkflowPhaseState] | None = None

@@ -23,6 +23,12 @@ export interface OutputFile {
   filename: string
   url: string
   size: number
+  /** Phase 095 Plan 05 (D-08) — additive hero flag from the backend
+   * final_output_files emit + persisted execute_code result. True for the
+   * agent-flagged (else heuristic-picked) final deliverable; the chat
+   * output area heroes these above a collapsible "Working files" group.
+   * Optional — older streams without it degrade gracefully (all working). */
+  is_hero?: boolean
 }
 
 export interface ToolCall {
@@ -144,6 +150,22 @@ export interface Message {
   runId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
+  /** Phase 095.1-03 (D-04 model attribution): the REAL resolved model/provider
+   * of the run that produced this assistant message, read from runs.model /
+   * runs.provider via the additive runs↔messages enrich. Drives the RunCard
+   * run-sub `{provider} · {model} · turn N`. Optional (NOT `| null`) because the
+   * api.ts mapper coerces the wire null → undefined; absent for legacy /
+   * pre-run-backed messages (graceful → run-sub shows just `turn N`). */
+  model?: string
+  provider?: string
+  /** Phase 095.1-03 (D-05 true reload timer): the run's persisted wall-clock
+   * start/end (runs.started_at / runs.completed_at, ISO strings). A finished
+   * run's TRUE duration = completedAt − startedAt — identical live and on reload
+   * (never Date.now() − created_at, the BUG-260606-02 inflation lie). A finished
+   * run with no completedAt → NO duration (the honesty rule). Optional because
+   * the mapper coerces null → undefined. */
+  startedAt?: string
+  completedAt?: string
   /** Phase 076.1: error string from SSE terminal errorPayload. Populated by
    * StreamsProvider onTerminal when kind === "error" or "timed_out". Used by
    * RunCard to display categorized failure reason. Only available for live-
@@ -157,7 +179,7 @@ export interface Message {
    * ToolCallPanel — closes the cumulative-repeat symptom where a 12-file
    * run rendered 12 download links per cell. Absent for runs that produced
    * no output files. */
-  finalOutputFiles?: { filename: string; url?: string }[]
+  finalOutputFiles?: { filename: string; url?: string; size?: number; is_hero?: boolean }[]
   /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
    * assistant messages from thinking-enabled providers (DeepSeek V4).
    * Accumulated during streaming via reasoning_delta SSE events.
@@ -290,6 +312,8 @@ export interface WorkspaceFile {
   version?: number
   created_at?: string
   updated_at?: string
+  kind?: string          // 100: 'template_input' for ephemeral uploads (D-02 badge)
+  expires_at?: string    // 100: ISO timestamp; drives countdown + amber tint (D-02)
 }
 
 /** GET /threads/{tid}/ask_user/pending (panel.py:103) +
@@ -304,6 +328,11 @@ export interface PendingAsk {
   message_id?: string
   run_id?: string
   created_at?: string
+  /** D-12 (Phase 093): the prior phase's draft answer the user is being asked to
+   *  confirm. Additive + optional — present on the /pending GET (panel.py) and the
+   *  ask_user_prompt SSE event; absent on older rows. The visible render is Phase 094;
+   *  093 only plumbs it onto the shape. */
+  draft?: string
 }
 
 /** GET /threads/{tid}/tasks (panel.py:156) + SSE sub_agent_start/done TASK
@@ -323,6 +352,68 @@ export interface TaskRunIndexItem {
   tools?: string[]
   max_steps?: number
   summary?: string
+}
+
+/**
+ * Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the normalized harness-phase shape
+ * (DATA-CONTRACT §3b). One element per phase in the panel-only `phasesByThread`
+ * slice. The discriminated render keys on `phaseType` (the wire `phase_started.
+ * phase_type` field, one of the 5 LOCKED literals; UNKNOWN → generic row).
+ *
+ * Source mapping (DATA-CONTRACT §3b):
+ *   slug       ← phase_started.phase
+ *   phaseIndex ← phase_started.phase_index
+ *   phaseType  ← phase_started.phase_type (the §2 discriminator)
+ *   status     ← phase_started→running / phase_completed→done /
+ *                run_failed|terminal gate_failed→failed /
+ *                non-terminal gate_failed→retrying /
+ *                phase_transition.via==="skip_to_phase"→skipped /
+ *                derived pending for not-yet-started phases
+ *   attempt    ← gate_failed.attempt
+ *   error      ← gate_failed.error / run_failed.reason
+ *   subAgents  ← sub_agent_start/done bookends (the existing TaskRunIndexItem
+ *                shape, keyed by sub_run_id), associated with this phase
+ *   pendingAsk ← a tool_call_id POINTER into pendingAsksByThread (the ask card
+ *                already has a store — do NOT duplicate the ask here)
+ */
+/** Phase 101.1-04 (GAP-C / D-11) — the discrete emit-moment sub-step the harness
+ *  streams via `phase_substep` (status field). A sealed forced emit is ATOMIC (it
+ *  cannot stream tokens), so the emit moment surfaces as these honest sub-steps on the
+ *  EXISTING status-node rail instead of a static "Step 0 · working…" box. Optional —
+ *  only a `llm_emit` fill phase ever carries one; every other phase leaves it undefined. */
+export type EmitSubStep =
+  | "forcing"
+  | "emitting"
+  | "recovering"
+  | "validating"
+  | "rendering"
+  | "validated"
+
+/** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
+ *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail
+ *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4). */
+export type EmitFailure =
+  | "model_failed_to_emit"
+  | "citation_gate_rejected"
+  | "render_failed"
+  | "integrity_failed"
+  | "no_template_bound"
+
+export interface Phase {
+  slug: string
+  phaseIndex: number
+  phaseType: string
+  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped"
+  attempt?: number
+  error?: string
+  subAgents: TaskRunIndexItem[]
+  pendingAsk: string | null
+  /** GAP-C (D-11) — the live emit sub-step (the latest `phase_substep` status), rendered
+   *  as a sub-row on the existing rail. Undefined on non-emit phases. */
+  emitSubStep?: EmitSubStep
+  /** GAP-C (D-11) — the terminal emit failure value (the `phase_substep` failure field).
+   *  Renders failed-as-failed via the closed taxonomy. Undefined unless an emit failed. */
+  emitFailure?: EmitFailure
 }
 
 // ────────────────────────────────────────────────────────────────────────────

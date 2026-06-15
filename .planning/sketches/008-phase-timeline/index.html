@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 008 — Phase Timeline (live harness run)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 008 — Phase Timeline
+   Q: What does the live harness run look like IN THE PANEL — the
+      run's REAL steps and tasks, not a spinner?
+   Content = the real literature_review-on-DBA storyboard (BRIEF §3.5).
+   ─────────────────────────────────────────────────────────────── */
+
+body { padding-top: 52px; }
+
+/* ── App shell (nav rail | chat | panel) ── */
+.shell {
+  display: grid;
+  grid-template-columns: 52px 1fr clamp(320px, 34%, 440px);
+  height: calc(100vh - 52px);
+  overflow: hidden;
+}
+.nav-rail {
+  background: var(--color-bg-elev1);
+  border-right: 1px solid var(--color-border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--space-3) 0; gap: var(--space-2);
+}
+.nav-rail .logo {
+  width: 30px; height: 30px; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet));
+  margin-bottom: var(--space-3);
+}
+.nav-rail .nav-ico {
+  width: 38px; height: 38px; border-radius: var(--radius-md);
+  display: grid; place-items: center; color: var(--color-text-dim);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+}
+.nav-rail .nav-ico:hover { background: var(--color-accent); color: var(--color-text); }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+/* ── Chat column (kept deliberately quiet — execution lives in the panel) ── */
+.chat {
+  display: flex; flex-direction: column;
+  background: var(--color-bg);
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+}
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; margin-bottom: var(--space-5); }
+.bubble-user {
+  align-self: flex-end; max-width: 80%;
+  background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+  color: var(--color-text); padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  font-size: var(--text-sm); line-height: 1.5;
+}
+.assistant-line {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-6); color: var(--color-text-muted); font-size: var(--text-sm);
+}
+.assistant-line .bot {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet));
+}
+.assistant-line.live .bot { animation: brandPulse 1.5s var(--ease-out) infinite; }
+.ws-pointer {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--text-xs); color: var(--color-primary);
+  background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+  padding: 3px 9px; border-radius: var(--radius-full); cursor: pointer;
+}
+.chat-final {
+  margin-top: var(--space-5); padding: var(--space-4);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); font-size: var(--text-sm); line-height: 1.6;
+  color: var(--color-text); max-width: 92%;
+}
+
+/* ── Panel ── */
+.panel {
+  background: hsl(220 40% 8%);
+  border-left: 1px solid hsl(220 25% 24%);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning);
+  box-shadow: 0 0 0 0 var(--color-warning); animation: pulseGlow 1.6s infinite;
+}
+.panel-head .spacer { flex: 1; }
+.panel-head .head-btn { color: var(--color-text-dim); cursor: pointer; padding: 4px; border-radius: 6px; }
+.panel-head .head-btn:hover { background: var(--color-accent); color: var(--color-text); }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); padding-bottom: 72px; }
+
+/* Run summary banner (shared) */
+.run-banner {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+.run-banner .wf-row { display: flex; align-items: center; gap: var(--space-2); }
+.mode-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 2px 7px; border-radius: var(--radius-full);
+  color: var(--color-warning); background: var(--color-warning-dim);
+  border: 1px solid hsl(38 92% 60% / .35);
+}
+.run-banner .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.run-banner .wf-meta { font-size: var(--text-xs); color: var(--color-text-dim); }
+.doing-now {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-sm); color: var(--color-text); margin-top: var(--space-2);
+}
+.doing-now .live-spark {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary);
+  animation: dotBounce 1.2s infinite;
+}
+.doing-now.is-failed { color: var(--color-danger); }
+.doing-now.is-done { color: var(--color-success); }
+
+/* Header honest-count chips */
+.count-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--space-2); }
+.chip {
+  font-family: var(--font-mono); font-size: 10.5px;
+  padding: 2px 7px; border-radius: var(--radius-full);
+  background: var(--color-muted); color: var(--color-text-muted);
+  border: 1px solid var(--color-border-soft);
+}
+.chip.primary { color: var(--color-primary); background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+
+/* ─────────── Status atoms (used by all variants) ─────────── */
+.st-ico {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  font-family: var(--font-mono);
+}
+.st-done   { background: var(--color-success-dim); color: var(--color-success); border: 1.5px solid var(--color-success); }
+.st-run    { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); }
+.st-lock   { background: transparent; color: var(--color-text-dim); border: 1.5px dashed var(--color-text-dim); }
+.st-fail   { background: var(--color-danger-dim); color: var(--color-danger); border: 1.5px solid var(--color-danger); }
+.st-retry  { background: hsl(258 90% 66% / .15); color: var(--color-accent-violet); border: 1.5px solid var(--color-accent-violet); }
+.st-run.spin { animation: pulseGlow 1.4s infinite; }
+
+.statuspill {
+  font-size: 10px; font-weight: 600; font-family: var(--font-mono);
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 1px 6px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 4px;
+}
+.sp-done  { color: var(--color-success); background: var(--color-success-dim); }
+.sp-run   { color: var(--color-warning); background: var(--color-warning-dim); }
+.sp-lock  { color: var(--color-text-dim); background: var(--color-muted); }
+.sp-fail  { color: var(--color-danger);  background: var(--color-danger-dim); }
+.sp-retry { color: var(--color-accent-violet); background: hsl(258 90% 66% / .15); }
+
+.type-tag {
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim);
+  background: var(--color-secondary); padding: 1px 5px; border-radius: var(--radius-sm);
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.tool-chip {
+  font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-muted);
+  border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm);
+}
+
+/* mini determinate/indeterminate progress */
+.mini-prog { height: 3px; border-radius: 2px; background: var(--color-primary-dim); overflow: hidden; position: relative; margin-top: 6px; }
+.mini-prog::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / .6), transparent);
+  animation: progressShimmer 1.6s ease-in-out infinite;
+}
+
+/* ═══════════ VARIANT A — Vertical span timeline (Temporal/Inngest) ═══════════ */
+.tlA { list-style: none; margin: 0; padding: 0; position: relative; }
+.tlA::before {
+  content:''; position: absolute; left: 8px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--color-border);
+}
+.tlA > li { position: relative; padding: 0 0 var(--space-4) var(--space-8); }
+.nodeA {
+  position: absolute; left: 0; top: 0;
+}
+.phaseA-head { display: flex; align-items: center; gap: var(--space-2); }
+.phaseA-head .pname { font-weight: 600; font-size: var(--text-sm); }
+.phaseA-head .pos { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.phaseA-bar { height: 5px; border-radius: 3px; margin-top: 6px; background: var(--color-muted); overflow: hidden; position: relative; }
+.phaseA-bar > i { display: block; height: 100%; border-radius: 3px; }
+.bar-done  > i { background: var(--color-success); width: 100%; }
+.bar-fail  > i { background: var(--color-danger); width: 100%; }
+.bar-lock  > i { background: transparent; width: 0; }
+.phaseA-bar.bar-run::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, var(--color-warning), transparent);
+  animation: progressShimmer 1.4s infinite;
+}
+.phaseA-meta { font-size: 11px; color: var(--color-text-muted); margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+
+/* nested sub-agent rows */
+.subrows { margin-top: var(--space-2); display: flex; flex-direction: column; gap: 5px; padding-left: 2px; border-left: 1px solid var(--color-border-soft); }
+.subrow {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 5px var(--space-2); border-radius: var(--radius-sm);
+  background: var(--color-surface); font-size: 11.5px;
+}
+.subrow .sa-name { flex: 1; color: var(--color-text); }
+.subrow .sa-stats { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+.subrow.run { background: var(--color-warning-dim); }
+.subrow.fail { background: var(--color-danger-dim); }
+
+.gate-row {
+  display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2);
+  padding: 6px var(--space-2); border-radius: var(--radius-sm); font-size: 11px;
+  background: hsl(258 90% 66% / .08); border: 1px dashed var(--color-accent-violet); color: var(--color-text-muted);
+}
+.fail-reason {
+  margin-top: var(--space-2); padding: var(--space-2) var(--space-3);
+  background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / .4);
+  border-radius: var(--radius-sm); font-size: 11.5px; color: hsl(0 80% 78%);
+}
+.fail-reason b { color: var(--color-danger); }
+
+/* ═══════════ VARIANT B — RunCard per phase (Cursor / our RunCard) ═══════════ */
+.tlB { display: flex; flex-direction: column; gap: var(--space-3); list-style:none; margin:0; padding:0; }
+.cardB {
+  border-radius: var(--radius-lg); border: 1px solid var(--color-border);
+  background: var(--color-surface); overflow: hidden;
+}
+.cardB.run { border-color: hsl(38 92% 60% / .5); box-shadow: 0 0 22px hsl(38 92% 60% / .12); }
+.cardB.fail { border-color: hsl(0 72% 51% / .5); }
+.cardB-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-3); cursor: pointer;
+}
+.cardB-head:hover { background: var(--color-surface-hi); }
+.cardB-head .cb-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.cardB-head .cb-sum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.cardB-head .caret { color: var(--color-text-dim); transition: transform var(--dur-fast); }
+.cardB.open .caret { transform: rotate(90deg); }
+.cardB-body { padding: 0 var(--space-3) var(--space-3) var(--space-3); display: none; }
+.cardB.open .cardB-body { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.cardB.run .tool-progress { height: 2px; }
+
+/* ═══════════ VARIANT C — Stepper + live event log (GitHub Actions) ═══════════ */
+.stepper { display: flex; align-items: stretch; gap: 4px; margin-bottom: var(--space-4); }
+.stepC { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.stepC .seg { height: 5px; border-radius: 3px; background: var(--color-muted); position: relative; overflow: hidden; }
+.stepC.done .seg { background: var(--color-success); }
+.stepC.fail .seg { background: var(--color-danger); }
+.stepC.run .seg::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, var(--color-warning), transparent);
+  animation: progressShimmer 1.3s infinite;
+}
+.stepC .lbl { font-size: 10px; color: var(--color-text-dim); display: flex; align-items: center; gap: 4px; }
+.stepC.done .lbl, .stepC.run .lbl { color: var(--color-text-muted); }
+.eventlog-toggle {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: var(--text-xs); color: var(--color-text-muted);
+  padding: var(--space-2); border-top: 1px solid var(--color-border-soft); margin-top: var(--space-2);
+}
+.eventlog-toggle:hover { color: var(--color-text); }
+.eventlog {
+  display: none; font-family: var(--font-mono); font-size: 10.5px;
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); padding: var(--space-2); margin-top: var(--space-2);
+  max-height: 230px; overflow-y: auto;
+}
+.eventlog.open { display: block; }
+.ev { display: flex; gap: var(--space-2); padding: 2.5px 0; align-items: baseline; }
+.ev .t { color: var(--color-text-dim); flex-shrink: 0; width: 44px; }
+.ev .name { color: var(--color-primary); flex-shrink: 0; }
+.ev .det { color: var(--color-text-muted); }
+.ev.warn .name { color: var(--color-warning); }
+.ev.err .name { color: var(--color-danger); }
+.ev.ok .name { color: var(--color-success); }
+.stepC-detail { margin-top: var(--space-2); }
+
+/* ═══════════ VARIANT D — Synthesis: RunCards threaded on a spine ═══════════ */
+.tlD { list-style: none; margin: 0; padding: 0; }
+.tlD > li { position: relative; padding-left: 32px; padding-bottom: 14px; }
+.tlD > li:last-child { padding-bottom: 0; }
+
+/* connector segment — drawn BEHIND the node circles, colored by this phase's status.
+   The opaque node "stations" (z-index 2) mask the line ends so it never crosses a glyph. */
+.tlD > li::before {
+  content: ''; position: absolute; left: 11px; transform: translateX(-1px);
+  top: 24px; bottom: -16px; width: 2px; z-index: 0;
+  background: var(--color-border);
+}
+.tlD > li:last-child::before { display: none; }
+.tlD > li.s-done::before  { background: var(--color-success); }
+.tlD > li.s-fail::before  { background: var(--color-danger); }
+.tlD > li.s-retry::before { background: var(--color-accent-violet); }
+.tlD > li.s-run::before   { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.tlD > li.s-lock::before  { background: transparent; border-left: 2px dashed var(--color-text-dim); width: 0; }
+
+/* node "station": an opaque circle that cleanly masks the spine where it passes */
+.nodeD {
+  position: absolute; left: 1px; top: 7px; width: 20px; height: 20px; z-index: 2;
+  display: grid; place-items: center; border-radius: 50%;
+  background: hsl(220 40% 8%);
+}
+
+.cardD {
+  border-radius: var(--radius-lg); border: 1px solid var(--color-border);
+  background: var(--color-surface); overflow: hidden;
+}
+.cardD.run  { border-color: hsl(38 92% 60% / .5); box-shadow: 0 0 22px hsl(38 92% 60% / .12); }
+.cardD.fail { border-color: hsl(0 72% 51% / .5); }
+.cardD.locked { background: transparent; border: 1px dashed var(--color-border); opacity: .72; }
+.cardD-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); cursor: pointer; }
+.cardD.locked .cardD-head { cursor: default; padding: var(--space-2) var(--space-3); }
+.cardD-head:hover { background: var(--color-surface-hi); }
+.cardD.locked .cardD-head:hover { background: transparent; }
+.cardD-head .cb-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.cardD-head .cb-name.dim { color: var(--color-text-dim); font-weight: 500; }
+.cardD-head .cb-sum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.cardD-head .caret { color: var(--color-text-dim); transition: transform var(--dur-fast); }
+.cardD.open .caret { transform: rotate(90deg); }
+.cardD-body { padding: 0 var(--space-3) var(--space-3) var(--space-3); display: none; }
+.cardD.open .cardD-body { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+/* legend */
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--color-border-soft); }
+.legend .li { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--color-text-muted); }
+.legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+/* state cycler */
+.state-cycler { display: flex; gap: 4px; }
+.state-cycler button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- Variant nav -->
+<nav class="variant-nav" id="variantNav">
+  <span class="label">Sketch 008 · Phase Timeline</span>
+  <button class="variant-tab" data-v="A" onclick="setVariant('A')">A · Span timeline</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · RunCard-per-phase</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Stepper + event log</button>
+  <button class="variant-tab active" data-v="D" onclick="setVariant('D')">D · Synthesis ★ cards on spine</button>
+</nav>
+
+<!-- App shell -->
+<div class="shell">
+  <div class="nav-rail">
+    <div class="logo"></div>
+    <div class="nav-ico active" title="Chat">💬</div>
+    <div class="nav-ico" title="Workflows">⚙</div>
+    <div class="nav-ico" title="Documents">▤</div>
+    <div class="nav-ico" title="Settings">⚙</div>
+  </div>
+
+  <!-- Chat stays quiet; the run is read in the panel -->
+  <div class="chat">
+    <div class="chat-head">Thread · Literature review</div>
+    <div class="bubble-user">Review the literature on leadership style, organizational culture, and employee engagement.</div>
+    <div class="assistant-line live" id="chatAssistant">
+      <div class="bot"></div>
+      <span id="chatAssistantText">Running in workspace…&nbsp; <span class="ws-pointer" onclick="flashPanel()">ran in workspace ▸</span></span>
+    </div>
+    <div class="chat-final" id="chatFinal" style="display:none">
+      <b>Integrated literature review.</b> Across leadership style, organizational culture, and employee
+      engagement, the corpus converges on transformational leadership as the strongest correlate of
+      engagement, mediated by culture strength… <span class="text-dim">(48 sources)</span>
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="pulse-dot" id="panelDot"></span>
+      <span class="ph-title">Workspace</span>
+      <span class="spacer"></span>
+      <span class="head-btn" title="Collapse to rail">⟩</span>
+    </div>
+    <div class="panel-body" id="panelBody"><!-- rendered --></div>
+  </div>
+</div>
+
+<!-- announcer (a11y: present at load, written on transitions only) -->
+<div role="status" aria-live="polite" class="sr-only" id="announcer"></div>
+
+<!-- Toolbar -->
+<div class="sketch-toolbar">
+  <span style="opacity:.6">state</span>
+  <div class="state-cycler" id="stateCycler">
+    <button data-s="running" class="on" onclick="setState('running')">Running</button>
+    <button data-s="retry" onclick="setState('retry')">Gate retry</button>
+    <button data-s="failed" onclick="setState('failed')">Failed</button>
+    <button data-s="done" onclick="setState('done')">Done</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ─── Real storyboard model (BRIEF §3.3 + §3.5) ─── */
+const STORY = {
+  workflow: 'Literature review',
+  kb: 'DBA · Fahed Mrad Chapters 1-4 (843 chunks)',
+  phases: [
+    { id:'split',  name:'Split topic', type:'programmatic',     typeLabel:'server step', tools:[] },
+    { id:'review', name:'Review',      type:'llm_batch_agents',  typeLabel:'parallel agents', tools:['search_documents'] },
+    { id:'merge',  name:'Merge',       type:'llm_single',        typeLabel:'AI write', tools:[] },
+  ],
+  subagents: [
+    { name:'Leadership style',          searches:2, tools:5, sources:14 },
+    { name:'Organizational culture',    searches:2, tools:4, sources:12 },
+    { name:'Employee engagement',       searches:1, tools:4, sources:13 },
+    { name:'Style × culture interplay', searches:1, tools:3, sources:9  },
+  ],
+};
+
+/* Per-state phase + sub-agent status maps */
+function model(state) {
+  // returns {phases:{split,review,merge:{status,...}}, subs:[{status}], gate, reason, doing, totals}
+  const subs = STORY.subagents.map(s => ({...s}));
+  let phases = { split:'lock', review:'lock', merge:'lock' };
+  let gate = null, reason = null, doing = '', totals = { agents:0, searches:0, tools:0, sources:0 };
+
+  if (state === 'running') {
+    phases = { split:'done', review:'run', merge:'lock' };
+    subs[0].status='done'; subs[1].status='run'; subs[2].status='run'; subs[3].status='queued';
+    doing = 'Reviewing 4 subtopics in parallel — 2 of 4 agents still searching the DBA corpus…';
+    totals = { agents:4, searches:3, tools:9, sources:26 };
+  } else if (state === 'retry') {
+    // illustrative authored workflow with a gate after review
+    phases = { split:'done', review:'done', merge:'lock' };
+    subs.forEach(s=>s.status='done');
+    gate = { name:"contains 'INTEGRATED'", attempt:1, max:3 };
+    doing = 'Gate on “Review” failed validation — retrying merge input (attempt 2 of 3)…';
+    totals = { agents:4, searches:6, tools:16, sources:48 };
+  } else if (state === 'failed') {
+    phases = { split:'done', review:'fail', merge:'lock' };
+    subs[0].status='done'; subs[1].status='done'; subs[2].status='fail'; subs[3].status='done';
+    reason = "Sub-agent “Employee engagement” reached its 12-step cap without a final answer (max_steps).";
+    doing = 'Run failed during Review — see reason below.';
+    totals = { agents:4, searches:5, tools:14, sources:35 };
+  } else { // done
+    phases = { split:'done', review:'done', merge:'done' };
+    subs.forEach(s=>s.status='done');
+    doing = 'Workflow complete — 3 of 3 phases succeeded.';
+    totals = { agents:4, searches:6, tools:16, sources:48 };
+  }
+  return { phases, subs, gate, reason, doing, totals, state };
+}
+
+const ICO = { done:['st-done','✓'], run:['st-run spin','●'], lock:['st-lock','○'], fail:['st-fail','✕'], retry:['st-retry','↻'], queued:['st-lock','○'] };
+const SUBICO = { done:['st-done','✓'], run:['st-run spin','●'], fail:['st-fail','✕'], queued:['st-lock','○'] };
+function stIco(s){ const [c,g]=ICO[s]||ICO.lock; return `<span class="st-ico ${c}" aria-hidden="true">${g}</span>`; }
+function pillFor(s){
+  const map={done:['sp-done','Complete'],run:['sp-run','Running'],lock:['sp-lock','Locked'],fail:['sp-fail','Failed'],retry:['sp-retry','Retrying']};
+  const [c,t]=map[s]||map.lock; return `<span class="statuspill ${c}">${t}</span>`;
+}
+
+function bannerHTML(m){
+  const doneClass = m.state==='failed'?'is-failed':(m.state==='done'?'is-done':'');
+  const spark = (m.state==='running'||m.state==='retry') ? '<span class="live-spark"></span>' : (m.state==='done'?'✓':'✕');
+  return `
+  <div class="run-banner">
+    <div class="wf-row">
+      <span class="mode-badge">Harness</span>
+      <span class="wf-name">${STORY.workflow}</span>
+    </div>
+    <div class="wf-meta">${STORY.kb}</div>
+    <div class="doing-now ${doneClass}">${spark}<span>${m.doing}</span></div>
+    <div class="count-strip">
+      <span class="chip primary">Phase ${m.state==='done'?'3/3':(m.state==='failed'?'2/3 ✕':'2/3')}</span>
+      <span class="chip">${m.totals.agents} agents</span>
+      <span class="chip">${m.totals.searches} searches</span>
+      <span class="chip">${m.totals.tools} tool calls</span>
+      <span class="chip">${m.totals.sources} sources</span>
+    </div>
+  </div>`;
+}
+
+function legendHTML(){
+  return `<div class="legend" aria-hidden="true">
+    <span class="li"><span class="dot" style="background:var(--color-success)"></span>Complete</span>
+    <span class="li"><span class="dot" style="background:var(--color-warning)"></span>Running</span>
+    <span class="li"><span class="dot" style="border:1.5px dashed var(--color-text-dim);background:transparent"></span>Locked-ahead</span>
+    <span class="li"><span class="dot" style="background:var(--color-danger)"></span>Failed</span>
+    <span class="li"><span class="dot" style="background:var(--color-accent-violet)"></span>Retrying</span>
+  </div>`;
+}
+
+/* ─────────── VARIANT A — Span timeline ─────────── */
+function renderA(m){
+  const subsBlock = (status) => {
+    if (status==='lock') return '';
+    return `<div class="subrows" role="group" aria-label="Sub-agents">
+      ${m.subs.map(s=>`
+        <div class="subrow ${s.status==='run'?'run':s.status==='fail'?'fail':''}">
+          ${stIco(s.status)}
+          <span class="sa-name">${s.name}</span>
+          <span class="sa-stats">${s.searches}s · ${s.tools}t · ${s.sources}src</span>
+        </div>`).join('')}
+    </div>`;
+  };
+  const phaseLi = (p, idx) => {
+    const st = m.phases[p.id];
+    const barClass = {done:'bar-done',run:'bar-run',fail:'bar-fail',lock:'bar-lock'}[st];
+    let extra='';
+    if (p.id==='review') extra = subsBlock(st);
+    if (p.id==='review' && m.gate) extra += `<div class="gate-row">${stIco('retry')} Gate: ${m.gate.name} — attempt ${m.gate.attempt} failed · retrying (${m.gate.attempt+1}/${m.gate.max})</div>`;
+    if (p.id==='review' && m.reason) extra += `<div class="fail-reason"><b>Failed:</b> ${m.reason}</div>`;
+    return `<li>
+      <span class="nodeA">${stIco(st)}</span>
+      <div class="phaseA-head">
+        <span class="pname">${p.name}</span>
+        <span class="type-tag">${p.typeLabel}</span>
+        <span style="flex:1"></span>
+        ${pillFor(st==='lock'&&m.state!=='running'&&m.state!=='retry'?'lock':st)}
+      </div>
+      <div class="phaseA-meta">
+        <span class="pos">${idx+1}/3</span>
+        ${p.tools.map(t=>`<span class="tool-chip">${t}</span>`).join('')}
+        ${p.id==='split'&&st!=='lock'?'<span>→ 4 subtopics</span>':''}
+        ${p.id==='merge'&&st==='done'?'<span>→ integrated review</span>':''}
+      </div>
+      <div class="phaseA-bar ${barClass}"><i></i></div>
+      ${extra}
+    </li>`;
+  };
+  return bannerHTML(m) + `<ol class="tlA" aria-label="Phases">${STORY.phases.map(phaseLi).join('')}</ol>` + legendHTML();
+}
+
+/* ─────────── VARIANT B — RunCard per phase ─────────── */
+function renderB(m){
+  const card = (p, idx) => {
+    const st = m.phases[p.id];
+    const open = (st==='run'||st==='fail'||st==='retry'); // active/problem cards expand; done collapse
+    let body = '';
+    if (p.id==='review') {
+      body = `<div class="subrows" role="group" aria-label="Sub-agents">
+        ${m.subs.map(s=>`<div class="subrow ${s.status==='run'?'run':s.status==='fail'?'fail':''}">${stIco(s.status)}<span class="sa-name">${s.name}</span><span class="sa-stats">${s.searches}s · ${s.tools}t · ${s.sources}src</span></div>`).join('')}
+      </div>`;
+      if (m.gate) body += `<div class="gate-row">${stIco('retry')} Gate ${m.gate.name}: attempt ${m.gate.attempt} failed → retry ${m.gate.attempt+1}/${m.gate.max}</div>`;
+      if (m.reason) body += `<div class="fail-reason"><b>Failed:</b> ${m.reason}</div>`;
+    } else if (p.id==='split') {
+      body = `<div style="font-size:12px;color:var(--color-text-muted)">Server function <span class="mono">split_topic</span> → <b style="color:var(--color-text)">4 subtopics</b> from <span class="mono">kickoff_prompt</span>.</div>`;
+    } else {
+      body = `<div style="font-size:12px;color:var(--color-text-muted)">${st==='done'?'Integrated the 4 reviews into one cited review (48 sources).':'Waits for upstream phases.'}</div>`;
+    }
+    const sum = st==='done'
+      ? (p.id==='review'? '4 agents · 48 src · 12.3s' : (p.id==='split'?'4 subtopics · 0.1s':'1 call · 4.8s'))
+      : st==='run' ? 'running…' : st==='fail' ? 'failed' : 'locked';
+    return `<li class="cardB ${open?'open':''} ${st==='run'?'run':''} ${st==='fail'?'fail':''}" data-card>
+      <div class="cardB-head" onclick="this.parentElement.classList.toggle('open')">
+        ${stIco(st)}
+        <span class="cb-name">${p.name}</span>
+        <span class="type-tag">${p.typeLabel}</span>
+        <span class="cb-sum">${sum}</span>
+        <span class="caret">▸</span>
+      </div>
+      ${st==='run'?'<div class="progress-bar tool-progress"></div>':''}
+      <div class="cardB-body">${body}</div>
+    </li>`;
+  };
+  return bannerHTML(m) + `<ol class="tlB" aria-label="Phases">${STORY.phases.map(card).join('')}</ol>` + legendHTML();
+}
+
+/* ─────────── VARIANT C — Stepper + event log ─────────── */
+function renderC(m){
+  const stepClass = (id) => ({done:'done',run:'run',fail:'fail',lock:'lock'})[m.phases[id]];
+  const stepper = `<div class="stepper" aria-hidden="true">
+    ${STORY.phases.map(p=>`<div class="stepC ${stepClass(p.id)}"><div class="seg"></div><div class="lbl">${stIco(m.phases[p.id])}${p.name}</div></div>`).join('')}
+  </div>`;
+
+  // live event log — the REAL event stream, faithfully named (BRIEF §1.2)
+  const evs = [];
+  evs.push(['00:00','phase_started','split (programmatic)','ok']);
+  if (m.phases.split!=='lock') evs.push(['00:00','phase_completed','split → 4 subtopics','ok']);
+  if (m.phases.review!=='lock') {
+    evs.push(['00:01','phase_started','review (llm_batch_agents)','']);
+    m.subs.forEach((s,i)=> evs.push(['00:0'+(2+i),'sub_agent_start',s.name+' · tools=[search_documents]','']));
+    evs.push(['00:07','sub_agent_done','Leadership style ✓','ok']);
+    if (m.state!=='running') {
+      evs.push(['00:09','sub_agent_done','Organizational culture ✓','ok']);
+      if (m.state==='failed') evs.push(['00:11','sub_agent_done','Employee engagement — max_steps','err']);
+      else evs.push(['00:10','sub_agent_done','Employee engagement ✓','ok']);
+      evs.push(['00:11','sub_agent_done','Style × culture ✓','ok']);
+    }
+  }
+  if (m.gate) { evs.push(['00:12','gate_failed',`review · attempt 1 · ${m.gate.name}`,'warn']); }
+  if (m.state==='failed') evs.push(['00:12','run_failed', m.reason,'err']);
+  if (m.phases.merge==='done') { evs.push(['00:13','phase_started','merge (llm_single)','']); evs.push(['00:18','phase_completed','merge → integrated review','ok']); evs.push(['00:18','run_completed','status: completed · 48 sources','ok']); }
+
+  const log = `<div class="eventlog-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.tw').textContent=this.nextElementSibling.classList.contains('open')?'▾':'▸'">
+      <span class="tw">▸</span> Event log <span class="text-dim mono" style="margin-left:auto">${evs.length} events</span>
+    </div>
+    <div class="eventlog scrollbar-thin">
+      ${evs.map(e=>`<div class="ev ${e[3]}"><span class="t">${e[0]}</span><span class="name">${e[1]}</span><span class="det">${e[2]}</span></div>`).join('')}
+    </div>`;
+
+  // current-phase detail card (the focus)
+  let focus = '';
+  if (m.state==='running') {
+    focus = `<div style="margin-top:var(--space-3)"><div class="mini-prog"></div>
+      <div class="subrows" style="margin-top:var(--space-3)" role="group" aria-label="Sub-agents">
+      ${m.subs.map(s=>`<div class="subrow ${s.status==='run'?'run':''}">${stIco(s.status)}<span class="sa-name">${s.name}</span><span class="sa-stats">${s.searches}s · ${s.tools}t · ${s.sources}src</span></div>`).join('')}
+      </div></div>`;
+  } else if (m.state==='failed') {
+    focus = `<div class="fail-reason" style="margin-top:var(--space-3)"><b>Run failed:</b> ${m.reason}</div>`;
+  } else if (m.state==='retry') {
+    focus = `<div class="gate-row" style="margin-top:var(--space-3)">${stIco('retry')} Gate ${m.gate.name}: attempt 1 failed → retrying ${m.gate.attempt+1}/${m.gate.max}</div>`;
+  }
+  return bannerHTML(m) + stepper + focus + log + legendHTML();
+}
+
+/* ─────────── shared body/summary helpers (used by D) ─────────── */
+function bodyFor(p, st, m){
+  if (p.id==='review') {
+    let b = `<div class="subrows" role="group" aria-label="Sub-agents">
+      ${m.subs.map(s=>`<div class="subrow ${s.status==='run'?'run':s.status==='fail'?'fail':''}">${stIco(s.status)}<span class="sa-name">${s.name}</span><span class="sa-stats">${s.searches}s · ${s.tools}t · ${s.sources}src</span></div>`).join('')}
+    </div>`;
+    if (m.gate)   b += `<div class="gate-row">${stIco('retry')} Gate ${m.gate.name}: attempt ${m.gate.attempt} failed → retry ${m.gate.attempt+1}/${m.gate.max}</div>`;
+    if (m.reason) b += `<div class="fail-reason"><b>Failed:</b> ${m.reason}</div>`;
+    return b;
+  }
+  if (p.id==='split') return `<div style="font-size:12px;color:var(--color-text-muted)">Server function <span class="mono">split_topic</span> → <b style="color:var(--color-text)">4 subtopics</b> from <span class="mono">kickoff_prompt</span>.</div>`;
+  return `<div style="font-size:12px;color:var(--color-text-muted)">${st==='done'?'Integrated the 4 reviews into one cited review (48 sources).':'Waits for upstream phases.'}</div>`;
+}
+function sumFor(p, st){
+  if (st==='done') return p.id==='review' ? '4 agents · 48 src · 12.3s' : (p.id==='split' ? '4 subtopics · 0.1s' : '1 call · 4.8s');
+  return st==='run' ? 'running…' : st==='fail' ? 'failed' : st==='retry' ? 'retrying…' : 'locked';
+}
+
+/* ─────────── VARIANT D — Synthesis (cards on spine) ─────────── */
+function renderD(m){
+  const node = (p, idx) => {
+    const st = m.phases[p.id];
+    let card;
+    if (st==='lock') {
+      card = `<div class="cardD locked"><div class="cardD-head"><span class="cb-name dim">${p.name}</span><span class="type-tag">${p.typeLabel}</span><span class="cb-sum">locked · queued</span></div></div>`;
+      return `<li class="s-lock"><span class="nodeD">${stIco('lock')}</span>${card}</li>`;
+    }
+    const open = (st==='run'||st==='fail'||st==='retry');
+    card = `<div class="cardD ${open?'open':''} ${st==='run'?'run':''} ${st==='fail'?'fail':''}">
+      <div class="cardD-head" onclick="this.parentElement.classList.toggle('open')">
+        <span class="cb-name">${p.name}</span>
+        <span class="type-tag">${p.typeLabel}</span>
+        <span class="cb-sum">${sumFor(p,st)}</span>
+        <span class="caret">▸</span>
+      </div>
+      ${st==='run'?'<div class="progress-bar tool-progress" style="height:2px"></div>':''}
+      <div class="cardD-body">${bodyFor(p,st,m)}</div>
+    </div>`;
+    return `<li class="s-${st}"><span class="nodeD">${stIco(st)}</span>${card}</li>`;
+  };
+  return bannerHTML(m) + `<ol class="tlD" aria-label="Phases">${STORY.phases.map(node).join('')}</ol>` + legendHTML();
+}
+
+/* ─── driver ─── */
+let CUR_V = 'D', CUR_S = 'running';
+const RENDER = { A:renderA, B:renderB, C:renderC, D:renderD };
+
+function render(){
+  const m = model(CUR_S);
+  document.getElementById('panelBody').innerHTML = RENDER[CUR_V](m);
+  // chat reflection
+  const live = (CUR_S==='running'||CUR_S==='retry');
+  document.getElementById('chatAssistant').style.display = (CUR_S==='done')?'none':'flex';
+  document.getElementById('chatFinal').style.display = (CUR_S==='done')?'block':'none';
+  document.getElementById('chatAssistant').classList.toggle('live', live);
+  document.getElementById('panelDot').style.display = live ? 'block' : 'none';
+  document.getElementById('chatAssistantText').innerHTML = CUR_S==='failed'
+    ? 'Run failed · <span class="ws-pointer" onclick="flashPanel()">see workspace ▸</span>'
+    : 'Running in workspace…&nbsp; <span class="ws-pointer" onclick="flashPanel()">ran in workspace ▸</span>';
+  // a11y announce (transition-level only)
+  announce(m.doing);
+}
+let lastAnnounce='';
+function announce(msg){ if(msg!==lastAnnounce){ document.getElementById('announcer').textContent=msg; lastAnnounce=msg; } }
+
+function setVariant(v){
+  CUR_V=v;
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active', t.dataset.v===v));
+  render();
+}
+function setState(s){
+  CUR_S=s;
+  document.querySelectorAll('#stateCycler button').forEach(b=>b.classList.toggle('on', b.dataset.s===s));
+  render();
+}
+function flashPanel(){
+  const p=document.querySelector('.panel');
+  p.style.transition='box-shadow .3s'; p.style.boxShadow='inset 0 0 0 2px var(--color-primary)';
+  setTimeout(()=>p.style.boxShadow='', 500);
+}
+render();
+</script>
+</body>
+</html>

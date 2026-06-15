@@ -7,7 +7,7 @@ scheduled: 2026-05-17
 scheduled_phase: 081.1 (proposed — Settings Architecture Unification, inserted between Phase 081 OpenRouter UAT and Phase 082 cross-cutting verify)
 option_locked: B (small v2.6 polish phase before v3.0 starts; user lock-in 2026-05-17 — "we need to be consistent to establish a correct and solid ground to future milestones and plans")
 phase_origin: 073-asyncpg-pool-integration (user-raised concern post-073 close)
-related_seeds: [SEED-009, SEED-012, SEED-023]
+related_seeds: [SEED-009, SEED-012, SEED-023, SEED-078, SEED-003, SEED-001, SEED-004]
 relates_to:
   - CLAUDE.md project rule — "Settings live in `user_settings` / `app_settings` and the Settings UI; env vars are for secrets and infra only"
   - `backend/settings_override.json` — current 30+ non-secret values on disk that DRIFT from the CLAUDE.md principle
@@ -25,6 +25,7 @@ re_open_triggers:
   - Any operator who hand-edits `settings_override.json` in production (sign that admin UI surface is missing)
   - Multi-tenancy planning (v3.2) — a JSON file on disk doesn't survive multi-tenant deployment patterns
   - When `settings_override.json` file diverges between local dev and production (drift inevitable, just a question of when)
+  - **Reinforced 2026-06-01 (discuss-093):** the harness stale-model bug (F9) traced to scattered model-resolution — `override_provider` (`models/user_settings.py:514`) updates provider/key/base-url but NOT `llm_model`, and the cross-provider safety net (`resolve_sub_agent_model_safely`) was dead code reading a non-existent field (`llm_models` vs `available_models`). Phase 093 adds a contained shared model-resolver (resolve-don't-mutate) as the immediate root-fix; this seed owns the WIDER theme the operator raised — admin/full controllability over model + settings across ALL features at scale (also SEED-012). Re-open when the v2.9 admin/operator role tier is scoped.
 
 priority: HIGH (security/architecture concern; affects v3.1 scope directly)
 suggested_phase: Fold into v3.1 plan-phase OR ship as a v2.6 polish phase before v3.0 starts (e.g., 081.x or 082.x). Cannot defer past v3.1 close.
@@ -152,3 +153,23 @@ User preference recorded at planting: lean toward **Option B**. The seed says "d
 2. **Title-drafting + sub-agent code audit** — confirm where these prompts/models actually live today (mostly hardcoded?), so the migration knows what to migrate vs. what to net-new.
 3. **`app_settings` schema delta** — current `app_settings` is a single-row table (per memory). Either keep single-row with JSONB columns OR move to key-value shape. Decision needed before plan-phase.
 4. **Hot-reload cache invalidation contract** — exact API for "I changed key X, invalidate caches" (Pub/Sub via Redis? Direct cache.invalidate(key) call? Whichever survives multi-worker).
+
+## Strengthen — 2026-06-10 alignment sweep (Phase 101, workflow wf_13ed5033)
+
+This unification leaves one boundary under-specified: which values *legitimately* stay env-only and require a process restart, versus which only live in `.env` today by accident and should become hot-reloadable through `app_settings`. Operators currently discover that distinction by trial-and-error — they change a value, nothing happens, and they have to guess whether a restart is required. That guessing is the operational tax this seed must eliminate alongside deleting `settings_override.json`.
+
+**New deliverable — full env-var classification inventory.** Produce a complete, per-variable inventory of every operational env var the backend reads, classifying each one as either:
+
+- **Legitimately env-only / restart-required** — secrets and connection material (provider API keys, `SUPABASE_*`, DSNs, `REDIS_URL`, embedding/Ollama base URLs), and process-shaping knobs that genuinely cannot hot-reload because they bind at worker startup: `WORKER_COUNT` (forks uvicorn workers — D-PRD-12), `SANDBOX_ENABLED` (gates the Docker sandbox subsystem at import), and the AnyIO threadpool ceiling (the `run_in_threadpool` capacity limit — D-v2.5-01 — set once at process boot). These are correctly env-only; the inventory's job is to *say so explicitly* so nobody tries to migrate them into `app_settings` and nobody waits for a hot-reload that will never come.
+- **Should-be hot-reloadable via `app_settings`** — everything operational that has no startup-binding reason to stay in env: the retrieval/rerank/web-search/timeout knobs and the rest of the `settings_override.json` migration targets already enumerated above.
+
+**Surfacing requirement (two homes, same truth):**
+
+1. **OPERATOR.md** carries the inventory as the canonical reference — one table, every var, its classification, and (for the restart-required rows) a one-line reason it cannot hot-reload. This is where an operator reads *before* changing anything.
+2. **The v3.1 admin shell** marks each surfaced setting per-row as **`live`** (takes effect on next read via the short-TTL cache / invalidation contract in §5) vs **`restart required`** (the operator must bounce the workers). Pair this with the per-row "current / default / last-changed-by / last-changed-at" affordances from §4 so the restart expectation is visible at the point of edit, not buried in docs.
+
+The inventory feeds directly off the §1 categorization table and the §3 admin-scope rows — every row that lands in `app_settings` should carry a `live` marker; every row the inventory pins as env-only should carry a `restart required` marker (and ideally not be editable in the shell at all, just documented).
+
+**Cross-link — SEED-078 (unified runtime feature-flag / kill-switch / maintenance-mode):** the `live` marker and SEED-078's flags ride the *same hot-reload substrate* — the short-TTL cache + targeted invalidation contract from §5. A feature flag, a kill-switch, a maintenance-mode toggle, and a hot-reloadable `app_settings` knob are all "change a DB-backed value, have it take effect within seconds across all workers, without a restart." Build that substrate once and both seeds consume it; the env-var inventory's `live`-vs-`restart` distinction is exactly the line SEED-078's kill-switches must land on the `live` side of (a kill-switch that needs a restart is not a kill-switch). Co-scope the hot-reload primitive when either seed is picked up.
+
+Sibling cross-links: SEED-012 (admin/operator UI — this inventory is a concrete admin-shell deliverable), SEED-003 (deployment flexibility — env-only classification is what makes the local↔cloud env-var switch legible), SEED-001 (scale readiness — `WORKER_COUNT`/AnyIO-ceiling are the scale knobs the inventory must explain), and SEED-004 (org multi-tenancy — restart-required env vars are deployment-global and can't be per-org, which the inventory should flag for the v3.2 multi-tenant pass).

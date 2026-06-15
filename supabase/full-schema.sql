@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
+\restrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -219,6 +219,35 @@ END;
 $$;
 
 
+--
+-- Name: workflow_definitions_block_published_update(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.workflow_definitions_block_published_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.status = 'published' AND (
+        NEW.slug        IS DISTINCT FROM OLD.slug
+     OR NEW.version     IS DISTINCT FROM OLD.version
+     OR NEW.name        IS DISTINCT FROM OLD.name
+     OR NEW.description  IS DISTINCT FROM OLD.description
+     OR NEW.status      IS DISTINCT FROM OLD.status
+     OR NEW.definition  IS DISTINCT FROM OLD.definition
+     OR NEW.created_by  IS DISTINCT FROM OLD.created_by
+     OR NEW.is_global   IS DISTINCT FROM OLD.is_global
+     OR NEW.org_id      IS DISTINCT FROM OLD.org_id
+  ) THEN
+    RAISE EXCEPTION
+      'workflow_definitions row % is published and immutable; create a new version instead',
+      OLD.id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -272,6 +301,7 @@ CREATE TABLE public.app_settings (
     title_drafting_config jsonb DEFAULT '{"max_length": 60, "max_tokens": 30}'::jsonb,
     sub_agent_config jsonb DEFAULT '{"max_output_tokens": 32768}'::jsonb,
     token_capture_enabled boolean DEFAULT true,
+    template_ttl_hours integer DEFAULT 24,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -281,6 +311,13 @@ CREATE TABLE public.app_settings (
 --
 
 COMMENT ON COLUMN public.app_settings.chat_tool_args_progress_emit_boundary_bytes IS 'Byte boundary at which provider services emit tool_args_progress SSE events during tool argument generation. Lower = more visible streaming (per Claude.ai) but more SSE bandwidth. Default 256 ≈ a line of Python every event. Was hardcoded 5120 pre-075.10.';
+
+
+--
+-- Name: COLUMN app_settings.template_ttl_hours; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.template_ttl_hours IS 'Phase 100 D-05. Hours an uploaded template_input file lives before expiry. Default 24. No new RLS — app_settings is the single global-row config table.';
 
 
 --
@@ -406,6 +443,29 @@ CREATE TABLE public.folders (
 
 
 --
+-- Name: harness_audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.harness_audit (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    run_id uuid,
+    event_type text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    org_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text])))
+);
+
+
+--
+-- Name: COLUMN harness_audit.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.harness_audit.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
 -- Name: message_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -519,7 +579,8 @@ CREATE TABLE public.runs (
     error text,
     spawned_by_worker text,
     parent_run_id uuid,
-    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
+    continues_used integer DEFAULT 0 NOT NULL,
+    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
 
@@ -528,6 +589,13 @@ CREATE TABLE public.runs (
 --
 
 COMMENT ON COLUMN public.runs.spawned_by_worker IS 'OS PID of the uvicorn worker that INSERTed this run. Populated at INSERT time (Phase 079). NULL for pre-079 runs.';
+
+
+--
+-- Name: COLUMN runs.continues_used; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.continues_used IS 'D-06: Continue cap counter, max 3/run (Deep-run cap). Durable (WORKER_COUNT=2).';
 
 
 --
@@ -588,7 +656,8 @@ CREATE TABLE public.threads (
     title text DEFAULT 'New Chat'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    folder_id uuid
+    folder_id uuid,
+    active_workflow_run_id uuid
 );
 
 
@@ -637,6 +706,140 @@ CREATE TABLE public.user_settings (
 
 
 --
+-- Name: workflow_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_definitions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    slug text NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'draft'::text NOT NULL,
+    definition jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_by uuid NOT NULL,
+    is_global boolean DEFAULT false NOT NULL,
+    org_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    skill_snapshots jsonb,
+    CONSTRAINT workflow_definitions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text])))
+);
+
+
+--
+-- Name: COLUMN workflow_definitions.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_definitions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN workflow_definitions.skill_snapshots; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_definitions.skill_snapshots IS 'Phase 099 D-03a materialization state (derived at FIRST kickoff), NOT authored content. Keyed by phase slug -> SkillSnapshot JSON. EXCLUDED from the immutable-on-publish guarantee (the amended block-published trigger lets a published row change ONLY this column). Nullable, no default; NULL until first kickoff materializes the referenced skills.';
+
+
+--
+-- Name: workflow_phases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_phases (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    workflow_run_id uuid NOT NULL,
+    phase_index integer NOT NULL,
+    slug text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    output jsonb DEFAULT '{}'::jsonb NOT NULL,
+    org_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text])))
+);
+
+
+--
+-- Name: COLUMN workflow_phases.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_phases.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    definition_id uuid NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    current_phase_id uuid,
+    org_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model text,
+    continues_used integer DEFAULT 0 NOT NULL,
+    user_id uuid,
+    is_golden_run boolean DEFAULT false,
+    CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: COLUMN workflow_runs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN workflow_runs.claimed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.claimed_at IS 'Resume CAS lease (Phase 091 CR-01): the startup sweep stamps now() when it wins the claim_run CAS so a racing WORKER_COUNT=2 sibling matches 0 rows and skips. Re-claimable once the lease (engine constant, default 5 min) expires. Orthogonal to status; NULL = never claimed.';
+
+
+--
+-- Name: COLUMN workflow_runs.inputs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.inputs IS 'SEED-047: kickoff inputs persisted at creation for resume rehydration (top-level programmatic inputs + kickoff_prompt). Defaults to {} for legacy rows.';
+
+
+--
+-- Name: COLUMN workflow_runs.model; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.model IS 'SEED-047: resolved model at run creation, rehydrated into the resume ctx so resumed llm_* phases do not run with an empty model. Nullable — older rows have none.';
+
+
+--
+-- Name: COLUMN workflow_runs.continues_used; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.continues_used IS 'D-06: Continue cap counter, max 3/run. Durable (WORKER_COUNT=2) — the Continue-handling worker may differ from the one that hit the cap.';
+
+
+--
+-- Name: COLUMN workflow_runs.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.user_id IS '092-05 F1: run-owner (server-side current_user at creation). Sourced into harness_audit.user_id (NOT NULL) on every audit write and into the      
+  resume ctx (_build_resume_context). FK -> auth.users ON DELETE CASCADE. Nullable for legacy rows; new inserts always supply it.';
+
+
+--
+-- Name: COLUMN workflow_runs.is_golden_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.is_golden_run IS 'Phase 102 QUAL-01 (D-05). True = a publish-time validation run (real engine, real KB, judge-graded). Excluded from ordinary run history/listings. Default false (every pre-102 + ordinary run byte-identical).';
+
+
+--
 -- Name: workspace_file_versions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -667,9 +870,26 @@ CREATE TABLE public.workspace_files (
     created_by uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text,
+    expires_at timestamp with time zone,
+    CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
 );
+
+
+--
+-- Name: COLUMN workspace_files.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agent'' = agent-written (permanent, byte-identical to pre-100). ''template_input'' = user-uploaded ephemeral template (TTL-bound).';
+
+
+--
+-- Name: COLUMN workspace_files.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
 
 
 --
@@ -734,6 +954,14 @@ ALTER TABLE ONLY public.documents
 
 ALTER TABLE ONLY public.folders
     ADD CONSTRAINT folders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: harness_audit harness_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.harness_audit
+    ADD CONSTRAINT harness_audit_pkey PRIMARY KEY (id);
 
 
 --
@@ -862,6 +1090,38 @@ ALTER TABLE ONLY public.user_memory
 
 ALTER TABLE ONLY public.user_settings
     ADD CONSTRAINT user_settings_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: workflow_definitions workflow_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_definitions workflow_definitions_slug_version_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_slug_version_unique UNIQUE (slug, version);
+
+
+--
+-- Name: workflow_phases workflow_phases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_phases
+    ADD CONSTRAINT workflow_phases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -995,6 +1255,20 @@ CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
 
 
 --
+-- Name: idx_harness_audit_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_harness_audit_run ON public.harness_audit USING btree (run_id) WHERE (run_id IS NOT NULL);
+
+
+--
+-- Name: idx_harness_audit_user_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_harness_audit_user_created ON public.harness_audit USING btree (user_id, created_at DESC);
+
+
+--
 -- Name: idx_pdf_extraction_runs_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1030,10 +1304,59 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_threads_active_workflow_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (active_workflow_run_id) WHERE (active_workflow_run_id IS NOT NULL);
+
+
+--
 -- Name: idx_todos_thread; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_index);
+
+
+--
+-- Name: idx_workflow_definitions_created_by; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_definitions_created_by ON public.workflow_definitions USING btree (created_by);
+
+
+--
+-- Name: idx_workflow_definitions_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_definitions_slug ON public.workflow_definitions USING btree (slug);
+
+
+--
+-- Name: idx_workflow_phases_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_phases_run ON public.workflow_phases USING btree (workflow_run_id, phase_index);
+
+
+--
+-- Name: idx_workflow_runs_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_thread ON public.workflow_runs USING btree (thread_id);
+
+
+--
+-- Name: idx_workflow_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_user_id ON public.workflow_runs USING btree (user_id);
+
+
+--
+-- Name: idx_workspace_files_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_expires_at ON public.workspace_files USING btree (expires_at) WHERE (expires_at IS NOT NULL);
 
 
 --
@@ -1142,6 +1465,34 @@ CREATE TRIGGER user_memory_updated_at BEFORE UPDATE ON public.user_memory FOR EA
 
 
 --
+-- Name: workflow_definitions workflow_definitions_block_published; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_definitions_block_published BEFORE UPDATE ON public.workflow_definitions FOR EACH ROW EXECUTE FUNCTION public.workflow_definitions_block_published_update();
+
+
+--
+-- Name: workflow_definitions workflow_definitions_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_definitions_set_updated_at BEFORE UPDATE ON public.workflow_definitions FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workflow_phases workflow_phases_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_phases_set_updated_at BEFORE UPDATE ON public.workflow_phases FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workflow_runs workflow_runs_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: audit_log audit_log_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1243,6 +1594,14 @@ ALTER TABLE ONLY public.folders
 
 ALTER TABLE ONLY public.folders
     ADD CONSTRAINT folders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: harness_audit harness_audit_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.harness_audit
+    ADD CONSTRAINT harness_audit_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1374,6 +1733,14 @@ ALTER TABLE ONLY public.skills
 
 
 --
+-- Name: threads threads_active_workflow_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.threads
+    ADD CONSTRAINT threads_active_workflow_run_id_fkey FOREIGN KEY (active_workflow_run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+
+
+--
 -- Name: threads threads_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1403,6 +1770,46 @@ ALTER TABLE ONLY public.todos
 
 ALTER TABLE ONLY public.user_memory
     ADD CONSTRAINT user_memory_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_definitions workflow_definitions_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_phases workflow_phases_workflow_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_phases
+    ADD CONSTRAINT workflow_phases_workflow_run_id_fkey FOREIGN KEY (workflow_run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_runs workflow_runs_definition_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_definition_id_fkey FOREIGN KEY (definition_id) REFERENCES public.workflow_definitions(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: workflow_runs workflow_runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_runs workflow_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1447,6 +1854,13 @@ CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELET
 --
 
 CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: workflow_definitions Users can delete own workflow definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE USING ((auth.uid() = created_by));
 
 
 --
@@ -1506,6 +1920,13 @@ CREATE POLICY "Users can insert own folders" ON public.folders FOR INSERT WITH C
 
 
 --
+-- Name: harness_audit Users can insert own harness audit; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: user_memory Users can insert own memory; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1531,6 +1952,13 @@ CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSER
 --
 
 CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
+-- Name: workflow_definitions Users can insert own workflow definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
 
 
 --
@@ -1618,6 +2046,13 @@ CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE USING ((
 
 
 --
+-- Name: workflow_definitions Users can update own workflow definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE USING ((auth.uid() = created_by)) WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
+
+
+--
 -- Name: document_chunks Users can update their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1676,10 +2111,24 @@ CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT
 
 
 --
+-- Name: workflow_definitions Users can view own and global workflow definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT USING (((auth.uid() = created_by) OR (is_global = true)));
+
+
+--
 -- Name: code_executions Users can view own executions; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "Users can view own executions" ON public.code_executions FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: harness_audit Users can view own harness audit; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT USING ((auth.uid() = user_id));
 
 
 --
@@ -1765,6 +2214,12 @@ ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.folders ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: harness_audit; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.harness_audit ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: message_feedback; Type: ROW SECURITY; Schema: public; Owner: -
@@ -1896,6 +2351,105 @@ CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING
 ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: workflow_definitions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workflow_definitions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workflow_phases; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workflow_phases ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workflow_phases workflow_phases_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+
+--
+-- Name: workflow_phases workflow_phases_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+
+--
+-- Name: workflow_phases workflow_phases_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+
+--
+-- Name: workflow_phases workflow_phases_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id)))) WITH CHECK ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+
+--
+-- Name: workflow_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workflow_runs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workflow_runs workflow_runs_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id))));
+
+
+--
+-- Name: workflow_runs workflow_runs_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id))));
+
+
+--
+-- Name: workflow_runs workflow_runs_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id))));
+
+
+--
+-- Name: workflow_runs workflow_runs_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id)))) WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id))));
+
+
+--
 -- Name: workspace_file_versions; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1967,5 +2521,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
+\unrestrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
 

@@ -26,12 +26,119 @@
  * (D4). On 0-countdown the card renders the calm grey .expired state (D5) — never
  * a crash/hang. All agent-supplied text (prompt, options) and the user's answer
  * render as plain React text children — never as raw HTML (T-087-11).
+ *
+ * 096-04 (BUG-260605-01 / D-06 honesty): the countdown seeds from created_at
+ * when present, so a reconciled stale prompt renders expired on mount (never a
+ * fresh 5:00 for a dead prompt). A 404 on submit (the backend's IDOR-safe "run
+ * not active" answer) flips the card to the expired state with a visible
+ * constant message; other failures show a retryable error line — never silence.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useAskUserPrompt, useViewingThread } from "@/providers/StreamsProvider"
-import { answerAskUser } from "@/lib/api"
+import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
+// Phase 094 Plan 05 (D-06): a draft longer than this (word count) previews
+// behind a faded mask + opens the WIDE review overlay; shorter drafts render
+// inline. The threshold is presentational — the contract is "long ⇒ preview +
+// open-wide" (DATA-CONTRACT §4.4), driven by draft length (generic).
+const LONG_DRAFT_WORD_THRESHOLD = 60
+
+/**
+ * Phase 094 Plan 05 Task 2 (D-06 — run-honesty draft preview).
+ *
+ * Renders `ask.draft` (the prior phase's text the user is being asked to review)
+ * ABOVE the question, labelled with the VERBATIM amber tag
+ * "DRAFT · awaiting your review — not yet saved" — the "not yet saved" half is
+ * NON-NEGOTIABLE: it prevents the draft being read as the final saved answer
+ * (UI-SPEC Copywriting Contract). A long draft shows a faded-mask preview + a
+ * word count + "⤢ Review & edit full draft", which opens a WIDE overlay OVER the
+ * chat (never auto-widens the panel — sketch 010-C D4, reuses the 005 overlay
+ * pattern). The draft body renders as plain React text children — NEVER as
+ * raw/innerHTML markup (T-094-05-02 / T-087-11 XSS guard).
+ *
+ * GUARD: callers render this only when a draft string is present — but it also
+ * self-guards on an empty draft, returning null (DRAFT-MISSING, DATA-CONTRACT §6).
+ */
+function DraftBlock({ draft }: { draft: string }) {
+  const [overlayOpen, setOverlayOpen] = useState(false)
+  if (!draft) return null
+
+  const wordCount = draft.trim().split(/\s+/).filter(Boolean).length
+  const isLong = wordCount >= LONG_DRAFT_WORD_THRESHOLD
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-[hsl(var(--warning)/0.4)] bg-[hsl(var(--warning)/0.06)] p-2.5">
+      {/* The non-negotiable label — verbatim copy, amber mono tag. */}
+      <span className="font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--warning))]">
+        DRAFT · awaiting your review — not yet saved
+      </span>
+
+      {isLong ? (
+        <>
+          {/* Faded-mask preview — the gradient fades the draft tail so it reads
+              as a peek, not the full answer. Plain text children (XSS guard). */}
+          <div className="relative max-h-[6.5rem] overflow-hidden">
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+              {draft}
+            </p>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[hsl(var(--warning)/0.06)] to-transparent"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            {/* IN-04: panel-scoped dim token (8.42:1 dark / 4.66:1 light) — the
+                global --muted-foreground-dim is 3.59:1 on the dark panel (fails). */}
+            <span className="font-mono text-[10px] text-panel-muted-foreground-dim">
+              ≈ {wordCount} words · long draft
+            </span>
+            <button
+              type="button"
+              onClick={() => setOverlayOpen(true)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-[12px] font-medium",
+                "text-[hsl(var(--warning))] hover:bg-[hsl(var(--warning)/0.12)]",
+                "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              )}
+            >
+              ⤢ Review &amp; edit full draft
+            </button>
+          </div>
+
+          {/* The WIDE overlay OVER the chat (min(760px, 88%)) — reuses the repo's
+              shadcn Dialog (focus-trap + Escape + restore for free; mirrors the
+              087 DiffExpandOverlay). NEVER auto-widens the panel. */}
+          <Dialog open={overlayOpen} onOpenChange={setOverlayOpen}>
+            <DialogContent className="w-[88vw] max-w-[760px] gap-3 p-0">
+              <DialogHeader className="border-b border-border/60 px-4 py-3">
+                <DialogTitle className="font-mono text-sm text-[hsl(var(--warning))]">
+                  Draft · not yet saved
+                </DialogTitle>
+              </DialogHeader>
+              <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                  {draft}
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+          {draft}
+        </p>
+      )}
+    </div>
+  )
+}
 
 /** mm:ss from a non-negative seconds count. */
 function formatClock(totalSeconds: number): string {
@@ -50,7 +157,7 @@ interface PendingAskCardProps {
 type CardState = "pending" | "answered" | "expired"
 
 export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
-  const { tool_call_id, prompt, timeout_seconds, run_id } = ask
+  const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
   // Normalize to [] so the `.length`/index reads below never throw (a null here
   // crashed the whole panel — there is no error boundary). See BUG-260529-03.
@@ -61,10 +168,23 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   const [state, setState] = useState<CardState>("pending")
   const [submitting, setSubmitting] = useState(false)
   const [answeredValue, setAnsweredValue] = useState<string>("")
+  // 096-04 (BUG-260605-01): non-404 submit failures surface a visible,
+  // retryable, CONSTANT-string error line — never silence, never raw server text.
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  // 096-04: a 404-driven expiry carries its own honesty message; null → the
+  // default countdown-timeout copy in the expired-state render.
+  const [expiredMessage, setExpiredMessage] = useState<string | null>(null)
 
-  // Countdown — drive the calm .expired state (D5). Recomputed from
-  // timeout_seconds on mount; ticks once a second while pending.
-  const [remaining, setRemaining] = useState<number>(timeout_seconds)
+  // Countdown — drive the calm .expired state (D5). 096-04 (BUG-260605-01):
+  // derive the initial remaining from created_at when present (GET-reconciled
+  // prompts carry it — panel.py:154) so a stale reconciled prompt renders
+  // expired on mount, never a misleading fresh 5:00. SSE-path prompts lack
+  // created_at (genuinely fresh — emission ≈ mount) and honestly seed at
+  // timeout_seconds. Ticks once a second while pending.
+  const initialRemaining = ask.created_at
+    ? Math.max(0, timeout_seconds - Math.floor((Date.now() - Date.parse(ask.created_at)) / 1000))
+    : timeout_seconds
+  const [remaining, setRemaining] = useState<number>(initialRemaining)
 
   useEffect(() => {
     if (state !== "pending") return
@@ -101,20 +221,36 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   const handleSubmit = async () => {
     if (!canSubmit || run_id == null) return
     setSubmitting(true)
+    setSubmitError(null)
     const valueForDisplay = selectedValue
     try {
       await answerAskUser(run_id, {
         tool_call_id,
-        response_text: hasText ? freeText.trim() : "",
+        // BUG-260607-01: a choice-click answer must carry the chosen option's
+        // TEXT — selectedValue resolves options[choiceIndex] for choices and
+        // freeText for typed answers (the documented contract at the top of
+        // this file). Sending "" for choices fed the model an empty answer.
+        response_text: selectedValue,
         choice_index: hasChoice ? choiceIndex : null,
       })
       // Optimistic green answered state (D4). The ask_user_response SSE then
       // removes the prompt from the store, reactively unmounting this card.
       setAnsweredValue(valueForDisplay)
       setState("answered")
-    } catch {
-      // Leave the card pending so the user can retry; never crash the panel.
+    } catch (err) {
+      // Never crash the panel — and never stay silent (096-04 / BUG-260605-01).
       setSubmitting(false)
+      if (err instanceof ApiError && err.status === 404) {
+        // D-06: the run is terminal — the 404 is the backend's correct
+        // IDOR-safe answer (runs.py anchor-confirm); surface it honestly as
+        // the calm expired state instead of a dead-but-submittable card.
+        setExpiredMessage("This prompt has expired — the run is no longer active")
+        setState("expired")
+      } else {
+        // Transient/unknown failure — leave the card pending so the user can
+        // retry, with a visible constant-string error line.
+        setSubmitError("Couldn't submit your answer — try again.")
+      }
     }
   }
 
@@ -134,8 +270,13 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
         <p className="text-sm leading-relaxed text-foreground" id={labelId}>
           {prompt}
         </p>
-        <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]" aria-live="polite">
-          No response within {formatClock(timeout_seconds)} — agent stopped
+        {/* IN-05: the card root is already role="status" (a polite live region),
+            so this inner line must NOT also carry aria-live — a nested polite
+            region inside role="status" can double-announce. The root announces.
+            096-04: a 404-driven expiry renders its own constant honesty message;
+            countdown-driven expiry keeps the timeout copy. */}
+        <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]">
+          {expiredMessage ?? `No response within ${formatClock(timeout_seconds)} — agent stopped`}
         </p>
       </div>
     )
@@ -175,6 +316,12 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
         <span aria-live="assertive">Needs you</span>
         <span className="ml-auto text-[hsl(var(--muted-foreground-dim))]">{formatClock(remaining)}</span>
       </div>
+
+      {/* Phase 094 (D-06): the draft renders ABOVE the question — labelled
+          "not yet saved" so it is never read as the final answer. DRAFT-MISSING
+          guard: hide the block entirely when draft is undefined/empty (older
+          streams), never an empty DRAFT box (DATA-CONTRACT §6). */}
+      {draft && <DraftBlock draft={draft} />}
 
       <p className="text-sm leading-relaxed text-foreground" id={labelId}>
         {prompt}
@@ -242,6 +389,14 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
           {/* A2: a real run_id has not landed yet → quiet "preparing…" affordance. */}
           {hasAnswer && !runReady ? "Preparing…" : "Send Answer"}
         </button>
+        {/* 096-04: non-404 submit failure — visible + retryable. CONSTANT string,
+            never raw server text (T-096-04-01/02). role="alert" announces the
+            failure; it renders only on error so it never double-announces. */}
+        {submitError && (
+          <p role="alert" className="self-end text-[12px] text-[hsl(var(--destructive))]">
+            {submitError}
+          </p>
+        )}
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from langsmith import traceable
+from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.config import settings
@@ -31,9 +32,16 @@ async def _vector_search(
     user_settings: UserEffectiveSettings | None,
     folder_ids: list[str] | None = None,
 ) -> list[dict]:
-    # embed_texts is a sync OpenAI HTTP call. Per D-058-01, only Supabase
-    # `.execute()` is in scope for 058 — this OpenAI call is deferred.
-    query_embedding = embed_texts([query], user_settings=user_settings)[0]
+    # SEED-065: embed_texts is a SYNC OpenAI HTTP call. Running it directly on the
+    # event loop froze ALL request serving for the embedding round-trip — under a
+    # search-heavy llm_batch_agents fan-out (N concurrent sub-agents) that stacked
+    # into multi-second idle-request stalls (conc_probe cross_tab_latency p95=2.6s,
+    # threadpool only 6/200 = blocking, not starvation). Wrap in run_in_threadpool
+    # so the blocking HTTP call leaves the loop (the D-v2.5-01 pattern; supersedes
+    # the D-058-01 deferral that scoped 058 to Supabase only). Behavior identical.
+    query_embedding = (
+        await run_in_threadpool(embed_texts, [query], user_settings=user_settings)
+    )[0]
     params: dict = {
         "query_embedding": query_embedding,
         "match_user_id": user_id,
@@ -108,7 +116,7 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
     doc_ids = list({row["document_id"] for row in rows})
     docs_result = await aexec(
         supabase.table("documents")
-        .select("id, filename, metadata, version_number")
+        .select("id, filename, metadata, version_number, folder_id")
         .in_("id", doc_ids)
     )
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
@@ -122,6 +130,9 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
             "chunk_index": row.get("chunk_index"),
             "similarity": row.get("similarity") or row.get("rrf_score") or row.get("rank") or 0.0,
             "version_number": doc.get("version_number", 1),
+            # Phase 098 GOV-01 — additive folder_id for the post-query ⊆ scope clip
+            # (Deep-inert: Deep consumers never read it; the return shape is unchanged).
+            "folder_id": doc.get("folder_id"),
         }
         if doc.get("metadata"):
             entry["metadata"] = doc["metadata"]
@@ -297,8 +308,12 @@ async def search_documents(
 
     rerank_enabled = user_settings.rerank_enabled if user_settings else settings.rerank_enabled
     if rerank_enabled:
-        # rerank is a sync OpenAI/Cohere HTTP call; out of 058 scope (D-058-01).
-        candidates = rerank(query, candidates, top_n=top_k, user_settings=user_settings)
+        # SEED-065: rerank is a SYNC Cohere-HTTP / local-ML call — same event-loop
+        # blocking class as the embed above. Off by default, but when enabled it
+        # compounds the stall, so wrap it in run_in_threadpool too (D-v2.5-01).
+        candidates = await run_in_threadpool(
+            rerank, query, candidates, top_n=top_k, user_settings=user_settings
+        )
     else:
         candidates = candidates[:top_k]
 

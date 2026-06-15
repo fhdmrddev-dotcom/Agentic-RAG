@@ -51,9 +51,14 @@ test.describe("@075.4 scenario-01 — parallel composers (BUG-260523-01)", () =>
   test("Thread B composer accepts input while Thread A streams", async ({
     authedPage: page,
   }) => {
-    // Step 1: Land on the chat surface. After auth fixture, we should already
-    // be off /login — the app routes to "/" which is the chat surface.
-    await expect(page).not.toHaveURL(/\/login/)
+    // Step 1: Land on the chat surface. Auth gated by authedPage fixture;
+    // /login URL PERSISTS post-auth (the app re-renders chat inline — see
+    // auth.fixture.ts; asserting on a URL change is the documented false-positive
+    // trap). The fixture already asserted the "Ask anything…" composer is visible,
+    // so we are on the chat surface here.
+    await expect(
+      page.getByPlaceholder(/ask anything/i).first(),
+    ).toBeVisible()
 
     // Open a fresh New Chat for Thread A. Selector is broad to survive sidebar
     // redesigns; the role + name regex matches "New Chat", "+ New Chat", etc.

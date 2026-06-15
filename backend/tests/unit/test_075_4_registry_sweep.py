@@ -47,7 +47,9 @@ def test_uses_max_completion_tokens_registry_hit_gpt5() -> None:
     from app.config import MODEL_CAPABILITIES
     from app.services.openai_service import _uses_max_completion_tokens
 
-    for model_id in ("gpt-5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "o3", "o4"):
+    # o3/o4 dropped — removed from registry 2026-06-07 (096 D-05 curation, not served live);
+    # gpt-5.2/5.4-pro/5.5-pro added by the same curation pass.
+    for model_id in ("gpt-5", "gpt-5.2", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro", "gpt-5.5", "gpt-5.5-pro"):
         assert MODEL_CAPABILITIES[model_id].get("uses_max_completion_tokens") is True
         assert _uses_max_completion_tokens(model_id) is True
 
@@ -176,15 +178,22 @@ def test_parallel_tool_calls_gate_defaults_to_supported_for_openai() -> None:
 
 
 def test_anthropic_native_gate_carries_audit_comment() -> None:
-    """Test 7: the gate at threads.py around line 1679 (``if active_provider_name ==
-    \"anthropic\"``) is operator-controlled via active_provider. Audit-only: confirm
-    the Plan 075.4-02 audit comment is present near the gate so future maintainers
-    don't accidentally refactor it into a registry-based check (which would route
-    OpenRouter-Claude variants through the native path and lose the operator's
-    routing/billing/fallback intent)."""
-    from app.api import threads as threads_mod
+    """Test 7: the native-path gate is operator-controlled via active_provider.
+    Audit-only: confirm the Plan 075.4-02 audit comment is present near the gate
+    so future maintainers don't accidentally refactor it into a registry-based
+    check (which would route OpenRouter-Claude variants through the native path
+    and lose the operator's routing/billing/fallback intent).
 
-    src = inspect.getsource(threads_mod)
-    # Both the audit comment AND the original gate must be present.
+    Phase 089-03 (G-5 verbatim move): the provider gate + the audit comment
+    moved with the loop body from threads.py into agent_loop.py.
+
+    Phase 092.5 Wave 2: the two clean branches (Anthropic + Google) collapsed
+    into ONE gateway-dispatched native branch, so the gate is now
+    ``active_provider_name in ("anthropic", "google")`` — STILL operator-controlled
+    via active_provider (NOT a registry check), preserving Test 7's intent."""
+    from app.services import agent_loop as agent_loop_mod
+
+    src = inspect.getsource(agent_loop_mod)
+    # Both the audit comment AND the operator-controlled gate must be present.
     assert "Plan 075.4-02 audit (Site 4)" in src
-    assert 'active_provider_name == "anthropic"' in src
+    assert 'active_provider_name in ("anthropic", "google")' in src

@@ -134,3 +134,18 @@ Folded into **Phase 068.5: Chat-Surface Persistent Rendering + In-Flight Pulse**
 ### New affected area added
 
 `frontend/navigation` — page-route changes (sidebar nav clicks, deep-links, F5) also trigger the symptom, not just intra-chat thread switches.
+
+---
+
+## Residual 2026-05-31 — pre-React-mount splash
+
+This bug is closed (folded into 068.5, which landed persistent render + in-flight pulse for thread switch). Triaging the operator's original "idle load → loading icon" observation against the shipped code turned up ONE uncovered slice that 068.5 never touched. Documenting it here so it isn't lost — this is NOT a new seed, just a residual note. Status/frontmatter unchanged.
+
+**The two covered slices (no action needed):**
+- App cold-start spinner exists — `frontend/src/App.tsx:16-21` renders a loading indicator gated on `useAuth` loading. So once React is mounted and auth is resolving, the operator sees a spinner.
+- Thread-switch blank window is closed by 068.5 (persistent cached render + in-flight pulse).
+
+**The uncovered slice:**
+- `frontend/index.html` ships an empty `<div id="root"></div>` with NO static splash markup. Between the moment the browser finishes downloading + parsing the JS bundle and the moment React commits its first render (which is what then shows the `App.tsx` spinner), there is a blank themed screen. This window is worst exactly "when the app is idle" / cold cache — the bundle isn't in memory, so download+parse takes longest, and the blank-white gap is most visible. This is BEFORE React mounts, so neither the `App.tsx:16-21` spinner nor the 068.5 thread-switch work can cover it — they both run after the first commit.
+
+**Disposition:** ~5-line static-HTML change — inline a splash/spinner (themed Deep Midnight background + brand mark) directly inside `<div id="root">` in `frontend/index.html`, so the browser paints it the instant the HTML arrives and React replaces it on first commit. Ideal for `/gsd:fast` IF the operator reconfirms they're seeing a blank/white screen (not a spinner) on first load after inactivity. If what they actually see is already the `App.tsx` spinner, there's nothing further to do.

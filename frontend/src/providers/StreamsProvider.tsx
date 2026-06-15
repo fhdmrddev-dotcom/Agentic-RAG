@@ -32,8 +32,9 @@
  *           threadId is non-null — without adding a second assignment to the
  *           ref. Sole-writer grep gate remains at exactly 1.
  * L-068-04: makeStreamCallbacks factory captures surfaceId via closure
- *           (RESEARCH §Finding #7). Deltas route to streamingThreadIdRef's
- *           bucket regardless of viewing thread.
+ *           (RESEARCH §Finding #7). Deltas route to the run's OWNING thread
+ *           bucket (captured via closure) regardless of viewing thread — which is
+ *           what lets concurrent background streams coexist (SEED-055).
  * L-068-05: reconcile's for-loop runId-match dedup (m.runId equals run.run_id)
  *           reuses the existing placeholder's id as the assistantId.
  * L-068-06: loadMessages MERGE 3-clause filter preserves live in-flight temp
@@ -53,7 +54,7 @@
  *                      store; async actions throw notMounted. Safe.
  * RESEARCH §Pitfall 5: Throwing stubs surface pre-mount usage instantly.
  */
-import { useEffect, useRef, type PropsWithChildren, type MutableRefObject } from "react"
+import { useEffect, useMemo, useRef, type PropsWithChildren, type MutableRefObject } from "react"
 import type {
   Message,
   ToolCall,
@@ -64,6 +65,7 @@ import type {
   WorkspaceFile,
   PendingAsk,
   TaskRunIndexItem,
+  Phase,
 } from "@/types"
 import {
   getMessages,
@@ -76,6 +78,8 @@ import {
   getThreadWorkspaceFiles,
   getThreadPendingAsks,
   getThreadTasks,
+  getThreadWorkflow,
+  ApiError,
   type StreamCallbacks,
   type ThreadSnapshot,
 } from "@/lib/api"
@@ -84,10 +88,24 @@ import {
   useStreamsStore,
   type SurfaceId,
   type StreamsState,
+  type WorkflowLock,
 } from "@/stores/streamsStore"
 import { makeThrottle } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
+// Phase 095.1 Plan 02 (D-095.1-01/02): the deterministic activity-derived
+// workspace-panel selector (Plan 01). `useDerivedPanel` is a PURE read over the
+// viewing thread's persisted chat tool_calls — it consumes these, never re-rolls
+// the gate/derive logic.
+import {
+  shouldPopulate,
+  deriveWorkspacePanel,
+  type DerivedPanelItem,
+} from "@/lib/workspacePanel"
+// Phase 092-07 (Facet C): the Continue affordance (MessageItem) fires this signal
+// with the FRESH producer_run_id from the /continue 200 body; the provider
+// re-subscribes that thread's producer stream (additive, per-thread keyed).
+import { subscribeProducerResubscribe } from "@/providers/producerResubscribeSignal"
 
 // RESEARCH §Finding #1: module-level constant gives every empty-bucket subscriber
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
@@ -102,6 +120,25 @@ const EMPTY_TODOS: Todo[] = []
 const EMPTY_FILES: WorkspaceFile[] = []
 const EMPTY_ASKS: PendingAsk[] = []
 const EMPTY_TASKS: TaskRunIndexItem[] = []
+// Phase 094 Plan 02 (PANEL-08/09) — stable EMPTY ref for the panel-only phase
+// timeline hook. A per-thread Map miss (or null threadId) returns this SAME
+// reference so useSyncExternalStore skips re-render (PANEL-09 structural).
+const EMPTY_PHASES: Phase[] = []
+// Phase 095.1 Plan 02 (D-095.1-01/02) — stable EMPTY ref for the activity-derived
+// workspace panel selector. Returned (same rationale as EMPTY_TODOS) whenever the
+// thread is null OR the smart gate does not pass, so reading useDerivedPanel never
+// forces a chat re-render (PANEL-06 / FC#1 isolation).
+const EMPTY_DERIVED: DerivedPanelItem[] = []
+
+// Phase 096-05 (D-09 — BUG-260530-01): cap held-open streaming fetches at a
+// thread-keyed LRU pool. One held-open fetch per active run saturates the
+// browser's 6-per-host HTTP/1.1 connection cap (uvicorn serves HTTP/1.1), so
+// with ~6 concurrent runs every navigation's reconcile GETs queue 15-30s behind
+// the streams. Pool = 3 (the viewed thread + the 2 most-recently-viewed
+// background threads) leaves 3 connections free for normal traffic. Evicted
+// threads keep executing server-side; returning to one re-attaches via the
+// EXISTING reconcile path with replay from the retained cursor (D-11).
+const STREAM_POOL_SIZE = 3
 
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
@@ -271,7 +308,11 @@ type ThreadBoundSetMessages = (
 export function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
-  onTitleUpdate?: (title: string) => void
+  // Title cross-wiring fix (parallel chats): the consumer receives the run's
+  // OWNING threadId so the title lands on the right chat even under concurrent
+  // runs / fast nav. makeStreamCallbacks injects it (the wire StreamCallbacks
+  // below still receives title-only).
+  onTitleUpdate?: (threadId: string, title: string) => void
   setMessages: ThreadBoundSetMessages
 }): StreamCallbacks {
   const { assistantId, threadId, onTitleUpdate, setMessages } = opts
@@ -306,7 +347,10 @@ export function makeStreamCallbacks(opts: {
     onTerminal: () => {
       // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
     },
-    onTitleUpdate,
+    // Inject the run's OWNING threadId (closure) so a generated title is applied
+    // to THIS run's chat — not whatever thread the user is viewing when the title
+    // SSE arrives (the cross-wiring under parallel chats / fast nav).
+    onTitleUpdate: onTitleUpdate ? (title: string) => onTitleUpdate(threadId, title) : undefined,
     onToolPreparing: (name: string, index: number) => {
       setMessages((prev) =>
         prev.map((m) => {
@@ -476,28 +520,122 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
+    // Phase 095 Plan 03 Task 1 (D-05 root fix): the legacy analyze_document
+    // sub-agent now stamps onto its OWNING tool_call entry instead of a
+    // separate single-slot message-scoped sub_agent field. That single slot
+    // was the dual-render ROOT: it rendered once as the tool body (via the
+    // owner's tc.sub_agent on reconcile) AND once via the message-scoped
+    // fallback in ToolCallPanel, so the read/summarize content visibly doubled
+    // and never self-healed (it was stable state, not the 075.2 transient-id
+    // race — a separate root, and that transient fix is left fully untouched).
+    //
+    // The fix mirrors onToolStart's makeToolKey discipline: find the running
+    // analyze_document owner and set tc.sub_agent on THAT entry, preserving
+    // its existing clientKey. If no owner exists yet (sub_agent_start arrived
+    // before tool_start for some provider ordering), create the owner entry
+    // here with ONE stable makeToolKey identity from frame 1. Provider-agnostic
+    // and additive — m.content and the four terminal kinds are untouched, and
+    // the closure is scoped to the OWNING threadId (no global flag, no
+    // cross-thread write).
+    //
+    // helper: locate the tool_call this sub-agent belongs to (the most recent
+    // running/preparing analyze_document — the legacy sub-agent owner).
     onSubAgentStart: (filename, task) => {
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
-            : m,
-        ),
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Find the most recent running/preparing analyze_document owner.
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            const tc = calls[i]
+            if (
+              tc.name === "analyze_document" &&
+              (tc.status === "running" || tc.status === "preparing")
+            ) {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx !== -1) {
+            // Stamp onto the existing owner, preserving its clientKey identity.
+            const updated = calls.map((tc, i) =>
+              i === ownerIdx
+                ? { ...tc, sub_agent: { filename, task, content: "", status: "running" as const } }
+                : tc,
+            )
+            return { ...m, tool_calls: updated }
+          }
+          // No owner yet (sub_agent_start before tool_start) — create the
+          // analyze_document owner entry with ONE stable identity from frame 1,
+          // mirroring onToolStart's makeToolKey stamp (443-448).
+          const observedAt = Date.now()
+          const clientKey = makeToolKey({
+            messageId: assistantId,
+            name: "analyze_document",
+            observedAt,
+            index: calls.length,
+          })
+          const ownerEntry: ToolCall = {
+            id: `running-${observedAt}`,
+            clientKey,
+            name: "analyze_document",
+            args: {},
+            status: "running",
+            startedAt: observedAt,
+            iteration: currentIteration,
+            sub_agent: { filename, task, content: "", status: "running" },
+          }
+          return { ...m, tool_calls: [...calls, ownerEntry] }
+        }),
       )
     },
     onSubAgentDelta: (text) => {
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.id !== assistantId || !m.sub_agent) return m
-          return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Append to the OWNING tool_call's sub_agent.content (the most recent
+          // entry that carries a running sub_agent). Immutable copy-then-mutate.
+          // This is a NEW-field append — m.content is never touched (preserves
+          // the onDelta content-append invariant).
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].sub_agent && calls[i].sub_agent!.status === "running") {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx === -1) return m
+          const updated = calls.map((tc, i) =>
+            i === ownerIdx
+              ? { ...tc, sub_agent: { ...tc.sub_agent!, content: tc.sub_agent!.content + text } }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
         }),
       )
     },
     onSubAgentDone: () => {
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.id !== assistantId || !m.sub_agent) return m
-          return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Flip the owning tool_call's sub_agent status → done.
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].sub_agent && calls[i].sub_agent!.status === "running") {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx === -1) return m
+          const updated = calls.map((tc, i) =>
+            i === ownerIdx
+              ? { ...tc, sub_agent: { ...tc.sub_agent!, status: "done" as const } }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
         }),
       )
     },
@@ -605,7 +743,10 @@ export function makeStreamCallbacks(opts: {
     // assistant message; MessageItem renders the panel below the per-cell
     // delta outputs in each execute_code tool card. The reducer never
     // mutates `m.content` (Plan 03 invariant — only onDelta appends).
-    onFinalOutputFiles: (files: { filename: string; url?: string }[]) => {
+    onFinalOutputFiles: (files: { filename: string; url?: string; size?: number; is_hero?: boolean }[]) => {
+      // Phase 095 Plan 05 (D-08): the additive `is_hero` flag rides through the
+      // existing full-replace stamp untouched — MessageItem groups heroes above
+      // a collapsible Working files group.
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, finalOutputFiles: files } : m)),
       )
@@ -699,6 +840,130 @@ export function makeStreamCallbacks(opts: {
       useStreamsStore
         .getState()
         .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
+    // Phase 092 (CONT-01 / D-07 — SC#3): live cap_paused SSE → set the OWNING
+    // thread's lock to capPaused so the inline Continue card appears out-of-band
+    // (the durable carrier row is filtered from /messages — BUG-260528-01).
+    // Closes over the factory's `threadId` (the owning thread), so a background
+    // thread's cap_paused never touches the viewed thread's lock.
+    onCapPaused: (info) =>
+      useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
+        runId: info.runId,
+        mode: "harness",
+        capPaused: true,
+        continuesRemaining: info.continuesRemaining,
+      }),
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle demux.
+    // Each closes over the factory's `threadId` (the OWNING thread, Pitfall 6),
+    // so a background harness run's phase events can NEVER corrupt the viewed
+    // thread's timeline. They write phasesByThread ONLY — never bucketsBySurface
+    // (PANEL-09: the chat selector useThreadMessages reads bucketsBySurface
+    // exclusively → zero chat re-renders). Provider-agnostic (honest producer
+    // events, no provider branching).
+    // ────────────────────────────────────────────────────────────────────────
+    onPhaseStarted: (p) => {
+      // BUG-260609-01 mid-run honesty fix: a LATER phase going live is durable proof
+      // the EARLIER phases finished (sequential engine — phase N can't start until
+      // N-1 completed + advanced, harness_engine.py:963/973/994). Sweep any earlier
+      // phase still running/retrying → done BY INDEX before appending the new row.
+      // Index-matched so it survives a missed phase_completed AND a placeholder-slug
+      // mismatch (the two ways the live draft→done flip is lost across the ask_user
+      // pause / a consumer reattach). The finalizeAllPhasesForThread terminal sweep
+      // remains the run_completed floor. Closure threadId (PANEL-09); phasesByThread only.
+      const _actions = useStreamsStore.getState().actions
+      _actions.finalizeEarlierPhasesForThread(threadId, p.phaseIndex)
+      _actions.appendPhaseForThread(threadId, {
+        slug: p.phase,
+        phaseIndex: p.phaseIndex,
+        phaseType: p.phaseType,
+        status: "running",
+        subAgents: [],
+        pendingAsk: null,
+      })
+    },
+    onPhaseCompleted: (phase) =>
+      useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, phase, "done"),
+    // 101.1 review WR-01: an honest emit failure terminalizes its phase as FAILED
+    // (the engine no longer emits phase_completed for it). Flip the card to failed
+    // so the sweeps (finalizeEarlierPhasesForThread / finalizeAllPhasesForThread) —
+    // which skip terminal statuses — never repaint a "✓ Complete" pill over the
+    // emitFailure alert. Closure threadId (PANEL-09); phasesByThread only.
+    onPhaseFailed: (phase, _phaseIndex, failure) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, phase, "failed", { error: failure }),
+    onPhaseTransition: (from, _to, via) => {
+      // A skip_to_phase routing marks the FROM phase skipped (it was bypassed by
+      // a gate's on_failure='skip_to_phase'). A normal advance is a no-op on
+      // status (the from-phase already flipped to done via phase_completed).
+      if (via === "skip_to_phase")
+        useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, from, "skipped")
+    },
+    onGateFailed: (g) =>
+      // Non-terminal gate failure → the phase is retrying (the engine will
+      // re-attempt). A TERMINAL gate failure is followed by run_failed, which
+      // flips the active phase to failed below — so retrying here is correct for
+      // every attempt; run_failed overrides on exhaustion.
+      useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, g.phase, "retrying", {
+        attempt: g.attempt,
+        error: g.error,
+      }),
+    onRunFailed: (reason) =>
+      // Mark the latest RUNNING/RETRYING phase failed (the one that was active
+      // when the run died), carrying the reason. The store body resolves "the
+      // active phase" by scanning for the last non-terminal row.
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, "", "failed", { error: reason }),
+    onRunCompleted: (status) => {
+      // Phase 098-UAT run-honesty fix (A): a phase flips running→done ONLY when its
+      // own phase_completed SSE lands live. Across the ask_user pause / a consumer
+      // reattach, an earlier phase's completed can be missed — leaving it stuck
+      // "running" forever (this handler was previously a no-op, and the terminal
+      // reconcile floor returns []; neither corrects it in-session). On a SUCCESSFUL
+      // completion the DB ground truth is every phase completed, so sweep any
+      // lingering non-terminal phase for THIS owning thread to done. A failed/
+      // cancelled run is left alone (onRunFailed owns it) so a real failure is never
+      // masked as done. Closure threadId (PANEL-09); phasesByThread only.
+      if (status === "completed")
+        useStreamsStore.getState().actions.finalizeAllPhasesForThread(threadId)
+      // Phase 101.1-09 (gap 4 frontend): on a SUCCESSFUL harness terminal, refetch
+      // the workspace files so a just-persisted deliverable's file + phase status
+      // self-heal WITHOUT an F5 (the UAT log showed FILES fetched ~2 min BEFORE the
+      // emit's row existed and never refetched → "No files yet" until refresh).
+      // Scoped to the OWNING threadId (PANEL-09 closure). run_completed is a
+      // HARNESS-ONLY event (Deep never emits it), so a Deep completion never reaches
+      // here — no guard needed beyond the status==="completed" check. The Plan-08
+      // snapshot degrade ensures this refetch path doesn't 503 on a GC'd buffer.
+      if (status === "completed") {
+        getThreadWorkspaceFiles(threadId)
+          .then((files) =>
+            useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(threadId, files),
+          )
+          .catch(() => {
+            // Best-effort self-heal — a failed refetch is non-fatal (the panel's
+            // own mount/visibility reconcile remains the floor); never throw into
+            // the SSE consumer.
+          })
+      }
+    },
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 101.1-09 (gap 6 / GAP-C / D-11) — the phase_substep demux Plan 04
+    // deferred. ADDITIVE + PANEL-ONLY: writes phasesByThread (like the 094
+    // lifecycle demux), NEVER bucketsBySurface — the chat selector reads
+    // bucketsBySurface exclusively → Deep byte-identical, no chat re-render.
+    // Closes over the factory threadId (Pitfall 6 — a background run never
+    // corrupts the viewed thread's rail). PhaseCard already renders emitSubStep/
+    // emitFailure (Plan 04) — this populates them from the wire. One shared event
+    // for every provider (no provider branch — D-14).
+    // ────────────────────────────────────────────────────────────────────────
+    onPhaseSubstep: (sub) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseEmitSubstepForThread(threadId, sub.phase, sub.phaseIndex, {
+          emitSubStep: sub.status,
+          emitFailure: sub.failure,
+        }),
   }
 }
 
@@ -747,6 +1012,35 @@ function _removeRunFromThread(
   return next
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 092 (MODE-01/02 — SC#3) — per-thread workflow-lock copy-then-mutate
+// helpers. EXACT shape as _addRunToThread / _removeRunFromThread above (new Map
+// → set / GC delete-the-key). NEVER a global boolean — a global flag here is the
+// BUG-260523-01-class regression (Thread A's workflow locking Thread B). Returns
+// the NEXT Map so callers fold it into a setState partial.
+// ─────────────────────────────────────────────────────────────────────────────
+function _setWorkflowLock(
+  current: Map<string, WorkflowLock>,
+  threadId: string,
+  lock: WorkflowLock,
+): Map<string, WorkflowLock> {
+  const next = new Map(current)
+  next.set(threadId, lock)
+  return next
+}
+
+function _clearWorkflowLock(
+  current: Map<string, WorkflowLock>,
+  threadId: string,
+): Map<string, WorkflowLock> {
+  if (!current.has(threadId)) return current
+  const next = new Map(current)
+  // GC: drop the key entirely on unlock — absence of a key IS "Deep/unlocked",
+  // so size stays correct without a sentinel.
+  next.delete(threadId)
+  return next
+}
+
 export function StreamsProvider({ children }: PropsWithChildren) {
   // ---- Provider-scoped refs (D-068-01: handles, not display state) ----
   // Lifted VERBATIM from useMessages.ts:417-447 shape (single source of truth
@@ -754,14 +1048,33 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
   const reconcileInFlightRef = useRef(false)
-  const streamingThreadIdRef = useRef<string | null>(null)
   const activeThreadIdRef = useRef<string | null>(null)
+  // Phase 096-05 (D-09): most-recently-viewed thread ids, most-recent first,
+  // deduped, capped at ~10 entries. Feeds the LRU-3 keep-set (viewed thread +
+  // first STREAM_POOL_SIZE-1 MRU entries). A ref — never display state.
+  const mruThreadsRef = useRef<string[]>([])
   // Phase 068 (Task 2a): additional refs lifted from useMessages.ts for sendMessage.
-  const isSendingRef = useRef(false)
+  // SEED-055 (true concurrent chats): the send guard is now PER-THREAD. The old
+  // single global `isSendingRef` boolean + single-slot `streamingThreadIdRef` were
+  // replaced by `sendingThreadsRef` — the Set of thread ids with a send currently in
+  // flight. A send into thread B is therefore no longer blocked by thread A streaming
+  // (the old global mutex silently DROPPED it — BUG-260603-01 mechanism #1). The Set
+  // is added at the guard (synchronously, before the optimistic placeholders) and
+  // deleted in the finally; the reconcile / loadMessages placeholder-preservation
+  // guards read `.has(threadId)`, preserving the BUG-260521-01 wipe protection
+  // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
+  // lockstep) still drives the composer's OWN-thread disable + Stop button.
+  const sendingThreadsRef = useRef<Set<string>>(new Set())
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const resumeInFlightRef = useRef(false)
+  // Phase 092-07 (Facet C): the producer-stream re-subscribe closure, installed by
+  // useEffect #1 (it closes over subscriptionsRef/lastSeenOffsetRef) and consumed
+  // by the mount reconcile + the producer-resubscribe signal listener.
+  const subscribeProducerStreamRef = useRef<
+    ((threadId: string, producerRunId: string) => void) | null
+  >(null)
 
   // Phase 068.5 D-068.5-03: throttled localStorage writer; hoisted into a ref
   // so the synchronous setViewingThread action body can call `.flush()` without
@@ -778,6 +1091,120 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       (surfaceId: SurfaceId, threadId: string): ThreadBoundSetMessages =>
       (updater) =>
         useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, updater)
+
+    // ── Phase 096-05 (D-09 / BUG-260530-01): thread-keyed LRU-3 stream pool ──
+    // The keep-set = {viewed thread} ∪ first (STREAM_POOL_SIZE - 1) MRU threads
+    // (minus the viewed thread). EVERY stream-open site below is gated on
+    // membership so no code path can ever leak a 4th held-open connection.
+    const isThreadInStreamPool = (threadId: string | null): boolean => {
+      if (threadId === null) return true // pre-navigation sends never blocked
+      const viewed = activeThreadIdRef.current
+      const keep = new Set<string>(
+        [viewed, ...mruThreadsRef.current.filter((t) => t !== viewed)]
+          .filter(Boolean)
+          .slice(0, STREAM_POOL_SIZE) as string[],
+      )
+      return keep.has(threadId)
+    }
+
+    // Evict every subscription whose owning thread (reverse lookup via the
+    // store's subscriptionsByThread mirror) is OUTSIDE the keep-set.
+    //
+    // api.ts:516-517 — AbortError is a SILENT return: NO onTerminal fires on a
+    // caller-initiated abort, so the evictor must replicate the onTerminal
+    // remove pair (StreamsProvider :subscribeProducerStream onTerminal shape)
+    // itself: subscriptionsRef.delete + _removeRunFromThread, in lockstep.
+    //
+    // NEVER touch lastSeenOffsetRef — the cursor is the D-11 replay substrate:
+    // returning to an evicted thread re-attaches via the existing reconcile
+    // path, replaying from the retained cursor (client cursors win over the
+    // snapshot's since_cursors re-seed).
+    const enforceStreamPool = (viewedThreadId: string) => {
+      const keep = new Set<string>(
+        [viewedThreadId, ...mruThreadsRef.current.filter((t) => t !== viewedThreadId)]
+          .filter(Boolean)
+          .slice(0, STREAM_POOL_SIZE),
+      )
+      const byThread = useStreamsStore.getState().subscriptionsByThread
+      for (const [ownerThreadId, runIds] of byThread) {
+        if (keep.has(ownerThreadId)) continue
+        for (const runId of runIds) {
+          const controller = subscriptionsRef.current.get(runId)
+          controller?.abort()
+          subscriptionsRef.current.delete(runId)
+          useStreamsStore.setState((s) => ({
+            subscriptionsByThread: _removeRunFromThread(
+              s.subscriptionsByThread,
+              ownerThreadId,
+              runId,
+            ),
+          }))
+        }
+      }
+    }
+
+    // Phase 092-07 (Facet C): re-subscribe a thread's FRESH producer stream so a
+    // startup-sweep-resumed run (mount reconcile latest_producer_run_id) AND a
+    // Harness Continue (the /continue 200 producer_run_id) re-attach their live
+    // events with no page action. Per-thread keyed (BUG-260523-01), idempotent
+    // (won't double-subscribe), additive — reuses the existing subscribeToRun
+    // machinery + the chat-surface callbacks; touches no provider streaming branch.
+    const subscribeProducerStream = (threadId: string, producerRunId: string) => {
+      if (!threadId || !producerRunId) return
+      // Idempotent: already attached → no-op.
+      if (subscriptionsRef.current.has(producerRunId)) return
+      // Phase 096-05 (D-09): pool-gate — skip opening (and the slot-reservation
+      // write) for a thread outside the LRU-3 keep-set. The run keeps executing
+      // server-side; reconcile re-attaches it when the thread is re-viewed.
+      if (!isThreadInStreamPool(threadId)) return
+      const surfaceId: SurfaceId = "chat"
+      const controller = new AbortController()
+      subscriptionsRef.current.set(producerRunId, controller)
+      useStreamsStore.setState((s) => ({
+        subscriptionsByThread: _addRunToThread(
+          s.subscriptionsByThread,
+          threadId,
+          producerRunId,
+        ),
+      }))
+      const callbacks: StreamCallbacks = makeStreamCallbacks({
+        // No assistant placeholder to target — the resumed run's phase/sub-agent
+        // events render in the panel via the shared callbacks; the chat transcript
+        // is reconciled separately. Use the run id as the target id (harmless when
+        // no placeholder matches).
+        assistantId: producerRunId,
+        threadId,
+        setMessages: setMessagesForBucketBound(surfaceId, threadId),
+      })
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(producerRunId, msId)
+      }
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        subscriptionsRef.current.delete(producerRunId)
+        useStreamsStore.setState((s) => ({
+          subscriptionsByThread: _removeRunFromThread(
+            s.subscriptionsByThread,
+            threadId,
+            producerRunId,
+          ),
+        }))
+        originalOnTerminal(kind, errorPayload)
+      }
+      subscribeToRun(
+        producerRunId,
+        lastSeenOffsetRef.current.get(producerRunId) ?? "0",
+        callbacks,
+        controller.signal,
+      ).catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("producer re-subscribe failed:", err)
+        }
+        subscriptionsRef.current.delete(producerRunId)
+      })
+    }
+    // expose to the reconcile action + the producer-resubscribe signal listener.
+    subscribeProducerStreamRef.current = subscribeProducerStream
 
     useStreamsStore.setState({
       actions: {
@@ -814,7 +1241,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // is now structurally orthogonal to streaming-state membership.
         clearThreadBucket: (surface) => {
           const tid = activeThreadIdRef.current
-          if (tid && tid !== streamingThreadIdRef.current) {
+          // SEED-055: refuse to wipe the active bucket if a send is in flight on it
+          // (per-thread now — was `tid !== streamingThreadIdRef.current`).
+          if (tid && !sendingThreadsRef.current.has(tid)) {
             useStreamsStore.setState((state) => {
               const surfMap = state.bucketsBySurface.get(surface)
               if (!surfMap || !surfMap.has(tid)) return {}
@@ -860,6 +1289,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               .catch((err) => {
                 console.error("[StreamsProvider] reconcile from setViewingThread failed", err)
               })
+            // Phase 096-05 (D-09): AFTER the reconcile fires — promote this
+            // thread to the front of the MRU list (deduped, capped) and evict
+            // every stream outside the LRU-3 keep-set. Navigation is the ONLY
+            // eviction trigger; the viewed thread is always in the keep-set so
+            // the reconcile above can never have its own attach evicted.
+            mruThreadsRef.current = [
+              threadId,
+              ...mruThreadsRef.current.filter((t) => t !== threadId),
+            ].slice(0, 10)
+            enforceStreamPool(threadId)
           }
         },
 
@@ -900,12 +1339,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // (preserve untyped temps instead of bailing completely).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
               const dbRunIds = new Set(snapshot.messages.filter((m) => m.runId).map((m) => m.runId))
-              const sendInFlightOnThisThread =
-                isSendingRef.current && streamingThreadIdRef.current === threadId
+              // SEED-055: per-thread send-in-flight check (was
+              // `isSendingRef.current && streamingThreadIdRef.current === threadId`).
+              // Each thread's optimistic temps are now preserved on its OWN send,
+              // so a reconcile on thread A no longer wipes A's temps while B streams.
+              const sendInFlightOnThisThread = sendingThreadsRef.current.has(threadId)
               const liveTempPlaceholders = prev.filter((m) => {
                 if (!m.id.startsWith("temp-")) return false
                 if (m.runId) {
-                  return !dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)
+                  // BUG-260609-03 fix (symmetric with loadMessages): keep a runId-bearing
+                  // temp only while genuinely in flight — subscribed, or still STREAMING
+                  // and not yet persisted. A terminated, unsubscribed temp is a stale
+                  // duplicate of the snapshot's persisted answer (harness answers return
+                  // runId=undefined, so the old `!dbRunIds.has` survival orphaned it →
+                  // double-render on reload). The untyped-temp branch below is untouched
+                  // (it protects the 075.7 pre-stamp optimistic-placeholder race).
+                  return (
+                    subscriptionsRef.current.has(m.runId) ||
+                    (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
+                  )
                 }
                 return sendInFlightOnThisThread
               })
@@ -958,6 +1410,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 063.1 (D-063.1-09 / Gap-003): NARROWED short-circuit.
               if (subscriptionsRef.current.has(run.run_id)) continue
 
+              // Phase 096-05 (D-09): pool-gate — never open (or reserve a slot
+              // for) a stream whose thread is outside the LRU-3 keep-set. In
+              // practice reconcile targets the viewed thread (always in-pool);
+              // the gate is defensive so no future path leaks a 4th connection.
+              if (!isThreadInStreamPool(threadId)) continue
+
               // WR-06 fix: RESERVE the subscription slot BEFORE firing subscribeToRun.
               const controller = new AbortController()
               subscriptionsRef.current.set(run.run_id, controller)
@@ -1003,6 +1461,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     run.run_id,
                     lastSeenOffsetRef,
                     (rid: string, since: string) => {
+                      // Phase 096-05 (D-09): pool-gate the transient re-attach
+                      // — skip opening (and the slot reservation) when the
+                      // owning thread left the LRU-3 keep-set mid-probe.
+                      if (!isThreadInStreamPool(threadId)) return
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -1086,6 +1548,44 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     .catch(console.error)
                 })
             }
+
+            // Phase 092 (092-06 / F3 — SC#5 / D-v2.5-03): reconcile the per-thread
+            // workflow lock from the AUTHORITATIVE GET /threads/{id}/workflow read
+            // (Realtime/SSE is a hint, not truth). A reload mid-workflow rehydrates
+            // the composer lock here; a stale/terminal anchor (F2 self-heal) CLEARS
+            // it so the composer re-enables. Own try/catch — a workflow-state fetch
+            // failure must NOT break message reconcile. Keyed by the OWNING
+            // `threadId` (closure) — never a global flag (SC#3 / BUG-260523-01).
+            if (activeThreadIdRef.current === threadId) {
+              try {
+                const wf = await getThreadWorkflow(threadId)
+                const actions = useStreamsStore.getState().actions
+                if (wf.locked && !wf.lock_is_stale && wf.active_workflow_run_id) {
+                  actions.setWorkflowLockForThread(threadId, {
+                    runId: wf.active_workflow_run_id,
+                    mode: "harness",
+                    capPaused: wf.cap_paused,
+                    continuesRemaining: wf.continues_remaining,
+                  })
+                  // Phase 092-07 (Facet C, startup-sweep re-attach): when the
+                  // workflow is live AND the backend reports a live producer runs
+                  // row (latest_producer_run_id — the fresh shell a startup-sweep
+                  // resume minted), re-subscribe its stream so the resumed run's
+                  // events render with no page action. Per-thread keyed; idempotent.
+                  if (wf.latest_producer_run_id) {
+                    subscribeProducerStreamRef.current?.(
+                      threadId,
+                      wf.latest_producer_run_id,
+                    )
+                  }
+                } else {
+                  // Stale / terminal / Deep → unlock (honors the F2 self-heal).
+                  actions.clearWorkflowLockForThread(threadId)
+                }
+              } catch (err) {
+                console.error("reconcile workflow-state failed:", err)
+              }
+            }
           } finally {
             // Phase 063.1 (D-063.1-11 / Gap-005): ALWAYS reset in finally.
             reconcileInFlightRef.current = false
@@ -1096,9 +1596,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // thread; cleanup on onTerminal. Source: useMessages.ts:673-939.
         sendMessage: async (threadId, content, opts) => {
           const surfaceId: SurfaceId = opts?.surfaceId ?? "chat"
-          if (isSendingRef.current) return
-          isSendingRef.current = true
-          streamingThreadIdRef.current = threadId
+          // SEED-055 (true concurrent chats): per-thread guard. Block only a re-send
+          // into a thread that is ALREADY sending (re-entrancy / double-submit) — a
+          // send into a DIFFERENT thread proceeds CONCURRENTLY (the old global
+          // `isSendingRef` boolean silently dropped it). Added synchronously here,
+          // before the optimistic placeholders, so a fresh-thread reconcile's
+          // preserve-guard sees it immediately.
+          if (sendingThreadsRef.current.has(threadId)) return
+          sendingThreadsRef.current.add(threadId)
 
           // Optimistic user message.
           const userMsg: Message = {
@@ -1144,26 +1649,70 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
           try {
             // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
-            const { message_id, run_id } = await postMessage(threadId, content, {
+            // Phase 095.1-07 (GAP-2): the dispatch response now ALSO carries the
+            // RESOLVED model/provider (aliased so they don't shadow the request
+            // `opts?.model`/`opts?.provider`); we stamp them onto the assistant
+            // placeholder below so attribution shows in the LIVE moment, not only
+            // after a reload re-reads them via the Plan-03 enrich SELECT.
+            const {
+              message_id,
+              run_id,
+              model: resolvedModel,
+              provider: resolvedProvider,
+            } = await postMessage(threadId, content, {
               model: opts?.model,
               provider: opts?.provider,
               agentMode: opts?.agentMode,
+              // Phase 092 (D-02): kickoff field — only present on a Harness send.
+              workflowDefinitionId: opts?.workflowDefinitionId,
             })
             registeredRunId = run_id
+
+            // Phase 092 (092-06 / F3 — SC#3): seed the per-thread workflow lock
+            // at KICKOFF so the composer disables IMMEDIATELY on a Harness send,
+            // not only when a cap_paused SSE arrives. Keyed by the OWNING
+            // `threadId` (closure) — never a global flag (BUG-260523-01). A fresh
+            // run has the full Continue budget (D-06: max 3/run); a real terminal
+            // (onTerminal) or the mount reconcile clears/refreshes it.
+            if (opts?.workflowDefinitionId && run_id) {
+              useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
+                runId: run_id,
+                mode: "harness",
+                capPaused: false,
+                continuesRemaining: 3,
+              })
+            }
 
             // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages.
             // L-068-07 (open side): track in subscriptionsByThread mirror.
             // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
-            subscriptionsRef.current.set(run_id, controller)
-            useStreamsStore.setState((s) => ({
-              subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run_id),
-            }))
+            // Phase 096-05 (D-09): pool-gate — in practice the send-time thread
+            // IS the viewed thread (always in-pool); the gate is defensive so a
+            // future code path can't leak a 4th held-open connection. Computed
+            // ONCE here (no awaits between reservation and the subscribe below)
+            // so the reservation and the open stay consistent.
+            const sendThreadInPool = isThreadInStreamPool(threadId)
+            if (sendThreadInPool) {
+              subscriptionsRef.current.set(run_id, controller)
+              useStreamsStore.setState((s) => ({
+                subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run_id),
+              }))
+            }
 
             // WR-04 fix: swap temp user id for real, stamp run_id on assistant placeholder.
+            // Phase 095.1-07 (GAP-2): also stamp the RESOLVED model/provider so the
+            // RunCard run-sub shows `{provider} · {model}` LIVE. Coerce null →
+            // undefined to match the Message type (string | undefined, not | null).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
               prev.map((m) => {
                 if (m.id === userMsg.id) return { ...m, id: message_id }
-                if (m.id === assistantId) return { ...m, runId: run_id }
+                if (m.id === assistantId)
+                  return {
+                    ...m,
+                    runId: run_id,
+                    model: resolvedModel ?? undefined,
+                    provider: resolvedProvider ?? undefined,
+                  }
                 return m
               }),
             )
@@ -1207,6 +1756,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     registeredRunId,
                     lastSeenOffsetRef,
                     (rid, since) => {
+                      // Phase 096-05 (D-09): pool-gate the transient re-attach
+                      // — skip opening (and the slot reservation) when the
+                      // owning thread left the LRU-3 keep-set mid-probe.
+                      if (!isThreadInStreamPool(threadId)) return
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -1250,6 +1803,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
                 }))
               }
+              // Phase 092 (SC#3 / MODE-02): a TERMINAL kind unlocks the thread
+              // (the lock-clear is also authoritative server-side — finish_run
+              // clears the anchor; the mount reconcile is the source of truth).
+              // cap_paused is NON-terminal and is delivered via onCapPaused, NOT
+              // onTerminal — so the lock survives a pause and only clears here on
+              // a real terminal (done / error / timed_out / cancelled / reader_done).
+              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
               // Pitfall 8: TTL-expired buffer fallback.
               if (errorPayload === "buffer_expired") {
                 useStreamsStore
@@ -1265,11 +1825,52 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               lastSeenOffsetRef.current.set(run_id, msId)
             }
 
-            await subscribeToRun(run_id, "0", callbacks, controller.signal)
+            // Phase 096-05 (D-09): same gate as the slot reservation above —
+            // skip the held-open fetch when the thread is outside the pool
+            // (the run keeps executing server-side; reconcile re-attaches it).
+            if (sendThreadInPool) {
+              await subscribeToRun(run_id, "0", callbacks, controller.signal)
+            }
           } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.
+            } else if (err instanceof ApiError && err.status === 409) {
+              // Phase 092 (092-06 / F3): a 409 lock-refusal (MODE-02 server-side
+              // Harness→Deep refusal). Roll back BOTH optimistic bubbles — the
+              // user bubble AND the orphaned assistant placeholder — so no ghost
+              // messages linger. Then surface a fixed, per-thread error banner
+              // (T-092-06-03: a constant user-facing string, never the raw
+              // server body). Keyed by the OWNING threadId — never a global flag.
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
+              )
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(
+                  threadId,
+                  new ApiError(
+                    "This thread is running a workflow — cancel it to send a Deep message.",
+                    409,
+                  ),
+                ),
+              }))
+            } else if (err instanceof ApiError) {
+              // 099-08 (UAT L10): a non-409 kickoff/send refusal (e.g. the 400
+              // disabled-skill gate). Mirror the 409 rollback shape — drop BOTH
+              // optimistic temps so reconcile (the preserve-guard ~1295-1319)
+              // cannot resurrect a dead blank thread — but surface the SERVER's
+              // descriptive detail (already a plain string from api.ts; rendered
+              // as React text in ChatArea, never HTML → T-099-08-01). Stash the
+              // typed prompt per-thread so the composer can recover it via the
+              // existing prefill seam.
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
+              )
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(threadId, err),
+                failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+              }))
             } else {
+              // genuine network / non-HTTP failure — unchanged swallow-to-failed-placeholder.
               console.error("sendMessage failed:", err)
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
                 prev.map((m) =>
@@ -1279,8 +1880,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
           } finally {
             abortControllerRef.current = null
-            isSendingRef.current = false
-            streamingThreadIdRef.current = null
+            // SEED-055: release THIS thread's send slot (per-thread; other threads'
+            // in-flight sends are unaffected).
+            sendingThreadsRef.current.delete(threadId)
             // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads delete.
             // This is the AUTHORITATIVE streaming-end write — clearThreadBucket
             // no longer writes here (D-075.4-A1 invariant; see L:617).
@@ -1346,9 +1948,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // Phase 068 (L-068-07 safety-net side): stopStream tears down
         // subscription; mirror remove. Source: useMessages.ts:477-495.
         stopStream: async () => {
-          // Pitfall 3: derive run_id from streaming bucket (or fall back to
-          // viewing bucket). RESEARCH §Pattern 5: read via getState().
-          const stid = streamingThreadIdRef.current ?? activeThreadIdRef.current
+          // SEED-055: Stop targets the VIEWED thread — the composer's Stop button
+          // only renders on the thread you're watching (useStreamingForThread), and
+          // under concurrency there is no single "streaming thread" to fall back to.
+          // Was `streamingThreadIdRef.current ?? activeThreadIdRef.current`.
+          const stid = activeThreadIdRef.current
           if (!stid) return
           const bucket =
             useStreamsStore.getState().bucketsBySurface.get("chat")?.get(stid) ?? []
@@ -1362,6 +1966,28 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             await cancelRun(runId)
           } catch (err) {
             console.error("Stop failed:", err)
+          }
+        },
+
+        // SEED-064 — stop the active run on ANY thread (not just the viewed one).
+        // Mirrors stopStream but takes an explicit threadId so the sidebar Stop +
+        // the cross-thread active-runs tray can cancel a backgrounded run without
+        // navigating into it. Same durable cancel path (DELETE /runs/{id}); same
+        // stopped-by-user marking so the terminal renders "Response stopped".
+        stopThread: async (threadId: string) => {
+          if (!threadId) return
+          const bucket =
+            useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+          const streamingMsg = [...bucket]
+            .reverse()
+            .find((m) => m.role === "assistant" && m.runStatus === "streaming")
+          const runId = streamingMsg?.runId
+          if (!runId) return
+          stoppedByUserRef.current = true
+          try {
+            await cancelRun(runId)
+          } catch (err) {
+            console.error("Stop failed (thread", threadId, "):", err)
           }
         },
 
@@ -1424,12 +2050,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // discards cross-thread responses.
               if (activeThreadIdRef.current !== threadId) return
               // Protect optimistic placeholders if a send is in flight on the same thread.
-              // Phase 068.5 Gap-02: scope to streamingThreadIdRef so cross-thread
-              // cold-load reconciles (A streaming, user clicks unvisited D) merge
-              // into the target bucket instead of bailing globally and leaving
-              // MessageSkeleton stuck. The un-stamped placeholder window is
-              // bounded to the sending thread, so this guard only matters there.
-              if (isSendingRef.current && streamingThreadIdRef.current === threadId) return
+              // Phase 068.5 Gap-02 / SEED-055: per-thread guard — bail only if a send
+              // is in flight on THIS thread (its optimistic temps aren't yet runId-
+              // stamped). Cross-thread cold-load reconciles still merge normally. Was
+              // `isSendingRef.current && streamingThreadIdRef.current === threadId`.
+              if (sendingThreadsRef.current.has(threadId)) return
               // L-068-06 / L-068.5-02: MERGE 3-clause filter preserves live in-flight
               // temp placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
               //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
@@ -1439,9 +2064,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   (m) =>
                     m.id.startsWith("temp-") &&
                     m.runId &&
-                    // Keep when DB doesn't have this runId yet OR a live SSE
-                    // consumer is still bound via this runId (CR-01 fix).
-                    (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
+                    // Keep a runId-bearing temp ONLY while genuinely in flight: a live
+                    // SSE consumer is still bound, OR the run is still STREAMING and the
+                    // DB hasn't returned it yet. BUG-260609-03 fix: the prior bare
+                    // `!dbRunIds.has(m.runId)` survival orphaned a TERMINATED streamed
+                    // copy forever for harness runs — the harness producer-shell leaves
+                    // runs.message_id NULL (harness_engine.py:353-357) so the fetched
+                    // answer comes back with runId=undefined, dbRunIds never holds the
+                    // run_id, and the cached temp + the DB copy both rendered (double
+                    // answer on reload, persisted). A terminated, unsubscribed temp is a
+                    // stale duplicate of the just-fetched `data` answer → drop it (the
+                    // answer is preserved in `data`). Deep is unaffected (its fetched msg
+                    // carries runId, so it was already dropped via dbRunIds.has).
+                    (subscriptionsRef.current.has(m.runId) ||
+                      (!dbRunIds.has(m.runId) && m.runStatus === "streaming")),
                 )
                 return [...data, ...liveTempPlaceholders]
               })
@@ -1641,6 +2277,174 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             next.set(threadId, tasks)
             return { tasksByThread: next }
           }),
+        // --- Phase 092 (SC#3): per-thread workflow-lock mutators ---
+        // Copy-then-mutate via the _setWorkflowLock / _clearWorkflowLock helpers
+        // (new Map → set / GC delete-the-key). Keyed strictly by the passed
+        // threadId — never a global flag.
+        setWorkflowLockForThread: (threadId, lock) =>
+          useStreamsStore.setState((s) => ({
+            workflowLockByThread: _setWorkflowLock(s.workflowLockByThread, threadId, lock),
+          })),
+        clearWorkflowLockForThread: (threadId) =>
+          useStreamsStore.setState((s) => ({
+            workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
+          })),
+        // --- Phase 094 (PANEL-08/09): panel-only phase-timeline mutators ---
+        // Copy-then-mutate the phasesByThread Map (new Map → set), keyed strictly
+        // by the passed (OWNING) threadId. NEVER touch bucketsBySurface — the
+        // chat selector useThreadMessages reads bucketsBySurface only, so a phase
+        // mutation re-renders the panel timeline but NOT the chat (PANEL-09).
+        appendPhaseForThread: (threadId, phase) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            // Idempotent: a genuine re-emit of a phase whose REAL slug is already
+            // present is a no-op (replay/reconnect safety).
+            if (prev.some((p) => p.slug === phase.slug)) return {}
+            // IN-02: the reconcile floor seeds positional placeholder rows
+            // (slug === `phase-${i}`, phaseType "unknown") because the real slugs
+            // aren't known ahead of phase_started. When a live phase_started
+            // carries the REAL slug for an index that still holds its placeholder,
+            // REPLACE the skeleton row in place (by phaseIndex) instead of
+            // appending — otherwise the timeline shows both `phase-1` (pending) and
+            // `research` (running) for the same index. Forward-only counting is
+            // preserved (the placeholder was running/pending; the live row carries
+            // the true status). Any other case appends as before.
+            const placeholderIdx = prev.findIndex(
+              (p) => p.phaseIndex === phase.phaseIndex && p.slug === `phase-${p.phaseIndex}`,
+            )
+            if (placeholderIdx !== -1) {
+              next.set(
+                threadId,
+                prev.map((p, i) =>
+                  i === placeholderIdx ? { ...p, ...phase } : p,
+                ),
+              )
+              return { phasesByThread: next }
+            }
+            next.set(threadId, [...prev, phase])
+            return { phasesByThread: next }
+          }),
+        setPhaseStatusForThread: (threadId, slug, status, patch) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            if (prev.length === 0) return {}
+            // An empty slug is the "active phase" sentinel (onRunFailed): target
+            // the phase that was live when the run died. Otherwise match by slug.
+            let targetIdx = -1
+            if (slug === "") {
+              // IN-01: prefer a GENUINELY-ACTIVE row (running/retrying) — the phase
+              // actually executing when the run died. A trailing `pending` skeleton
+              // row (seeded positionally by the reconcile floor) must NOT be
+              // preferentially marked failed when an earlier phase actually failed.
+              for (let i = prev.length - 1; i >= 0; i--) {
+                const st = prev[i].status
+                if (st === "running" || st === "retrying") {
+                  targetIdx = i
+                  break
+                }
+              }
+              // No active row → fall back to the last `pending` (a run that died
+              // before its first phase went live), then to the last row, so a
+              // failure is never silently dropped.
+              if (targetIdx === -1) {
+                for (let i = prev.length - 1; i >= 0; i--) {
+                  if (prev[i].status === "pending") {
+                    targetIdx = i
+                    break
+                  }
+                }
+              }
+              if (targetIdx === -1) targetIdx = prev.length - 1
+            } else {
+              targetIdx = prev.findIndex((p) => p.slug === slug)
+            }
+            if (targetIdx === -1) return {}
+            next.set(
+              threadId,
+              prev.map((p, i) => (i === targetIdx ? { ...p, ...patch, status } : p)),
+            )
+            return { phasesByThread: next }
+          }),
+        replacePhasesForThread: (threadId, phases) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            next.set(threadId, phases)
+            return { phasesByThread: next }
+          }),
+        // Phase 101.1-09 (gap 6 / GAP-C / D-11): patch a phase's emitSubStep/
+        // emitFailure from a phase_substep event. ADDITIVE + PANEL-ONLY — copies
+        // phasesByThread (new Map → set), merges the patch onto the matching row,
+        // and writes phasesByThread EXCLUSIVELY (never bucketsBySurface), exactly
+        // like setPhaseStatusForThread. Match by slug; fall back to phaseIndex when
+        // the slug is the reconcile placeholder (`phase-${i}`) — the same draft→
+        // real-slug race the 094 demux handles. PhaseCard (Plan 04) renders the
+        // populated fields → the live emit sub-step rail.
+        setPhaseEmitSubstepForThread: (threadId, slug, phaseIndex, patch) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            if (prev.length === 0) return {}
+            let targetIdx = prev.findIndex((p) => p.slug === slug)
+            if (targetIdx === -1) targetIdx = prev.findIndex((p) => p.phaseIndex === phaseIndex)
+            if (targetIdx === -1) return {}
+            next.set(
+              threadId,
+              prev.map((p, i) => (i === targetIdx ? { ...p, ...patch } : p)),
+            )
+            return { phasesByThread: next }
+          }),
+        // Phase 098-UAT run-honesty fix (A): on a SUCCESSFUL run completion, sweep
+        // any lingering non-terminal phase to "done". A phase flips running→done
+        // ONLY when its own phase_completed SSE is observed live; across the
+        // ask_user pause / a consumer reattach phase-0's completed can be missed,
+        // and nothing else corrects it in-session (onRunCompleted was a no-op; the
+        // terminal reconcile floor returned []). Mirror the DB ground truth (every
+        // phase of a completed run IS completed). NEVER touch a phase that
+        // legitimately ended failed/skipped — those are terminal truths, not
+        // stragglers. Closure threadId only (PANEL-09); phasesByThread only.
+        finalizeAllPhasesForThread: (threadId) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId)
+            if (!prev || prev.length === 0) return {}
+            let changed = false
+            const swept = prev.map((p) => {
+              if (p.status === "running" || p.status === "retrying" || p.status === "pending") {
+                changed = true
+                return { ...p, status: "done" as const }
+              }
+              return p
+            })
+            if (!changed) return {}
+            next.set(threadId, swept)
+            return { phasesByThread: next }
+          }),
+        // BUG-260609-01 mid-run fix: flip EARLIER phases (phaseIndex < beforeIndex)
+        // still in {running,retrying} → done when a later phase goes live. By-INDEX
+        // (survives a placeholder-slug mismatch); never touches skipped/failed/pending
+        // or the current/later phases, so a real skip/failure is never masked.
+        finalizeEarlierPhasesForThread: (threadId, beforeIndex) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId)
+            if (!prev || prev.length === 0) return {}
+            let changed = false
+            const swept = prev.map((p) => {
+              if (
+                p.phaseIndex < beforeIndex &&
+                (p.status === "running" || p.status === "retrying")
+              ) {
+                changed = true
+                return { ...p, status: "done" as const }
+              }
+              return p
+            })
+            if (!changed) return {}
+            next.set(threadId, swept)
+            return { phasesByThread: next }
+          }),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
@@ -1676,6 +2480,26 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // ---- useEffect #2b (092-07 Facet C): Continue producer re-subscribe ----
+  // The Continue affordance fires requestProducerResubscribe(threadId, producerId)
+  // on a Harness /continue 200 (the backend minted a fresh producer runs row).
+  // Point the per-thread lock at the fresh id AND re-subscribe its live stream
+  // (per-thread keyed; idempotent — won't double-subscribe).
+  useEffect(() => {
+    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId }) => {
+      const actions = useStreamsStore.getState().actions
+      const existing = useStreamsStore.getState().workflowLockByThread.get(threadId)
+      if (existing) {
+        actions.setWorkflowLockForThread(threadId, {
+          ...existing,
+          runId: producerRunId,
+        })
+      }
+      subscribeProducerStreamRef.current?.(threadId, producerRunId)
+    })
+    return unsubscribe
+  }, [])
+
   // ---- useEffect #3: unmount cleanup (mirror of useMessages.ts:1209-1214) ----
   useEffect(() => {
     const subs = subscriptionsRef.current
@@ -1694,16 +2518,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // threads load from DB + skeleton; their cache writes were wasted churn.
   useEffect(() => {
     const writeNow = (state: StreamsState) => {
-      const streamingTid = streamingThreadIdRef.current
+      // SEED-055: persist EVERY currently-streaming thread (was the single
+      // streamingThreadIdRef slot) plus the viewed thread, so concurrent background
+      // streams are all cached.
+      const streaming = state.streamingThreads
       const activeTid = activeThreadIdRef.current
-      // If neither ref points anywhere (early-render), skip persistence — nothing
-      // meaningful to cache yet. The hydrate path at mount still works because
-      // it reads the existing snapshot before any write fires.
-      if (!streamingTid && !activeTid) return
+      // If nothing is streaming and no thread is viewed (early-render), skip
+      // persistence — nothing meaningful to cache yet. The hydrate path at mount
+      // still works because it reads the existing snapshot before any write fires.
+      if (streaming.size === 0 && !activeTid) return
       writeSnapshotToLocalStorage(
         state.bucketsBySurface,
         Date.now(),
-        (_surface, tid) => tid === streamingTid || tid === activeTid,
+        (_surface, tid) => streaming.has(tid) || tid === activeTid,
         state.todosByThread,
         state.tasksByThread,
       )
@@ -1783,6 +2610,36 @@ export function useTodos(threadId: string | null): {
   return { data, isLoading, error, reconcile }
 }
 
+// Phase 095.1 Plan 02 (D-095.1-01/02): the activity-derived workspace panel. A
+// PURE read selector over the viewing thread's persisted chat tool_calls — it
+// NEVER writes todosByThread (so the real write_todos precedence in TodosSection
+// stays trivial) and NEVER mutates the chat bucket reference (PANEL-06 / FC#1).
+// Reload-safe for free because tool_calls are DB truth reconstructed by
+// _mapMessageResponse — the same derivation recomputes next-day.
+//
+// Implemented as OPTION (b) (RESEARCH Open-Q1 / A2): a panel-side read selector,
+// NOT a cross-store write through replaceTodosForThread (option a). Chosen because
+// writing derived items into the panel store from the chat path risks the PANEL-06
+// isolation contract and muddies real-vs-derived precedence; a pure read keeps ONE
+// clean precedence with zero cross-store write. Verified against FC#1.
+//
+// To avoid useSyncExternalStore churn (a selector returning a fresh array every
+// render would re-run subscribers), the store selector returns the STABLE chat
+// Message[] reference (changes only when the bucket changes), and the derivation
+// is memoized over that ref — so the hook output identity is stable until the
+// thread's tool activity actually changes.
+export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
+  const messages = useStreamsStore((s) =>
+    threadId ? (s.bucketsBySurface.get("chat")?.get(threadId) ?? EMPTY_ARRAY) : EMPTY_ARRAY,
+  )
+  return useMemo(() => {
+    if (!threadId) return EMPTY_DERIVED
+    const allToolCalls = messages.flatMap((m) => m.tool_calls ?? [])
+    if (!shouldPopulate(allToolCalls)) return EMPTY_DERIVED
+    return deriveWorkspacePanel(allToolCalls)
+  }, [threadId, messages])
+}
+
 export function useWorkspaceFiles(threadId: string | null): {
   data: WorkspaceFile[]
   isLoading: boolean
@@ -1842,6 +2699,94 @@ export function useTasks(threadId: string | null): {
   return { data, isLoading, error, reconcile }
 }
 
+/**
+ * Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the panel-only harness phase
+ * timeline hook. Mirrors useTasks: a thin null-safe phasesByThread selector +
+ * usePanelReconcile for the mount reconcile floor.
+ *
+ * RECONCILE FLOOR (DATA-CONTRACT §3c / D-v2.5-03): the reconcile fetcher wraps
+ * `getThreadWorkflow` (the authoritative ThreadWorkflowState — total_phases +
+ * current_phase_index, the honest "Phase i / N" counter) and derives a Phase[]
+ * SKELETON: total_phases rows, all pending, the current one running. On mount,
+ * a reconnect mid-run shows "Phase 3 / 5, running" from durable DB state BEFORE
+ * any live event arrives. LIVE events then advance phasesByThread forward; live
+ * NEVER moves the counter backward (the reconcile is the floor). The fetcher is
+ * a no-op (returns []) when the thread is Deep / has no run, so the skeleton
+ * only appears for an actual harness run.
+ */
+// Phase 098-UAT run-honesty fix (B): map a DB-native workflow_phases.status to the
+// Phase status union the PhaseCard renders verbatim (active→running, completed→done).
+const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
+  pending: "pending",
+  active: "running",
+  completed: "done",
+  failed: "failed",
+  skipped: "skipped",
+}
+
+async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
+  const wf = await getThreadWorkflow(threadId, signal)
+  // Live/ACTIVE harness run → the existing forward-only skeleton floor (UNCHANGED):
+  // total_phases rows, the current one running. Slugs are unknown ahead of live
+  // phase_started (only current_phase_slug is known), so non-current rows carry
+  // positional placeholder slugs the live events replace.
+  if (wf.mode === "harness" && !wf.lock_is_stale) {
+    const total = wf.total_phases ?? 0
+    if (total <= 0) return []
+    const current = wf.current_phase_index ?? 0
+    return Array.from({ length: total }, (_, i): Phase => ({
+      slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
+      phaseIndex: i,
+      phaseType: "unknown",
+      status: i < current ? "done" : i === current ? "running" : "pending",
+      subAgents: [],
+      pendingAsk: null,
+    }))
+  }
+  // Phase 098-UAT run-honesty fix (B): NOT a live/active harness run. A COMPLETED
+  // workflow run CLEARS the thread anchor (mode flips back to "deep"); a terminal
+  // anchored run reports lock_is_stale. BOTH previously returned [] here and
+  // BLANKED the timeline on revisit/reload of a finished workflow thread. When the
+  // backend supplies the durable per-phase array (the thread has a workflow run in
+  // its history), rebuild the HONEST historical timeline from it — real slugs +
+  // statuses (active→running, completed→done); genuinely skipped/failed phases stay
+  // honest, never masked as done. A pure-deep thread (never a workflow) carries
+  // phases=null → [] (no timeline), unchanged.
+  const rows = wf.phases ?? []
+  if (rows.length === 0) return []
+  return rows
+    .slice()
+    .sort((a, b) => a.phase_index - b.phase_index)
+    .map((r): Phase => ({
+      slug: r.slug,
+      phaseIndex: r.phase_index,
+      phaseType: "unknown",
+      status: DB_PHASE_STATUS[r.status] ?? "done",
+      subAgents: [],
+      pendingAsk: null,
+  }))
+}
+
+export function usePhases(threadId: string | null): {
+  data: Phase[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.phasesByThread.get(threadId) ?? EMPTY_PHASES) : EMPTY_PHASES,
+  )
+  const replace = useStreamsStore((s) => s.actions.replacePhasesForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<Phase>({
+    threadId,
+    hookId: "phases",
+    // fetcher: getThreadWorkflow wrapped to derive the Phase[] reconcile floor.
+    fetcher: reconcilePhases,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
 export const useViewingThread = (): string | null =>
   useStreamsStore((state) => state.viewedThreadId)
 
@@ -1886,6 +2831,34 @@ export const useStreamSubscriptions = (runId: string): boolean =>
 export const useStreamingForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) => (threadId ? s.streamingThreads.has(threadId) : false))
 
+// SEED-064 — cross-thread active-run surface (sidebar dots + active-runs tray).
+//
+// Returns the SET of thread ids with a live run. Selecting `streamingThreads`
+// directly is reference-stable across token deltas (the Set is reassigned ONLY
+// on stream start/stop — tokens never touch it), so consumers (NavPanel dots,
+// the tray counter) re-render on start/stop, NOT on every streamed token.
+export const useStreamingThreadIds = (): Set<string> =>
+  useStreamsStore((s) => s.streamingThreads)
+
+// Non-reactive read of a thread's live-run start epoch-ms (the streaming
+// assistant message's startedAt, falling back to created_at). Read imperatively
+// by the active-runs tray on its own 1s elapsed ticker so per-token bucket
+// mutations never re-render anything. Returns null when nothing is streaming or
+// the timestamp is unparseable.
+export const getActiveRunStartMs = (threadId: string): number | null => {
+  const bucket =
+    useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+  for (let i = bucket.length - 1; i >= 0; i--) {
+    const m = bucket[i]
+    if (m.role === "assistant" && m.runStatus === "streaming") {
+      const raw = m.startedAt ?? m.created_at
+      const t = raw ? Date.parse(raw) : NaN
+      return Number.isNaN(t) ? null : t
+    }
+  }
+  return null
+}
+
 export const useLoadingForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) => (threadId ? s.loadingThreads.has(threadId) : false))
 
@@ -1894,3 +2867,20 @@ export const useReconcileErrorForThread = (threadId: string | null): Error | nul
 
 export const useFallbackNoticeForThread = (threadId: string | null): string | null =>
   useStreamsStore((s) => (threadId ? (s.fallbackNotices.get(threadId) ?? null) : null))
+
+// 099-08 (UAT L10): per-thread stashed prompt from a send/kickoff refusal.
+// ChatArea reads this keyed by the active thread and feeds it into the
+// MessageInput prefill seam so the user's typed prompt is recoverable.
+export const useFailedSendDraftForThread = (threadId: string | null): string | null =>
+  useStreamsStore((s) => (threadId ? (s.failedSendDrafts.get(threadId) ?? null) : null))
+
+// Phase 092 (MODE-01/02 — SC#3): the per-thread workflow-lock reader. Returns the
+// lock record (or null) for the OWNING thread id. Every composer/selector
+// `disabled` derivation MUST read this keyed by the thread the composer SENDS to
+// (the owning thread, e.g. thread?.id), NEVER viewedThreadId or a global flag —
+// a background workflow thread must not lock an unrelated thread's composer
+// (useMessages.ts:80-86 lesson; the parallel-thread UAT is the binding gate).
+// Copy-then-mutate keeps the per-key object reference stable, so Object.is
+// equality re-renders only the threads whose lock actually changed.
+export const useWorkflowLockForThread = (threadId: string | null): WorkflowLock | null =>
+  useStreamsStore((s) => (threadId ? (s.workflowLockByThread.get(threadId) ?? null) : null))

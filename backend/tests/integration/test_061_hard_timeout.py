@@ -25,6 +25,13 @@ from pathlib import Path
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _THREADS_PY = _PROJECT_ROOT / "backend" / "app" / "api" / "threads.py"
 _CONFIG_PY = _PROJECT_ROOT / "backend" / "app" / "config.py"
+# Phase 089 Plan 01 (G-5 extraction): the _drain_stream_with_close_on_cancel
+# helper moved VERBATIM from threads.py into agent_loop.py.
+# Phase 089 Plan 03 (THE verbatim move): the iteration loop body — including the
+# helper CALL SITES (close_fn=stream.close / close_fn=_ant_gen.close) — also
+# moved into agent_loop.py::run_agent_loop. The grep guards below now look in
+# agent_loop.py for BOTH the helper definition AND its call sites.
+_AGENT_LOOP_PY = _PROJECT_ROOT / "backend" / "app" / "services" / "agent_loop.py"
 
 
 def test_legacy_outer_wrapper_is_gone():
@@ -61,30 +68,41 @@ def test_per_call_timer_replacements_present():
     Phase 067.1 Plan 01 Track A: the per-call asyncio.timeout previously
     appeared verbatim as `async with asyncio.timeout(per_call_budget)` in
     each branch. Track A factored it into the
-    ``_drain_stream_with_close_on_cancel`` helper (threads.py:~155). The
-    contract is preserved: both Anthropic and OpenAI branches still bound
-    SDK iteration by the per-call deadline — the bind happens via the
-    helper's second positional arg ``per_call_budget`` at the call sites.
+    ``_drain_stream_with_close_on_cancel`` helper. Phase 089 Plan 01 moved that
+    helper VERBATIM into ``agent_loop.py``; Phase 089 Plan 03 moved the loop
+    body (and thus the call sites) into ``agent_loop.py::run_agent_loop`` too.
+    The contract is preserved: both Anthropic and OpenAI branches still bound
+    SDK iteration by the per-call deadline — the bind happens via the helper's
+    second positional arg ``per_call_budget`` at the call sites (now in
+    agent_loop.py).
     """
-    src = _THREADS_PY.read_text(encoding="utf-8")
-    # Track A invariant: helper exists exactly once.
-    assert src.count("async def _drain_stream_with_close_on_cancel(") == 1, (
+    threads_src = _THREADS_PY.read_text(encoding="utf-8")
+    agent_loop_src = _AGENT_LOOP_PY.read_text(encoding="utf-8")
+    # Track A invariant: helper DEFINITION exists exactly once — in agent_loop.py
+    # after the Phase 089 G-5 move (no duplicate left in threads.py).
+    assert agent_loop_src.count("async def _drain_stream_with_close_on_cancel(") == 1, (
         "Track A regression: helper _drain_stream_with_close_on_cancel "
-        "missing or duplicated. Both provider branches must route iteration "
-        "through the helper (PATTERNS.md parity rule)."
+        "missing or duplicated in agent_loop.py. Both provider branches must "
+        "route iteration through the helper (PATTERNS.md parity rule)."
     )
-    # Both branches must call the helper with per_call_budget bound. The
-    # helper's per-iteration `async with asyncio.timeout(timeout_seconds)`
-    # consumes that arg — same effective contract as the inline form.
-    n_calls = src.count("await _drain_stream_with_close_on_cancel(")
+    assert threads_src.count("async def _drain_stream_with_close_on_cancel(") == 0, (
+        "Phase 089 G-5 regression: a duplicate _drain_stream_with_close_on_cancel "
+        "DEFINITION reappeared in threads.py. The helper lives in agent_loop.py; "
+        "threads.py only re-imports it."
+    )
+    # Phase 089-03: both branches call the helper with per_call_budget bound —
+    # the call sites moved INTO agent_loop.py with the loop body. The helper's
+    # per-iteration `async with asyncio.timeout(timeout_seconds)` consumes that
+    # arg — same effective contract as the inline form.
+    n_calls = agent_loop_src.count("await _drain_stream_with_close_on_cancel(")
     assert n_calls >= 2, (
         f"Expected >=2 call sites of `await _drain_stream_with_close_on_cancel(...)` "
-        f"(Anthropic + OpenAI paths per D-066-02 + Track A parity rule); "
+        f"in agent_loop.py (Anthropic + OpenAI paths per D-066-02 + Track A parity rule); "
         f"found {n_calls}. Without these the per-call timer is missing — "
         f"runs would never time out."
     )
-    # The helper itself wraps the iteration in an asyncio.timeout.
-    assert "async with asyncio.timeout(timeout_seconds)" in src, (
+    # The helper itself (now in agent_loop.py) wraps the iteration in an asyncio.timeout.
+    assert "async with asyncio.timeout(timeout_seconds)" in agent_loop_src, (
         "Track A regression: _drain_stream_with_close_on_cancel must wrap "
         "queue consumption in `async with asyncio.timeout(timeout_seconds)`. "
         "Without it the helper would never raise TimeoutError on stalled streams."
@@ -95,18 +113,29 @@ def test_sdk_close_methods_present():
     """D-066-11 + Phase 067.1 Plan 01 Track A: SDK close() bind reaches both branches.
 
     Track A binds the close call via ``close_fn=`` keyword on the helper
-    invocation: ``close_fn=stream.close`` (OpenAI) and
-    ``close_fn=_ant_gen.close`` (Anthropic). The helper invokes the bound
-    callable from the main thread on cancel BEFORE the producer's
-    for-loop cleanup propagates GeneratorExit into _TracedStream.__iter__.
+    invocation: ``close_fn=stream.close`` (OpenAI) and ``close_fn=_stream.close``
+    (the gateway-dispatched native path). The helper invokes the bound callable
+    from the main thread on cancel BEFORE the producer's for-loop cleanup
+    propagates GeneratorExit into _TracedStream.__iter__.
+
+    Phase 089-03: the provider branches (and thus these close_fn binds) moved
+    with the loop body into agent_loop.py::run_agent_loop — grep there.
+
+    Phase 092.5 Wave 2: the Anthropic + Google branches collapsed into ONE
+    gateway-dispatched native branch whose stream is the bare ``stream_*`` SYNC
+    generator returned by ``open_stream`` — bound to the local ``_stream``. The
+    close bind is byte-identical (the underlying ``.close`` is the SAME
+    sync-generator close that was ``_ant_gen.close`` / ``_g_gen.close``), now
+    spelled ``close_fn=_stream.close`` after the collapse.
     """
-    src = _THREADS_PY.read_text(encoding="utf-8")
+    src = _AGENT_LOOP_PY.read_text(encoding="utf-8")
     assert "close_fn=stream.close" in src, (
         "D-066-11 regression: OpenAI Stream.close() bind missing on the "
         "_drain_stream_with_close_on_cancel call. LangSmith would record "
         "GeneratorExit on TimeoutError without this."
     )
-    assert "close_fn=_ant_gen.close" in src, (
-        "D-066-11 regression: Anthropic _ant_gen.close() bind missing on the "
-        "_drain_stream_with_close_on_cancel call."
+    assert "close_fn=_stream.close" in src, (
+        "D-066-11 regression: native-path (Anthropic/Google) sync-generator "
+        "close bind missing on the _drain_stream_with_close_on_cancel call "
+        "(092.5 collapsed _ant_gen/_g_gen.close -> _stream.close)."
     )

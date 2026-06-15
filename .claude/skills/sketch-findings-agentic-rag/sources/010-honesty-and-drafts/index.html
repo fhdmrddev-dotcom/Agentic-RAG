@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 010 — Honesty &amp; Drafts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 010 — Honesty & Drafts
+   Q: How do we make the run HONEST —
+      (1) a failed run shows as FAILED, with a reason (never an empty
+          'done' card — the RC-4 trust bug);
+      (2) the DRAFT you're asked to review is actually VISIBLE
+          (operator finding #2 — today the draft is wire-only);
+      (3) intermediate batch results surface (progressive disclosure);
+      (4) the final harness answer gets a provenance RunCard.
+   Variants differ on WHERE an attention-moment lives:
+      A inline-in-timeline · B pinned-at-top · C ★ pin-while-active→fold.
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { display: grid; grid-template-columns: 52px 1fr clamp(330px, 35%, 460px); height: calc(100vh - 52px); overflow: hidden; }
+.nav-rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.nav-rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.nav-rail .nav-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow-y: auto; padding: var(--space-6) var(--space-8) 72px; gap: var(--space-4); }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; }
+.bubble-user { align-self: flex-end; max-width: 80%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); }
+.answer { display: flex; gap: var(--space-3); }
+.answer .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; }
+.answer .body { font-size: var(--text-sm); line-height: 1.65; }
+.chat-pointer { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-xs); cursor: pointer; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); width: fit-content; }
+.chat-pointer.amber { color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); }
+.chat-pointer.red { color: hsl(0 80% 78%); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / .4); }
+.chat-pointer .spark { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: dotBounce 1.2s infinite; }
+.composer-hint { margin-top: auto; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: var(--space-2); }
+.composer-hint.locked { background: var(--color-warning-dim); border-color: hsl(38 92% 60% / .3); color: var(--color-warning); }
+
+/* panel */
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .pulse-dot { width: 7px; height: 7px; border-radius: 50%; }
+.pd-amber { background: var(--color-warning); animation: pulseGlow 1.6s infinite; }
+.pd-red { background: var(--color-danger); }
+.pd-green { background: var(--color-success); }
+.panel-head .spacer { flex: 1; }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); padding-bottom: 72px; }
+
+.run-banner { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+.run-banner .wf-row { display: flex; align-items: center; gap: var(--space-2); }
+.run-banner .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.doing-now { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); margin-top: var(--space-1); }
+.doing-now.amber { color: var(--color-warning); } .doing-now.red { color: var(--color-danger); } .doing-now.green { color: var(--color-success); }
+
+.mode-badge { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: var(--radius-full); color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); }
+.chip { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border-radius: var(--radius-full); background: var(--color-muted); color: var(--color-text-muted); border: 1px solid var(--color-border-soft); }
+
+/* status atoms */
+.st-ico { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--font-mono); }
+.st-done { background: var(--color-success-dim); color: var(--color-success); border: 1.5px solid var(--color-success); }
+.st-run { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); animation: pulseGlow 1.4s infinite; }
+.st-lock { background: transparent; color: var(--color-text-dim); border: 1.5px dashed var(--color-text-dim); }
+.st-fail { background: var(--color-danger-dim); color: var(--color-danger); border: 1.5px solid var(--color-danger); }
+.st-ask { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); }
+.type-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); background: var(--color-secondary); padding: 1px 5px; border-radius: var(--radius-sm); text-transform: uppercase; }
+
+/* spine timeline */
+.tlD { list-style: none; margin: 0; padding: 0; }
+.tlD > li { position: relative; padding-left: 32px; padding-bottom: 12px; }
+.tlD > li:last-child { padding-bottom: 0; }
+.tlD > li::before { content: ''; position: absolute; left: 11px; transform: translateX(-1px); top: 24px; bottom: -14px; width: 2px; z-index: 0; background: var(--color-border); }
+.tlD > li:last-child::before { display: none; }
+.tlD > li.s-done::before { background: var(--color-success); }
+.tlD > li.s-fail::before { background: var(--color-danger); }
+.tlD > li.s-ask::before { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.tlD > li.s-run::before { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.tlD > li.s-lock::before { background: transparent; border-left: 2px dashed var(--color-text-dim); width: 0; }
+.nodeD { position: absolute; left: 1px; top: 7px; width: 20px; height: 20px; z-index: 2; display: grid; place-items: center; border-radius: 50%; background: hsl(220 40% 8%); }
+.cardD { border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden; }
+.cardD.ask { border-color: hsl(38 92% 60% / .55); box-shadow: 0 0 22px hsl(38 92% 60% / .12); }
+.cardD.fail { border-color: hsl(0 72% 51% / .5); }
+.cardD.locked { background: transparent; border: 1px dashed var(--color-border); opacity: .72; }
+.cardD-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); }
+.cardD-head .cb-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.cardD-head .cb-name.dim { color: var(--color-text-dim); font-weight: 500; }
+.cardD-head .cb-sum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.cardD-body { padding: 0 var(--space-3) var(--space-3); }
+
+/* DRAFT block (the key fix) */
+.draft-block { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--space-3); }
+.draft-label { display: flex; align-items: center; gap: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); padding: 6px var(--space-3); background: var(--color-muted); border-bottom: 1px solid var(--color-border-soft); }
+.draft-label .tag { font-family: var(--font-mono); color: var(--color-warning); }
+.draft-text { padding: var(--space-3); font-size: 12.5px; line-height: 1.6; color: var(--color-text); background: var(--color-bg); max-height: 180px; overflow-y: auto; }
+.draft-text .cursor { color: var(--color-warning); }
+
+/* ask question */
+.ask-q { font-size: var(--text-sm); color: var(--color-text); margin: var(--space-2) 0 var(--space-3); }
+.ask-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.ask-chip { font-size: var(--text-sm); padding: 6px var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-surface); cursor: pointer; transition: all var(--dur-fast); }
+.ask-chip:hover { border-color: var(--color-warning); color: var(--color-warning); }
+.ask-chip.primary { background: var(--color-warning-dim); border-color: var(--color-warning); color: var(--color-warning); }
+.ask-free { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2); color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: vertical; }
+
+/* batch results */
+.batch-list { display: flex; flex-direction: column; gap: 6px; }
+.batch-item { border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); overflow: hidden; }
+.batch-item-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); cursor: pointer; font-size: 12.5px; }
+.batch-item-head:hover { background: var(--color-surface-hi); }
+.batch-item-head .bi-name { flex: 1; font-weight: 500; }
+.batch-item-head .bi-src { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+.batch-item-body { display: none; padding: 0 var(--space-3) var(--space-3) 34px; font-size: 12px; color: var(--color-text-muted); line-height: 1.5; }
+.batch-item.open .batch-item-body { display: block; }
+.batch-item.open .caret { transform: rotate(90deg); }
+.caret { color: var(--color-text-dim); transition: transform var(--dur-fast); font-size: 10px; }
+
+/* failure */
+.fail-card { border: 1px solid hsl(0 72% 51% / .45); background: var(--color-danger-dim); border-radius: var(--radius-md); overflow: hidden; }
+.fail-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid hsl(0 72% 51% / .25); }
+.fail-head .fh-title { font-weight: 600; font-size: var(--text-sm); color: hsl(0 80% 80%); flex: 1; }
+.fail-type { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; padding: 1px 6px; border-radius: var(--radius-sm); background: var(--color-danger); color: #fff; }
+.fail-reason { padding: var(--space-3); font-size: 12.5px; line-height: 1.6; color: hsl(0 80% 82%); }
+.fail-reason .where { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); display: block; margin-top: 6px; }
+.fail-taxonomy { display: flex; gap: 5px; flex-wrap: wrap; padding: var(--space-2) var(--space-3); border-top: 1px solid hsl(0 72% 51% / .2); }
+.tax-chip { font-family: var(--font-mono); font-size: 9px; padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-soft); color: var(--color-text-dim); cursor: pointer; }
+.tax-chip.on { background: var(--color-danger-dim); color: hsl(0 80% 80%); border-color: hsl(0 72% 51% / .4); }
+
+/* long-draft preview + expand (reuses sketch-005's opt-in wide overlay) */
+.draft-preview { position: relative; }
+.draft-preview .draft-text { max-height: 132px; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent); mask-image: linear-gradient(180deg, #000 60%, transparent); }
+.draft-expand-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-border-soft); background: var(--color-muted); }
+.draft-expand-row .wordcount { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); flex: 1; }
+.expand-btn { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 5px var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--color-warning); color: var(--color-warning); background: var(--color-warning-dim); cursor: pointer; }
+.expand-btn:hover { background: hsl(38 92% 60% / .22); }
+
+/* wide reading/editing overlay (over the chat, not full screen) */
+.overlay-backdrop { position: fixed; inset: 0; z-index: 9000; background: rgba(3,5,12,.66); backdrop-filter: blur(3px); display: none; place-items: center; padding: var(--space-6); }
+.overlay-backdrop.open { display: grid; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.overlay-card { width: min(760px, 88%); max-height: 84vh; display: flex; flex-direction: column; background: var(--color-surface); border: 1px solid hsl(38 92% 60% / .4); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
+.overlay-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.overlay-head .oh-tag { font-family: var(--font-mono); font-size: 10px; color: var(--color-warning); text-transform: uppercase; letter-spacing: .05em; }
+.overlay-head .oh-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); flex: 1; }
+.overlay-head .oh-close { cursor: pointer; color: var(--color-text-dim); padding: 4px 8px; border-radius: 6px; }
+.overlay-head .oh-close:hover { background: var(--color-accent); color: var(--color-text); }
+.overlay-body { flex: 1; overflow-y: auto; padding: var(--space-6); font-size: 14.5px; line-height: 1.72; color: var(--color-text); outline: none; }
+.overlay-body p { margin: 0 0 var(--space-4); }
+.overlay-body[contenteditable]:focus { box-shadow: inset 0 0 0 1px var(--color-primary-glow); border-radius: var(--radius-sm); }
+.overlay-foot { border-top: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); display: flex; align-items: center; gap: var(--space-3); background: var(--color-bg-elev1); }
+.overlay-foot .of-q { flex: 1; font-size: var(--text-sm); color: var(--color-text-muted); }
+.overlay-foot .edit-hint { font-size: 10px; color: var(--color-text-dim); font-style: italic; }
+
+/* pinned attention card (B / C) */
+.pinned { border-radius: var(--radius-md); margin-bottom: var(--space-4); overflow: hidden; box-shadow: var(--shadow-md); }
+.pinned.amber { border: 1px solid hsl(38 92% 60% / .5); }
+.pinned.red { border: 1px solid hsl(0 72% 51% / .5); }
+.pinned-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.pinned.amber .pinned-head { background: var(--color-warning-dim); color: var(--color-warning); }
+.pinned.red .pinned-head { background: var(--color-danger-dim); color: hsl(0 80% 80%); }
+.pinned-head .pin-ico { animation: dotBounce 1.3s infinite; }
+.pinned-body { padding: var(--space-3); background: var(--color-surface); }
+.fold-note { font-size: 10px; color: var(--color-text-dim); padding: 6px var(--space-3); background: var(--color-muted); border-top: 1px dashed var(--color-border-soft); font-style: italic; }
+
+/* provenance answer card */
+.prov { border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden; }
+.prov-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); cursor: pointer; }
+.prov-head:hover { background: var(--color-surface-hi); }
+.prov-head .pv-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.prov-head .pv-sum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.prov.open .caret { transform: rotate(90deg); }
+.prov-body { display: none; padding: var(--space-3); border-top: 1px solid var(--color-border-soft); }
+.prov.open .prov-body { display: block; }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3); margin-top: var(--space-3); border-top: 1px dashed var(--color-border-soft); line-height: 1.5; }
+.callout b { color: var(--color-primary); }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 010 · Honesty &amp; Drafts</span>
+  <button class="variant-tab" data-v="A" onclick="setVariant('A')">A · Inline in timeline</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Pinned at top</button>
+  <button class="variant-tab active" data-v="C" onclick="setVariant('C')">C · Pin-while-active → fold ★</button>
+</nav>
+
+<div class="shell">
+  <div class="nav-rail">
+    <div class="logo"></div>
+    <div class="nav-ico active">💬</div><div class="nav-ico">⚙</div><div class="nav-ico">▤</div>
+  </div>
+  <div class="chat" id="chatCol"></div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="pulse-dot" id="panelDot"></span>
+      <span class="ph-title">Workspace</span>
+      <span class="spacer"></span>
+      <span class="type-tag" id="panelTag"></span>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+</div>
+
+<div role="status" aria-live="polite" class="sr-only" id="announcer"></div>
+<div role="alert" class="sr-only" id="alerter"></div>
+
+<!-- wide reading/editing overlay for a long draft (opt-in ⤢, over the chat) -->
+<div class="overlay-backdrop" id="draftOverlay" onclick="if(event.target===this) closeDraftOverlay()">
+  <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Review draft">
+    <div class="overlay-head">
+      <span class="oh-tag">Draft · Confirm phase · not yet saved</span>
+      <span class="oh-title">Review &amp; edit draft</span>
+      <span class="oh-close" onclick="closeDraftOverlay()">✕</span>
+    </div>
+    <div class="overlay-body" id="overlayDraft" contenteditable="true" spellcheck="false"></div>
+    <div class="overlay-foot">
+      <span class="of-q">Does this answer your question? <span class="edit-hint">— edit inline above</span></span>
+      <span class="ask-chip primary" onclick="closeDraftOverlay()">Looks good</span>
+      <span class="ask-chip" onclick="closeDraftOverlay()">Needs changes</span>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">scenario</span>
+  <div class="toolbar-toggle" id="scToggle">
+    <button data-sc="draft" class="on" onclick="setSC('draft')">Draft to review</button>
+    <button data-sc="batch" onclick="setSC('batch')">Batch results</button>
+    <button data-sc="failed" onclick="setSC('failed')">Failed run</button>
+    <button data-sc="answer" onclick="setSC('answer')">Answer card</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <span style="opacity:.6">draft size</span>
+  <div class="toolbar-toggle" id="dsToggle">
+    <button data-ds="short" onclick="setDS('short')">Short</button>
+    <button data-ds="long" class="on" onclick="setDS('long')">Long ~2k</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const ico = s => `<span class="st-ico ${ {done:'st-done',run:'st-run',lock:'st-lock',fail:'st-fail',ask:'st-ask'}[s] }">${ {done:'✓',run:'●',lock:'○',fail:'✕',ask:'?'}[s] }</span>`;
+
+let CUR_V='C', CUR_SC='draft', FAILTYPE='max_steps', DRAFTSIZE='long';
+
+/* SHORT draft — fits inline in the panel with no friction */
+const DRAFT_SHORT = `Based on Chapters 1–4, the study sampled <b>200 participants</b> across 4 organizational departments (Operations, HR, Finance, Sales). The sample skews <b>35–44 (38%)</b> with a <b>61% male</b> majority; mean tenure 6.2 years. Data were collected via a structured survey (UWES + OCAI instruments)…`;
+
+/* LONG draft — the operator's concern: a 2,000-word review doesn't belong crammed in a 30% column */
+const DRAFT_LONG_PARAS = [
+  `Based on a review of Chapters 1–4, the study employed a quantitative, cross-sectional design to examine the relationships between leadership style, organizational culture, and employee engagement within a single large services organization. The sample comprised <b>200 participants</b> drawn across four departments — Operations, Human Resources, Finance, and Sales — selected via stratified random sampling to preserve departmental proportionality.`,
+  `Demographically, the sample skews toward the <b>35–44 age band (38%)</b>, followed by 25–34 (29%) and 45–54 (21%), with a <b>61% male</b> majority and a mean organizational tenure of 6.2 years (SD = 4.1). Educational attainment was high: 64% held a bachelor's degree or above. These characteristics are broadly consistent with the sector benchmark, though the male skew is more pronounced than the national workforce average and is acknowledged as a limitation in Chapter 4.`,
+  `Instrumentation combined the Utrecht Work Engagement Scale (UWES-17) for the dependent variable, the Multifactor Leadership Questionnaire (MLQ-5X) for leadership style, and the Organizational Culture Assessment Instrument (OCAI) for the culture typology. Internal consistency was acceptable to strong across scales (Cronbach's α between 0.81 and 0.93), supporting the reliability of the composite measures used in the subsequent regression analyses.`,
+  `Preliminary findings reported in Chapter 4 indicate a positive association between transformational leadership and engagement, partially mediated by culture strength, with clan and adhocracy cultures showing the strongest engagement correlations and hierarchy culture a weak negative association. Transactional leadership showed a smaller positive effect, while laissez-faire leadership was negatively related to all three engagement sub-dimensions (vigor, dedication, absorption).`,
+  `Limitations explicitly noted include the cross-sectional design (precluding causal inference), single-organization sampling (limiting generalizability), and common-method variance from self-report instruments collected at one time point. The author proposes a longitudinal follow-up and multi-source ratings as directions for future research.`,
+];
+function draftLongHTML(){ return DRAFT_LONG_PARAS.map(p=>`<p>${p}</p>`).join(''); }
+
+const BATCH = [
+  ['Leadership style','14 src','Transformational leadership is the most consistently reported correlate of engagement; transactional weaker; laissez-faire negative.'],
+  ['Organizational culture','12 src','Clan & adhocracy cultures correlate with higher engagement; hierarchy culture shows a negative association (OCAI-based studies).'],
+  ['Employee engagement','13 src','Engagement operationalised as vigor/dedication/absorption (UWES); primarily driven by job resources and personal resources.'],
+  ['Style × culture interplay','9 src','Culture partially mediates the leadership→engagement path; effect strongest where culture is strong and aligned.'],
+];
+
+const FAILS = {
+  max_steps:  ['max_steps', 'Sub-agent “Employee engagement” reached its 12-step cap without a final answer.', 'phase: review · sub-agent 3 · glm-4.6 · 12/12 steps'],
+  gate:       ['gate_failed', 'Validation gate “output contains INTEGRATED” failed after 3 attempts; run halted per on_failure: fail_run.', 'phase: review → gate · attempt 3/3'],
+  timeout:    ['wall_clock_timeout', 'Phase exceeded its 180s wall-clock budget before completing.', 'phase: review · 181s / 180s'],
+  empty:      ['reason_unknown', 'Failure reason not captured by the backend — surfaced explicitly so the run is never shown as an empty success.', 'phase: review · error field was empty'],
+};
+
+/* mini timeline per scenario */
+function timeline(scenario){
+  let phases;
+  if (scenario==='draft') phases = [
+    {n:'Draft', t:'agent', st:'done', sum:'KB answer drafted'},
+    {n:'Confirm', t:'human input', st:'ask', sum:'awaiting you'},
+    {n:'Finalize', t:'AI write', st:'lock', sum:'locked · queued'},
+  ];
+  else if (scenario==='batch') phases = [
+    {n:'Split', t:'server step', st:'done', sum:'4 subtopics'},
+    {n:'Review', t:'parallel agents', st:'done', sum:'4 agents · 48 src', batch:true},
+    {n:'Merge', t:'AI write', st:'run', sum:'integrating…'},
+  ];
+  else if (scenario==='failed') phases = [
+    {n:'Split', t:'server step', st:'done', sum:'4 subtopics'},
+    {n:'Review', t:'parallel agents', st:'fail', sum:'failed', fail:true},
+    {n:'Merge', t:'AI write', st:'lock', sum:'never reached'},
+  ];
+  else phases = [
+    {n:'Split', t:'server step', st:'done', sum:'4 subtopics · 0.1s'},
+    {n:'Review', t:'parallel agents', st:'done', sum:'4 agents · 48 src · 12.3s'},
+    {n:'Merge', t:'AI write', st:'done', sum:'1 call · 4.8s'},
+  ];
+  const li = (p) => {
+    let body='';
+    const inlineHere = (CUR_V==='A'); // variant A renders attention-moments inside the phase card
+    if (p.batch) body = `<div class="cardD-body">${batchBlock()}</div>`;
+    if (p.ask && inlineHere) body = `<div class="cardD-body">${draftBlock()}</div>`;
+    if (p.fail && inlineHere) body = `<div class="cardD-body">${failBlock()}</div>`;
+    if (p.st==='lock') return `<li class="s-lock"><span class="nodeD">${ico('lock')}</span><div class="cardD locked"><div class="cardD-head"><span class="cb-name dim">${p.n}</span><span class="type-tag">${p.t}</span><span class="cb-sum">${p.sum}</span></div></div></li>`;
+    const cls = p.st==='ask'?'ask':p.st==='fail'?'fail':'';
+    return `<li class="s-${p.st}"><span class="nodeD">${ico(p.st)}</span><div class="cardD ${cls}"><div class="cardD-head"><span class="cb-name">${p.n}</span><span class="type-tag">${p.t}</span><span class="cb-sum">${p.sum}</span></div>${body}</div></li>`;
+  };
+  return `<ol class="tlD" aria-label="Phases">${phases.map(li).join('')}</ol>`;
+}
+
+function draftBlock(){
+  if (DRAFTSIZE==='short') {
+    return `<div class="draft-block">
+      <div class="draft-label"><span class="tag">DRAFT</span> · awaiting your review — not yet saved</div>
+      <div class="draft-text">${DRAFT_SHORT} <span class="cursor">▍</span></div>
+    </div>
+    <div class="ask-q">Does this draft answer your question? Add any corrections before I finalize.</div>
+    <div class="ask-chips"><span class="ask-chip primary">Looks good</span><span class="ask-chip">Needs changes</span></div>
+    <textarea class="ask-free" rows="2" placeholder="Optional corrections…"></textarea>`;
+  }
+  // LONG: preview in the panel + opt-in wide overlay for comfortable reading/editing
+  return `<div class="draft-block draft-preview">
+      <div class="draft-label"><span class="tag">DRAFT</span> · awaiting your review — not yet saved</div>
+      <div class="draft-text">${draftLongHTML()}</div>
+      <div class="draft-expand-row">
+        <span class="wordcount">≈ 1,950 words · long draft</span>
+        <span class="expand-btn" onclick="openDraftOverlay()">⤢ Review &amp; edit full draft</span>
+      </div>
+    </div>
+    <div class="ask-q">Does this draft answer your question?</div>
+    <div class="ask-chips"><span class="ask-chip primary" onclick="openDraftOverlay()">Read &amp; approve ▸</span><span class="ask-chip">Quick: looks good</span></div>`;
+}
+function batchBlock(){
+  return `<div class="batch-list">${BATCH.map(b=>`
+    <div class="batch-item" onclick="this.classList.toggle('open')">
+      <div class="batch-item-head">${ico('done')}<span class="bi-name">${b[0]}</span><span class="bi-src">${b[1]}</span><span class="caret">▸</span></div>
+      <div class="batch-item-body">${b[2]}</div>
+    </div>`).join('')}</div>`;
+}
+function failBlock(){
+  const f = FAILS[FAILTYPE];
+  return `<div class="fail-card">
+    <div class="fail-head">${ico('fail')}<span class="fh-title">Run failed during Review</span><span class="fail-type">${f[0]}</span></div>
+    <div class="fail-reason">${f[1]}<span class="where">${f[2]}</span></div>
+    <div class="fail-taxonomy">
+      ${Object.keys(FAILS).map(k=>`<span class="tax-chip ${k===FAILTYPE?'on':''}" onclick="event.stopPropagation(); setFail('${k}')">${FAILS[k][0]}</span>`).join('')}
+    </div>
+  </div>`;
+}
+function provBlock(){
+  return `<div class="prov open">
+    <div class="prov-head" onclick="this.parentElement.classList.toggle('open')">
+      ${ico('done')}<span class="pv-name">Literature review</span><span class="pv-sum">3 phases · 16 tool calls · 48 sources · 18s</span><span class="caret" style="transform:rotate(90deg)">▸</span>
+    </div>
+    <div class="prov-body">${timeline('answer')}</div>
+  </div>`;
+}
+
+/* panel render — variant decides WHERE the attention-moment lives */
+function renderPanel(){
+  const sc = CUR_SC;
+  const wfName = sc==='draft' ? 'Doc Q&A' : 'Literature review';
+  let dot='pd-amber', tag='harness · live', doing='', doingCls='amber';
+  if (sc==='failed'){ dot='pd-red'; tag='harness · failed'; doing='Run failed — see reason'; doingCls='red'; }
+  else if (sc==='answer'){ dot='pd-green'; tag='harness · done'; doing='Workflow complete — 3 of 3 phases'; doingCls='green'; }
+  else if (sc==='batch'){ doing='Merging 4 reviews into the final output…'; }
+  else { doing='Paused — your review needed on the draft'; }
+  document.getElementById('panelDot').className = 'pulse-dot '+dot;
+  document.getElementById('panelTag').textContent = tag;
+
+  const banner = `<div class="run-banner"><div class="wf-row"><span class="mode-badge">Harness</span><span class="wf-name">${wfName}</span></div>
+    <div class="doing-now ${doingCls}">${doing}</div></div>`;
+
+  if (sc==='answer') return banner + provBlock() + `<div class="callout"><b>Provenance answer card.</b> The harness answer gets the same RunCard treatment Deep tool-turns get — collapsed to <span class="mono">N phases · M tools · K sources</span>, expandable to the full phase record.</div>`;
+
+  // pinned attention (B always pins; C pins WHILE active then notes it folds)
+  let pinned = '';
+  const isAttention = (sc==='draft' || sc==='failed');
+  if (isAttention && CUR_V!=='A') {
+    const amber = sc==='draft';
+    const head = amber ? `<span class="pin-ico">●</span> Needs you — draft review` : `<span class="pin-ico">▲</span> Run failed`;
+    const body = amber ? draftBlock() : failBlock();
+    const fold = CUR_V==='C' ? `<div class="fold-note">When you answer, this folds back into the “${amber?'Confirm':'Review'}” phase as a record (matches sketch 006 + 008).</div>` : '';
+    pinned = `<div class="pinned ${amber?'amber':'red'}"><div class="pinned-head">${head}</div><div class="pinned-body">${body}</div>${fold}</div>`;
+  }
+  const tl = timeline(sc);
+  const note = CUR_V==='A'
+    ? `<div class="callout"><b>Inline.</b> The draft / failure renders inside its phase card on the spine — one consistent place, nothing pinned. Risk: an attention-moment can scroll out of view on a long run.</div>`
+    : CUR_V==='B'
+    ? `<div class="callout"><b>Pinned.</b> The attention-moment pins to the top (loud, can't be missed) and stays pinned as a record. Risk: stale pinned cards accumulate.</div>`
+    : `<div class="callout"><b>Pin-while-active → fold.</b> Loud while it needs you (pinned), then folds into the phase timeline as a record once resolved — the calm-loud pattern from sketch 006.</div>`;
+  return banner + pinned + tl + note;
+}
+
+/* chat render */
+function renderChat(){
+  const sc = CUR_SC;
+  let head, prompt;
+  if (sc==='draft'){ head='Doc Q&A · DBA corpus'; prompt='What was the sample size and composition in my dissertation?'; }
+  else { head='Literature review · DBA corpus'; prompt='Review the literature on leadership style, organizational culture, and employee engagement.'; }
+  let html = `<div class="chat-head">Thread · ${head}</div><div class="bubble-user">${prompt}</div>`;
+
+  if (sc==='draft') html += `<div class="chat-pointer amber" onclick="flashPanel()"><span class="spark"></span> Needs your review in workspace ▸</div>
+    <div class="composer-hint locked">🔒 Paused — answer in the workspace panel to continue</div>`;
+  else if (sc==='failed') html += `<div class="chat-pointer red" onclick="flashPanel()">✕ Run failed · see reason in workspace ▸</div>`;
+  else if (sc==='batch') html += `<div class="chat-pointer amber" onclick="flashPanel()"><span class="spark"></span> Running in workspace — Merge ▸</div>`;
+  else html += `<div class="answer"><div class="bot"></div><div class="body"><b>Integrated literature review.</b> Across the three constructs, the corpus converges on transformational leadership as the strongest correlate of engagement, mediated by culture strength… <span class="text-dim">(48 sources)</span>
+    <div class="chat-pointer amber" style="margin-top:10px;color:var(--color-primary);background:var(--color-primary-dim);border-color:var(--color-primary-glow)" onclick="flashPanel()">↳ ran in workspace · 3 phases · 16 tool calls · 48 sources · 18s ▸</div></div></div>`;
+  return html;
+}
+
+function render(){
+  document.getElementById('chatCol').innerHTML = renderChat();
+  document.getElementById('panelBody').innerHTML = renderPanel();
+  if (CUR_SC==='failed') document.getElementById('alerter').textContent = 'Run failed during Review. '+FAILS[FAILTYPE][1];
+  else document.getElementById('announcer').textContent = CUR_SC==='draft' ? 'Paused. Draft ready for your review.' : '';
+}
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); render(); }
+function setSC(sc){ CUR_SC=sc; document.querySelectorAll('#scToggle button').forEach(b=>b.classList.toggle('on',b.dataset.sc===sc)); render(); }
+function setDS(ds){ DRAFTSIZE=ds; document.querySelectorAll('#dsToggle button').forEach(b=>b.classList.toggle('on',b.dataset.ds===ds)); render(); }
+function setFail(k){ FAILTYPE=k; render(); }
+function openDraftOverlay(){ document.getElementById('overlayDraft').innerHTML = draftLongHTML(); document.getElementById('draftOverlay').classList.add('open'); }
+function closeDraftOverlay(){ document.getElementById('draftOverlay').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeDraftOverlay(); });
+function flashPanel(){ const p=document.querySelector('.panel'); p.style.transition='box-shadow .3s'; p.style.boxShadow='inset 0 0 0 2px var(--color-primary)'; setTimeout(()=>p.style.boxShadow='',500); }
+render();
+</script>
+</body>
+</html>

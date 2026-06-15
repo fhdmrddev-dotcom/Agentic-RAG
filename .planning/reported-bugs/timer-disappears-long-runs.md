@@ -4,9 +4,9 @@ title: Timer disappears during long-running agent cycles (non-Anthropic provider
 reported: 2026-05-28
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat]
-folded_into: null
+folded_into: "095"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

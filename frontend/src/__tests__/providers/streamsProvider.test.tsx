@@ -45,13 +45,20 @@ const {
   mockCancelRun: vi.fn(),
 }))
 
-vi.mock("@/lib/api", () => ({
-  postMessage: mockPostMessage,
-  subscribeToRun: mockSubscribeToRun,
-  getMessages: mockGetMessages,
-  getActiveRuns: mockGetActiveRuns,
-  cancelRun: mockCancelRun,
-}))
+vi.mock("@/lib/api", async (importActual) => {
+  // 099-08: re-export the REAL ApiError so production `instanceof ApiError`
+  // checks (the 409 distinguisher + the new non-409 branch) work against the
+  // same class the tests construct. Only the network functions are stubbed.
+  const actual = await importActual<typeof import("@/lib/api")>()
+  return {
+    ApiError: actual.ApiError,
+    postMessage: mockPostMessage,
+    subscribeToRun: mockSubscribeToRun,
+    getMessages: mockGetMessages,
+    getActiveRuns: mockGetActiveRuns,
+    cancelRun: mockCancelRun,
+  }
+})
 
 // ── Mock Supabase auth ────────────────────────────────────────────────────────
 vi.mock("@/lib/supabase", () => ({
@@ -69,6 +76,7 @@ vi.mock("@/lib/supabase", () => ({
 import { StreamsProvider, useStreamActions, useThreadMessages } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import type { StreamCallbacks } from "@/lib/api"
+import { ApiError } from "@/lib/api"
 
 // ── SSE recorder helper (port of useMessages.test.ts:76-91) ───────────────────
 function makeSseRecorder() {
@@ -119,6 +127,7 @@ beforeEach(() => {
     streamingThreads: new Set<string>(),
     fallbackNotices: new Map<string, string>(),
     reconcileErrors: new Map<string, Error>(),
+    failedSendDrafts: new Map<string, string>(),
     loadingThreads: new Set<string>(),
     subscriptionsByThread: new Map<string, Set<string>>(),
   })
@@ -1728,5 +1737,96 @@ describe("075.6 Req #5 — argsCodeText reducer slice", () => {
     expect(tc?.argsCodeText).toBeUndefined()
 
     void sendPromise
+  })
+})
+
+// =============================================================================
+// 099-08 (UAT L10) — a kickoff/send refusal surfaces the server detail.
+// A non-409 ApiError rolls back BOTH optimistic temps, sets the per-thread
+// banner to the SERVER's detail string, and stashes the typed prompt; 409 +
+// genuine-network + success paths are unchanged.
+// =============================================================================
+describe("099-08 — kickoff refusal surfaces the server detail", () => {
+  const LOCK_COPY =
+    "This thread is running a workflow — cancel it to send a Deep message."
+
+  it("Test 1 — non-409 ApiError rolls back both temps AND sets the banner to the server detail", async () => {
+    const detail = "Skill 'risk-lens' is disabled; enable it or remove the reference."
+    mockPostMessage.mockRejectedValueOnce(new ApiError(detail, 400))
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      await result.current.sendMessage("thread-A", "my prompt")
+    })
+
+    // Both optimistic bubbles filtered out — no ghost user/assistant temps.
+    const bucketA =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
+    expect(bucketA.find((m) => m.role === "user")).toBeUndefined()
+    expect(bucketA.find((m) => m.role === "assistant")).toBeUndefined()
+
+    // Banner carries the server detail with the real status.
+    const err = useStreamsStore.getState().reconcileErrors.get("thread-A")
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(400)
+    expect(err?.message).toBe(detail)
+  })
+
+  it("Test 2 — the typed prompt is stashed per-thread for composer recovery", async () => {
+    mockPostMessage.mockRejectedValueOnce(
+      new ApiError("Skill 'risk-lens' is disabled...", 400),
+    )
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      await result.current.sendMessage("thread-A", "my prompt")
+    })
+
+    expect(useStreamsStore.getState().failedSendDrafts.get("thread-A")).toBe("my prompt")
+  })
+
+  it("Test 3 — 409 lock-refusal is byte-equivalent: fixed copy, temps rolled back, NO draft stashed", async () => {
+    mockPostMessage.mockRejectedValueOnce(new ApiError("ignored", 409))
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      await result.current.sendMessage("thread-A", "my prompt")
+    })
+
+    const bucketA =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
+    expect(bucketA.find((m) => m.role === "user")).toBeUndefined()
+    expect(bucketA.find((m) => m.role === "assistant")).toBeUndefined()
+
+    const err = useStreamsStore.getState().reconcileErrors.get("thread-A")
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(409)
+    expect(err?.message).toBe(LOCK_COPY)
+
+    // 409 does NOT stash a draft — retrying a doomed Deep send is meaningless.
+    expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false)
+  })
+
+  it("Test 4 — a genuine non-ApiError network failure keeps the failed placeholder, no banner", async () => {
+    mockPostMessage.mockRejectedValueOnce(new TypeError("fetch failed"))
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      await result.current.sendMessage("thread-A", "my prompt")
+    })
+
+    // The assistant placeholder remains, marked failed (current network behavior).
+    const bucketA =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
+    const assistant = bucketA.find((m) => m.role === "assistant")
+    expect(assistant?.runStatus).toBe("failed")
+
+    // No banner is set for a transient network error (KEEP MINIMAL decision).
+    expect(useStreamsStore.getState().reconcileErrors.has("thread-A")).toBe(false)
+    expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false)
   })
 })

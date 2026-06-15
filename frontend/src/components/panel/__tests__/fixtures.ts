@@ -121,7 +121,10 @@ export const mockContentBucket = (
 })
 
 // ── ask_user pending prompts (PANEL-04) ───────────────────────────────────────
-/** GET-reconciled prompt — carries `run_id` (REQUIRED to POST the answer). */
+/** GET-reconciled prompt — carries `run_id` (REQUIRED to POST the answer).
+ *  096-04: the card's countdown now derives from `created_at` — keep it FRESH
+ *  at module load so pending-state tests don't mount already-expired (the old
+ *  static 2026-05-29 date would read as a long-dead prompt). */
 export const mockPendingAskWithRunId: PendingAsk = {
   tool_call_id: "tc-ask-1",
   prompt: "Which dataset should I use for the Q3 rollup?",
@@ -129,7 +132,7 @@ export const mockPendingAskWithRunId: PendingAsk = {
   timeout_seconds: 300,
   message_id: "msg-ask-1",
   run_id: "run-ask-1",
-  created_at: "2026-05-29T10:00:00Z",
+  created_at: new Date().toISOString(),
 }
 
 /** Pure-SSE prompt (A2 / Pitfall 1) — `run_id` ABSENT. Submit must be gated /

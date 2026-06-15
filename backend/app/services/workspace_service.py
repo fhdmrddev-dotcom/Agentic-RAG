@@ -4,6 +4,7 @@ import difflib
 import logging
 import mimetypes
 import re
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -47,6 +48,11 @@ _BINARY_MIME_PREFIXES = (
     "application/zip",
     "application/gzip",
     "application/octet-stream",
+    # Phase 100 (TMPL-01) — A1 hygiene: a workspace_read of an uploaded OOXML
+    # template (docx/pptx/xlsx) must return the clean binary stub. Without this
+    # the OOXML ZIP bytes would be UTF-8-decoded into garbage in the read_file
+    # text branch (and raw ZIP bytes would leak into the agent context).
+    "application/vnd.openxmlformats-officedocument",
 )
 
 
@@ -94,6 +100,34 @@ def guess_mime_type(path: str) -> str:
     """Detect MIME type from file path extension."""
     mime, _ = mimetypes.guess_type(path)
     return mime or "application/octet-stream"
+
+
+# A small allowlist of mimes that are text even though they are not ``text/*``.
+_TEXTISH_MIMES = frozenset({"application/json", "text/csv"})
+
+
+def _is_binary_mime(mime: str) -> bool:
+    """Return True for mimes whose bytes are NOT safe to unified-text-diff.
+
+    101.1-08 (gap 5a): a binary delta (docx/pptx/xlsx) decodes ``\\x00`` zip bytes
+    to a NUL which Postgres JSONB rejects (UntranslatableCharacterError — UAT run
+    4ea9bc56). We skip the unified-text delta for binary mimes; a missing delta is
+    harmless (the version row is still recorded), a crash is not.
+
+    Conservative by construction: anything not clearly text is treated as binary.
+    True for the 3 OOXML office mimes, application/octet-stream, application/pdf,
+    image/* (and audio/video), and any mime NOT starting with ``text/`` and not in
+    the small textish allowlist. False for ``text/*`` and {application/json,
+    text/csv}.
+    """
+    if not mime:
+        return True
+    mime = mime.lower()
+    if mime.startswith("text/"):
+        return False
+    if mime in _TEXTISH_MIMES:
+        return False
+    return True
 
 
 def compute_diff(old_text: str, new_text: str, from_label: str, to_label: str) -> dict:
@@ -203,6 +237,14 @@ async def _compute_delta_from_prev(
     except Exception:
         return {"format": "binary", "note": "Binary file changed"}
 
+    # 101.1-08 (gap 5a) defense-in-depth: errors="replace" turns invalid bytes into
+    # the replacement char but a literal \x00 in the source decodes straight to a NUL
+    # — and a NUL in a JSONB delta raises UntranslatableCharacterError at insert. If a
+    # binary slipped past _is_binary_mime classification (a mis-typed extension), a NUL
+    # in either side returns the NUL-free binary verdict so no NUL can ever reach JSONB.
+    if "\x00" in new_text or "\x00" in old_text:
+        return {"format": "binary", "note": "Binary file changed"}
+
     return compute_diff(old_text, new_text, f"v{current_version - 1}", f"v{current_version}")
 
 
@@ -215,10 +257,18 @@ async def write_file(
     path: str,
     content: bytes,
     inline_threshold: int = DEFAULT_INLINE_THRESHOLD,
+    kind: str | None = None,
+    expires_at: datetime | None = None,
 ) -> dict:
     """Write or update a workspace file with auto-versioning.
 
-    Returns dict with keys: file_id, path, version, size_bytes, mime_type, warning.
+    Returns dict with keys: file_id, path, version, size_bytes, mime_type,
+    kind, expires_at, warning.
+
+    Phase 100 (TMPL-01): ``kind`` / ``expires_at`` thread through to the row. The
+    template upload handler (Plan 100-04) passes kind='template_input' + a future
+    expiry (D-12); every existing agent caller passes neither -> both default None
+    -> NULL/NULL -> byte-identical (D-11).
     """
     path = validate_path(path)
     size = len(content)
@@ -240,6 +290,8 @@ async def write_file(
         content_inline=content if is_inline else None,
         content_storage_path=None,
         created_by=user_id,
+        kind=kind,
+        expires_at=expires_at,
     )
 
     storage_path: str | None = None
@@ -259,8 +311,14 @@ async def write_file(
     else:
         version_num = await get_next_version(pool, file_id)
 
+    # 101.1-08 (gap 5a): a binary (docx/pptx/xlsx) delta decodes \x00 zip bytes to
+    # a NUL which Postgres JSONB rejects (UntranslatableCharacterError — UAT run
+    # 4ea9bc56). _compute_delta_from_prev's errors="replace" never raises so its
+    # binary guard was dead. Skip the delta for binary mimes — versioning still
+    # records the version row; only the unified-text diff (meaningless for binaries)
+    # is omitted.
     delta = None
-    if version_num > 1:
+    if version_num > 1 and not _is_binary_mime(mime):
         delta = await _compute_delta_from_prev(
             pool, supabase, file_id, version_num, content, path
         )
@@ -289,6 +347,8 @@ async def write_file(
         "version": version_num,
         "size_bytes": size,
         "mime_type": mime,
+        "kind": kind,
+        "expires_at": expires_at.isoformat() if expires_at is not None else None,
         "is_new": is_new,
         "warning": warning,
     }
@@ -312,6 +372,12 @@ async def read_file(
     file_row = await get_file_by_path(pool, thread_id, path)
     if not file_row:
         raise FileNotFoundError_(f"File not found: {path}")
+    if file_row.get("is_expired"):
+        # D-10: an expired template is present in the row but past its TTL. Name
+        # expiry explicitly so the model can relay honestly (run-honesty) rather
+        # than confabulating about a file the user knows they uploaded — NOT a
+        # generic not-found. NULL-expiry agent rows never set is_expired (D-11).
+        raise FileNotFoundError_("template expired")
 
     mime = file_row["mime_type"]
 
@@ -411,6 +477,11 @@ async def get_diff(
     file_row = await get_file_by_path(pool, thread_id, path)
     if not file_row:
         raise FileNotFoundError_(f"File not found: {path}")
+    if file_row.get("is_expired"):
+        # D-10 (WR-02, 100-REVIEW): mirror the read_file gate — an expired template
+        # must be hidden from ALL read paths, including the workspace_diff tool
+        # (ws_get_diff). NULL-expiry agent rows never set is_expired (D-11).
+        raise FileNotFoundError_("template expired")
 
     file_id = file_row["id"]
     latest = await get_latest_version_number(pool, file_id)

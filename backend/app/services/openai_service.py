@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -489,6 +490,110 @@ EXECUTE_CODE_TOOL = {
 
 
 # ---------------------------------------------------------------------------
+# Phase 101 (TMPL-02 / TMPL-03) — the render_template tool schema (101-06 WR-01)
+# ---------------------------------------------------------------------------
+# WR-01 root cause: the render_template HANDLER is registered + whitelist-admitted,
+# but there was NO function-schema for it anywhere, so the model never SAW the tool
+# and physically could not call it. apply_tool_budget can only FILTER existing
+# schemas — a whitelisted NAME with no SCHEMA is a no-op. This constant is that
+# missing schema.
+#
+# RED LINE (Deep byte-identical): this schema is DELIBERATELY NOT appended into
+# get_tools(). Deep Mode calls get_tools() directly and must stay byte-unchanged.
+# The harness injects RENDER_TEMPLATE_TOOL into its per-phase tools_override
+# candidate list ONLY when the fill phase whitelists "render_template"
+# (phase_types._render_template_candidates). So the tool is visible ONLY on a
+# declaring harness fill phase; Deep + every non-declaring phase stay identical.
+#
+# Pitfall 4 intact: build_field_map_tool_schema([]) touches ONLY Pydantic schema
+# (GenericFieldMap.model_json_schema()) — NO docxtpl/python-docx import. The heavy
+# libs are imported function-locally / shipped into the sandbox driver only.
+def _build_render_template_tool() -> dict:
+    """Construct the render_template OpenAI function-schema.
+
+    ``field_map``'s shape is the GenericFieldMap envelope (built from the Pydantic
+    model's JSON schema, with the template-key hint in its description). The other
+    args mirror exactly what ``_handle_render_template`` reads (tool_dispatcher.py):
+    ``retrieved_ids`` (the spotlight ids the citation gate validates against),
+    ``out_filename`` (the OOXML basename — handler-side validated/sanitized — CR-01),
+    ``asset`` (optional AssetRef → trusted library path; omitted ⇒ ephemeral upload),
+    ``emission_meta`` (optional truncation metadata the D-08 guard reads).
+    """
+    from app.services.template_render_service import build_field_map_tool_schema
+
+    field_map_schema = build_field_map_tool_schema([])
+    return {
+        "type": "function",
+        "function": {
+            "name": "render_template",
+            "description": (
+                "Fill a template document (docx/pptx/xlsx) into a real, downloadable "
+                "deliverable using a CITED field-map. The LLM produces DATA (the cited "
+                "field-map); deterministic code produces the FILE. Put every scalar "
+                "placeholder value under field_map.scalars and every list/table value "
+                "under field_map.collections, and for EVERY non-null value set "
+                "source_chunk_id to the <doc id> it actually came from — never invent a "
+                "value or a citation (an uncited or invented value is rejected before "
+                "render). Set retrieved_ids to the spotlight/source ids you were given "
+                "so the citation gate can validate. Pass `asset` to fill a trusted "
+                "library template; omit it to fill an ephemeral uploaded template. The "
+                "produced file is integrity-checked (re-opened, residual-token scanned) "
+                "before delivery — a corrupt or half-filled file is never delivered."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "field_map": field_map_schema,
+                    "retrieved_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "The spotlight/source ids (<doc id=...>) that were retrieved "
+                            "for this turn. The citation gate validates every value's "
+                            "source_chunk_id against this set."
+                        ),
+                    },
+                    "out_filename": {
+                        "type": "string",
+                        "description": (
+                            "The output filename, e.g. 'risk-register.docx'. A single "
+                            "basename with a .docx/.pptx/.xlsx extension — no path "
+                            "separators (a bad name is sanitized to a safe default)."
+                        ),
+                    },
+                    "asset": {
+                        "type": "object",
+                        "description": (
+                            "Optional. A trusted library template reference. Omit to "
+                            "fill an ephemeral uploaded template instead."
+                        ),
+                        "properties": {
+                            "asset_id": {"type": "string"},
+                            "filename": {"type": "string"},
+                            "kind": {"type": "string", "enum": ["template", "reference"]},
+                            "mime": {"type": "string"},
+                        },
+                        "required": ["asset_id", "filename", "kind", "mime"],
+                    },
+                    "emission_meta": {
+                        "type": "object",
+                        "description": (
+                            "Optional. Truncation metadata (stop_reason / finish_reason) "
+                            "so a cut-off field-map emission is rejected, not shipped."
+                        ),
+                    },
+                },
+                "required": ["field_map", "retrieved_ids", "out_filename"],
+            },
+        },
+    }
+
+
+# Built once at import (pure Pydantic schema — Pitfall 4 safe; no heavy-lib import).
+RENDER_TEMPLATE_TOOL = _build_render_template_tool()
+
+
+# ---------------------------------------------------------------------------
 # Phase 084: Workspace tools
 # ---------------------------------------------------------------------------
 
@@ -782,6 +887,79 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     if sandbox_enabled:
         tools.append(EXECUTE_CODE_TOOL)
     return tools
+
+
+def apply_tool_budget(
+    schemas: list[dict],
+    model: str,
+    whitelist: "frozenset[str] | None",
+) -> list[dict]:
+    """Phase 091 — D-05 layer 1 whitelist filter + TOOL-05 per-provider budget cap.
+
+    Pure function (no side effects). Used by the harness phase executor (Plan 03)
+    to build a per-phase ``tools_override``::
+
+        apply_tool_budget(get_tools(user_settings), model, phase_whitelist)
+
+    Two stages:
+
+    1. **Whitelist filter (D-05 layer 1):** when ``whitelist`` is not None, keep only
+       the schemas whose ``function.name`` is in the whitelist — the model only SEES
+       the allowed tools. ``None`` (Deep Mode) skips the filter entirely.
+    2. **Budget cap (TOOL-05):** read ``MODEL_CAPABILITIES[model].max_tools``. When
+       that ``max_tools is None`` (absent / unregistered model) OR the list already
+       fits, return as-is. Otherwise drop schemas from the LOW-priority end (registry/
+       assembly order — last appended = lowest priority, A3) until it fits, but NEVER
+       drop a whitelisted tool (whitelist tools are the point of the phase). If the
+       whitelist alone exceeds the cap, keep ALL whitelist tools (the structural
+       requirement wins over the soft ceiling) and log a warning.
+
+    IMPORTANT (SC#2 / Phase 089 byte-identical invariant): this function is NOT wired
+    into any Deep-Mode/default ``get_tools()`` call site in 091 — it is invoked ONLY
+    from the harness executor (phase config present). Google's ``max_tools`` ceiling
+    therefore applies only on the harness path; Explorer/General/Deep-Mode tool sets —
+    including Google — stay byte-identical. Order is preserved throughout.
+    """
+    # Stage 1 — D-05 layer 1 whitelist filter (None = Deep Mode = no filter).
+    if whitelist is not None:
+        schemas = [t for t in schemas if t["function"]["name"] in whitelist]
+
+    # Stage 2 — TOOL-05 budget cap.
+    max_tools = MODEL_CAPABILITIES.get(model, {}).get("max_tools")
+    if max_tools is None or len(schemas) <= max_tools:
+        return schemas
+
+    # Over budget: drop lowest-priority (latest in assembly order) NON-whitelist tools
+    # first. Iterate from the end so the earliest (highest-priority) tools survive.
+    wl = whitelist or frozenset()
+    kept: list[dict] = []
+    dropped_protected = False
+    # Walk in reverse, dropping non-whitelist tools until we fit; always keep whitelist.
+    surviving = list(schemas)
+    # Indices of droppable (non-whitelist) tools, lowest-priority (last) first.
+    droppable = [
+        i for i in range(len(surviving) - 1, -1, -1)
+        if surviving[i]["function"]["name"] not in wl
+    ]
+    to_drop: set[int] = set()
+    for i in droppable:
+        if len(surviving) - len(to_drop) <= max_tools:
+            break
+        to_drop.add(i)
+    kept = [t for idx, t in enumerate(surviving) if idx not in to_drop]
+
+    if len(kept) > max_tools:
+        # Only whitelist tools remain and they still exceed the cap — the structural
+        # requirement (the phase NEEDS these tools) wins over the soft ceiling.
+        dropped_protected = True
+
+    if dropped_protected:
+        logger.warning(
+            "apply_tool_budget: whitelist (%d tools) exceeds model %s max_tools=%d; "
+            "retaining all whitelist tools (soft ceiling yields to phase requirement)",
+            len(kept), model, max_tools,
+        )
+    return kept
 
 
 def get_explorer_tools() -> list[dict]:
@@ -1128,8 +1306,19 @@ def create_adaptive_streaming_chat(
     user_settings: UserEffectiveSettings | None = None,
     tools_override: list[dict] | None = None,
     max_tokens: int | None = None,
+    force_tool_name: str | None = None,
+    strict_response_format: bool = False,
 ) -> tuple:
-    """Returns (stream, calling_mode). calling_mode indicates how to parse the response."""
+    """Returns (stream, calling_mode). calling_mode indicates how to parse the response.
+
+    Phase 101.1 (D-05 — TIER-FORCE / TIER-COERCE): the OpenAI-compat gateway adapter
+    passes ``force_tool_name`` to FORCE the model to call a named tool
+    (``tool_choice={"type":"function","function":{"name":...}}``) and, when
+    ``strict_response_format`` is set, requests a token-level guaranteed schema
+    (strict ``response_format`` built from the forced tool's parameters). Both are
+    ADDITIVE — the defaults (None / False) preserve the byte-identical ``"auto"`` path
+    (Deep + every pre-101.1 caller unchanged). This is the openai-compat ADAPTER's own
+    request construction — NOT the shared chunk/SSE path (the D-14 RED LINE)."""
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
     resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
@@ -1165,14 +1354,76 @@ def create_adaptive_streaming_chat(
     # round-trip is handled in threads.py agent loop (076.2 Plan 01 Task 1).
     # reasoning_effort="high" is DeepSeek's default (D-04); "max" available
     # but not enabled this phase.
-    if provider == "deepseek" or effective_model.startswith("deepseek-"):
+    #
+    # Phase 101.1-07 (gap 1a / D-15 / TIER-FORCE-NOTHINK): DeepSeek shares
+    # Anthropic's no-force-under-thinking constraint — a named tool_choice WITH
+    # thinking ON returns "Thinking mode does not support this tool_choice"
+    # (UAT runs 575e7345/a7f415ad). The D-13 two-step already moves reasoning to
+    # the gather phase, so the forced emit call runs thinking-OFF. Provider-scoped,
+    # inside the forced branch's precondition (force_tool_name is None) — the auto
+    # path (force_tool_name None) is byte-identical.
+    if (provider == "deepseek" or effective_model.startswith("deepseek-")) and force_tool_name is None:
         kwargs.setdefault("extra_body", {})
         kwargs["extra_body"]["thinking"] = {
             "type": "enabled",
             "reasoning_effort": "high",
         }
 
-    if tool_choice == "auto":
+    # Phase 101.1 (D-05 — TIER-FORCE): a forced emit names the tool the model MUST
+    # call. This branch slots BESIDE the ``"auto"`` branch (additive — force_tool_name
+    # is None for every Deep / pre-101.1 caller). It always passes the tools + the
+    # named tool_choice; on a NATIVE provider it additionally requests a strict
+    # ``response_format`` (token-level guarantee) when ``strict_response_format`` is
+    # set. NEVER reached on the auto path (the byte-identical RED LINE).
+    if force_tool_name is not None:
+        _forced_tools = tools_override if tools_override is not None else get_tools(user_settings)
+        if strict_response_format:
+            # 101.1 review WR-05 (1): strictness for FORCED TOOL ARGUMENTS belongs
+            # on the FUNCTION DEFINITION ("strict": true) — on OpenAI-compat APIs,
+            # ``response_format`` constrains the assistant CONTENT channel, not the
+            # forced tool-call arguments (the thing the executor validates). The
+            # schema is already strict-shaped (additionalProperties:false +
+            # all-required-with-null from EmitFieldMap — D-09). Deep-copy FIRST: the
+            # fallback list is the SHARED get_tools() catalog — never mutate it.
+            _forced_tools = copy.deepcopy(_forced_tools)
+            for _t in _forced_tools or []:
+                _fn = _t.get("function") if isinstance(_t, dict) else None
+                if _fn and _fn.get("name") == force_tool_name:
+                    _fn["strict"] = True
+                    break
+        kwargs["tools"] = _forced_tools
+        kwargs["tool_choice"] = {
+            "type": "function",
+            "function": {"name": force_tool_name},
+        }
+        if strict_response_format and provider == "openai":
+            # 101.1 review WR-05 (2): ``json_schema`` response_format is verified on
+            # OpenAI ONLY — DeepSeek's documented response_format support is
+            # ``json_object``, so an unverified ``json_schema`` would 400 EVERY
+            # DeepSeek TIER-FORCE emit (the exact "docs said forceable!" trap
+            # 101.1-07 hit; the layer-6 backstop catches it honestly but the feature
+            # dies). Gate per-provider; the plan-10 live re-verify must assert a
+            # forced=true + emit_rendered receipt on DeepSeek with the function-level
+            # strict flag above — widen this gate only on live evidence.
+            # Build the strict json_schema response_format from the forced tool's
+            # parameters. Defensive: only inject when the named tool's schema is
+            # present in the tool list.
+            _schema = None
+            for _t in _forced_tools or []:
+                _fn = _t.get("function") if isinstance(_t, dict) else None
+                if _fn and _fn.get("name") == force_tool_name:
+                    _schema = _fn.get("parameters")
+                    break
+            if _schema is not None:
+                kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": force_tool_name,
+                        "schema": _schema,
+                        "strict": True,
+                    },
+                }
+    elif tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
             # Native mode: pass tools via API parameter
             kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)

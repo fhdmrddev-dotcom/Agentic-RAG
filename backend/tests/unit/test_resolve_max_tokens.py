@@ -101,17 +101,22 @@ def test_exacto_suffix_stripped_for_clamp_lookup(caplog):
 
 def test_free_suffix_NOT_stripped(caplog):
     """Defensive sanity — `:free` is part of the upstream model card (not a routing
-    suffix) and MUST NOT be stripped. `minimax/minimax-m2.5:free` has its own
-    registry entry with cap=16384 — the clamp resolves against that entry, not a
-    nonexistent `minimax/minimax-m2.5`."""
+    suffix) and MUST NOT be stripped. Repinned 2026-06-07 (096 D-05 curation removed
+    the registered `minimax/minimax-m2.5:free` row — no `:free` registry entries
+    remain): `minimax/minimax-m2.7:free` is UNREGISTERED while its base
+    `minimax/minimax-m2.7` carries cap=131072. If the resolver wrongly stripped
+    `:free`, it would clamp to the base's 131072; correct behavior is pass-through
+    (no registry hit, no clamp)."""
     s = MagicMock()
     s.active_provider = "openrouter"
-    s.llm_model = "minimax/minimax-m2.5:free"
+    s.llm_model = "minimax/minimax-m2.7:free"
     s.llm_max_output_tokens = 0
     s.llm_api_key = "test-key"
     with caplog.at_level(logging.INFO, logger="app.services.openai_service"):
         result = _resolve_max_tokens(999999, s)
-    assert result == 16384, f"expected clamp to 16384 (m2.5:free cap), got {result}"
+    assert result == 999999, (
+        f"expected pass-through 999999 (':free' variant is unregistered — "
+        f"clamping means the suffix was wrongly stripped to the base card), got {result}"
+    )
     clamp_logs = [r for r in caplog.records if "clamped max_tokens" in r.getMessage()]
-    assert len(clamp_logs) == 1
-    assert "minimax/minimax-m2.5:free" in clamp_logs[0].getMessage()
+    assert len(clamp_logs) == 0, f"unexpected clamp log: {clamp_logs[0].getMessage()!r}"
