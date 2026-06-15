@@ -115,10 +115,6 @@ async def two_users(pg_pool):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="scoped service-role read wired in Plan 02 (D-111-6)",
-    strict=False,
-)
 async def test_scoped_read_excludes_other_users_private_field(pg_pool, two_users):
     """B's scoped read returns B-own + global, NEVER A's private row."""
     if not await _table_exists(pg_pool, "metadata_field_definitions"):
