@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dcAU6bXwTtkgEQwyqgQDrC0ZbfWy9UA7YUdfpHdoPWg1y9XtxL6iUTbXdXfKD1p
+\restrict JSuEzqMEO3NDQqH4uBLk8VA7YBrGWeENgUv1XuYCb1JibngCaumuVfSBmFA5BkH
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -303,6 +303,9 @@ CREATE TABLE public.app_settings (
     token_capture_enabled boolean DEFAULT true,
     template_ttl_hours integer DEFAULT 24,
     document_management_enabled boolean DEFAULT true,
+    extraction_model text,
+    extraction_window_cap integer DEFAULT 32000,
+    metadata_enrichment_mode text DEFAULT 'enriched'::text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -605,6 +608,7 @@ CREATE TABLE public.metadata_field_definitions (
     is_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    options jsonb,
     CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_global = true)))
 );
 
@@ -2927,5 +2931,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dcAU6bXwTtkgEQwyqgQDrC0ZbfWy9UA7YUdfpHdoPWg1y9XtxL6iUTbXdXfKD1p
+\unrestrict JSuEzqMEO3NDQqH4uBLk8VA7YBrGWeENgUv1XuYCb1JibngCaumuVfSBmFA5BkH
 
