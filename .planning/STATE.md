@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: verified
-last_updated: "2026-06-15T15:30:00.000Z"
-last_activity: 2026-06-15 — Phase 110 VERIFIED (gsd-verifier 7/7 must-haves PASSED; code review 0C/0W/3I) — secure-phase pending
+status: verifying
+last_updated: "2026-06-15T16:21:04.591Z"
+last_activity: 2026-06-15 — Phase 110 VERIFIED (gsd-verifier passed; code review clean) — secure-phase pending
 progress:
   total_phases: 10
   completed_phases: 1
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 Phase: 110 — DM Foundations — **✅ COMPLETE + VERIFIED (2/2 plans; gsd-verifier 7/7 PASSED)** — **v3.0 Document Management** (10 phases, 110-119)
 Plan: 2 of 2 COMPLETE
 Status: **Phase 110 EXECUTED + live-verified + phase-goal VERIFIED 2026-06-15.** Migration `071` applied to live :54322 via psycopg2-direct (operator-authorized CLI apply; NEVER db push/reset; dev data preserved 19 docs/221 threads) → full-schema regenerated → 27 live tests GREEN (8 audit round-trip + drift subset + 2-user RLS isolation + flag) + net-new=0 vs base. **One live-apply defect found+fixed (the live gate working as designed):** Plan-01's uniform RLS template referenced `is_global` on `document_relationships`, which has NO such column by design (relationships are user-owned links per RESEARCH/PATTERNS §3.2) → fixed to user-scoped-only policies + schema test (commit `25844c67`). Code review 0C/0W/3I (3 latent-assumption Info notes, no change). gsd-verifier 7/7 must-haves PASSED, no human-UAT items (backend-only substrate). DMF-01/02/03 Validated. **Security gate OPEN (security_enforcement on, no 110-SECURITY.md). NEXT = `/gsd:secure-phase 110`** then `/gsd:discuss-phase 111`. Recommend `/clear` first.
-Resume file: None
+Resume file: --resume-file
 Last activity: 2026-06-15 — Phase 110 VERIFIED (gsd-verifier passed; code review clean) — secure-phase pending
 
 **Phase 110 (DM Foundations substrate) — EXECUTED 2026-06-15 (2/2 plans):**
