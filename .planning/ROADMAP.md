@@ -67,7 +67,12 @@
   2. Extraction reads beyond `content[:3000]` (a configurable larger window or front-matter + tail sampling) so late title-page/byline data isn't missed.
   3. User-defined custom metadata fields (from `metadata_field_definitions`) are extracted on ingest via a runtime Pydantic `create_model` schema; per-field confidence is stored flat under a `_confidence` sub-key so the existing `metadata @> filter` containment pre-filter still matches; `exclude_none=True` (empty `author` dropped, not coerced to `""`) is preserved as a guarded non-regression invariant.
   4. **SC#10 4-axis UAT**: dynamic-schema structured extraction is verified across the native-7 (cross-provider) — extraction succeeds and returns valid confidence-scored fields on each provider; long-doc (≥ 5 KB) window-lift sampling exercised; rows authored in VALIDATION.md.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 111-01-PLAN.md — Wave-0 test scaffolds + migration 072 file (un-applied) + first-class `lmstudio` provider + 3 app_settings-backed settings fields (META-03 foundation)
+  - [ ] 111-02-PLAN.md — The enrichment engine: `build_metadata_model` + `sample_for_extraction` + explicit-scoped `read_enabled_field_defs` + async `extract_metadata_enriched` (forced_emit caller) (META-01/03/04)
+  - [ ] 111-03-PLAN.md — `/metadata-fields` CRUD router + Pydantic models (field_type Literal + field_key validators) + `metadata.field.create` audit, mounted in main.py (META-01)
+  - [ ] 111-04-PLAN.md — `ingest_document` wiring: hoist load_app_settings + enriched/legacy branch + `asyncio.run` call site + `_confidence` attach + graceful degradation (META-01/03/04)
+  - [ ] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03)
 **UI hint**: no
 
 #### Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit
@@ -169,7 +174,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
-| 111. Metadata Enrichment — Extraction Backend | 0/? | Not started | - |
+| 111. Metadata Enrichment — Extraction Backend | 0/5 | Planned | - |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
