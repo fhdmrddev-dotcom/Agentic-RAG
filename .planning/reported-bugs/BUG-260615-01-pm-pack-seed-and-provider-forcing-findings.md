@@ -60,3 +60,15 @@ which providers can drive template-fill workflows. (4) is the curation pass the 
 (3) pairs with SEED-082 (emit-gate policy + model-fit routing) and the provider-feature-fit routing
 direction — surface at the next provider/eval phase. (1)/(2) are a small `seed-pm-pack.py` hardening.
 (4) is a model-registry curation pass. None block the Phase-104 content pack (all proofs green live).
+
+## Fix status (2026-06-15, post-104 code review)
+
+- **(2) PARTIALLY FIXED** (WR-02, commit pending): `upsert_definition` now compares PARSED dicts
+  (`json.loads(existing) == def_dict`) instead of `json.dumps` vs Postgres-normalized text, so a NO-OP
+  refresh is genuinely idempotent and no longer DELETE-then-INSERTs (which FK-violated once runs
+  referenced the def). A genuine def-CONTENT change while runs reference the published row would still
+  need handling (the immutability model favors a NEW version, not deleting a referenced one) — leave open.
+- **(1) OPEN** — dedup short-circuit on un-embedded `pending` rows (the re-drive-ingestion fix).
+- **(3) OPEN** — DeepSeek/Gemini forced-emit reliability (provider-tuning; pairs with SEED-082).
+- **(4) OPEN** — model-list curation (the scoreboard harness IDs were fixed to `gpt-4o`/`MiniMax-M2.7`).
+- The BLOCKING double-gate over-rejection (not in this report's scope) is FIXED (commit `6a607169`).

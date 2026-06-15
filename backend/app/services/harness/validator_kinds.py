@@ -269,7 +269,7 @@ async def _validate_output_file_valid(output: dict, config: dict, ctx) -> GateRe
     # and the deliverable is stored as a workspace-INLINE file whose ``path`` is a virtual
     # workspace path (not a filesystem path a second re-open could resolve). Trust opened=True
     # the same way opened=False is trusted above (the documented engine/persisted-verdict seam).
-    if of.get("opened") is True and of.get("residual_clean", True):
+    if of.get("opened") is True and of.get("residual_clean") is True:
         return GateResult(True, None)
 
     filename = of.get("filename") or of.get("path") or config.get("path") or ""

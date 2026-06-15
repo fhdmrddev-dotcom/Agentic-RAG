@@ -484,7 +484,13 @@ def upsert_definition(conn, def_id: str, def_dict: dict) -> None:
             (def_id,),
         )
         existing = cur.fetchone()
-        if existing is not None and existing[0] != target_def:
+        # WR-02 (104-03 review): compare PARSED dicts, not the raw text. Postgres
+        # normalizes JSONB key order (alphabetical) while json.dumps uses insertion
+        # order, so a text compare ALWAYS differed -> a needless DELETE-then-INSERT
+        # every run (which FK-violates once a workflow_run references the published
+        # def). Parsing makes the no-op refresh genuinely idempotent.
+        unchanged = existing is not None and json.loads(existing[0]) == def_dict
+        if existing is not None and not unchanged:
             # Stale published row — DELETE so the corrected def can be re-inserted.
             # DELETE is permitted (the immutability trigger is BEFORE UPDATE only).
             cur.execute(
