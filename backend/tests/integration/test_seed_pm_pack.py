@@ -113,13 +113,24 @@ def _run_seed_or_skip(module):
     assert rc == 0, "seed main() must return 0 on success"
 
 
-def _fetch_pm_defs(cur):
+def _fetch_pm_defs(cur, module):
+    """The seed's OWN two defs, fetched by their deterministic ids (not by slug).
+
+    Scope by the seed's fixed ``STATUS_DEF_ID`` / ``RISK_DEF_ID`` rather than the slug: the
+    phase's own Tweak→v(N+1) republish flow (exercised at the Plan-03 live UAT) legitimately
+    creates ADDITIONAL rows under the same ``pm-weekly-status-report`` slug (different ids,
+    version+1, draft or published), so a slug-scoped query is not stable once the versioning
+    feature has been used. The seed's idempotency property is "each of its two FIXED def ids
+    resolves to exactly one row after running the seed twice" — a non-DELETE-then-INSERT seed
+    would raise a duplicate-key error on the second fixed-id INSERT, so the double-run in
+    ``test_seed_smoke_and_idempotency`` still proves the refresh path.
+    """
     cur.execute(
         "SELECT slug, is_global, created_by, status, definition "
         "FROM public.workflow_definitions "
-        "WHERE created_by = %s AND slug IN %s "
+        "WHERE created_by = %s AND id IN %s "
         "ORDER BY slug",
-        (DEMO_USER_ID, PM_SLUGS),
+        (DEMO_USER_ID, (module.STATUS_DEF_ID, module.RISK_DEF_ID)),
     )
     return cur.fetchall()
 
@@ -136,10 +147,10 @@ def test_seed_smoke_and_idempotency():
     conn = psycopg2.connect(_DSN, connect_timeout=5)
     try:
         cur = conn.cursor()
-        rows = _fetch_pm_defs(cur)
+        rows = _fetch_pm_defs(cur, module)
         slugs = sorted(r[0] for r in rows)
         assert slugs == sorted(PM_SLUGS), f"expected exactly {PM_SLUGS}, got {slugs}"
-        assert len(rows) == 2, f"expected exactly 2 PM def rows (no duplicates), got {len(rows)}"
+        assert len(rows) == 2, f"expected exactly 2 seeded PM def rows (no duplicates), got {len(rows)}"
         for slug, is_global, created_by, status, _definition in rows:
             assert is_global is False, f"{slug}: must be is_global=false (per-account, never global)"
             assert str(created_by) == DEMO_USER_ID, f"{slug}: created_by must be the demo uid"
@@ -160,8 +171,8 @@ def test_def_shape_is_two_phase_fill():
     conn = psycopg2.connect(_DSN, connect_timeout=5)
     try:
         cur = conn.cursor()
-        rows = _fetch_pm_defs(cur)
-        assert len(rows) == 2, f"expected 2 PM def rows, got {len(rows)}"
+        rows = _fetch_pm_defs(cur, module)
+        assert len(rows) == 2, f"expected 2 seeded PM def rows, got {len(rows)}"
 
         for slug, _is_global, _created_by, _status, definition in rows:
             # psycopg2 returns jsonb as a parsed dict; tolerate a str just in case.
