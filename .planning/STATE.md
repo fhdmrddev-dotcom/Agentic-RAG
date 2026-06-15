@@ -2,37 +2,35 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: ready_to_plan
-last_updated: "2026-06-15T01:00:00.000Z"
-last_activity: 2026-06-15 -- Phase 104 Plans 01+02 executed (PM pack templates+corpus, seed/provisioning script + manifest + integration tests green); Plan 03 = human-verify UAT gate pending
+status: milestone_complete
+last_updated: "2026-06-15T07:00:00.000Z"
+last_activity: 2026-06-15 -- v2.9 Workflow Studio milestone COMPLETE + archived (CORE 097-104 shipped + validated + secured; STRETCH 105-109 deferred to backlog; git tag v2.9). Next = /gsd:new-milestone.
 progress:
-  total_phases: 14
+  total_phases: 9
   completed_phases: 9
-  total_plans: 58
+  total_plans: 57
   completed_plans: 57
-  percent: 64
+  percent: 100
 ---
 
 # Project State
 
-> **Scope note:** the frontmatter `total_phases: 14` counts every ROADMAP phase — the 8 CORE integer phases (097–104) + the 101.1 decimal gap-closure + the 5 STRETCH phases (105–109: SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01). The **CORE committed scope (097–104, incl. the 097 spike + 101.1) is now COMPLETE** — that is what the v2.9 milestone closes on (pending only `/gsd:secure-phase 103` + `104`). The 5 STRETCH phases were never part of the committed scope; promote or drop them at `/gsd:new-milestone`. `percent: 64` (9/14) counts STRETCH in the denominator, so it understates CORE completion (8/8 core done). Full phase detail in `.planning/ROADMAP.md` → "## v2.9 Workflow Studio".
+> **Scope note:** v2.9 Workflow Studio is **SHIPPED + archived (2026-06-15)**. CORE phases 097–104 (incl. the 097 spike + the 101.1 emission-layer gap-closure) are COMPLETE, validated, secured, and live-UAT'd; that is the milestone. The 5 STRETCH phases (105–109: SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01) were never started and rolled to backlog — promote or drop them at `/gsd:new-milestone`. Full detail archived to `.planning/milestones/v2.9-ROADMAP.md`; close-out in `.planning/MILESTONES.md` + `RETROSPECTIVE.md`.
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
+See: .planning/PROJECT.md (updated 2026-06-15 — v2.9 Workflow Studio milestone complete + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 103 ✅ **FUNCTIONALLY COMPLETE + LIVE-UAT-HARDENED (2026-06-14)** — the full describe→draft→refine→publish→run journey verified in a live Chrome session driven by Claude. 9 real bugs found+fixed this session (commits e64f24bd→5904584a): NL-gen provider_error (per-user settings to gateway), save-loop+unique-slug+409, plain-language Builder forms + always-visible helper text + real folder/skill NAMES, project-folder picker, filter race, publish gauntlet → clean MODAL, **open/tweak now load the existing workflow** (was birth-only) + Save button + list refresh, AND the AI now authors a TEXT deliverable when no template (no unpublishable render_template). **NEXT formal gate = `/gsd:secure-phase 103`** (no 103-SECURITY.md yet) before the v2.9 milestone closes. New seeds: SEED-085 (user-friendly-vs-admin terminology), SEED-086 (engaging visual multi-agent representation — sketch/Stitch), SEED-087/deferred (async background publish + live golden-run progress — kills the multi-minute synchronous block; template-upload in the Builder stays deferred per D-103-3). **Phase 104 (PM Flagship Content Pack) now EXECUTING — 2 of 3 plans complete, live-UAT gate pending.** Phase 102 ✅ FULLY CLOSED 2026-06-13.
+**Current focus:** **No active milestone — v2.9 Workflow Studio shipped 2026-06-15** (CORE 097–104: project=folder binding + server-side KB governance, workflow↔skill composition, ephemeral template upload + guaranteed cited template-fill + integrity gates, reusable validation-gate library + output-quality judge hard-wall, Workflows page + NL authoring + read-only graph + 8-stage publish gauntlet, PM flagship content pack). 14/14 CORE requirements Validated; every CORE phase verify-work'd + secure-phase'd + live cross-provider UAT'd. **Next = `/gsd:new-milestone`** — operator-confirmed candidate is SEED-005 Enhanced Document Structure (M-Files/Doxis basics). Backlog carry-forwards: v2.9 STRETCH 105–109, SEED-013/014 connectors, SEED-082/084, and 7 open `surface: Agentic-RAG` polish reports (see `## Deferred Items`).
 
 ## Current Position
 
-Phase: 105 (STRETCH) — but **v2.9 milestone close is the real next step**, blocked ONLY on secure-phase
-Plan: Not started
-Status: **Phase 104 COMPLETE 2026-06-15** (last v2.9 CORE phase — 3/3 plans + live UAT passed, all 5 proofs green; `phase.complete` 0 warnings; details in Recent Completed Phases below). **NEXT = `/gsd:secure-phase 104`** (security_enforcement on; no 104-SECURITY.md yet) **+ the still-pending `/gsd:secure-phase 103`** — both block the v2.9 milestone close. Phases 105-109 are STRETCH (optional; promote at /gsd:new-milestone). Recommend `/clear` before secure-phase given the long 104 session.
-Resume file: `.planning/phases/104-pm-flagship-content-pack/104-HUMAN-UAT.md` (status: passed)
-Last activity: 2026-06-15
-
-> **Milestone close still pending on Phase 103:** `/gsd:secure-phase 103` (no `103-SECURITY.md` yet) + the 7 `103-HUMAN-UAT.md` lived-experience items remain before v2.9 closes. 103 was EXECUTED 6/6 + live-UAT-hardened (9 bugs fixed); code review 9 fixed / 1 false-positive / 1 deferred (WR-01).
+Phase: none active — **v2.9 Workflow Studio SHIPPED + archived 2026-06-15**
+Plan: —
+Status: **v2.9 milestone COMPLETE.** CORE phases 097–104 shipped + validated + secured + live-UAT'd (103 secured 2026-06-14, 32 threats/0 open; 104 secured + nyquist + UAT 5/5, 15 threats/0 open). ROADMAP collapsed (414→149 lines); REQUIREMENTS archived to `milestones/v2.9-REQUIREMENTS.md` + removed; MILESTONES.md + RETROSPECTIVE.md + PROJECT.md evolved; 40 open artifacts triaged (zero CORE blockers) + acknowledged in `## Deferred Items`; git tag v2.9. **NEXT = `/gsd:new-milestone`** (operator-confirmed candidate: SEED-005 Enhanced Document Structure). Recommend `/clear` first.
+Resume file: —
+Last activity: 2026-06-15 — v2.9 milestone close
 
 **Phase 104 (PM Flagship Content Pack — last v2.9 core) — ✅ COMPLETE 2026-06-15 (3/3 plans + live UAT passed; `phase.complete` 0 warnings; PM-01 validated). Content + seed only — EXCEPT 2 operator-approved engine-fix overrides found at the human-verify gate (the double-gate bug, commit `6a607169`). NEXT = `/gsd:secure-phase 104`.**
 
@@ -408,6 +406,22 @@ _Historical — Phase 097 spike per-plan execution detail:_
 - **SEED-069 planted** (`.planning/seeds/SEED-069-living-document-workflow-output-reingestion.md`): workflows that produce evolving artifacts need optional OUTPUT re-ingestion so the next run grounds on the latest version. CRITICAL — the dedup/versioning/reingest infra ALREADY EXISTS; net-new is only thin wiring + a `derived/source` provenance flag (self-feedback amplification guard) + a scoped exception to the CLAUDE.md manual-upload-only rule. Linked to SEED-005 (DM versioning, next milestone) + GOV-02 (provenance receipt, STRETCH 107).
 
 **Phase 097→098 housekeeping (historical — Phase 098 now COMPLETE):** Discuss-phase complete 2026-06-09: `.planning/phases/098-project-binding-server-side-kb-scope-governance/098-CONTEXT.md` committed (`9aae09cb`). 3 gray areas resolved (all operator-accepted): **(1)** output-side schema shapes (`output_target_folder`/`reingest_output`/`version_policy`/`provenance`) **locked-now, behavior-deferred** [D-08]; **(2)** scope-violation = **clip + observable run-log warning** (`scope_violation` event on the existing run-event/`run:{run_id}` channel) + per-phase `folder_scope` **narrow-only enforced at definition-save validate** [D-06/D-07], with the ⊆ assert **GATED no-op when scope is None** to keep Deep byte-identical on the shared `search_documents` path [D-05a]; **(3)** **representative-4** cross-provider in 098, **full native-7 reserved for Phase 101** [D-09]. A 3-agent adversarial verify pass confirmed code seams + source fidelity (0 high) and drove 4 medium precision fixes. **Housekeeping still open:** Phase 097 was never formally run through `/gsd:verify-work 097` + complete — the 098 dependency (097 schema shape) is satisfied by the operator-confirmed CONCLUSION.md, but the 097 verify/complete step remains outstanding. Phase 103 (Workflows page) stays **sketch-gated (G-2)**.
+
+## Deferred Items
+
+Items acknowledged and deferred at the **v2.9 milestone close on 2026-06-15** (40 total from the pre-close `audit-open` sweep). Triaged: none are v2.9 CORE blockers — they are status-label lag on superseded/closed phases, historical tracking cruft, a satisfied todo, and deferred-by-design seeds.
+
+| Category | Count | Disposition |
+|----------|-------|-------------|
+| UAT gaps | 5 | Status-label lag — 101-HUMAN-UAT (8 pending) superseded by 101.1 (closed/re-verified); 101-LIVE-UAT-FINDINGS, 101.1-UAT, 103-HUMAN-UAT, 104-HUMAN-UAT all 0-pending. No real pending work. |
+| Verification gaps | 3 | Stale labels — 101-VERIFICATION superseded by 101.1; 102-VERIFICATION gaps closed by gap-plans 06-09 + secured 34/34; 103-VERIFICATION live-UAT-hardened + secured. |
+| Quick tasks | 19 | Orphaned tracker slugs (`[missing]`) from Mar–Jun 2026 — mostly already-fixed bugs from v2.5–v2.8. Tracking cruft, not v2.9 work. |
+| Pending todos | 1 | `spike-nl-workflow-authoring` — satisfied (NL authoring shipped in Phase 103). |
+| Unimplemented seeds | 12 | Deferred-by-design with re-open triggers: SEED-002/003/004/005/040/041/042/043/044/045/046/084. Future-milestone candidates (SEED-005 = next-milestone Enhanced Document Structure). |
+
+**STRETCH phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01)** rolled to backlog as next-milestone candidates — CORE landed clean; the roadmap's "ship only if budget remains" gate drew the line at CORE 097–104.
+
+**Open `surface: Agentic-RAG` reports (roll forward, not folded into any v2.9 CORE phase):** BUG-260609-02, BUG-260609-04, BUG-260610-01, BUG-260615-01, `general-chat-intermittent-silent-send-drop`, `minimax-m3-invalid-tool-args-400`, `setting-up-agent-hides-model-activity` — carried into the next milestone's UAT blast radius (noted in RETROSPECTIVE).
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 

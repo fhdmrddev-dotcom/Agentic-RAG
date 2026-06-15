@@ -444,6 +444,42 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.9 — Workflow Studio
+
+**Shipped:** 2026-06-15
+**Phases:** 9 CORE (097–104, incl. inserted emission-layer 101.1) | **Plans:** 57 | STRETCH 105–109 deferred
+
+### What Was Built
+Turned the v2.8 harness into an authorable capability: project=folder binding + server-side KB scope governance (model-unwidenable), workflow↔skill composition with locked version snapshots, ephemeral one-run template upload, a shared guaranteed-cited-emission `llm_emit` layer + integrity gates (corrupt files can never reach the user as "done"), a reusable validation-gate library + an `llm_judge` output-quality **hard publish blocker**, a Workflows page with NL→draft authoring + read-only phase-spine graph + an 8-stage publish gauntlet, and a PM flagship content pack authored entirely on the generic primitives.
+
+### What Worked
+- **Composition over re-implementation held the red line.** ~80–90% of the milestone was reuse of shipped harness primitives; Deep Mode stayed byte-identical across all 9 phases because every engine addition was an additive seam, never a breaking change to the G-5 hot files.
+- **Per-phase rigor substituted for a milestone audit.** Each CORE phase ran verify-work + secure-phase + live cross-provider UAT, so close-time confidence was high without a separate audit pass (102: 34/34 threats + 7/7 SC#10; 103: 32 threats/0 open; 104: 15 threats/0 open + nyquist + UAT 5/5).
+- **Live-driven validation caught what static tests missed, repeatedly.** Driving the REAL endpoints (publish, emit, judge) surfaced blockers that mocks and static def-shape tests false-green'd.
+
+### What Was Inefficient
+- **The "static would false-green" trap recurred across 099/102/104.** Each time, mock-masked or static-test-passed code shipped "complete" but was non-functional live (099: 2 mock-masked blockers; 102: 6; 104: 2 double-gate engine bugs). The pattern is now a named decision — but it cost gap-closure waves on three phases before the lesson fully generalized to auditors and validation maps themselves.
+- **STATE.md re-balloon recurred** during 104 executor writes (343KB→1.5MB) — required restore-from-clean-base. Guard: keep STATE.md edits small/targeted.
+- **Reasoning-model forced-emit reliability** (DeepSeek/Gemini `model_failed_to_emit`) remains a provider-boundary rough edge surfaced at the 104 cross-provider scoreboard (honest-fail, never a silent bad file — the bar was met, but forcing reliability is a follow-up, SEED-082).
+
+### Patterns Established
+- **Guaranteed structured emission as an engine layer** (FORCE a cited field-map → deterministic no-model-code render) — the generic home for any typed-artifact workflow.
+- **Judge-as-hard-wall at publish** — a lint-clean workflow that produces bad output cannot publish; the judge runs live on a real golden run.
+- **Orchestrator hand-spot-checks the highest-stakes controls** rather than trusting an auditor/verifier blind (the 102/103/104 secure-phase practice).
+- **Re-run automated verification at validate-phase**, don't trust stale status labels — 104's validate-phase found 2 integration tests that were green at execution but brittle against the phase's own Tweak→v(N+1) versioning feature.
+
+### Key Lessons
+- Drive the real endpoint. A gate, judge, or validator is unproven until it runs against the live path on real data — static shape checks and mocks systematically false-green.
+- Additive seams + a None-gated no-op are how you add capability without breaking the shared path; the discipline is what kept Deep byte-identical through 9 phases.
+- Cross-provider honesty (never a silent bad deliverable) is a more durable acceptance bar than cross-provider success — all 7 natives honest-failed or succeeded; none silently narrated.
+
+### Cost Observations
+- Model mix: Opus 4.x for orchestration / planning / execution; live cross-provider UAT operator- and Claude-driven (Chrome MCP + psycopg2 DB cross-checks against local Supabase :54322).
+- Sessions: many across 8 days — 57 plans / 8 days ≈ 7.1 plans/day.
+- Notable: one inserted phase (101.1 emission layer) absorbed the template-fill gap-closure; three phases (099/102/104) needed live-UAT gap-closure waves for mock-masked blockers — the recurring cost of this milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -458,3 +494,4 @@ Living retrospective — updated at each milestone boundary.
 | v2.6 Foundation: RAG Quality + Multi-Worker + Polish | 35 | 91 | 2.6 | 16 days |
 | v2.7 Agent Workspace & Panel | 6 | 28 | 4.67 | 3 days |
 | v2.8 Harness Engine & Workflow Mode | 10 | 67 | 6.7 | 9 days |
+| v2.9 Workflow Studio (CORE) | 9 | 57 | 6.3 | 8 days |
