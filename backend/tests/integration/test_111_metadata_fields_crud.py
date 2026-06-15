@@ -62,6 +62,56 @@ async def _table_exists(pool, table: str) -> bool:
     ))
 
 
+def _read_local_supabase_env():
+    """Read the REAL local SUPABASE_URL + service-role key from backend/.env.
+
+    The conftest plants a fake cloud SUPABASE_URL at import time so the suite runs
+    against a mock client; these live tests drive the actual service against the
+    local REST gate, so they source the two values straight from backend/.env
+    (bypassing the conftest override). Returns None if either is absent → skip.
+    Modeled on test_093_ask_user_workflow_run_live.py.
+    """
+    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    if not os.path.exists(env_path):
+        return None
+    url = key = None
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k, v = k.strip(), v.strip().strip('"').strip("'")
+                if k == "SUPABASE_URL":
+                    url = v
+                elif k == "SUPABASE_SERVICE_ROLE_KEY":
+                    key = v
+    except OSError:
+        return None
+    if not url or not key:
+        return None
+    return url, key
+
+
+def _supabase_or_skip():
+    """Build a service-role supabase client against the REAL local Supabase, or skip."""
+    creds = _read_local_supabase_env()
+    if creds is None:
+        pytest.skip("local SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not found in backend/.env")
+    url, key = creds
+    try:
+        from supabase import create_client
+        client = create_client(url, key)
+    except Exception as e:  # noqa: BLE001
+        pytest.skip(f"supabase service-role client unavailable: {type(e).__name__}: {e}")
+    try:
+        client.table("metadata_field_definitions").select("id").limit(1).execute()
+    except Exception as e:  # noqa: BLE001
+        pytest.skip(f"local Supabase REST gate unreachable: {type(e).__name__}: {e}")
+    return client
+
+
 @pytest_asyncio.fixture
 async def pg_pool():
     """Function-scoped real asyncpg pool against local Postgres :54322."""
@@ -102,10 +152,6 @@ async def test_user(pg_pool):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="metadata_field_definitions CRUD endpoint lands in Plan 03 (META-01)",
-    strict=False,
-)
 async def test_crud_create_forces_owner_and_not_global(pg_pool, test_user):
     """The CRUD create path forces user_id=caller and is_global=false."""
     if not await _table_exists(pg_pool, "metadata_field_definitions"):
@@ -113,12 +159,14 @@ async def test_crud_create_forces_owner_and_not_global(pg_pool, test_user):
 
     from app.services.metadata_field_service import create_field_definition
 
+    sb = _supabase_or_skip()
     created = await create_field_definition(
         user_id=test_user,
         field_key="contract_value",
         field_type="number",
         # A client trying to escalate to global must be ignored.
         is_global=True,
+        supabase=sb,
     )
     row = await pg_pool.fetchrow(
         "SELECT user_id, is_global FROM public.metadata_field_definitions WHERE id = $1",
@@ -130,16 +178,77 @@ async def test_crud_create_forces_owner_and_not_global(pg_pool, test_user):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="metadata_field_definitions list endpoint lands in Plan 03 (META-01)",
-    strict=False,
-)
 async def test_list_returns_own_plus_global_enabled(pg_pool, test_user):
     """List returns the caller's own enabled fields plus global enabled fields."""
     if not await _table_exists(pg_pool, "metadata_field_definitions"):
         pytest.skip("migration 071 not applied (metadata_field_definitions absent)")
 
-    from app.services.metadata_field_service import list_field_definitions
+    from app.services.metadata_field_service import (
+        create_field_definition,
+        list_field_definitions,
+    )
 
-    fields = await list_field_definitions(user_id=test_user)
+    sb = _supabase_or_skip()
+    await create_field_definition(
+        user_id=test_user, field_key="own_field", field_type="string", supabase=sb
+    )
+    fields = await list_field_definitions(user_id=test_user, supabase=sb)
     assert isinstance(fields, list), "list must return a list of field defs"
+    keys = {f["field_key"] for f in fields}
+    assert "own_field" in keys, "list must return the caller's own field def"
+    # Every returned row is either the caller's own or a global row.
+    for f in fields:
+        assert str(f["user_id"]) == str(test_user) or f["is_global"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_delete_own_scoped_404_not_403_on_cross_user(pg_pool, test_user):
+    """update/delete are own-scoped: a cross-user/non-existent id collapses to None (→404)."""
+    if not await _table_exists(pg_pool, "metadata_field_definitions"):
+        pytest.skip("migration 071 not applied (metadata_field_definitions absent)")
+
+    from uuid import uuid4
+
+    from app.services.metadata_field_service import (
+        create_field_definition,
+        update_field_definition,
+        delete_field_definition,
+    )
+
+    sb = _supabase_or_skip()
+    created = await create_field_definition(
+        user_id=test_user, field_key="scoped_field", field_type="string", supabase=sb
+    )
+
+    # Another user seeds a private field; the caller must NOT be able to touch it.
+    other_user = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+        other_user, f"phase-111-other-{other_user}@test.local",
+    )
+    other = await create_field_definition(
+        user_id=other_user, field_key="other_field", field_type="string", supabase=sb
+    )
+    try:
+        # update on another user's row → None (router maps to 404, NOT 403)
+        miss = await update_field_definition(
+            test_user, other["id"], {"enabled": False}, supabase=sb
+        )
+        assert miss is None, "cross-user update must miss (→404, not 403)"
+
+        # delete on another user's row → False (router maps to 404)
+        removed_cross = await delete_field_definition(test_user, other["id"], supabase=sb)
+        assert removed_cross is False, "cross-user delete must miss (→404)"
+
+        # own update + delete succeed
+        upd = await update_field_definition(
+            test_user, created["id"], {"enabled": False}, supabase=sb
+        )
+        assert upd is not None and upd["enabled"] is False
+        removed_own = await delete_field_definition(test_user, created["id"], supabase=sb)
+        assert removed_own is True
+    finally:
+        await pg_pool.execute(
+            "DELETE FROM public.metadata_field_definitions WHERE user_id = $1", other_user
+        )
+        await pg_pool.execute("DELETE FROM auth.users WHERE id = $1", other_user)
