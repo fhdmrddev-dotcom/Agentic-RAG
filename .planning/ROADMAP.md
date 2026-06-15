@@ -73,7 +73,7 @@
   - [x] 111-02-PLAN.md — The enrichment engine: `build_metadata_model` + `sample_for_extraction` + explicit-scoped `read_enabled_field_defs` + async `extract_metadata_enriched` (forced_emit caller) (META-01/03/04) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 7 GREEN flipped; net-new failures 0)
   - [x] 111-03-PLAN.md — `/metadata-fields` CRUD router + Pydantic models (field_type Literal + field_key validators) + `metadata.field.create` audit, mounted in main.py (META-01) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 34/34 GREEN live; net-new failures 0)
   - [x] 111-04-PLAN.md — `ingest_document` wiring: hoist load_app_settings + enriched/legacy branch + `asyncio.run` call site + `_confidence` attach + graceful degradation (META-01/03/04) — EXECUTED 2026-06-15 (1 TDD task / 1 commit; proved D-111-9 flat-filter compat; net-new failures 0)
-  - [ ] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03)
+  - [x] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03) — EXECUTED 2026-06-15 (operator-authorized psycopg2-direct apply; 4 cols live, 19 docs preserved; live suite 7 passed / 2 xpassed)
 **UI hint**: no
 
 #### Phase 111.1: Configurable / Multi-Provider Embeddings — incl. local Ollama + LM Studio (INSERTED)
