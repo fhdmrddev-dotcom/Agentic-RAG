@@ -1,16 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v3.0
-milestone_name: Document Management
-status: in_progress
-last_updated: "2026-06-15T13:00:00.000Z"
-last_activity: 2026-06-15 -- v3.0 Document Management roadmap CREATED (10 phases 110-119, 24/24 reqs mapped incl. DMF-03 capability flag). Research done + committed. NEXT = /gsd:discuss-phase 110 (G-2 /gsd:sketch first for UI phases 112/114/117).
+milestone_name: Document Management — 🔨 ACTIVE
+status: completed
+last_updated: "2026-06-15T11:27:15.424Z"
+last_activity: 2026-06-15 — v3.0 roadmap created (re-sequence → research → requirements → roadmap)
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State
@@ -29,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 Phase: 110 — DM Foundations (not started) — **v3.0 Document Management** (10 phases, 110-119)
 Plan: —
 Status: **Roadmap created — milestone set up.** v3.0 = SEED-005 Tier A as a first-class product surface (chosen over resuming Skill Studio → deferred v3.1). DONE: v3.x PRD re-sequence + `PRDs/SEQUENCE.md` (authoritative version map); 4-stream research (`research/v3.0-document-management/` — near-zero new deps, build order Foundations→Enrichment→Views→Relationships→Classification→Governance); `REQUIREMENTS.md` (24 functional reqs incl. **DMF-03 capability flag** for feature-independence + 2 UX); `ROADMAP.md` (10 phases 110-119, 24/24 mapped). **G-2 sketch-first** on UI phases 112 (document detail panel) / 114 (view builder) / 117 (relationship panel); **SC#10** cross-provider UAT on 111/115/116. Risk profile: ~90% additive; the only working-path change is metadata enrichment (111), kept backward-compatible + reversible behind the DMF-03 flag; Deep chat / agent loop / threads.py untouched (G-5). **NEXT = `/gsd:discuss-phase 110`** (DM Foundations is backend substrate — no sketch needed; sketch fires at 112). Recommend `/clear` before starting 110.
-Resume file: —
+Resume file: --resume-file
 Last activity: 2026-06-15 — v3.0 roadmap created (re-sequence → research → requirements → roadmap)
 
 ---
