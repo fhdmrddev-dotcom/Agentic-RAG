@@ -286,10 +286,14 @@ worded impact (High/Medium/Low), owner, mitigation and status.
 """
 
 
+# 104-03 live-UAT fix: encode the actual reporting week in the FILENAME (not the
+# ambiguous "w1"/"w2") — the publish judge cites by filename and read "w2" as "Week 2",
+# flagging a false period mismatch against a Week-9 report. "week8"/"week9" are
+# unambiguous and match each doc's "Week N of 24" header.
 DOCS = {
     "project-charter-source.md": PROJECT_CHARTER_SOURCE,
-    "weekly-meeting-notes-w1.md": WEEKLY_MEETING_NOTES_W1,
-    "weekly-meeting-notes-w2.md": WEEKLY_MEETING_NOTES_W2,
+    "weekly-meeting-notes-week8.md": WEEKLY_MEETING_NOTES_W1,
+    "weekly-meeting-notes-week9.md": WEEKLY_MEETING_NOTES_W2,
     "sprint-task-log.md": SPRINT_TASK_LOG,
     "risk-log.md": RISK_LOG,
 }
