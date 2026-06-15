@@ -15,7 +15,7 @@ progress:
 
 # Project State
 
-> `total_phases: 8` = the CORE committed scope (Phases 097–104, incl. the spike). STRETCH Phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01) are optional and excluded from the progress denominator until promoted. Full phase detail in `.planning/ROADMAP.md` → "## v2.9 Workflow Studio".
+> **Scope note:** the frontmatter `total_phases: 14` counts every ROADMAP phase — the 8 CORE integer phases (097–104) + the 101.1 decimal gap-closure + the 5 STRETCH phases (105–109: SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01). The **CORE committed scope (097–104, incl. the 097 spike + 101.1) is now COMPLETE** — that is what the v2.9 milestone closes on (pending only `/gsd:secure-phase 103` + `104`). The 5 STRETCH phases were never part of the committed scope; promote or drop them at `/gsd:new-milestone`. `percent: 64` (9/14) counts STRETCH in the denominator, so it understates CORE completion (8/8 core done). Full phase detail in `.planning/ROADMAP.md` → "## v2.9 Workflow Studio".
 
 ## Project Reference
 
@@ -292,18 +292,7 @@ _Historical (Phase 101 per-plan execution detail below — all code-complete + 1
 The adversarial code review (`101-REVIEW.md`, 1 critical + 4 warnings) found the render_template feature was NON-FUNCTIONAL end-to-end + carried a command-injection. All 5 fixed atomically (each its own `fix(101-06): ...` commit), happy-path + visibility tests added (the gap that let WR-01/WR-02 ship green), seed fixture re-run live.
 
 - **WR-01 (BLOCKER, commit `6c5424d2`):** render_template had NO tool schema, so the model never saw the tool. Added `RENDER_TEMPLATE_TOOL` (`openai_service.py`, built from `build_field_map_tool_schema([])` — Pitfall 4 safe) + `_phase_tools_override` helper (`phase_types.py`) that augments the per-phase `tools_override` candidate list with the schema ONLY when the fill phase whitelists `render_template`, BEFORE `apply_tool_budget`. Wired into `_exec_llm_agent` + `_exec_llm_batch_agents`. **Deep byte-identical: `get_tools()` body UNCHANGED (not in diff); `render_template` ABSENT from its return** (verified programmatically + by test). Corrected the misleading `_effective_tools` docstring (the two-layer mechanism: layer-1 = schemas the model sees via apply_tool_budget; layer-2 = the dispatch backstop).
-- **CR-01 (SECURITY, commit `1cd8fb21`):** model-controlled, prompt-injectable `out_filename` was interpolated unquoted into the sandbox shell command. Added `_safe_out_filename` (strict `^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)# Project State
-
-> `total_phases: 8` = the CORE committed scope (Phases 097–104, incl. the spike). STRETCH Phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01) are optional and excluded from the progress denominator until promoted. Full phase detail in `.planning/ROADMAP.md` → "## v2.9 Workflow Studio".
-
-## Project Reference
-
-See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
-
-**Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase --phase — 101.1
-
- allow-list → safe default `deliverable.<ext>` on reject), built the command argv-safely with `shlex.quote` per token, whitelisted the engine token (`_VALID_RENDER_ENGINES`).
+- **CR-01 (SECURITY, commit `1cd8fb21`):** model-controlled, prompt-injectable `out_filename` was interpolated unquoted into the sandbox shell command. Added `_safe_out_filename` (strict `^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)$` allow-list → safe default `deliverable.<ext>` on reject), built the command argv-safely with `shlex.quote` per token, whitelisted the engine token (`_VALID_RENDER_ENGINES`).
 
 - **WR-02 (BLOCKER, commit `1cd8fb21`):** every render passing both gates failed to persist — `ws_write_file(path=out_filename)` with a bare basename hit `validate_path`'s leading-slash requirement → silent `persist_failed`. Normalize to `ws_path = "/" + out_filename` (after the CR-01 basename validation); harvest still keys on the bare basename.
 - **WR-03 (correctness, commit `037280e5`):** the integrity gate ignored `residual_clean`, shipping silent half-fills. Folded `residual_clean` into the gate (`.get(..., True)` back-compat default); a residual-only fail returns `reason=residual_tokens` + surfaces `residual_tags` for the harness retry loop.

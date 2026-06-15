@@ -41,7 +41,7 @@
 
 **CORE (committed — 097–104):**
 
-- [ ] **Phase 097: Spike — Risk-Register Template-Fill + Authoring Feel** - De-risk the milestone end-to-end on one provider; answer the 4 schema-shaping unknowns before any schema locks (SEED-051)
+- [x] **Phase 097: Spike — Risk-Register Template-Fill + Authoring Feel** ✓ COMPLETE (2026-06-08) - De-risk the milestone end-to-end on one provider; answer the 4 schema-shaping unknowns before any schema locks (SEED-051)
 - [x] **Phase 098: Project Binding + Server-Side KB Scope Governance** ✓ COMPLETE (2026-06-10) - Bind a workflow to a project (folder + subtree); resolve retrieval scope server-side so the model cannot widen it
 - [x] **Phase 099: Workflow ↔ Skill Composition** ✓ COMPLETE (2026-06-10) - A phase can pull a project skill's judgment via `skill_ref` with a version snapshot; Deep path byte-identical
 - [x] **Phase 100: Ephemeral Template Upload** ✓ COMPLETE (2026-06-10) - Upload a docx/pptx/xlsx for one run, workspace-only, TTL + sweep, never ingested, never in search
@@ -296,9 +296,9 @@ Plans:
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
-| 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
-| 101.1. Guaranteed Structured Emission Layer | 6/10 (build 01-05 + gap 06 done; gap-closure 07-10 planned from the live UAT) | Executing (gap closure) | - |
-| 102. Reusable Validation-Gate Library + Output-Quality Gate | 4/5 | Executing (2026-06-12) | - |
+| 101. Template-Fill + Integrity Validation | 5/5 | Complete (via 101.1) | 2026-06-12 |
+| 101.1. Guaranteed Structured Emission Layer | 10/10 | Complete (verify-work 19/19 + secure 36/36) | 2026-06-12 |
+| 102. Reusable Validation-Gate Library + Output-Quality Gate | 9/9 | Complete (verify-work 7/7 + secure 34/34) | 2026-06-13 |
 | 103. Workflows Page + Authoring API + NL Authoring | 6/6 | Complete    | 2026-06-14 |
 | 104. PM Flagship Content Pack | 3/3 | Complete    | 2026-06-15 |
 | 105. Scheduled/Recurring Triggers + Budget Caps (STRETCH) | 0/TBD | Not started | - |
