@@ -23,6 +23,14 @@
 - [ ] **META-04**: Metadata extraction reads beyond the first 3,000 characters (configurable/larger window or title-page + tail sampling) so late title-page/byline data isn't missed.
 - [ ] **META-05**: User can manually edit/override an extracted metadata value, audit-logged.
 
+### Configurable / Multi-Provider Embeddings (EMBED) — retires the OpenAI embedding SPOF (SEED-048)
+- [ ] **EMBED-01**: Admin can select the embedding provider (OpenAI / Google / local Ollama / local LM Studio / other OpenAI-compatible `/v1/embeddings`) from Settings — embeddings are no longer effectively OpenAI-only.
+- [ ] **EMBED-02**: Selecting a local provider auto-fills its base_url (Ollama `http://localhost:11434/v1`, LM Studio `http://localhost:1234/v1`) and relaxes the API key to a dummy value.
+- [ ] **EMBED-03**: The existing embedding model / dimensions / base_url / key remain as advanced overrides, with a provider→default-model→default-dimensions auto-fill map.
+- [ ] **EMBED-04**: Chunk-embedding and query-embedding use the SAME configured model + credentials (fix `embed_chunks` dropping `user_settings`) so a configured non-default embedder never embeds queries and chunks in mismatched vector spaces.
+- [ ] **EMBED-05**: Changing the embedding model/dimension triggers a guarded, RLS-scoped re-embed of existing chunks (wire `resize_embedding_column` + a batched re-embed background job from preserved `content`); search recovers afterward.
+- [ ] **EMBED-06**: A destructive-change confirmation names the re-embed (and its cost) before any embedding model/dimension change commits.
+
 ### Metadata-Driven Views / "Virtual Folders" (VIEW)
 - [ ] **VIEW-01**: User can save a metadata filter as a named view that appears in the sidebar like a folder.
 - [ ] **VIEW-02**: A view's contents are live; one document can appear in multiple views with no duplication.
@@ -70,7 +78,7 @@
 
 ## Traceability
 
-Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing past v2.9 CORE phase 104, skipping the deferred-STRETCH labels 105-109). Each functional requirement maps to exactly one phase. UX-01/UX-02 are cross-cutting acceptance criteria attached to every UI-bearing phase (112, 114, 117, 118, 119) — not owned by a single phase.
+Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing past v2.9 CORE phase 104, skipping the deferred-STRETCH labels 105-109). Each functional requirement maps to exactly one phase. UX-01/UX-02 are cross-cutting acceptance criteria attached to every UI-bearing phase (111.1, 112, 114, 117, 118, 119) — not owned by a single phase. (Phase 111.1 was INSERTED 2026-06-15 — embedding-provider flexibility; its Settings UI carries UX-01, and G-2 sketch applies.)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -80,6 +88,12 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | META-01 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
 | META-03 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
 | META-04 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
+| EMBED-01 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
+| EMBED-02 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
+| EMBED-03 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
+| EMBED-04 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
+| EMBED-05 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
+| EMBED-06 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
 | META-02 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
 | META-05 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
 | VIEW-01 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |

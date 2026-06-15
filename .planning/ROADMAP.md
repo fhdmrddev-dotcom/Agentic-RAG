@@ -33,6 +33,7 @@
 
 - [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ COMPLETE 2026-06-15 (2/2 plans; live-verified on :54322; gsd-verifier 7/7 PASSED; code review 0C/0W/3I — secure-phase pending)
 - [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
+- [ ] **Phase 111.1: Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)** — Embedding-provider picker + local presets + re-embed-on-change lifecycle; retires the OpenAI embedding SPOF (SEED-048). **(INSERTED · G-2 sketch)**
 - [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
 - [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
 - [ ] **Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar** — Typed/indexed date columns + relative-date operators; the view/filter builder UI; sidebar render-as-folder. **(G-2 sketch)**
@@ -74,6 +75,20 @@
   - [ ] 111-04-PLAN.md — `ingest_document` wiring: hoist load_app_settings + enriched/legacy branch + `asyncio.run` call site + `_confidence` attach + graceful degradation (META-01/03/04)
   - [ ] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03)
 **UI hint**: no
+
+#### Phase 111.1: Configurable / Multi-Provider Embeddings — incl. local Ollama + LM Studio (INSERTED)
+**Goal**: Make the embedding model a first-class, provider-pickable setting — including local Ollama/LM Studio — with a safe re-embed-on-change lifecycle, retiring the OpenAI embedding SPOF (SEED-048). Reuses Phase 111's `lmstudio` provider plumbing + admin-DB-setting pattern; lands before the DM read-path phases (113-119) that depend on retrieval quality. (Correction from a 5-agent investigation: embeddings are NOT OpenAI-hardwired today — `embedding_model`/`embedding_base_url`/`embedding_api_key`/`embedding_dimensions` are already configurable Settings with UI controls at `SettingsPage.tsx:934-950`; what's missing is a provider PICKER + local presets + the re-embed LIFECYCLE, plus a latent credential bug.)
+**Depends on**: Phase 111
+**Requirements**: EMBED-01, EMBED-02, EMBED-03, EMBED-04, EMBED-05, EMBED-06
+**Success Criteria** (what must be TRUE):
+  1. An admin can pick an embedding provider (incl. Ollama + LM Studio local) from Settings; selecting a local provider auto-fills its base_url (Ollama `http://localhost:11434/v1`, LM Studio `http://localhost:1234/v1`) + relaxes the API key to a dummy (EMBED-01/02), modeled on the existing rerank-provider `<select>` (`SettingsPage.tsx:959-967`).
+  2. Chunk-embedding and query-embedding use the SAME configured model + creds — the `embed_chunks` credential bug (drops `user_settings`; `embedding_service.py:94` / `documents.py:1405`) is fixed so a configured non-default embedder no longer embeds queries and chunks in mismatched vector spaces (EMBED-04; proven by a live cross-embedder ingest+search test).
+  3. Changing the embedding model/dimension triggers a guarded, RLS-scoped re-embed of existing chunks — `resize_embedding_column(N)` (`full-schema.sql:173-191`, currently never called) wired + a net-new batched re-embed background job over `document_chunks WHERE embedding IS NULL` (from preserved `content`); search recovers; a destructive-change UI confirmation names the re-embed first (EMBED-05/06). No silent vector-space mismatch.
+  4. **SC#10-style live UAT**: a local (LM Studio/Ollama) embedding model embeds + serves search; an OpenAI→local switch re-embeds and search still returns relevant cited results; search-threshold recalibration noted (confidence buckets `0.54/0.38` at `agent_loop.py:664-682` + `retrieval_match_threshold` 0.3 are calibrated for text-embedding-3-small and are NOT portable).
+**Design driver (the dimension-mismatch problem)**: `document_chunks.embedding` is a fixed `vector(1536)` column (`full-schema.sql:394`) + HNSW index with NO per-chunk record of which model produced a vector. **v1 = GLOBAL single embedding model + re-embed-on-change** (matches the single-column design). Optional: standardize one target dimension (1024) via Matryoshka truncation (pass `embedding_dimensions` into `embeddings.create(dimensions=…)` — a 1-line change at `openai_service.py:1473`, currently NOT passed) so truncation-capable providers coexist; add per-chunk `embedding_model`/`dimensions` tagging as a cross-space-search safety net. Per-folder embedding sets = OUT OF SCOPE (schema redesign). Realistic provider boundary = "any OpenAI-compatible `/v1/embeddings`" (OpenAI/Google/Jina/Mistral/Cohere/Ollama/LM Studio = zero new client code; Voyage + int8/binary = native-SDK, defer).
+**Plans**: TBD
+**UI hint**: yes
+**G-2**: /gsd:sketch (operator-approved mockup of the Settings embedding-provider picker + local presets + the destructive re-embed confirmation) BEFORE plan.
 
 #### Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit
 **Goal**: Give users a first-class place to SEE enriched metadata with per-field confidence and to correct it — establishing the net-new document detail panel that relationships (117) and classification (118) will also inhabit.
