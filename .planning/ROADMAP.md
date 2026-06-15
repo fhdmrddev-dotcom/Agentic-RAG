@@ -55,7 +55,7 @@
   4. A real audit row for each new action type INSERTs and SELECTs back **against the live DB** (verified live, not mocked — the D-102 "static would false-green" lesson).
   5. A single DM capability flag (`app_settings`, default **on**) gates the new DM surfaces + tools so the whole capability can be cleanly toggled off; defaults on so v3.0 behavior is unchanged when unset. This is the feature-independence seam a future tier/entitlement system (SEED-080, v3.2) plugs into — no enforcement built here.
 **Plans**: 2 plans
-  - [ ] 110-01-PLAN.md — Author migration 071 (4 RLS tables + audit enum 11->19 + DM capability flag) + frozenset/boot-guard sync + flag read chain + 6 Wave-0 tests
+  - [x] 110-01-PLAN.md — Author migration 071 (4 RLS tables + audit enum 11->19 + DM capability flag) + frozenset/boot-guard sync + flag read chain + 6 Wave-0 tests ✅ EXECUTED 2026-06-15 (4 commits; migration un-applied — Plan 02 applies + verifies live; DMF-01/02/03 stay Pending until phase verification)
   - [ ] 110-02-PLAN.md — [BLOCKING] operator applies migration 071 + regen full-schema.sql + 4 live verification tests GREEN (SC#1-5)
 
 #### Phase 111: Metadata Enrichment — Extraction Backend
