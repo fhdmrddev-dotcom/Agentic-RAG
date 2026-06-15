@@ -21,10 +21,6 @@ BUILT_INS = {"title", "author", "date", "document_type", "topics", "language", "
 FIELD_TYPE_VOCAB = {"string", "date", "number", "boolean", "enum"}
 
 
-@pytest.mark.xfail(
-    reason="build_metadata_model not built until Plan 02/03 (META-01)",
-    strict=False,
-)
 def test_custom_fields_in_schema():
     """A dynamic model built from an enabled custom field carries the 7
     built-ins + the custom field + the confidence map."""
@@ -41,10 +37,6 @@ def test_custom_fields_in_schema():
     assert "confidence" in fields, "confidence map field absent from dynamic model"
 
 
-@pytest.mark.xfail(
-    reason="build_metadata_model field_type vocabulary not built until Plan 02/03 (META-01)",
-    strict=False,
-)
 def test_field_type_vocabulary():
     """An unknown field_type is rejected by the closed Literal vocabulary;
     an enum field with options yields the options as Literal members."""

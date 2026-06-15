@@ -12,15 +12,9 @@ RED convention: `sample_for_extraction` is built in Plan 02 (META-04). Import
 inside each body; xfail until it lands.
 """
 
-import pytest
-
 ELISION = "[...document body elided for metadata extraction...]"
 
 
-@pytest.mark.xfail(
-    reason="sample_for_extraction not built until Plan 02 (META-04)",
-    strict=False,
-)
 def test_full_text_returned_when_under_cap():
     from app.services.embedding_service import sample_for_extraction
 
@@ -30,10 +24,6 @@ def test_full_text_returned_when_under_cap():
     assert ELISION not in out, "no elision when under cap"
 
 
-@pytest.mark.xfail(
-    reason="sample_for_extraction not built until Plan 02 (META-04)",
-    strict=False,
-)
 def test_head_and_tail_when_over_cap():
     from app.services.embedding_service import sample_for_extraction
 

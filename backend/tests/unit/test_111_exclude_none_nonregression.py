@@ -10,7 +10,6 @@ The exclude_none behavior is real today on a plain BaseModel, so the design
 proof runs green now; the dynamic-model variant xfails until Plan 02/03.
 """
 
-import pytest
 from pydantic import BaseModel
 
 
@@ -31,10 +30,6 @@ def test_plain_model_drops_none_keeps_flat():
     assert dumped.get("author", "__MISSING__") == "__MISSING__"
 
 
-@pytest.mark.xfail(
-    reason="build_metadata_model not built until Plan 02/03 (D-111-9)",
-    strict=False,
-)
 def test_dynamic_model_drops_none_author():
     """Build the dynamic model with author=None; exclude_none drops it; flat
     fields stay top-level."""

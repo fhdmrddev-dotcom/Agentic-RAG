@@ -1,10 +1,28 @@
 import logging
+from typing import Literal
+
+from pydantic import BaseModel, Field, create_model
 
 from app.config import settings
 from app.models.document import DocumentMetadata
 from app.services.openai_service import embed_texts, get_llm_client
 
 logger = logging.getLogger(__name__)
+
+# Phase 111 (META-01/03/04) — the cross-provider metadata-enrichment engine.
+#
+# field_type → (python type, default). The vocabulary is CLOSED (D-111-5): an
+# unknown field_type is REJECTED, not silently coerced (the RED contract in
+# test_111_dynamic_model.test_field_type_vocabulary). `enum` is handled
+# separately because it carries `options` and becomes a Literal[...].
+_FIELD_TYPE_MAP: dict[str, tuple] = {
+    "string": (str | None, None),
+    "date": (str | None, None),  # ISO string; do NOT lowercase/typecast (typed cols are 113/114)
+    "number": (float | None, None),
+    "boolean": (bool | None, None),
+}
+# The closed field_type vocabulary the builder accepts (mirrors migration 071/072).
+_FIELD_TYPE_VOCAB = set(_FIELD_TYPE_MAP) | {"enum"}
 
 
 def chunk_text(text: str, chunk_size: int | None = None, overlap: int | None = None) -> list[str]:
@@ -135,3 +153,123 @@ def extract_metadata(content: str, model: str | None = None) -> DocumentMetadata
         # Metadata extraction is best-effort — never block ingestion
         logger.warning("Metadata extraction failed: %s", e, exc_info=True)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 111 — enrichment engine (additive; legacy extract_metadata above is the
+# `legacy` reversibility path and is NEVER touched by anything below).
+# ---------------------------------------------------------------------------
+
+
+def build_metadata_model(custom_defs: list[dict]) -> type[BaseModel]:
+    """Build a runtime Pydantic model = the 7 immutable built-ins + enabled custom
+    fields + a per-field `confidence` map (META-01 / D-111-3/5; RESEARCH Pattern 2).
+
+    The 7 built-ins mirror ``models/document.py`` (always-on, immutable). Each custom
+    def is ``{"field_key", "field_type", ...}``; ``enum`` additionally carries
+    ``options`` and becomes ``Literal[*options] | None``. The ``field_type``
+    vocabulary is CLOSED — an unknown type raises ``ValueError`` (the closed-vocab
+    contract, D-111-5), never a silent str fallback.
+
+    A1 (BLOCKING): the confidence carrier is named ``confidence`` with NO leading
+    underscore — a ``_confidence``-named field would be a Pydantic-2 PRIVATE attr,
+    silently excluded from ``model_dump``. It defaults to ``{}`` (a populated dict is
+    never ``None``, so it survives ``model_dump(exclude_none=True)``). The post-dump
+    rename into the nested ``_confidence`` containment key is :func:`attach_confidence`.
+    """
+    fields: dict = {
+        "title": (str | None, None),
+        "author": (str | None, None),
+        "date": (str | None, None),
+        "document_type": (str | None, None),
+        "topics": (list[str] | None, None),
+        "language": (str | None, None),
+        "summary": (str | None, None),
+    }
+    for d in custom_defs:
+        key, ftype = d["field_key"], d["field_type"]
+        if ftype not in _FIELD_TYPE_VOCAB:
+            # Closed vocabulary — reject unknown types (D-111-5). The DB column is
+            # free-text, so the app is the only gate; a silent str fallback would let
+            # a typo'd field_type ship a wrong-typed field.
+            raise ValueError(
+                f"unknown field_type {ftype!r} for field {key!r}; "
+                f"allowed: {sorted(_FIELD_TYPE_VOCAB)}"
+            )
+        if ftype == "enum" and d.get("options"):
+            fields[key] = (Literal[tuple(d["options"])] | None, None)  # type: ignore[valid-type]
+        elif ftype == "enum":
+            # enum with no options carries no allowed members — degrade to free string.
+            fields[key] = (str | None, None)
+        else:
+            fields[key] = _FIELD_TYPE_MAP[ftype]
+    # A1: public `confidence` (no underscore), populated-dict default so it survives
+    # exclude_none; renamed to `_confidence` by attach_confidence after the dump.
+    fields["confidence"] = (dict[str, float], Field(default_factory=dict))
+    return create_model("DynamicDocumentMetadata", **fields)
+
+
+def attach_confidence(dumped: dict) -> dict:
+    """Rename the public ``confidence`` map into the nested ``_confidence`` containment
+    key on a dumped metadata dict (the A1 post-dump step; D-111-3).
+
+    ``confidence`` rides as a public model field (so it survives
+    ``model_dump(exclude_none=True)``); the stored JSONB shape uses ``_confidence`` so
+    it is a DISPLAY-ONLY nested key, NEVER a flat metadata_filter dimension (D-111-3/9).
+    A missing/empty ``confidence`` is dropped silently (no empty ``_confidence`` key).
+    """
+    out = dict(dumped)
+    conf = out.pop("confidence", None)
+    if conf:
+        out["_confidence"] = conf
+    return out
+
+
+def sample_for_extraction(text: str, cap: int) -> str:
+    """Head(70%)+tail(30%) extraction window with an elision marker (META-04 / D-111-4;
+    RESEARCH Q7). Replaces the hardwired ``content[:3000]`` so late title/byline/date
+    data past the head survives.
+
+    ``len(text) <= cap`` returns the full text (stripped). Over cap returns
+    ``head(0.7*cap) + elision marker + tail(0.3*cap)`` — truncate-then-degrade, never
+    fail. The second arg is named ``cap`` to match the Wave-0 RED test keyword
+    (``sample_for_extraction(text, cap=...)``); Plan 04 calls it positionally.
+    """
+    if len(text) <= cap:
+        return text.strip()
+    head = text[: int(cap * 0.7)]
+    tail = text[-int(cap * 0.3):]
+    return (
+        head
+        + "\n\n[...document body elided for metadata extraction...]\n\n"
+        + tail
+    ).strip()
+
+
+def read_enabled_field_defs(supabase, doc_owner_uid: str) -> list[dict]:
+    """Read the owner+global ENABLED custom field defs under service-role, EXPLICITLY
+    scoped + fail-closed (D-111-6 / the 110 SECURITY lesson; RESEARCH Pattern 4).
+
+    A BackgroundTask carries no request JWT → ``auth.uid()`` is NULL → the service-role
+    client BYPASSES RLS. So the app MUST scope by hand: an explicit
+    ``.or_(user_id.eq.{owner},is_global.eq.true)`` predicate pushed to the DB plus a
+    Python-side fail-closed filter ``(own or is_global)``. On a query exception return
+    ``[]`` (built-ins only) — NEVER a bare full-table read.
+    """
+    try:
+        rows = (
+            supabase.table("metadata_field_definitions")
+            .select("id,field_key,field_type,description,is_global,user_id,enabled,options")
+            .or_(f"user_id.eq.{doc_owner_uid},is_global.eq.true")
+            .execute()
+            .data
+        ) or []
+    except Exception:  # noqa: BLE001 — a scoped read miss must FAIL CLOSED, never widen scope.
+        logger.warning("field-def read failed; extracting built-ins only", exc_info=True)
+        return []
+    return [
+        r
+        for r in rows
+        if r.get("enabled")
+        and (str(r.get("user_id")) == str(doc_owner_uid) or r.get("is_global"))
+    ]

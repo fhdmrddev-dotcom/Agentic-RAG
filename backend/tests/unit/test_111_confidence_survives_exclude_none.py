@@ -19,7 +19,6 @@ inside the body, xfail the not-yet-built assertions. The DESIGN assertions
 prove the naming choice is correct regardless of the builder.
 """
 
-import pytest
 from pydantic import BaseModel
 
 
@@ -54,10 +53,6 @@ def test_underscore_named_field_is_a_private_attr_and_excluded():
     )
 
 
-@pytest.mark.xfail(
-    reason="build_metadata_model not built until Plan 02/03 (A1 attach step)",
-    strict=False,
-)
 def test_confidence_survives_exclude_none_and_attaches():
     """Build the dynamic model with confidence={"title":0.9}; assert the public
     `confidence` field survives exclude_none, then the documented post-dump
