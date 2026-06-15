@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-15T18:19:32.560Z"
-last_activity: 2026-06-15 — Phase 111 EXECUTING — 111-01 (Wave 1 substrate) done; Wave 2 (111-02 engine + 111-03 CRUD) next
+last_updated: "2026-06-15T18:55:00.000Z"
+last_activity: 2026-06-15 — Phase 111 EXECUTING — Waves 1+2 done (111-01/02/03); Wave 3 (111-04 ingest wiring) next
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 7
-  completed_plans: 3
-  percent: 43
+  completed_plans: 5
+  percent: 71
 ---
 
 # Project State
@@ -26,14 +26,16 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 111 — Metadata Enrichment (Extraction Backend) — **🔨 EXECUTING (1/5 plans)** — **v3.0 Document Management** (META-01/03/04)
-Plan: 2 of 5 (Wave 2 next: 111-02 engine + 111-03 CRUD)
-Status: **Phase 111 EXECUTING — sequential-on-main-tree** (worktrees overridden OFF: `backend/venv` is gitignored → worktree-isolated pytest verification is impossible; the Wave-4 checkpoint applies migration 072 to live :54322). **Orchestrator owns STATE.md/ROADMAP.md writes** — the documented STATE.md balloon-bug recurred at 111-01 (STATE re-stamped 512→23,201 lines, committed in `ae44a1c1`; repaired by restoring the clean `c6791c40` base + re-applying this entry); remaining executors are instructed NOT to touch STATE/ROADMAP. 111-01 (Wave 1) done. **NEXT = execute Wave 2 (111-02 engine, 111-03 CRUD).**
+Phase: 111 — Metadata Enrichment (Extraction Backend) — **🔨 EXECUTING (3/5 plans)** — **v3.0 Document Management** (META-01/03/04)
+Plan: 4 of 5 (Wave 3 next: 111-04 ingest wiring)
+Status: **Phase 111 EXECUTING — sequential-on-main-tree** (worktrees overridden OFF: `backend/venv` is gitignored → worktree-isolated pytest verification is impossible; the Wave-4 checkpoint applies migration 072 to live :54322). **Orchestrator owns STATE.md/ROADMAP.md writes** — the documented STATE.md balloon-bug recurred at 111-01 (STATE re-stamped 512→23,201 lines; repaired by restoring the clean `c6791c40` base; remaining executors instructed NOT to touch STATE/ROADMAP). Waves 1+2 done (111-01 substrate, 111-02 engine, 111-03 CRUD). **NEXT = execute Wave 3 (111-04 — wire the engine into `ingest_document`), then Wave 4 (111-05 BLOCKING checkpoint: apply migration 072 to live :54322 + regen full-schema.sql).**
 Resume file: None
-Last activity: 2026-06-15 — Phase 111 EXECUTING — 111-01 done; Wave 2 next
+Last activity: 2026-06-15 — Phase 111 EXECUTING — Waves 1+2 done; Wave 3 next
 
-**Phase 111 (Metadata Enrichment — Extraction Backend) — EXECUTING (1/5 plans):**
+**Phase 111 (Metadata Enrichment — Extraction Backend) — EXECUTING (3/5 plans):**
 
+- **111-03 (Wave 2, META-01) — EXECUTED 2026-06-15** (2 tasks / 2 commits — `20ce5eaa` MetadataField models + V5 validators, `e9021e37` `/metadata-fields` CRUD router + service + audit mounted in main.py): the custom-field authoring surface. New `metadata_field_service.py` hard-sets `user_id=caller` + `is_global=false` server-side (RLS-safe), validates `field_type` against a closed vocabulary + `field_key` against regex + reserved-key blocklist, writes a `metadata.field.create` audit row, 409-on-duplicate own-scoped pre-check. Service takes an injectable `supabase` client (clean DI mirroring `write_audit_entry`). **34/34 GREEN live against :54322** (29 unit + 3 CRUD + 2 audit). Net-new failures = 0 (only `main.py` additively touched; the 3 `test_lifespan.py` failures reproduce at base). `options` jsonb omitted from insert until Plan 05 applies migration 072. SUMMARY: `111-03-SUMMARY.md` (Self-Check: PASSED).
+- **111-02 (Wave 2, META-01/03/04) — EXECUTED 2026-06-15** (2 tasks / 2 commits — `f7ff0a65` dynamic-model builder + window sampler + scoped field-def reader, `48982da3` `extract_metadata_enriched` forced_emit caller + degrade layer 1): the cross-provider enrichment engine — the only genuinely net-new service code. `build_metadata_model` (runtime Pydantic `create_model`; raises ValueError on unknown field_type), `sample_for_extraction(text, cap)` (full text under cap, head+tail over cap), explicit user-scoped `read_enabled_field_defs`, `attach_confidence`, async `extract_metadata_enriched` riding `forced_emit`. **PURELY ADDITIVE to `embedding_service.py`** — legacy `extract_metadata` (OpenAI json_object) byte-identical as the `legacy` reversibility path. 7 GREEN flipped; full `test_111_*` set 11 passed / 0 failures. Net-new failures = 0. SUMMARY: `111-02-SUMMARY.md` (Self-Check: PASSED).
 - **111-01 (Wave 1, META-03) — EXECUTED 2026-06-15** (3 tasks / 3 commits — `11c453ef` 11 Wave-0 test scaffolds, `c17a9662` migration 072 file, `bf7f34e3` lmstudio provider + 3 settings fields): landed the Phase 111 substrate. 11 RED/xfail `test_111_*` scaffolds (6 unit + 5 integration, matching VALIDATION.md filenames; xfail(strict=False) so the suite exits 0; the BLOCKING A1 confidence-survives-exclude_none test encodes the no-underscore design — public `confidence` survives `model_dump(exclude_none=True)`). Migration `072_app_settings_extraction_model.sql` (un-applied, idempotent): `app_settings.extraction_model`/`extraction_window_cap`(32000)/`metadata_enrichment_mode`('enriched') + `metadata_field_definitions.options` jsonb — FILE only, full-schema.sql untouched, Plan 05 crosses it live. First-class `lmstudio` provider in config.py (no `/v1` double-append, dummy `lm-studio` key, NOT in `_NATIVE_TOOL_PROVIDERS` → TIER-COERCE-safe local default). 3 `UserEffectiveSettings` fields read via `_build_settings_from_row` (env_attr=None, app_settings-only, absent from `SettingsUpdate`). Net-new test failures = **0** (SEED-056: base unit 59 failed/806 passed → with-plan 59 failed/810 passed; +4 = new GREEN test_111 tests). Decisions: D-111-7 lmstudio no /v1 double-append; D-111-2 the 3 settings DB-only (no UI). SUMMARY: `.planning/phases/111-metadata-enrichment-extraction-backend/111-01-SUMMARY.md` (Self-Check: PASSED).
 
 **Phase 110 (DM Foundations substrate) — EXECUTED 2026-06-15 (2/2 plans):**

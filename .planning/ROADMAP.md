@@ -70,8 +70,8 @@
   4. **SC#10 4-axis UAT**: dynamic-schema structured extraction is verified across the native-7 (cross-provider) — extraction succeeds and returns valid confidence-scored fields on each provider; long-doc (≥ 5 KB) window-lift sampling exercised; rows authored in VALIDATION.md.
 **Plans**: 5 plans
   - [x] 111-01-PLAN.md — Wave-0 test scaffolds + migration 072 file (un-applied) + first-class `lmstudio` provider + 3 app_settings-backed settings fields (META-03 foundation) — EXECUTED 2026-06-15 (3 tasks / 3 commits; net-new failures 0)
-  - [ ] 111-02-PLAN.md — The enrichment engine: `build_metadata_model` + `sample_for_extraction` + explicit-scoped `read_enabled_field_defs` + async `extract_metadata_enriched` (forced_emit caller) (META-01/03/04)
-  - [ ] 111-03-PLAN.md — `/metadata-fields` CRUD router + Pydantic models (field_type Literal + field_key validators) + `metadata.field.create` audit, mounted in main.py (META-01)
+  - [x] 111-02-PLAN.md — The enrichment engine: `build_metadata_model` + `sample_for_extraction` + explicit-scoped `read_enabled_field_defs` + async `extract_metadata_enriched` (forced_emit caller) (META-01/03/04) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 7 GREEN flipped; net-new failures 0)
+  - [x] 111-03-PLAN.md — `/metadata-fields` CRUD router + Pydantic models (field_type Literal + field_key validators) + `metadata.field.create` audit, mounted in main.py (META-01) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 34/34 GREEN live; net-new failures 0)
   - [ ] 111-04-PLAN.md — `ingest_document` wiring: hoist load_app_settings + enriched/legacy branch + `asyncio.run` call site + `_confidence` attach + graceful degradation (META-01/03/04)
   - [ ] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03)
 **UI hint**: no
