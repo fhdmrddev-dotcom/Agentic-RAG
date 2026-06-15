@@ -133,6 +133,9 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
+    document_management_enabled: bool = True
+
     # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
@@ -472,6 +475,10 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         sandbox_enabled=_val_bool(row, "sandbox_enabled", "sandbox_enabled", True),
 
+        # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
+        document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
+
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
 
@@ -566,6 +573,20 @@ def tool_args_progress_emit_boundary_bytes() -> int:
     if value is None or value <= 0:
         return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
     return int(value)
+
+
+def document_management_enabled() -> bool:
+    """Phase 110 DMF-03 — master DM capability gate. Defensive: True on any read failure
+    (a settings-read failure must NOT hide DM surfaces — default-on, D-110-2).
+
+    Note the polarity flip vs tool_args_progress_emit_boundary_bytes(): that helper
+    falls back to a fixed VALUE; this one MUST fall back to True (default-ON). F8 trap:
+    returning False here would silently hide DM despite the default-on guarantee.
+    """
+    try:
+        return load_app_settings().document_management_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-on on cold cache / DB read failure
+        return True
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:
