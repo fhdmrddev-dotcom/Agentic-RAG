@@ -161,6 +161,19 @@ def extract_metadata(content: str, model: str | None = None) -> DocumentMetadata
 # ---------------------------------------------------------------------------
 
 
+def resolve_extraction_model(extraction_model: str | None) -> str:
+    """Resolve the effective metadata-extraction model (META-03).
+
+    ``app_settings.extraction_model`` wins when set; an unset/empty value falls
+    back to the env ``settings.llm_model`` (gpt-4o default) — NOT to a
+    (nonexistent) ``app_settings.llm_model``. This un-pins extraction off the
+    hardwired gpt-4o while keeping the env default as the safe fallback.
+    """
+    from app.config import settings  # function-local (Pitfall 4 import discipline)
+
+    return (extraction_model or "").strip() or settings.llm_model
+
+
 def build_metadata_model(custom_defs: list[dict]) -> type[BaseModel]:
     """Build a runtime Pydantic model = the 7 immutable built-ins + enabled custom
     fields + a per-field `confidence` map (META-01 / D-111-3/5; RESEARCH Pattern 2).

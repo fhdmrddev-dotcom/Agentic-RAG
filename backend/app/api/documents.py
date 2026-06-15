@@ -1363,11 +1363,77 @@ def ingest_document(
         # status='processing' gates UI visibility; ingestion_step provides the label.
         supabase.table("documents").update({"ingestion_step": "extracting"}).eq("id", document_id).execute()
 
+        # Phase 111 (META-01/03/04) — read effective settings ONCE, BEFORE the
+        # metadata extract branch, so extraction_model / window_cap / enrichment_mode
+        # are in scope. load_app_settings() is sync/cache-only and already used at
+        # the embedding step below — this is the sync BackgroundTask, not an async
+        # handler, so D-v2.5-01 does NOT fire (it's hoisted, not newly introduced).
+        app_settings = load_app_settings()
+
         # Extract metadata FIRST so we can use it to enrich chunk embeddings.
         # This is best-effort — failures are logged but never block ingestion.
-        metadata = extract_metadata(text)
-        metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
-        # Normalize case-sensitive filter fields for consistent retrieval
+        #
+        # Phase 111 (D-111-2/8) — branch on metadata_enrichment_mode:
+        #   - 'enriched' (default; any non-'legacy' value fails safe to enriched):
+        #       cross-provider forced_emit through extract_metadata_enriched, with a
+        #       runtime create_model schema (built-ins + user custom fields), a
+        #       head+tail window sample (NOT content[:3000]), and a nested per-field
+        #       `_confidence` map attached AFTER the dump.
+        #   - 'legacy': the untouched OpenAI json_object extract_metadata path runs
+        #       byte-identical (the reversibility path).
+        # Three graceful-degradation layers are preserved: (1) extract_metadata_enriched's
+        # own except→None [Plan 02], (2) the call-site except below → emitted=None, and
+        # (3) the outer try/except backstop at the function bottom. A None metadata_dict
+        # is fine — the doc still reaches status=completed and flat `@>` filters still match.
+        mode = app_settings.metadata_enrichment_mode
+        if mode != "legacy":  # default-on 'enriched'; any non-'legacy' value fails safe to enriched
+            from app.config import get_model_capability  # noqa: PLC0415
+            from app.services.embedding_service import (  # noqa: PLC0415
+                build_metadata_model,
+                extract_metadata_enriched,
+                read_enabled_field_defs,
+                resolve_extraction_model,
+                sample_for_extraction,
+            )
+
+            model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
+            provider = (get_model_capability(model) or {}).get("provider")
+            defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
+            DynModel = build_metadata_model(defs)
+            emit_tool = {
+                "type": "function",
+                "function": {
+                    "name": "emit_document_metadata",
+                    "description": (
+                        "Emit structured metadata for this document with a per-field "
+                        "0-1 confidence."
+                    ),
+                    "parameters": DynModel.model_json_schema(),
+                },
+            }
+            sampled = sample_for_extraction(text, app_settings.extraction_window_cap)
+            try:
+                result = asyncio.run(extract_metadata_enriched(
+                    sampled=sampled,
+                    model=model,
+                    provider=provider,
+                    schema_model=DynModel,
+                    emit_tool=emit_tool,
+                    user_settings=app_settings,
+                ))
+                emitted = result.get("emitted")
+            except Exception:  # noqa: BLE001 — degrade layer 2 at the call site; doc still completes (D-111-8)
+                log.warning("enriched metadata extraction failed; degrading to None", exc_info=True)
+                emitted = None
+            metadata_dict = emitted.model_dump(exclude_none=True) if emitted else None
+            if metadata_dict is not None and getattr(emitted, "confidence", None):
+                metadata_dict["_confidence"] = emitted.confidence  # attach AFTER dump (Pitfall 2)
+        else:
+            metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
+            metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+        # Normalize case-sensitive filter fields for consistent retrieval.
+        # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
+        # is NEVER touched here, and is NEVER promoted to a flat filter field.
         if metadata_dict:
             if metadata_dict.get("document_type"):
                 metadata_dict["document_type"] = metadata_dict["document_type"].lower()
@@ -1400,7 +1466,7 @@ def ingest_document(
 
         texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks
 
-        app_settings = load_app_settings()
+        # Phase 111 — app_settings was hoisted above the metadata extract branch; reuse it.
         supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
         embeddings = embed_chunks(texts_to_embed, model=app_settings.embedding_model or None)
 

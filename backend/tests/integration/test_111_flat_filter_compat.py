@@ -91,16 +91,20 @@ async def seeded_doc(pg_pool):
             "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
             user_id, f"phase-111-flat-{user_id}@test.local",
         )
+        # The pg_pool init registers a jsonb type codec (encoder=json.dumps), so the
+        # dict is passed DIRECTLY — wrapping it in json.dumps here AND letting the
+        # codec re-encode would double-encode it into a JSON string scalar, and a
+        # flat `@>` object containment would never match (Plan-04 Rule-1 test fix).
         await pg_pool.execute(
             "INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, status, metadata) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)",
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             doc_id, user_id, "flat-filter-probe.txt", f"{user_id}/flat-probe.txt",
             123, "text/plain", "completed",
-            json.dumps({
+            {
                 "document_type": "report",
                 "title": "Flat Filter Probe",
                 "_confidence": {"document_type": 0.91, "title": 0.88},
-            }),
+            },
         )
     except Exception as e:
         pytest.skip(f"seeded_doc fixture setup failed: {type(e).__name__}: {e}")
@@ -116,19 +120,21 @@ async def seeded_doc(pg_pool):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="real-pipeline _confidence row produced in Plan 04 (D-111-9); synthetic proof stands",
-    strict=False,
-)
 async def test_flat_containment_still_matches_with_confidence(pg_pool, seeded_doc):
     """A flat @> containment filter on document_type still matches a row that
-    also carries a nested _confidence object."""
+    also carries a nested _confidence object (D-111-9).
+
+    Flipped GREEN in Plan 04 — the synthetic-row proof stands on its own (the
+    fixture self-seeds a row with nested `_confidence`); no real-pipeline run is
+    required to prove the nested key doesn't break flat top-level `@>` matching.
+    """
     _user_id, doc_id = seeded_doc
 
+    # Dict param — the registered jsonb codec encodes the containment filter.
     row = await pg_pool.fetchrow(
         "SELECT id FROM documents "
-        "WHERE id = $1 AND metadata @> $2::jsonb",
-        doc_id, json.dumps({"document_type": "report"}),
+        "WHERE id = $1 AND metadata @> $2",
+        doc_id, {"document_type": "report"},
     )
     assert row is not None, (
         "flat @> containment must still match when a nested _confidence is present"

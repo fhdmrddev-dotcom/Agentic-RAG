@@ -1,21 +1,16 @@
-"""Phase 111 Wave-0 (RED) — extraction model resolution (META-03).
+"""Phase 111 Wave-0 (RED→GREEN) — extraction model resolution (META-03).
 
 The extraction model is un-pinned off the hardwired `gpt-4o`. A resolver
 returns `app_settings.extraction_model` when set, and falls back to the env
 `settings.llm_model` (gpt-4o default) when unset/empty — NOT to a (nonexistent)
 `app_settings.llm_model`.
 
-RED convention: the resolver helper is built in Plan 02/04 (META-03). Import
-inside the body; xfail until it lands.
+Flipped GREEN in Plan 04: `resolve_extraction_model` now lives in
+`embedding_service` and is the model-resolution helper the `ingest_document`
+enriched branch calls (META-03).
 """
 
-import pytest
 
-
-@pytest.mark.xfail(
-    reason="resolve_extraction_model not built until Plan 02/04 (META-03)",
-    strict=False,
-)
 def test_resolves_to_app_settings_when_set():
     from app.services.embedding_service import resolve_extraction_model
 
@@ -23,10 +18,6 @@ def test_resolves_to_app_settings_when_set():
     assert chosen == "claude-sonnet-4-6", "explicit app_settings.extraction_model must win"
 
 
-@pytest.mark.xfail(
-    reason="resolve_extraction_model not built until Plan 02/04 (META-03)",
-    strict=False,
-)
 def test_falls_back_to_env_llm_model_when_unset():
     from app.config import settings
     from app.services.embedding_service import resolve_extraction_model
