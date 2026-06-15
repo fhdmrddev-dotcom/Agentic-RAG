@@ -3,7 +3,7 @@ phase: 111
 slug: metadata-enrichment-extraction-backend
 status: draft
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-06-15
 ---
 
@@ -60,18 +60,18 @@ created: 2026-06-15
 
 ## Wave 0 Requirements
 
-- [ ] `tests/unit/test_111_dynamic_model.py` — create_model schema + field_type vocabulary (META-01)
-- [ ] `tests/unit/test_111_confidence_survives_exclude_none.py` — the A1 underscore-field caveat (**BLOCKING** — verifies the chosen `confidence`→`_confidence` naming)
-- [ ] `tests/unit/test_111_exclude_none_nonregression.py` — empty author dropped (D-111-9)
-- [ ] `tests/unit/test_111_window_sampling.py` — head+tail + cap clamp (META-04)
-- [ ] `tests/unit/test_111_extraction_model_resolve.py` — model resolution + gpt-4o fallback (META-03)
-- [ ] `tests/unit/test_111_lmstudio_provider.py` — provider registration (D-111-7)
-- [ ] `tests/integration/test_111_metadata_fields_crud.py` — CRUD + RLS forcing (META-01)
-- [ ] `tests/integration/test_111_field_def_scoping.py` — 2-user service-role scoping (D-111-6)
-- [ ] `tests/integration/test_111_settings_readback.py` — migration 072 read-back (META-03)
-- [ ] `tests/integration/test_111_flat_filter_compat.py` — `@>` still matches with `_confidence` present (D-111-9)
-- [ ] `tests/integration/test_111_audit_field_create.py` — live INSERT+SELECT (D-111-5/11)
-- [ ] Framework install: none — pytest + venv already present
+- [x] `tests/unit/test_111_dynamic_model.py` — create_model schema + field_type vocabulary (META-01) — authored 111-01, xfail until Plan 02/03
+- [x] `tests/unit/test_111_confidence_survives_exclude_none.py` — the A1 underscore-field caveat (**BLOCKING** — verifies the chosen `confidence`→`_confidence` naming) — authored 111-01, design proof GREEN + builder variant xfail
+- [x] `tests/unit/test_111_exclude_none_nonregression.py` — empty author dropped (D-111-9) — authored 111-01, design proof GREEN + dynamic variant xfail
+- [x] `tests/unit/test_111_window_sampling.py` — head+tail + cap clamp (META-04) — authored 111-01, xfail until Plan 02
+- [x] `tests/unit/test_111_extraction_model_resolve.py` — model resolution + gpt-4o fallback (META-03) — authored 111-01, xfail until Plan 02/04
+- [x] `tests/unit/test_111_lmstudio_provider.py` — provider registration (D-111-7) — authored + flipped GREEN 111-01 Task 3
+- [x] `tests/integration/test_111_metadata_fields_crud.py` — CRUD + RLS forcing (META-01) — authored 111-01, xfail until Plan 03
+- [x] `tests/integration/test_111_field_def_scoping.py` — 2-user service-role scoping (D-111-6) — authored 111-01, xfail until Plan 02
+- [x] `tests/integration/test_111_settings_readback.py` — migration 072 read-back (META-03) — authored 111-01, xfail until Plan 05 live apply
+- [x] `tests/integration/test_111_flat_filter_compat.py` — `@>` still matches with `_confidence` present (D-111-9) — authored 111-01, xfail until Plan 04 (synthetic-row proof stands)
+- [x] `tests/integration/test_111_audit_field_create.py` — live INSERT+SELECT (D-111-5/11) — authored 111-01, raw round-trip xpasses against migrated :54322
+- [x] Framework install: none — pytest + venv already present
 
 ---
 
