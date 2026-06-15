@@ -13,9 +13,169 @@
 - ✅ **v2.7 Agent Workspace & Panel** — Phases 083-088 (shipped 2026-05-30)
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
-- 🔨 **v3.0 Document Management** — ACTIVE (started 2026-06-15, defining requirements). SEED-005 Tier A as a product surface: **metadata enrichment → metadata-driven views / "virtual folders" → document relationships → auto-classification.** Phase numbers assigned by the roadmapper, continuing from 104 (the v2.9 STRETCH labels 105–109 are backlog candidates, not committed phases — roadmapper picks a non-colliding range).
+- 🔨 **v3.0 Document Management** — ACTIVE (started 2026-06-15). SEED-005 Tier A as a product surface: **DM Foundations → metadata enrichment → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health.** 10 phases (**110-119**); the v2.9 STRETCH labels 105-109 are backlog candidates, not committed phases, so the range starts at 110 to avoid collision.
 - 📋 **v3.1 Workflow + Skill Eval Studio** — re-scoped "Skill Studio" (eval/regression over the Phase 102 judge + golden-run, for workflows + composed skills). Next after v3.0 *unless a paying customer flips priority to the GTM track*. Brief: `PRDs/v3.1-skill-studio-eval.md`
 - 📋 **v3.2 Operator UX** → **v3.3 Multi-tenancy** → **v3.4 Open Platform (API/MCP)** → **v3.5 Automations** — the enterprise-GTM track. **Authoritative version map: `PRDs/SEQUENCE.md`.** (All re-sequenced 2026-06-15; briefs predate the v2.7–2.9 pivot and re-author at milestone start.)
+
+---
+
+## v3.0 Document Management — 🔨 ACTIVE
+
+**Goal:** Turn the product's incidental document-management capabilities into a first-class, metadata-driven surface (M-Files-aligned Tier A) — documents structured, related, and trustworthy enough to power both direct use and every cited workflow deliverable.
+
+**Build order (dependency-driven — all four research sources converge here):** DM Foundations → Metadata Enrichment → Virtual Folders → Relationships → Auto-Classification → Governance Health. Enrichment is a **hard prerequisite** for classification. Each Tier A item is a full vertical (table + RLS + query path + agent tool + UI + audit-enum migration + cross-provider UAT) — realistically 2-3 phases each (research Pitfall 1).
+
+**Phase numbering:** 110-119 (10 phases). Continues past v2.9 CORE (ended at 104); avoids the deferred-STRETCH labels 105-109.
+
+**Coverage:** 24/24 functional requirements mapped (DMF 3, META 5, VIEW 7, REL 4, CLASS 3, DGOV 2). UX-01/UX-02 are cross-cutting acceptance attached to every UI-bearing phase.
+
+### Phases
+
+- [ ] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam).
+- [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
+- [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
+- [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
+- [ ] **Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar** — Typed/indexed date columns + relative-date operators; the view/filter builder UI; sidebar render-as-folder. **(G-2 sketch)**
+- [ ] **Phase 115: Virtual Folders — Agent Tool** — The agent can run a saved view / metadata query as a tool to answer questions in chat.
+- [ ] **Phase 116: Document Relationships — Backend + Agent Tool** — Typed-link table, create/remove, `get_related_documents` tool (registry + advertised schema).
+- [ ] **Phase 117: Document Relationships — Panel UI** — Relationship panel on the document detail surface (outgoing/incoming typed links, no-access masking). **(G-2 sketch)**
+- [ ] **Phase 118: Auto-Classification** — Classification rules → suggestion on upload (never silent auto-move) → accept/dismiss.
+- [ ] **Phase 119: Document Governance Health** — Light read-only governance view (broken relationships, unclassified docs, low-confidence metadata) with action links.
+
+### Phase Details
+
+#### Phase 110: DM Foundations
+**Goal**: Land the shared DM substrate once — the four new tables, RLS discipline, multi-tenancy forward-compat, and the audit-enum extension — so no later phase silently drops an audit row or fights a future org rewrite.
+**Depends on**: Nothing (first DM phase)
+**Requirements**: DMF-01, DMF-02, DMF-03
+**Success Criteria** (what must be TRUE):
+  1. The four new tables (`document_views`, `document_relationships`, `classification_rules`, `metadata_field_definitions`) exist with RLS enabled, each carrying a nullable `org_id uuid` (no FK) and a re-keyable `auth.uid() = user_id OR is_global` policy shape mirroring the `workflow_definitions` precedent.
+  2. The `audit_log` `action_type` CHECK enum is extended (min `view.create`, `relationship.create`, `classification.apply`, `metadata.update`) AND `VALID_ACTION_TYPES` (`audit_service.py:13`) is synced in the same phase; `full-schema.sql` regenerated (no reset).
+  3. A boot/CI assertion fails loudly if `VALID_ACTION_TYPES` is NOT a subset of the live DB CHECK enum (drift guard turns a silent 23514 reject into a boot failure).
+  4. A real audit row for each new action type INSERTs and SELECTs back **against the live DB** (verified live, not mocked — the D-102 "static would false-green" lesson).
+  5. A single DM capability flag (`app_settings`, default **on**) gates the new DM surfaces + tools so the whole capability can be cleanly toggled off; defaults on so v3.0 behavior is unchanged when unset. This is the feature-independence seam a future tier/entitlement system (SEED-080, v3.2) plugs into — no enforcement built here.
+**Plans**: TBD
+
+#### Phase 111: Metadata Enrichment — Extraction Backend
+**Goal**: Replace the thin fixed-schema/hardwired-`gpt-4o`/3k-char extraction with a configurable, model-flexible, confidence-scored enrichment pipeline — the spine the M-Files "metadata not folders" story rests on and the hard prerequisite for classification.
+**Depends on**: Phase 110
+**Requirements**: META-01, META-03, META-04
+**Success Criteria** (what must be TRUE):
+  1. Metadata extraction routes through the user-selected (or an admin-configured `extraction_model` setting in `user_settings`/`app_settings`) model — not the hardwired `gpt-4o`; the effective model threads `_upload_pipeline → ingest_document → extract_metadata(model=...)`.
+  2. Extraction reads beyond `content[:3000]` (a configurable larger window or front-matter + tail sampling) so late title-page/byline data isn't missed.
+  3. User-defined custom metadata fields (from `metadata_field_definitions`) are extracted on ingest via a runtime Pydantic `create_model` schema; per-field confidence is stored flat under a `_confidence` sub-key so the existing `metadata @> filter` containment pre-filter still matches; `exclude_none=True` (empty `author` dropped, not coerced to `""`) is preserved as a guarded non-regression invariant.
+  4. **SC#10 4-axis UAT**: dynamic-schema structured extraction is verified across the native-7 (cross-provider) — extraction succeeds and returns valid confidence-scored fields on each provider; long-doc (≥ 5 KB) window-lift sampling exercised; rows authored in VALIDATION.md.
+**Plans**: TBD
+**UI hint**: no
+
+#### Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit
+**Goal**: Give users a first-class place to SEE enriched metadata with per-field confidence and to correct it — establishing the net-new document detail panel that relationships (117) and classification (118) will also inhabit.
+**Depends on**: Phase 111
+**Requirements**: META-02, META-05
+**Success Criteria** (what must be TRUE):
+  1. Opening a document shows a detail panel that displays each metadata value alongside its per-field confidence (reusing the `ConfidenceChip` primitive); low confidence reads as visibly tentative.
+  2. User can manually edit/override any extracted metadata value inline; the edit persists into `documents.metadata` and writes a `metadata.update` audit row (verified live).
+  3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
+**Plans**: TBD
+**UI hint**: yes
+**G-2**: /gsd:sketch (operator-approved mockup of the **document detail panel** — the shared shell for META display/edit + REL panel + CLASS suggestion) BEFORE plan. (UX-02 cross-cutting acceptance.)
+
+#### Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)
+**Goal**: Land the saved-view data model and the one genuinely net-new component — a closed-registry filter-AST → parameterized-SQL compiler — proving equality/AND/folder-scope views compose the existing `search_documents` seam leak-safely.
+**Depends on**: Phase 111 (richer metadata to filter on)
+**Requirements**: VIEW-01, VIEW-02, VIEW-04, VIEW-05, VIEW-06
+**Success Criteria** (what must be TRUE):
+  1. A saved view (name + `filter_expr` jsonb + optional `folder_scope`) persists and resolves live contents through `search_documents(metadata_filter, folder_ids)` — query-not-copy, so one document appears in multiple views with no duplication (VIEW-01/02).
+  2. A view can combine multiple equality conditions (AND) and optionally scope to a folder subtree (VIEW-04/05); the filter-AST compiler uses a closed operator registry with field-whitelist + all literals bound as `$n` (no eval, no string interpolation).
+  3. A globally-shared (`is_global`) view exposes its *definition* but resolves *results/counts/facets over each viewer's own visible set* — two users see different result sets for the same shared view, with no cross-user content/count/existence leakage; cross-user miss returns 404-not-403 (VIEW-06). Verified live in secure-phase (the leak test, not the DEFINER label).
+  4. An injection/SSTI attempt placed in a filter value is neutralized (parameterized — no SQL/template execution).
+**Plans**: TBD
+**UI hint**: no
+
+#### Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar
+**Goal**: Complete virtual folders end-to-end — add the range/relative-date evaluator on typed indexed columns and the guided view/filter builder UI that renders saved views in the sidebar exactly like folders.
+**Depends on**: Phase 113
+**Requirements**: VIEW-03
+**Success Criteria** (what must be TRUE):
+  1. View filters support equals / one-of / contains / is-empty / numeric & date comparisons including relative dates ("expiring within N days"); "expiring in 90 days" returns correct rows across month/day boundaries because hot date/`document_type` fields are promoted to **typed, indexed columns** (btree), not lexically-compared lowercased JSONB strings (VIEW-03).
+  2. A guided condition builder (no raw DSL) lets the user compose a view's filter; saved views render in the sidebar as a distinct "Views" group with a visual affordance that they are saved queries (not real folders the user can drop files into), reusing the global-folder indicator pattern.
+  3. `EXPLAIN` shows index use (not a seq scan) for a view query at ~10k docs; sidebar render does not degrade with corpus size.
+  4. The builder + sidebar match the Deep Midnight / Aether design system, are mobile-responsive, and meet WCAG 2.1 AA (UX-01 cross-cutting acceptance).
+**Plans**: TBD
+**UI hint**: yes
+**G-2**: /gsd:sketch (operator-approved mockup of the **view/filter builder**) BEFORE plan. (UX-02 cross-cutting acceptance.)
+
+#### Phase 115: Virtual Folders — Agent Tool
+**Goal**: Make saved views and metadata queries answerable in chat — the agent can run a view as a tool, extending the M-Files-folderless story into the conversational surface.
+**Depends on**: Phase 113 (compiler), Phase 114 (full operator set)
+**Requirements**: VIEW-07
+**Success Criteria** (what must be TRUE):
+  1. The agent can run a saved view (or an ad-hoc metadata query) as a tool to answer a question in chat; the tool is registered in `_TOOL_REGISTRY` AND advertised in the `get_tools` schema (the Phase 101 `render_template` schema-visibility bug guarded against — verified the model actually calls it).
+  2. The tool resolves results over the caller's visible set (own-or-global-folder), never leaking another user's documents; respects `ctx.phase_whitelist` for free via the `dispatch_tool` guard.
+  3. **SC#10 4-axis UAT**: the new agent tool is exercised cross-provider (native-7), in a multi-tool prompt (e.g. view-query + `search_documents`), with a parallel-thread row and a long-message row; authored in VALIDATION.md.
+**Plans**: TBD
+**UI hint**: no
+
+#### Phase 116: Document Relationships — Backend + Agent Tool
+**Goal**: Let users typed-link documents and let the agent traverse those links — establishing directional relationship edges and the `get_related_documents` tool over them.
+**Depends on**: Phase 110 (table substrate)
+**Requirements**: REL-01, REL-03, REL-04
+**Success Criteria** (what must be TRUE):
+  1. User can create a typed link (`supersedes` / `amends` / `references` / `attached_to`) between two documents and remove it; links reference document identity via latest-resolved/`is_latest` so a new version or restore does not orphan them (REL-01/03); a `relationship.create` audit row lands live.
+  2. The agent retrieves a document's related documents via a `get_related_documents` tool registered in `_TOOL_REGISTRY` AND advertised in `get_tools` (REL-04); a relationship pointing at a document the caller can't see renders as "linked document (no access)" — never leaking the target's title/metadata.
+  3. **SC#10 4-axis UAT**: `get_related_documents` is exercised cross-provider (native-7), multi-tool, parallel-thread, and long-message; authored in VALIDATION.md.
+**Plans**: TBD
+**UI hint**: no
+
+#### Phase 117: Document Relationships — Panel UI
+**Goal**: Surface a document's typed relationships in a panel on its detail view so users can see and manage links visually.
+**Depends on**: Phase 116, Phase 112 (document detail panel shell)
+**Requirements**: REL-02
+**Success Criteria** (what must be TRUE):
+  1. A document's detail view shows a relationship panel listing outgoing and incoming typed links with the related filename + a relationship-type chip (REL-02); inaccessible targets render as "linked document (no access)".
+  2. The panel supports creating a link (reusing the `MoveToFolderDialog` document-picker pattern for relationship target selection) and removing one, reflecting changes live.
+  3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
+**Plans**: TBD
+**UI hint**: yes
+**G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) BEFORE plan. (UX-02 cross-cutting acceptance.)
+
+#### Phase 118: Auto-Classification
+**Goal**: Turn the now-richer metadata into routing intelligence — classification rules that produce a suggestion on upload (never a silent auto-move) the user can accept or dismiss.
+**Depends on**: Phase 111 (enriched metadata — HARD prerequisite), Phase 110 (rules table)
+**Requirements**: CLASS-01, CLASS-02, CLASS-03
+**Success Criteria** (what must be TRUE):
+  1. User can define classification rules (metadata condition → suggested folder/tag) stored in `classification_rules`, owner-private or global, enable/disable-able (CLASS-01).
+  2. On upload, a rule-eval pass in `ingest_document` (between metadata-build and persist) writes a *suggestion* into `metadata._classification` — never a silent auto-move; rule-matching reads are explicitly user-scoped in app code (no `auth.uid()` in a BackgroundTask) (CLASS-02).
+  3. User can accept or dismiss a classification suggestion from the document row/detail; accepting writes a `classification.apply` audit row (verified live) and performs the move; dismissing clears the suggestion. The whole flow is reversible (CLASS-03).
+  4. The classification UI matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 119: Document Governance Health
+**Goal**: Give users a light, read-only governance view of document-structure health — distinct from the retrieval (knowledge-health) dashboard — that surfaces and links to the fixes for the signals the upstream features produce.
+**Depends on**: Phase 116 (relationships), Phase 118 (classification), Phase 111 (confidence) — pure consumer, lands last
+**Requirements**: DGOV-01, DGOV-02
+**Success Criteria** (what must be TRUE):
+  1. A separate, light governance view (its own surface/route + queries — NOT cards bolted onto the knowledge-health dashboard) surfaces broken/dangling relationships, unclassified documents, and low-confidence metadata, reusing the `HealthPanel` card + paginated/actionable-empty-state patterns (DGOV-01).
+  2. Each governance signal links to the action that fixes it (open document, re-extract, classify) (DGOV-02).
+  3. The view is read-only aggregation over the new tables under their existing RLS (no new write path), matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
+**Plans**: TBD
+**UI hint**: yes
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 110. DM Foundations | 0/? | Not started | - |
+| 111. Metadata Enrichment — Extraction Backend | 0/? | Not started | - |
+| 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
+| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
+| 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
+| 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
+| 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
+| 117. Document Relationships — Panel UI | 0/? | Not started | - |
+| 118. Auto-Classification | 0/? | Not started | - |
+| 119. Document Governance Health | 0/? | Not started | - |
 
 ---
 
@@ -148,4 +308,4 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 ---
 
-*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. **Active milestone: v3.0 Document Management** (started 2026-06-15 — defining requirements; SEED-005 Tier A). Re-sequenced PRD roadmap + the deferral of Skill Studio → v3.1: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*
+*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. **Active milestone: v3.0 Document Management** (started 2026-06-15 — Phases 110-119; SEED-005 Tier A). Re-sequenced PRD roadmap + the deferral of Skill Studio → v3.1: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*

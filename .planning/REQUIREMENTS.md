@@ -11,6 +11,7 @@
 ### Foundations (DMF) — shared substrate, landed once
 - [ ] **DMF-01**: New document-management actions (view created, relationship added/removed, classification applied, metadata edited) are recorded in the immutable audit log. *(closes the closed-CHECK-enum silent-reject trap; verify live, not with mocks)*
 - [ ] **DMF-02**: All DM data (views, relationships, classification rules, custom-field definitions) is owner-private or intentionally global-shared with no cross-user leakage, and every new table carries a nullable `org_id` so the future multi-tenancy rewrite (v3.3) re-keys cleanly.
+- [ ] **DMF-03**: The v3.0 DM capability is gated behind a single feature flag (`app_settings`, default **on**) that cleanly enables/disables the new DM surfaces (views, relationships, classification, governance) + tools, and the metadata-enrichment change is backward-compatible / reversible. The flag is the seam a future entitlement/tier system plugs into (SEED-080, enforced at v3.2 Operator UX) — no entitlement *enforcement* is built in v3.0.
 
 ### Metadata Enrichment (META) — built first; unblocks classification
 - [ ] **META-01**: User can define custom metadata fields (beyond the built-in title/author/date/type/topics/language/summary) that the system extracts on ingest.
@@ -65,12 +66,42 @@
 | A raw end-user query DSL / freeform search language | Guided condition builder instead; a raw DSL is an injection + UX hazard |
 
 ## Traceability
-*(filled during roadmap creation)*
+
+Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing past v2.9 CORE phase 104, skipping the deferred-STRETCH labels 105-109). Each functional requirement maps to exactly one phase. UX-01/UX-02 are cross-cutting acceptance criteria attached to every UI-bearing phase (112, 114, 117, 118, 119) — not owned by a single phase.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DMF-01 | Phase 110 — DM Foundations | Pending |
+| DMF-02 | Phase 110 — DM Foundations | Pending |
+| DMF-03 | Phase 110 — DM Foundations | Pending |
+| META-01 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
+| META-03 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
+| META-04 | Phase 111 — Metadata Enrichment (Extraction Backend) | Pending |
+| META-02 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
+| META-05 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
+| VIEW-01 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-02 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-04 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-05 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Pending |
+| VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Pending |
+| REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
+| REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
+| REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
+| REL-02 | Phase 117 — Document Relationships (Panel UI) | Pending |
+| CLASS-01 | Phase 118 — Auto-Classification | Pending |
+| CLASS-02 | Phase 118 — Auto-Classification | Pending |
+| CLASS-03 | Phase 118 — Auto-Classification | Pending |
+| DGOV-01 | Phase 119 — Document Governance Health | Pending |
+| DGOV-02 | Phase 119 — Document Governance Health | Pending |
+| UX-01 | Cross-cutting (Phases 112, 114, 117, 118, 119) | Pending |
+| UX-02 | Cross-cutting G-2 sketch (Phases 112, 114, 117) | Pending |
 
 **Coverage:**
-- v3.0 requirements: 23 total (DMF 2, META 5, VIEW 7, REL 4, CLASS 3, DGOV 2) + UX 2 cross-cutting
-- Mapped to phases: TBD
-- Unmapped: TBD
+- v3.0 requirements: 24 functional total (DMF 3, META 5, VIEW 7, REL 4, CLASS 3, DGOV 2) + UX 2 cross-cutting
+- Mapped to phases: **24 / 24 functional ✓** (each to exactly one phase, no orphans, no duplicates); UX-01/UX-02 attached as cross-cutting acceptance to the UI/sketch phases
+- Unmapped: **0**
 
 ---
-*Requirements defined: 2026-06-15*
+*Requirements defined: 2026-06-15 · Traceability filled during roadmap creation 2026-06-15 (Phases 110-119)*
