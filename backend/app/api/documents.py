@@ -1389,6 +1389,7 @@ def ingest_document(
         if mode != "legacy":  # default-on 'enriched'; any non-'legacy' value fails safe to enriched
             from app.config import get_model_capability  # noqa: PLC0415
             from app.services.embedding_service import (  # noqa: PLC0415
+                attach_confidence,
                 build_metadata_model,
                 extract_metadata_enriched,
                 read_enabled_field_defs,
@@ -1425,9 +1426,12 @@ def ingest_document(
             except Exception:  # noqa: BLE001 — degrade layer 2 at the call site; doc still completes (D-111-8)
                 log.warning("enriched metadata extraction failed; degrading to None", exc_info=True)
                 emitted = None
-            metadata_dict = emitted.model_dump(exclude_none=True) if emitted else None
-            if metadata_dict is not None and getattr(emitted, "confidence", None):
-                metadata_dict["_confidence"] = emitted.confidence  # attach AFTER dump (Pitfall 2)
+            # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
+            # `confidence` field out of the dump and renames it to the nested
+            # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
+            # left the flat `confidence` key in the dump (the populated-dict default
+            # survives exclude_none), polluting the `metadata @>` containment filter.
+            metadata_dict = attach_confidence(emitted.model_dump(exclude_none=True)) if emitted else None
         else:
             metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
             metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None

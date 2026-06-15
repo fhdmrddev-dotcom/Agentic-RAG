@@ -77,3 +77,30 @@ def test_confidence_survives_exclude_none_and_attaches():
     assert "confidence" not in metadata_dict, (
         "the top-level public `confidence` is renamed away after attach"
     )
+
+
+def test_ingest_callsite_uses_attach_confidence_not_handrolled():
+    """WR-01 regression guard (call-site, not helper).
+
+    The 111-04 ingest enriched branch must route the dumped model through
+    `attach_confidence` — which POPS the public `confidence` field and renames
+    it to nested `_confidence`. The original call site hand-rolled
+    ``metadata_dict["_confidence"] = emitted.confidence`` WITHOUT popping the
+    flat `confidence` key; because `confidence` has a populated-dict default it
+    survives `model_dump(exclude_none=True)`, so every enriched doc persisted a
+    flat top-level `confidence` key that pollutes the `metadata @>` containment
+    pre-filter (D-111-3 violation). The helper-level test above false-greens
+    this; this source guard catches the regression at the call site.
+    """
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[2] / "app" / "api" / "documents.py"
+    text = src.read_text(encoding="utf-8")
+
+    assert "attach_confidence(" in text, (
+        "the ingest enriched branch must use attach_confidence() to nest _confidence"
+    )
+    assert 'metadata_dict["_confidence"] = emitted.confidence' not in text, (
+        "the hand-rolled _confidence attach (WR-01) must not return — it leaves the "
+        "flat `confidence` key in the dump, polluting the metadata containment filter"
+    )
