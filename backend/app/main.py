@@ -230,6 +230,13 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
+    # Phase 110 DMF-01 / D-110-4 — audit-enum drift guard. MUST hard-fail (unlike the
+    # best-effort blocks above): a frozenset⊄live-CHECK drift = a silent prod audit hole.
+    # Mirrors the 075.4 UnknownProviderError-at-startup pattern. Runs per worker (read-only,
+    # idempotent; a drift crashes all WORKER_COUNT workers identically — the desired loud fail).
+    from app.services.audit_service import assert_action_types_synced
+    await assert_action_types_synced(await get_pg_pool())
+
     # Phase 091 HARNESS-03 — resume runs left `active` by a restart. CLAIMS each
     # run (CAS) so WORKER_COUNT=2 workers never double-execute (Pitfall 7), and
     # resumes a mid-ask_user phase correctly (answered → proceed; pending →
