@@ -23,6 +23,8 @@ waves: 3
 
 # Phase: Milestone PRD Authoring (Meta-Phase)
 
+> ℹ️ **Historical (2026-05-10 meta-phase) — version slotting superseded 2026-06-15; authoritative map: `.planning/PRDs/SEQUENCE.md`.** This plan produced the v2.6 + v3.0–v3.4 PRDs under the ORIGINAL sequence (v3.0 = Skill Studio). After the v2.7–2.9 pivot the roadmap was re-sequenced (Document Management = v3.0; Skill Studio → v3.1; the rest shifted down one) and the PRD files were renamed. The `.planning/PRDs/v3.X.md` paths referenced below are the OLD names; current files are `v3.1-skill-studio-eval.md` / `v3.2-operator-ux.md` / `v3.3-multi-tenancy.md` / `v3.4-open-platform.md` / `v3.5-automations.md`.
+
 ## Goal
 
 Produce 6 PRDs — one per upcoming milestone (v2.6, v3.0, v3.1, v3.2, v3.3, v3.4) — that are fact-checked against current code, prune outdated content from the recovered strategy docs, surface ideas the synthesis didn't capture, and explicitly bound scope. Each PRD must be ready for `/gsd:new-milestone <version>` to consume directly without further interpretation.

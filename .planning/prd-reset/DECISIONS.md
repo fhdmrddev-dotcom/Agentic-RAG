@@ -1,5 +1,7 @@
 # PRD-Reset Decisions (ADRs)
 
+> ℹ️ **Version slotting re-sequenced 2026-06-15 — see `.planning/PRDs/SEQUENCE.md`.** The business-shape decisions below (D-PRD-01..15) still hold and are NOT changed. But where a "Consequences" line ties a feature to a version (e.g. "v3.0 ships X", "v3.1 ships Y"), those slots shifted: Document Management took **v3.0**, Skill Studio → **v3.1**, Operator UX → **v3.2**, Multi-tenancy → **v3.3**, Open Platform → **v3.4**, Automations → **v3.5**. Read version slots here as the *original* plan; `SEQUENCE.md` is authoritative.
+
 This document codifies the 11 business-shape and roadmap decisions locked
 2026-05-10 from the milestone-shaping synthesis. It is the canonical input to
 the 6 milestone PRDs (v2.6 → v3.4) authored in `.planning/prd-reset/Plans 02-08`

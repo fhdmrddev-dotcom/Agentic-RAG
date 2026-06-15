@@ -1,36 +1,40 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.9
-milestone_name: Workflow Studio
-status: milestone_complete
-last_updated: "2026-06-15T07:00:00.000Z"
-last_activity: 2026-06-15 -- v2.9 Workflow Studio milestone COMPLETE + archived (CORE 097-104 shipped + validated + secured; STRETCH 105-109 deferred to backlog; git tag v2.9). Next = /gsd:new-milestone.
+milestone: v3.0
+milestone_name: Document Management
+status: defining_requirements
+last_updated: "2026-06-15T12:00:00.000Z"
+last_activity: 2026-06-15 -- v3.0 Document Management milestone STARTED (defining requirements). DM chosen over resuming Skill Studio; v3.x PRD roadmap re-sequenced (DM=v3.0, Skill Studio->v3.1, rest shift down one). See PRDs/SEQUENCE.md.
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 57
-  completed_plans: 57
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
-> **Scope note:** v2.9 Workflow Studio is **SHIPPED + archived (2026-06-15)**. CORE phases 097–104 (incl. the 097 spike + the 101.1 emission-layer gap-closure) are COMPLETE, validated, secured, and live-UAT'd; that is the milestone. The 5 STRETCH phases (105–109: SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01) were never started and rolled to backlog — promote or drop them at `/gsd:new-milestone`. Full detail archived to `.planning/milestones/v2.9-ROADMAP.md`; close-out in `.planning/MILESTONES.md` + `RETROSPECTIVE.md`.
+> **Scope note:** **v3.0 Document Management is the ACTIVE milestone (started 2026-06-15 — defining requirements).** Scope = SEED-005 Tier A (metadata enrichment → metadata-driven views/"virtual folders" → document relationships → auto-classification) as a first-class product surface. It was chosen over resuming Skill Studio (the original v3.0 PRD), which the v2.7–2.9 pivot largely superseded; Skill Studio deferred → v3.1, re-scoped as a Workflow+Skill Eval Studio. The v3.x PRD roadmap was re-sequenced 2026-06-15 — authoritative map: `.planning/PRDs/SEQUENCE.md`. The prior milestone (v2.9 Workflow Studio) shipped + archived 2026-06-15; its detail is in `.planning/milestones/` + `MILESTONES.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards. **Everything below the Current Position block is v2.9-and-earlier accumulated context, retained per the milestone-transition convention.**
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-15 — v2.9 Workflow Studio milestone complete + archived)
+See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** **No active milestone — v2.9 Workflow Studio shipped 2026-06-15** (CORE 097–104: project=folder binding + server-side KB governance, workflow↔skill composition, ephemeral template upload + guaranteed cited template-fill + integrity gates, reusable validation-gate library + output-quality judge hard-wall, Workflows page + NL authoring + read-only graph + 8-stage publish gauntlet, PM flagship content pack). 14/14 CORE requirements Validated; every CORE phase verify-work'd + secure-phase'd + live cross-provider UAT'd. **Next = `/gsd:new-milestone`** — operator-confirmed candidate is SEED-005 Enhanced Document Structure (M-Files/Doxis basics). Backlog carry-forwards: v2.9 STRETCH 105–109, SEED-013/014 connectors, SEED-082/084, and 7 open `surface: Agentic-RAG` polish reports (see `## Deferred Items`).
+**Current focus:** **v3.0 Document Management — defining requirements (started 2026-06-15).** Turn the incidental DM capabilities into a first-class metadata-driven surface (M-Files-aligned Tier A): metadata enrichment (un-pin extraction off the hardwired `gpt-4o`, lift the 3,000-char window, custom fields + per-field confidence) → metadata-driven views/"virtual folders" → document relationships → auto-classification. Folds in SEED-040 (model picker), light SEED-046 (governance health), minimal SEED-012 slice, SEED-069. DM Tier B → deferred (v3.5). Skill Studio deferred → v3.1 (Workflow+Skill Eval Studio). Re-sequenced PRD roadmap: `.planning/PRDs/SEQUENCE.md`. **Next = define + scope requirements, then `/gsd:plan-phase`.**
 
 ## Current Position
 
-Phase: none active — **v2.9 Workflow Studio SHIPPED + archived 2026-06-15**
+Phase: Not started (defining requirements) — **v3.0 Document Management**
 Plan: —
-Status: **v2.9 milestone COMPLETE.** CORE phases 097–104 shipped + validated + secured + live-UAT'd (103 secured 2026-06-14, 32 threats/0 open; 104 secured + nyquist + UAT 5/5, 15 threats/0 open). ROADMAP collapsed (414→149 lines); REQUIREMENTS archived to `milestones/v2.9-REQUIREMENTS.md` + removed; MILESTONES.md + RETROSPECTIVE.md + PROJECT.md evolved; 40 open artifacts triaged (zero CORE blockers) + acknowledged in `## Deferred Items`; git tag v2.9. **NEXT = `/gsd:new-milestone`** (operator-confirmed candidate: SEED-005 Enhanced Document Structure). Recommend `/clear` first.
+Status: **Defining requirements.** v3.0 Document Management milestone started 2026-06-15 (SEED-005 Tier A as a product surface; chosen over resuming Skill Studio). PRD roadmap re-sequenced + PRD files renamed to new slots + `PRDs/SEQUENCE.md` authored as the canonical version map; PROJECT.md / ROADMAP.md / SEED-002 / SEED-005 / prd-reset docs updated. **NEXT in the `/gsd:new-milestone` flow:** research decision → scope requirements (REQ-IDs) → roadmapper creates the v3.0 phase plan (continuing phase numbering from 104; 105–109 STRETCH labels are backlog candidates).
 Resume file: —
-Last activity: 2026-06-15 — v2.9 milestone close
+Last activity: 2026-06-15 — v3.0 milestone started + v3.x PRD re-sequence applied
+
+---
+
+_The remainder of this file below is v2.9-and-earlier accumulated context (retained per the milestone-transition convention)._
 
 **Phase 104 (PM Flagship Content Pack — last v2.9 core) — ✅ COMPLETE 2026-06-15 (3/3 plans + live UAT passed; `phase.complete` 0 warnings; PM-01 validated). Content + seed only — EXCEPT 2 operator-approved engine-fix overrides found at the human-verify gate (the double-gate bug, commit `6a607169`). NEXT = `/gsd:secure-phase 104`.**
 

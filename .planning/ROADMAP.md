@@ -13,7 +13,9 @@
 - ✅ **v2.7 Agent Workspace & Panel** — Phases 083-088 (shipped 2026-05-30)
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
-- 📋 **v3.0 (next)** — TBD (start with `/gsd:new-milestone`; SEED-005 Enhanced Document Structure is the operator-confirmed candidate)
+- 🔨 **v3.0 Document Management** — ACTIVE (started 2026-06-15, defining requirements). SEED-005 Tier A as a product surface: **metadata enrichment → metadata-driven views / "virtual folders" → document relationships → auto-classification.** Phase numbers assigned by the roadmapper, continuing from 104 (the v2.9 STRETCH labels 105–109 are backlog candidates, not committed phases — roadmapper picks a non-colliding range).
+- 📋 **v3.1 Workflow + Skill Eval Studio** — re-scoped "Skill Studio" (eval/regression over the Phase 102 judge + golden-run, for workflows + composed skills). Next after v3.0 *unless a paying customer flips priority to the GTM track*. Brief: `PRDs/v3.1-skill-studio-eval.md`
+- 📋 **v3.2 Operator UX** → **v3.3 Multi-tenancy** → **v3.4 Open Platform (API/MCP)** → **v3.5 Automations** — the enterprise-GTM track. **Authoritative version map: `PRDs/SEQUENCE.md`.** (All re-sequenced 2026-06-15; briefs predate the v2.7–2.9 pivot and re-author at milestone start.)
 
 ---
 
@@ -146,4 +148,4 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 ---
 
-*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. No active milestone — start the next with `/gsd:new-milestone` (SEED-005 Enhanced Document Structure is the operator-confirmed candidate; v2.9 STRETCH 105–109 are backlog carry-forwards).*
+*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. **Active milestone: v3.0 Document Management** (started 2026-06-15 — defining requirements; SEED-005 Tier A). Re-sequenced PRD roadmap + the deferral of Skill Studio → v3.1: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*

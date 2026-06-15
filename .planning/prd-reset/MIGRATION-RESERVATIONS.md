@@ -1,3 +1,5 @@
+> ⚠️ **STALE / HISTORICAL as of 2026-06-15.** This file reserved migration ranges for a 6-PRD program whose sequence changed twice since (the v2.7–2.9 pivot, then the 2026-06-15 re-sequence). The real migration head is now past `070` (not the `038` assumed below) and the per-milestone ranges no longer match reality. Its stated purpose ("prevent collision when 6 PRD agents run in parallel") has ended. Authoritative version map: `.planning/PRDs/SEQUENCE.md`. Manage new migrations directly in `supabase/migrations/` (next number = current head + 1). Kept for historical reference only.
+
 # Migration Number Reservations
 
 **Purpose:** Prevent number-collision when 6 PRD-authoring agents (Plans 03-08) run in parallel. Each PRD claims a contiguous range up-front. Authors MUST consult this file before assigning any migration number in their PRD's §5 (Architecture & Data Model changes).

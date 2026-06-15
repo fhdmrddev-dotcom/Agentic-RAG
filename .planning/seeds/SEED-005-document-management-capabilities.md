@@ -1,6 +1,6 @@
 ---
 id: SEED-005
-status: dormant
+status: active (v3.0 — in progress)
 planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a milestone scoped to "document management", "DM", "DMS", "lifecycle", "workflow", "approvals", "metadata views", "retention", or when users start asking for features beyond the current basic folder + version + audit capabilities
@@ -8,6 +8,8 @@ scope: Large (split across 2–3 milestones likely)
 ---
 
 # SEED-005: Document Management Capabilities (M-Files-aligned subset)
+
+> **Update 2026-06-15 — PROMOTED to the active milestone v3.0 "Document Management."** Operator-confirmed as the next milestone (chosen over resuming Skill Studio, which deferred to v3.1 — see `.planning/PRDs/SEQUENCE.md`). Scope = **Tier A** (metadata-driven views / virtual folders, document relationships, auto-classification) **+ the metadata-enrichment add-on** (un-pin extraction off the hardwired `gpt-4o`, lift the 3,000-char window, custom fields + per-field confidence). Folded-in seeds: **SEED-040** (model-registry self-service — the extraction-model picker), a **light SEED-046** (governance health view), the **minimal SEED-012** slice (extraction-model setting only — the full admin shell stays with v3.2 Operator UX), and **SEED-069** (re-ingest workflow deliverables as managed docs). **Tier B** (retention / check-in-out / approvals) stays deferred — it is the sibling of the v3.5 Automations brief. Recommended internal order: **enrichment → virtual folders → relationships → auto-classification.** Roadmap: `.planning/ROADMAP.md`.
 
 ## Why This Matters
 
