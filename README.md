@@ -159,9 +159,9 @@ The platform runs entirely on local containers for development and switches to c
 
 9. **(Recommended) Build the sandbox image** so the code-execution tool has the data-science and document libraries pre-installed:
    ```bash
-   docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:075.1.1 backend/
+   docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/
    ```
-   Then set `SANDBOX_IMAGE=agentic-rag-sandbox:075.1.1` and `SANDBOX_ENABLED=true` in `backend/.env`. Without the pre-built image, code execution still works but the agent must `pip install` packages on each fresh thread (~10–15s warm-up). Bump the tag whenever the package set changes so cached containers don't shadow the new image. Sandbox sessions are cached per thread, so image/env changes only affect **new** chats.
+   Then set `SANDBOX_IMAGE=agentic-rag-sandbox:101.1` and `SANDBOX_ENABLED=true` in `backend/.env`. Without the pre-built image, code execution still works but the agent must `pip install` packages on each fresh thread (~10–15s warm-up). Bump the tag whenever the package set changes so cached containers don't shadow the new image. Sandbox sessions are cached per thread, so image/env changes only affect **new** chats.
 
 **Production-like run** (no auto-reload, 2 workers — `--reload` and `--workers` do not combine):
 ```bash
