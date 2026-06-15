@@ -3,7 +3,10 @@
 Asserts (via pg_class/pg_constraint/information_schema):
   - all 4 tables exist with rowsecurity = true;
   - each org_id is nullable AND has NO FK (F7 forward-compat trap);
-  - the SELECT policy shape (auth.uid()=user_id OR is_global).
+  - the SELECT policy shape: user_id for all 4 tables, plus is_global for the
+    3 library/config tables (document_views, classification_rules,
+    metadata_field_definitions). document_relationships is USER-SCOPED ONLY (no
+    is_global column by design — see 110-RESEARCH.md §3.2 / ARCHITECTURE.md §2).
 Plus a LIVE 2-user RLS sample on >=2 of the 4 tables + the nullable-user_id
 global-field path on metadata_field_definitions.
 
@@ -178,10 +181,24 @@ async def test_dm_table_org_id_nullable_no_fk(pg_pool, table):
     assert fk_count == 0, f"{table}.org_id must NOT have a foreign key (found {fk_count})"
 
 
+# The 3 library/config tables carry is_global (user_id + is_global RLS). By
+# design, document_relationships does NOT have an is_global column — a
+# relationship is an inherently user-owned link between a user's own documents,
+# never a global/admin-seeded shareable object. Its SELECT policy is user-scoped
+# only. (Authoritative per-table DDL: 110-RESEARCH.md §3.2 / 110-PATTERNS.md §3.2,
+# both citing ARCHITECTURE.md §2.) Asserting is_global on it would embed the wrong
+# uniform-template assumption and fail correctly — so we assert per-table shape.
+_IS_GLOBAL_TABLES = frozenset(
+    {"document_views", "classification_rules", "metadata_field_definitions"}
+)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("table", _DM_TABLES)
 async def test_dm_table_select_policy_shape(pg_pool, table):
-    """The SELECT policy USING clause carries user_id + is_global."""
+    """The SELECT policy USING clause carries user_id for every table, and
+    is_global ONLY for the 3 library tables (NOT document_relationships, which
+    is user-scoped by design)."""
     _migration_applied_skip(await _table_exists(pg_pool, table))
     quals = await pg_pool.fetch(
         "SELECT qual FROM pg_policies WHERE schemaname='public' AND tablename=$1 AND cmd='SELECT'",
@@ -189,9 +206,18 @@ async def test_dm_table_select_policy_shape(pg_pool, table):
     )
     assert quals, f"{table} has no SELECT policy"
     joined = " ".join((r["qual"] or "") for r in quals)
-    assert "user_id" in joined and "is_global" in joined, (
-        f"{table} SELECT policy missing user_id/is_global: {joined!r}"
+    assert "user_id" in joined, (
+        f"{table} SELECT policy missing user_id: {joined!r}"
     )
+    if table in _IS_GLOBAL_TABLES:
+        assert "is_global" in joined, (
+            f"{table} SELECT policy missing is_global (library table): {joined!r}"
+        )
+    else:
+        # document_relationships: user-scoped only, NO is_global.
+        assert "is_global" not in joined, (
+            f"{table} SELECT policy must be user-scoped only (no is_global): {joined!r}"
+        )
 
 
 # ---------------------------------------------------------------------------

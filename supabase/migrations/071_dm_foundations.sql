@@ -132,14 +132,20 @@ CREATE POLICY "Users can update own document_views" ON public.document_views
 CREATE POLICY "Users can delete own document_views" ON public.document_views
   FOR DELETE USING ((auth.uid() = user_id));
 
--- document_relationships policies
+-- document_relationships policies (USER-SCOPED ONLY — this table has NO is_global
+-- column by design: a relationship is an inherently user-owned link between a
+-- user's OWN documents, never a global/admin-seeded shareable object. Only the
+-- 3 library/config tables (document_views, classification_rules,
+-- metadata_field_definitions) carry is_global. The authoritative per-table DDL
+-- (RESEARCH §3.2 / PATTERNS §3.2, cited ARCHITECTURE.md §2) omits is_global here;
+-- the generic 4-table RLS template's is_global clauses do not apply to this table.)
 ALTER TABLE public.document_relationships ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own and global document_relationships" ON public.document_relationships
-  FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own document_relationships" ON public.document_relationships
+  FOR SELECT USING ((auth.uid() = user_id));
 CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships
-  FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+  FOR INSERT WITH CHECK ((auth.uid() = user_id));
 CREATE POLICY "Users can update own document_relationships" ON public.document_relationships
-  FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+  FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
 CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships
   FOR DELETE USING ((auth.uid() = user_id));
 
