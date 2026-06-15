@@ -180,3 +180,55 @@ Authored against `095-SKETCH-GROUNDING.md` (real Deep SSE event vocabulary, the 
 ## Downstream
 
 The design substrate for **Phase 095 (Chat Tool-Card Unification)**. Each sketch README carries a reuse-vs-net-new Build Handover; `references/chat-tool-card-unification.md` consolidates the decisions + the build-once inventory. G-2 acceptance bar met; next on the 095 path is `/gsd:plan-phase 095` (or `/gsd:ui-phase 095` for a UI-SPEC). The skill auto-loads during build for the chat tool-card frame, the run-status strip, scroll, and the output-files area.
+
+---
+
+# Session 5 — Workflow Studio: Authoring, Publish, Run Surface & Navigation (Phase 103)
+
+**Date:** 2026-06-14
+**Sketches processed:** 6 (018–023 — all included)
+**Design areas:** Workflow Authoring · Publish Gauntlet · Workflows Page (updated) · Workflow Run Surface · App Information Architecture
+**Skill output:** appended to `./.claude/skills/sketch-findings-agentic-rag/` (5 new reference files: `workflow-authoring.md`, `publish-gauntlet.md`, `workflows-page.md` [extended], `workflow-run-surface.md`, `app-information-architecture.md`)
+
+## Included Sketches
+
+| # | Name | Winner | Design Area / Reference |
+|---|------|--------|-------------------------|
+| 018 | requirement-first-authoring | A — Describe-box-first, form-led, post-draft grounding | Workflow Authoring → `references/workflow-authoring.md` |
+| 019 | draft-refine-and-readonly-graph | D — Read-only vertical phase-spine + side-panel forms | Workflow Authoring → `references/workflow-authoring.md` |
+| 020 | publish-gauntlet-honesty | B — Real 8-stage progress-spine, judge hard-wall, verbatim PublishVerdict | Publish Gauntlet → `references/publish-gauntlet.md` |
+| 021 | workflows-page-and-nav-map | A — Project-folder rail + drafts shelf + derived strictness-tier badge | Workflows Page (updated) → `references/workflows-page.md` |
+| 022 | workflow-run-in-thread | A — Panel owns the meaningful spine, chat thin receipt, composer locked-in-thread | Workflow Run Surface → `references/workflow-run-surface.md` |
+| 023 | app-linkage-map | A — Three-homes no-router contract; publish-is-the-test | App Information Architecture → `references/app-information-architecture.md` |
+
+## Excluded Sketches
+
+| # | Name | Reason |
+|---|------|--------|
+| 017 | cross-thread-run-stop | Orphan — no README authored; not packaged into a reference. (The cross-thread "live somewhere else" / stop question routed forward from Session 1 remains open; not part of this Phase 103 batch.) |
+
+## Grounding
+
+Authored against `103-grounding/` (`BRIEF.md`, plus `022-RUN-SURFACE-AUDIT.md` and `APP-LINKAGE-MAP.md`) and the `MANIFEST.md` decision log — the real `WorkflowDefinition` / `PhaseSpec` schema, the real `PublishVerdict` field set + the 10 `blocked_stage` codes, the 8-stage publish gauntlet, and the existing endpoints. The honest real-vs-net-new boundary is carried into every reference file (only `GET /workflows/published` + `POST /workflows/{id}/publish` are live).
+
+## Design Direction
+
+**Calm instrument, now an authoring + governance surface — and the run made honest.** v2.9 Workflow Studio gives the workflow ENGINE a face: you describe a recurring task in plain language, the AI drafts the whole definition one-shot, you refine by form on a read-only graph, and a real publish gauntlet (golden run on your KB + an independent judge) is the ONLY trial run before it can ever run. The same restraint governs throughout — a 3-second read at rest, tiered guidance (inline ⓘ popovers · dismissible banners · a modal only for a must-decide grey area), real-enum strictness only (never invented labels), and load-bearing honesty (every net-new wire field flagged in-surface). The run surface keeps the seam clean: the workspace panel owns the meaningful phase spine, the chat carries only a thin run receipt.
+
+## Key Decisions
+
+1. **Requirement-first, form-led authoring (018-A, supersedes 013's talk-led).** First screen is JUST the describe box (3-second read). The AI drafts the whole `WorkflowDefinition` one-shot + sets a real-enum strictness dial (`citation_policy` strict\|flag\|partial\|draft, presets + advanced). Grounding (project-folder confirm + template upload/fill-contract + the two-layer guarantee) and the BATCHED no-silent-substitution grey-area confirm appear POST-DRAFT, revealed by the draft — never faked up front.
+
+2. **Refine by FORM on a read-only VERTICAL phase-spine graph (019-D).** Linear i→i+1 spine + one dashed `skip_to_phase`; NO drag-canvas, no `depends_on` / parallel lanes, no horizontal-graph slider, no inline-expand. Each of the six `phase_type`-conditioned forms opens in a fixed-width 400px right-side push/split panel (`minmax(0,1fr)`; 44px resting rail; mobile bottom-sheet).
+
+3. **Publish IS the test — the real 8-stage gauntlet, judge as a hard wall (020-B).** owner → definition-valid → business_requirement → lint → interactive-phase → REAL golden run on the project KB → structural gate → independent judge → flip, collapsed to a horizontal progress-spine so the long SYNCHRONOUS golden-run wait is the canvas hero. `PublishVerdict`'s 5 fields render VERBATIM from the server. Judge = NO override (the "publish anyway" rendered struck-through), per-criterion `{criterion, score, evidence}` rows + a one-paragraph server summary. "View the golden run" gates on `golden_run_id != null`; un-producible verdict fails closed; HTTP mapping distinguished using only the 10 real `blocked_stage` codes.
+
+4. **Workflows page extends 012, doesn't replace it (021-A, D7–D14).** The Run-into-a-thread launch handoff stays byte-for-byte 012's; 021 adds a left project-folder filter rail (the live `GET /workflows/published?project_folder_id` query), a Drafts & seeds shelf above Published (calm collapsed search + dismissible honesty banner), per-card ESSENCE (icon+name+vN + source tag + 6-type phase-chain glyphs incl. `llm_emit` ◆ + entry `input_keys` + strictness-tier badge), a strictness-tier badge DERIVED via `deriveTier()` (`TIERS` = single source of truth, real vocab only), Run = a mode of a thread, and Tweak forks a NEW draft version (a draft CANNOT be Run directly — publish gauntlet IS the test).
+
+5. **Run surface — panel owns the MEANINGFUL spine, chat is a thin receipt (022-A).** The workspace PANEL owns the single live meaningful phase spine (008-D PhaseTimeline/PhaseCard, stays visible during the run); the CHAT carries only a thin run receipt (015-C never-vanishes status strip + mode badge) that resolves into a three-way deliverable/failure/cancel terminal — never a second embedded 6-row timeline. A meaningful step = human title (NET-NEW `phase.name`) + "Phase i of N · type" + a RUNNING-phase-ONLY honest activity line + a gate chip only when a `PhaseSpec.validator` exists. Composer A (locked-in-thread, ★) makes the run own the composer (status chip + Cancel; only the scoped 006-C ask_user pause replies; unlocks to Deep on resolve; parallel-thread escape hatch).
+
+6. **Three-homes navigation contract, NO router (023-A; all OD-1..11 ADOPTED).** THREE HOMES — Builder (authoring) / Workflows-page (library + launch) / Chat-thread (execution) — wired with NO router; every redirect is a `useState<ActiveView>` switch, intra-page state, a modal, or create-thread-then-switch. PUBLISH IS THE TEST: a draft cannot be Run directly; Run appears ONLY once published; publish success auto-returns to the Workflows page with the new version + a Run CTA; Run = create thread + set workflow mode + switch to Chat. One net-new "Workflows" nav entry (extend the `ActiveView` union + a shared `NAV_ITEMS`, delete the dead AppDock, distinct non-gear icon); Tweak forks a new-version draft into the Builder; the locked-run escape hatch is a sibling Deep thread.
+
+## Downstream
+
+The design substrate for **Phase 103 (Workflows page + NL authoring; G-2 sketch FIRES)** and the surrounding Workflow Studio build. All 11 open IA decisions (OD-1..11) are ADOPTED 2026-06-14 ("publish is the test") — this is the locked contract, not open questions. Honest real-vs-net-new boundary preserved in every reference (only `GET /workflows/published` + `POST /workflows/{id}/publish` are live). Five new reference files packaged; the skill now spans 18 reference files across five sessions. G-2 acceptance bar met; next on the 103 path is the UI design contract / plan-phase. The skill auto-loads during build for the workflow Builder/authoring, the publish gauntlet, the Workflows page, the workflow run surface, and the app navigation/IA.

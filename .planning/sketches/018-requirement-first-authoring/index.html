@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 018 — Requirement-First Authoring (grey-area confirm loop)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 018 — Requirement-First Authoring · Phase 103 · NET-NEW
+   Q: You describe a business requirement, the AI drafts the whole
+      workflow AND sets a strictness dial — how does it CONFIRM its
+      grey-area guesses (ambiguous folder ref, vague scope, unmapped
+      template placeholder) instead of silently inventing them?
+   The grey-area confirm loop is the CENTERPIECE.
+   Extends 013 (describe/refine, inferred-inputs strip). Adds the
+   6th phase type (llm_emit), the real strictness dial (citation_policy
+   strict|flag|partial|draft), and the no-silent-substitution loop.
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { height: calc(100vh - 52px); overflow: hidden; }
+
+/* ── header ── */
+.builder-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+.builder-head .bh-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); display:flex; align-items:center; gap:var(--space-2); }
+.builder-head .netnew { font-family: var(--font-mono); font-size: 9px; padding: 2px 7px; border-radius: var(--radius-full); background: var(--color-accent-violet); color: #fff; }
+.builder-head .spacer { flex: 1; }
+.bind-badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 4px var(--space-3); border-radius: var(--radius-full); border:1px solid; font-family:var(--font-mono); }
+.bind-badge.blocked { background: var(--color-warning-dim); color: var(--color-warning); border-color: hsl(38 92% 60% / .4); }
+.bind-badge.clear { background: var(--color-success-dim); color: var(--color-success); border-color: hsl(142 71% 45% / .35); }
+.bind-badge.pending { background: var(--color-muted); color: var(--color-text-dim); border-color: var(--color-border); }
+.publish-btn { font-size: var(--text-sm); font-weight: 600; padding: 7px var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border: none; cursor: pointer; transition: filter var(--dur-fast) var(--ease-out); }
+.publish-btn:hover:not(.disabled) { filter:brightness(1.08); }
+.publish-btn.disabled { background: var(--color-muted); color: var(--color-text-dim); cursor: not-allowed; }
+
+/* ── layouts per variant ── */
+.body-area { display: grid; height: calc(100vh - 52px - 53px); overflow: hidden; }
+.body-area.vA { grid-template-columns: 360px 1fr; }
+.body-area.vB { grid-template-columns: 1fr; }
+.body-area.vC { grid-template-columns: 360px 1fr; }
+/* EMPTY first-screen: ONE calm column, no rail — the describe box IS the whole screen. */
+.body-area.first { grid-template-columns: 1fr; }
+
+/* ── describe-first hero (EMPTY — reads in 3 seconds) ── */
+.describe-first { height:100%; overflow-y:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: var(--space-8) var(--space-6); background: var(--color-bg); }
+.df-inner { width:100%; max-width: 640px; display:flex; flex-direction:column; gap:var(--space-4); animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+.df-lead { text-align:center; }
+.df-lead .df-glyph { font-size: 30px; opacity:.9; }
+.df-lead .df-title { font-family: var(--font-headline); font-weight:700; font-size: var(--text-2xl); color: var(--color-text); margin-top: var(--space-2); }
+.df-box { position:relative; }
+.df-req-label { font-size: 10px; text-transform:uppercase; letter-spacing:.05em; color: var(--color-primary); font-family: var(--font-mono); margin-bottom: var(--space-2); display:flex; align-items:center; gap:6px; }
+.df-req-label .req-star { color: var(--color-warning); }
+.df-req-label .req-tag { color: var(--color-text-dim); text-transform:none; letter-spacing:0; }
+.df-input { width:100%; background: var(--color-surface); border:1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); color: var(--color-text); font-family: inherit; font-size: var(--text-md); line-height:1.6; resize:none; transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast); }
+.df-input:focus { outline:none; border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+.df-input.req-empty { border-color: hsl(38 92% 60% / .5); }
+.df-actions { display:flex; align-items:center; gap: var(--space-3); }
+.df-draft-btn { flex:1; font-size: var(--text-md); font-weight:600; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border:none; cursor:pointer; transition: filter var(--dur-fast); }
+.df-draft-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.df-draft-btn:disabled { background: var(--color-muted); color: var(--color-text-dim); cursor:not-allowed; }
+.df-hint { text-align:center; font-size: 12px; color: var(--color-text-muted); line-height:1.55; padding: 0 var(--space-4); }
+.df-hint b { color: var(--color-text); font-weight:600; }
+.df-warn { font-size: 11px; color: var(--color-warning); display:none; }
+.df-warn.show { display:block; }
+
+/* ── talk rail (shared) ── */
+.talk { display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-bg-elev1); overflow: hidden; }
+.talk-scroll { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.talk-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); font-family: var(--font-mono); }
+.msg { font-size: 13px; line-height: 1.55; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.msg.user { align-self: flex-end; max-width: 90%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-md); }
+.msg.ai { display: flex; gap: var(--space-2); color: var(--color-text); }
+.msg.ai .bot { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; }
+.msg.ai.thinking .bot { animation: brandPulse 1.5s infinite; }
+.msg.ai .mt { background: var(--color-surface); border: 1px solid var(--color-border-soft); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
+.talk-composer { padding: var(--space-3); border-top: 1px solid var(--color-border); }
+.req-label { font-size: 10px; text-transform: uppercase; letter-spacing:.05em; color: var(--color-primary); font-family: var(--font-mono); margin-bottom: 5px; display:flex; align-items:center; gap:5px; }
+.req-label .req-star { color: var(--color-warning); }
+.talk-input { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: none; transition: border-color var(--dur-fast) var(--ease-out); }
+.talk-input:focus { outline:none; border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+.talk-input.req-empty { border-color: hsl(38 92% 60% / .5); }
+.req-warn { font-size: 10px; color: var(--color-warning); margin-top: 5px; display:none; }
+.req-warn.show { display:block; }
+.compose-btn { margin-top: var(--space-2); width:100%; font-size: var(--text-sm); font-weight:600; padding: 8px; border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border:none; cursor:pointer; transition: filter var(--dur-fast); }
+.compose-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.compose-btn:disabled { background: var(--color-muted); color: var(--color-text-dim); cursor:not-allowed; }
+.talk-hint { font-size: 10px; color: var(--color-text-dim); margin-top: 6px; text-align: center; }
+
+/* ── draft canvas (shared) ── */
+.canvas { overflow-y: auto; padding: var(--space-5) var(--space-6) 80px; background: var(--color-bg); }
+.canvas-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); color: var(--color-text-dim); text-align: center; }
+.canvas-empty .big { font-size: 32px; }
+
+/* one-shot composing state */
+.composing-card { max-width: 460px; margin: 14vh auto 0; text-align:center; display:flex; flex-direction:column; align-items:center; gap:var(--space-4); }
+.composing-orb { width:56px; height:56px; border-radius:50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); animation: brandPulse 1.5s infinite; box-shadow: var(--shadow-glow-primary); }
+.composing-card .ct { font-family:var(--font-headline); font-weight:600; font-size: var(--text-lg); color: var(--color-text); }
+.composing-card .cs { font-size: 12.5px; color: var(--color-text-muted); max-width: 360px; }
+.composing-steps { display:flex; flex-direction:column; gap:6px; width:100%; max-width: 360px; text-align:left; margin-top:var(--space-2); }
+.cstep { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--color-text-dim); padding:5px 0; }
+.cstep .dot { width:14px; height:14px; border-radius:50%; border:1.5px solid var(--color-border); display:grid; place-items:center; font-size:8px; flex-shrink:0; }
+.cstep.done { color:var(--color-text); } .cstep.done .dot { background:var(--color-success-dim); border-color:var(--color-success); color:var(--color-success); }
+.cstep.active { color:var(--color-text); } .cstep.active .dot { border-color:var(--color-primary); animation:pulseGlow 1.4s infinite; }
+.note-bar { font-size:10px; color:var(--color-text-dim); margin-top:var(--space-3); font-style:italic; }
+
+/* auto-repair transient micro-state */
+.repair-flash { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--color-warning); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); border-radius:var(--radius-md); padding:7px var(--space-3); margin:0 auto var(--space-4); max-width:380px; }
+.repair-flash .spin { width:12px; height:12px; border:2px solid hsl(38 92% 60% / .35); border-top-color:var(--color-warning); border-radius:50%; animation:repairspin .8s linear infinite; }
+@keyframes repairspin { to { transform:rotate(360deg); } }
+.repair-flash .x { margin-left:auto; cursor:default; opacity:.5; }
+
+/* ── strictness dial ── */
+.dial { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); margin-bottom: var(--space-5); }
+.dial-summary { width:100%; display:flex; align-items:center; gap:var(--space-2); text-align:left; border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-5); cursor:pointer; font-family:inherit; color:var(--color-text); transition:border-color var(--dur-fast) var(--ease-out); }
+.dial-summary:hover { border-color:var(--color-primary-glow); }
+.dial-summary .ds-ico { font-size:14px; opacity:.8; }
+.dial-summary .ds-txt { flex:1; font-size:12px; color:var(--color-text-muted); }
+.dial-summary .ds-txt b { color:var(--color-text); }
+.dial-summary .ds-enum { font-family:var(--font-mono); font-size:10px; color:var(--color-accent-violet); }
+.dial-summary .ds-ai { font-size:9px; padding:2px 7px; border-radius:var(--radius-full); background:hsl(258 90% 66% / .15); color:var(--color-accent-violet); }
+.dial-summary .ds-adj { font-size:11px; color:var(--color-primary); }
+.dial-h { display:flex; align-items:center; gap:var(--space-2); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); }
+.dial-h .ai-set { margin-left:auto; font-size:9px; padding:2px 7px; border-radius:var(--radius-full); background:hsl(258 90% 66% / .15); color:var(--color-accent-violet); text-transform:none; letter-spacing:0; }
+.preset-row { display:flex; gap:var(--space-2); }
+.preset { flex:1; text-align:left; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-bg-elev1); padding:var(--space-3); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.preset:hover { border-color:var(--color-primary-glow); }
+.preset.on { border-color:var(--color-primary); background:var(--color-primary-dim); }
+.preset .pn { font-weight:600; font-size:var(--text-sm); display:flex; align-items:center; gap:6px; }
+.preset .pc { font-size:11px; color:var(--color-text-muted); margin-top:4px; line-height:1.4; }
+.preset.on .pn { color:var(--color-primary); }
+.preset .penum { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); margin-top:6px; display:block; }
+.dial-adv-toggle { margin-top:var(--space-3); font-size:11px; color:var(--color-primary); background:none; border:none; cursor:pointer; display:flex; align-items:center; gap:5px; padding:0; }
+.dial-adv-toggle .caret { transition:transform var(--dur-fast); } .dial-adv-toggle.open .caret { transform:rotate(90deg); }
+.dial-adv { margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-border-soft); display:none; animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.dial-adv.open { display:block; }
+.adv-block { margin-bottom:var(--space-4); }
+.adv-block .ab-h { font-size:11px; color:var(--color-text-muted); margin-bottom:var(--space-2); font-weight:600; }
+.gate-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.gate-chip { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:4px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:var(--color-muted); color:var(--color-text-dim); cursor:pointer; font-family:var(--font-mono); transition:all var(--dur-fast); }
+.gate-chip.on { background:var(--color-success-dim); color:var(--color-success); border-color:hsl(142 71% 45% / .35); }
+.gate-chip .gck { width:13px; height:13px; border-radius:3px; border:1px solid currentColor; display:grid; place-items:center; font-size:8px; }
+.gate-chip .gate-cfg { margin-left:4px; padding:1px 5px; border-radius:var(--radius-sm); background:hsl(142 71% 45% / .18); font-size:9px; }
+.judge-banner { display:flex; align-items:flex-start; gap:8px; margin-top:var(--space-3); padding:var(--space-3); border:1px solid hsl(258 90% 66% / .4); border-radius:var(--radius-md); background:hsl(258 90% 66% / .1); }
+.judge-banner .jb-ico { font-size:15px; line-height:1.2; flex-shrink:0; }
+.judge-banner .jb-txt { font-size:10.5px; color:var(--color-text-muted); line-height:1.45; }
+.judge-banner .jb-txt b { color:var(--color-accent-violet); }
+.seg { display:inline-flex; border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; }
+.seg button { background:var(--color-bg-elev1); color:var(--color-text-muted); border:none; border-right:1px solid var(--color-border); padding:6px var(--space-3); font-size:11px; font-family:var(--font-mono); cursor:pointer; transition:all var(--dur-fast); }
+.seg button:last-child { border-right:none; }
+.seg button.on { background:var(--color-primary-dim); color:var(--color-primary); }
+.seg button:hover:not(.on) { background:var(--color-accent); color:var(--color-text); }
+.seg-caption { font-size:11px; color:var(--color-text-muted); margin-top:6px; min-height:32px; }
+.policy-grey { font-size:10px; color:var(--color-text-dim); margin-top:var(--space-2); display:flex; align-items:center; gap:6px; opacity:.7; }
+.policy-grey .gtag { font-family:var(--font-mono); font-size:8px; padding:1px 5px; border-radius:var(--radius-sm); background:var(--color-muted); }
+
+/* ── inferred inputs / assets strip ── */
+.inputs-strip { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); margin-bottom: var(--space-5); }
+.inputs-strip .is-h { display: flex; align-items: center; gap: var(--space-2); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: var(--space-3); }
+.input-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items:center; }
+.input-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px var(--space-3); border-radius: var(--radius-md); background: var(--color-muted); border: 1px solid var(--color-border-soft); font-size: 12px; }
+.input-chip .ic-type { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); }
+.input-chip.template { border-color: hsl(258 90% 66% / .4); }
+.assets-h { display:flex; align-items:center; gap:var(--space-2); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-accent-violet); font-family:var(--font-mono); margin:var(--space-4) 0 var(--space-2); }
+
+/* ── phase flow (read-only spine) ── */
+.flow { list-style: none; margin: 0; padding: 0; }
+.flow > li { position: relative; padding-left: 30px; padding-bottom: var(--space-3); }
+.flow > li:last-child { padding-bottom: 0; }
+.flow > li::before { content:''; position:absolute; left:10px; top:34px; bottom:-4px; width:2px; background: var(--color-border-soft); }
+.flow > li:last-child::before { display:none; }
+.flow-node { position:absolute; left:0; top:12px; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:10px; background: var(--color-surface); border:1.5px solid var(--color-border); color: var(--color-text-dim); z-index:1; }
+.pcard { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-3); transition: all var(--dur-base) var(--ease-out); position:relative; }
+.pcard.emit { border-color: hsl(258 90% 66% / .5); background: linear-gradient(180deg, hsl(258 90% 66% / .05), var(--color-surface)); }
+.pcard.has-grey { border-color: hsl(38 92% 60% / .5); }
+.pcard-top { display: flex; align-items: center; gap: var(--space-2); }
+.pcard .p-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.ptype { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-sm); text-transform: uppercase; }
+.pt-agent { background: var(--color-success-dim); color: var(--color-success); }
+.pt-single { background: var(--color-primary-dim); color: var(--color-primary); }
+.pt-human { background: var(--color-warning-dim); color: var(--color-warning); }
+.pt-prog { background: var(--color-muted); color: var(--color-text-muted); }
+.pt-batch { background: hsl(258 90% 66% / .15); color: var(--color-accent-violet); }
+.pt-emit { background: hsl(258 90% 66% / .22); color: var(--color-accent-violet); }
+.pcard .p-note { font-size: 11.5px; color: var(--color-text-muted); margin-top: 5px; }
+.pcard-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: var(--space-2); align-items: center; }
+.tchip { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-muted); border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm); }
+.tchip.scope { color: var(--color-success); border-color: hsl(142 71% 45% / .35); }
+.tchip.scope.unconfirmed { color: var(--color-warning); border-color: hsl(38 92% 60% / .5); background:var(--color-warning-dim); }
+.tchip.gate { color: var(--color-primary); border-color: var(--color-primary-glow); }
+.tchip.cit { color: var(--color-accent-violet); border-color: hsl(258 90% 66% / .4); }
+.tchip.placeholder { color: var(--color-warning); border-color: hsl(38 92% 60% / .5); background:var(--color-warning-dim); }
+
+/* ── grey-area: shared confirm-card vocabulary ── */
+.grey-card { border:1px solid hsl(38 92% 60% / .5); background:var(--color-warning-dim); border-radius:var(--radius-md); padding:var(--space-3); animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.grey-card.resolved { border-color:hsl(142 71% 45% / .35); background:var(--color-success-dim); }
+.grey-head { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; }
+.grey-head .gico { font-size:14px; }
+.grey-kind { font-family:var(--font-mono); font-size:8px; padding:1px 6px; border-radius:var(--radius-sm); background:hsl(38 92% 60% / .2); color:var(--color-warning); text-transform:uppercase; margin-left:auto; }
+.grey-card.resolved .grey-kind { background:hsl(142 71% 45% / .2); color:var(--color-success); }
+.grey-said { font-size:11.5px; color:var(--color-text-muted); margin-top:6px; }
+.grey-said .quote { color:var(--color-text); font-style:italic; }
+.grey-read { font-size:12.5px; margin-top:8px; padding:8px var(--space-3); background:var(--color-surface); border:1px solid var(--color-border-soft); border-radius:var(--radius-sm); display:flex; align-items:center; gap:8px; }
+.grey-read .ico { color:var(--color-success); } .grey-read .bound-id { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); margin-left:auto; }
+.grey-alts { margin-top:8px; display:flex; flex-direction:column; gap:5px; }
+.grey-alt { font-size:11.5px; padding:6px var(--space-3); border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-bg-elev1); cursor:pointer; display:flex; align-items:center; gap:8px; transition:all var(--dur-fast); }
+.grey-alt:hover { border-color:var(--color-primary-glow); background:var(--color-accent); }
+.grey-alt .a-path { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); margin-left:auto; }
+.grey-actions { display:flex; gap:var(--space-2); margin-top:var(--space-3); }
+.gbtn { font-size:11.5px; font-weight:600; padding:6px var(--space-4); border-radius:var(--radius-sm); cursor:pointer; border:1px solid; transition:all var(--dur-fast); }
+.gbtn.confirm { background:var(--color-success); color:hsl(160 60% 8%); border-color:var(--color-success); }
+.gbtn.confirm:hover { filter:brightness(1.1); }
+.gbtn.correct { background:transparent; color:var(--color-text-muted); border-color:var(--color-border); }
+.gbtn.correct:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.grey-resolved-line { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--color-success); }
+.grey-batch { font-family:var(--font-mono); font-size:8px; padding:1px 6px; border-radius:var(--radius-full); background:var(--color-muted); color:var(--color-text-dim); flex-shrink:0; }
+
+/* ── A: batched assumptions panel ── */
+.assume-panel { border:1px solid hsl(38 92% 60% / .5); background:var(--color-surface); border-radius:var(--radius-lg); margin-bottom:var(--space-5); overflow:hidden; animation:fadeSlideUp var(--dur-slow) var(--ease-out); }
+.assume-panel.cleared { border-color:hsl(142 71% 45% / .35); }
+.assume-bar { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-4); background:var(--color-warning-dim); border-bottom:1px solid hsl(38 92% 60% / .3); }
+.assume-panel.cleared .assume-bar { background:var(--color-success-dim); border-color:hsl(142 71% 45% / .3); }
+.assume-bar .ab-ico { font-size:16px; }
+.assume-bar .ab-title { font-weight:600; font-size:var(--text-sm); }
+.assume-bar .ab-count { margin-left:auto; font-family:var(--font-mono); font-size:11px; padding:2px var(--space-2); border-radius:var(--radius-full); background:var(--color-warning); color:hsl(40 60% 10%); }
+.assume-panel.cleared .ab-count { background:var(--color-success); color:hsl(160 60% 10%); }
+.assume-body { padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-3); }
+.assume-foot { padding:var(--space-3) var(--space-4); border-top:1px solid var(--color-border-soft); display:flex; align-items:center; gap:var(--space-3); }
+.assume-foot .af-note { font-size:11px; color:var(--color-text-dim); flex:1; }
+.lock-til { font-size:11px; color:var(--color-warning); display:flex; align-items:center; gap:5px; }
+.assume-panel.cleared .lock-til { color:var(--color-success); }
+
+/* ── B: inline checkpoint stepper context ── */
+.checkpoint-wrap { padding:var(--space-5) var(--space-6); max-width:720px; margin:0 auto; }
+.cp-progress { display:flex; align-items:center; gap:6px; margin-bottom:var(--space-4); font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono); }
+.cp-pip { width:15px; height:15px; border-radius:50%; background:var(--color-border); color:var(--color-text-dim); display:inline-grid; place-items:center; font-size:8px; font-weight:700; border:1px solid var(--color-border); }
+.cp-pip.done { background:var(--color-success); color:hsl(160 60% 8%); border-color:var(--color-success); }
+.cp-pip.active { background:transparent; color:var(--color-warning); border:2px solid var(--color-warning); transform:scale(1.15); animation:pulseGlow 1.4s infinite; }
+.cp-stream { display:flex; flex-direction:column; gap:var(--space-3); }
+.cp-ai { display:flex; gap:var(--space-2); }
+.cp-ai .bot { width:24px; height:24px; border-radius:50%; background:linear-gradient(135deg,var(--color-primary),var(--color-accent-violet)); flex-shrink:0; }
+.cp-ai .body { flex:1; }
+.cp-ai .lead { font-size:13px; color:var(--color-text); margin-bottom:var(--space-2); }
+.cp-resolved-mini { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--color-success); padding:6px var(--space-3); border:1px solid hsl(142 71% 45% / .25); border-radius:var(--radius-sm); background:var(--color-success-dim); }
+.cp-done-banner { text-align:center; padding:var(--space-5); border:1px dashed hsl(142 71% 45% / .4); border-radius:var(--radius-lg); background:var(--color-success-dim); color:var(--color-success); margin-top:var(--space-3); }
+.cp-ai .seq { font-size:9px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:4px; }
+.cp-ai.active .body { animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.cp-user { align-self:flex-end; max-width:80%; font-size:12px; background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); padding:var(--space-2) var(--space-3); border-radius:var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-md); }
+.cp-user .cu-tag { font-size:9px; font-family:var(--font-mono); color:var(--color-text-dim); margin-right:6px; text-transform:uppercase; }
+.cp-req { align-self:flex-end; max-width:88%; font-size:12.5px; line-height:1.5; background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); padding:var(--space-3); border-radius:var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-md); }
+.cp-req .cr-label { font-size:9px; font-family:var(--font-mono); color:var(--color-primary); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:4px; }
+.cp-composer { display:flex; gap:var(--space-2); margin-top:var(--space-4); padding:var(--space-3); border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); color:var(--color-text-dim); font-size:12px; align-items:center; }
+.cp-composer .cc-input { flex:1; color:var(--color-text-dim); }
+.cp-composer .cc-send { font-size:11px; font-weight:600; padding:5px var(--space-3); border-radius:var(--radius-sm); background:var(--color-muted); color:var(--color-text-dim); border:none; }
+
+/* ── C: confirm chips on draft ── */
+.chip-confirm { display:inline-flex; align-items:center; gap:5px; font-size:9px; font-family:var(--font-mono); padding:1px 6px; border-radius:var(--radius-full); background:var(--color-warning); color:hsl(40 60% 10%); cursor:pointer; border:none; animation:pulseGlow 2s infinite; }
+.chip-confirm:hover { filter:brightness(1.08); }
+.chip-pop { position:fixed; z-index:8001; width:320px; background:var(--color-surface-hi); border:1px solid hsl(38 92% 60% / .5); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:var(--space-4); animation:fadeSlideUp var(--dur-fast) var(--ease-out); }
+.chip-pop::before { content:''; position:absolute; top:-7px; left:24px; width:12px; height:12px; background:var(--color-surface-hi); border-left:1px solid hsl(38 92% 60% / .5); border-top:1px solid hsl(38 92% 60% / .5); transform:rotate(45deg); }
+.chip-pop .cp-pinned { font-size:9px; font-family:var(--font-mono); color:var(--color-text-dim); margin-bottom:6px; }
+#chipBackdrop { position:fixed; inset:0; z-index:8000; }
+.draft-meter { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); margin-bottom:var(--space-5); }
+.draft-meter .dm-ico { font-size:18px; }
+.draft-meter .dm-txt { flex:1; }
+.draft-meter .dm-title { font-weight:600; font-size:var(--text-sm); }
+.draft-meter .dm-sub { font-size:11px; color:var(--color-text-muted); margin-top:2px; }
+.dm-track { width:120px; height:6px; border-radius:3px; background:var(--color-muted); overflow:hidden; }
+.dm-fill { height:100%; background:var(--color-warning); transition:width var(--dur-slow) var(--ease-out), background var(--dur-slow); border-radius:3px; }
+.draft-meter.clear { border-color:hsl(142 71% 45% / .35); }
+.draft-meter.clear .dm-fill { background:var(--color-success); }
+.tchip.resolved { color:var(--color-success); border-color:hsl(142 71% 45% / .35); background:var(--color-success-dim); }
+
+/* ── shared published note ── */
+.published-note { padding: var(--space-3) var(--space-6); border-top: 1px dashed var(--color-border-soft); font-size: 11px; color: var(--color-text-dim); line-height: 1.5; }
+.published-note b { color: var(--color-primary); }
+
+/* ── grounding strip (NET-NEW: describe-step grounding affordances) ── */
+.ground { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-3); margin-top: var(--space-3); }
+.ground-h { display:flex; align-items:center; gap:var(--space-2); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-2); }
+.ground-h .gnetnew { font-family:var(--font-mono); font-size:8px; padding:1px 6px; border-radius:var(--radius-full); background:var(--color-accent-violet); color:#fff; text-transform:none; letter-spacing:0; margin-left:auto; }
+.ground-seq { font-size:10.5px; color:var(--color-text-dim); line-height:1.5; margin-bottom:var(--space-3); }
+.ground-seq b { color:var(--color-text-muted); }
+.ground-seq .opt { color:var(--color-accent-violet); font-weight:600; }
+.ground-seq .req { color:var(--color-warning); font-weight:600; }
+.ground-row { display:flex; flex-direction:column; gap:var(--space-2); }
+.ground-aff { display:flex; align-items:center; gap:var(--space-2); border:1px dashed var(--color-border); border-radius:var(--radius-md); background:var(--color-bg-elev1); padding:var(--space-2) var(--space-3); cursor:pointer; font-family:inherit; color:var(--color-text-muted); font-size:12px; text-align:left; width:100%; transition:all var(--dur-fast) var(--ease-out); }
+.ground-aff:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.ground-aff .ga-ico { font-size:14px; flex-shrink:0; }
+.ground-aff .ga-txt { flex:1; }
+.ground-aff .ga-mode { font-family:var(--font-mono); font-size:8px; padding:1px 6px; border-radius:var(--radius-sm); background:var(--color-muted); color:var(--color-text-dim); flex-shrink:0; }
+.ground-aff.attached { border-style:solid; border-color:hsl(258 90% 66% / .4); background:hsl(258 90% 66% / .07); color:var(--color-text); }
+.ground-aff.attached .ga-mode { background:hsl(258 90% 66% / .18); color:var(--color-accent-violet); }
+.ground-aff.set { border-style:solid; border-color:hsl(142 71% 45% / .35); background:var(--color-success-dim); color:var(--color-text); }
+.ground-aff.set .ga-mode { background:hsl(142 71% 45% / .2); color:var(--color-success); }
+.ga-clear { margin-left:6px; font-size:10px; color:var(--color-text-dim); border:none; background:none; cursor:pointer; padding:2px 4px; border-radius:var(--radius-sm); }
+.ga-clear:hover { color:var(--color-warning); background:var(--color-warning-dim); }
+.ground-aff .ga-meta { display:flex; align-items:center; gap:5px; flex:1; min-width:0; }
+.ground-aff .ga-meta .ga-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ground-two-level { font-size:10px; color:var(--color-text-dim); line-height:1.5; margin-top:var(--space-2); padding-top:var(--space-2); border-top:1px solid var(--color-border-soft); }
+.ground-two-level b { color:var(--color-text-muted); }
+.ground-two-level .you-set { color:var(--color-success); }
+.ground-two-level .ai-guess { color:var(--color-warning); }
+
+/* ── folder-tree popover (project folder picker) ── */
+#groundBackdrop { position:fixed; inset:0; z-index:8000; }
+.folder-pop { position:fixed; z-index:8001; width:340px; max-height:420px; display:flex; flex-direction:column; background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); animation:fadeSlideUp var(--dur-fast) var(--ease-out); overflow:hidden; }
+.folder-pop .fp-h { padding:var(--space-3) var(--space-3) var(--space-2); border-bottom:1px solid var(--color-border-soft); }
+.folder-pop .fp-title { font-size:11px; font-weight:600; color:var(--color-text); display:flex; align-items:center; gap:6px; }
+.folder-pop .fp-sub { font-size:10px; color:var(--color-text-dim); margin-top:3px; line-height:1.4; }
+.folder-search { width:100%; margin-top:var(--space-2); background:var(--color-bg-elev1); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px var(--space-3); color:var(--color-text); font-family:inherit; font-size:12px; }
+.folder-search:focus { outline:none; border-color:var(--color-primary-glow); }
+.folder-tree { flex:1; overflow-y:auto; padding:var(--space-2); }
+.folder-node { display:flex; align-items:center; gap:7px; padding:5px var(--space-2); border-radius:var(--radius-sm); cursor:pointer; font-size:12px; color:var(--color-text-muted); transition:background var(--dur-fast); }
+.folder-node:hover { background:var(--color-accent); color:var(--color-text); }
+.folder-node.on { background:var(--color-success-dim); color:var(--color-success); }
+.folder-node .fn-ico { font-size:12px; flex-shrink:0; }
+.folder-node .fn-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.folder-node .fn-id { font-family:var(--font-mono); font-size:8px; color:var(--color-text-dim); }
+.folder-node.on .fn-id { color:var(--color-success); }
+.folder-node.lvl1 { padding-left:var(--space-4); } .folder-node.lvl2 { padding-left:var(--space-6); }
+.folder-pop .fp-foot { padding:var(--space-2) var(--space-3); border-top:1px solid var(--color-border-soft); font-size:9.5px; color:var(--color-text-dim); font-family:var(--font-mono); }
+
+/* ── template fill-contract panel (upload-time inspection — layer 1) ── */
+.fc-pop { position:fixed; z-index:8001; width:420px; max-height:560px; display:flex; flex-direction:column; background:var(--color-surface-hi); border:1px solid hsl(258 90% 66% / .4); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); animation:fadeSlideUp var(--dur-fast) var(--ease-out); overflow:hidden; }
+.fc-pop.rejected { border-color:var(--color-danger); }
+.fc-pop.warn { border-color:hsl(38 92% 60% / .5); }
+.fc-h { padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--color-border-soft); }
+.fc-h .fc-title { font-size:var(--text-sm); font-weight:600; display:flex; align-items:center; gap:7px; }
+.fc-h .fc-file { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-top:3px; }
+.fc-h .fc-parser { font-size:9.5px; color:var(--color-text-dim); margin-top:6px; line-height:1.45; }
+.fc-h .fc-parser code { font-family:var(--font-mono); color:var(--color-accent-violet); font-size:9px; }
+.fc-status { display:flex; align-items:center; gap:7px; padding:var(--space-2) var(--space-4); font-size:11.5px; font-weight:600; }
+.fc-status.clean { background:var(--color-success-dim); color:var(--color-success); }
+.fc-status.rejected { background:var(--color-danger-dim); color:var(--color-danger); }
+.fc-status.warn { background:var(--color-warning-dim); color:var(--color-warning); }
+.fc-status.empty { background:var(--color-muted); color:var(--color-text-muted); }
+.fc-body { flex:1; overflow-y:auto; padding:var(--space-3) var(--space-4); }
+.fc-list { display:flex; flex-direction:column; gap:6px; }
+.fc-ph { display:flex; align-items:center; gap:8px; padding:6px var(--space-3); border:1px solid var(--color-border-soft); border-radius:var(--radius-sm); background:var(--color-bg-elev1); font-size:12px; }
+.fc-ph .fc-tag { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text); }
+.fc-ph .fc-kind { font-family:var(--font-mono); font-size:8px; padding:1px 5px; border-radius:var(--radius-sm); background:var(--color-muted); color:var(--color-text-dim); }
+.fc-ph .fc-state { margin-left:auto; font-size:10px; display:flex; align-items:center; gap:4px; }
+.fc-ph.mapped .fc-state { color:var(--color-success); }
+.fc-ph.unmapped { border-color:hsl(38 92% 60% / .4); background:var(--color-warning-dim); }
+.fc-ph.unmapped .fc-state { color:var(--color-warning); }
+.fc-ph .fc-src { font-family:var(--font-mono); font-size:8.5px; color:var(--color-text-dim); }
+.fc-badtag { font-family:var(--font-mono); font-size:11px; color:var(--color-danger); background:var(--color-danger-dim); border:1px solid hsl(0 72% 51% / .4); border-radius:var(--radius-sm); padding:6px var(--space-3); margin-top:var(--space-2); word-break:break-all; }
+.fc-callout { font-size:11px; line-height:1.5; color:var(--color-text-muted); margin-top:var(--space-3); padding:var(--space-3); border-radius:var(--radius-sm); background:var(--color-bg-elev1); border:1px solid var(--color-border-soft); }
+.fc-callout b { color:var(--color-text); }
+.fc-callout.warn { border-color:hsl(38 92% 60% / .4); }
+.fc-callout.warn b { color:var(--color-warning); }
+.fc-foot { padding:var(--space-3) var(--space-4); border-top:1px solid var(--color-border-soft); display:flex; align-items:center; gap:var(--space-2); }
+.fc-foot .fc-note { flex:1; font-size:10px; color:var(--color-text-dim); line-height:1.4; }
+.fc-foot .fc-act { font-size:11px; font-weight:600; padding:6px var(--space-3); border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg-elev1); color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.fc-foot .fc-act.primary { background:var(--color-primary); color:hsl(240 60% 8%); border-color:var(--color-primary); }
+.fc-foot .fc-act:hover { filter:brightness(1.08); }
+.fc-flagpick { display:flex; flex-wrap:wrap; gap:4px; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--color-border-soft); background:rgba(0,0,0,.18); }
+.fc-flagpick .fcp-lbl { font-size:8.5px; font-family:var(--font-mono); color:var(--color-text-dim); width:100%; }
+.fc-flagpick button { font-size:9px; font-family:var(--font-mono); padding:2px 6px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg-elev1); color:var(--color-text-dim); cursor:pointer; }
+.fc-flagpick button.on { background:var(--color-accent-violet); color:#fff; border-color:var(--color-accent-violet); }
+
+/* ── post-draft grounding-reveal (the draft ASKS for grounding) ── */
+/* a workflow-level project-folder set/confirm bar — appears ONLY after the draft */
+.ground-rail { border: 1px solid hsl(38 92% 60% / .35); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); display:flex; align-items:center; gap: var(--space-3); animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.ground-rail.all-set { border-color: hsl(142 71% 45% / .35); }
+.ground-rail .gr-ico { font-size: 16px; flex-shrink:0; }
+.ground-rail .gr-body { flex:1; min-width:0; }
+.ground-rail .gr-title { font-size: var(--text-sm); font-weight:600; color: var(--color-text); }
+.ground-rail .gr-sub { font-size: 11px; color: var(--color-text-muted); margin-top:2px; line-height:1.45; }
+.ground-rail .gr-folder { display:inline-flex; align-items:center; gap:6px; font-size: 11.5px; font-family: var(--font-mono); padding: 5px var(--space-3); border-radius: var(--radius-md); border:1px solid; cursor:pointer; background:none; transition: all var(--dur-fast); flex-shrink:0; }
+.ground-rail .gr-folder.unset { border-color: hsl(38 92% 60% / .5); background: var(--color-warning-dim); color: var(--color-warning); }
+.ground-rail .gr-folder.set { border-color: hsl(142 71% 45% / .35); background: var(--color-success-dim); color: var(--color-success); }
+.ground-rail .gr-folder:hover { filter:brightness(1.1); }
+
+/* a per-phase grounding affordance pinned INSIDE a draft phase card — the phase reveals what it needs */
+.needs-aff { display:inline-flex; align-items:center; gap:6px; font-size:10.5px; font-family:var(--font-mono); padding: 3px 8px; border-radius: var(--radius-full); border:1px solid; cursor:pointer; background:none; transition: all var(--dur-fast); }
+.needs-aff.want { border-color: hsl(258 90% 66% / .5); background: hsl(258 90% 66% / .12); color: var(--color-accent-violet); animation: pulseGlow 2.4s infinite; }
+.needs-aff.want:hover { filter:brightness(1.12); }
+.needs-aff.got { border-color: hsl(258 90% 66% / .4); background: hsl(258 90% 66% / .08); color: var(--color-accent-violet); }
+.needs-aff.confirm { border-color: hsl(38 92% 60% / .5); background: var(--color-warning-dim); color: var(--color-warning); animation: pulseGlow 2.4s infinite; }
+.needs-aff.confirm:hover { filter:brightness(1.12); }
+.pcard .p-reveal { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-border-soft); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.pcard .p-reveal .pr-lead { color: var(--color-text-dim); }
+.pcard.wants-ground { border-color: hsl(258 90% 66% / .4); }
+
+/* the post-draft refine intro line (the draft reveals grounding gaps) */
+.refine-intro { display:flex; gap:var(--space-3); padding: var(--space-3) var(--space-4); border:1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); margin-bottom: var(--space-5); animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.refine-intro .ri-bot { width:24px; height:24px; border-radius:50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink:0; }
+.refine-intro .ri-txt { font-size: 12.5px; color: var(--color-text-muted); line-height:1.5; }
+.refine-intro .ri-txt b { color: var(--color-text); }
+
+/* ── JOB 2: prominent template-attach button on the emit phase (a real button, not a faint chip) ── */
+.attach-tpl-btn { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; font-family:inherit; padding:8px var(--space-4); border-radius:var(--radius-md); border:1px solid hsl(258 90% 66% / .55); background:hsl(258 90% 66% / .14); color:var(--color-accent-violet); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); animation:pulseGlow 2.4s infinite; }
+.attach-tpl-btn:hover { background:hsl(258 90% 66% / .22); filter:brightness(1.08); }
+.attach-tpl-btn .atb-ico { font-size:15px; line-height:1; }
+.attach-tpl-btn .atb-fmt { font-family:var(--font-mono); font-size:9px; padding:1px 6px; border-radius:var(--radius-sm); background:hsl(258 90% 66% / .2); color:var(--color-accent-violet); }
+.attach-tpl-row { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; margin-top:6px; }
+.attach-tpl-row .atr-sub { font-size:11px; color:var(--color-text-muted); flex-basis:100%; line-height:1.45; }
+
+/* ── JOB 2: one-time dismissible contextual banner — "your deliverable needs a template" (never on EMPTY) ── */
+.tpl-nudge { display:flex; align-items:flex-start; gap:var(--space-3); border:1px solid hsl(258 90% 66% / .45); background:linear-gradient(180deg, hsl(258 90% 66% / .12), var(--color-surface)); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.tpl-nudge .tn-ico { font-size:16px; line-height:1.2; flex-shrink:0; }
+.tpl-nudge .tn-body { flex:1; min-width:0; }
+.tpl-nudge .tn-title { font-size:var(--text-sm); font-weight:600; color:var(--color-text); }
+.tpl-nudge .tn-sub { font-size:11px; color:var(--color-text-muted); margin-top:2px; line-height:1.45; }
+.tpl-nudge .tn-jump { background:none; border:none; color:var(--color-accent-violet); font-family:inherit; font-size:11px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; }
+.tpl-nudge .tn-x { background:none; border:none; color:var(--color-text-dim); font-size:14px; cursor:pointer; padding:2px 6px; border-radius:var(--radius-sm); flex-shrink:0; line-height:1; transition:all var(--dur-fast); }
+.tpl-nudge .tn-x:hover { color:var(--color-warning); background:var(--color-warning-dim); }
+
+/* ── JOB 3: tiered-guidance ⓘ info affordances + non-blocking popover ── */
+.info-dot { display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; border:1px solid var(--color-border); background:var(--color-muted); color:var(--color-text-dim); font-size:9px; font-weight:700; font-family:var(--font-headline); cursor:help; vertical-align:middle; transition:all var(--dur-fast); flex-shrink:0; }
+.info-dot:hover, .info-dot.open { border-color:var(--color-primary-glow); color:var(--color-primary); background:var(--color-primary-dim); }
+.info-dot.how { width:auto; height:auto; padding:2px 8px; border-radius:var(--radius-full); font-size:10px; gap:4px; display:inline-flex; align-items:center; cursor:pointer; }
+.info-pop { position:fixed; z-index:8002; width:280px; background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:var(--space-3) var(--space-4); animation:fadeSlideUp var(--dur-fast) var(--ease-out); }
+.info-pop .ip-title { font-size:11.5px; font-weight:600; color:var(--color-text); display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.info-pop .ip-enum { font-family:var(--font-mono); font-size:9px; padding:1px 6px; border-radius:var(--radius-sm); background:var(--color-muted); color:var(--color-accent-violet); }
+.info-pop .ip-body { font-size:11px; color:var(--color-text-muted); line-height:1.55; }
+.info-pop .ip-body b { color:var(--color-text); }
+.info-pop .ip-body code { font-family:var(--font-mono); font-size:10px; color:var(--color-accent-violet); }
+.info-pop .ip-enums { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.info-pop .ip-er { display:flex; gap:8px; font-size:10.5px; line-height:1.4; }
+.info-pop .ip-er .ek { font-family:var(--font-mono); font-size:9px; color:var(--color-primary); flex-shrink:0; min-width:48px; }
+.info-pop .ip-er .ev { color:var(--color-text-muted); }
+.info-pop .ip-foot { font-size:9px; color:var(--color-text-dim); margin-top:8px; padding-top:6px; border-top:1px solid var(--color-border-soft); font-family:var(--font-mono); }
+#infoBackdrop { position:fixed; inset:0; z-index:8001; }
+
+/* ── two-layer guarantee note ── */
+.two-layer { display:flex; gap:var(--space-3); border:1px solid hsl(142 71% 45% / .3); border-radius:var(--radius-md); background:var(--color-success-dim); padding:var(--space-3); margin-top:var(--space-3); }
+.two-layer .tl-ico { font-size:15px; line-height:1.2; flex-shrink:0; }
+.two-layer .tl-body { font-size:10.5px; line-height:1.5; color:var(--color-text-muted); }
+.two-layer .tl-body b { color:var(--color-text); }
+.two-layer .tl-l { font-family:var(--font-mono); font-size:9px; padding:1px 5px; border-radius:var(--radius-sm); background:hsl(142 71% 45% / .18); color:var(--color-success); }
+.two-layer .tl-gate { font-family:var(--font-mono); color:var(--color-accent-violet); }
+
+/* winner marker on variant tab A (glyph + word — non-color-alone) */
+.variant-tab .star { font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+
+/* toolbar */
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+.sketch-toolbar { bottom: auto; top: 60px; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 018 · Requirement-First Authoring</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Describe-then-confirm <span class="star" title="Selected winner">★ Selected</span></button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Inline checkpoints</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Confirm-chips on draft</button>
+</nav>
+
+<div class="shell" id="shell"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">state</span>
+  <div class="toolbar-toggle" id="stToggle">
+    <button data-s="empty" class="on" onclick="setState('empty')">1 Empty</button>
+    <button data-s="composing" onclick="setState('composing')">2 Composing</button>
+    <button data-s="draft" onclick="setState('draft')">3 Draft + grey areas</button>
+    <button data-s="confirming" onclick="setState('confirming')">4 Confirming</button>
+    <button data-s="done" onclick="setState('done')">5 Cleared</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  DOMAIN-AGNOSTIC EXAMPLE (strict template-fill → natural grey areas)
+//  Requirement: "Fill our weekly vendor-risk report template from the
+//  latest vendor assessments in our knowledge base."
+//  → a template asset with placeholders (one UNMAPPED)
+//  → an ambiguous folder ref ('vendor assessments' → which folder?)
+//  → a strict cited fill (every placeholder must trace to evidence)
+// ─────────────────────────────────────────────────────────────
+const REQUIREMENT = "Fill our weekly vendor-risk report template from the latest vendor assessments in our knowledge base. Every figure must trace back to a source — it's reviewed by our risk committee.";
+
+// The whole draft the AI emits in ONE shot (proven one-shot in spike-097).
+// llm_emit is the deliverable terminus carrying the citation badge.
+const PHASES = [
+  {id:'gather', n:'Gather latest vendor assessments', t:'llm_agent', tt:'pt-agent',
+   tools:['search_documents'], scopeRef:'vendorScope', note:'Pulls the most recent assessment per vendor from the scoped folder.'},
+  {id:'extract', n:'Extract risk figures per vendor', t:'llm_batch_agents', tt:'pt-batch',
+   tools:['search_documents'], note:'One agent per vendor — pulls score, tier, last-reviewed date, open findings.'},
+  {id:'review', n:'Risk owner sign-off', t:'llm_human_input', tt:'pt-human',
+   tools:[], note:'Pauses for the risk owner to approve the extracted figures before the report binds.'},
+  {id:'emit', n:'Fill & export the vendor-risk report', t:'llm_emit', tt:'pt-emit',
+   tools:[], emitter:'render_template', note:'Fills every placeholder in the template — each value cited to its assessment.',
+   placeholderRef:'tplPlaceholder', citation:'strict'},
+];
+
+// The TWO+ grey areas this draft surfaces (centerpiece).
+// 1. ambiguous folder ref — the PRIME trigger
+// 2. unmapped template placeholder
+const GREY = {
+  vendorScope: {
+    kind:'folder ref', ico:'📁', phase:'gather',
+    // origin:'requirement' — `said` is a VERBATIM fragment of the user's requirement text, so the
+    // "You said …" quote frame is honest. Never put an AI finding in this field.
+    origin:'requirement',
+    said:'the latest vendor assessments in our knowledge base',
+    readName:'Vendors — 2025 Assessments', readId:'fld_8c1a',
+    readPath:'KB › Operations › Vendors — 2025 Assessments',
+    // alts are computed dynamically (folderScopeAlts) so they stay WITHIN the project_folder_id —
+    // a per-phase folder_scope can only narrow inside the workflow's project folder (harness.py:241-253).
+  },
+  tplPlaceholder: {
+    kind:'template field', ico:'❏', phase:'emit',
+    // origin:'template' — the placeholder was DISCOVERED by parsing the template (DocxTemplate parse),
+    // NOT spoken by the user. So `found` (the AI's reading) is rendered with a "In your template I found …"
+    // frame — never the "You said …" quote frame, which is reserved for requirement-derived greys.
+    // (no-silent-substitution: never conflate the user's words with the AI's reading — BRIEF §2 / §7.)
+    origin:'template',
+    found:'{{committee_sign_off_date}}',
+    foundNote:'a placeholder in your template I can\'t source',
+    readName:'Leave blank for manual entry at review time',
+    readId:'unmapped',
+    readPath:'template: weekly-vendor-risk.docx',
+    alts:[
+      {name:'Map to the "Risk owner sign-off" phase timestamp', path:'phase: review'},
+      {name:'Map to today\'s run date', path:'input: run_date'},
+      {name:'Drop the placeholder from the fill', path:'template edit'},
+    ],
+  },
+};
+
+// Strictness presets — REAL enum words only.
+const PRESETS = {
+  strict: {name:'Strict', emoji:'🔒', cit:'strict',
+    caption:'Honest fail — the report is NOT produced if any figure can\'t be traced to a source.',
+    gates:['citations_required','output_file_valid','freshness','llm_judge_rubric'],
+    citMode:'deterministic'},
+  middle: {name:'Middle', emoji:'⚖️', cit:'flag',
+    caption:'Delivered with uncited values marked " [unverified]" + a coverage summary — working-grade.',
+    gates:['citations_required','structure_check','llm_judge_rubric'],
+    citMode:'presence'},
+  loose: {name:'Loose', emoji:'✎', cit:'draft',
+    caption:'No citation enforcement; output is prepended "DRAFT — citations not enforced" for a human to review.',
+    gates:[], citMode:'presence'},
+};
+const GATE_LABELS = {
+  citations_required:'citations_required',
+  output_file_valid:'output_file_valid',
+  freshness:'freshness',
+  structure_check:'structure_check',
+  llm_judge_rubric:'llm_judge_rubric',
+};
+const CIT_CAPTIONS = {
+  strict:'Honest fail, deliverable NOT produced — compliance / financial / legal: reject anything unverified.',
+  flag:'Deliver WITH " [unverified]" marks + a coverage summary — working-grade.',
+  partial:'BLANK the uncited values (null over invent) + a gap list — data-room.',
+  draft:'No enforcement; prepend "DRAFT — citations not enforced" — a human reviews.',
+};
+
+// ── live UI state ──
+let CUR_V='A', STATE='empty';
+let PRESET='strict', ADV_OPEN=false, CIT='strict';
+let DIAL_PEEK=false;   // while grey areas are open the dial collapses to a summary chip; click to expand
+let GATES = {citations_required:true, output_file_valid:true, freshness:true, structure_check:false, llm_judge_rubric:true};
+// grey-area resolution map: greyKey → 'unconfirmed' | 'confirmed' | 'corrected:<altName>'
+let RESOLVED = {};
+let ACTIVE_GREY = null;   // B: which checkpoint card is open
+let CHIP_OPEN = null;     // C: which chip popover is open
+
+// ── post-draft grounding state (NET-NEW surfaces) ──
+// CORE REFRAME: the AI drafts from the requirement ALONE, so grounding is REVEALED by the draft,
+// not collected up front. The first screen is JUST the describe box — these surfaces only exist
+// AFTER a draft. The template is OPTIONAL; its PRESENCE flips analysis-mode <-> fill-mode (ties to the dial).
+let TPL_ATTACHED = false;      // start UNATTACHED — the draft's llm_emit phase REVEALS it needs a template
+// The AI INFERRED a project folder from the requirement (fld_ops) but it is UNCONFIRMED until you confirm it.
+// Once confirmed it is the workflow-level project_folder_id; the per-phase folder_scope (fld_8c1a, a descendant)
+// can only narrow WITHIN it (harness.py:241-253). project_folder_id is author-CONFIRMED, never silently bound.
+let PROJECT_FOLDER = 'fld_ops'; // the folder the AI inferred (the value); confirmation is tracked separately
+let PROJECT_CONFIRMED = false; // has the author confirmed the inferred project_folder_id? (set/confirm affordance)
+let FOLDER_POP = false;        // project-folder picker popover open
+let FOLDER_Q = '';             // folder search query
+let FC_OPEN = false;           // fill-contract inspection panel open
+let FC_FLAG = 'clean';         // which fill-contract flag state is demonstrated: clean|malformed|runsplit|empty|wrongfmt
+// JOB 2: one-time dismissible "needs a template" contextual banner. Appears WITH the draft (never on EMPTY),
+// points at the fill step. Once dismissed it stays gone for the session; attaching a template also retires it.
+let TPL_NUDGE_DISMISSED = false;
+// JOB 3: tiered-guidance ⓘ micro-hint popover — which explainer is open (key into INFO_HINTS), or null.
+let INFO_OPEN = null;
+
+// ── the project folder tree (simplified, searchable) — author's DELIBERATE choice ──
+// Distinct from per-phase folder_scope (the AI INFERS that + you confirm in the grey-area loop).
+const FOLDERS = [
+  {id:'fld_root', name:'Knowledge Base', lvl:0, ico:'🏠', parent:null},
+  {id:'fld_ops',  name:'Operations', lvl:1, ico:'📁', parent:'fld_root'},
+  {id:'fld_8c1a', name:'Vendors — 2025 Assessments', lvl:2, ico:'📁', parent:'fld_ops'},
+  {id:'fld_arc24',name:'Vendors — Archive 2024', lvl:2, ico:'📁', parent:'fld_ops'},
+  {id:'fld_proc', name:'Procurement', lvl:1, ico:'📁', parent:'fld_root'},
+  {id:'fld_onb',  name:'Vendor Onboarding', lvl:2, ico:'📁', parent:'fld_proc'},
+  {id:'fld_fin',  name:'Finance', lvl:1, ico:'📁', parent:'fld_root'},
+];
+function folderById(id){ return FOLDERS.find(f=>f.id===id)||null; }
+function folderBreadcrumb(id){ const parts=[]; let f=folderById(id); while(f){ parts.unshift(f.name); f=f.parent?folderById(f.parent):null; } return 'KB › '+parts.slice(1).join(' › '); }
+function isDescendant(id, ancestorId){ let f=folderById(id); while(f){ if(f.parent===ancestorId) return true; f=f.parent?folderById(f.parent):null; } return false; }
+// Per-phase folder_scope can ONLY narrow WITHIN the project_folder_id (harness.py:241-253).
+// So the grey-area alternatives are descendants of the picked project folder — never siblings/the whole KB.
+// folder_scope is itself a BOUND list[UUID] (BRIEF 3.6), so each confirmed scope is rendered as a list.
+function folderScopeAlts(){
+  if(!PROJECT_FOLDER) return [];   // no project folder → folder_scope is unbindable; card prompts to pick one first
+  return FOLDERS
+    .filter(f=>f.id!=='fld_8c1a' && isDescendant(f.id, PROJECT_FOLDER))
+    .map(f=>({name:f.name, id:f.id, path:folderBreadcrumb(f.id)}))
+    .concat([{name:'Fall back to the whole PROJECT folder', id:PROJECT_FOLDER, path:folderBreadcrumb(PROJECT_FOLDER)}]);
+}
+
+// ── the parsed fill-contract for each flag state (framed as parsed via the REAL extractor) ──
+// Real parser: DocxTemplate.get_undeclared_template_variables() / parse_docx_template_variables (stdlib zip+regex).
+const FILL_CONTRACTS = {
+  clean: {
+    cls:'clean', icon:'✓', file:'weekly-vendor-risk.docx', fmt:'docx',
+    status:'Clean contract — 5 placeholders parsed · 4 mappable from your KB · 1 unmapped',
+    placeholders:[
+      {tag:'{{vendor_name}}', kind:'field', mapped:true, src:'KB → assessment.vendor'},
+      {tag:'{{risk_tier}}', kind:'field', mapped:true, src:'KB → assessment.tier'},
+      {tag:'{{review_date}}', kind:'field', mapped:true, src:'KB → assessment.last_reviewed'},
+      {tag:'{%tr for r in risks%}', kind:'loop / table row', mapped:true, src:'KB → assessment.open_findings[]'},
+      {tag:'{{committee_sign_off_date}}', kind:'field', mapped:false, src:'no KB source found'},
+    ],
+    callout:null,
+  },
+  malformed: {
+    cls:'rejected', icon:'✕', file:'q3-board-deck.docx', fmt:'docx',
+    status:'Rejected — malformed template tag (Jinja won\'t compile)',
+    placeholders:[],
+    badtag:'{{ revenue_total   ← unclosed: opening {{ never closed before paragraph end',
+    callout:{cls:'warn', html:'<b>The exact bad tag is shown above.</b> The filler can\'t guess your intent from a broken tag — fix it in the source document and re-upload. Nothing is auto-repaired (silent repair could bind the wrong field).'},
+  },
+  runsplit: {
+    cls:'warn', icon:'⚠', file:'monthly-summary.docx', fmt:'docx',
+    status:'Word run-split warning — 1 placeholder fragmented across XML runs',
+    placeholders:[
+      {tag:'{{period_label}}', kind:'field', mapped:true, src:'KB → run.period'},
+      {tag:'{{ total_⟂spend }}', kind:'field · SPLIT', mapped:false, src:'fragmented — filler can\'t see it'},
+    ],
+    callout:{cls:'warn', html:'<b>Known silent-miss failure mode.</b> Word fragmented <code>{{total_spend}}</code> across separate XML runs (an edit mid-tag), so the renderer never sees it as one variable — it would silently stay literal in the output. <b>Fix: delete the placeholder and retype it in one pass</b> (no mid-tag cursor moves), then re-upload.'},
+  },
+  empty: {
+    cls:'empty', icon:'○', file:'vendor-notes.docx', fmt:'docx',
+    status:'No placeholders found — this is not a fillable template',
+    placeholders:[],
+    callout:{cls:'', html:'This .docx has <b>zero <code>{{…}}</code> placeholders</b> — nothing to fill. Did you mean <b>analysis mode</b>? Remove the template and the workflow writes prose / a written analysis instead (the deliverable still goes through the judge + integrity gate).'},
+  },
+  wrongfmt: {
+    cls:'rejected', icon:'✕', file:'risk-data.csv', fmt:'csv',
+    status:'Wrong format — fill-contract templates must be .docx / .pptx / .xlsx',
+    placeholders:[],
+    callout:{cls:'warn', html:'<b>.csv isn\'t a fillable Office template.</b> The placeholder parser only reads <code>.docx</code> (DocxTemplate), <code>.pptx</code>, and <code>.xlsx</code>. Convert to one of those, or upload it as a regular KB document and use analysis mode.'},
+  },
+};
+const FC_FLAG_ORDER = ['clean','malformed','runsplit','empty','wrongfmt'];
+const FC_FLAG_LABEL = {clean:'clean', malformed:'malformed tag', runsplit:'word run-split', empty:'no placeholders', wrongfmt:'wrong format'};
+
+// ── JOB 3: tiered-guidance micro-hint explainers (the ⓘ popovers). REAL enum words only — no invented labels. ──
+// Surface-to-stakes: these are passive, non-blocking, hidden behind the ⓘ until hover/tap. No modal here.
+const INFO_HINTS = {
+  how: {
+    title:'How this works', glyph:'✎', enum:null,
+    body:`<b>You describe the goal in plain language</b> — not a phase list. The AI then drafts the whole workflow in one pass, <b>sets the strictness</b> proportional to the stakes you described, and <b>asks you about anything it had to guess</b> (an ambiguous folder, an unmapped template field) instead of silently inventing it. Grounding — the template + the project folder — is a <b>refinement the draft reveals</b>, not something you set up front.<br><br>The requirement is the one <b>required</b> field — <b>publish is rejected (400) without it</b>, and it's what the always-on publish judge grades the deliverable against.`,
+    foot:'the first screen stays just the box · required field',
+  },
+  project_folder: {
+    title:'Project folder', glyph:'📁', enum:'project_folder_id',
+    body:`The workflow's <b>home knowledge base</b> — the folder you <b>confirm</b> (binds as a single UUID, never a path). It's distinct from the per-phase <code>folder_scope</code> the AI <b>infers</b> for each searching phase: a phase's <code>folder_scope</code> can only <b>narrow WITHIN</b> the project folder, never reach outside it. You set the project folder; the AI only guesses the per-phase narrowing — and surfaces that guess for you to confirm.`,
+    foot:'project_folder_id (UUID) · author-confirmed, never silently bound',
+  },
+  strict: {
+    title:'Strict / citation_policy', glyph:'🔒', enum:'citation_policy',
+    body:`The strictness dial maps to the real <code>citation_policy</code> enum on the <code>llm_emit</code> deliverable — it governs what happens to a value the AI <b>can't trace to a source</b>:`,
+    enums:[
+      {k:'strict', v:'Honest fail — the deliverable is NOT produced if any value is uncited.'},
+      {k:'flag', v:'Deliver WITH " [unverified]" marks + a coverage summary.'},
+      {k:'partial', v:'Blank the uncited values (null over invent) + a gap list.'},
+      {k:'draft', v:'No enforcement; prepend "DRAFT — citations not enforced".'},
+    ],
+    foot:"citation_policy strict|flag|partial|draft · llm_emit only",
+  },
+  judge: {
+    title:'The always-on judge', glyph:'🛡', enum:'llm_judge_rubric',
+    body:`Separate from the per-phase gates the dial controls, the <b>publish gauntlet always runs an independent judge</b> before a workflow can publish. The dial <b>cannot switch it off</b> — even a loose draft with zero per-phase gates still faces it. (It lives in the publish flow — sketch 020 — and grades the deliverable against the business requirement you described.)`,
+    foot:'always-on at publish · the dial cannot remove it',
+  },
+};
+function openInfo(e, key){ if(e){ e.stopPropagation(); }
+  INFO_OPEN=key; render();
+  // re-resolve the dot's anchor AFTER render (the old node was destroyed) so the popover pins to the live ⓘ.
+  requestAnimationFrame(()=>{ const pop=document.getElementById('infoPop'); if(!pop) return;
+    const w=pop.offsetWidth||280, h=pop.offsetHeight||160;
+    const anchor=document.getElementById('infoDot-'+key);
+    const r=anchor?anchor.getBoundingClientRect():null;
+    if(r && (r.width||r.height)){ pop.style.top=Math.min(r.bottom+8, window.innerHeight-h-12)+'px';
+      pop.style.left=Math.max(12, Math.min(r.left-8, window.innerWidth-w-12))+'px'; }
+    else { pop.style.top=Math.max(64,(window.innerHeight-h)/2)+'px'; pop.style.left=Math.max(12,(window.innerWidth-w)/2)+'px'; }
+  });
+}
+function closeInfo(){ INFO_OPEN=null; render(); }
+function infoDot(key, opts){ opts=opts||{};
+  if(opts.how) return `<button class="info-dot how ${INFO_OPEN===key?'open':''}" id="infoDot-${key}" onclick="openInfo(event,'${key}')" aria-label="How this works"><span>ⓘ</span> how this works</button>`;
+  return `<button class="info-dot ${INFO_OPEN===key?'open':''}" id="infoDot-${key}" onclick="openInfo(event,'${key}')" aria-label="What is ${INFO_HINTS[key]?INFO_HINTS[key].title:key}?" title="What is this?">ⓘ</button>`;
+}
+function infoPopHTML(){
+  if(!INFO_OPEN || !INFO_HINTS[INFO_OPEN]) return '';
+  const h=INFO_HINTS[INFO_OPEN];
+  const enums = h.enums ? `<div class="ip-enums">${h.enums.map(e=>`<div class="ip-er"><span class="ek">${e.k}</span><span class="ev">${e.v}</span></div>`).join('')}</div>` : '';
+  return `<div id="infoBackdrop" onclick="closeInfo()"></div>
+    <div class="info-pop" id="infoPop" onclick="event.stopPropagation()">
+      <div class="ip-title"><span>${h.glyph}</span> ${h.title}${h.enum?`<span class="ip-enum">${h.enum}</span>`:''}</div>
+      <div class="ip-body">${h.body}${enums}</div>
+      ${h.foot?`<div class="ip-foot">${h.foot}</div>`:''}
+    </div>`;
+}
+// JOB 2: dismissible contextual nudge — appears WITH the draft pointing at the fill step. Never on EMPTY.
+function dismissTplNudge(){ TPL_NUDGE_DISMISSED=true; render(); }
+function tplNudgeHTML(){
+  // Show ONLY when: we have a draft (not empty/composing), the template is still unattached,
+  // and it hasn't been dismissed. Non-blocking, one-time, points DOWN at the fill step.
+  if(STATE==='empty' || STATE==='composing') return '';
+  if(TPL_ATTACHED || TPL_NUDGE_DISMISSED) return '';
+  return `<div class="tpl-nudge">
+    <span class="tn-ico">⬆</span>
+    <div class="tn-body">
+      <div class="tn-title">Your deliverable needs a template — attach it on the fill step ↓</div>
+      <div class="tn-sub">The last phase fills a document. <button class="tn-jump" onclick="attachTemplate()">Attach the .docx / .pptx / .xlsx</button> there, or leave it off for a written-prose analysis instead.</div>
+    </div>
+    <button class="tn-x" onclick="dismissTplNudge()" aria-label="Dismiss">✕</button>
+  </div>`;
+}
+
+function resetResolved(){ RESOLVED = {vendorScope:'unconfirmed', tplPlaceholder:'unconfirmed'}; ACTIVE_GREY='vendorScope'; CHIP_OPEN=null; }
+function greyKeys(){ return Object.keys(GREY); }
+function unresolvedKeys(){ return greyKeys().filter(k=>RESOLVED[k]==='unconfirmed'); }
+function allCleared(){ return unresolvedKeys().length===0; }
+// Fully bound = every grey-area guess confirmed AND the grounding the draft revealed is provided
+// (template attached → fill mode, project folder confirmed). Until then the draft stays provisional.
+function fullyGrounded(){ return allCleared() && TPL_ATTACHED && PROJECT_CONFIRMED; }
+// what grounding the draft still wants (for the header + intro counts)
+function groundingGaps(){ let g=0; if(!TPL_ATTACHED) g++; if(!PROJECT_CONFIRMED) g++; return g; }
+
+// ── strictness dial ──
+function applyPreset(p){ PRESET=p; CIT=PRESETS[p].cit; const set=new Set(PRESETS[p].gates);
+  GATES={citations_required:set.has('citations_required'),output_file_valid:set.has('output_file_valid'),freshness:set.has('freshness'),structure_check:set.has('structure_check'),llm_judge_rubric:set.has('llm_judge_rubric')};
+  render(); }
+function toggleGate(g){ GATES[g]=!GATES[g]; PRESET='custom'; render(); }
+function setCit(c){ CIT=c; PRESET='custom'; render(); }
+function toggleAdv(){ ADV_OPEN=!ADV_OPEN; render(); }
+function toggleDialPeek(){ DIAL_PEEK=!DIAL_PEEK; render(); }
+
+// While grey areas are open the dial is supporting context — collapse it to a one-line
+// summary so the unresolved-guess panel owns the fold. Returns the full dial once expanded.
+function dialOrSummaryHTML(){
+  if(allCleared() || DIAL_PEEK) return dialHTML();
+  const on=Object.keys(GATES).filter(g=>GATES[g]).length;
+  // Reconcile with the emit-node chip (gateChips): freshness (timing='pre') keys to the searching
+  // phase, so it's in the total but NOT on the emit node. Show the emit-node count parenthetically
+  // so an operator reading "4" here and "3" on the emit chip can see they're the same dial state.
+  const PRE_TIMING={freshness:true};
+  const emitOn=Object.keys(GATES).filter(g=>GATES[g] && !PRE_TIMING[g]).length;
+  const emitQual = emitOn!==on ? ` (${emitOn} on the emit node)` : '';
+  return `<div class="dial-summary" style="cursor:default">
+    <span class="ds-ico">⚙</span>
+    <span class="ds-txt"><b>${PRESETS[PRESET]?PRESETS[PRESET].name:'Custom'}</b> · ${on} per-phase gate${on===1?'':'s'}${emitQual} + publish judge · citation_policy <span class="ds-enum">${CIT}</span></span>
+    <span onclick="event.stopPropagation()">${infoDot('strict')}</span>
+    <span class="ds-ai" title="NET-NEW — proven only in throwaway spike-097, not yet shipped live">AI set this · net-new</span>
+    <button class="ds-adj" style="background:none;border:none;color:var(--color-primary);font-family:inherit;cursor:pointer;font-size:11px" onclick="toggleDialPeek()">adjust ▾</button>
+  </div>`;
+}
+
+function dialHTML(){
+  const presetCard = (key)=>{ const p=PRESETS[key]; const on=PRESET===key;
+    return `<button class="preset ${on?'on':''}" onclick="applyPreset('${key}')">
+      <span class="pn">${p.emoji} ${p.name}${on?' ✓':''}</span>
+      <span class="pc">${p.caption}</span>
+      <span class="penum">citation_policy = ${p.cit}</span>
+    </button>`; };
+  const gateChip = (g)=>`<span class="gate-chip ${GATES[g]?'on':''}" onclick="toggleGate('${g}')">
+      <span class="gck">${GATES[g]?'✓':''}</span>${GATE_LABELS[g]}${g==='freshness'&&GATES[g]?'<span class="gate-cfg">max_age_days: 7</span>':''}</span>`;
+  const seg = ['strict','flag','partial','draft'].map(c=>`<button class="${CIT===c?'on':''}" onclick="setCit('${c}')">${c}</button>`).join('');
+  return `<div class="dial">
+    <div class="dial-h">⚙ Strictness — proportional to the stakes you described ${infoDot('strict')}
+      <span class="ai-set" title="NET-NEW — proven only in throwaway spike-097, not yet shipped live">AI set this · net-new (spike-097)</span></div>
+    <div class="preset-row">${presetCard('strict')}${presetCard('middle')}${presetCard('loose')}</div>
+    <button class="dial-adv-toggle ${ADV_OPEN?'open':''}" onclick="toggleAdv()"><span class="caret">▸</span> Advanced — the two controls a preset composes</button>
+    <div class="dial-adv ${ADV_OPEN?'open':''}">
+      <div class="adv-block">
+        <div class="ab-h">1 · Which per-phase gates run on the deliverable</div>
+        <div class="gate-chips">
+          ${gateChip('citations_required')}${gateChip('output_file_valid')}${gateChip('freshness')}${gateChip('structure_check')}${gateChip('llm_judge_rubric')}
+        </div>
+        <div style="font-size:10px;color:var(--color-text-dim);margin-top:8px">These are per-phase validators — a loose preset can remove every one of them, including <span style="font-family:var(--font-mono)">llm_judge_rubric</span>.${GATES.freshness?' <span style="color:var(--color-warning)">freshness needs a <span style="font-family:var(--font-mono)">max_age_days</span> (the AI inferred 7d) — without one it fails the run closed.</span>':''}</div>
+        <div class="judge-banner"><span class="jb-ico">🛡</span><div class="jb-txt"><b>The publish gauntlet always runs an independent judge.</b> ${infoDot('judge')} Separate from the per-phase gates above — it lives in the publish flow (sketch 020, stage 4) and the dial CANNOT remove it. Even a loose draft with zero per-phase gates still faces it before it can publish.</div></div>
+      </div>
+      <div class="adv-block">
+        <div class="ab-h">2 · citation_policy — what happens to an uncited value</div>
+        <div class="seg">${seg}</div>
+        <div class="seg-caption">${CIT_CAPTIONS[CIT]}</div>
+        <div class="policy-grey"><span class="gtag">integrity_policy</span> greyed — coming with the Phase 106 emitters (declared in the schema, not wired yet).</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── inputs / assets strip ──
+function inputsStripHTML(){
+  const tplChip = TPL_ATTACHED
+    ? `<span class="input-chip template" onclick="openFillContract()" style="cursor:pointer" title="Inspect the fill contract">weekly-vendor-risk.docx <span class="ic-type">5 placeholders · 4 mapped</span></span>`
+    : `<span class="input-chip" style="opacity:.7">— no template · analysis mode <span class="ic-type">written prose</span></span>`;
+  return `<div class="inputs-strip">
+    <div class="is-h">⊙ Inputs the AI inferred — collected each run</div>
+    <div class="input-chips">
+      <span class="input-chip">report_week <span class="ic-type">text</span></span>
+    </div>
+    <div class="assets-h">📎 ${TPL_ATTACHED?'Template asset — the fill contract':'No template asset — analysis mode'}</div>
+    <div class="input-chips">${tplChip}</div>
+    ${TPL_ATTACHED?`<div class="two-layer" style="margin-top:var(--space-3)">
+      <span class="tl-ico">🛡</span>
+      <div class="tl-body"><b>An unfillable Office template (.docx / .pptx / .xlsx) can't publish — two layers guard it.</b><br>
+        <span class="tl-l">layer 1</span> upload-time inspection (<span style="cursor:pointer;text-decoration:underline" onclick="openFillContract()">the fill contract</span>) — catches malformed / empty / Word run-split tags early.<br>
+        <span class="tl-l">layer 2</span> the per-phase <span class="tl-gate">output_file_valid</span> gate re-opens the produced file <b>on every run</b> (the publish golden run is just one instance — it runs for real against your KB); any residual unfilled tag fails closed.</div>
+    </div>`:''}
+  </div>`;
+}
+
+// ── POST-DRAFT GROUNDING RAIL (NET-NEW) — the workflow-level project_folder_id set/confirm ──
+// CORE REFRAME: the AI drafted from the requirement alone, so it INFERRED a project folder and now
+// surfaces it for confirmation — it never silently bound one. project_folder_id is author-CONFIRMED.
+// This appears ONLY after the draft (the describe step had none of this — the first screen is just the box).
+function groundRailHTML(){
+  const projFolder = PROJECT_FOLDER ? FOLDERS.find(f=>f.id===PROJECT_FOLDER) : null;
+  const allSet = PROJECT_CONFIRMED;
+  const chip = allSet
+    ? `<button class="gr-folder set" onclick="openFolderPop(event)" title="Change the project folder">📁 ${projFolder.name} · ${projFolder.id} ✓</button>`
+    : (projFolder
+      ? `<button class="gr-folder unset" onclick="openFolderPop(event)" title="Confirm or change the inferred project folder">📁 confirm: ${projFolder.name} ▾</button>`
+      : `<button class="gr-folder unset" onclick="openFolderPop(event)">📁 set project folder ▾</button>`);
+  return `<div class="ground-rail ${allSet?'all-set':''}">
+    <span class="gr-ico">${allSet?'✓':'📁'}</span>
+    <div class="gr-body">
+      <div class="gr-title">${allSet?'Project folder confirmed' : 'I inferred a project folder — confirm it'} ${infoDot('project_folder')}</div>
+      <div class="gr-sub">${allSet
+        ? `<span style="font-family:var(--font-mono)">project_folder_id</span> is the workflow's home KB (a single UUID). The per-phase <span style="font-family:var(--font-mono)">folder_scope</span> below can only narrow WITHIN it.`
+        : `From your requirement I read <b>${projFolder?projFolder.name:'a folder'}</b> as the workflow's home KB. You <b>set</b> this (<span style="font-family:var(--font-mono)">project_folder_id</span>); I never bind it silently. The per-phase <span style="font-family:var(--font-mono)">folder_scope</span> narrowing I only <b>guess</b> — you confirm that on the searching phase below.`}</div>
+    </div>
+    ${chip}
+  </div>`;
+}
+
+// ── compact grounding receipt (B draft state — re-opens the project-folder picker) ──
+function groundReceiptHTML(){
+  const projFolder = PROJECT_FOLDER ? FOLDERS.find(f=>f.id===PROJECT_FOLDER) : null;
+  const tpl = TPL_ATTACHED
+    ? `<span class="ds-txt" onclick="openFillContract()" style="cursor:pointer">❏ <b>fill mode</b> · weekly-vendor-risk.docx <span class="ds-enum">inspect ▸</span></span>`
+    : `<span class="ds-txt" onclick="attachTemplate()" style="cursor:pointer;color:var(--color-accent-violet)">⬆ <b>the emit phase needs a template</b> <span class="ds-enum">attach ▸</span></span>`;
+  const fld = PROJECT_CONFIRMED && projFolder
+    ? `<span class="ds-txt" onclick="openFolderPop(event)" style="cursor:pointer">📁 project folder: <b>${projFolder.name}</b> <span class="ds-enum">${projFolder.id} ✓</span></span>`
+    : `<span class="ds-txt" onclick="openFolderPop(event)" style="cursor:pointer;color:var(--color-warning)">📁 <b>confirm the inferred project folder</b> <span class="ds-enum">${projFolder?projFolder.id:'project_folder_id'} ▾</span></span>`;
+  return `<div class="dial-summary" style="cursor:default;flex-direction:column;align-items:stretch;gap:6px;margin-bottom:var(--space-4)">
+    <div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-dim);font-family:var(--font-mono)">⊕ Grounding the draft revealed</div>
+    ${tpl}${fld}
+  </div>`;
+}
+
+// ── project-folder picker popover (simplified searchable folder tree) ──
+function openFolderPop(e){ if(e) e.stopPropagation(); FOLDER_Q=''; FOLDER_POP=true; FC_OPEN=false; render();
+  requestAnimationFrame(()=>{ positionPop('folderPop', e&&e.currentTarget); const s=document.getElementById('folderSearch'); if(s) s.focus(); }); }
+function closeFolderPop(){ FOLDER_Q=''; FOLDER_POP=false; render(); }
+// Picking (or keeping) a folder CONFIRMS the project_folder_id — the author's deliberate act.
+function pickFolder(id){
+  if(PROJECT_FOLDER===id && PROJECT_CONFIRMED){ PROJECT_FOLDER=null; PROJECT_CONFIRMED=false; } // clear → KB-wide
+  else { PROJECT_FOLDER=id; PROJECT_CONFIRMED=true; }
+  FOLDER_Q=''; FOLDER_POP=false; render();
+}
+function onFolderSearch(el){ FOLDER_Q=el.value.toLowerCase(); const tree=document.getElementById('folderTree'); if(tree) tree.innerHTML=folderTreeNodes(); }
+function folderTreeNodes(){
+  return FOLDERS.filter(f=>!FOLDER_Q || f.name.toLowerCase().includes(FOLDER_Q) || f.id.includes(FOLDER_Q)).map(f=>{
+    const on=PROJECT_FOLDER===f.id;
+    return `<div class="folder-node lvl${f.lvl} ${on?'on':''}" onclick="pickFolder('${f.id}')">
+      <span class="fn-ico">${on?'✓':f.ico}</span><span class="fn-name">${f.name}</span><span class="fn-id">${f.id}</span></div>`;
+  }).join('') || `<div style="font-size:11px;color:var(--color-text-dim);padding:var(--space-3);text-align:center">no folder matches “${FOLDER_Q}”</div>`;
+}
+function folderPopHTML(){
+  if(!FOLDER_POP) return '';
+  return `<div id="groundBackdrop" onclick="closeFolderPop()"></div>
+    <div class="folder-pop" id="folderPop" onclick="event.stopPropagation()">
+      <div class="fp-h">
+        <div class="fp-title">📁 ${PROJECT_CONFIRMED?'Change the project folder':'Confirm the project folder'} <span style="font-family:var(--font-mono);font-size:8px;color:var(--color-text-dim)">project_folder_id</span></div>
+        <div class="fp-sub">The workflow's <b>home knowledge base</b> — <b>your</b> deliberate choice. The AI <b>pre-selected the folder it inferred</b> from your requirement; click to confirm or pick another. The per-phase <span style="font-family:var(--font-mono)">folder_scope</span> can only narrow WITHIN it.</div>
+        <input class="folder-search" id="folderSearch" placeholder="Search folders…" oninput="onFolderSearch(this)" value="${FOLDER_Q}">
+      </div>
+      <div class="folder-tree scrollbar-thin" id="folderTree">${folderTreeNodes()}</div>
+      <div class="fp-foot">binds as a single UUID — never a path string · clear to leave the workflow KB-wide</div>
+    </div>`;
+}
+
+// ── template attach / detach (flips analysis-mode <-> fill-mode) ──
+function attachTemplate(){ TPL_ATTACHED=true; FC_FLAG='clean'; openFillContract(); }
+function detachTemplate(){ TPL_ATTACHED=false; FC_OPEN=false; render(); }
+
+// ── FILL-CONTRACT INSPECTION (layer 1) — triggered by the upload ──
+function openFillContract(){ if(!TPL_ATTACHED) TPL_ATTACHED=true; FC_OPEN=true; FOLDER_POP=false; render();
+  requestAnimationFrame(()=>positionPop('fcPop', null)); }
+function closeFillContract(){ FC_OPEN=false; render(); }
+function setFcFlag(f){ FC_FLAG=f; render(); requestAnimationFrame(()=>positionPop('fcPop', null)); }
+function fillContractHTML(){
+  if(!FC_OPEN) return '';
+  const c=FILL_CONTRACTS[FC_FLAG];
+  const flagPicker = `<div class="fc-flagpick">
+    <span class="fcp-lbl">demo the flag states the upload-time parser can return →</span>
+    ${FC_FLAG_ORDER.map(f=>`<button class="${FC_FLAG===f?'on':''}" onclick="setFcFlag('${f}')">${FC_FLAG_LABEL[f]}</button>`).join('')}
+  </div>`;
+  let bodyInner='';
+  if(c.placeholders.length){
+    bodyInner += `<div class="fc-list">${c.placeholders.map(p=>{
+      const mapped=p.mapped;
+      return `<div class="fc-ph ${mapped?'mapped':'unmapped'}">
+        <span class="fc-tag">${p.tag}</span>
+        <span class="fc-kind">${p.kind}</span>
+        <span class="fc-state">${mapped?'✓ mappable':'⚠ unmapped'}<span class="fc-src">${p.src}</span></span>
+      </div>`;
+    }).join('')}</div>`;
+  }
+  if(c.badtag){ bodyInner += `<div class="fc-badtag">⛒ ${c.badtag}</div>`; }
+  if(c.callout){ bodyInner += `<div class="fc-callout ${c.callout.cls}">${c.callout.html}</div>`; }
+  // unmapped placeholders route into the EXISTING grey-area loop
+  if(FC_FLAG==='clean'){
+    bodyInner += `<div class="fc-callout warn" style="margin-top:var(--space-2)">The <b>1 unmapped placeholder</b> (<span style="font-family:var(--font-mono)">{{committee_sign_off_date}}</span>) flows into the <b>grey-area confirm loop</b> below — route it to a phase, leave it blank for manual entry, or make it a run-time input. It is <b>never silently filled</b>.</div>`;
+  }
+  // two-layer guarantee — shown on every non-rejected contract
+  let twoLayer='';
+  if(c.cls!=='rejected'){
+    twoLayer = `<div class="two-layer">
+      <span class="tl-ico">🛡</span>
+      <div class="tl-body"><b>Two layers guard the fill, so an unfillable Office template (.docx / .pptx / .xlsx) can't publish.</b> <span style="font-size:9px;color:var(--color-text-dim)">(PDF re-open is a v1 stub — real integrity → Phase 106.)</span><br>
+        <span class="tl-l">layer 1</span> this upload-time inspection — catches malformed / empty / run-split tags <b>early</b>, before you've built anything.<br>
+        <span class="tl-l">layer 2</span> the per-phase <span class="tl-gate">output_file_valid</span> integrity gate — it <b>re-opens the produced file on every run</b> (and the publish gauntlet runs it for real against your KB); any residual unfilled tag fails the run closed.</div>
+    </div>`;
+  }
+  const cls = c.cls==='rejected'?'rejected':(c.cls==='warn'?'warn':'');
+  return `<div id="groundBackdrop" onclick="closeFillContract()"></div>
+    <div class="fc-pop ${cls}" id="fcPop" onclick="event.stopPropagation()">
+      <div class="fc-h">
+        <div class="fc-title">❏ Fill contract <span style="font-family:var(--font-mono);font-size:8px;padding:1px 6px;border-radius:var(--radius-full);background:var(--color-accent-violet);color:#fff">NET-NEW · no upload-validate endpoint</span></div>
+        <div class="fc-file">${c.file}</div>
+        <div class="fc-parser">Parsed via the real extractor — <code>DocxTemplate.get_undeclared_template_variables()</code> / <code>parse_docx_template_variables()</code> (stdlib zip + regex). No fill is attempted here; this only reads the contract.</div>
+      </div>
+      ${flagPicker}
+      <div class="fc-status ${c.cls}">${c.icon} ${c.status}</div>
+      <div class="fc-body scrollbar-thin">${bodyInner}${twoLayer}</div>
+      <div class="fc-foot">
+        <span class="fc-note">${c.cls==='rejected'?'Rejected — fix the source & re-upload. The draft stays in analysis mode until a valid template attaches.':'Inspection only — accepting keeps it attached as the fill contract.'}</span>
+        ${c.cls==='empty'?`<button class="fc-act" onclick="detachTemplate();closeFillContract()">Use analysis mode</button>`:''}
+        ${c.cls==='rejected'?`<button class="fc-act" onclick="detachTemplate();closeFillContract()">Remove</button>`:`<button class="fc-act primary" onclick="closeFillContract()">${c.cls==='warn'?'Keep anyway':'Use as fill contract'}</button>`}
+      </div>
+    </div>`;
+}
+
+// ── phase scope/placeholder chip (reflects grey-area state) ──
+function scopeChip(p){
+  if(!p.scopeRef) return '';
+  const st=RESOLVED[p.scopeRef]||'unconfirmed', g=GREY[p.scopeRef];
+  // folder_scope binds as a list[UUID] (BRIEF 3.6) — render it as a list even with one element.
+  if(st==='unconfirmed') return `<span class="tchip scope unconfirmed" title="Folder ref not yet confirmed">📁 “${g.said.split(' in ')[0]}” — needs confirm</span>`;
+  if(st.startsWith('corrected:')){ const nm=st.slice(10); const f=FOLDERS.find(x=>x.name===nm); const id=f?f.id:g.readId; return `<span class="tchip scope" title="folder_scope: [${id}]">📁 folder_scope [${id}] · ${nm}</span>`; }
+  return `<span class="tchip scope" title="folder_scope: [${g.readId}]">📁 folder_scope [${g.readId}] · ${g.readName}</span>`;
+}
+function placeholderChip(p){
+  if(!p.placeholderRef) return '';
+  const st=RESOLVED[p.placeholderRef]||'unconfirmed';
+  if(st==='unconfirmed') return `<span class="tchip placeholder" title="Unmapped placeholder">❏ {{committee_sign_off_date}} — unmapped</span>`;
+  if(st.startsWith('corrected:')) return `<span class="tchip resolved">❏ ${st.slice(10).slice(0,28)}…</span>`;
+  return `<span class="tchip resolved">❏ blank for manual entry</span>`;
+}
+function gateChips(p){
+  if(p.t!=='llm_emit') return '';
+  // BRIEF §3.4/§3.5: validators are PER-PHASE — freshness (timing='pre') keys to the searching phase,
+  // not the emit deliverable. So count emit-node gates separately from pre-timing ones rather than
+  // implying the whole set runs on this node. freshness shows on the searching phase's chip instead.
+  const PRE_TIMING = {freshness:true};
+  const emitGates = Object.keys(GATES).filter(g=>GATES[g] && !PRE_TIMING[g]).length;
+  return `<span class="tchip gate" title="Per-phase validators that run on THIS deliverable node — pre-timing gates like freshness key to their own phase; the publish judge is a separate always-on gate, not a per-phase one">${emitGates} gate${emitGates===1?'':'s'} on this node + publish judge</span><span class="tchip cit">citation_policy: ${CIT}</span>`;
+}
+
+// ── per-phase grounding REVEAL — the draft tells each phase what grounding it still needs ──
+// The searching phase reveals the folder it INFERRED (confirm it); the llm_emit phase reveals it
+// needs a template to fill. This is the CORE reframe: grounding is surfaced BY the draft.
+function phaseRevealHTML(p){
+  // emit phase: needs a template (fill mode) — drafted from the requirement alone, so it's unattached.
+  if(p.t==='llm_emit'){
+    if(!TPL_ATTACHED){
+      // JOB 2: a PROMINENT, clearly-labeled attach button (a real button, not a faint chip).
+      return `<div class="p-reveal" id="emitAttachAnchor"><span class="pr-lead" style="width:100%">⬆ To fill a document this phase needs a template:</span>
+        <div class="attach-tpl-row">
+          <button class="attach-tpl-btn" onclick="attachTemplate()">
+            <span class="atb-ico">⬆</span> Attach the .docx / .pptx / .xlsx this fills
+            <span class="atb-fmt">net-new</span>
+          </button>
+        </div>
+        <span class="pr-lead" style="width:100%">Without one the deliverable is <b>written prose</b> (analysis mode). The template's presence flips analysis ↔ fill — clicking opens the fill-contract (placeholders + flag states).</span></div>`;
+    }
+    return `<div class="p-reveal"><span class="pr-lead">❏ Template attached —</span>
+      <button class="needs-aff got" onclick="openFillContract()">fill mode · weekly-vendor-risk.docx · inspect ▸</button></div>`;
+  }
+  // searching phase: reveal the per-phase folder_scope the AI INFERRED — confirm or correct it.
+  if(p.scopeRef==='vendorScope'){
+    const st=RESOLVED[p.scopeRef]||'unconfirmed';
+    if(st==='unconfirmed'){
+      const projFolder = PROJECT_FOLDER?FOLDERS.find(f=>f.id===PROJECT_FOLDER):null;
+      const inferred = FOLDERS.find(f=>f.id===GREY.vendorScope.readId);
+      return `<div class="p-reveal"><span class="pr-lead">📁 I inferred this phase searches</span>
+        <button class="needs-aff confirm" id="chipAnchor-vendorScope" onclick="openChip(event,'vendorScope')">${inferred?inferred.name:'a folder'} · confirm folder ▾</button>
+        <span class="pr-lead" style="width:100%">I never silently bind a scope${projFolder?` — only folders inside <b>${projFolder.name}</b> are offered`:''}.</span></div>`;
+    }
+    const f=FOLDERS.find(x=>x.id===(st.startsWith('corrected:')?(FOLDERS.find(z=>z.name===st.slice(10))||{}).id:GREY.vendorScope.readId));
+    return `<div class="p-reveal"><span class="pr-lead">📁 Folder confirmed —</span>
+      <button class="needs-aff got" onclick="openChip(event,'vendorScope')" id="chipAnchor-vendorScope" style="border-color:hsl(142 71% 45% / .4);background:var(--color-success-dim);color:var(--color-success)">folder_scope [${f?f.id:GREY.vendorScope.readId}] · change ▾</button></div>`;
+  }
+  return '';
+}
+
+function phaseCard(p, idx, mode){
+  // mode: 'chips' (variant C) shows confirm chips inline; else read-only chips
+  const tools = p.tools.map(t=>`<span class="tchip">${t}</span>`).join('');
+  let scope = scopeChip(p), ph = placeholderChip(p);
+  // variant C: append a confirm chip to the unconfirmed greys
+  if(mode==='chips'){
+    if(p.scopeRef && RESOLVED[p.scopeRef]==='unconfirmed') scope += ` <button class="chip-confirm" id="chipAnchor-${p.scopeRef}" onclick="openChip(event,'${p.scopeRef}')">confirm ▾</button>`;
+    if(p.placeholderRef && RESOLVED[p.placeholderRef]==='unconfirmed') ph += ` <button class="chip-confirm" id="chipAnchor-${p.placeholderRef}" onclick="openChip(event,'${p.placeholderRef}')">confirm ▾</button>`;
+  }
+  const hasGrey = (p.scopeRef&&RESOLVED[p.scopeRef]==='unconfirmed')||(p.placeholderRef&&RESOLVED[p.placeholderRef]==='unconfirmed');
+  const isEmit = p.t==='llm_emit';
+  // the draft REVEALS what grounding this phase still needs (post-draft, on the artifact)
+  const reveal = phaseRevealHTML(p);
+  const wantsGround = (isEmit && !TPL_ATTACHED) || (p.scopeRef==='vendorScope' && (RESOLVED.vendorScope||'unconfirmed')==='unconfirmed');
+  return `<li><span class="flow-node">${idx+1}</span>
+    <div class="pcard ${isEmit?'emit':''} ${hasGrey&&mode==='chips'?'has-grey':''} ${wantsGround?'wants-ground':''}">
+      <div class="pcard-top"><span class="p-name">${p.n}</span><span class="ptype ${p.tt}">${p.t}</span></div>
+      <div class="p-note">${p.note}</div>
+      <div class="pcard-meta">${tools}${scope}${ph}${isEmit?`<span class="tchip cit">emitter: ${p.emitter}</span>`:''}${gateChips(p)}</div>
+      ${reveal}
+    </div></li>`;
+}
+
+function flowHTML(mode){ return `<ol class="flow">${PHASES.map((p,i)=>phaseCard(p,i,mode)).join('')}</ol>`; }
+
+// ── grey-area confirm card (shared vocabulary) ──
+// The folder ref's alternatives + read line are computed from the picked project_folder_id so the
+// per-phase folder_scope can only narrow WITHIN it (harness.py:241-253). folder_scope binds as a
+// list[UUID] (BRIEF 3.6), so the read line leads with the bound id(s); the breadcrumb is human-only.
+function greyAlts(key){ return key==='vendorScope' ? folderScopeAlts() : GREY[key].alts; }
+// Honest origin line — NEVER conflate the user's words with the AI's reading (BRIEF §2 no-silent-substitution).
+// origin:'requirement' → the `said` text is a verbatim requirement fragment, framed "You said …".
+// origin:'template'    → the `found` text was parsed from the template (DocxTemplate parse), framed
+//                        "In your template I found …" — it is the AI's finding, not the user's words.
+function greyOriginLine(g, opts){
+  opts=opts||{};
+  if(g.origin==='template'){
+    const note = opts.truncate ? '' : ` <span style="color:var(--color-text-dim)">— ${g.foundNote}</span>`;
+    return `<div class="grey-said">In your template I found <span class="quote" style="font-family:var(--font-mono);font-style:normal">${g.found}</span>${note}</div>`;
+  }
+  // requirement-derived: a verbatim quote of the user's words.
+  const q = opts.truncate ? `${g.said.slice(0,52)}…` : g.said;
+  return `<div class="grey-said">You said <span class="quote">“${q}”</span></div>`;
+}
+function greyCardHTML(key, opts){
+  opts=opts||{};
+  // variant A renders these as a checklist inside a review panel — stamp each card with its batch position
+  const batchBadge = opts.batch ? `<span class="grey-batch">${opts.batch.i} of ${opts.batch.n}</span>` : '';
+  const g=GREY[key], st=RESOLVED[key]||'unconfirmed';
+  const isFolder = key==='vendorScope';
+  if(st!=='unconfirmed'){
+    const label = st.startsWith('corrected:') ? `Corrected → ${st.slice(10)}` : `Confirmed → ${g.readName}`;
+    return `<div class="grey-card resolved">
+      <div class="grey-resolved-line">${batchBadge}✓ <b>${g.kind==='folder ref'?'Folder':'Template field'}:</b> ${label}
+        <button class="gbtn correct" style="margin-left:auto;padding:3px 10px" onclick="reopenGrey('${key}')">change</button></div>
+    </div>`;
+  }
+  // No project folder → folder_scope is unbindable (it requires project_folder_id). Prompt to pick one first.
+  if(isFolder && !PROJECT_FOLDER){
+    return `<div class="grey-card">
+      <div class="grey-head">${batchBadge}<span class="gico">${g.ico}</span> Can't bind a folder scope yet<span class="grey-kind">${g.kind}</span></div>
+      ${greyOriginLine(g)}
+      <div class="grey-read"><span class="ico">⚠</span> <b>No project folder set</b> — <span style="font-family:var(--font-mono)">folder_scope</span> requires a <span style="font-family:var(--font-mono)">project_folder_id</span> to narrow within. Pick a project folder first.</div>
+      <div class="grey-actions">
+        <button class="gbtn confirm" onclick="openFolderPop(event)">📁 Pick a project folder</button>
+      </div>
+    </div>`;
+  }
+  const alts = greyAlts(key).map(a=>`<div class="grey-alt" onclick="correctGrey('${key}','${a.name.replace(/'/g,"\\'")}')"><span>↳ ${a.name}</span><span class="a-path">${a.path}</span></div>`).join('');
+  // Folder read line: bound id is the primary token (id is the bound value, path is only for humans).
+  const readLine = isFolder
+    ? `<div class="grey-read"><span class="ico">→</span> I'll bind <b style="font-family:var(--font-mono)">folder_scope: [${g.readId}]</b> <span style="font-size:10px;color:var(--color-text-dim)">(1 id)</span><span class="bound-id" style="margin-left:auto">${g.readName}</span></div>
+      <div style="font-size:10px;color:var(--color-text-dim);margin-top:5px">id is the bound value · <span style="font-family:var(--font-mono)">${g.readPath}</span> is only for you to read</div>`
+    : `<div class="grey-read"><span class="ico">→</span> I read this as <b>${g.readName}</b><span class="bound-id">${g.readId}</span></div>
+      ${g.readPath?`<div style="font-size:10px;color:var(--color-text-dim);font-family:var(--font-mono);margin-top:5px">${g.readPath}</div>`:''}`;
+  return `<div class="grey-card">
+    <div class="grey-head">${batchBadge}<span class="gico">${g.ico}</span> I made a guess here — confirm before it binds<span class="grey-kind">${g.kind}</span></div>
+    ${greyOriginLine(g)}
+    ${readLine}
+    <div style="font-size:10px;color:var(--color-text-dim);margin-top:8px">Or correct it${isFolder?' (only folders inside your project folder)':''}:</div>
+    <div class="grey-alts">${alts}</div>
+    <div class="grey-actions">
+      <button class="gbtn confirm" onclick="confirmGrey('${key}')">✓ Confirm — bind it</button>
+    </div>
+  </div>`;
+}
+
+// ── grey-area actions ──
+function confirmGrey(key){ RESOLVED[key]='confirmed'; advanceActive(key); render(); }
+function correctGrey(key, alt){ RESOLVED[key]='corrected:'+alt; advanceActive(key); render(); }
+function reopenGrey(key){ RESOLVED[key]='unconfirmed'; ACTIVE_GREY=key; render(); }
+function advanceActive(justResolved){
+  if(CUR_V==='B'){ const rest=unresolvedKeys(); ACTIVE_GREY = rest.length?rest[0]:null; }
+  CHIP_OPEN=null;
+  // auto-promote to 'done' when nothing left
+}
+
+// ── C: chip popover ──
+function openChip(e, key){ e.stopPropagation(); const anchor=e.currentTarget||e.target; CHIP_OPEN=key; render();
+  requestAnimationFrame(()=>positionPop('chipPop', anchor)); }
+function closeChip(){ CHIP_OPEN=null; render(); }
+function chipPopHTML(){
+  if(!CHIP_OPEN) return '';
+  const g=GREY[CHIP_OPEN];
+  const isFolder = CHIP_OPEN==='vendorScope';
+  if(isFolder && !PROJECT_FOLDER){
+    return `<div id="chipBackdrop" onclick="closeChip()"></div>
+      <div class="chip-pop" id="chipPop" onclick="event.stopPropagation()">
+        <div class="cp-pinned">↳ pinned to this field on the draft</div>
+        <div class="grey-head"><span class="gico">${g.ico}</span> Can't bind a folder scope yet<span class="grey-kind">${g.kind}</span></div>
+        ${greyOriginLine(g, {truncate:true})}
+        <div class="grey-read"><span class="ico">⚠</span> <b>No project folder set</b> — <span style="font-family:var(--font-mono)">folder_scope</span> requires <span style="font-family:var(--font-mono)">project_folder_id</span>.</div>
+        <div class="grey-actions"><button class="gbtn confirm" onclick="openFolderPop(event)">📁 Pick a project folder</button></div>
+      </div>`;
+  }
+  const alts=greyAlts(CHIP_OPEN).map(a=>`<div class="grey-alt" onclick="correctGrey('${CHIP_OPEN}','${a.name.replace(/'/g,"\\'")}')"><span>↳ ${a.name}</span><span class="a-path">${a.path}</span></div>`).join('');
+  const readLine = isFolder
+    ? `<div class="grey-read"><span class="ico">→</span> <b style="font-family:var(--font-mono)">folder_scope: [${g.readId}]</b> <span style="font-size:10px;color:var(--color-text-dim)">(1 id)</span><span class="bound-id" style="margin-left:auto">${g.readName}</span></div>`
+    : `<div class="grey-read"><span class="ico">→</span> <b>${g.readName}</b><span class="bound-id">${g.readId}</span></div>`;
+  return `<div id="chipBackdrop" onclick="closeChip()"></div>
+    <div class="chip-pop" id="chipPop" onclick="event.stopPropagation()">
+      <div class="cp-pinned">↳ pinned to this field on the draft</div>
+      <div class="grey-head"><span class="gico">${g.ico}</span> Confirm this guess<span class="grey-kind">${g.kind}</span></div>
+      ${greyOriginLine(g, {truncate:true})}
+      ${readLine}
+      <div style="font-size:10px;color:var(--color-text-dim);margin-top:8px">Or correct it${isFolder?' (within your project folder)':''}:</div>
+      <div class="grey-alts">${alts}</div>
+      <div class="grey-actions"><button class="gbtn confirm" onclick="confirmGrey('${CHIP_OPEN}')">✓ Confirm</button></div>
+    </div>`;
+}
+
+// ── shared popover positioning (folder picker + fill contract) ──
+function positionPop(id, anchorEl){
+  const pop=document.getElementById(id); if(!pop) return;
+  const w=pop.offsetWidth||360, h=pop.offsetHeight||400;
+  if(anchorEl){
+    const r=anchorEl.getBoundingClientRect();
+    pop.style.top=Math.min(r.bottom+6, window.innerHeight-h-12)+'px';
+    pop.style.left=Math.max(12, Math.min(r.left, window.innerWidth-w-12))+'px';
+  } else {
+    // centered fallback (e.g. fill-contract opened from a chip or seeded state)
+    pop.style.top=Math.max(64, (window.innerHeight-h)/2)+'px';
+    pop.style.left=Math.max(12, (window.innerWidth-w)/2)+'px';
+  }
+}
+
+// ── composing (one-shot working state) ──
+function composingHTML(){
+  // Template-read step is conditional — the template is OPTIONAL (analysis mode reads no placeholders).
+  return `<div class="canvas"><div class="composing-card">
+    <div class="composing-orb"></div>
+    <div class="ct">Composing your workflow…</div>
+    <div class="cs">Reading your requirement against your knowledge base, the tool registry${TPL_ATTACHED?", and the template's placeholders":''}. The draft appears whole — not drawn step by step.</div>
+    <div class="composing-steps">
+      <div class="cstep done"><span class="dot">✓</span> Grounded on KB folder tree + tool registry</div>
+      ${TPL_ATTACHED?`<div class="cstep done"><span class="dot">✓</span> Read 5 placeholders from weekly-vendor-risk.docx</div>`:`<div class="cstep done"><span class="dot">✓</span> Analysis mode — no template, the deliverable is written prose</div>`}
+      <div class="cstep active"><span class="dot"></span> Emitting one WorkflowDefinition (forced structured output) — and flagging anything it had to guess</div>
+    </div>
+    <div class="note-bar" style="margin-top:6px">One pass — grounding, emission, and grey-area flagging happen together, not as separate generation phases.</div>
+    <div class="note-bar">In the live spike the draft validated on the first try — so the “caught an invalid field, regenerating…” repair below is designed-for resilience, not an every-run event.</div>
+    <div class="repair-flash" style="margin-top:var(--space-3)"><span class="spin"></span> caught an invalid field — regenerating once… <span class="x" title="this transient state never fired in the live spike">⌃</span></div>
+  </div></div>`;
+}
+
+// ── EMPTY = the FIRST screen: JUST the describe box. Reads in 3 seconds. ──
+// No grounding, no dial, no inputs, no phase list. business_requirement is REQUIRED
+// (publish 400s without it) so the box itself carries the required affordance — nothing else.
+// Grounding / strictness / inputs appear ONLY after the first draft (revealed BY the draft).
+function describeFirstHTML(){
+  return `<div class="describe-first"><div class="df-inner">
+    <div class="df-lead">
+      <div class="df-glyph">✎</div>
+      <div class="df-title">Describe the business requirement</div>
+    </div>
+    <div class="df-box">
+      <div class="df-req-label"><span class="req-star">★</span> Business requirement <span class="req-tag">· required</span></div>
+      <textarea class="df-input req-empty" id="reqInput" rows="4" oninput="onReqInput(this)"
+        placeholder="e.g. Fill our weekly vendor-risk report template from the latest vendor assessments in our knowledge base — every figure must trace to a source."></textarea>
+      <div class="df-warn" id="reqWarn">Required</div>
+    </div>
+    <div class="df-actions">
+      <button class="df-draft-btn" id="composeBtn" disabled onclick="onCompose()">Describe a requirement to draft</button>
+    </div>
+    <div class="df-hint">You describe the goal — <b>the AI drafts the phases, sets the strictness, and asks about anything it had to guess.</b> ${infoDot('how',{how:true})}</div>
+  </div></div>`;
+}
+
+// ── VARIANT A: describe-then-confirm (batched panel) ──
+function canvasA(){
+  if(STATE==='composing') return composingHTML();
+  const cleared = allCleared();
+  const done = fullyGrounded();
+  // The draft REVEALS what grounding it needs — a one-line intro framing the post-draft refine surface.
+  const intro = `<div class="refine-intro"><span class="ri-bot"></span>
+    <div class="ri-txt">${done
+      ? `<b>The draft is fully grounded.</b> Every guess is confirmed, the template is attached, and the project folder is set.`
+      : `<b>I drafted this from your requirement alone</b> — so the draft itself shows what grounding it still needs: confirm the project folder I inferred, attach the template the emit phase needs, and clear the ${unresolvedKeys().length} guess${unresolvedKeys().length===1?'':'es'} I flagged. Nothing is bound until you do. Grounding is a <b>refinement</b>, not a precondition.`}</div></div>`;
+  let panel='';
+  if(!cleared || STATE==='confirming'){
+    const n=unresolvedKeys().length;
+    panel=`<div class="assume-panel ${cleared?'cleared':''}">
+      <div class="assume-bar"><span class="ab-ico">${cleared?'✓':'⚠'}</span>
+        <span class="ab-title">${cleared?'All grey-area guesses confirmed':'Confirm the '+n+' guess'+(n===1?'':'es')+' the draft flagged'}</span>
+        <span class="ab-count">${greyKeys().length-n} / ${greyKeys().length}</span></div>
+      <div class="assume-body">
+        ${!cleared?`<div style="font-size:10.5px;color:var(--color-text-dim);line-height:1.5">These are the grey areas the AI had to <b style="color:var(--color-text-muted)">guess</b> — an ambiguous folder ref, an unmapped template field. It drafted, then ASKED. Nothing is silently substituted.</div>`:''}
+        ${greyKeys().map((k,i)=>greyCardHTML(k,{batch:{i:i+1,n:greyKeys().length}})).join('')}
+      </div>
+      <div class="assume-foot">
+        <span class="af-note">Nothing is silently substituted — the draft stays <b>provisional</b> until every guess is cleared and the grounding is provided.</span>
+        <span class="lock-til">${done?'🔓 cleared — ready to refine & publish':'🔒 binds when grounded'}</span>
+      </div>
+    </div>`;
+  } else if(cleared){
+    panel=`<div class="assume-panel cleared"><div class="assume-bar"><span class="ab-ico">✓</span><span class="ab-title">All guesses cleared — finish the grounding to bind</span><span class="ab-count">${greyKeys().length} / ${greyKeys().length}</span></div></div>`;
+  }
+  // Centerpiece-first: while guesses/grounding are open, the panel + ground rail lead and the dial collapses.
+  // JOB 2: the one-time "needs a template" nudge sits right under the intro, pointing down at the fill step.
+  const body = done
+    ? `${intro}${groundRailHTML()}${dialHTML()}${inputsStripHTML()}${panel}${flowHTML('read')}`
+    : `${intro}${tplNudgeHTML()}${groundRailHTML()}${panel}${dialOrSummaryHTML()}${inputsStripHTML()}${flowHTML('read')}`;
+  return `<div class="canvas">${body}
+    ${done?`<div class="published-note">✓ Grounded & cleared. The draft is now <b>bound</b>: the project folder is confirmed, the template attached, <b>folder_scope</b> resolved to a real folder id, the unmapped placeholder routed. Next: refine by form (sketch 019) → publish gauntlet (sketch 020). A judge fail there is a hard wall — no “publish anyway”.</div>`:''}
+  </div>`;
+}
+
+// ── VARIANT B: inline checkpoint cards (one at a time, in the talk stream) ──
+function canvasB(){
+  if(STATE==='composing') return composingHTML();
+  const keys=greyKeys();
+  const cleared=allCleared();
+  const done=fullyGrounded();
+  // progress pips
+  const pips=keys.map((k,i)=>{ const st=RESOLVED[k]; const done=st!=='unconfirmed'; const active=!done&&k===ACTIVE_GREY;
+    const cls=done?'done':(active?'active':''); const aria=done?'confirmed':(active?'in progress':'pending');
+    const glyph=done?'✓':(active?'•':(i+1)); return `<span class="cp-pip ${cls}" role="img" aria-label="checkpoint ${i+1}: ${aria}">${glyph}</span>`; }).join('');
+  let stream='';
+  // 1 · the user's described requirement opens the conversation
+  stream += `<div class="cp-req"><span class="cr-label">★ Business requirement</span>${REQUIREMENT}</div>`;
+  // 2 · the AI's draft turn — the whole draft, then "here's what I had to guess"
+  stream += `<div class="cp-ai"><div class="bot"></div><div class="body">
+    <div class="lead">Here's the whole draft — <b>4 phases</b>, ending in the cited template-fill. I set strictness to <b>Strict</b> because you said it's reviewed by your risk committee. I drafted from your requirement alone, so the draft shows what it still needs: a <b>template</b> + a confirmed <b>project folder</b> (above), and <b>${keys.length} guesses</b> I had to make — let me confirm those one at a time.</div>
+  </div></div>`;
+  // 3 · walk the checkpoints in order: resolved ones become PAST turns (AI card + user echo),
+  //     the active one arrives as the latest AI turn; later ones stay hidden until reached.
+  let reachedActive=false, seq=0;
+  keys.forEach(k=>{
+    const st=RESOLVED[k], g=GREY[k]; seq++;
+    if(st!=='unconfirmed'){
+      // past turn: the AI's confirm card (collapsed to its resolved line) + the user's echoed reply
+      const corrected=st.startsWith('corrected:');
+      const label=corrected?`corrected → ${st.slice(10)}`:`confirmed → ${g.readName}`;
+      const echo=corrected?`Use “${st.slice(10)}” instead`:'Confirm — that’s right';
+      stream+=`<div class="cp-ai"><div class="bot"></div><div class="body"><div class="seq">checkpoint ${seq} of ${keys.length}</div><div class="cp-resolved-mini">✓ <b>${g.kind}:</b> ${label}</div></div></div>`;
+      stream+=`<div class="cp-user"><span class="cu-tag">${corrected?'corrected':'confirmed'}</span>${echo}</div>`;
+    } else if(k===ACTIVE_GREY && !reachedActive){
+      reachedActive=true;
+      // latest AI turn: the active checkpoint card, alternatives expanded so confirm-vs-correct is live
+      stream+=`<div class="cp-ai active"><div class="bot"></div><div class="body"><div class="seq">checkpoint ${seq} of ${keys.length} · just now</div>${greyCardHTML(k)}</div></div>`;
+    }
+  });
+  if(done){
+    stream+=`<div class="cp-done-banner">✓ Every guess confirmed & the draft grounded — it's now bound. Refine it by form next, or publish.</div>`;
+  } else if(cleared){
+    stream+=`<div class="cp-done-banner" style="border-style:solid;border-color:hsl(38 92% 60% / .4);background:var(--color-warning-dim);color:var(--color-warning)">Guesses cleared — finish the grounding above (template + project folder) to bind the draft.</div>`;
+  } else {
+    // a passive composer so the surface reads as a real chat thread, not a wizard
+    stream+=`<div class="cp-composer"><span class="cc-input">…or reply in plain language to adjust the draft</span><span class="cc-send">Send</span></div>`;
+  }
+  // The draft REVEALS its grounding: the project-folder rail leads, the dial collapses, the receipt re-opens it.
+  // JOB 2: the one-time "needs a template" nudge leads the checkpoint wrap, pointing down at the fill step.
+  return `<div class="checkpoint-wrap">
+    ${tplNudgeHTML()}
+    ${groundRailHTML()}
+    ${dialOrSummaryHTML()}
+    ${groundReceiptHTML()}
+    <div class="cp-progress">grey-area checkpoints ${pips} ${keys.filter(k=>RESOLVED[k]!=='unconfirmed').length}/${keys.length} confirmed</div>
+    ${flowHTML('read')}
+    <div style="height:var(--space-5)"></div>
+    <div class="talk-label" style="margin-bottom:var(--space-2)">In the talk stream — one checkpoint at a time</div>
+    <div class="cp-stream">${stream}</div>
+  </div>`;
+}
+
+// ── VARIANT C: confirm chips on the rendered draft ──
+function canvasC(){
+  if(STATE==='composing') return composingHTML();
+  // total open items = grey-area guesses + the grounding the draft revealed (template, project folder)
+  const n=unresolvedKeys().length, total=greyKeys().length, cleared=n===0;
+  const gGaps=groundingGaps(), gTotal=2;        // template + project folder
+  const openItems=n+gGaps, allTotal=total+gTotal, doneItems=allTotal-openItems;
+  const done=fullyGrounded();
+  const pct = Math.round((doneItems/allTotal)*100);
+  const meter=`<div class="draft-meter ${done?'clear':''}">
+    <span class="dm-ico">${done?'✓':'⚠'}</span>
+    <div class="dm-txt"><div class="dm-title">${done?'Draft fully grounded & confirmed — bound':doneItems+' of '+allTotal+' grounded'}</div>
+      <div class="dm-sub">${done?'Every guessed field traces to a real folder id, the template is attached, the project folder is set.':'I drafted from your requirement alone — each phase wears a chip for what it still needs (a folder to confirm, a template to attach) and each guess wears a confirm chip. Clear them all before the draft binds. Nothing is silently invented.'}</div></div>
+    <div class="dm-track"><div class="dm-fill" style="width:${pct}%"></div></div>
+  </div>`;
+  // Centerpiece-first: while guesses/grounding are open, the meter + ground rail lead and the dial collapses.
+  // JOB 2: the one-time "needs a template" nudge leads the canvas, pointing down at the fill step.
+  const body = done
+    ? `${groundRailHTML()}${dialHTML()}${inputsStripHTML()}${meter}${flowHTML('chips')}`
+    : `${tplNudgeHTML()}${groundRailHTML()}${meter}${dialOrSummaryHTML()}${inputsStripHTML()}${flowHTML('chips')}`;
+  return `<div class="canvas">${body}
+    ${done?`<div class="published-note">✓ All confirm-chips cleared & grounded — the draft is <b>bound</b>. The inferred folder confirmed to a real id, the template attached, the unmapped placeholder routed. Next: refine by form (019) → publish gauntlet (020).</div>`:''}
+  </div>`;
+}
+
+// ── talk rail (A & C share the left rail) — a LIGHT conversation only, never a control panel ──
+// Post-draft only (EMPTY uses the describe-first hero, not this rail). The grounding affordances
+// live on the RIGHT (the artifact), revealed BY the draft — the rail just narrates.
+function talkHTML(){
+  const msgs=[];
+  msgs.push(`<div class="talk-label">Your requirement → the AI's draft</div>`);
+  msgs.push(`<div class="msg user">${REQUIREMENT}</div>`);
+  if(STATE==='composing'){
+    msgs.push(`<div class="msg ai thinking"><div class="bot"></div><div class="mt">Drafting one workflow from your requirement — the draft appears whole, then it tells you what grounding it still needs.</div></div>`);
+  } else {
+    const cleared=allCleared() && TPL_ATTACHED && PROJECT_CONFIRMED;
+    msgs.push(`<div class="msg ai"><div class="bot"></div><div class="mt">Drafted a <b>4-phase</b> workflow ending in a cited template-fill, and set strictness to <b>Strict</b> (you said it's risk-committee-reviewed). I drafted from your requirement alone — so the draft now shows what it still needs from you on the right: ${cleared?'all set. ✓':'a template, a confirmed folder, and the guesses I flagged →'}</div></div>`);
+    if(cleared) msgs.push(`<div class="msg user">All set — keep it.</div>`);
+  }
+  // The composer is a light re-draft control only — NOT a grounding-collection panel.
+  const composer = `<div class="talk-composer">
+    <div class="req-label"><span class="req-star">★</span> Business requirement <span style="color:var(--color-text-dim);text-transform:none;letter-spacing:0">· the anchor</span></div>
+    <textarea class="talk-input" id="reqInput" rows="3" oninput="onReqInput(this)">${REQUIREMENT}</textarea>
+    <button class="compose-btn" id="composeBtn" onclick="onCompose()">↻ Re-draft from this requirement</button>
+    <div class="talk-hint">grounding (template · folder) is surfaced by the draft on the right — refine there, not here</div>
+  </div>`;
+  return `<div class="talk"><div class="talk-scroll">${msgs.join('')}</div>${composer}</div>`;
+}
+
+function onReqInput(el){
+  const empty = el.value.trim().length===0;
+  el.classList.toggle('req-empty', empty);
+  const warn=document.getElementById('reqWarn'); if(warn) warn.classList.toggle('show', empty);
+  const btn=document.getElementById('composeBtn'); if(!btn) return;
+  // Only the FIRST screen (EMPTY) flips the button copy; the post-draft rail keeps its "Re-draft" label.
+  if(STATE==='empty'){ btn.disabled=empty; btn.textContent=empty?'Describe a requirement to draft':'Draft the workflow ▸'; }
+}
+function onCompose(){ setState('composing'); setTimeout(()=>{ if(STATE==='composing') setState('draft'); }, 1700); }
+
+// ── header ──
+function headHTML(){
+  let bind;
+  if(STATE==='empty'||STATE==='composing') bind=`<span class="bind-badge pending">○ binding — waiting for a draft</span>`;
+  else if(fullyGrounded()) bind=`<span class="bind-badge clear">✓ grounded & confirmed — bound</span>`;
+  else { const ng=unresolvedKeys().length+groundingGaps(); bind=`<span class="bind-badge blocked">⚠ ${ng} item${ng===1?'':'s'} await${ng===1?'s':''} you — provisional</span>`; }
+  const canPublish = STATE!=='empty'&&STATE!=='composing'&&fullyGrounded();
+  const publish = `<button class="publish-btn ${canPublish?'':'disabled'}" ${canPublish?'':'title="Confirm every grey area first — nothing binds until you do"'} onclick="${canPublish?"alert('→ sketch 020: the 8-stage publish gauntlet (lint → real golden run → judge verdict). A judge fail is a hard wall.')":''}">Continue to publish ▸</button>`;
+  return `<div class="builder-head">
+    <span class="bh-title">＋ Author a workflow <span class="netnew">NET-NEW · Phase 103</span></span>
+    <span class="spacer"></span>${bind}${publish}
+  </div>`;
+}
+
+// ── render ──
+function canvasFor(){ return CUR_V==='A'?canvasA():CUR_V==='B'?canvasB():canvasC(); }
+function render(){
+  let body;
+  // EMPTY = the FIRST screen: one calm column, no rail, the describe box IS the whole screen.
+  if(STATE==='empty'){
+    body=`<div class="body-area first">${describeFirstHTML()}</div>`;
+  }
+  else if(CUR_V==='A') body=`<div class="body-area vA">${talkHTML()}${canvasA()}</div>`;
+  else if(CUR_V==='B') body=`<div class="body-area vB">${canvasB()}</div>`;
+  else body=`<div class="body-area vC">${talkHTML()}${canvasC()}</div>`;
+  // grounding popovers (project-folder picker + fill-contract inspection + grey-area confirm popover)
+  // overlay EVERY variant — the per-phase reveal affordances trigger the confirm popover in A/B/C alike.
+  // infoPopHTML is the tiered-guidance ⓘ micro-hint popover (job 3) — also overlays every variant.
+  document.getElementById('shell').innerHTML = headHTML()+body+folderPopHTML()+fillContractHTML()+chipPopHTML()+infoPopHTML();
+  // position any open chip popover against its field anchor (handles seeded states with no click event)
+  if(CHIP_OPEN){
+    requestAnimationFrame(()=>{ const pop=document.getElementById('chipPop'), anchor=document.getElementById('chipAnchor-'+CHIP_OPEN);
+      if(pop && anchor){ const r=anchor.getBoundingClientRect();
+        pop.style.top=Math.min(r.bottom+6, window.innerHeight-320)+'px';
+        pop.style.left=Math.max(12, Math.min(r.left, window.innerWidth-332))+'px'; } });
+  }
+}
+
+function setVariant(v){ CUR_V=v; FOLDER_POP=false; FC_OPEN=false; INFO_OPEN=null; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  // B has no left rail describe; keep state coherent
+  if(CUR_V==='B' && (STATE==='draft')) ACTIVE_GREY=ACTIVE_GREY||unresolvedKeys()[0]||null;
+  // C auto-shows the active correction popover mid-flow; other variants render it inline (no floating pop)
+  CHIP_OPEN = (CUR_V==='C' && STATE==='confirming' && ACTIVE_GREY && RESOLVED[ACTIVE_GREY]==='unconfirmed') ? ACTIVE_GREY : null;
+  render(); }
+
+function setState(s){
+  STATE=s; FOLDER_POP=false; FC_OPEN=false; INFO_OPEN=null;
+  if(s==='empty'){ // back to the FIRST screen — clear all post-draft grounding so it re-reveals on next draft
+    resetResolved(); TPL_ATTACHED=false; PROJECT_CONFIRMED=false; PROJECT_FOLDER='fld_ops'; TPL_NUDGE_DISMISSED=false; }
+  else if(s==='draft'){ // fresh draft: grounding UNPROVIDED — the draft reveals it needs template + folder + clears
+    resetResolved(); TPL_ATTACHED=false; PROJECT_CONFIRMED=false; PROJECT_FOLDER='fld_ops'; TPL_NUDGE_DISMISSED=false; }
+  else if(s==='confirming'){ // mid-flow: project folder confirmed + template attached, one guess cleared, one open
+    resetResolved(); PROJECT_CONFIRMED=true; TPL_ATTACHED=true; RESOLVED.vendorScope='confirmed'; ACTIVE_GREY='tplPlaceholder';
+    CHIP_OPEN = (CUR_V==='C') ? 'tplPlaceholder' : null; } // C auto-shows the active correction popover
+  else if(s==='done'){ // fully grounded & confirmed
+    RESOLVED={vendorScope:'confirmed', tplPlaceholder:'corrected:Leave blank for manual entry'}; ACTIVE_GREY=null;
+    TPL_ATTACHED=true; PROJECT_CONFIRMED=true; }
+  document.querySelectorAll('#stToggle button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  render();
+}
+
+// clearing the last grey area while in draft/confirming reflects live in the header bind-badge + canvas (STATE is unchanged; the resolution map drives it)
+resetResolved();
+render();
+</script>
+</body>
+</html>

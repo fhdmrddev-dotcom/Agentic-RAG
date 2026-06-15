@@ -1,10 +1,11 @@
 ---
 phase: 104
 slug: pm-flagship-content-pack
-status: draft
+status: verified
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-06-14
+validated: 2026-06-15
 ---
 
 # Phase 104 — Validation Strategy
@@ -46,12 +47,12 @@ created: 2026-06-14
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 104-01-01 | 01 | 1 | PM-01 | T-104-01-02 / T-104-01-03 | Synthetic-only corpus (no PII/secrets, no adversarial citation strings); content + template files only — no DB/network | unit (build + reopen) | `backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_corpus.py && backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_templates.py` | ❌ W0 | ⬜ pending |
-| 104-01-02 | 01 | 1 | PM-01 | T-104-01-01 | Inline P×I Score is a fixed author expression inside docxtpl SandboxedEnvironment(autoescape) — no arbitrary Python, no user-controlled template; operates only on citation-gated cells | unit (build + reopen) | `backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_templates.py && backend/venv/Scripts/python.exe -c "from docx import Document; d=Document('scripts/pm-pack/templates/risk-register.docx'); print('reopen ok', len(d.tables))"` | ❌ W0 | ⬜ pending |
-| 104-01-03 | 01 | 1 | PM-01 | T-104-01-01 | Proves the worded→numeric Score renders via the sandboxed inline Jinja (no backend code); fixture shape provably matches build_context dict output (no divergent false-pass) | unit | `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_pm_pack_templates.py -x -q` | ❌ W0 | ⬜ pending |
-| 104-02-01 | 02 | 2 | PM-01 | T-104-02-01 / T-104-02-03 / T-104-02-07 | Slug regex guard (no path traversal); secrets NAME-ONLY via dotenv; DEMO_USER_ID pre-flight aborts on RLS-owner mismatch (no wrong-owner seed) | unit (ast.parse + grep) | `cd "C:/Vibe Apps/Agentic RAG" && backend/venv/Scripts/python.exe -c "import ast; ast.parse(open('scripts/seed-pm-pack.py').read()); print('parses ok')"` | ❌ W0 | ⬜ pending |
-| 104-02-02 | 02 | 2 | PM-01 | T-104-02-04 / T-104-02-06 | 2-phase def validates; render_template absent from any available_tools (clean server-side bound-template shape); output_file_valid config:{} re-opens the produced file (SC#2 integrity gate provably live, not false-green); DELETE-then-INSERT only | unit (model_validate + def-shape assert) | `cd "C:/Vibe Apps/Agentic RAG" && backend/venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'backend'); from dotenv import load_dotenv; load_dotenv('backend/.env'); import importlib.util as u; s=u.spec_from_file_location('seed','scripts/seed-pm-pack.py'); m=u.module_from_spec(s); s.loader.exec_module(m); from app.models.harness import WorkflowDefinition; f='11111111-1111-1111-1111-111111111111'; d=m.build_status_def(f,'d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-weekly-status-report.docx'); WorkflowDefinition.model_validate(d); r=m.build_risk_def(f,'d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-risk-register.docx'); WorkflowDefinition.model_validate(r); import json; assert 'render_template' not in json.dumps([p['config'].get('available_tools',[]) for p in d['phases']]); ofv=[v for v in d['phases'][1]['validators'] if v['kind']=='output_file_valid'][0]; assert ofv['config']=={}; print('ok')"` | ❌ W0 | ⬜ pending |
-| 104-02-03 | 02 | 2 | PM-01 | T-104-02-02 / T-104-02-04 / T-104-02-06 / T-104-02-07 | Live-DB proof: idempotency (no dup rows), 2-phase def shape (render_template absent, output_file_valid config:{}), immutability UPDATE→CheckViolation, RLS isolation (is_global=false, owner-scoped corpus) | integration (live :54322 or SKIP) | `cd backend && venv/Scripts/python.exe -m pytest tests/integration/test_seed_pm_pack.py -x -q` | ❌ W0 | ⬜ pending |
+| 104-01-01 | 01 | 1 | PM-01 | T-104-01-02 / T-104-01-03 | Synthetic-only corpus (no PII/secrets, no adversarial citation strings); content + template files only — no DB/network | unit (build + reopen) | `backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_corpus.py && backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_templates.py` | ✅ built | ✅ green |
+| 104-01-02 | 01 | 1 | PM-01 | T-104-01-01 | Inline P×I Score is a fixed author expression inside docxtpl SandboxedEnvironment(autoescape) — no arbitrary Python, no user-controlled template; operates only on citation-gated cells | unit (build + reopen) | `backend/venv/Scripts/python.exe scripts/pm-pack/make_pm_templates.py && backend/venv/Scripts/python.exe -c "from docx import Document; d=Document('scripts/pm-pack/templates/risk-register.docx'); print('reopen ok', len(d.tables))"` | ✅ built | ✅ green |
+| 104-01-03 | 01 | 1 | PM-01 | T-104-01-01 | Proves the worded→numeric Score renders via the sandboxed inline Jinja (no backend code); fixture shape provably matches build_context dict output (no divergent false-pass) | unit | `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_pm_pack_templates.py -x -q` | ✅ built | ✅ green |
+| 104-02-01 | 02 | 2 | PM-01 | T-104-02-01 / T-104-02-03 / T-104-02-07 | Slug regex guard (no path traversal); secrets NAME-ONLY via dotenv; DEMO_USER_ID pre-flight aborts on RLS-owner mismatch (no wrong-owner seed) | unit (ast.parse + grep) | `cd "C:/Vibe Apps/Agentic RAG" && backend/venv/Scripts/python.exe -c "import ast; ast.parse(open('scripts/seed-pm-pack.py').read()); print('parses ok')"` | ✅ built | ✅ green |
+| 104-02-02 | 02 | 2 | PM-01 | T-104-02-04 / T-104-02-06 | 2-phase def validates; render_template absent from any available_tools (clean server-side bound-template shape); output_file_valid config:{} re-opens the produced file (SC#2 integrity gate provably live, not false-green); DELETE-then-INSERT only | unit (model_validate + def-shape assert) | `cd "C:/Vibe Apps/Agentic RAG" && backend/venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'backend'); from dotenv import load_dotenv; load_dotenv('backend/.env'); import importlib.util as u; s=u.spec_from_file_location('seed','scripts/seed-pm-pack.py'); m=u.module_from_spec(s); s.loader.exec_module(m); from app.models.harness import WorkflowDefinition; f='11111111-1111-1111-1111-111111111111'; d=m.build_status_def(f,'d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-weekly-status-report.docx'); WorkflowDefinition.model_validate(d); r=m.build_risk_def(f,'d8a54002-6a29-4b88-b918-cff2aa4a06d5/_library/pm-risk-register.docx'); WorkflowDefinition.model_validate(r); import json; assert 'render_template' not in json.dumps([p['config'].get('available_tools',[]) for p in d['phases']]); ofv=[v for v in d['phases'][1]['validators'] if v['kind']=='output_file_valid'][0]; assert ofv['config']=={}; print('ok')"` | ✅ built | ✅ green |
+| 104-02-03 | 02 | 2 | PM-01 | T-104-02-02 / T-104-02-04 / T-104-02-06 / T-104-02-07 | Live-DB proof: idempotency (no dup rows), 2-phase def shape (render_template absent, output_file_valid config:{}), immutability UPDATE→CheckViolation, RLS isolation (is_global=false, owner-scoped corpus) | integration (live :54322 or SKIP) | `cd backend && venv/Scripts/python.exe -m pytest tests/integration/test_seed_pm_pack.py -x -q` | ✅ built | ✅ green |
 | 104-03-01 | 03 | 3 | PM-01 | T-104-03-02 | Cross-provider kickoff harness opt-in gated (no auto provider-spend); pure client (no backend write paths). VALIDATION.md finalized (SC#10 scoreboard + nyquist flip) | unit (ast.parse + grep) | `cd "C:/Vibe Apps/Agentic RAG" && backend/venv/Scripts/python.exe -c "import ast; ast.parse(open('scripts/pm-pack/scoreboard_smoke.py').read()); print('ok')"` | ✅ harness | ✅ green |
 | 104-03-02 | 03 | 3 | PM-01 | T-104-03-03 / T-104-03-04 | Runbook drives the LIVE publish gauntlet (judge hard-wall) on a Tweak v2 fork with v1 immutability psql read-back | doc (grep) | `cd "C:/Vibe Apps/Agentic RAG" && grep -q "UAT-1" ".planning/phases/104-pm-flagship-content-pack/104-HUMAN-UAT.md"` | ✅ runbook | ✅ green |
 | 104-03-03 | 03 | 3 | PM-01 | T-104-03-01 / T-104-03-03 | Live human-verify checkpoint (manual by design): SC#2 cited integrity-checked .docx, SC#1/#3 author proof, SC#10 scoreboard incl. honest-fail/no-silent-narration | manual (human-verify) | DONE 2026-06-15 — all 5 proofs green; see "SC#10 — LIVE RESULTS" below + 104-HUMAN-UAT.md | ✅ verified | ✅ pass |
@@ -152,6 +153,47 @@ attach the 102 `citations_required` + `output_file_valid` validators to an `llm_
 over-rejected a correct, already-rendered `.docx` (the emit success output didn't expose
 `retrieved_ids`/the integrity verdict to the post-phase validators). Additive fix; 112 emit/validator/
 render tests green + a net-new regression test. **Engine-fix override of the content-only boundary, operator-approved.**
+
+---
+
+## Validation Audit 2026-06-15
+
+Re-ran every automated `<automated>` command against shipped HEAD on the live `:54322` stack
+(not trusting the pre-execution map's `⬜ pending` placeholders — the same "don't trust the
+static state" discipline applied to validation). Result before fix:
+
+| Metric | Count |
+|--------|-------|
+| Automated commands re-run | 6 task rows (unit + ast.parse + def-shape + integration) |
+| COVERED (green) | 5 rows + 2/4 integration sub-tests |
+| Gaps found | 1 (integration test brittleness — `104-02-03`) |
+| Resolved | 1 |
+| Escalated | 0 |
+
+**Gap (GAP-104-VAL-01) — slug-scoped integration query is not version-stable.**
+`backend/tests/integration/test_seed_pm_pack.py` `test_seed_smoke_and_idempotency` +
+`test_def_shape_is_two_phase_fill` were **green at Plan-02 execution** (pristine DB, `4 passed
+in 4.14s`) but **failed at this audit** (`2 failed, 2 passed`): `_fetch_pm_defs` queried
+`workflow_definitions` by **slug**, asserting "exactly 2 PM def rows," but the live DB now holds
+**4** rows for the status slug — `pm-weekly-status-report` v1 (published, the seed's own
+`STATUS_DEF_ID`), v2 (draft) and v3 (published). The v2/v3 rows are the **legitimate Tweak→v(N+1)
+republish forks created by the Plan-03 SC#3+QUAL-01 live UAT** (different ids, version+1). The
+seed and the engine are correct; the test assertion was incompatible with the phase's *own*
+versioning feature.
+
+**Resolution (test-only, no impl files).** Re-scoped `_fetch_pm_defs(cur, module)` to the seed's
+deterministic `module.STATUS_DEF_ID` / `module.RISK_DEF_ID` (the ids its DELETE-then-INSERT is
+keyed on) instead of by slug. This preserves both tests' intent — the double `_run_seed_or_skip`
+still proves idempotency (a non-DELETE-then-INSERT seed would raise a duplicate-key error on the
+second fixed-id INSERT) and the def-shape assertions still validate the seed's two defs — while
+making them robust to the Tweak→v(N+1) feature and to repeated UAT runs. Immutability (Test 3) and
+RLS-isolation (Test 4) were unaffected and stayed green throughout.
+
+**Post-fix:** `test_seed_pm_pack.py` → **4 passed in 3.80s**; the VALIDATION quick-run
+(`test_pm_pack_templates.py` + `test_seed_pm_pack.py`) → **8 passed in 4.12s**. All 6 Wave-1/2
+per-task rows now `✅ green` (verified live), the SC#10 manual scoreboard rows have live results,
+and `104-03-03` is the by-design human-verify checkpoint (DONE 2026-06-15). `nyquist_compliant:
+true` holds with the automated coverage now genuinely green, not just present.
 
 ---
 
