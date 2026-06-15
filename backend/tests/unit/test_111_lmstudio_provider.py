@@ -7,28 +7,17 @@ LM Studio is registered as a first-class provider (no Ollama-impersonation):
     URL already ends in /v1 — unlike ollama which appends /v1);
   - the resolved key is the dummy `lm-studio`.
 
-This file starts xfail (Wave-0 RED), and Task 3 of Plan 01 flips it GREEN by
-registering the provider. After Task 3 the @pytest.mark.xfail decorators are
-removed and these are real assertions.
+This file started xfail (Wave-0 RED); Task 3 of Plan 01 registered the provider
+and flipped it GREEN — these are now real assertions (no xfail).
 """
 
-import pytest
 
-
-@pytest.mark.xfail(
-    reason="lmstudio provider not registered until Plan 01 Task 3 (D-111-7)",
-    strict=False,
-)
 def test_lmstudio_in_provider_base_urls():
     from app.config import _PROVIDER_BASE_URLS
 
     assert "lmstudio" in _PROVIDER_BASE_URLS, "lmstudio must be a registered provider"
 
 
-@pytest.mark.xfail(
-    reason="lmstudio provider not registered until Plan 01 Task 3 (D-111-7)",
-    strict=False,
-)
 def test_lmstudio_resolves_base_url_no_v1_append_and_dummy_key():
     from app.config import Settings
 

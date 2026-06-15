@@ -152,6 +152,13 @@ class UserEffectiveSettings(BaseModel):
     extraction_equation_engine: str = "none"
     extraction_per_call_hints_enabled: bool = True
 
+    # Phase 111 META-03 — configurable metadata extraction (migration 072).
+    # app_settings-only (env_attr=None below); deliberately NOT in SettingsUpdate
+    # (DB-only, no UI — D-111-2; mirrors extraction_* / harness_judge_model).
+    extraction_model: str = ""              # unset => settings.llm_model (gpt-4o env default)
+    extraction_window_cap: int = 32000      # head+tail sampler cap
+    metadata_enrichment_mode: str = "enriched"  # enriched | legacy
+
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -494,6 +501,12 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         extraction_image_engine_docx=str(_val(row, "extraction_image_engine_docx", None, "zip_xpath")),
         extraction_equation_engine=str(_val(row, "extraction_equation_engine", None, "none")),
         extraction_per_call_hints_enabled=_val_bool(row, "extraction_per_call_hints_enabled", None, True),
+
+        # Phase 111 META-03 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
+        extraction_model=str(_val(row, "extraction_model", None, "")),
+        extraction_window_cap=int(_val(row, "extraction_window_cap", None, 32000)),
+        metadata_enrichment_mode=str(_val(row, "metadata_enrichment_mode", None, "enriched")),
 
         context_window_max_tokens=int(_val(row, "context_window_max_tokens", "context_window_max_tokens", 0)),
         sub_agent_max_output_tokens=int(_val(row, "sub_agent_max_output_tokens", "sub_agent_max_output_tokens", 8192)),
