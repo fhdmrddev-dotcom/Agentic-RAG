@@ -54,7 +54,9 @@
   3. A boot/CI assertion fails loudly if `VALID_ACTION_TYPES` is NOT a subset of the live DB CHECK enum (drift guard turns a silent 23514 reject into a boot failure).
   4. A real audit row for each new action type INSERTs and SELECTs back **against the live DB** (verified live, not mocked — the D-102 "static would false-green" lesson).
   5. A single DM capability flag (`app_settings`, default **on**) gates the new DM surfaces + tools so the whole capability can be cleanly toggled off; defaults on so v3.0 behavior is unchanged when unset. This is the feature-independence seam a future tier/entitlement system (SEED-080, v3.2) plugs into — no enforcement built here.
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 110-01-PLAN.md — Author migration 071 (4 RLS tables + audit enum 11->19 + DM capability flag) + frozenset/boot-guard sync + flag read chain + 6 Wave-0 tests
+  - [ ] 110-02-PLAN.md — [BLOCKING] operator applies migration 071 + regen full-schema.sql + 4 live verification tests GREEN (SC#1-5)
 
 #### Phase 111: Metadata Enrichment — Extraction Backend
 **Goal**: Replace the thin fixed-schema/hardwired-`gpt-4o`/3k-char extraction with a configurable, model-flexible, confidence-scored enrichment pipeline — the spine the M-Files "metadata not folders" story rests on and the hard prerequisite for classification.
