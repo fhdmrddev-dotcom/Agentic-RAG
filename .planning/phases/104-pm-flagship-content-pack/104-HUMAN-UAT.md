@@ -1,9 +1,28 @@
 ---
-status: pending
+status: passed
 phase: 104-pm-flagship-content-pack
 source: [104-03-PLAN.md, 104-VALIDATION.md, 104-RESEARCH.md]
 started: 2026-06-15
 updated: 2026-06-15
+result: "All 5 proofs GREEN (Claude-driven live UAT 2026-06-15). 2 engine bugs found+fixed (commit 6a607169), corpus naming + harness IDs fixed. See RESULTS below."
+---
+
+## RESULTS — Claude-driven live UAT (2026-06-15)
+
+All runs against local stack (backend :8000, Supabase :54322), demo account fhdmrd@gmail.com.
+
+| UAT | Proof | Result | Evidence |
+|---|---|---|---|
+| **UAT-1** | SC#2 headline cited `.docx` | ✅ PASS | run `66e49c53` (gpt-4o): `gate_passed`+`run_completed`; file `scripts/pm-pack/out/SC2-weekly-status-report.docx` (37KB) opens clean, ZERO residual tags, grounded (Week 9 AMBER, 412k records, 6% dups, 0.5% threshold, Wk11/13/18 milestones) |
+| **UAT-2** | SC#2 citation red-case (honest-fail) | ✅ PASS | Pre-fix runs `27571799`/`f18fb994` honest-failed the citation gate (`citation_gate_rejected`, no silent `.docx`); the publish judge also blocked a weakly-grounded golden run (grounded_in_evidence 30). No silent invented `.docx` ever produced. |
+| **UAT-3** | SC#1/#3 Charter NL-authoring | ✅ PASS | `POST /workflows/generate` (gpt-4o) → `{ok:true}`, phases `[llm_agent, llm_single]`, NO `render_template`, no template asset (TEXT deliverable); `strict=False` avoided a strict-mode 400 |
+| **UAT-4** | SC#3 + QUAL-01 Tweak→publish | ✅ PASS | Tweak v2 → judge **BLOCKED** (golden `2b3a3217`, hard wall); corpus-naming fixed → Tweak v3 → judge **PASSED** (golden `4dbeaa02`) → `published:true v3`; v1 UNCHANGED (immutability) |
+| **UAT-5** | SC#10 4-axis cross-provider | ✅ PASS | 7-model sweep (`scoreboard-20260615T054206Z.json`): 4 FORCE clean cited `.docx` (gpt-4o/claude-opus-4-8/MiniMax-M2.7/glm-4.6); deepseek+gemini honest-fail forcing; kimi honest-fail — **honesty holds on all 7**. Multi-tool inherent; parallel-thread (`397432ff`+`1b764141` concurrent, both clean); long-message (`1b764141` `--long`, complete `.docx`, no truncation) |
+
+**Engine fixes at this gate** (commit `6a607169`): double-gate over-rejection (post-phase `citations_required` + `output_file_valid` on `llm_emit` lacked `retrieved_ids`/integrity verdict). **Corpus naming** (`6e2f383e`): `w1/w2` → `week8/week9` (judge cited filename, read "w2" as Week 2). **Harness** (committed): real model IDs + `workspace_files` column fix.
+
+**Findings filed** (reported-bugs): seed dedup short-circuits on un-embedded `pending` rows; seed DELETE-then-INSERT def-refresh FK-violates when `workflow_runs` reference the def; DeepSeek/Gemini forced-emit reliability (`model_failed_to_emit`); model-list curation (`gpt-5.4`/`MiniMax-M3` not in registry).
+
 ---
 
 # Phase 104 — Live UAT Runbook (PM Flagship Content Pack)

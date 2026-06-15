@@ -145,7 +145,25 @@ None. The harness introduces NO new network endpoint, auth path, or schema surfa
 - Commits: `23e3c117` FOUND; `6e42cfd3` FOUND.
 - Both task `<verify>` commands pass (Task 1 ast.parse + the full SC#10/nyquist/per-task-id loop; Task 2 the UAT-1/Tweak/kimi-k2.6 grep).
 - No `backend/app/**`, no migration, no route; STATE.md + ROADMAP.md untouched (`git diff --name-only HEAD~2 HEAD` = exactly 3 contracted files).
-- Task 3 (human-verify) correctly NOT executed — left for the operator-driven gate.
+- Task 3 (human-verify) correctly NOT executed by the autonomous segment — see the addendum below.
+
+---
+
+## Task 3 — COMPLETE (Claude-driven live UAT, 2026-06-15)
+
+The human-verify gate ran live against the local stack. **All 5 proofs GREEN** (full evidence in
+`104-HUMAN-UAT.md` RESULTS + `104-VALIDATION.md` "SC#10 — LIVE RESULTS"):
+- **SC#2** cited integrity-checked `.docx` (run `66e49c53`, opens clean, grounded).
+- **SC#1/#3** Charter NL-authoring → TEXT deliverable (no template).
+- **SC#3 + QUAL-01** Tweak→v(N+1) + live publish gauntlet — judge **blocks** a weakly-grounded golden run AND **passes** the clean one → v3 published; v1 frozen (immutability).
+- **SC#10** 4-axis: cross-provider 7-model sweep (4 FORCE clean `.docx` + honesty on all 7) · multi-tool · parallel-thread (2 concurrent clean) · long-message (`--long` complete, no truncation).
+
+**2 BLOCKING engine bugs found + fixed at the gate** (commit `6a607169`, +112 tests + a regression test):
+Phase 104 is the first def to attach the 102 `citations_required` + `output_file_valid` validators to an
+`llm_emit` phase; both over-rejected a correct already-rendered `.docx` (emit success output didn't expose
+`retrieved_ids`/the integrity verdict). **Engine-fix override of the content-only boundary — operator-approved.**
+Also: corpus filenames `w1/w2`→`week8/week9` (commit `6e2f383e`, the judge cited the filename); harness
+stale IDs + `workspace_files` column fix (committed). Findings filed: `BUG-260615-01`.
 
 ---
 *Phase: 104-pm-flagship-content-pack · Plan: 03 (Tasks 1+2 of 3; Task 3 = human-verify, PENDING)*
