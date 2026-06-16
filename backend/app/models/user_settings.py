@@ -159,6 +159,13 @@ class UserEffectiveSettings(BaseModel):
     extraction_window_cap: int = 32000      # head+tail sampler cap
     metadata_enrichment_mode: str = "enriched"  # enriched | legacy
 
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
+    embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
+    extraction_provider: str = ""           # D-09 #1 explicit extraction provider (short-circuits name-inference)
+    confidence_bucket_high: float = 0.54    # D-12 portable confidence bucket (was hardcoded 0.54)
+    confidence_bucket_medium: float = 0.38  # D-12 portable confidence bucket (was hardcoded 0.38)
+
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -507,6 +514,13 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         extraction_model=str(_val(row, "extraction_model", None, "")),
         extraction_window_cap=int(_val(row, "extraction_window_cap", None, 32000)),
         metadata_enrichment_mode=str(_val(row, "metadata_enrichment_mode", None, "enriched")),
+
+        # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
+        embedding_provider=str(_val(row, "embedding_provider", None, "")),
+        extraction_provider=str(_val(row, "extraction_provider", None, "")),
+        confidence_bucket_high=float(_val(row, "confidence_bucket_high", None, 0.54)),
+        confidence_bucket_medium=float(_val(row, "confidence_bucket_medium", None, 0.38)),
 
         context_window_max_tokens=int(_val(row, "context_window_max_tokens", "context_window_max_tokens", 0)),
         sub_agent_max_output_tokens=int(_val(row, "sub_agent_max_output_tokens", "sub_agent_max_output_tokens", 8192)),
