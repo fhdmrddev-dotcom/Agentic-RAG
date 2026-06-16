@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JSuEzqMEO3NDQqH4uBLk8VA7YBrGWeENgUv1XuYCb1JibngCaumuVfSBmFA5BkH
+\restrict EHlldUEEwEkozAZ2HH9D5IWdIYyrHiXmexVT9SU1OVmAzwyIjz4vhX3V0gtmIdt
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -114,10 +114,10 @@ $$;
 
 
 --
--- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
+CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
@@ -126,11 +126,12 @@ BEGIN
          1 - (dc.embedding <=> query_embedding) AS similarity
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id
+  WHERE dc.user_id = match_user_id          -- RLS scope (V4 — keep)
     AND 1 - (dc.embedding <=> query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+    AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
   ORDER BY dc.embedding <=> query_embedding
   LIMIT match_count;
 END;
@@ -306,6 +307,10 @@ CREATE TABLE public.app_settings (
     extraction_model text,
     extraction_window_cap integer DEFAULT 32000,
     metadata_enrichment_mode text DEFAULT 'enriched'::text,
+    embedding_provider text,
+    extraction_provider text,
+    confidence_bucket_high double precision DEFAULT 0.54,
+    confidence_bucket_medium double precision DEFAULT 0.38,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -396,7 +401,9 @@ CREATE TABLE public.document_chunks (
     chunk_index integer NOT NULL,
     embedding public.vector(1536),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    search_vector tsvector
+    search_vector tsvector,
+    embedding_model text,
+    embedding_dimensions integer
 );
 
 
@@ -2931,5 +2938,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JSuEzqMEO3NDQqH4uBLk8VA7YBrGWeENgUv1XuYCb1JibngCaumuVfSBmFA5BkH
+\unrestrict EHlldUEEwEkozAZ2HH9D5IWdIYyrHiXmexVT9SU1OVmAzwyIjz4vhX3V0gtmIdt
 
