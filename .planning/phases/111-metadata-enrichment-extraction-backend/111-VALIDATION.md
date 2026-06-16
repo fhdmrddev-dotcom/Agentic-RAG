@@ -1,10 +1,11 @@
 ---
 phase: 111
 slug: metadata-enrichment-extraction-backend
-status: draft
-nyquist_compliant: false
+status: validated
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-06-15
+validated: 2026-06-16
 ---
 
 # Phase 111 — Validation Strategy
@@ -39,20 +40,20 @@ created: 2026-06-15
 
 > The planner maps each Wave-0 test file to the Task that delivers its behavior. Requirement→test reference (from RESEARCH § Validation Architecture):
 
-| Requirement / Invariant | Behavior | Test Type | Automated Command | File Exists |
+| Requirement / Invariant | Behavior | Test Type | Automated Command | Status |
 |--------|----------|-----------|-------------------|-------------|
-| META-01 (define) | CRUD create writes own-scoped, `is_global=false` forced; list returns own+global enabled | integration (live DB) | `pytest tests/integration/test_111_metadata_fields_crud.py -x` | ❌ W0 |
-| META-01 (extract) | `build_metadata_model` folds enabled custom fields into the schema (7 built-ins + custom + confidence) | unit | `pytest tests/unit/test_111_dynamic_model.py::test_custom_fields_in_schema -x` | ❌ W0 |
-| META-01 (vocab) | `field_type` validated against closed `{string,date,number,boolean,enum}` `Literal`; unknown rejected | unit | `pytest tests/unit/test_111_dynamic_model.py::test_field_type_vocabulary -x` | ❌ W0 |
-| META-03 (un-pin) | `extraction_model` resolves from `app_settings`; unset → `settings.llm_model` (gpt-4o) | unit | `pytest tests/unit/test_111_extraction_model_resolve.py -x` | ❌ W0 |
-| META-03 (settings) | migration 072 columns read back via `_build_settings_from_row` (env_attr=None) | integration (live DB) | `pytest tests/integration/test_111_settings_readback.py -x` | ❌ W0 |
-| META-04 (window) | head+tail sampler returns head+tail for >cap text, full text for ≤cap; cap clamps to model window | unit | `pytest tests/unit/test_111_window_sampling.py -x` | ❌ W0 |
-| Confidence survival | `confidence` populated dict survives `model_dump(exclude_none=True)`; attaches as `_confidence` | unit | `pytest tests/unit/test_111_confidence_survives_exclude_none.py -x` | ❌ W0 |
-| exclude_none non-regression | empty `author` DROPPED (not `""`); flat fields stay top-level | unit | `pytest tests/unit/test_111_exclude_none_nonregression.py -x` | ❌ W0 |
-| Flat-filter non-regression | stored metadata with `_confidence` still matches a flat `@>` containment filter | integration (live DB) | `pytest tests/integration/test_111_flat_filter_compat.py -x` | ❌ W0 |
-| User-scoped read | field-def read with explicit `.or_(user_id,is_global)` returns own+global only, NOT cross-user (2-user) | integration (live DB) | `pytest tests/integration/test_111_field_def_scoping.py -x` | ❌ W0 |
-| lmstudio provider | `lmstudio` in `_PROVIDER_BASE_URLS`; `resolve_llm_provider` sets base_url, dummy key, no `/v1` append | unit | `pytest tests/unit/test_111_lmstudio_provider.py -x` | ❌ W0 |
-| Audit live | `metadata.field.create` INSERTs and SELECTs back against live DB (NOT mocked) | integration (live DB) | `pytest tests/integration/test_111_audit_field_create.py -x` | ❌ W0 |
+| META-01 (define) | CRUD create writes own-scoped, `is_global=false` forced; list returns own+global enabled | integration (live DB) | `pytest tests/integration/test_111_metadata_fields_crud.py -x` | ✅ green |
+| META-01 (extract) | `build_metadata_model` folds enabled custom fields into the schema (7 built-ins + custom + confidence) | unit | `pytest tests/unit/test_111_dynamic_model.py::test_custom_fields_in_schema -x` | ✅ green |
+| META-01 (vocab) | `field_type` validated against closed `{string,date,number,boolean,enum}` `Literal`; unknown rejected | unit | `pytest tests/unit/test_111_dynamic_model.py::test_field_type_vocabulary -x` | ✅ green |
+| META-03 (un-pin) | `extraction_model` resolves from `app_settings`; unset → `settings.llm_model` (gpt-4o) | unit | `pytest tests/unit/test_111_extraction_model_resolve.py -x` | ✅ green |
+| META-03 (settings) | migration 072 columns read back via `_build_settings_from_row` (env_attr=None) | integration (live DB) | `pytest tests/integration/test_111_settings_readback.py -x` | ✅ green |
+| META-04 (window) | head+tail sampler returns head+tail for >cap text, full text for ≤cap; cap clamps to model window | unit | `pytest tests/unit/test_111_window_sampling.py -x` | ✅ green |
+| Confidence survival | `confidence` populated dict survives `model_dump(exclude_none=True)`; attaches as `_confidence` | unit | `pytest tests/unit/test_111_confidence_survives_exclude_none.py -x` | ✅ green |
+| exclude_none non-regression | empty `author` DROPPED (not `""`); flat fields stay top-level | unit | `pytest tests/unit/test_111_exclude_none_nonregression.py -x` | ✅ green |
+| Flat-filter non-regression | stored metadata with `_confidence` still matches a flat `@>` containment filter | integration (live DB) | `pytest tests/integration/test_111_flat_filter_compat.py -x` | ✅ green |
+| User-scoped read | field-def read with explicit `.or_(user_id,is_global)` returns own+global only, NOT cross-user (2-user) | integration (live DB) | `pytest tests/integration/test_111_field_def_scoping.py -x` | ✅ green |
+| lmstudio provider | `lmstudio` in `_PROVIDER_BASE_URLS`; `resolve_llm_provider` sets base_url, dummy key, no `/v1` append | unit | `pytest tests/unit/test_111_lmstudio_provider.py -x` | ✅ green |
+| Audit live | `metadata.field.create` INSERTs and SELECTs back against live DB (NOT mocked) | integration (live DB) | `pytest tests/integration/test_111_audit_field_create.py -x` | ✅ green |
 
 *Status filled by executor: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -78,6 +79,8 @@ created: 2026-06-15
 ## Manual-Only Verifications
 
 > THE CRITICAL GATE (the D-102/104 lesson): static def-shape tests FALSE-GREEN forced-structured-output, provider-forcing, and audit-enum failures. These MUST be driven LIVE, not mocked, and are authored here (NOT as PLAN.md tasks). SC#4 = the CLAUDE.md UAT scoreboard recipe.
+>
+> **✅ ALL 5 MANUAL-ONLY ITEMS RESOLVED 2026-06-16** (verify-work `human_verification` gate closed 4/4; `111-HUMAN-UAT.md` status: passed, 0 issues; `111-VERIFICATION.md` frontmatter `human_verification_resolved`). Axes a/c/d + live audit driven live 2026-06-15; axis b (local LM Studio) proven live 2026-06-16 (`gemma-4-12b-qat` emitted full confidence-scored metadata via the real `forced_emit` TIER-COERCE path). Two app-path local-routing bugs surfaced → folded into Phase 111.1 (BUG-260616-01); they do NOT affect 111's engine or degradation contract.
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
@@ -91,11 +94,29 @@ created: 2026-06-15
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (unit subset 0.47s)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-06-16
+
+---
+
+## Validation Audit 2026-06-16
+
+State A audit (validate-phase): re-ran the suite for ground truth (not trusting artifacts) — **42 unit passed (0.47s) + 7 passed / 2 xpassed integration against live :54322 / 0 failures**. All 12 automated Per-Task rows COVERED (test exists, targets behavior, green). All 5 Manual-Only rows resolved via verify-work (4/4). No gap-fill auditor spawned — no MISSING/PARTIAL gaps.
+
+| Metric | Count |
+|--------|-------|
+| Requirements / invariants | 12 automated + 5 manual-only |
+| COVERED (automated, green) | 12 |
+| PARTIAL | 0 |
+| MISSING | 0 |
+| Manual-only resolved | 5 |
+| Gaps found | 0 |
+| Tests generated this audit | 0 (none needed) |
+
+**Advisory (non-blocking, test hygiene):** 2 integration tests xpass (authored `xfail "until Plan 05 live apply"` — `test_111_settings_readback`, `test_111_audit_field_create` — now passing post-072-apply). They count green; the stale `xfail` markers could be dropped in a future cleanup. Not a coverage gap.
