@@ -661,8 +661,20 @@ CONFIDENCE_DISCLAIMER = (
 )
 
 
-def _compute_confidence(avg_similarity: float) -> str:
-    """Map average cosine similarity to confidence level (D-10).
+def _compute_confidence(
+    avg_similarity: float,
+    settings_obj=None,
+    bucket_high: float | None = None,
+    bucket_medium: float | None = None,
+) -> str:
+    """Map average cosine similarity to confidence level (D-10 / D-12).
+
+    Cutoffs are read from settings so confidence labels stay calibrated after an
+    embedder switch (D-12): the per-preset `confidence_bucket_high` /
+    `confidence_bucket_medium` are app_settings columns (migration 073). Explicit
+    `bucket_high` / `bucket_medium` kwargs win, then the `settings_obj` attrs,
+    then the shipped 0.54/0.38 defaults — so behavior is byte-identical to today
+    when no settings are supplied (D-08 back-compat).
 
     Thresholds calibrated for text-embedding-3-small. Phase 076 recalibration
     (2026-05-25, N=121 queries, 100 audit_log + 21 synthetic) adjusted from
@@ -675,9 +687,15 @@ def _compute_confidence(avg_similarity: float) -> str:
     0.55/0.40 because text-embedding-3-small produces lower absolute scores
     than expected.
     """
-    if avg_similarity >= 0.54:
+    high = bucket_high
+    if high is None:
+        high = getattr(settings_obj, "confidence_bucket_high", 0.54) if settings_obj else 0.54
+    medium = bucket_medium
+    if medium is None:
+        medium = getattr(settings_obj, "confidence_bucket_medium", 0.38) if settings_obj else 0.38
+    if avg_similarity >= high:
         return "high"
-    elif avg_similarity >= 0.38:
+    elif avg_similarity >= medium:
         return "medium"
     return "low"
 
@@ -2323,7 +2341,9 @@ async def run_agent_loop(
       # Emit confidence event (D-05, D-07: after citations, before title)
       if similarity_scores:
           final_avg = sum(similarity_scores) / len(similarity_scores)
-          level = _compute_confidence(final_avg)
+          # D-12: read the confidence buckets from the resolved user_settings so labels
+          # stay calibrated after an embedder switch; defaults 0.54/0.38 when unset.
+          level = _compute_confidence(final_avg, user_settings)
           disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
           _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
           await _emit(redis, run_id, 'confidence', level=level, avg_similarity=round(final_avg, 4), disclaimer=disclaimer)
