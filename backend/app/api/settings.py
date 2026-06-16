@@ -12,6 +12,7 @@ from app.models.user_settings import (
     resolve_sub_agent_model,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.reembed_service import start_reembed
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -332,6 +333,12 @@ async def update_settings(
                 detail=f"Model '{body.sub_agent_model}' is not available for provider '{pending_provider}'.",
             )
 
+    # Phase 111.1 EMBED-05 — snapshot the PREVIOUS embedding model/dims BEFORE the write,
+    # so we can detect a real change after save and kick the re-embed job (D-04/D-05).
+    prev_settings = await load_app_settings_async()
+    prev_model = prev_settings.embedding_model
+    prev_dims = prev_settings.embedding_dimensions
+
     await save_app_settings(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
@@ -341,7 +348,73 @@ async def update_settings(
         metadata={"new_settings": sanitized},
         supabase=supabase,
     )
+
+    # Phase 111.1 EMBED-05 — kick the re-embed job on a CONFIRMED model/dim change.
+    # The D-03 confirm gate is the FRONTEND modal (Plan 06) — the backend kicks on the
+    # already-confirmed save, so we never add a second backend confirmation. A change in
+    # the embedding MODEL or DIMENSIONS makes the existing chunks stale (their vectors
+    # live in a different space), so the job re-embeds them from preserved content
+    # (graceful-dip recall in the meantime via the D-10 stale-model filter). The handler
+    # returns fast; the job runs in the BackgroundTask thread (same pattern as
+    # documents.py:497). dims_changed gates the destructive resize_embedding_column.
+    new_settings = await load_app_settings_async()
+    model_changed = new_settings.embedding_model != prev_model
+    dims_changed = new_settings.embedding_dimensions != prev_dims
+    if model_changed or dims_changed:
+        background_tasks.add_task(
+            start_reembed,
+            supabase,
+            current_user["id"],
+            new_settings,
+            dims_changed,
+        )
+
     return await _build_response()
+
+
+# Phase 111.1 EMBED-05 — re-embed progress + manual re-kick surfaces.
+
+class ReembedProgressResponse(BaseModel):
+    status: str            # idle | running | partial | complete | failed
+    total: int | None
+    re_embedded: int | None
+    remaining: int | None
+    model: str | None = None
+    updated_at: float | None = None
+
+
+@router.get("/reembed-progress", response_model=ReembedProgressResponse)
+async def get_reembed_progress(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Reconcile-on-fetch progress for the Settings re-embed status card (D-v2.5-03).
+
+    Counts are derived live from document_chunks (the source of truth); the status hint
+    is reconciled against them (counts win — T-111.1-05-05). RLS-scoped to the caller.
+    """
+    from app.services.reembed_service import reembed_progress
+
+    s = await load_app_settings_async()
+    return await reembed_progress(supabase, current_user["id"], s)
+
+
+@router.post("/reembed", response_model=ReembedProgressResponse)
+async def rekick_reembed(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Manual "Re-embed now" re-kick for a failed/partial run (D-05). Re-runs against the
+    same stale predicate, so it resumes from wherever the last run stopped. dims_changed
+    is False here — a manual re-kick re-embeds the still-stale chunks, never re-resizes
+    (a dims change always flows through the settings save kickoff above)."""
+    from app.services.reembed_service import reembed_progress, start_reembed
+
+    s = await load_app_settings_async()
+    background_tasks.add_task(start_reembed, supabase, current_user["id"], s, False)
+    # Return the CURRENT (pre-run) progress snapshot so the card can show "running".
+    return await reembed_progress(supabase, current_user["id"], s)
 
 
 @router.get("/providers")
