@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: executing
-last_updated: "2026-06-16T00:00:00.000Z"
-last_activity: 2026-06-16 — Phase 111 FULLY CLOSED (all 3 gates: verify-work 4/4 + secure 21/21 + validate nyquist-compliant); next = Phase 111.1
+status: verifying
+last_updated: "2026-06-16T17:42:58.071Z"
+last_activity: 2026-06-16 — Phase 111 fully closed (verify-work 4/4 + secure 21/21 + validate nyquist-compliant)
 progress:
   total_phases: 11
   completed_phases: 2
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 Phase: 111 — Metadata Enrichment (Extraction Backend) — **✅ FULLY CLOSED 2026-06-16 (all 3 gates clear)** — **v3.0 Document Management** (META-01/03/04)
 Plan: 5 of 5 COMPLETE
 Status: **Phase 111 FULLY CLOSED 2026-06-16 — all three gates clear.** Executed sequential-on-main-tree (worktrees OFF: `backend/venv` gitignored); Waves 1-4: 111-01 substrate (migration 072 file, lmstudio provider, 3 settings fields) → 111-02 cross-provider enrichment engine → 111-03 `/metadata-fields` CRUD → 111-04 `ingest_document` enriched/legacy wiring → 111-05 BLOCKING checkpoint (migration 072 applied live to :54322, operator-authorized psycopg2-direct; 4 cols live, 19 docs preserved; full-schema regenerated). Engine ON for every ingest in default `enriched` mode; `legacy` = byte-identical reversibility. **GATE 1 — verify-work: 4/4 must-haves** (`111-VERIFICATION.md` status verified; `human_verification` gate closed 4/4 via `111-HUMAN-UAT.md` status passed — axes a/c/d + live audit driven live 2026-06-15, axis b local LM Studio proven live 2026-06-16 `gemma-4-12b-qat`; 2 app-path local-routing bugs → BUG-260616-01 → Phase 111.1, do NOT affect 111's engine). Code review 0C/2W/4I — WR-01 (REAL D-111-3/SC#3 bug) FIXED `b62726cf`; WR-02 + IN-01..04 advisory carry-forwards. **GATE 2 — secure-phase: 21/21 threats CLOSED, threats_open 0** (`111-SECURITY.md` @ `ffcedcc3`, ASVS L1, 3 accepts AR-111-01/02; orchestrator hand-spot-checked service-role field-def scoping + global-field EoP dual-enforce + 3-layer DoS backstop — all real). **GATE 3 — validate-phase: nyquist_compliant** (`111-VALIDATION.md` @ `7cafbca9`; suite re-run for ground truth = 42 unit + 7 passed/2 xpassed integration live :54322 / 0 failures; 12/12 automated COVERED + 5/5 manual resolved, 0 gaps). Net-new failures = 0. **Orchestrator owns STATE.md/ROADMAP.md writes** (balloon-bug recurred at 111-01 → repaired from clean `c6791c40`). **NEXT = Phase 111.1 (Configurable / Multi-Provider Embeddings — INSERTED before 112; owns the embeddings-SPOF work + BUG-260616-01 local-routing bugs + retires SEED-048) → `/gsd:discuss-phase 111.1`.**
-Resume file: None
+Resume file: --resume-file
 Last activity: 2026-06-16 — Phase 111 fully closed (verify-work 4/4 + secure 21/21 + validate nyquist-compliant)
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
@@ -509,6 +509,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 ## Accumulated Context
 
 ### Roadmap Evolution
+
 - **Phase 111.1 INSERTED after Phase 111 (2026-06-15):** "Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)" — embedding-provider picker + local presets + re-embed-on-change lifecycle; new reqs **EMBED-01..06**; depends on Phase 111 (reuses its `lmstudio` provider plumbing); G-2 sketch fires (Settings UI). Lands before the DM read-path phases (113-119). Sourced from a 5-agent investigation (the `embedding-flexibility-scoping` workflow). **Decision:** keep embedding flexibility OUT of Phase 111 (different domain = retrieval substrate, not the metadata LLM; plus the fixed-`vector(1536)`/HNSW dimension + destructive-re-embed landmine) → its own phase. **Retires SEED-048.** **SEED-048 correction:** embeddings are NOT OpenAI-hardwired today — `embedding_model`/`embedding_base_url`/`embedding_api_key`/`embedding_dimensions` are already configurable Settings with UI controls (`SettingsPage.tsx:934-950`); what's missing = a provider picker, local presets, the re-embed lifecycle, and a fix for the `embed_chunks` `user_settings`-drop bug (folded in as EMBED-04). The 111.1 plan must VERIFY these findings against live code.
 
 **Open blockers:** None. (Resolved 2026-06-08: Phase 097 Plan 01 Task 3 human-action checkpoint — operator confirmed folder `75755ec9-5ba7-495b-ad93-7500011cf6f2` "Project Meridian — Risks" and ingested a synthetic risk corpus to ground it; `out/spike-config.json` written + committed `61025148`.)
