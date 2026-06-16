@@ -1447,7 +1447,14 @@ def create_adaptive_streaming_chat(
 
             # OpenRouter quality strategy enhancements
             if user_settings and getattr(user_settings, "openrouter_tool_strategy", "quality") == "quality":
-                if effective_model.startswith("openrouter/") or "/" in effective_model:
+                # D-09 #3 (BUG-260616-01): gate on the RESOLVED provider, not the model
+                # string. The old `"/" in effective_model` slash-gate fired for EVERY
+                # `org/model` id — which is exactly how every LM Studio/Ollama model is
+                # named (`google/gemma-4-e4b`) — appending `:exacto` + a `response-healing`
+                # plugin that 500s the local server. `provider` is resolved upstream
+                # (active_provider or settings.llm_provider) so OpenRouter still gets the
+                # quality strategy while local providers are left untouched.
+                if provider == "openrouter":
                     # Append :exacto for quality routing if not already present
                     if ":exacto" not in effective_model:
                         kwargs["model"] = f"{effective_model}:exacto"
