@@ -1398,7 +1398,15 @@ def ingest_document(
             )
 
             model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
-            provider = (get_model_capability(model) or {}).get("provider")
+            # D-09 #1 (BUG-260616-01 / EMBED-01 data-egress cure): prefer the stored
+            # explicit `extraction_provider`. When the operator pinned a provider in
+            # Settings (e.g. `lmstudio`/`ollama`), trust it and SKIP name-inference
+            # entirely — a slashed local id (`google/gemma-3-4b`) can no longer be
+            # mis-inferred to `openrouter` and ship document text to the cloud.
+            # Name-inference stays ONLY as the last-resort legacy fallback for pre-111.1
+            # rows that never set `extraction_provider` (D-08 back-compat — byte-identical).
+            provider = (getattr(app_settings, "extraction_provider", "") or "").strip().lower() \
+                or (get_model_capability(model) or {}).get("provider")
             defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
             DynModel = build_metadata_model(defs)
             emit_tool = {
