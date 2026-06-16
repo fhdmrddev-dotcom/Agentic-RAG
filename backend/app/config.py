@@ -349,6 +349,15 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
 #
 # All patterns are anchored at ``^`` with bounded character classes to keep
 # ``re.search`` linear in the input length — T-075.3-02-01 ReDoS mitigation.
+#
+# D-09 #1 / BUG-260616-01 (data-egress) — NAME-INFERENCE IS LAST-RESORT ONLY.
+# The `^word/word → openrouter` rule below cannot disambiguate a slashed id that
+# legitimately lives behind OpenRouter, a local LM Studio, OR a local Ollama
+# (`google/gemma-3-4b` is valid on all three). A name therefore CANNOT identify
+# the endpoint. Any caller that has an explicit stored `(provider, model)` pair
+# (e.g. `app_settings.extraction_provider`) MUST prefer it and skip this inference
+# entirely — see `backend/app/api/documents.py` extraction routing. Inference here
+# stays purely as the legacy fallback for rows that never pinned a provider.
 _INFERENCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^gpt-", re.IGNORECASE), "openai"),
     (re.compile(r"^o[1-9](-|$)", re.IGNORECASE), "openai"),
