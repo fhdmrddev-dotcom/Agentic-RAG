@@ -1,9 +1,10 @@
 ---
 phase: 111-metadata-enrichment-extraction-backend
-verified: 2026-06-15T23:45:00Z
-status: human_needed
-score: 3/4 must-haves verified
+verified: 2026-06-16T14:10:00Z
+status: verified
+score: 4/4 must-haves verified
 overrides_applied: 0
+human_verification_resolved: "2026-06-16 — all 5 human_verification items resolved in 111-HUMAN-UAT.md (status: passed, 0 issues). Axes a/c/d + live audit driven live 2026-06-15; axis b (local LM Studio) proven live 2026-06-16 (gemma-4-12b-qat emitted full confidence-scored metadata via the real forced_emit TIER-COERCE path). Two app-path local-routing bugs surfaced and folded into Phase 111.1 (BUG-260616-01) — they do not affect 111's engine or degradation contract."
 human_verification:
   - test: "SC#4 4-axis UAT — cross-provider dynamic-schema extraction (VALIDATION.md axis a)"
     expected: "Ingest the same doc with extraction_model set to one model per native-7 (OpenAI, Anthropic, Google, DeepSeek, Moonshot, Z.ai-GLM, MiniMax) + OpenRouter; SELECT stored documents.metadata. Each provider either returns valid confidence-scored fields OR an honest-fail that degrades to null metadata (doc still status=completed). Acceptance = pass OR documented limitation per provider."
@@ -25,9 +26,9 @@ human_verification:
 # Phase 111: Metadata Enrichment — Extraction Backend Verification Report
 
 **Phase Goal:** Replace the thin fixed-schema / hardwired-`gpt-4o` / 3k-char extraction with a configurable, model-flexible, confidence-scored enrichment pipeline — the spine the M-Files "metadata not folders" story rests on and the hard prerequisite for classification.
-**Verified:** 2026-06-15T23:45:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-06-16T14:10:00Z
+**Status:** verified
+**Re-verification:** Yes — human_verification gate closed 2026-06-16 (see frontmatter `human_verification_resolved`)
 
 ---
 
@@ -40,9 +41,9 @@ human_verification:
 | 1 | Metadata extraction routes through the user-selected / admin-configured model (not hardwired gpt-4o); the effective model threads `_upload_pipeline → ingest_document → extract_metadata_enriched(model=...)` | VERIFIED | `resolve_extraction_model(app_settings.extraction_model)` called at `documents.py:1400`; returns `settings.llm_model` (gpt-4o env default) when unset. The 3-field chain: `_upload_pipeline` (line 241) calls `ingest_document` which calls `asyncio.run(extract_metadata_enriched(..., model=model, ...))` at line 1417. `UserEffectiveSettings` carries `extraction_model`, `extraction_window_cap`, `metadata_enrichment_mode` — all reading from `app_settings` via `_build_settings_from_row` with `env_attr=None`. Migration 072 live on `:54322` (full-schema.sql line 306-308 confirmed). Unit tests GREEN: `test_111_extraction_model_resolve.py` 2 passed. |
 | 2 | Extraction reads beyond `content[:3000]` via configurable head+tail window sampling so late title-page/byline data is not missed | VERIFIED | `sample_for_extraction(text, cap)` at `embedding_service.py:241-259`: `len(text) <= cap` returns full text; over cap returns `head(0.7*cap) + "[...document body elided for metadata extraction...]" + tail(0.3*cap)`. Called at `documents.py:1415` with `app_settings.extraction_window_cap` (default 32000). Live proof: `sample_for_extraction('A'*10000, cap=1000)` produces the elision marker. Unit test `test_111_window_sampling.py` GREEN. |
 | 3 | Custom metadata fields extracted via runtime Pydantic `create_model`; per-field confidence stored under `_confidence` nested key (not flat); `exclude_none=True` drops empty fields; flat `@>` containment filter still matches | VERIFIED | `build_metadata_model(custom_defs)` at `embedding_service.py:177-222`: 7 built-ins + custom fields + public `confidence` field (not `_confidence` — A1 design prevents Pydantic private-attr exclusion). `attach_confidence(dumped)` at line 225-238 pops the flat `confidence` key and renames to `_confidence` only when non-empty. Call site at `documents.py:1434` uses `attach_confidence(emitted.model_dump(exclude_none=True))` — WR-01 fix confirmed in commit `b62726cf`. Test `test_111_confidence_survives_exclude_none.py` includes the call-site source guard asserting `"attach_confidence(" in documents.py` and `'metadata_dict["_confidence"] = emitted.confidence' not in documents.py`. Integration test `test_111_flat_filter_compat.py` PASSES (1 passed, xpassed) confirming `metadata @> '{"document_type":"report"}'` matches even with nested `_confidence` present. `exclude_none` non-regression: `test_111_exclude_none_nonregression.py` GREEN. |
-| 4 | SC#10 4-axis UAT: dynamic-schema structured extraction verified across native-7 (cross-provider), long-doc window-lift, with valid confidence-scored fields per provider | NEEDS HUMAN | The 4-axis UAT is documented in VALIDATION.md as Manual-Only (5 axes: cross-provider native-7, LM Studio TIER-COERCE, long-doc window-lift, graceful degradation, live audit). None have been executed by the operator against the live system. The VALIDATION.md explicitly notes this is the critical gate per the D-102/104 lesson: "static def-shape tests FALSE-GREEN forced-structured-output, provider-forcing, and audit-enum failures." |
+| 4 | SC#10 4-axis UAT: dynamic-schema structured extraction verified across native-7 (cross-provider), long-doc window-lift, with valid confidence-scored fields per provider | VERIFIED | All 5 manual axes resolved in `111-HUMAN-UAT.md` (status: passed, 0 issues). Axis a (cross-provider native-7+OpenRouter): all 8 reached status=completed, 4/8 returned full confidence-scored metadata, 4/8 honest-fail-degraded to null — distinct per-provider endpoints verified in the log-sink. Axis c (long-doc window-lift): 8,386-byte doc, late title/byline/date at char 3549 captured. Axis d (graceful degradation): failing provider → status=completed with null metadata, never stuck. Live audit INSERT+SELECT: metadata.field.create row confirmed under real JWT. Axis b (local LM Studio TIER-COERCE) proven live 2026-06-16: `gemma-4-12b-qat` emitted all 7 built-ins + confidence map via the real `forced_emit` path (`scripts/_uat111/test_lmstudio_extraction.py`); smaller models honest-fail to null (contract holds). Two app-path local-routing bugs found → BUG-260616-01 → Phase 111.1 (do not affect 111's engine). |
 
-**Score:** 3/4 truths verified (SC#4 is human_needed per the project UAT scoreboard recipe and VALIDATION.md)
+**Score:** 4/4 truths verified (SC#4 4-axis UAT resolved 2026-06-16 per the project UAT scoreboard recipe and VALIDATION.md)
 
 ---
 
