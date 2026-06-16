@@ -62,11 +62,20 @@ export const EMBEDDING_PRESETS: ProviderPreset[] = [
 // extraction model. Cloud LLMs + the two local servers; the local entries are
 // what structurally close the BUG-260616-01 mis-route (route by stored provider,
 // never name-inference).
+//
+// NOTE (SEED-088): the `model` below is only a sensible MODERN DEFAULT — the field
+// stays editable so any served model id works today. These defaults are validated
+// against live /models (2026-06-17) and exist in MODEL_CAPABILITIES. They are NOT a
+// closed roster: the dynamic model registry (SEED-088, next phase) will replace
+// these hardcoded defaults by sourcing the full per-provider model list live from
+// each provider's /models (the same provider.models the chat picker already reads),
+// so new models — and the full Anthropic Haiku/Opus/Sonnet set — appear with zero
+// code change. Until then, type any other model id into the editable field.
 export const EXTRACTION_PRESETS: ProviderPreset[] = [
-  { key: "openai", label: "OpenAI · gpt-4o", base_url: "https://api.openai.com/v1", model: "gpt-4o", dims: 0, threshold: 0, local: false, keyNote: "uses your OpenAI key" },
-  { key: "anthropic", label: "Anthropic · claude-sonnet", base_url: "https://api.anthropic.com/v1", model: "claude-sonnet-4", dims: 0, threshold: 0, local: false, keyNote: "uses your Anthropic key" },
-  { key: "google", label: "Google · gemini-2.5-flash", base_url: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemini-2.5-flash", dims: 0, threshold: 0, local: false, keyNote: "uses your Google key" },
-  { key: "ollama", label: "Ollama (local) · llama3.1", base_url: "http://localhost:11434/v1", model: "llama3.1", dims: 0, threshold: 0, local: true, dummyKey: "ollama", keyNote: "no key needed" },
+  { key: "openai", label: "OpenAI · gpt-5.4-mini", base_url: "https://api.openai.com/v1", model: "gpt-5.4-mini", dims: 0, threshold: 0, local: false, keyNote: "uses your OpenAI key" },
+  { key: "anthropic", label: "Anthropic · claude-sonnet-4-6", base_url: "https://api.anthropic.com/v1", model: "claude-sonnet-4-6", dims: 0, threshold: 0, local: false, keyNote: "uses your Anthropic key" },
+  { key: "google", label: "Google · gemini-3.5-flash", base_url: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemini-3.5-flash", dims: 0, threshold: 0, local: false, keyNote: "uses your Google key" },
+  { key: "ollama", label: "Ollama (local) · qwen3:8b", base_url: "http://localhost:11434/v1", model: "qwen3:8b", dims: 0, threshold: 0, local: true, dummyKey: "ollama", keyNote: "no key needed" },
   { key: "lmstudio", label: "LM Studio (local) · loaded GGUF model", base_url: "http://localhost:1234/v1", model: "gemma-4-12b-qat", dims: 0, threshold: 0, local: true, dummyKey: "lm-studio", keyNote: "no key needed" },
   { key: "custom", label: "Custom / OpenAI-compatible…", base_url: "", model: "", dims: 0, threshold: 0, local: false, keyNote: "set base URL + key below" },
 ]
