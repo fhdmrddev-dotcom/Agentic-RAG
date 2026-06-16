@@ -87,7 +87,13 @@
   4. **SC#10-style live UAT**: a local (LM Studio/Ollama) embedding model embeds + serves search; an OpenAI→local switch re-embeds and search still returns relevant cited results; search-threshold recalibration noted (confidence buckets `0.54/0.38` at `agent_loop.py:664-682` + `retrieval_match_threshold` 0.3 are calibrated for text-embedding-3-small and are NOT portable).
 **Design driver (the dimension-mismatch problem)**: `document_chunks.embedding` is a fixed `vector(1536)` column (`full-schema.sql:394`) + HNSW index with NO per-chunk record of which model produced a vector. **v1 = GLOBAL single embedding model + re-embed-on-change** (matches the single-column design). Optional: standardize one target dimension (1024) via Matryoshka truncation (pass `embedding_dimensions` into `embeddings.create(dimensions=…)` — a 1-line change at `openai_service.py:1473`, currently NOT passed) so truncation-capable providers coexist; add per-chunk `embedding_model`/`dimensions` tagging as a cross-space-search safety net. Per-folder embedding sets = OUT OF SCOPE (schema redesign). Realistic provider boundary = "any OpenAI-compatible `/v1/embeddings`" (OpenAI/Google/Jina/Mistral/Cohere/Ollama/LM Studio = zero new client code; Voyage + int8/binary = native-SDK, defer).
 **Carry-in (BUG-260616-01 — local-model routing trap; surfaced from Phase 111 UAT axis b):** the SAME root cause that motivates the embedding-provider picker also breaks LLM-side local routing today — provider is inferred from the model-id STRING, so a slashed local id (`google/gemma-3-4b`) mis-infers to `openrouter` (`config.py:362`) and `forced_emit` ships the call to OpenRouter's cloud instead of the local `:1234`/`:11434` server (data-egress surprise; no `lmstudio` inference pattern exists). Fold the SYMMETRIC fix into this phase: (a) explicit `(provider, model)` pairing — add `extraction_provider` beside `extraction_model` AND `embedding_provider`, route by the stored provider, skip name-inference when set; (b) make the `forced_emit` cross-provider block local-aware (resolve a local target provider's base_url + dummy key — `forced_emit.py:261-275`); (c) gate the OpenRouter "quality" mangling on `provider=="openrouter"` instead of `"/" in model` (`openai_service.py:1449-1456`) — as-is it appends `:exacto` + a `response-healing` plugin to any slashed local model id and 500s LM Studio/Ollama. **Live-proven 2026-06-16:** once these are bypassed, a 12B local model (gemma-4-12b-qat) extracts full confidence-scored metadata through the real engine; the blocker is purely this routing/mangling. Discuss-phase must route BUG-260616-01 (status: folded → 111.1).
-**Plans**: TBD
+**Plans**: 6 plans
+  - [ ] 111.1-01-PLAN.md — Substrate: Wave-0 test scaffolds + migration 073 file (un-applied; all DDL incl. match_document_chunks + resize_embedding_column) + settings schema/API for embedding_provider/extraction_provider/confidence buckets
+  - [ ] 111.1-02-PLAN.md — Data-egress routing fixes (BUG-260616-01 / D-09 x3): explicit extraction_provider, local-aware forced_emit, OpenRouter mangling gated on provider==openrouter
+  - [ ] 111.1-03-PLAN.md — EMBED-04 embed_chunks cred fix + D-10 chunk-tag write + match_document_chunks filter caller + D-12 confidence buckets from settings
+  - [ ] 111.1-04-PLAN.md — [BLOCKING] apply migration 073 live to :54322 (SQL-editor/psycopg2, NEVER db push) + read-back + regen full-schema.sql + D-07 preset curation + live D-10 tests
+  - [ ] 111.1-05-PLAN.md — Re-embed background job (batched, RLS-scoped, resumable, non-destructive, threadpool) + settings kickoff + progress/re-kick endpoints (EMBED-05)
+  - [ ] 111.1-06-PLAN.md — Frontend: reusable ProviderPicker (sketch 024) + ReembedConfirmModal (sketch 025) + ReembedStatusCard (sketch 026) + SettingsPage wiring (EMBED-01/02/03/06)
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the Settings embedding-provider picker + local presets + the destructive re-embed confirmation) BEFORE plan.
 
@@ -190,7 +196,8 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
-| 111. Metadata Enrichment — Extraction Backend | 1/5 | 🔨 Executing | 2026-06-15 |
+| 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
+| 111.1 Configurable / Multi-Provider Embeddings | 0/6 | 📋 Planned | 2026-06-16 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
