@@ -93,7 +93,7 @@
   - [x] 111.1-03-PLAN.md — EMBED-04 embed_chunks cred fix + D-10 chunk-tag write + match_document_chunks filter caller + D-12 confidence buckets from settings ✅ EXECUTED 2026-06-16 (Wave 2; user_settings threaded through embed_chunks, chunk rows tagged embedding_model/dims, p_embedding_model stale-filter, confidence buckets from settings; net-new failures 0; live cross-embedder + match-filter stay xfail until Plan 04 migration apply)
   - [x] 111.1-04-PLAN.md — [BLOCKING] apply migration 073 live to :54322 (SQL-editor/psycopg2, NEVER db push) + read-back + regen full-schema.sql + D-07 preset curation + live D-10 tests ✅ EXECUTED 2026-06-17 (Wave 3 checkpoint; operator authorized psycopg2-direct; docs 30→30 preserved, 0 NULL embedding_model, p_embedding_model live; auto-fixed stale 6-arg match_document_chunks overload via DROP FUNCTION; 3 live D-10 tests GREEN; PROVIDER-PRESETS.md curated — OpenAI/Google live-validated, local+Jina/Cohere/Mistral/Voyage UNVERIFIED; net-new failures 0)
   - [x] 111.1-05-PLAN.md — Re-embed background job (batched, RLS-scoped, resumable, non-destructive, threadpool) + settings kickoff + progress/re-kick endpoints (EMBED-05) ✅ EXECUTED 2026-06-17 (Wave 4; reembed_service.py — eq(user_id) on every read+write, stale-predicate resume, write-new-never-delete, run_in_threadpool x8; kickoff on confirmed model/dim change with dims_changed-gated resize; GET /settings/reembed-progress reconcile-on-fetch + POST /settings/reembed re-kick; 2 reembed tests un-marked GREEN via rollback-txn live proof; net-new failures 0)
-  - [ ] 111.1-06-PLAN.md — Frontend: reusable ProviderPicker (sketch 024) + ReembedConfirmModal (sketch 025) + ReembedStatusCard (sketch 026) + SettingsPage wiring (EMBED-01/02/03/06)
+  - [x] 111.1-06-PLAN.md — Frontend: reusable ProviderPicker (sketch 024) + ReembedConfirmModal (sketch 025) + ReembedStatusCard (sketch 026) + SettingsPage wiring (EMBED-01/02/03/06) ✅ EXECUTED 2026-06-17 (Wave 5; Tasks 1-2 built tsc-clean, Task 3 live UI walk APPROVED via Chrome MCP; picker auto-fill + always-on endpoint footer + CLOUD↔LOCAL + SAME-PICKER reuse, serious 5-fact confirm gate (Cancel = corpus untouched, DB-verified), extraction defaults modernized to live-/models IDs; live UAT found+fixed a real reembed progress count-cap bug (len→count=exact, 1000→1839); follow-ups: mount search pointer + SEED-088 dynamic registry)
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the Settings embedding-provider picker + local presets + the destructive re-embed confirmation) BEFORE plan.
 
@@ -197,7 +197,7 @@
 |-------|----------------|--------|-----------|
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
-| 111.1 Configurable / Multi-Provider Embeddings | 5/6 | 🔨 In Progress | 2026-06-17 |
+| 111.1 Configurable / Multi-Provider Embeddings | 6/6 | 🔨 In Progress | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
