@@ -111,9 +111,10 @@ async def test_reembed_job_is_resumable(pg_pool, monkeypatch):
 
             adapter = SupabaseTxnAdapter(conn)
 
-            # --- Pass 1: process ONE batch then stop (simulate interruption) ---
+            # --- Pass 1: process ONE small batch (2 of 5) then stop (interruption) ---
             await reembed_service.reembed_job(
-                adapter, str(user_id), app_settings, dims_changed=False, max_batches=1,
+                adapter, str(user_id), app_settings, dims_changed=False,
+                max_batches=1, batch_size=2,
             )
             done_after_pass1 = await conn.fetchval(
                 "SELECT count(*) FROM public.document_chunks "
@@ -178,9 +179,10 @@ async def test_reembed_job_is_non_destructive(pg_pool, monkeypatch):
             assert null_before == 0, "seed must give every chunk a (stale) vector"
 
             adapter = SupabaseTxnAdapter(conn)
-            # Run ONE batch only (interrupt). dims_changed=False => NEVER resize/NULL.
+            # Run ONE small batch only (2 of 4 -> interrupt). dims_changed=False => NEVER resize/NULL.
             await reembed_service.reembed_job(
-                adapter, str(user_id), app_settings, dims_changed=False, max_batches=1,
+                adapter, str(user_id), app_settings, dims_changed=False,
+                max_batches=1, batch_size=2,
             )
 
             # CONTRACT: at no point is an old vector NULLed before its replacement.
