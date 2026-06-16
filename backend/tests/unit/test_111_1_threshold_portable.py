@@ -49,10 +49,6 @@ def test_incoherent_bucket_order_rejected():
     _validate_confidence_buckets(high=0.6, medium=0.4)
 
 
-@pytest.mark.xfail(
-    reason="_compute_confidence reads buckets from settings in Plan 03 (D-12)",
-    strict=False,
-)
 def test_compute_confidence_reads_buckets_from_settings():
     """CONSUMPTION layer — Plan 03. Lower the high bucket and a mid score reads 'high'."""
     from app.services.agent_loop import _compute_confidence
@@ -60,3 +56,34 @@ def test_compute_confidence_reads_buckets_from_settings():
     # With a high bucket of 0.30, a 0.40 similarity should grade 'high' (not 'medium').
     grade = _compute_confidence(0.40, bucket_high=0.30, bucket_medium=0.20)
     assert grade == "high", "compute_confidence must honor settings-driven buckets, not 0.54/0.38"
+
+
+class _FakeSettings:
+    def __init__(self, high, medium):
+        self.confidence_bucket_high = high
+        self.confidence_bucket_medium = medium
+
+
+def test_compute_confidence_reads_buckets_from_settings_obj():
+    """CONSUMPTION layer (D-12) — buckets come from the settings object in scope.
+
+    With confidence_bucket_high=0.7, an avg_similarity of 0.6 must read 'medium'
+    (NOT 'high'), proving the cutoff is settings-driven and not the 0.54 literal.
+    """
+    from app.services.agent_loop import _compute_confidence
+
+    settings_obj = _FakeSettings(high=0.7, medium=0.38)
+    assert _compute_confidence(0.6, settings_obj) == "medium"
+    # Above the configured high bucket → high.
+    assert _compute_confidence(0.75, settings_obj) == "high"
+
+
+def test_compute_confidence_defaults_when_settings_none():
+    """CONSUMPTION layer (D-08 back-compat) — no settings → 0.54/0.38, byte-identical to today."""
+    from app.services.agent_loop import _compute_confidence
+
+    assert _compute_confidence(0.60) == "high"     # >= 0.54
+    assert _compute_confidence(0.54) == "high"      # boundary
+    assert _compute_confidence(0.40) == "medium"    # 0.38 <= x < 0.54
+    assert _compute_confidence(0.38) == "medium"    # boundary
+    assert _compute_confidence(0.20) == "low"       # < 0.38

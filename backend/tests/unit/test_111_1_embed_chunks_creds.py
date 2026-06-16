@@ -15,10 +15,6 @@ import inspect
 import pytest
 
 
-@pytest.mark.xfail(
-    reason="embed_chunks gains the user_settings kwarg in Plan 03 (EMBED-04 / D-13)",
-    strict=False,
-)
 def test_embed_chunks_accepts_user_settings_kwarg():
     from app.services.embedding_service import embed_chunks
 
@@ -28,10 +24,6 @@ def test_embed_chunks_accepts_user_settings_kwarg():
     )
 
 
-@pytest.mark.xfail(
-    reason="embed_chunks forwards user_settings to embed_texts in Plan 03 (EMBED-04 / D-13)",
-    strict=False,
-)
 def test_embed_chunks_forwards_user_settings_to_embed_texts(monkeypatch):
     import app.services.embedding_service as es
 

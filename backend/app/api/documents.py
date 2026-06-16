@@ -1480,8 +1480,23 @@ def ingest_document(
 
         # Phase 111 — app_settings was hoisted above the metadata extract branch; reuse it.
         supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
-        embeddings = embed_chunks(texts_to_embed, model=app_settings.embedding_model or None)
+        # Phase 111.1 EMBED-04 / D-13: thread user_settings=app_settings so the chunk
+        # path resolves the SAME get_embedding_client the query path uses
+        # (retrieval_service.py:42-44). Without this, a configured non-default embedder
+        # embedded chunks via env creds while queries used configured creds → two vector
+        # spaces → silent retrieval failure.
+        embeddings = embed_chunks(
+            texts_to_embed,
+            model=app_settings.embedding_model or None,
+            user_settings=app_settings,
+        )
 
+        # Phase 111.1 D-10: tag each chunk with the embedding model + dims it was
+        # produced under, so a half-finished re-embed never compares across vector
+        # spaces (match_document_chunks filters on p_embedding_model). Default mirrors
+        # the migration-073 backfill (text-embedding-3-small / 1536) for back-compat.
+        _chunk_embedding_model = app_settings.embedding_model or "text-embedding-3-small"
+        _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
         chunk_rows = [
             {
                 "document_id": document_id,
@@ -1489,6 +1504,8 @@ def ingest_document(
                 "content": chunk,        # raw text — clean for display and citations
                 "chunk_index": i,
                 "embedding": embedding,  # computed from context_header + chunk
+                "embedding_model": _chunk_embedding_model,           # D-10 per-chunk tag
+                "embedding_dimensions": _chunk_embedding_dimensions,  # D-10
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]
