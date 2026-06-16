@@ -1544,6 +1544,10 @@ export interface FullAppSettings {
   embedding_base_url: string
   embedding_dimensions: number
   embedding_has_api_key: boolean
+  // Phase 111.1 — the stored provider the picker reads back to show the current
+  // selection (routes by stored provider, never name-inference — D-06 / D-09).
+  embedding_provider: string
+  extraction_provider: string
   rerank_enabled: boolean
   rerank_provider: string
   rerank_model: string
@@ -1592,6 +1596,15 @@ export interface SettingsUpdate {
   embedding_api_key?: string
   embedding_base_url?: string
   embedding_dimensions?: number
+  // Phase 111.1 — explicit provider pinning (D-06 embedding / D-09 extraction).
+  // The picker stores the preset key so the backend routes by it. `extraction_model`
+  // travels with the picker default; the backend persists `extraction_provider`
+  // through the contract today (the model is stored via app_settings).
+  embedding_provider?: string
+  extraction_provider?: string
+  extraction_model?: string
+  confidence_bucket_high?: number
+  confidence_bucket_medium?: number
   rerank_enabled?: boolean
   rerank_provider?: string
   rerank_api_key?: string
@@ -1640,6 +1653,34 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     throw new Error("Failed to save settings")
   }
   return res.json() as Promise<FullAppSettings>
+}
+
+// Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
+// live from document_chunks on every fetch (the source of truth — reconcile-on-fetch,
+// D-v2.5-03); `status` is a cosmetic hint reconciled against the counts (counts win).
+export interface ReembedProgress {
+  status: "idle" | "running" | "partial" | "complete" | "failed"
+  total: number | null
+  re_embedded: number | null
+  remaining: number | null
+  model: string | null
+  updated_at: number | null
+}
+
+/** GET /settings/reembed-progress — reconcile-on-fetch progress for the status card. */
+export async function getReembedProgress(): Promise<ReembedProgress> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/reembed-progress`, { headers, cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to get re-embed progress")
+  return res.json() as Promise<ReembedProgress>
+}
+
+/** POST /settings/reembed — manual "Re-embed now" re-kick of a failed/partial run. */
+export async function kickReembed(): Promise<ReembedProgress> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/reembed`, { method: "POST", headers })
+  if (!res.ok) throw new Error("Failed to start re-embed")
+  return res.json() as Promise<ReembedProgress>
 }
 
 export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
