@@ -90,7 +90,7 @@
 **Plans**: 6 plans
   - [x] 111.1-01-PLAN.md — Substrate: Wave-0 test scaffolds + migration 073 file (un-applied; all DDL incl. match_document_chunks + resize_embedding_column) + settings schema/API for embedding_provider/extraction_provider/confidence buckets ✅ EXECUTED 2026-06-16 (Wave 1; 11 scaffolds + migration 073 file + 4 settings fields; net-new failures 0)
   - [x] 111.1-02-PLAN.md — Data-egress routing fixes (BUG-260616-01 / D-09 x3): explicit extraction_provider, local-aware forced_emit, OpenRouter mangling gated on provider==openrouter ✅ EXECUTED 2026-06-16 (Wave 1 ∥; 3 D-09 fixes + 15 real-assertion tests; merge resolved 3 add/add test-file conflicts taking Plan 02 versions)
-  - [ ] 111.1-03-PLAN.md — EMBED-04 embed_chunks cred fix + D-10 chunk-tag write + match_document_chunks filter caller + D-12 confidence buckets from settings
+  - [x] 111.1-03-PLAN.md — EMBED-04 embed_chunks cred fix + D-10 chunk-tag write + match_document_chunks filter caller + D-12 confidence buckets from settings ✅ EXECUTED 2026-06-16 (Wave 2; user_settings threaded through embed_chunks, chunk rows tagged embedding_model/dims, p_embedding_model stale-filter, confidence buckets from settings; net-new failures 0; live cross-embedder + match-filter stay xfail until Plan 04 migration apply)
   - [ ] 111.1-04-PLAN.md — [BLOCKING] apply migration 073 live to :54322 (SQL-editor/psycopg2, NEVER db push) + read-back + regen full-schema.sql + D-07 preset curation + live D-10 tests
   - [ ] 111.1-05-PLAN.md — Re-embed background job (batched, RLS-scoped, resumable, non-destructive, threadpool) + settings kickoff + progress/re-kick endpoints (EMBED-05)
   - [ ] 111.1-06-PLAN.md — Frontend: reusable ProviderPicker (sketch 024) + ReembedConfirmModal (sketch 025) + ReembedStatusCard (sketch 026) + SettingsPage wiring (EMBED-01/02/03/06)
@@ -197,7 +197,7 @@
 |-------|----------------|--------|-----------|
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
-| 111.1 Configurable / Multi-Provider Embeddings | 2/6 | 🔨 In Progress | 2026-06-16 |
+| 111.1 Configurable / Multi-Provider Embeddings | 3/6 | 🔨 In Progress | 2026-06-16 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
