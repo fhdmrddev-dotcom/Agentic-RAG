@@ -38,6 +38,9 @@ class FullSettingsResponse(BaseModel):
     embedding_base_url: str
     embedding_dimensions: int
     embedding_has_api_key: bool
+    # Phase 111.1 — the stored provider the picker reads to show the current selection.
+    embedding_provider: str
+    extraction_provider: str
     # Reranking
     rerank_enabled: bool
     rerank_provider: str
@@ -92,6 +95,11 @@ class SettingsUpdate(BaseModel):
     embedding_api_key: str | None = None   # "***" = keep; "" = clear; real = save
     embedding_base_url: str | None = None
     embedding_dimensions: int | None = None
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    embedding_provider: str | None = None      # D-06 explicit embedding provider
+    extraction_provider: str | None = None     # D-09 #1 explicit extraction provider
+    confidence_bucket_high: float | None = None    # D-12 portable confidence bucket
+    confidence_bucket_medium: float | None = None  # D-12 portable confidence bucket
     # Reranking
     rerank_enabled: bool | None = None
     rerank_provider: str | None = None
@@ -142,6 +150,9 @@ async def _build_response(s=None) -> FullSettingsResponse:
         embedding_base_url=s.embedding_base_url,
         embedding_dimensions=s.embedding_dimensions,
         embedding_has_api_key=bool(s.embedding_api_key),
+        # Phase 111.1 — surface the stored provider so the picker can read it back.
+        embedding_provider=s.embedding_provider,
+        extraction_provider=s.extraction_provider,
         rerank_enabled=s.rerank_enabled,
         rerank_provider=s.rerank_provider,
         rerank_model=s.rerank_model,
@@ -177,6 +188,30 @@ async def _build_response(s=None) -> FullSettingsResponse:
             if m and m not in MODEL_CAPABILITIES
         },
     )
+
+
+def _validate_confidence_buckets(high: float | None, medium: float | None) -> None:
+    """Phase 111.1 V5 — clamp/coherence guard for the confidence buckets (D-12).
+
+    Each bucket, when supplied, must be inside [0.0, 1.0]; when BOTH are supplied
+    they must keep a coherent order (medium <= high). An incoherent pair is a
+    tampering vector (T-111.1-01-01) — reject with a 422 rather than silently
+    storing thresholds that make every result grade 'low'/'high' nonsensically.
+    """
+    for name, val in (("confidence_bucket_high", high), ("confidence_bucket_medium", medium)):
+        if val is not None and not (0.0 <= val <= 1.0):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{name} must be within [0.0, 1.0] (got {val}).",
+            )
+    if high is not None and medium is not None and medium > high:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"confidence_bucket_medium ({medium}) must be <= confidence_bucket_high "
+                f"({high}) — incoherent bucket order."
+            ),
+        )
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -224,6 +259,19 @@ async def update_settings(
         updates["embedding_base_url"] = body.embedding_base_url
     if body.embedding_dimensions is not None:
         updates["embedding_dimensions"] = body.embedding_dimensions
+
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    # V5: validate the confidence buckets BEFORE building updates so an incoherent
+    # pair (medium > high) or an out-of-range value is rejected with a 422.
+    _validate_confidence_buckets(body.confidence_bucket_high, body.confidence_bucket_medium)
+    if body.embedding_provider is not None:
+        updates["embedding_provider"] = body.embedding_provider
+    if body.extraction_provider is not None:
+        updates["extraction_provider"] = body.extraction_provider
+    if body.confidence_bucket_high is not None:
+        updates["confidence_bucket_high"] = body.confidence_bucket_high
+    if body.confidence_bucket_medium is not None:
+        updates["confidence_bucket_medium"] = body.confidence_bucket_medium
 
     if body.rerank_enabled is not None:
         updates["rerank_enabled"] = body.rerank_enabled

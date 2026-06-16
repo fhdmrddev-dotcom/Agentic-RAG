@@ -16,15 +16,8 @@ RED convention: not-yet-built symbols imported inside the body; xfail(strict=Fal
 import pytest
 
 
-@pytest.mark.xfail(
-    reason="confidence buckets added to UserEffectiveSettings in Task 3 of this plan (D-12)",
-    strict=False,
-)
 def test_buckets_read_back_with_defaults_without_db():
-    """SCHEMA layer — flips GREEN once Task 3 adds the two fields (D-12).
-
-    Un-marked (xfail removed) by Task 3 of this plan once the fields land.
-    """
+    """SCHEMA layer — GREEN (Task 3 added the two fields; D-12)."""
     from app.models.user_settings import _build_settings_from_row
 
     s = _build_settings_from_row({})
@@ -32,36 +25,27 @@ def test_buckets_read_back_with_defaults_without_db():
     assert s.confidence_bucket_medium == 0.38, "default confidence_bucket_medium is 0.38"
 
 
-@pytest.mark.xfail(
-    reason="confidence buckets added to SettingsUpdate in Task 3 of this plan (D-12)",
-    strict=False,
-)
 def test_settings_update_has_bucket_fields():
-    """SCHEMA layer — SettingsUpdate carries the two bucket fields after Task 3.
-
-    Un-marked (xfail removed) by Task 3 of this plan once the fields land.
-    """
+    """SCHEMA layer — GREEN (Task 3 added the two fields to SettingsUpdate; D-12)."""
     from app.api.settings import SettingsUpdate
 
     assert "confidence_bucket_high" in SettingsUpdate.model_fields
     assert "confidence_bucket_medium" in SettingsUpdate.model_fields
 
 
-@pytest.mark.xfail(
-    reason="bucket-order validation lands in Task 3 of this plan (V5)",
-    strict=False,
-)
 def test_incoherent_bucket_order_rejected():
-    """SCHEMA layer — medium > high is incoherent and must 422 (V5).
+    """SCHEMA layer — GREEN (Task 3): medium > high is incoherent and must 422 (V5)."""
+    from fastapi import HTTPException
 
-    Pure-Python guard: the validation helper rejects medium > high. Kept xfail
-    until Task 3 wires the clamp/order check so the suite stays green during RED.
-    """
     from app.api.settings import _validate_confidence_buckets
 
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException) as exc:
         _validate_confidence_buckets(high=0.5, medium=0.9)
-    # A coherent pair passes.
+    assert exc.value.status_code == 422
+    # Out-of-range is also rejected.
+    with pytest.raises(HTTPException):
+        _validate_confidence_buckets(high=1.5, medium=0.4)
+    # A coherent in-range pair passes (no raise).
     _validate_confidence_buckets(high=0.6, medium=0.4)
 
 
