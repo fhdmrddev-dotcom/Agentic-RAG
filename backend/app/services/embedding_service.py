@@ -109,10 +109,18 @@ def chunk_text(text: str, chunk_size: int | None = None, overlap: int | None = N
     return _split_and_merge(text, SEPARATORS)
 
 
-def embed_chunks(chunks: list[str], model: str | None = None) -> list[list[float]]:
+def embed_chunks(chunks: list[str], model: str | None = None, user_settings=None) -> list[list[float]]:
+    """Embed ingest-time chunks via the SAME embedder the query path resolves.
+
+    EMBED-04 / D-13 fix (Phase 111.1): `user_settings` is threaded through to
+    `embed_texts` so chunk-time and query-time both resolve the SAME
+    `get_embedding_client`. Without this, a configured non-default embedder
+    embedded CHUNKS via env creds while QUERIES used the configured creds — two
+    vector spaces, a silent retrieval failure. Mirrors retrieval_service.py:42-44.
+    """
     if not chunks:
         return []
-    return embed_texts(chunks, model=model)
+    return embed_texts(chunks, model=model, user_settings=user_settings)
 
 
 def extract_metadata(content: str, model: str | None = None) -> DocumentMetadata | None:
