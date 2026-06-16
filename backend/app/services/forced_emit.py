@@ -259,20 +259,36 @@ async def forced_emit(
     # provider's key — so the active-provider path (Deep emit) is byte-identical (no copy).
     _active_provider = (getattr(user_settings, "active_provider", "") or settings.llm_provider or "")
     if provider and provider != _active_provider and hasattr(user_settings, "model_copy"):
-        _target_key = getattr(settings, f"{provider}_api_key", "")
-        if _target_key:
-            _updates = {"llm_api_key": _target_key}
-            # FINDING-05 (102-UAT): the openai-compat path (openai/openrouter/deepseek/
-            # moonshot/minimax/zhipu) resolves the ENDPOINT from ``llm_base_url`` — the
-            # active provider's by default. A cross-provider shot must ALSO carry the
-            # TARGET provider's base_url, else the right key is sent to the wrong endpoint
-            # (e.g. an openrouter key → api.openai.com → 401). Native adapters (anthropic/
-            # google) ignore llm_base_url (fixed SDK endpoints), so this is harmless there;
-            # "" (openai target) → the SDK's own default endpoint.
-            from app.config import _PROVIDER_BASE_URLS  # function-local
-            if provider in _PROVIDER_BASE_URLS:
-                _updates["llm_base_url"] = _PROVIDER_BASE_URLS[provider]
+        # D-09 #2 (BUG-260616-01 / EMBED-01): local providers (lmstudio/ollama) have NO
+        # ``<provider>_api_key`` env field, so the cloud branch below would no-op
+        # (``_target_key == ""``) and the forced shot would fall through to the WRONG
+        # active (cloud) provider — shipping document text off-box. Inject the local
+        # dummy key + local base_url here, MIRRORING ``resolve_llm_provider`` exactly
+        # (Ollama appends ``/v1``; LM Studio's URL already ends ``/v1`` → AS-IS, no
+        # double-append; dummy keys ``"ollama"`` / ``"lm-studio"``). A forced local shot
+        # now resolves the local endpoint and stays local.
+        if provider in ("ollama", "lmstudio"):
+            _updates = {"llm_api_key": "lm-studio" if provider == "lmstudio" else "ollama"}
+            _updates["llm_base_url"] = (
+                settings.lmstudio_base_url.rstrip("/") if provider == "lmstudio"
+                else f"{settings.ollama_base_url.rstrip('/')}/v1"
+            )
             user_settings = user_settings.model_copy(update=_updates)
+        else:
+            _target_key = getattr(settings, f"{provider}_api_key", "")
+            if _target_key:
+                _updates = {"llm_api_key": _target_key}
+                # FINDING-05 (102-UAT): the openai-compat path (openai/openrouter/deepseek/
+                # moonshot/minimax/zhipu) resolves the ENDPOINT from ``llm_base_url`` — the
+                # active provider's by default. A cross-provider shot must ALSO carry the
+                # TARGET provider's base_url, else the right key is sent to the wrong endpoint
+                # (e.g. an openrouter key → api.openai.com → 401). Native adapters (anthropic/
+                # google) ignore llm_base_url (fixed SDK endpoints), so this is harmless there;
+                # "" (openai target) → the SDK's own default endpoint.
+                from app.config import _PROVIDER_BASE_URLS  # function-local
+                if provider in _PROVIDER_BASE_URLS:
+                    _updates["llm_base_url"] = _PROVIDER_BASE_URLS[provider]
+                user_settings = user_settings.model_copy(update=_updates)
 
     _system = system_prompt
     if forced:
