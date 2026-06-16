@@ -186,27 +186,30 @@ async def reembed_progress(
     """
     current = _current_model(app_settings) if app_settings is not None else None
 
-    total = (
-        await run_in_threadpool(
-            lambda: supabase.table("document_chunks")
-            .select("id")
-            .eq("user_id", user_id)
-            .execute()
-        )
-    ).data or []
-    total_n = len(total)
+    # COUNT via count="exact" (PostgREST Content-Range), NOT len(rows): a plain
+    # .select().execute() returns at most the PostgREST default max-rows (1000),
+    # so len() silently undercounts any corpus > 1000 chunks. Found live (G-4 UAT):
+    # an 1839-chunk corpus reported total=1000, which also skewed the progress
+    # denominator. limit(1) avoids transferring rows we don't need — only .count matters.
+    total_res = await run_in_threadpool(
+        lambda: supabase.table("document_chunks")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    total_n = total_res.count or 0
 
     if current is not None:
-        done_rows = (
-            await run_in_threadpool(
-                lambda: supabase.table("document_chunks")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("embedding_model", current)
-                .execute()
-            )
-        ).data or []
-        re_embedded = len(done_rows)
+        done_res = await run_in_threadpool(
+            lambda: supabase.table("document_chunks")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("embedding_model", current)
+            .limit(1)
+            .execute()
+        )
+        re_embedded = done_res.count or 0
     else:
         re_embedded = None
 
