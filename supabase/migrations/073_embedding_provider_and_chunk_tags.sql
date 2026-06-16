@@ -25,6 +25,12 @@ UPDATE public.document_chunks
 -- 4. match_document_chunks (D-10): add a trailing p_embedding_model param + ONE WHERE clause.
 --    Body copied byte-for-byte from full-schema.sql:120-137; the new param is LAST + defaulted
 --    so existing callers stay compatible. KEEP dc.user_id = match_user_id (RLS, V4).
+--    A trailing param creates a NEW overload (CREATE OR REPLACE matches an exact signature only),
+--    so DROP the prior 6-arg overload first — exactly the migration-016 precedent — leaving ONE
+--    clean function (no "function is not unique" ambiguity, no duplicate in full-schema.sql).
+DROP FUNCTION IF EXISTS public.match_document_chunks(
+  public.vector, uuid, integer, double precision, jsonb, uuid[]
+);
 CREATE OR REPLACE FUNCTION public.match_document_chunks(
   query_embedding public.vector,
   match_user_id uuid,
