@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-15T18:55:00.000Z"
-last_activity: 2026-06-15 — Phase 111 EXECUTING — Waves 1+2 done (111-01/02/03); Wave 3 (111-04 ingest wiring) next
+last_updated: "2026-06-16T00:00:00.000Z"
+last_activity: 2026-06-16 — Phase 111 FULLY CLOSED (all 3 gates: verify-work 4/4 + secure 21/21 + validate nyquist-compliant); next = Phase 111.1
 progress:
   total_phases: 11
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 111 — Metadata Enrichment (Extraction Backend) — **✅ ALL 5 PLANS EXECUTED + VERIFIED (3/4 SC, gsd-verifier `human_needed`) — awaiting operator 4-axis UAT** — **v3.0 Document Management** (META-01/03/04)
+Phase: 111 — Metadata Enrichment (Extraction Backend) — **✅ FULLY CLOSED 2026-06-16 (all 3 gates clear)** — **v3.0 Document Management** (META-01/03/04)
 Plan: 5 of 5 COMPLETE
-Status: **Phase 111 EXECUTED + auto-VERIFIED 2026-06-15 — sequential-on-main-tree** (worktrees overridden OFF: `backend/venv` gitignored). Waves 1-4 done: 111-01 substrate (migration 072 file, lmstudio provider, 3 settings fields) → 111-02 cross-provider enrichment engine → 111-03 `/metadata-fields` CRUD → 111-04 `ingest_document` enriched/legacy wiring → 111-05 BLOCKING checkpoint (migration 072 applied live to :54322, operator-authorized psycopg2-direct; 4 cols live, 19 docs preserved; full-schema regenerated; live `test_111` 7 passed/2 xpassed). Engine ON for every ingest in default `enriched` mode; `legacy` = byte-identical reversibility. **Code review 0C/2W/4I — WR-01 (a REAL D-111-3/SC#3 bug: ingest call site leaked a flat `confidence` key by not popping it) found + FIXED (`b62726cf`, now uses `attach_confidence` helper + a call-site source guard).** WR-02 (comment-only) + IN-01..04 (minor robustness) carried to secure-phase/polish. **gsd-verifier: `human_needed`, 3/4 SC VERIFIED against live code** (SC#1 model threading, SC#2 window lift, SC#3 runtime schema + nested `_confidence` — WR-01 fix confirmed gone). SC#4 = the cross-provider native-7 LIVE 4-axis UAT (manual by design, the D-102/104 lesson) → 5 items in `111-HUMAN-UAT.md`. Net-new failures = 0 (59 base = 59 now). **Orchestrator owns STATE.md/ROADMAP.md writes** (balloon-bug recurred at 111-01 → repaired from clean `c6791c40`; held all 4 executor plans). **NEXT = operator runs the 5 `111-HUMAN-UAT.md` items live (or `/gsd:verify-work 111`); on "approved" → mark phase complete (`phase.complete`) → `/gsd:secure-phase 111` (security_enforcement on, no 111-SECURITY.md yet).**
+Status: **Phase 111 FULLY CLOSED 2026-06-16 — all three gates clear.** Executed sequential-on-main-tree (worktrees OFF: `backend/venv` gitignored); Waves 1-4: 111-01 substrate (migration 072 file, lmstudio provider, 3 settings fields) → 111-02 cross-provider enrichment engine → 111-03 `/metadata-fields` CRUD → 111-04 `ingest_document` enriched/legacy wiring → 111-05 BLOCKING checkpoint (migration 072 applied live to :54322, operator-authorized psycopg2-direct; 4 cols live, 19 docs preserved; full-schema regenerated). Engine ON for every ingest in default `enriched` mode; `legacy` = byte-identical reversibility. **GATE 1 — verify-work: 4/4 must-haves** (`111-VERIFICATION.md` status verified; `human_verification` gate closed 4/4 via `111-HUMAN-UAT.md` status passed — axes a/c/d + live audit driven live 2026-06-15, axis b local LM Studio proven live 2026-06-16 `gemma-4-12b-qat`; 2 app-path local-routing bugs → BUG-260616-01 → Phase 111.1, do NOT affect 111's engine). Code review 0C/2W/4I — WR-01 (REAL D-111-3/SC#3 bug) FIXED `b62726cf`; WR-02 + IN-01..04 advisory carry-forwards. **GATE 2 — secure-phase: 21/21 threats CLOSED, threats_open 0** (`111-SECURITY.md` @ `ffcedcc3`, ASVS L1, 3 accepts AR-111-01/02; orchestrator hand-spot-checked service-role field-def scoping + global-field EoP dual-enforce + 3-layer DoS backstop — all real). **GATE 3 — validate-phase: nyquist_compliant** (`111-VALIDATION.md` @ `7cafbca9`; suite re-run for ground truth = 42 unit + 7 passed/2 xpassed integration live :54322 / 0 failures; 12/12 automated COVERED + 5/5 manual resolved, 0 gaps). Net-new failures = 0. **Orchestrator owns STATE.md/ROADMAP.md writes** (balloon-bug recurred at 111-01 → repaired from clean `c6791c40`). **NEXT = Phase 111.1 (Configurable / Multi-Provider Embeddings — INSERTED before 112; owns the embeddings-SPOF work + BUG-260616-01 local-routing bugs + retires SEED-048) → `/gsd:discuss-phase 111.1`.**
 Resume file: None
-Last activity: 2026-06-15 — Phase 111 executed + verified (human_needed, 3/4 SC); awaiting operator 4-axis UAT
+Last activity: 2026-06-16 — Phase 111 fully closed (verify-work 4/4 + secure 21/21 + validate nyquist-compliant)
 
-**Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), verification pending:**
+**Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
 - **111-05 (Wave 4, META-01/03, `autonomous:false` BLOCKING) — EXECUTED 2026-06-15** (operator-authorized psycopg2-direct apply at the Wave-4 checkpoint — commit `0438eace`): crossed migration 072 into the live local DB :54322. `scripts/apply_migration_072.py` applied the 3 `app_settings` extraction columns + `metadata_field_definitions.options` jsonb in ONE transaction (idempotent), read-back asserted all 4 columns + defaults (`extraction_model` NULL / `extraction_window_cap` 32000 / `metadata_enrichment_mode` 'enriched' / `options` jsonb NULL) and **documents preserved 19→19** (proves no reset — NEVER db push/reset). `full-schema.sql` regenerated via the script (no `--reset`, 2935 lines, `options jsonb` line 611). Live `test_111` integration suite **7 passed / 2 xpassed / 0 failures**. The phase is no longer in a false-positive (build-passes-without-apply) state. SUMMARY: `111-05-SUMMARY.md` (Self-Check: PASSED).
 - **111-04 (Wave 3, META-01/03/04) — EXECUTED 2026-06-15** (1 TDD task / 1 commit — `1ee00b60`): the surgical wiring that turns the Plan-02 engine ON for every real ingest. Hoisted `load_app_settings()` above the metadata extract; branched `ingest_document` on `metadata_enrichment_mode` (default-on `enriched` → dynamic model from `read_enabled_field_defs` + caller-owned `emit_document_metadata` tool + `sample_for_extraction` window + `asyncio.run(extract_metadata_enriched(...))` inside the sync BackgroundTask; `legacy` → untouched OpenAI `extract_metadata` path byte-identical); attached nested `_confidence` AFTER `model_dump(exclude_none=True)`; all three graceful-degradation layers preserved. Added `resolve_extraction_model` (env gpt-4o fallback, never `app_settings.llm_model`). **Found+fixed a genuine bug** in `test_111_flat_filter_compat` (double-`json.dumps` stored metadata as a JSON string scalar → flat `@>` object containment never matched) — fix proves **D-111-9** (a nested `_confidence` doesn't break flat top-level `metadata @>` matching, SC#3) live on :54322. `test_111_*` set 48 passed / 0 failures. Net-new failures = 0. SUMMARY: `111-04-SUMMARY.md` (Self-Check: PASSED).
