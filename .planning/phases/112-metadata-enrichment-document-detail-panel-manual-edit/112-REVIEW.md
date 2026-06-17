@@ -26,7 +26,8 @@ findings:
   warning: 4
   info: 5
   total: 10
-status: issues_found
+status: resolved
+resolution: "CR-01 + IN-05 + WR-04 + WR-02 + IN-01 + IN-02 fixed & verified 2026-06-18 (commits 7dfbd9b1, b82b3589, 2de3c1fd, 79a8f325, 8865a2b6). CR-01 premise confirmed: IN-05 regression test fails pre-fix / passes post-fix. Advisory carry-forwards (NOT fixed): WR-03 (PATCH custom-field value type-check), IN-03 (resize double-eval, cosmetic), IN-04 (pre-existing reingest console.error)."
 ---
 
 # Phase 112: Code Review Report
