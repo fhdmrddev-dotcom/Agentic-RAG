@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
 import { DocumentList } from "@/components/ingestion/DocumentList"
+import { DocumentDetailPanel } from "@/components/metadata/DocumentDetailPanel"
 import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
 import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
@@ -16,6 +17,15 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+  // Phase 112 (D-01): the open document for the right-side push/split detail panel.
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
+
+  // Resolve the selected doc from the live documents array so it tracks edits +
+  // re-fetches (loadDocuments reconcile). Falls back to closed if it disappears.
+  const selectedDoc = useMemo(
+    () => (selectedDocId === null ? null : documents.find((d) => d.id === selectedDocId) ?? null),
+    [selectedDocId, documents],
+  )
 
   // Derive selected folder name for upload label
   const selectedFolderName = useMemo(() => {
@@ -92,46 +102,69 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
             />
           </div>
 
-          {/* Right panel: Breadcrumb + Upload + Document List */}
-          <div className="flex-1 flex flex-col overflow-y-auto space-y-6">
-            {selectedFolderId === null && (
-              <div>
-                <h2 className="text-lg font-semibold">Root</h2>
-                <p className="text-sm text-muted-foreground">Documents not assigned to a folder</p>
-              </div>
-            )}
-            {selectedFolderId !== null && (
-              <>
-                <FolderBreadcrumb
-                  folders={folders}
-                  selectedFolderId={selectedFolderId}
-                  onSelectFolder={setSelectedFolderId}
-                />
-                {selectedFolder && (
-                  <FolderDetail
-                    folder={selectedFolder}
-                    documents={folderDocuments}
-                    subfolderCount={subfolderCount}
+          {/* Right region: push/split grid (D-01). The list shrinks but stays
+              visible (minmax(0,1fr)) while a fixed 430px detail-panel track mounts
+              when a document is selected. The panel owns its own mobile bottom-sheet
+              fallback (useIsMobile < 768) — on desktop only does the 430px track show. */}
+          <div
+            className="grid flex-1 min-h-0 min-w-0 gap-6"
+            style={{
+              gridTemplateColumns: selectedDoc ? "minmax(0,1fr) 430px" : "minmax(0,1fr)",
+            }}
+          >
+            {/* Document list column */}
+            <div className="flex flex-col overflow-y-auto space-y-6 min-w-0">
+              {selectedFolderId === null && (
+                <div>
+                  <h2 className="text-lg font-semibold">Root</h2>
+                  <p className="text-sm text-muted-foreground">Documents not assigned to a folder</p>
+                </div>
+              )}
+              {selectedFolderId !== null && (
+                <>
+                  <FolderBreadcrumb
+                    folders={folders}
+                    selectedFolderId={selectedFolderId}
+                    onSelectFolder={setSelectedFolderId}
                   />
-                )}
-              </>
-            )}
-            <DocumentUpload
-              onUpload={upload}
-              uploading={uploading}
-              uploadingCount={uploadingCount}
-              folderId={selectedFolderId}
-              folderName={selectedFolderName}
-              disabled={!canUploadToFolder}
-            />
+                  {selectedFolder && (
+                    <FolderDetail
+                      folder={selectedFolder}
+                      documents={folderDocuments}
+                      subfolderCount={subfolderCount}
+                    />
+                  )}
+                </>
+              )}
+              <DocumentUpload
+                onUpload={upload}
+                uploading={uploading}
+                uploadingCount={uploadingCount}
+                folderId={selectedFolderId}
+                folderName={selectedFolderName}
+                disabled={!canUploadToFolder}
+              />
 
-            <DocumentList
-              documents={documents}
-              onDelete={deleteDoc}
-              onRefresh={loadDocuments}
-              folderId={selectedFolderId}
-              currentUserId={user?.id ?? ""}
-            />
+              <DocumentList
+                documents={documents}
+                onDelete={deleteDoc}
+                onRefresh={loadDocuments}
+                folderId={selectedFolderId}
+                currentUserId={user?.id ?? ""}
+                onSelect={setSelectedDocId}
+                selectedDocId={selectedDocId}
+              />
+            </div>
+
+            {/* Detail panel track (desktop) — the panel renders a bottom-sheet on
+                mobile internally, so this track is only meaningful ≥768px. */}
+            {selectedDoc && (
+              <DocumentDetailPanel
+                doc={selectedDoc}
+                onClose={() => setSelectedDocId(null)}
+                onReconcile={loadDocuments}
+              />
+            )}
           </div>
         </div>
       </div>

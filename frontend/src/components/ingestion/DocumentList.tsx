@@ -13,7 +13,8 @@ import { DocumentStatusBadge } from "./DocumentStatusBadge"
 import { fetchDocumentVersions, restoreDocumentVersion, reingestDocument } from "@/lib/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFileIcon } from "@/lib/fileIcons"
-import type { Document, DocumentMetadata } from "@/types"
+import { cn } from "@/lib/utils"
+import type { Document } from "@/types"
 
 interface Props {
   documents: Document[]
@@ -21,6 +22,11 @@ interface Props {
   onRefresh: () => void
   folderId?: string | null
   currentUserId: string
+  /** Phase 112 (D-01): open the document detail panel. Inline metadata expand is
+   *  retired — the filename cell click opens the push/split panel instead. */
+  onSelect?: (id: string) => void
+  /** The currently open document (drives the selected-row affordance). */
+  selectedDocId?: string | null
 }
 
 function formatBytes(bytes: number): string {
@@ -29,61 +35,9 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function MetadataPanel({ metadata }: { metadata: DocumentMetadata }) {
-  return (
-    <div className="px-4 py-3 bg-muted/30 border-t text-xs space-y-1.5">
-      {metadata.title && (
-        <div>
-          <span className="font-medium text-muted-foreground">Title: </span>
-          {metadata.title}
-        </div>
-      )}
-      {metadata.author && (
-        <div>
-          <span className="font-medium text-muted-foreground">Author: </span>
-          {metadata.author}
-        </div>
-      )}
-      {metadata.date && (
-        <div>
-          <span className="font-medium text-muted-foreground">Date: </span>
-          {metadata.date}
-        </div>
-      )}
-      {metadata.document_type && (
-        <div>
-          <span className="font-medium text-muted-foreground">Type: </span>
-          {metadata.document_type}
-        </div>
-      )}
-      {metadata.language && (
-        <div>
-          <span className="font-medium text-muted-foreground">Language: </span>
-          {metadata.language}
-        </div>
-      )}
-      {metadata.topics && metadata.topics.length > 0 && (
-        <div className="flex flex-wrap gap-1 items-center">
-          <span className="font-medium text-muted-foreground">Topics: </span>
-          {metadata.topics.map((t) => (
-            <span
-              key={t}
-              className="rounded-full bg-primary/10 text-primary px-2 py-0.5"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-      {metadata.summary && (
-        <div>
-          <span className="font-medium text-muted-foreground">Summary: </span>
-          {metadata.summary}
-        </div>
-      )}
-    </div>
-  )
-}
+// Phase 112 Plan 04 (D-01): the inline `MetadataPanel` was RETIRED here — metadata
+// now lives in the one honest surface (DocumentDetailPanel, opened by a row click).
+// Version-history inline-expand stays (VersionHistoryPanel below).
 
 function VersionHistoryPanel({
   documentId,
@@ -226,7 +180,7 @@ function VersionHistoryPanel({
   )
 }
 
-export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId }: Props) {
+export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId, onSelect, selectedDocId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -303,11 +257,10 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
     )
   }
 
-  const hasMetadata = (doc: Document) =>
-    doc.status === "completed" && doc.metadata != null
-
+  // Phase 112 Plan 04 (D-01): the chevron now toggles VERSION HISTORY ONLY —
+  // metadata moved to the click-to-open DocumentDetailPanel (no longer drives expand).
   const hasVersions = (doc: Document) => (doc.version_number ?? 1) > 1
-  const isExpandable = (doc: Document) => hasMetadata(doc) || hasVersions(doc)
+  const isExpandable = (doc: Document) => hasVersions(doc)
 
   return (
     <>
@@ -328,14 +281,18 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
             {filtered.map((doc) => (
               <Fragment key={doc.id}>
                 <tr
-                  className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+                  data-selected={selectedDocId === doc.id || undefined}
+                  className={cn(
+                    "border-b last:border-0 hover:bg-muted/20 transition-colors",
+                    selectedDocId === doc.id && "bg-primary/5",
+                  )}
                 >
                   <td className="px-2 py-3">
                     {isExpandable(doc) && (
                       <button
                         onClick={() => toggle(doc.id)}
                         className="text-muted-foreground hover:text-foreground"
-                        aria-label={expanded.has(doc.id) ? "Collapse details" : "Expand details"}
+                        aria-label={expanded.has(doc.id) ? "Collapse version history" : "Expand version history"}
                       >
                         {expanded.has(doc.id)
                           ? <ChevronDown className="h-3.5 w-3.5" />
@@ -344,7 +301,14 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium max-w-xs truncate">
-                    <span className="flex items-center gap-1.5 flex-wrap">
+                    {/* Phase 112 (D-01): the filename cell opens the detail panel.
+                        Distinct from the chevron (version-history toggle) per RESEARCH Q4. */}
+                    <button
+                      type="button"
+                      onClick={() => onSelect?.(doc.id)}
+                      aria-pressed={selectedDocId === doc.id}
+                      className="flex items-center gap-1.5 flex-wrap text-left hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
+                    >
                       {doc.filename}
                       {(doc.version_number ?? 1) > 1 && (
                         <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
@@ -361,7 +325,7 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                           {doc.image_count} imgs
                         </span>
                       )}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3">{getFileIcon(doc.filename)}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
@@ -405,13 +369,6 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     </div>
                   </td>
                 </tr>
-                {hasMetadata(doc) && expanded.has(doc.id) && (
-                  <tr>
-                    <td colSpan={7} className="p-0">
-                      <MetadataPanel metadata={doc.metadata!} />
-                    </td>
-                  </tr>
-                )}
                 {hasVersions(doc) && expanded.has(doc.id) && (
                   <tr>
                     <td colSpan={7} className="p-0">
