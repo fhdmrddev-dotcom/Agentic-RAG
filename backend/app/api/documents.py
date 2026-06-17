@@ -19,7 +19,7 @@ from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
-from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
+from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
 from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -69,6 +69,22 @@ class ReextractRequest(BaseModel):
     """
 
     engine: Literal["pymupdf", "legacy"]
+
+
+class MetadataUpdateRequest(BaseModel):
+    """PATCH /documents/{id}/metadata body schema (Phase 112 META-05, D-03).
+
+    Single-field edit (D-03 contract). `value` is polymorphic — a built-in field
+    is a string/date/list[str] and a custom field follows its def's type
+    (string/date/number/boolean/enum) — so we accept any JSON value and let the
+    VALIDATED `field` (allow-list checked in the route) constrain the shape
+    (RESEARCH Open Question 1). The route NEVER reads a client-supplied `source`:
+    there is deliberately no `source` field here — provenance is server-stamped.
+    """
+
+    field: str
+    value: object | None = None
+
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -1328,6 +1344,101 @@ async def move_document(
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found")
+    return result.data[0]
+
+
+# The 7 immutable built-in metadata keys (mirrors models/metadata_field.py:17 /
+# embedding_service DocumentMetadata). A PATCH `field` must be one of these OR an
+# enabled custom field_key — and must NEVER start with '_' (provenance-forgery block).
+_METADATA_BUILTINS = {"title", "author", "date", "document_type", "topics", "language", "summary"}
+
+
+@router.patch("/{document_id}/metadata", response_model=DocumentResponse)
+async def update_document_metadata(
+    document_id: str,
+    body: MetadataUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 112 META-05 (D-03) — audited single-field metadata edit.
+
+    Persists one validated metadata field on a document the caller owns, hard-stamps
+    `_source[field]='user'` (the client may NEVER assert provenance), drops any stale
+    `_confidence[field]` (a human override has no model score), and writes a
+    `metadata.update` audit row. Owner-scoped on BOTH the SELECT and the UPDATE →
+    404 (never 403) on a non-owner miss (no existence leak), mirroring move_document.
+
+    Every `.execute()` is wrapped in `run_in_threadpool` (D-v2.5-01) — move_document's
+    raw `.execute()` predates that sweep and is deliberately NOT the threadpool template;
+    the reextract_document owner-SELECT (documents.py:1033) is.
+    """
+    # 1. Owner SELECT (404 on miss, no existence leak) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .eq("is_latest", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        # is_latest=False / no-row makes supabase-py raise on .maybe_single() rather than
+        # returning data=None — treat as 404 (matches reextract_document:1043-1049).
+        raise HTTPException(status_code=404, detail="Document not found")
+    # supabase-py .maybe_single().execute() on a no-row owner miss may return the whole
+    # response object as None (not an object with .data=None) — guard both shapes so a
+    # non-owner gets a clean 404, never an AttributeError 500 (no existence leak).
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Validate the field allow-list + reject any leading underscore (V5 input validation
+    #    + provenance-forgery block — a client must not write _source/_confidence directly).
+    field = body.field
+    if field.startswith("_"):
+        raise HTTPException(status_code=422, detail="Invalid metadata field")
+    enabled_custom = {
+        d["field_key"]
+        for d in await run_in_threadpool(
+            lambda: read_enabled_field_defs(supabase, current_user["id"])
+        )
+    }
+    if field not in _METADATA_BUILTINS and field not in enabled_custom:
+        raise HTTPException(status_code=422, detail="Unknown metadata field")
+
+    # 3. Merge into the existing metadata blob; hard-stamp _source='user'.
+    meta = doc.data.get("metadata") or {}
+    value = body.value
+    if field in ("document_type", "language") and isinstance(value, str):
+        # Mirror ingest_document:1457-1461 so user-edited values still match `@>` filters.
+        value = value.lower()
+    meta[field] = value
+    meta.setdefault("_source", {})[field] = "user"
+    # Phase 112 D-03: a user override carries NO model score — the chip renders neutral
+    # "Edited", never a fabricated number. Drop any stale _confidence entry for this field.
+    if isinstance(meta.get("_confidence"), dict):
+        meta["_confidence"].pop(field, None)
+
+    # 4. Owner-scoped UPDATE — threadpool-wrapped (D-v2.5-01).
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 5. Audit row (await inline; write_audit_entry swallows errors — the live round-trip
+    #    is the real verification). metadata.update is in VALID_ACTION_TYPES + live CHECK.
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type="metadata.update",
+        metadata={"document_id": document_id, "field": field},
+        supabase=supabase,
+    )
     return result.data[0]
 
 
