@@ -79,6 +79,56 @@ describe("InlineEdit (AC10) — honest inline metadata edit", () => {
     expect(restored).toHaveFocus()
   })
 
+  it("WR-04: blur WITHOUT Enter does NOT commit — clicking away abandons the draft", async () => {
+    const user = userEvent.setup()
+    const onCommit = vi.fn()
+    render(
+      <>
+        <InlineEdit
+          field="summary"
+          fieldType="summary"
+          value="Extracted summary"
+          onCommit={onCommit}
+        />
+        {/* A sibling focus target outside the control — like another row / the close button. */}
+        <button type="button">elsewhere</button>
+      </>,
+    )
+    await user.click(screen.getByRole("button", { name: /edit summary/i }))
+    const textarea = screen.getByRole("textbox", { name: /edit summary/i })
+    await user.clear(textarea)
+    await user.type(textarea, "half-typed replacement")
+    // Move focus away WITHOUT pressing Enter — an accidental click elsewhere.
+    await user.click(screen.getByRole("button", { name: /elsewhere/i }))
+
+    // The extracted value must NOT be overwritten — no commit, no audit row.
+    expect(onCommit).not.toHaveBeenCalled()
+    // Dropped back to display mode with the original value intact.
+    const restored = await screen.findByRole("button", { name: /edit summary/i })
+    expect(restored).toHaveTextContent("Extracted summary")
+  })
+
+  it("WR-04: Cmd/Ctrl+Enter on the summary Textarea commits exactly once", async () => {
+    const user = userEvent.setup()
+    const onCommit = vi.fn()
+    render(
+      <InlineEdit
+        field="summary"
+        fieldType="summary"
+        value="Old"
+        onCommit={onCommit}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /edit summary/i }))
+    const textarea = screen.getByRole("textbox", { name: /edit summary/i })
+    await user.clear(textarea)
+    await user.type(textarea, "New summary")
+    await user.keyboard("{Control>}{Enter}{/Control}")
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith("summary", "New summary")
+  })
+
   it("editing an empty/absent field adds a value (the 'Not extracted — add' path)", async () => {
     const user = userEvent.setup()
     const onCommit = vi.fn()

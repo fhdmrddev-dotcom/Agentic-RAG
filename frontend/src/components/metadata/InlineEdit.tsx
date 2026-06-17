@@ -4,9 +4,14 @@
  * Mirrors the FolderNode inline-rename pattern (ingestion/FolderNode.tsx:151-170):
  * the value is a real <button> trigger; click/Enter swaps it to a type-appropriate
  * control IN PLACE (no panel-wide edit mode, no bottom Save bar — sketch 028 winner A).
- * Enter commits if dirty; Esc cancels + restores focus to the trigger (useRef);
- * a guarded blur-commit only fires when the value changed AND Esc didn't fire AND
- * focus didn't move to an in-control affordance.
+ * Enter (single-line) / Cmd-Ctrl+Enter (summary) is the EXPLICIT commit path; Esc
+ * cancels + restores focus to the trigger (useRef).
+ *
+ * Blur does NOT commit a half-typed edit (WR-04 data-loss guard): a blur-commit
+ * only fires when the value changed AND Esc didn't fire AND the explicit Enter
+ * commit path was taken — clicking another field row or the close button (focus
+ * moving OUTSIDE the control via `e.relatedTarget`) abandons the in-progress draft
+ * without writing, so an accidental click can never destroy an extracted value.
  *
  * field_type → control mapping (LOCKED per RESEARCH Open Q1/Q2 + the plan):
  *   string | title | author → <Input> (h-8)
@@ -117,6 +122,10 @@ export function InlineEdit({
   const triggerRef = useRef<HTMLButtonElement>(null)
   // Set while Esc cancels so the control's onBlur doesn't ALSO commit.
   const cancelledRef = useRef(false)
+  // WR-04: set ONLY by the explicit Enter / Cmd-Ctrl+Enter path. A blur that did
+  // not follow an explicit Enter must NOT commit (an accidental click elsewhere
+  // would otherwise overwrite an extracted value + stamp _source='user').
+  const explicitCommitRef = useRef(false)
 
   const empty = isEmptyValue(value)
   const original = toEditString(value, fieldType)
@@ -124,15 +133,46 @@ export function InlineEdit({
   function startEditing() {
     setDraft(toEditString(value, fieldType))
     cancelledRef.current = false
+    explicitCommitRef.current = false
     setEditing(true)
   }
 
+  /** The shared write path: leave editing mode and fire onCommit when dirty.
+   *  Called by the explicit Enter path. Idempotent — the trailing blur an
+   *  explicit commit triggers (the control unmounts) is absorbed by clearing
+   *  the explicit flag here, so onCommit fires exactly once. */
   function commit() {
     if (cancelledRef.current) return
+    explicitCommitRef.current = false
     setEditing(false)
     // Only fire onCommit when the value actually changed (dirty guard).
     if (draft === original) return
     onCommit(field, fromEditString(draft, fieldType))
+  }
+
+  /** Explicit commit (Enter / Cmd-Ctrl+Enter). Marks the commit explicit so the
+   *  trailing blur it triggers is recognised as intentional, not accidental. */
+  function commitExplicit() {
+    explicitCommitRef.current = true
+    commit()
+  }
+
+  /** WR-04 focus-target guard. Blur fires when focus leaves the control. After an
+   *  explicit Enter, `commit()` has already cleared the explicit flag + left editing
+   *  mode, so this is a no-op. A blur the user caused by clicking another row / the
+   *  close button / outside (no Enter) must NOT commit — it abandons the in-progress
+   *  draft (no write, no audit row, the extracted value survives) and drops back to
+   *  display mode. Focus moving to an in-control affordance (relatedTarget still
+   *  inside this control) keeps editing. */
+  function handleBlur(e: React.FocusEvent<HTMLElement>) {
+    if (cancelledRef.current || explicitCommitRef.current) return
+    const next = e.relatedTarget as Node | null
+    if (next && e.currentTarget.contains(next)) {
+      // Focus stayed inside this control (an in-control affordance) — keep editing.
+      return
+    }
+    // Accidental blur to outside the control — abandon the draft, don't write.
+    setEditing(false)
   }
 
   function cancel() {
@@ -235,7 +275,7 @@ export function InlineEdit({
         aria-label={`Edit ${field}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={handleBlur}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.preventDefault()
@@ -243,7 +283,7 @@ export function InlineEdit({
           }
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault()
-            commit()
+            commitExplicit()
           }
         }}
         className="min-h-[60px] text-sm focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-offset-0"
@@ -262,11 +302,11 @@ export function InlineEdit({
       aria-label={`Edit ${field}`}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
+      onBlur={handleBlur}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault()
-          commit()
+          commitExplicit()
         }
         if (e.key === "Escape") {
           e.preventDefault()
