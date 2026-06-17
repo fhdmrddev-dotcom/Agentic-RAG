@@ -1571,6 +1571,45 @@ def ingest_document(
             if metadata_dict.get("language"):
                 metadata_dict["language"] = metadata_dict["language"].lower()
 
+        # Phase 112 D-03 (META-05) — re-extract precedence merge guard.
+        # Preserve any field a human marked _source='user' (via PATCH /documents/{id}/metadata,
+        # Plan 01) across re-extraction, so a later extraction never silently destroys an edit.
+        #
+        # Pitfall 1 (single write site): this guard MUST live here at the SINGLE
+        # ingest_document metadata-write site — NOT in a re-extract wrapper — so ALL THREE
+        # re-extract entry points inherit it: /upload + /reingest (-> _upload_pipeline ->
+        # ingest_document) and /reextract (-> background_tasks.add_task(ingest_document)).
+        # A wrapper-placed guard would pass a /reextract-only test while still destroying
+        # edits on /upload + /reingest. The guard reads the PRIOR doc's _source map (there
+        # is no request-scoped `body` in this function's scope — Pitfall 1 is self-enforced).
+        #
+        # Pitfall 2 (degrade): enriched extraction can degrade to metadata_dict=None; we
+        # promote None -> {} BEFORE the user-field loop so a degrade-with-prior-user-fields
+        # yields {user fields + _source}, never None (a degrade must NOT wipe a human edit).
+        #
+        # sync .execute() — already inside the BackgroundTask thread (this function is a
+        # sync def), so D-v2.5-01 (no blocking I/O in async handlers) does NOT fire here.
+        prior = (
+            supabase.table("documents").select("metadata")
+            .eq("id", document_id).maybe_single().execute()
+        )
+        prior_meta = (getattr(prior, "data", None) or {}).get("metadata") or {}
+        user_fields = prior_meta.get("_source") or {}  # {field: "user"}
+        if user_fields:
+            metadata_dict = metadata_dict or {}  # Pitfall 2: degrade None -> {} before the loop
+            preserved_source = metadata_dict.setdefault("_source", {})
+            for fld, src in user_fields.items():
+                if src != "user":
+                    continue
+                if fld in prior_meta:
+                    metadata_dict[fld] = prior_meta[fld]  # restore the human value
+                else:
+                    metadata_dict.pop(fld, None)          # human cleared it -> keep it cleared
+                preserved_source[fld] = "user"            # keep the marker
+                # a human override has no model score -> drop any fresh _confidence for it
+                if isinstance(metadata_dict.get("_confidence"), dict):
+                    metadata_dict["_confidence"].pop(fld, None)
+
         supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
         if not chunks:
