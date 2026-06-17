@@ -74,7 +74,12 @@ export const EMBEDDING_PRESETS: ProviderPreset[] = [
 export const EXTRACTION_PRESETS: ProviderPreset[] = [
   { key: "openai", label: "OpenAI · gpt-5.4-mini", base_url: "https://api.openai.com/v1", model: "gpt-5.4-mini", dims: 0, threshold: 0, local: false, keyNote: "uses your OpenAI key" },
   { key: "anthropic", label: "Anthropic · claude-sonnet-4-6", base_url: "https://api.anthropic.com/v1", model: "claude-sonnet-4-6", dims: 0, threshold: 0, local: false, keyNote: "uses your Anthropic key" },
-  { key: "google", label: "Google · gemini-3.5-flash", base_url: "https://generativelanguage.googleapis.com/v1beta/openai/", model: "gemini-3.5-flash", dims: 0, threshold: 0, local: false, keyNote: "uses your Google key" },
+  // verify-work 111.1 (2026-06-17): Google preset REMOVED for now — every Gemini model
+  // (2.5-flash/-pro/-lite, 3-flash-preview, 3.5-flash) returns `model_failed_to_emit` via
+  // the forced-emit path on BOTH the cross-provider OpenAI-compat route AND the native
+  // adapter (Gemini won't commit the forced tool call for the optional-heavy emit schema).
+  // Listing it would silently yield ZERO metadata — the exact trap 111.1 is closing. Still
+  // reachable via Custom. Re-add when the forced-emit / COERCE-fallback fix lands (SEED-088).
   { key: "ollama", label: "Ollama (local) · qwen3:8b", base_url: "http://localhost:11434/v1", model: "qwen3:8b", dims: 0, threshold: 0, local: true, dummyKey: "ollama", keyNote: "no key needed" },
   { key: "lmstudio", label: "LM Studio (local) · loaded GGUF model", base_url: "http://localhost:1234/v1", model: "gemma-4-12b-qat", dims: 0, threshold: 0, local: true, dummyKey: "lm-studio", keyNote: "no key needed" },
   { key: "custom", label: "Custom / OpenAI-compatible…", base_url: "", model: "", dims: 0, threshold: 0, local: false, keyNote: "set base URL + key below" },

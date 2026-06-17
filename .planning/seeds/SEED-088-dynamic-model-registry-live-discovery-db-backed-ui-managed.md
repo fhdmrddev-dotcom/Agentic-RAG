@@ -92,3 +92,63 @@ All pickers (chat, extraction, embedding) then read from this one source; revive
 ## Out of scope / guardrails
 - NOT the LLM call path itself (free-text model id → completion already works + degrades gracefully).
 - Fold into the pre-production comprehensive review the operator flagged.
+
+---
+
+## Addendum (2026-06-17): verify-work 111.1 extraction-probe findings — design inputs for dynamic pulling
+
+A live cross-provider metadata-extraction probe (the app's REAL `extract_metadata_enriched` →
+`forced_emit` path, scripts/_uat111_1/xprovider_extract.py, two workflow sweeps + adversarial
+verification, all failures reproduced live) surfaced concrete reasons the hardcoded picker
+defaults are insufficient and what dynamic pulling MUST account for. The picker
+(`EXTRACTION_PRESETS`) was trimmed to live-confirmed-working models pending this work.
+
+### Extraction scoreboard (forced-emit metadata path, single sample doc)
+
+| Provider | Model | Result | Cause |
+|---|---|---|---|
+| OpenAI | gpt-5.4-mini | ✅ full (7 fields) | TIER-FORCE + strict=False handled |
+| Anthropic | claude-sonnet-4-6 | ✅ full (7 fields) | native forced emit |
+| OpenRouter | deepseek/deepseek-chat | ✅ full (7 fields) | — |
+| Moonshot | moonshot-v1-8k, kimi-k2.6 | ✅ full (7 fields) | TIER-COERCE |
+| DeepSeek | deepseek-chat | ✅ full (7 fields) | TIER-COERCE |
+| Zhipu/GLM | glm-4.5 | ✅ full (6 fields) | TIER-FORCE works |
+| MiniMax | MiniMax-M2 | ⚠️ WEAK (n_fields=1, title+type null) | forced emit returns near-empty map |
+| Google | gemini-2.5-flash/-pro/-lite, 3-flash-preview, 3.5-flash | ❌ `model_failed_to_emit` | Gemini won't commit the forced tool call for the optional-heavy schema — on BOTH cross-provider OpenAI-compat AND native adapter paths |
+| DeepSeek | deepseek-v4-flash | ❌ `provider_error` (400 "Thinking mode does not support this tool_choice") | registry `forced_emission:True` routes a thinking model onto force_tool_name; emits cleanly in COERCE/auto |
+| Zhipu/GLM | glm-4.6 | ❌ `provider_error` (400 code 1210) | same: force_tool_name rejected; `tool_choice='auto'` emits a tool call cleanly |
+
+(All rows `raised=null` → metadata failure never breaks ingestion. `resolved_model == requested
+model` everywhere → the selected model IS honored after the extraction_model persistence fix.)
+
+### Design considerations the dynamic registry MUST handle (not just "list ids")
+
+1. **Validate ids against LIVE `/models`, never hardcode.** Picker defaults `glm-4.6`,
+   `deepseek-v4-flash`, `gemini-3.5-flash` were all in MODEL_CAPABILITIES yet failed live. A
+   registered id ≠ a working id.
+2. **`forced_emission` accuracy is a correctness bug, not cosmetics.** `deepseek-v4-flash` and
+   `glm-4.6` are marked `forced_emission:True` but their APIs **400 on the force_tool_name path**
+   (thinking-mode / param rejection) while emitting fine in COERCE/auto. This mis-route yields
+   ZERO metadata on EVERY extraction with those models — and also affects any other forced-emit
+   caller (judge, authoring). Dynamic pulling should derive/verify `forced_emission` per model
+   (probe once, store the result) and **fall back to COERCE when the force path 400s**, rather
+   than trusting a hardcoded flag. (Relates to project_cross_provider_native_tools_registry_trap.)
+3. **List ≠ extraction-capable.** Even a served, reachable mainstream model can fail to emit
+   (all Gemini models) or emit garbage (MiniMax-M2, 1 field). The registry/UI should carry a
+   per-model **"emit-capable" signal** (probe-derived), so the picker can show only models that
+   actually produce metadata — or warn on the weak ones.
+4. **Provider-down vs model-declined vs forcing-incompatible are THREE different states**
+   (`provider_error` thrown / `model_failed_to_emit` honest decline / 400-on-force). Collapsing
+   them to "no metadata" hides the cause (ties to SEED-090). The dynamic surface + the document
+   row badge should distinguish them so the operator knows whether to switch model, start a server,
+   or it's a forcing-config issue.
+5. **Google forced-emit needs a path fix before Google returns to the extraction picker** — either
+   a COERCE fallback for Gemini, or the native function-calling adapter for the emit schema.
+   Tracked here; Google omitted from `EXTRACTION_PRESETS` (2026-06-17) until fixed (still reachable
+   via Custom).
+
+### Immediate state (post-verify-work)
+- `EXTRACTION_PRESETS` now lists only live-confirmed-working cloud defaults (OpenAI gpt-5.4-mini,
+  Anthropic claude-sonnet-4-6) + the two local presets + Custom. Model field stays editable.
+- Native-7 (deepseek/moonshot/glm/minimax) + OpenRouter are reachable via Custom; their per-model
+  extraction status is the table above.
