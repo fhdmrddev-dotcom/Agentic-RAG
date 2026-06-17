@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-18T00:00:00.000Z"
-last_activity: 2026-06-18 — Phase 112 spec-phase + discuss-phase DONE (7 reqs locked, 8 decisions; SPEC + CONTEXT committed 7e0b3c89). NEXT = /gsd:plan-phase 112.
+last_updated: "2026-06-17T20:46:10.840Z"
+last_activity: "2026-06-18 — Phase 112 SPEC + CONTEXT committed (7e0b3c89); NEXT = /gsd:plan-phase 112"
 progress:
   total_phases: 11
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_plans: 17
+  completed_plans: 13
+  percent: 76
 ---
 
 # Project State
@@ -522,4 +522,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 111 (metadata-enrichment-extraction-backend) — 5 plans — 2026-06-15T17:12:49.975Z
+**Planned Phase:** 112 (metadata-enrichment-document-detail-panel-manual-edit) — 4 plans — 2026-06-17T20:46:10.826Z
