@@ -278,7 +278,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
       ) : (
         <main className="flex-1 overflow-hidden">
           {activeView === "documents" ? (
-            <IngestionPage />
+            <IngestionPage onNavigate={onNavigate} />
           ) : activeView === "skills" ? (
             <SkillsPage onTryInChat={handleTryInChat} />
           ) : activeView === "settings" ? (

@@ -4,12 +4,14 @@ import { DocumentList } from "@/components/ingestion/DocumentList"
 import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
 import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
+import { ReembedSearchPointer } from "@/components/settings/ReembedStatusCard"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
 import { useAuth } from "@/hooks/useAuth"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import type { ActiveView } from "@/App"
 
-export function IngestionPage() {
+export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
@@ -51,6 +53,27 @@ export function IngestionPage() {
           <p className="text-muted-foreground mt-1.5 text-sm">
             Upload documents to give the AI context for your conversations.
           </p>
+        </div>
+
+        {/* Phase 111.1 follow-up #1: the slim "search is catching up" pointer.
+            Self-fetches re-embed progress; auto-hides when remaining == 0. The
+            deep-link switches to Settings and scrolls the status card into view. */}
+        <div className="mb-4">
+          <ReembedSearchPointer
+            onViewProgress={
+              onNavigate
+                ? () => {
+                    onNavigate("settings")
+                    // Let the Settings view mount before scrolling its card in.
+                    setTimeout(() => {
+                      document
+                        .getElementById("reembed-status-card")
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                    }, 100)
+                  }
+                : undefined
+            }
+          />
         </div>
 
         <div className="flex flex-row gap-6 flex-1 min-h-0">
