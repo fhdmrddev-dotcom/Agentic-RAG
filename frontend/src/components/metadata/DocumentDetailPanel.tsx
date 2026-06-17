@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from "react"
 import { X, ShieldCheck } from "lucide-react"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "@/components/panel/PanelSection"
-import { ConfidenceChip } from "./ConfidenceChip"
+import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
 import { getFileIcon } from "@/lib/fileIcons"
@@ -74,10 +74,11 @@ const BUILTIN_FIELDS: FieldRow[] = [
 
 const BUILTIN_KEYS = new Set(BUILTIN_FIELDS.map((f) => f.key))
 
-/** The D-05 display tiers (mirror ConfidenceChip's hardcoded TIER). Used only to
- *  count LOW fields for the PanelSection warn badge + the tentative-value styling.
+/** The D-05 LOW/MED boundary, single-sourced from ConfidenceChip's TIER (IN-02).
+ *  Used only to count LOW fields for the PanelSection warn badge + the tentative-
+ *  value styling, so the warn count can never drift from the chip rendering.
  *  NOT the retrieval confidence_bucket (0.54/0.38) — a different system. */
-const LOW_TIER = 0.5
+const LOW_TIER = TIER.MED
 
 interface FieldState {
   row: FieldRow

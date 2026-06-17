@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.document import DocumentMoveRequest, DocumentResponse
+from app.models.document import DocumentMetadata, DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
@@ -1347,10 +1347,12 @@ async def move_document(
     return result.data[0]
 
 
-# The 7 immutable built-in metadata keys (mirrors models/metadata_field.py:17 /
-# embedding_service DocumentMetadata). A PATCH `field` must be one of these OR an
-# enabled custom field_key — and must NEVER start with '_' (provenance-forgery block).
-_METADATA_BUILTINS = {"title", "author", "date", "document_type", "topics", "language", "summary"}
+# The immutable built-in metadata keys. IN-01: single-sourced from DocumentMetadata
+# (under extra="allow", model_fields still returns ONLY the 7 declared built-ins, not
+# extras) so a future built-in addition can't drift this allow-list out of lockstep.
+# A PATCH `field` must be one of these OR an enabled custom field_key — and must
+# NEVER start with '_' (provenance-forgery block).
+_METADATA_BUILTINS = set(DocumentMetadata.model_fields)
 
 
 @router.patch("/{document_id}/metadata", response_model=DocumentResponse)

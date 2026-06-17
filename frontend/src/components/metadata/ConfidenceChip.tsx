@@ -33,7 +33,9 @@ export interface ConfidenceChipProps {
 // agent_loop.py — that is a different system (cosine similarity over retrieved
 // chunks). Do not conflate or import them here.
 // Tunable constants; re-verify against the live confidence distribution at UAT.
-const TIER = { HIGH: 0.75, MED: 0.5 } as const
+// IN-02: exported so DocumentDetailPanel's low-field warn count reads the SAME
+// threshold the chip renders by (no duplicated magic number that can drift).
+export const TIER = { HIGH: 0.75, MED: 0.5 } as const
 
 function tierFor(score: number): "high" | "med" | "low" {
   if (score >= TIER.HIGH) return "high"
