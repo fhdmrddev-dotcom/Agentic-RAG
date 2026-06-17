@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-17T20:46:10.840Z"
-last_activity: "2026-06-18 — Phase 112 SPEC + CONTEXT committed (7e0b3c89); NEXT = /gsd:plan-phase 112"
+last_updated: "2026-06-18T00:00:00.000Z"
+last_activity: "2026-06-18 — Phase 112 EXECUTING (4 plans / 3 waves; orchestrator owns STATE/ROADMAP writes — balloon guard)"
 progress:
   total_phases: 11
   completed_phases: 3
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-**Phase: 112 — Metadata Enrichment — Document Detail Panel + Manual Edit — SPEC + CONTEXT DONE 2026-06-18** — v3.0 Document Management (META-02, META-05). spec-phase: 7 falsifiable reqs, ambiguity 0.15 (gate passed, 1 boundary round). discuss-phase: 8 decisions (D-01 retire inline expand → right-side push/split panel on `IngestionPage`; D-02 parallel `_source` sub-key mirroring `_confidence`, `@>`/D-111-9 safe; D-03 single-field `PATCH /documents/{id}/metadata` + `metadata.update` audit + re-extract merge skips `source=user`; D-04 custom fields via `/metadata-fields` defs, control-by-type; D-05 display tiers **High≥0.75/Med≥0.50/Low<0.50** hardcoded — refined 0.80→0.75 from live bimodal data median 0.95, separate from retrieval `confidence_bucket_*`; D-06 **NO new migration**; D-07 no open Agentic-RAG bug folds in; D-08 SC#10 4-axis N/A — G-4 lived-UI + WCAG AA acceptance). G-2 sketches 027/028 satisfied. **NEXT = /gsd:plan-phase 112.**
+**Phase: 112 — Metadata Enrichment — Document Detail Panel + Manual Edit — EXECUTING 2026-06-18 (4 plans / 3 waves; W1 = 112-01 backend PATCH + 112-03 frontend foundation [parallel]; W2 = 112-02 re-extract merge guard; W3 = 112-04 document detail panel). Orchestrator owns STATE/ROADMAP writes (balloon guard — SDK begin-phase ballooned 525→1244 lines, repaired from clean HEAD eb996f7c). Worktrees ON.** — v3.0 Document Management (META-02, META-05). spec-phase: 7 falsifiable reqs, ambiguity 0.15 (gate passed, 1 boundary round). discuss-phase: 8 decisions (D-01 retire inline expand → right-side push/split panel on `IngestionPage`; D-02 parallel `_source` sub-key mirroring `_confidence`, `@>`/D-111-9 safe; D-03 single-field `PATCH /documents/{id}/metadata` + `metadata.update` audit + re-extract merge skips `source=user`; D-04 custom fields via `/metadata-fields` defs, control-by-type; D-05 display tiers **High≥0.75/Med≥0.50/Low<0.50** hardcoded — refined 0.80→0.75 from live bimodal data median 0.95, separate from retrieval `confidence_bucket_*`; D-06 **NO new migration**; D-07 no open Agentic-RAG bug folds in; D-08 SC#10 4-axis N/A — G-4 lived-UI + WCAG AA acceptance). G-2 sketches 027/028 satisfied. **NEXT = /gsd:plan-phase 112.**
 
 ---
 
