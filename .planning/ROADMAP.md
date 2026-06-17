@@ -33,7 +33,7 @@
 
 - [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ COMPLETE 2026-06-15 (2/2 plans; live-verified on :54322; gsd-verifier 7/7 PASSED; code review 0C/0W/3I — secure-phase pending)
 - [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
-- [ ] **Phase 111.1: Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)** — Embedding-provider picker + local presets + re-embed-on-change lifecycle; retires the OpenAI embedding SPOF (SEED-048). **(INSERTED · G-2 sketch)**
+- [x] **Phase 111.1: Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)** — Embedding-provider picker + local presets + re-embed-on-change lifecycle; retires the OpenAI embedding SPOF (SEED-048). ✅ COMPLETE 2026-06-17 — all 3 gates clear (verify-work 5/5 incl. post-restart cold-start smoke + secure verified 0-open + validate nyquist-compliant; live local-infra UAT). **(INSERTED · G-2 sketch)**
 - [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
 - [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
 - [ ] **Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar** — Typed/indexed date columns + relative-date operators; the view/filter builder UI; sidebar render-as-folder. **(G-2 sketch)**
@@ -197,7 +197,7 @@
 |-------|----------------|--------|-----------|
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
-| 111.1 Configurable / Multi-Provider Embeddings | 6/6 | 🔨 In Progress | 2026-06-17 |
+| 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
