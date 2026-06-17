@@ -1408,7 +1408,15 @@ async def update_document_metadata(
         raise HTTPException(status_code=422, detail="Unknown metadata field")
 
     # 3. Merge into the existing metadata blob; hard-stamp _source='user'.
-    meta = doc.data.get("metadata") or {}
+    # WR-02: defensive-copy the fetched blob (+ the nested _source/_confidence dicts
+    # we mutate) so the prior SELECT result stays pristine — a future refactor that
+    # re-reads doc.data["metadata"] for an audit diff must see the PRIOR value, not
+    # the post-merge state. Behavior is unchanged; this is purely defensive.
+    meta = dict(doc.data.get("metadata") or {})
+    if isinstance(meta.get("_source"), dict):
+        meta["_source"] = dict(meta["_source"])
+    if isinstance(meta.get("_confidence"), dict):
+        meta["_confidence"] = dict(meta["_confidence"])
     value = body.value
     if field in ("document_type", "language") and isinstance(value, str):
         # Mirror ingest_document:1457-1461 so user-edited values still match `@>` filters.
@@ -1593,8 +1601,11 @@ def ingest_document(
             supabase.table("documents").select("metadata")
             .eq("id", document_id).maybe_single().execute()
         )
-        prior_meta = (getattr(prior, "data", None) or {}).get("metadata") or {}
-        user_fields = prior_meta.get("_source") or {}  # {field: "user"}
+        # WR-02: defensive-copy the fetched prior blob (+ the nested _source dict we
+        # read) so the SELECT result stays pristine and restored values don't share a
+        # mutable reference with the prior object. Behavior unchanged; purely defensive.
+        prior_meta = dict((getattr(prior, "data", None) or {}).get("metadata") or {})
+        user_fields = dict(prior_meta.get("_source") or {})  # {field: "user"}
         if user_fields:
             metadata_dict = metadata_dict or {}  # Pitfall 2: degrade None -> {} before the loop
             preserved_source = metadata_dict.setdefault("_source", {})
