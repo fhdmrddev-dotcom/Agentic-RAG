@@ -31,7 +31,7 @@ This phase delivers META-02 (see per-field confidence) and META-05 (manually edi
 
 2. **Per-field ConfidenceChip (META-02)**: Each metadata value displays its per-field confidence as a chip that never relies on colour alone.
    - Current: `documents.metadata._confidence` is stored (Phase 111) but never displayed; no `ConfidenceChip` primitive exists.
-   - Target: A net-new `ConfidenceChip` (cloned from `StatusPill` anatomy) renders next to each value as **[glyph] + [tier WORD] + [· raw score]** — High `✓ High · 0.96`, Med `● Med · 0.63`, Low `⚠ Low · 0.41`; tiers are hardcoded constants **High ≥ 0.80 / Med ≥ 0.50 / Low < 0.50**; the score shown is the raw stored value, never rescaled to a percentage.
+   - Target: A net-new `ConfidenceChip` (cloned from `StatusPill` anatomy) renders next to each value as **[glyph] + [tier WORD] + [· raw score]** — High `✓ High · 0.96`, Med `● Med · 0.63`, Low `⚠ Low · 0.41`; tiers are hardcoded constants **High ≥ 0.75 / Med ≥ 0.50 / Low < 0.50**; the score shown is the raw stored value, never rescaled to a percentage.
    - Acceptance: A field with `_confidence = 0.41` shows "⚠ Low · 0.41" (glyph + word + raw score, not colour-only); a field at 0.96 shows "✓ High · 0.96"; no field displays a rescaled percentage.
 
 3. **Honest confidence states**: Confidence display never fabricates authority the model didn't earn.
@@ -68,7 +68,7 @@ This phase delivers META-02 (see per-field confidence) and META-05 (manually edi
 - **Honest inline edit** (click-to-edit, Enter/Esc/blur, "Saved · audit logged" receipt) for **both built-in and custom fields**.
 - A per-field **`source: user | extracted`** marker + **re-extract precedence** that preserves user edits.
 - **Editing an empty field = adding a value** (which then becomes a `source=user` override).
-- **Hardcoded display tier thresholds** (High ≥ 0.80 / Med ≥ 0.50 / Low < 0.50) as named constants.
+- **Hardcoded display tier thresholds** (High ≥ 0.75 / Med ≥ 0.50 / Low < 0.50) as named constants.
 - **UX-01** compliance (Deep Midnight / Aether, mobile bottom-sheet, WCAG 2.1 AA).
 
 **Out of scope:**
@@ -91,7 +91,7 @@ This phase delivers META-02 (see per-field confidence) and META-05 (manually edi
 ## Acceptance Criteria
 
 - [ ] Clicking a document opens a right-side detail panel with the document list still visible (desktop) / a bottom-sheet (mobile); the Metadata section renders inside a `PanelSection` accordion.
-- [ ] Each metadata value shows a `ConfidenceChip` with glyph + tier word + raw score (e.g. "⚠ Low · 0.41"), tiers High ≥ 0.80 / Med ≥ 0.50 / Low < 0.50, raw value (not a percentage).
+- [ ] Each metadata value shows a `ConfidenceChip` with glyph + tier word + raw score (e.g. "⚠ Low · 0.41"), tiers High ≥ 0.75 / Med ≥ 0.50 / Low < 0.50, raw value (not a percentage).
 - [ ] A manually-edited field shows a neutral "✎ Edited" chip (no score, no green); an unscored stored value shows "✦ Extracted" (not a fabricated "High"); an absent field shows "Not extracted — add".
 - [ ] A low-confidence value's text reads tentative (italic + dimmed + leading ⚠) and is distinguishable in greyscale.
 - [ ] `PATCH /documents/{id}/metadata` persists a single field edit into `documents.metadata` AND writes an `audit_log` row with `action_type='metadata.update'` — verified live against :54322.
@@ -122,7 +122,7 @@ Status: ✓ = met minimum, ⚠ = below minimum (planner treats as assumption)
 | 1     | Boundary Keeper | How much of the shared shell ships now?   | Metadata-only, shell-ready — no inert REL/CLASS/Versions stubs (honesty; 117/118 plug in later) [Claude recommendation, operator-delegated] |
 | 1     | Boundary Keeper | Protect manual edits from re-extraction?  | Yes — per-field `source: user\|extracted` marker + explicit re-extract precedence (operator-chosen) |
 | 1     | Boundary Keeper | Custom fields in display + edit, or built-ins only? | Built-in AND custom fields — META-01 is the point of v3.0 enrichment [Claude recommendation, operator-delegated] |
-| 1     | Boundary Keeper | Tier thresholds: settings-driven or hardcoded? | Hardcoded constants High ≥ 0.80 / Med ≥ 0.50 / Low < 0.50; raw score always shown; settings knob OUT [Claude decision] |
+| 1     | Boundary Keeper | Tier thresholds: settings-driven or hardcoded? | Hardcoded constants High ≥ 0.75 / Med ≥ 0.50 / Low < 0.50; raw score always shown; settings knob OUT [Claude decision] |
 
 ---
 
