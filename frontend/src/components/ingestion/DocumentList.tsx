@@ -41,12 +41,10 @@ function formatBytes(bytes: number): string {
 
 function VersionHistoryPanel({
   documentId,
-  currentVersionNumber,
   onRestored,
   currentUserId,
 }: {
   documentId: string
-  currentVersionNumber: number
   onRestored: () => void
   currentUserId: string
 }) {
@@ -374,7 +372,6 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     <td colSpan={7} className="p-0">
                       <VersionHistoryPanel
                         documentId={doc.id}
-                        currentVersionNumber={doc.version_number ?? 1}
                         onRestored={onRefresh}
                         currentUserId={currentUserId}
                       />
