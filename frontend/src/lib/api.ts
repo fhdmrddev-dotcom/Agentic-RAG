@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1987,6 +1987,33 @@ export async function reingestDocument(id: string): Promise<Document> {
   })
   if (!res.ok) throw new Error("Failed to reingest document")
   return res.json() as Promise<Document>
+}
+
+/** Phase 112 (META-02) — manual single-field metadata edit. Clones the
+ *  `moveDocument` PATCH shape. The body is `{ field, value }` ONLY — the client
+ *  MUST NOT send `source`: the server hard-stamps provenance (`_source='user'`)
+ *  so the client can never assert it (T-112-03-02). Returns the updated Document;
+ *  the panel reconciles by calling `loadDocuments()` after a 200. */
+export async function updateDocumentMetadata(id: string, field: string, value: unknown): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/metadata`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ field, value }),
+  })
+  if (!res.ok) throw new Error("Failed to update metadata")
+  return res.json() as Promise<Document>
+}
+
+/** Phase 112 (META-02) — the caller's own + global metadata field definitions.
+ *  Thin consumer of the already-secured `GET /metadata-fields` (own-or-global
+ *  scoping enforced server-side, T-112-03-03). The panel renders the union of
+ *  built-in fields + enabled custom defs. */
+export async function listMetadataFields(): Promise<MetadataFieldDef[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/metadata-fields`, { headers })
+  if (!res.ok) throw new Error("Failed to load metadata fields")
+  return res.json() as Promise<MetadataFieldDef[]>
 }
 
 // -- Feedback API functions ---------------------------------------------------

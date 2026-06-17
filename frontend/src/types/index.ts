@@ -195,6 +195,33 @@ export interface DocumentMetadata {
   topics?: string[]
   language?: string
   summary?: string
+  /** Phase 112 (META-02) — per-field confidence map from enriched extraction
+   *  (Phase 111 `attach_confidence` renames `confidence` -> `_confidence`).
+   *  DISPLAY-ONLY (never a flat `metadata_filter` dimension, D-111-3/9).
+   *  Values are raw 0.0–1.0; the ConfidenceChip maps them to D-05 display tiers. */
+  _confidence?: Record<string, number>
+  /** Phase 112 — per-field provenance. `"user"` = manually overridden (the panel
+   *  renders a neutral "Edited" chip — no score). Server hard-stamps this on PATCH
+   *  so the client can never assert its own provenance. */
+  _source?: Record<string, "user" | "extracted">
+  /** Custom (user-defined) field_keys read through. The panel renders the union of
+   *  built-ins + enabled custom defs (`MetadataFieldDef`), never raw keys. */
+  [key: string]: unknown
+}
+
+/** Phase 112 (META-02) — mirrors the backend `MetadataFieldResponse`
+ *  (backend/app/models/metadata_field.py). Custom field defs live in
+ *  `metadata_field_definitions`; `field_type` is a closed vocab, and `enum`
+ *  carries `options: string[]`. Listed via `listMetadataFields()`. */
+export interface MetadataFieldDef {
+  id: string
+  user_id?: string | null
+  field_key: string
+  field_type: "string" | "date" | "number" | "boolean" | "enum"
+  description?: string | null
+  options?: string[] | null
+  is_global: boolean
+  enabled: boolean
 }
 
 export interface Folder {
