@@ -232,3 +232,55 @@ Authored against `103-grounding/` (`BRIEF.md`, plus `022-RUN-SURFACE-AUDIT.md` a
 ## Downstream
 
 The design substrate for **Phase 103 (Workflows page + NL authoring; G-2 sketch FIRES)** and the surrounding Workflow Studio build. All 11 open IA decisions (OD-1..11) are ADOPTED 2026-06-14 ("publish is the test") — this is the locked contract, not open questions. Honest real-vs-net-new boundary preserved in every reference (only `GET /workflows/published` + `POST /workflows/{id}/publish` are live). Five new reference files packaged; the skill now spans 18 reference files across five sessions. G-2 acceptance bar met; next on the 103 path is the UI design contract / plan-phase. The skill auto-loads during build for the workflow Builder/authoring, the publish gauntlet, the Workflows page, the workflow run surface, and the app navigation/IA.
+
+---
+
+# Session 6 — Document Detail Panel & Metadata Editing (Phase 112)
+
+**Date:** 2026-06-17
+**Sketches processed:** 2 (027–028 — both included)
+**Design areas:** Document Detail Panel & Metadata Editing (one combined area — the shared detail shell + the confidence chip / inline edit)
+**Skill output:** appended to `./.claude/skills/sketch-findings-agentic-rag/` (new: `references/document-detail-panel.md`)
+
+## Included Sketches
+
+| # | Name | Winner | Design Area / Reference |
+|---|------|--------|-------------------------|
+| 027 | document-detail-shell | A — right-side push/split panel (shared META+REL+CLASS shell) | Document Detail Panel & Metadata Editing → `references/document-detail-panel.md` |
+| 028 | confidence-and-edit | A — trust-gutter + scored ConfidenceChip + honest inline edit | (same reference) |
+
+## Still Unprocessed (flagged — NOT in this session)
+
+| # | Name | Note |
+|---|------|------|
+| 024 | embedding-provider-picker | Phase 111.1 settings session — not yet wrapped into the skill |
+| 025 | reembed-confirm-gate | Phase 111.1 — not yet wrapped |
+| 026 | reembed-in-progress | Phase 111.1 — not yet wrapped |
+
+_Run `/gsd:sketch-wrap-up` again to package the Phase 111.1 settings session (024–026)._
+
+## Grounding
+
+028 was authored from a grounded **3-lens design workflow** (calm-Linear / honesty-forward / dense-triage → judged 86 / 88 / 82 → synthesized) and the grounding was **independently re-verified against the codebase** — which overturned three wrong "doesn't exist" claims (per-field `documents.metadata._confidence`, the `metadata.update` audit action, and the `/metadata-fields` router all DO exist, from Phase 111). The corrected real-vs-net-new contract + the full build spec are preserved at `sources/028-confidence-and-edit/GROUNDING.md`.
+
+## Design Direction
+
+**Calm instrument, extended to the document-management surface — and made honest about what the model knew.** v3.0 needs a first-class place to SEE the metadata Phase 111 extracts (each field + its per-field confidence) and to CORRECT it. The detail surface is a right-side push/split panel (same push-not-overlay philosophy as the workspace panel) that keeps the list visible for the scan→fix→next correction loop, organized as stacked-accordion sections so it is a SHARED SHELL later DM phases plug into. Per-field confidence reads as a chip that is legible without colour (glyph + tier word + score); honesty is load-bearing — model-confidence vs human-override provenance is unmistakable, empty fields read as genuinely absent, and the audit write is surfaced.
+
+## Key Decisions
+
+1. **Detail surface = a right-side push/split panel (027-A), the SHARED shell.** `minmax(0,1fr) 430px`; list shrinks but stays visible (the scan→fix→next loop). Stacked-accordion sections (004-B): Metadata · Relationships (117) · Classification (118) · Versions. **117 and 118 add their sections to THIS panel — reuse, don't rebuild.** Mobile bottom-sheet. Rejected: full-page view (interrupts the loop), modal (breaks push-not-overlay + cramps), inline-expand (too tight).
+
+2. **Per-field confidence = a `ConfidenceChip` (028-A): glyph + tier word + raw score, never colour-alone (WCAG 1.4.1).** Clone `StatusPill`, NOT the chat `ConfidenceBadge`. Trust-gutter spine for an at-a-glance read; low-confidence VALUES read tentative (italic + dim + ⚠). Tier thresholds settings-driven (the `0.54/0.38` are *retrieval* buckets — a different system).
+
+3. **Honesty is load-bearing.** Manual edit → NEUTRAL "✎ Edited" (no score, no green — a human owns it); unscored value → "✦ Extracted" (never a fabricated "High"); `exclude_none` empties → "Not extracted — add" (editing one ADDS a value); "🛡 Saved · audit logged" receipt (`metadata.update`, already allow-listed).
+
+4. **Inline edit = correction, not a form (FolderNode pattern).** Click value → in-place control; Enter saves, Esc cancels; "will become · Edited" preview. Triage = honesty banner + `PanelSection` warn-count + "Review low first" + "Jump to next". **Bulk-confirm deliberately CUT** (manufactures false provenance).
+
+5. **Honest net-new wire for the build.** The metadata-PATCH endpoint does NOT exist today (metadata is written only at ingest) — inline edit needs it net-new (the Phase 101/104 false-green class); plus a per-field `source: user|extracted` marker (re-extraction must not overwrite edits) and custom-field edit persistence. Everything else (per-field `_confidence`, `exclude_none`, the audit action, `/metadata-fields`) is already real.
+
+## Downstream — concrete next stages
+
+**Build Phase 112 (this surface):** `/gsd:spec-phase 112` → `/gsd:discuss-phase 112` (cross-check open `surface: Agentic-RAG` bugs; lock the per-field `source` marker + tier thresholds + the metadata-PATCH contract as the gray areas) → `/gsd:plan-phase 112` → `/gsd:execute-phase 112`. **G-2 (sketch-before-plan) is satisfied** by 027 + 028. UX-01 (Deep Midnight / mobile / WCAG AA) + UX-02 are cross-cutting acceptance.
+
+**Phases that INHERIT this shell (reuse, do not rebuild):** Phase 117 (relationship panel) and Phase 118 (classification suggestion) add accordion sections to THIS panel; Phase 119 (governance health) links its low-confidence-metadata signal back into the `ConfidenceChip`. The skill now spans 19 reference files across six sessions and auto-loads during build for the document detail panel, the `ConfidenceChip`, inline metadata editing, and the documents-page right-side panel.

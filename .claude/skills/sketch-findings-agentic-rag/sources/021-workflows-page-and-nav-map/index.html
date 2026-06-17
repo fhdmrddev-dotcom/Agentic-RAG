@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 021 — Workflows Page + Nav/Redirect Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 021 — Workflows Page + Nav/Redirect Map (EXTENDS 012)
+   Q: What is the Workflows page — a project-filtered library of
+      DRAFTS + PUBLISHED with CRUD, a strictness-tier badge per card,
+      a Run→thread handoff, and an explicit tweak→NEW VERSION path
+      that never edits a frozen published row — plus a clear nav/
+      redirect map of where every action lands?
+
+   HONESTY (load-bearing, encoded as UI badges):
+     • Backend today = ONLY  GET /workflows/published  (owner-scoped,
+       optional project_folder_id) +  POST /workflows/{id}/publish.
+       Draft create/list/update/single-GET/unpublish are NET-NEW → the
+       "net-new" badge sits on every draft-CRUD surface.
+     • Strictness tier = REAL vocab only: STRICT (all gates +
+       citation_policy strict) / MIDDLE (presence + structure_check +
+       citation_policy flag) / LOOSE (judge-only / no per-phase gate +
+       citation_policy draft). No level 1/2/3, no "compliance-mode".
+     • Run hands off INTO a chat thread (workflows = a MODE of a thread,
+       never page-resident). Execution never runs on the page.
+     • Tweak a PUBLISHED workflow = FORK a new draft version (per-version
+       immutability) — never an in-place edit of the frozen row.
+     • "Workflows" nav entry is NET-NEW (no ActiveView 'workflows').
+   ─────────────────────────────────────────────────────────────── */
+
+body { padding-top: 52px; }
+.shell { display: grid; grid-template-columns: 220px 1fr; height: calc(100vh - 52px); overflow: hidden; }
+.shell.in-thread { grid-template-columns: 52px 1fr clamp(320px,32%,420px); }
+
+/* full nav (page mode) */
+.nav { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); padding: var(--space-3); display: flex; flex-direction: column; gap: 2px; }
+.nav .logo { width: 32px; height: 32px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin: 0 0 var(--space-4) var(--space-2); }
+.nav-item { display: flex; align-items: center; gap: var(--space-3); padding: 9px var(--space-3); border-radius: var(--radius-md); color: var(--color-text-muted); font-size: var(--text-sm); cursor: pointer; position: relative; }
+.nav-item:hover { background: var(--color-accent); color: var(--color-text); }
+.nav-item.active { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; }
+.nav-item .ic { width: 18px; text-align: center; }
+.nav-item .netnew { position:absolute; right:8px; font-family:var(--font-mono); font-size:7.5px; font-weight:600; letter-spacing:.04em; padding:1px 5px; border-radius:var(--radius-full); background:hsl(258 90% 66% / .18); color:var(--color-accent-violet); border:1px solid hsl(258 90% 66% / .4); }
+/* collapsed rail (thread mode) */
+.rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.rail .rico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); }
+.rail .rico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+/* page */
+.page { overflow-y: auto; padding: var(--space-8) var(--space-10) 72px; }
+.page-head { display: flex; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-2); }
+.page-head h1 { font-family: var(--font-headline); font-size: var(--text-2xl); margin: 0; }
+.page-head .sub { color: var(--color-text-dim); font-size: var(--text-sm); flex: 1; }
+.build-new { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); padding: 8px var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border: none; cursor: pointer; font-weight: 600; transition: filter var(--dur-fast); }
+.build-new:hover { filter: brightness(1.08); }
+.mapbtn { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-sm); padding:8px var(--space-3); border-radius:var(--radius-md); background:transparent; color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; transition:all var(--dur-fast); }
+.mapbtn:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.mapbtn.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+
+/* ── project filter rail (A) + inline filter (B/C) ── */
+.proj-rail { display:flex; flex-direction:column; gap:2px; }
+.proj-rail .pr-label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); font-family:var(--font-mono); margin:0 0 var(--space-2) var(--space-2); }
+.proj-item { display:flex; align-items:center; gap:var(--space-2); padding:7px var(--space-3); border-radius:var(--radius-md); cursor:pointer; font-size:12.5px; color:var(--color-text-muted); border:1px solid transparent; transition:all var(--dur-fast); }
+.proj-item:hover { background:var(--color-accent); color:var(--color-text); }
+.proj-item.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.proj-item .pi-ico { width:16px; text-align:center; opacity:.85; }
+.proj-item .pi-n { flex:1; }
+.proj-item .pi-c { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); }
+.proj-item.on .pi-c { color:var(--color-primary); }
+/* inline project chip-strip (B/C) — delivers the line-64 promise so B/C answer
+   the 'project-filtered' clause on their own, not by inheriting A's rail */
+.proj-chips { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:var(--space-4) 0 var(--space-2); }
+.proj-chips .pc-label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); font-family:var(--font-mono); margin-right:2px; }
+.proj-chip { display:inline-flex; align-items:center; gap:6px; padding:5px var(--space-3); border-radius:var(--radius-full); cursor:pointer; font-size:12px; color:var(--color-text-muted); border:1px solid var(--color-border); background:transparent; transition:all var(--dur-fast); }
+.proj-chip:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.proj-chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.proj-chip .pc-ico { opacity:.85; }
+.proj-chip .pc-c { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); }
+.proj-chip.on .pc-c { color:var(--color-primary); }
+
+/* section labels + shelf toggle */
+.section-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--color-text-dim); margin: var(--space-6) 0 var(--space-3); font-family: var(--font-mono); display:flex; align-items:center; gap:var(--space-2); }
+.section-label .sl-count { color:var(--color-text-muted); }
+.shelf-toggle { display:inline-flex; gap:0; border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; }
+.shelf-toggle button { background:transparent; color:var(--color-text-dim); border:none; padding:6px var(--space-3); font-size:var(--text-xs); cursor:pointer; font-family:inherit; transition:all var(--dur-fast); }
+.shelf-toggle button.on { background:var(--color-primary-dim); color:var(--color-primary); }
+.shelf-toggle button:not(.on):hover { color:var(--color-text); }
+
+/* search + filter toolbar (collapsible — calm default) */
+.wf-toolbar { display:flex; align-items:center; gap:var(--space-3); margin:var(--space-4) 0; }
+.wf-search { flex:0 1 360px; display:flex; align-items:center; gap:var(--space-2); background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:8px var(--space-3); transition:border-color var(--dur-fast); }
+.wf-search:focus-within { border-color:var(--color-primary-glow); }
+.wf-search input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-family:inherit; font-size:var(--text-sm); }
+.wf-search input::placeholder { color:var(--color-text-dim); }
+.wf-filters { display:flex; gap:4px; }
+.wf-filter { font-size:var(--text-xs); padding:6px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.wf-filter:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.wf-filter.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.search-collapse { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-xs); padding:6px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.search-collapse:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+
+/* ── workflow card (A) ── */
+.wf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
+.wf-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); transition: all var(--dur-fast) var(--ease-out); cursor:default; }
+.wf-card:hover { border-color: var(--color-primary-glow); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.wf-card.is-draft { border-style:dashed; }
+.wf-card .wf-top { display: flex; align-items: flex-start; gap: var(--space-3); }
+.wf-icon { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center; font-size: 16px; flex-shrink: 0; background: var(--color-primary-dim); color: var(--color-primary); }
+.wf-card .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.wf-card .wf-ver { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-left:6px; }
+.wf-card .wf-purpose { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.5; }
+.wf-tags { display: flex; gap: 5px; align-items: center; flex-wrap:wrap; }
+
+/* source tag */
+.scope-tag { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-full); border: 1px solid var(--color-border-soft); color: var(--color-text-dim); }
+.scope-tag.seed { color: var(--color-success); border-color: hsl(142 71% 45% / .4); }
+.scope-tag.draft { color: var(--color-warning); border-color: hsl(38 92% 60% / .4); }
+.scope-tag.published { color: var(--color-primary); border-color: var(--color-primary-glow); }
+.scope-tag.shared { color: var(--color-accent-violet); border-color: hsl(258 90% 66% / .4); }
+
+/* ── strictness-tier badge (REAL vocab only — glyph + label + token = non-color-alone) ── */
+.tier { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:600; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.05em; padding:2px 8px; border-radius:var(--radius-full); border:1px solid; cursor:help; }
+.tier .tg { font-size:10px; }
+.tier.strict { color:var(--color-warning); background:var(--color-warning-dim); border-color:hsl(38 92% 60% / .45); }
+.tier.middle { color:var(--color-accent-violet); background:hsl(258 90% 66% / .12); border-color:hsl(258 90% 66% / .45); }
+.tier.loose  { color:var(--color-text-muted); background:var(--color-muted); border-color:var(--color-border); }
+
+/* phase chain (mini) — 6 REAL phase types */
+.chain { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.chain .ph { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--color-muted); border: 1px solid var(--color-border-soft); font-size: 11px; }
+.chain .ph .pg { font-size:11px; }
+.chain .ph .pt { font-family: var(--font-mono); font-size: 8.5px; color: var(--color-text-dim); text-transform: uppercase; }
+.chain .arrow { color: var(--color-text-dim); font-size: 10px; }
+.chain .ph.t-prog   { border-left: 2px solid var(--color-text-dim); }
+.chain .ph.t-single { border-left: 2px solid var(--color-primary); }
+.chain .ph.t-agent  { border-left: 2px solid var(--color-success); }
+.chain .ph.t-batch  { border-left: 2px solid var(--color-accent-violet); }
+.chain .ph.t-human  { border-left: 2px solid var(--color-warning); }
+.chain .ph.t-emit   { border-left: 2px solid var(--color-primary); background:hsl(239 100% 82% / .07); }
+.chain .ph.t-emit .pg { color:var(--color-primary); }
+.tool-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.tool-chip { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-muted); border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm); }
+
+.wf-foot { display: flex; align-items: center; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); border-top: 1px solid var(--color-border-soft); }
+.wf-input-hint { flex: 1; font-size: 11px; color: var(--color-text-dim); }
+.wf-input-hint .mono { font-family: var(--font-mono); color: var(--color-text-muted); }
+.run-btn { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 600; padding: 7px var(--space-4); border-radius: var(--radius-md); background: var(--color-warning); color: hsl(240 60% 8%); border: none; cursor: pointer; transition: filter var(--dur-fast); }
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn.ghost { background:transparent; color:var(--color-warning); border:1px solid hsl(38 92% 60% / .4); }
+.view-btn { font-size: var(--text-sm); padding: 7px var(--space-3); border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border); cursor: pointer; transition:all var(--dur-fast); }
+.view-btn:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.icon-btn { font-size:13px; padding:6px 9px; border-radius:var(--radius-md); background:transparent; color:var(--color-text-dim); border:1px solid var(--color-border); cursor:pointer; transition:all var(--dur-fast); }
+.icon-btn:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.icon-btn.danger:hover { border-color:hsl(0 72% 51% / .5); color:var(--color-danger); }
+
+/* draft-shelf build-card */
+.build-card { border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: transparent; padding: var(--space-4); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); text-align: center; min-height: 168px; cursor:pointer; transition:all var(--dur-fast); }
+.build-card:hover { border-color:var(--color-primary-glow); background:var(--color-primary-dim); }
+.build-card .bc-icon { font-size: 22px; color: var(--color-primary); }
+.build-card .bc-title { font-weight: 600; font-size: var(--text-sm); }
+.build-card .bc-sub { font-size: 11px; color: var(--color-text-dim); }
+.v29-pill { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-full); background: hsl(258 90% 66% / .18); color: var(--color-accent-violet); border:1px solid hsl(258 90% 66% / .4); }
+
+/* net-new badge — flags surfaces with no live endpoint */
+.nn { font-family:var(--font-mono); font-size:8px; font-weight:600; letter-spacing:.04em; padding:1px 5px; border-radius:var(--radius-full); background:hsl(258 90% 66% / .15); color:var(--color-accent-violet); border:1px solid hsl(258 90% 66% / .35); cursor:help; }
+.live-badge { font-family:var(--font-mono); font-size:8px; font-weight:600; padding:1px 5px; border-radius:var(--radius-full); background:var(--color-success-dim); color:var(--color-success); border:1px solid hsl(142 71% 45% / .35); cursor:help; }
+
+/* ── master-detail (B) ── */
+.md-grid { display: grid; grid-template-columns: 280px 1fr; gap: var(--space-5); margin-top: var(--space-3); }
+.md-list { display: flex; flex-direction: column; gap: 2px; }
+.md-shelf-h { font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); font-family:var(--font-mono); margin:var(--space-3) 0 4px; }
+.md-item { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); cursor: pointer; border: 1px solid transparent; transition:all var(--dur-fast); }
+.md-item:hover { background: var(--color-surface); }
+.md-item.active { background: var(--color-surface); border-color: var(--color-primary-glow); }
+.md-item .md-ico { width:24px; height:24px; border-radius:var(--radius-sm); display:grid; place-items:center; font-size:12px; background:var(--color-primary-dim); color:var(--color-primary); flex-shrink:0; }
+.md-item .md-name { font-weight: 500; font-size: 12.5px; flex:1; }
+.md-detail { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-5); }
+.md-detail.readonly { border-color:var(--color-primary-glow); }
+.dt-top { display:flex; align-items:flex-start; gap:var(--space-3); }
+.md-detail .dt-name { font-family: var(--font-headline); font-size: var(--text-lg); }
+.md-detail .dt-purpose { font-size: var(--text-sm); color: var(--color-text-muted); margin: 4px 0 var(--space-4); }
+.dt-section { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); margin: var(--space-4) 0 var(--space-2); font-family: var(--font-mono); }
+.ro-banner { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3); border-radius:var(--radius-md); background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); font-size:12px; color:var(--color-text); margin-bottom:var(--space-4); }
+.ro-banner .lk { color:var(--color-primary); }
+.gate-list { display:flex; flex-direction:column; gap:6px; }
+.gate-row { display:flex; align-items:center; gap:var(--space-2); font-size:12px; padding:6px var(--space-3); border-radius:var(--radius-sm); background:var(--color-muted); border:1px solid var(--color-border-soft); }
+.gate-row .gk { font-family:var(--font-mono); font-size:10px; color:var(--color-text); }
+.gate-row .gv { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); margin-left:auto; }
+.gate-row.on .gx { color:var(--color-success); }
+.gate-row .gx { color:var(--color-text-dim); }
+/* version history */
+.ver-list { display:flex; flex-direction:column; gap:4px; }
+.ver-row { display:flex; align-items:center; gap:var(--space-2); padding:7px var(--space-3); border-radius:var(--radius-sm); font-size:12px; border:1px solid var(--color-border-soft); }
+.ver-row.cur { border-color:var(--color-primary-glow); background:var(--color-primary-dim); }
+.ver-row .vn { font-family:var(--font-mono); font-weight:600; }
+.ver-row .vmeta { color:var(--color-text-dim); font-size:11px; flex:1; }
+.ver-row .vtag { font-family:var(--font-mono); font-size:9px; padding:1px 6px; border-radius:var(--radius-full); }
+.ver-row .vtag.frozen { color:var(--color-success); border:1px solid hsl(142 71% 45% / .35); }
+.ver-row .vtag.superseded { color:var(--color-text-dim); border:1px solid var(--color-border); }
+.dt-actions { display:flex; gap:var(--space-2); margin-top:var(--space-5); align-items:center; }
+
+/* ── compact list (C) — SkillsPage-style vertical rows ── */
+.cl-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-row { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow: hidden; transition:border-color var(--dur-fast); }
+.cl-row:hover { border-color: var(--color-primary-glow); }
+.cl-row.is-draft { border-style:dashed; }
+.cl-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; }
+.cl-head:hover { background: var(--color-surface-hi); }
+.cl-head .cl-ico { width:30px; height:30px; border-radius:var(--radius-md); display:grid; place-items:center; font-size:14px; background:var(--color-primary-dim); color:var(--color-primary); flex-shrink:0; }
+.cl-head .cl-name { font-weight: 600; font-size: var(--text-sm); white-space:nowrap; }
+.cl-head .cl-ver { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.cl-head .cl-purpose { color: var(--color-text-dim); font-size: 12px; flex: 1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cl-head .caret { color: var(--color-text-dim); transition: transform var(--dur-fast); }
+.cl-row.open .caret { transform: rotate(90deg); }
+.cl-body { display: none; padding: 0 var(--space-4) var(--space-4) 62px; flex-direction: column; gap: var(--space-3); }
+.cl-row.open .cl-body { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.cl-meta { display:flex; align-items:center; gap:var(--space-3); font-size:11px; color:var(--color-text-dim); flex-wrap:wrap; }
+
+/* ── launch modal (Run → thread handoff) ── */
+.modal-backdrop { position: fixed; inset: 0; z-index: 9000; background: rgba(3,5,12,.66); backdrop-filter: blur(3px); display: none; place-items: center; padding: var(--space-6); }
+.modal-backdrop.open { display: grid; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.modal { width: min(560px, 92%); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; }
+.modal-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
+.modal-head .wf-icon { width:32px; height:32px; font-size:15px; }
+.modal-head .mh-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); flex: 1; }
+.modal-head .close { cursor: pointer; color: var(--color-text-dim); padding: 4px 8px; border-radius: 6px; }
+.modal-head .close:hover { background:var(--color-muted); color:var(--color-text); }
+.modal-body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.field-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 5px; display: block; }
+.field-label .req { color: var(--color-warning); }
+.field-input { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: vertical; transition:border-color var(--dur-fast); }
+.field-input:focus { outline:none; border-color:var(--color-primary-glow); }
+.field-select { display: flex; align-items: center; gap: var(--space-2); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
+.field-select .bound { font-family:var(--font-mono); font-size:9px; color:var(--color-success); margin-left:auto; }
+.modal-foot { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border-top: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+.modal-foot .hint { flex: 1; font-size: 11px; color: var(--color-text-dim); }
+
+/* ── tweak → new-version confirm modal ── */
+.tweak-flow { display:flex; flex-direction:column; gap:var(--space-3); }
+.tweak-diff { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4); border-radius:var(--radius-md); background:var(--color-bg); border:1px solid var(--color-border); }
+.tweak-diff .tv { text-align:center; }
+.tweak-diff .tv .vlabel { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); text-transform:uppercase; letter-spacing:.05em; }
+.tweak-diff .tv .vbig { font-family:var(--font-headline); font-size:var(--text-2xl); }
+.tweak-diff .frozen-v .vbig { color:var(--color-success); }
+.tweak-diff .new-v .vbig { color:var(--color-warning); }
+.tweak-diff .tarrow { font-size:20px; color:var(--color-primary); }
+.tweak-note { font-size:12px; color:var(--color-text-muted); line-height:1.55; padding:var(--space-3); border-radius:var(--radius-md); background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); }
+.tweak-note b { color:var(--color-text); }
+
+/* ── redirect toast ── */
+.redirect-toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 9500; background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / .4); color: var(--color-success); padding: 8px var(--space-4); border-radius: var(--radius-full); font-size: var(--text-sm); box-shadow: var(--shadow-md); display: none; }
+.redirect-toast.show { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+/* ── in-thread view (Run landed) — reuses 008-D + 009-C + 011-A ── */
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow-y: auto; }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; margin-bottom: var(--space-4); }
+.bubble-user { align-self: flex-end; max-width: 78%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); }
+.livestatus { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border:1px solid hsl(38 92% 60% / .35); background:var(--color-warning-dim); border-radius:var(--radius-md); max-width:92%; cursor:pointer; margin-top:var(--space-4); }
+.livestatus .ls-spark { width:8px; height:8px; border-radius:50%; background:var(--color-warning); animation:dotBounce 1.2s infinite; flex-shrink:0; }
+.livestatus .ls-text { flex:1; font-size:var(--text-sm); color:var(--color-text); }
+.livestatus .ls-text .mono { color:var(--color-text-muted); font-size:var(--text-xs); }
+.livestatus .ls-open { font-size:var(--text-xs); color:var(--color-primary); }
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .pd { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: pulseGlow 1.6s infinite; }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .mode-tag { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); padding: 2px 7px; border-radius: var(--radius-full); margin-left: auto; }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); }
+.thread-banner { display:flex; flex-direction:column; gap:4px; padding-bottom:var(--space-3); margin-bottom:var(--space-3); border-bottom:1px solid var(--color-border-soft); }
+.thread-banner .wf-row { display:flex; align-items:center; gap:var(--space-2); }
+.tb-badge { font-family:var(--font-mono); font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; padding:2px 7px; border-radius:var(--radius-full); color:var(--color-warning); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); }
+.tb-name { font-family:var(--font-headline); font-weight:600; font-size:var(--text-md); }
+.tb-meta { font-size:var(--text-xs); color:var(--color-text-dim); }
+.tb-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+.tb-chip { font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:var(--radius-full); background:var(--color-muted); color:var(--color-text-muted); border:1px solid var(--color-border-soft); }
+.st-ico2 { width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700; font-family:var(--font-mono); }
+.si-done { background:var(--color-success-dim); color:var(--color-success); border:1.5px solid var(--color-success); }
+.si-run { background:var(--color-warning-dim); color:var(--color-warning); border:1.5px solid var(--color-warning); animation:pulseGlow 1.4s infinite; }
+.si-lock { color:var(--color-text-dim); border:1.5px dashed var(--color-text-dim); }
+.spine { list-style:none; margin:0; padding:0; }
+.spine > li { position:relative; padding-left:32px; padding-bottom:12px; }
+.spine > li:last-child { padding-bottom:0; }
+.spine > li::before { content:''; position:absolute; left:11px; transform:translateX(-1px); top:24px; bottom:-14px; width:2px; z-index:0; background:var(--color-border); }
+.spine > li:last-child::before { display:none; }
+.spine > li.s-done::before { background:var(--color-success); }
+.spine > li.s-run::before { background:linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.sp-node { position:absolute; left:1px; top:7px; width:20px; height:20px; z-index:2; display:grid; place-items:center; border-radius:50%; background:hsl(220 40% 8%); }
+.sp-card { border-radius:var(--radius-lg); border:1px solid var(--color-border); background:var(--color-surface); overflow:hidden; }
+.sp-card.run { border-color:hsl(38 92% 60% / .5); box-shadow:0 0 22px hsl(38 92% 60% / .12); }
+.sp-card.locked { background:transparent; border:1px dashed var(--color-border); opacity:.72; }
+.sp-card-head { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3); }
+.sp-card-head .spc-name { font-weight:600; font-size:var(--text-sm); flex:1; }
+.sp-card-head .spc-name.dim { color:var(--color-text-dim); font-weight:500; }
+.sp-card-head .spc-sum { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.ttag { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); background:var(--color-secondary); padding:1px 5px; border-radius:var(--radius-sm); text-transform:uppercase; }
+.reuse-note { font-size:10px; color:var(--color-text-dim); margin-top:var(--space-3); padding-top:var(--space-2); border-top:1px dashed var(--color-border-soft); line-height:1.5; }
+.reuse-note b { color:var(--color-primary); }
+.tcomposer { border-top:1px solid var(--color-border); background:var(--color-bg-elev1); padding:var(--space-3) var(--space-4) var(--space-4); }
+.t-runchip { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); margin-bottom:var(--space-2); border-radius:var(--radius-md); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); font-size:var(--text-sm); }
+.t-runchip .rc-name { color:var(--color-text); font-weight:500; }
+.t-runchip .rc-phase { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.t-runchip .sp { flex:1; }
+.t-runchip .cancel { font-size:var(--text-xs); color:var(--color-danger); cursor:pointer; padding:3px 8px; border-radius:var(--radius-sm); border:1px solid hsl(0 72% 51% / .35); }
+.t-ta { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:var(--space-3); opacity:.62; }
+.t-ta .ta-ph { color:var(--color-text-dim); font-size:var(--text-sm); }
+.t-pills { display:flex; gap:var(--space-2); margin-top:var(--space-3); }
+.t-pill { font-size:var(--text-xs); padding:5px var(--space-3); border-radius:var(--radius-full); border:1px solid var(--color-border); background:var(--color-bg-elev1); color:var(--color-text-dim); }
+
+/* ── NAV / REDIRECT MAP overlay (the operator-requested surface) ── */
+.map-overlay { position:fixed; inset:0; z-index:9200; background:rgba(3,5,12,.78); backdrop-filter:blur(4px); display:none; padding:var(--space-8); overflow-y:auto; }
+.map-overlay.open { display:block; animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.map-panel { max-width:1040px; margin:0 auto; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-xl); box-shadow:var(--shadow-lg); overflow:hidden; }
+.map-head { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-5) var(--space-6); border-bottom:1px solid var(--color-border); }
+.map-head h2 { font-family:var(--font-headline); font-size:var(--text-xl); margin:0; flex:1; }
+.map-head .mh-sub { font-size:12px; color:var(--color-text-dim); }
+.map-head .close { cursor:pointer; color:var(--color-text-dim); padding:6px 10px; border-radius:var(--radius-md); border:1px solid var(--color-border); }
+.map-head .close:hover { background:var(--color-muted); color:var(--color-text); }
+.map-body { padding:var(--space-6); }
+.map-journey { display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap; padding:var(--space-4); border-radius:var(--radius-lg); background:var(--color-bg-elev1); border:1px solid var(--color-border); margin-bottom:var(--space-6); }
+.jstep { display:inline-flex; flex-direction:column; align-items:center; gap:3px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); background:var(--color-surface); border:1px solid var(--color-border); min-width:96px; text-align:center; }
+.jstep .js-n { font-weight:600; font-size:12px; }
+.jstep .js-where { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); }
+.jstep.thread { border-color:hsl(38 92% 60% / .4); }
+.jstep.thread .js-n { color:var(--color-warning); }
+.jstep.pub { border-color:var(--color-primary-glow); }
+.jstep.pub .js-n { color:var(--color-primary); }
+.jarrow { color:var(--color-text-dim); font-size:14px; }
+.map-grid-h { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); font-family:var(--font-mono); margin:0 0 var(--space-3); }
+.map-table { display:flex; flex-direction:column; gap:6px; }
+.map-row { display:grid; grid-template-columns: 200px 24px 1fr 120px; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:var(--radius-md); background:var(--color-bg); border:1px solid var(--color-border-soft); transition:border-color var(--dur-fast); }
+.map-row:hover { border-color:var(--color-primary-glow); }
+.map-row .mr-action { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; }
+.map-row .mr-action .mr-g { font-size:14px; }
+.map-row .mr-to { color:var(--color-text-dim); }
+.map-row .mr-dest { font-size:12.5px; color:var(--color-text); }
+.map-row .mr-dest .mr-d2 { display:block; font-size:11px; color:var(--color-text-dim); margin-top:2px; }
+.map-row .mr-sketch { font-family:var(--font-mono); font-size:9.5px; padding:2px 7px; border-radius:var(--radius-full); text-align:center; justify-self:end; }
+.mr-sketch.thread { color:var(--color-warning); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .35); }
+.mr-sketch.builder { color:var(--color-accent-violet); background:hsl(258 90% 66% / .12); border:1px solid hsl(258 90% 66% / .35); }
+.mr-sketch.pub { color:var(--color-primary); background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); }
+.mr-sketch.page { color:var(--color-text-muted); background:var(--color-muted); border:1px solid var(--color-border); }
+.map-foot { font-size:11px; color:var(--color-text-dim); margin-top:var(--space-5); padding-top:var(--space-4); border-top:1px dashed var(--color-border-soft); line-height:1.6; }
+.map-foot b { color:var(--color-primary); }
+
+/* ── tiered-guidance ⓘ popover (calm — non-blocking) ── */
+.info-dot { display:inline-grid; place-items:center; width:14px; height:14px; border-radius:50%; border:1px solid var(--color-border); color:var(--color-text-dim); font-size:9px; font-family:var(--font-mono); cursor:help; vertical-align:middle; transition:all var(--dur-fast); }
+.info-dot:hover { border-color:var(--color-primary); color:var(--color-primary); }
+.info-pop { position:fixed; z-index:9600; max-width:320px; background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:var(--space-3) var(--space-4); font-size:12px; line-height:1.55; color:var(--color-text-muted); display:none; }
+.info-pop.show { display:block; animation:fadeSlideUp var(--dur-fast) var(--ease-out); }
+.info-pop b { color:var(--color-text); }
+.info-pop code { font-family:var(--font-mono); font-size:10.5px; color:var(--color-accent-violet); }
+
+/* dismissible honesty banner (calm — tiered guidance) */
+.honesty-banner { display:flex; align-items:flex-start; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-radius:var(--radius-md); background:hsl(258 90% 66% / .08); border:1px solid hsl(258 90% 66% / .3); font-size:12px; color:var(--color-text-muted); margin:var(--space-4) 0; line-height:1.5; }
+.honesty-banner.hidden { display:none; }
+.honesty-banner .hb-g { color:var(--color-accent-violet); font-size:15px; }
+.honesty-banner b { color:var(--color-text); }
+.honesty-banner .hb-x { margin-left:auto; cursor:pointer; color:var(--color-text-dim); padding:0 4px; }
+.honesty-banner .hb-x:hover { color:var(--color-text); }
+
+/* empty + skeleton (SkillsPage conventions) */
+.wf-empty { padding:var(--space-12) var(--space-8); text-align:center; color:var(--color-text-dim); }
+.wf-empty .ee-icon { font-size:34px; opacity:.5; margin-bottom:var(--space-3); }
+.wf-empty .ee-title { font-family:var(--font-headline); font-size:var(--text-md); color:var(--color-text-muted); margin-bottom:4px; }
+.wf-empty .ee-sub { font-size:var(--text-sm); }
+.skel { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:var(--space-4); height:168px; position:relative; overflow:hidden; }
+.skel::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, hsl(220 30% 14% / .5), transparent); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3) var(--space-10); line-height: 1.55; border-top: 1px dashed var(--color-border-soft); }
+.callout b { color: var(--color-primary); }
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+
+@media (max-width: 720px) {
+  .shell { grid-template-columns: 1fr; }
+  .nav { display:none; }
+  .wf-grid { grid-template-columns: 1fr; }
+  .md-grid { grid-template-columns: 1fr; }
+  .map-row { grid-template-columns: 1fr; gap:6px; }
+  .map-row .mr-to { display:none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 021 · Workflows Page + Nav Map</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Card grid + filter rail <span class="star">★</span> Selected</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Master-detail</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Compact list</button>
+</nav>
+
+<div class="redirect-toast" id="toast">✓ Opened new thread — workflow running in workflow mode</div>
+<div id="root"></div>
+
+<!-- ── launch modal (Run → thread handoff) ── -->
+<div class="modal-backdrop" id="launchModal" onclick="if(event.target===this) closeFlow()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><span class="wf-icon" id="mIcon">📄</span><span class="mh-name" id="mName">Workflow</span><span class="close" onclick="closeFlow()">✕</span></div>
+    <div class="modal-body">
+      <div id="mChain"></div>
+      <div>
+        <label class="field-label" id="mInputLabel">Kickoff prompt <span class="req">*</span></label>
+        <textarea class="field-input" id="mInput" rows="2"></textarea>
+      </div>
+      <div>
+        <label class="field-label">Project folder — already bound to this workflow</label>
+        <div class="field-select">📁 <span id="mFolder">Vendor Risk — 2026 Reviews</span> <span class="bound">project_folder_id ✓ bound</span></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint">Run opens a <b style="color:var(--color-text-muted)">new chat thread in workflow mode</b> and streams there — never on this page.</span>
+      <button class="view-btn" onclick="closeFlow()">Cancel</button>
+      <button class="run-btn" onclick="doRun()">▶ Run workflow</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── tweak → new-version modal ── -->
+<div class="modal-backdrop" id="tweakModal" onclick="if(event.target===this) closeFlow()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><span class="wf-icon">⑂</span><span class="mh-name">Tweak — creates a new version</span><span class="close" onclick="closeFlow()">✕</span></div>
+    <div class="modal-body tweak-flow">
+      <div class="tweak-diff">
+        <div class="tv frozen-v"><div class="vlabel">Frozen · published</div><div class="vbig" id="twFrozen">v2</div></div>
+        <div class="tarrow">→</div>
+        <div class="tv new-v"><div class="vlabel">New draft</div><div class="vbig" id="twNew">v3</div></div>
+      </div>
+      <div class="tweak-note">Published <b id="twName">Vendor-risk portfolio review</b> <b id="twFrozen2">v2</b> stays <b>frozen and immutable</b> — every prior run keeps pointing at it. This forks a <b>new draft v3</b> into the builder; you re-publish through the gauntlet to make it live (per-version immutability — the published row is never edited in place).</div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint">Lands in the <b style="color:var(--color-text-muted)">builder</b> (sketch 019) as a fresh draft version.</span>
+      <button class="view-btn" onclick="closeFlow()">Cancel</button>
+      <button class="run-btn" style="background:var(--color-primary);color:hsl(240 60% 8%)" onclick="doTweak()">⑂ Fork v3 draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── NAV / REDIRECT MAP overlay ── -->
+<div class="map-overlay" id="mapOverlay" onclick="if(event.target===this) toggleMap(false)">
+  <div class="map-panel">
+    <div class="map-head">
+      <span style="font-size:18px">🗺️</span>
+      <div style="flex:1"><h2>Where things go</h2><div class="mh-sub">Every actionable element on this page + exactly where it lands. Nothing here runs on the page itself.</div></div>
+      <span class="close" onclick="toggleMap(false)">Close ✕</span>
+    </div>
+    <div class="map-body">
+      <p class="map-grid-h">The whole journey</p>
+      <div class="map-journey">
+        <div class="jstep"><span class="js-n">Workflows page</span><span class="js-where">021 · this page</span></div>
+        <span class="jarrow">→</span>
+        <div class="jstep"><span class="js-n">Build / describe</span><span class="js-where">018</span></div>
+        <span class="jarrow">→</span>
+        <div class="jstep"><span class="js-n">Refine draft</span><span class="js-where">019</span></div>
+        <span class="jarrow">→</span>
+        <div class="jstep pub"><span class="js-n">Publish gauntlet</span><span class="js-where">020</span></div>
+        <span class="jarrow">→</span>
+        <div class="jstep thread"><span class="js-n">Run</span><span class="js-where">new thread</span></div>
+        <span class="jarrow">→</span>
+        <div class="jstep thread"><span class="js-n">Thread · workflow mode</span><span class="js-where">022</span></div>
+      </div>
+
+      <p class="map-grid-h">Every action → exactly where it lands</p>
+      <div class="map-table" id="mapTable"></div>
+
+      <div class="map-foot">
+        <b>Honest seams:</b> Run reuses the existing run / stream / lock / resume plumbing — it just creates a thread with the workflow attached, then redirects. <b>Tweak</b> never edits the frozen published row; it forks a new draft version. The <b>Workflows nav entry</b>, <b>card→detail</b>, <b>Open draft</b>, and all <b>draft CRUD</b> are NET-NEW surfaces — only <span style="font-family:var(--font-mono)">GET /workflows/published</span> + <span style="font-family:var(--font-mono)">POST /workflows/{id}/publish</span> exist today.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- tiered-guidance popover -->
+<div class="info-pop" id="infoPop"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">flow</span>
+  <div class="toolbar-toggle" id="flowToggle">
+    <button data-f="loading" onclick="setFlow('loading')">0 · Load</button>
+    <button data-f="browse" class="on" onclick="setFlow('browse')">1 · Browse</button>
+    <button data-f="launch" onclick="setFlow('launch')">2 · Run dialog</button>
+    <button data-f="thread" onclick="setFlow('thread')">3 · In thread</button>
+    <button data-f="empty" onclick="setFlow('empty')">∅ · Empty</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <button onclick="toggleMap()" id="mapToolBtn">🗺️ Map</button>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ── 6 REAL phase types — glyphs borrowed VERBATIM from PhaseCard.tsx (5) + ◆ llm_emit (net-new, 101.1) ── */
+const PT = {
+  programmatic:     ['t-prog',   '⚙', 'server'],
+  llm_single:       ['t-single', '✎', 'AI write'],
+  llm_agent:        ['t-agent',  '🤖','agent'],
+  llm_batch_agents: ['t-batch',  '⛓','parallel'],
+  llm_human_input:  ['t-human',  '☺','needs you'],
+  llm_emit:         ['t-emit',   '◆','deliverable'],
+};
+
+/* ── strictness tier → REAL gate set + citation_policy enum (NO invented labels) ── */
+const TIERS = {
+  strict: { glyph:'🔒', label:'Strict', cap:'Every value cited — deliverable is rejected if anything is unverified',
+            gates:['citations_required (deterministic)','output_file_valid','freshness','llm_judge_rubric'], cit:'strict' },
+  middle: { glyph:'◐', label:'Middle', cap:'Cited analysis — uncited values are delivered, marked [unverified]',
+            gates:['citations_required (presence)','structure_check (loose)','llm_judge_rubric'], cit:'flag' },
+  loose:  { glyph:'○', label:'Loose', cap:'Prose / analysis — judge-only, no per-phase citation gate',
+            gates:['(no per-phase gate)'], cit:'draft' },
+};
+/* ── derive the strictness tier from the REAL gate set, not a free-text label
+   (BRIEF §3.5 + 021 "tier badge derived from the gate set"). The tier is a
+   FUNCTION of (citation_policy, which gates are on) — TIERS is the single
+   source of truth; a workflow's `tier` key only points at its gate set, and
+   deriveTier re-classifies from that set so the badge can never drift from
+   the gates a card/detail actually shows. ── */
+function deriveTier(w){
+  const set = TIERS[w.tier] || TIERS.loose;
+  const gates = (set.gates||[]).map(g=>g.toLowerCase());
+  const hasJudge = gates.some(g=>g.includes('judge'));
+  const hasCitations = gates.some(g=>g.includes('citations_required'));
+  const deterministic = gates.some(g=>g.includes('deterministic'));
+  const perPhaseGate = !gates.some(g=>g.startsWith('(no'));
+  // classify from the gate signature + citation_policy enum
+  if (set.cit==='strict' && deterministic) return 'strict';
+  if (set.cit==='flag'   && hasCitations && hasJudge) return 'middle';
+  if (set.cit==='draft'  || !perPhaseGate) return 'loose';
+  // fallback: any per-phase citation gate → middle, else loose
+  return hasCitations ? 'middle' : 'loose';
+}
+function tierBadge(w){
+  // accept either a workflow object or a bare tier key (back-compat)
+  const t = (w && typeof w==='object') ? deriveTier(w) : w;
+  const T=TIERS[t];
+  return `<span class="tier ${t}" onmouseenter="showInfo(event,'tier-${t}')" onmouseleave="hideInfo()">
+    <span class="tg">${T.glyph}</span>${T.label}</span>`;
+}
+
+/* ── the LIBRARY — the 'Vendor Risk — 2026 Reviews' project, across the strictness spectrum ── */
+const PROJECTS = [
+  { id:'all',  ico:'▦', name:'All projects', count:6 },
+  { id:'vr26', ico:'📁', name:'Vendor Risk — 2026 Reviews', count:4 },
+  { id:'fin',  ico:'📁', name:'Finance Ops', count:1 },
+  { id:'unb',  ico:'⬡', name:'Unbound (no project)', count:1 },
+];
+
+const WORKFLOWS = [
+  { id:'vrp', icon:'📄', proj:'vr26', name:'Vendor-risk portfolio review', source:'published', version:2, tier:'strict',
+    purpose:'Pull the latest vendor assessments, analyze each vendor, render the cited vendor-risk report from your template.',
+    inputLabel:'Kickoff prompt', kickoff:'Produce the Q2-2026 portfolio review for all 14 active vendors.',
+    inputKeys:['kickoff_prompt'],
+    phases:[['Pull assessments','programmatic',[]],['Search the assessment folder','llm_agent',['search_documents']],['Analyze each vendor','llm_batch_agents',['search_documents']],['Render the vendor-risk report','llm_emit',[]]],
+    versions:[{v:2,meta:'published 2026-06-12 · 8/8 gauntlet PASS · golden run #a4f2',state:'frozen',cur:true},{v:1,meta:'published 2026-04-02 · superseded by v2',state:'superseded'}] },
+
+  { id:'wsr', icon:'📝', proj:'vr26', name:'Weekly status report', source:'draft', version:1, tier:'strict',
+    purpose:'Summarize the week’s vendor-risk activity into the cited weekly-status template for the risk committee.',
+    inputLabel:'Kickoff prompt', kickoff:'Generate this week’s vendor-risk status report.',
+    inputKeys:['kickoff_prompt'],
+    phases:[['Gather the week’s changes','llm_agent',['search_documents']],['Render the status template','llm_emit',[]]],
+    versions:[{v:1,meta:'draft · never published · needs a golden run',state:'draft',cur:true}] },
+
+  { id:'cce', icon:'📑', proj:'vr26', name:'Contract clause extractor', source:'published', version:1, tier:'middle',
+    purpose:'Extract key clauses from an uploaded contract, assess them against your playbook, write a cited analysis.',
+    inputLabel:'Kickoff prompt', kickoff:'Extract and assess the clauses in the attached MSA.',
+    inputKeys:['kickoff_prompt','contract_file'],
+    phases:[['Extract clauses','llm_agent',['search_documents']],['Assess vs playbook','llm_single',[]],['Write the cited analysis','llm_emit',[]]],
+    versions:[{v:1,meta:'published 2026-05-19 · 8/8 gauntlet PASS · golden run #b1c8',state:'frozen',cur:true}] },
+
+  { id:'mns', icon:'🗒️', proj:'unb', name:'Meeting-notes summarizer', source:'seed', version:0, tier:'loose',
+    purpose:'Turn raw meeting notes into a clean, readable summary with action items — no citation enforcement.',
+    inputLabel:'Kickoff prompt', kickoff:'Summarize the attached vendor-review meeting notes.',
+    inputKeys:['kickoff_prompt'],
+    phases:[['Read the notes','llm_agent',['search_documents']],['Write the summary','llm_single',[]]],
+    versions:[{v:0,meta:'seed template · clone to start a draft',state:'draft',cur:true}] },
+
+  { id:'rec', icon:'💰', proj:'fin', name:'Spend reconciliation digest', source:'published', version:3, tier:'middle',
+    purpose:'Reconcile vendor spend against contracts and surface variances in a structured, cited digest.',
+    inputLabel:'Kickoff prompt', kickoff:'Reconcile Q2 vendor spend against active contracts.',
+    inputKeys:['kickoff_prompt'],
+    phases:[['Pull spend ledger','programmatic',[]],['Match to contracts','llm_agent',['search_documents','execute_code']],['Render the digest','llm_emit',[]]],
+    versions:[{v:3,meta:'published 2026-06-01 · 8/8 gauntlet PASS · golden run #c9e1',state:'frozen',cur:true},{v:2,meta:'published 2026-03-11 · superseded',state:'superseded'},{v:1,meta:'published 2026-01-20 · superseded',state:'superseded'}] },
+];
+
+const SOURCE_LABEL = { seed:'seed', draft:'draft', published:'published', shared:'shared' };
+function sourceTag(s){ return `<span class="scope-tag ${s}">${SOURCE_LABEL[s]||s}</span>`; }
+const isDraftish = s => (s==='draft'||s==='seed');
+const isPublished = s => (s==='published'||s==='shared');
+
+function matchProj(w){ return PROJECT==='all' || w.proj===PROJECT; }
+function matchSearch(w){ const q=SEARCH.trim().toLowerCase(); return !q || w.name.toLowerCase().includes(q) || w.purpose.toLowerCase().includes(q); }
+function matchTier(w){ return TIERFILTER==='all' || w.tier===TIERFILTER; }
+function visible(){ return WORKFLOWS.filter(w=>matchProj(w)&&matchSearch(w)&&matchTier(w)); }
+
+let CUR_V='A', FLOW='browse', SELECTED=WORKFLOWS[0], SEARCH='', PROJECT='vr26', TIERFILTER='all',
+    SHELF='both', SHOW_SEARCH=false, BANNER=true, MAP_OPEN=false;
+
+/* ── phase chain renderer ── */
+function chainHTML(w, big){
+  return `<div class="chain">${w.phases.map((p,i)=>{
+    const [cls,glyph,label]=PT[p[1]];
+    const tools = p[2].length? `<span class="tool-chips">${p[2].map(t=>`<span class="tool-chip">${t}</span>`).join('')}</span>`:'';
+    return `${i>0?'<span class="arrow">→</span>':''}<span class="ph ${cls}"><span class="pg">${glyph}</span><span>${p[0]}</span><span class="pt">${label}</span>${big?tools:''}</span>`;
+  }).join('')}</div>`;
+}
+function inputKeysHTML(w){
+  return `<span class="wf-input-hint">entry needs ${w.inputKeys.map(k=>`<span class="mono">${k}</span>`).join(', ')}</span>`;
+}
+
+/* ── card (A) ── */
+function cardHTML(w){
+  const draft = isDraftish(w.source);
+  const verStr = w.version>0 ? `<span class="wf-ver">v${w.version}</span>` : '';
+  // published → View(detail)+Tweak+Run ; draft/seed → Open(builder)+Run-draft
+  const actions = isPublished(w.source)
+    ? `<button class="icon-btn" title="Tweak → fork a new version (019 builder)" onclick="openTweak('${w.id}')">⑂</button>
+       <button class="view-btn" title="Open the master-detail pane (variant B) on this workflow" onclick="viewDetail('${w.id}')">View</button>
+       <button class="run-btn" onclick="openLaunch('${w.id}')">▶ Run</button>`
+    : `<button class="icon-btn danger" title="Delete draft (net-new endpoint)" onclick="event.stopPropagation(); deleteDraft('${w.id}')">🗑</button>
+       <button class="view-btn" title="Open in builder — 018 describe / 019 refine" onclick="openBuilder('${w.id}')">Open ✎</button>
+       <button class="run-btn ghost" onclick="openLaunch('${w.id}')">▶ Test run</button>`;
+  return `<div class="wf-card ${draft?'is-draft':''}">
+    <div class="wf-top"><div class="wf-icon">${w.icon}</div>
+      <div style="flex:1"><div class="wf-name">${w.name}${verStr}</div></div>
+      <div class="wf-tags">${tierBadge(w)} ${sourceTag(w.source)}</div>
+    </div>
+    <div class="wf-purpose">${w.purpose}</div>
+    ${chainHTML(w)}
+    ${inputKeysHTML(w)}
+    <div class="wf-foot">${actions}</div>
+  </div>`;
+}
+
+/* ── project filter rail (A) ── */
+function projRailHTML(){
+  return `<div class="proj-rail">
+    <p class="pr-label">Project</p>
+    ${PROJECTS.map(p=>`<div class="proj-item ${PROJECT===p.id?'on':''}" onclick="setProject('${p.id}')"><span class="pi-ico">${p.ico}</span><span class="pi-n">${p.name}</span><span class="pi-c">${p.count}</span></div>`).join('')}
+  </div>`;
+}
+
+/* ── inline project filter chip-strip (B/C) — same setProject binding, so the
+   'project-filtered' clause is answered (and visible) inside B and C too ── */
+function projChipsHTML(){
+  return `<div class="proj-chips">
+    <span class="pc-label">Project</span>
+    ${PROJECTS.map(p=>`<button class="proj-chip ${PROJECT===p.id?'on':''}" onclick="setProject('${p.id}')"><span class="pc-ico">${p.ico}</span>${p.name}<span class="pc-c">${p.count}</span></button>`).join('')}
+  </div>`;
+}
+
+/* ── shelf section (drafts above published) ── */
+function shelfSection(list){
+  const drafts = list.filter(w=>isDraftish(w.source));
+  const pubs   = list.filter(w=>isPublished(w.source));
+  const buildCard = `<div class="build-card" title="Build a workflow → describe screen (018)" onclick="openBuilder('new')">
+    <div class="bc-icon">＋</div><div class="bc-title">Build a workflow</div>
+    <div class="bc-sub">Describe it in plain English → AI drafts it</div>
+    <span class="v29-pill">→ sketch 018</span></div>`;
+
+  let out = '';
+  if (SHELF==='both' || SHELF==='drafts') {
+    out += `<div class="section-label">Drafts &amp; seeds <span class="sl-count">· ${drafts.length}</span> <span class="nn" onmouseenter="showInfo(event,'nn-list')" onmouseleave="hideInfo()">net-new list</span></div>
+      <div class="wf-grid">${drafts.map(cardHTML).join('')}${buildCard}</div>`;
+  }
+  if (SHELF==='both' || SHELF==='published') {
+    out += `<div class="section-label">Published <span class="sl-count">· ${pubs.length}</span> <span class="live-badge" onmouseenter="showInfo(event,'live-pub')" onmouseleave="hideInfo()">GET /workflows/published</span></div>`;
+    out += pubs.length ? `<div class="wf-grid">${pubs.map(cardHTML).join('')}</div>`
+                       : `<div class="wf-empty" style="padding:var(--space-8)"><div class="ee-sub">No published workflows in this project yet.</div></div>`;
+  }
+  return out;
+}
+
+/* ── search/filter toolbar (collapsible — calm default) ── */
+function toolbarHTML(){
+  if (!SHOW_SEARCH) {
+    return `<div class="wf-toolbar">
+      <button class="search-collapse" onclick="toggleSearch()">🔎 Search &amp; filter</button>
+      <span style="flex:1"></span>
+      <div class="shelf-toggle">
+        ${['both','drafts','published'].map(s=>`<button class="${SHELF===s?'on':''}" onclick="setShelf('${s}')">${s[0].toUpperCase()+s.slice(1)}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+  return `<div class="wf-toolbar">
+    <div class="wf-search"><span>🔎</span><input id="wfSearch" placeholder="Search workflows…" oninput="onSearch(this.value)" value="${SEARCH}" autofocus></div>
+    <div class="wf-filters">${['all','strict','middle','loose'].map(t=>`<button class="wf-filter ${TIERFILTER===t?'on':''}" onclick="setTier('${t}')">${t==='all'?'All tiers':TIERS[t].label}</button>`).join('')}</div>
+    <span style="flex:1"></span>
+    <button class="search-collapse" onclick="toggleSearch()">✕</button>
+  </div>`;
+}
+
+function pageHeadHTML(){
+  return `<div class="page-head">
+    <h1>Workflows</h1>
+    <span class="sub">Repeatable, locked automations — author, publish, and Run into a thread.</span>
+    <button class="mapbtn ${MAP_OPEN?'on':''}" onclick="toggleMap()">🗺️ Where things go</button>
+    <button class="build-new" title="→ describe screen (018)" onclick="openBuilder('new')">＋ Build a workflow</button>
+  </div>`;
+}
+
+function honestyBanner(){
+  if(!BANNER) return '';
+  return `<div class="honesty-banner">
+    <span class="hb-g">⬡</span>
+    <span>This page shows <b>drafts + published</b> for a project. Published is backed by the live <b>GET /workflows/published</b> (owner-scoped). Draft <b>create / list / update / delete / unpublish</b> are <b>net-new</b> — proposed here, not yet built.</span>
+    <span class="hb-x" onclick="dismissBanner()">✕</span>
+  </div>`;
+}
+
+/* ── VARIANT A — card grid + project rail + drafts/published shelves ── */
+function renderA(){
+  const list = visible();
+  return `<div class="page">
+    ${pageHeadHTML()}
+    ${honestyBanner()}
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--space-6);margin-top:var(--space-3)">
+      ${projRailHTML()}
+      <div>
+        ${toolbarHTML()}
+        <div id="shelfMount">${shelfSection(list)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── VARIANT B — master-detail (list left, detail right with versions + Run/Tweak) ── */
+function renderB(){
+  const w = SELECTED;
+  const list = visible();
+  const drafts = list.filter(x=>isDraftish(x.source));
+  const pubs = list.filter(x=>isPublished(x.source));
+  const readonly = isPublished(w.source);
+  const dt = deriveTier(w);          // tier derived from the real gate set
+  const T = TIERS[dt];
+
+  const itemRow = x => `<div class="md-item ${x.id===w.id?'active':''}" onclick="selectWf('${x.id}')">
+      <span class="md-ico">${x.icon}</span><span class="md-name">${x.name}</span>${tierBadge(x)}</div>`;
+
+  const detail = `<div class="md-detail ${readonly?'readonly':''}">
+    ${readonly ? `<div class="ro-banner"><span class="lk">🔒</span> This is a <b>published, frozen</b> version (v${w.version}). Read-only — to change it, <b>Tweak → a new version</b>.</div>` : ''}
+    <div class="dt-top">
+      <span class="wf-icon">${w.icon}</span>
+      <div style="flex:1">
+        <div class="dt-name">${w.name} ${w.version>0?`<span class="wf-ver">v${w.version}</span>`:''}</div>
+        <div class="wf-tags" style="margin-top:4px">${tierBadge(w)} ${sourceTag(w.source)}</div>
+      </div>
+    </div>
+    <div class="dt-purpose">${w.purpose}</div>
+
+    <div class="dt-section">Phase chain · entry needs ${w.inputKeys.map(k=>`<span class="mono" style="color:var(--color-text-muted)">${k}</span>`).join(', ')}</div>
+    ${chainHTML(w,true)}
+
+    <div class="dt-section">Strictness — ${T.label} <span class="info-dot" onmouseenter="showInfo(event,'tier-${dt}')" onmouseleave="hideInfo()">i</span></div>
+    <div class="gate-list">
+      ${T.gates.map(g=>`<div class="gate-row on"><span class="gx">${g.startsWith('(')?'○':'✓'}</span><span class="gk">${g}</span></div>`).join('')}
+      <div class="gate-row"><span class="gx" style="color:var(--color-accent-violet)">⚖</span><span class="gk">publish judge (always-on)</span><span class="gv">QUAL-01 · can't be removed</span></div>
+      <div class="gate-row"><span class="gx">●</span><span class="gk">citation_policy</span><span class="gv">${T.cit}</span></div>
+    </div>
+
+    <div class="dt-section">Version history <span class="info-dot" onmouseenter="showInfo(event,'versions')" onmouseleave="hideInfo()">i</span></div>
+    <div class="ver-list">
+      ${w.versions.map(v=>`<div class="ver-row ${v.cur?'cur':''}"><span class="vn">v${v.v}</span><span class="vmeta">${v.meta}</span><span class="vtag ${v.state==='frozen'?'frozen':v.state==='superseded'?'superseded':'frozen'}">${v.state}</span></div>`).join('')}
+    </div>
+
+    <div class="dt-actions">
+      ${readonly
+        ? `<button class="run-btn" onclick="openLaunch('${w.id}')">▶ Run workflow</button>
+           <button class="view-btn" onclick="openTweak('${w.id}')">⑂ Tweak → new version</button>`
+        : `<button class="run-btn ghost" onclick="openLaunch('${w.id}')">▶ Test run</button>
+           <button class="build-new" style="font-size:var(--text-sm)" title="→ 019 builder" onclick="openBuilder('${w.id}')">✎ Open in builder</button>
+           <button class="run-btn" style="background:var(--color-success);color:hsl(240 60% 8%)" title="→ 020 gauntlet" onclick="goPublish('${w.id}')">⬆ Publish…</button>`}
+    </div>
+  </div>`;
+
+  return `<div class="page">
+    ${pageHeadHTML()}
+    ${honestyBanner()}
+    ${projChipsHTML()}
+    <div class="md-grid">
+      <div class="md-list">
+        ${drafts.length?`<div class="md-shelf-h">Drafts &amp; seeds · ${drafts.length} <span class="nn">net-new</span></div>`:''}
+        ${drafts.map(itemRow).join('')}
+        <div class="md-shelf-h">Published · ${pubs.length}</div>
+        ${pubs.map(itemRow).join('')}
+        <div class="md-item" style="opacity:.75" title="→ describe screen (018)" onclick="openBuilder('new')"><span class="md-ico" style="background:transparent;border:1px dashed var(--color-border)">＋</span><span class="md-name">Build a workflow</span><span class="v29-pill">018</span></div>
+      </div>
+      ${detail}
+    </div>
+  </div>`;
+}
+
+/* ── VARIANT C — compact list (SkillsPage-style vertical rows) ── */
+function renderC(){
+  const list = visible();
+  const drafts = list.filter(w=>isDraftish(w.source));
+  const pubs = list.filter(w=>isPublished(w.source));
+
+  const row = w => {
+    const draft = isDraftish(w.source);
+    const dt = deriveTier(w);          // tier derived from the real gate set
+    const verStr = w.version>0 ? `<span class="cl-ver">v${w.version}</span>` : '';
+    const quick = isPublished(w.source)
+      ? `<button class="icon-btn" title="Tweak → new version" onclick="event.stopPropagation(); openTweak('${w.id}')">⑂</button>
+         <button class="run-btn" onclick="event.stopPropagation(); openLaunch('${w.id}')">▶ Run</button>`
+      : `<button class="view-btn" onclick="event.stopPropagation(); openBuilder('${w.id}')" title="→ 019 builder">Open ✎</button>
+         <button class="run-btn ghost" onclick="event.stopPropagation(); openLaunch('${w.id}')">▶ Test</button>`;
+    return `<div class="cl-row ${draft?'is-draft':''} ${w.id===SELECTED.id?'open':''}">
+      <div class="cl-head" onclick="toggleRow(this.parentElement,'${w.id}')">
+        <div class="cl-ico">${w.icon}</div>
+        <span class="cl-name">${w.name}</span>${verStr}
+        ${tierBadge(w)} ${sourceTag(w.source)}
+        <span class="cl-purpose">${w.purpose}</span>
+        ${quick}
+        <span class="caret">▸</span>
+      </div>
+      <div class="cl-body">
+        ${chainHTML(w,true)}
+        <div class="cl-meta">
+          <span>entry needs ${w.inputKeys.map(k=>`<span class="mono" style="color:var(--color-text-muted)">${k}</span>`).join(', ')}</span>
+          <span>·</span><span>strictness <b style="color:var(--color-text-muted)">${TIERS[dt].label}</b> → citation_policy <span class="mono" style="color:var(--color-accent-violet)">${TIERS[dt].cit}</span></span>
+          <span>·</span><span>${w.versions.length} version${w.versions.length===1?'':'s'}</span>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  return `<div class="page">
+    ${pageHeadHTML()}
+    ${honestyBanner()}
+    ${projChipsHTML()}
+    ${toolbarHTML()}
+    <div class="section-label" style="margin-top:var(--space-4)">Drafts &amp; seeds <span class="sl-count">· ${drafts.length}</span> <span class="nn">net-new list</span></div>
+    <div class="cl-list">${drafts.map(row).join('')}</div>
+    <div class="section-label">Published <span class="sl-count">· ${pubs.length}</span> <span class="live-badge">GET /workflows/published</span></div>
+    <div class="cl-list">${pubs.length?pubs.map(row).join(''):'<div class="wf-empty" style="padding:var(--space-6)"><div class="ee-sub">No published workflows in this project.</div></div>'}</div>
+  </div>`;
+}
+
+/* ── loading skeleton (SkillsPage convention) — respects the active variant so
+   B/C don't silently show A's rail layout under their tab ── */
+function renderLoading(){
+  const body = `<div class="section-label">Loading workflows…</div>
+    <div class="wf-grid">${Array(4).fill('<div class="skel"></div>').join('')}</div>`;
+  if (CUR_V==='A') return `<div class="page">
+    ${pageHeadHTML()}
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--space-6);margin-top:var(--space-4)">
+      ${projRailHTML()}<div>${body}</div>
+    </div>
+  </div>`;
+  return `<div class="page">${pageHeadHTML()}${projChipsHTML()}${body}</div>`;
+}
+
+/* ── empty state (SkillsPage centered-icon convention) — variant-aware ── */
+function renderEmpty(){
+  const empty = `<div class="wf-empty">
+        <div class="ee-icon">⬡</div>
+        <div class="ee-title">No workflows in this project yet</div>
+        <div class="ee-sub">Describe a recurring task and the AI drafts a workflow for you.</div>
+        <div style="margin-top:var(--space-5)"><button class="build-new" title="→ describe screen (018)" onclick="openBuilder('new')">＋ Build your first workflow</button></div>
+      </div>`;
+  if (CUR_V==='A') return `<div class="page">
+    ${pageHeadHTML()}
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:var(--space-6);margin-top:var(--space-4)">
+      ${projRailHTML()}${empty}
+    </div>
+  </div>`;
+  return `<div class="page">${pageHeadHTML()}${projChipsHTML()}${empty}</div>`;
+}
+
+/* ── in-thread (Run landed) — renders the REAL winners 008-D + 009-C + 011-A ── */
+function renderThread(){
+  const w = SELECTED;
+  const kickoff = (document.getElementById('mInput') && document.getElementById('mInput').value) || w.kickoff;
+  const ic = s => `<span class="st-ico2 ${ {done:'si-done',run:'si-run',lock:'si-lock'}[s] }">${ {done:'✓',run:'●',lock:'○'}[s] }</span>`;
+  const subs = [['SecurePay Inc','done'],['Northstar Cloud','run'],['Helix Data','run'],['merge findings','lock']];
+
+  const panel = `
+    <div class="thread-banner"><div class="wf-row"><span class="tb-badge">Workflow</span><span class="tb-name">${w.name}</span>${tierBadge(w)}</div>
+      <div class="tb-meta">Vendor Risk — 2026 Reviews · project folder bound</div>
+      <div class="tb-chips"><span class="tb-chip">Phase 3/4</span><span class="tb-chip">3 agents</span><span class="tb-chip">⚙→🤖→⛓→◆</span><span class="tb-chip">citation_policy strict</span></div>
+    </div>
+    <ol class="spine">
+      <li class="s-done"><span class="sp-node">${ic('done')}</span><div class="sp-card"><div class="sp-card-head"><span class="spc-name">Pull assessments</span><span class="ttag">server</span><span class="spc-sum">14 vendors · 0.2s</span></div></div></li>
+      <li class="s-done"><span class="sp-node">${ic('done')}</span><div class="sp-card"><div class="sp-card-head"><span class="spc-name">Search assessment folder</span><span class="ttag">agent</span><span class="spc-sum">41 chunks · 3 searches</span></div></div></li>
+      <li class="s-run"><span class="sp-node">${ic('run')}</span><div class="sp-card run"><div class="sp-card-head"><span class="spc-name">Analyze each vendor</span><span class="ttag">parallel</span><span class="spc-sum">running…</span></div><div class="sp-card-body" style="padding:0 var(--space-3) var(--space-3)"><div style="display:flex;flex-direction:column;gap:5px;border-left:1px solid var(--color-border-soft)">${subs.map(s=>`<div style="display:flex;align-items:center;gap:var(--space-2);padding:5px var(--space-2);border-radius:var(--radius-sm);background:${s[1]==='run'?'var(--color-warning-dim)':'var(--color-surface-hi)'};font-size:11.5px">${ic(s[1])}<span style="flex:1">${s[0]}</span></div>`).join('')}</div></div></div></li>
+      <li class="s-lock"><span class="sp-node">${ic('lock')}</span><div class="sp-card locked"><div class="sp-card-head"><span class="spc-name dim">◆ Render the vendor-risk report</span><span class="ttag">deliverable</span><span class="spc-sum">queued</span></div></div></li>
+    </ol>
+    <div class="reuse-note">↳ this thread renders the designs you already picked — <b>008-D</b> (timeline) · <b>009-C</b> (chat seam) · <b>011-A</b> (composer). 021 only adds the <b>page</b> you launched from. Run reused the existing run/stream/lock/resume plumbing.</div>`;
+
+  return `<div class="rail">
+      <div class="logo"></div>
+      <div class="rico active">💬</div><div class="rico">⚙</div><div class="rico">▤</div>
+    </div>
+    <div class="chat" style="padding:0;display:flex;flex-direction:column">
+      <div style="flex:1;overflow-y:auto;padding:var(--space-6) var(--space-8)">
+        <div class="chat-head">New thread · workflow mode · ${w.name}</div>
+        <div class="bubble-user">${kickoff}</div>
+        <div class="livestatus"><span class="ls-spark"></span><span class="ls-text">Running in workspace — <b>Analyze each vendor (3 / 4)</b> <span class="mono">· panel is live</span></span><span class="ls-open">Open ▸</span></div>
+      </div>
+      <div class="tcomposer">
+        <div class="t-runchip"><span style="color:var(--color-warning)">⚙</span><span class="rc-name">Workflow · ${w.name}</span><span class="rc-phase">phase 3/4 · Analyze</span><span class="sp"></span><span class="cancel">⏹ Cancel</span></div>
+        <div class="t-ta"><span class="ta-ph">Workflow running — Cancel to type a new message</span><div class="t-pills"><span class="t-pill">⌘ openai/gpt-5.4 ▾</span><span class="t-pill">⊙ Workflow mode ▾</span></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="pd"></span><span class="ph-title">Workspace</span><span class="mode-tag">workflow</span></div>
+      <div class="panel-body">${panel}</div>
+    </div>`;
+}
+
+/* ── nav (page mode) — NET-NEW Workflows entry ── */
+function navHTML(){
+  return `<nav class="nav">
+    <div class="logo"></div>
+    <div class="nav-item"><span class="ic">💬</span> Chats</div>
+    <div class="nav-item active"><span class="ic">⚙</span> Workflows <span class="netnew" title="net-new ActiveView">NEW</span></div>
+    <div class="nav-item"><span class="ic">▤</span> Documents</div>
+    <div class="nav-item"><span class="ic">✦</span> Skills</div>
+    <div class="nav-item"><span class="ic">⚙</span> Settings</div>
+  </nav>`;
+}
+
+/* ── nav/redirect map rows ── */
+const MAP_ROWS = [
+  { g:'＋', a:'Build a workflow', d:'The describe screen — you type a business requirement, the AI drafts it', d2:'creates a new draft', s:'018', cls:'builder' },
+  { g:'✎', a:'Open draft', d:'The builder — refine the draft by form (talk available)', d2:'018 describe / 019 refine', s:'018·019', cls:'builder' },
+  { g:'⑂', a:'Tweak published', d:'Forks a NEW draft version into the builder', d2:'frozen v(n) untouched → new draft v(n+1)', s:'019', cls:'builder' },
+  { g:'▦', a:'Card / row', d:'The workflow detail (phase chain, gates, version history)', d2:'master-detail pane', s:'detail', cls:'page' },
+  { g:'⬆', a:'Publish…', d:'The 8-stage publish gauntlet (lint → golden run → judge)', d2:'can honestly BLOCK', s:'020', cls:'pub' },
+  { g:'▶', a:'Run', d:'A new chat thread in workflow mode, project folder already bound', d2:'reuses run/stream/lock/resume', s:'new thread', cls:'thread' },
+  { g:'💬', a:'Landed thread', d:'Workflow streams in the workspace panel — never on the page', d2:'workflow = a mode of a thread', s:'022', cls:'thread' },
+];
+function mapTableHTML(){
+  return MAP_ROWS.map(r=>`<div class="map-row">
+    <div class="mr-action"><span class="mr-g">${r.g}</span>${r.a}</div>
+    <div class="mr-to">→</div>
+    <div class="mr-dest">${r.d}<span class="mr-d2">${r.d2}</span></div>
+    <div class="mr-sketch ${r.cls}">${r.s}</div>
+  </div>`).join('');
+}
+
+/* ── tiered-guidance popovers (REAL enum words only) ── */
+const INFO = {
+  'tier-strict': `<b>🔒 Strict</b> — every value in the deliverable must trace to a source. Gates: <code>citations_required</code> (deterministic) + <code>output_file_valid</code> + <code>freshness</code> + <code>llm_judge_rubric</code>, with <code>citation_policy = strict</code> (an uncited value is an honest fail, not delivered). For risk-committee / compliance output.`,
+  'tier-middle': `<b>◐ Middle</b> — cited analysis. Gates: <code>citations_required</code> (presence) + <code>structure_check</code> (loose) + <code>llm_judge_rubric</code>, with <code>citation_policy = flag</code> — uncited values are delivered but marked <code>[unverified]</code>.`,
+  'tier-loose': `<b>○ Loose</b> — prose / analysis. No per-phase citation gate, <code>citation_policy = draft</code> (prepends a "DRAFT — citations not enforced" label). The always-on <b>publish judge</b> still grades it — loose does NOT mean ungraded.`,
+  'versions': `Each published version is <b>frozen and immutable</b> (a DB trigger blocks updates once <code>status='published'</code>). To change a published workflow you <b>Tweak → a new draft version</b> and re-publish through the gauntlet. Old runs keep pointing at the version they ran.`,
+  'nn-list': `<b>Net-new.</b> There is no draft create / list / update / single-GET / delete endpoint today — only <code>GET /workflows/published</code> + <code>POST /workflows/{id}/publish</code> are live. This drafts shelf proposes the new surface.`,
+  'live-pub': `<b>Live.</b> Backed by the real <code>GET /workflows/published</code> — owner-scoped (RLS), with an optional <code>project_folder_id</code> filter (this page's project rail).`,
+};
+function showInfo(ev, key){
+  const pop = document.getElementById('infoPop');
+  pop.innerHTML = INFO[key] || '';
+  pop.classList.add('show');
+  const r = ev.currentTarget.getBoundingClientRect();
+  let x = r.left, y = r.bottom + 8;
+  if (x + 330 > window.innerWidth) x = window.innerWidth - 340;
+  if (y + 160 > window.innerHeight) y = r.top - 8 - pop.offsetHeight;
+  pop.style.left = x + 'px'; pop.style.top = Math.max(8,y) + 'px';
+}
+function hideInfo(){ document.getElementById('infoPop').classList.remove('show'); }
+
+/* ── render dispatch ── */
+function render(){
+  const root = document.getElementById('root');
+  const shell = (FLOW==='thread') ? 'shell in-thread' : 'shell';
+  let main;
+  if (FLOW==='thread') main = renderThread();
+  else if (FLOW==='loading') main = navHTML() + renderLoading();
+  else if (FLOW==='empty') main = navHTML() + renderEmpty();
+  else main = navHTML() + (CUR_V==='A'?renderA():CUR_V==='B'?renderB():renderC());
+
+  root.innerHTML = `<div class="${shell}">${main}</div>`;
+
+  if (FLOW==='browse') {
+    root.insertAdjacentHTML('beforeend', `<div class="callout"><b>Run hands off INTO a thread.</b> Run → creates a NEW chat thread in workflow mode (project folder already bound), sets the active run, redirects you into it (step 3) with the workflow streaming in the panel. <b>Tweak</b> a published workflow forks a NEW draft version — the frozen row is never edited. Tap <b>🗺️ Where things go</b> for the full redirect map.</div>`);
+  }
+  document.getElementById('launchModal').classList.toggle('open', FLOW==='launch');
+  document.getElementById('tweakModal').classList.toggle('open', FLOW==='tweak');
+  document.getElementById('mapOverlay').classList.toggle('open', MAP_OPEN);
+  document.getElementById('mapToolBtn').classList.toggle('on', MAP_OPEN);
+  if (MAP_OPEN) document.getElementById('mapTable').innerHTML = mapTableHTML();
+}
+
+/* ── interactions ── */
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); if(FLOW==='launch'||FLOW==='tweak')FLOW='browse'; if(FLOW==='loading'||FLOW==='empty')FLOW='browse'; syncFlowBtns(); render(); }
+function setFlow(f){ FLOW=f; syncFlowBtns(); render(); }
+function syncFlowBtns(){ document.querySelectorAll('#flowToggle button').forEach(b=>b.classList.toggle('on',b.dataset.f===FLOW)); }
+function setProject(id){ PROJECT=id; SELECTED = visible()[0] || WORKFLOWS[0]; render(); }
+function setTier(t){ TIERFILTER=t; render(); }
+function setShelf(s){ SHELF=s; const m=document.getElementById('shelfMount'); if(m) m.innerHTML=shelfSection(visible()); document.querySelectorAll('.shelf-toggle button').forEach(b=>b.classList.toggle('on', b.textContent.toLowerCase()===s)); }
+function toggleSearch(){ SHOW_SEARCH=!SHOW_SEARCH; if(!SHOW_SEARCH){SEARCH='';TIERFILTER='all';} render(); }
+function onSearch(v){ SEARCH=v; const m=document.getElementById('shelfMount'); if(m) m.innerHTML=shelfSection(visible()); }
+function dismissBanner(){ BANNER=false; render(); }
+function selectWf(id){ SELECTED=WORKFLOWS.find(w=>w.id===id); render(); }
+function toggleRow(el,id){ SELECTED=WORKFLOWS.find(w=>w.id===id); el.classList.toggle('open'); }
+
+function openLaunch(id){ SELECTED=WORKFLOWS.find(w=>w.id===id); FLOW='launch'; syncFlowBtns();
+  document.getElementById('mIcon').textContent=SELECTED.icon;
+  document.getElementById('mName').textContent=SELECTED.name + (SELECTED.version>0?` · v${SELECTED.version}`:'');
+  document.getElementById('mChain').innerHTML=chainHTML(SELECTED,true);
+  document.getElementById('mInputLabel').innerHTML=SELECTED.inputLabel+' <span class="req">*</span>';
+  document.getElementById('mInput').value=SELECTED.kickoff;
+  const proj = PROJECTS.find(p=>p.id===SELECTED.proj);
+  document.getElementById('mFolder').textContent = proj && proj.id!=='unb' ? proj.name : '(no project bound)';
+  render(); }
+
+function openTweak(id){ SELECTED=WORKFLOWS.find(w=>w.id===id); FLOW='tweak'; syncFlowBtns();
+  const nv = SELECTED.version+1;
+  document.getElementById('twFrozen').textContent='v'+SELECTED.version;
+  document.getElementById('twFrozen2').textContent='v'+SELECTED.version;
+  document.getElementById('twNew').textContent='v'+nv;
+  document.getElementById('twName').textContent=SELECTED.name;
+  render(); }
+
+/* ── shared redirect toast — every advertised navigation gives visible feedback ── */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._tmr);
+  t._tmr=setTimeout(()=>{t.classList.remove('show'); t.textContent='✓ Opened new thread — workflow running in workflow mode';},2800);
+}
+function doTweak(){ FLOW='browse'; syncFlowBtns(); render();
+  showToast('⑂ Forked v'+(SELECTED.version+1)+' draft → opening builder (019)'); }
+
+/* ── advertised-navigation handlers (redirect toasts — no inert controls) ── */
+function openBuilder(id){
+  if(id==='new'){ showToast('＋ Opening the describe screen (018) — new workflow'); return; }
+  const w=WORKFLOWS.find(x=>x.id===id)||SELECTED;
+  showToast('✎ Opening builder (018/019) for '+w.name); }
+function goPublish(id){ const w=WORKFLOWS.find(x=>x.id===id)||SELECTED;
+  showToast('⬆ Entering publish gauntlet (020) for '+w.name); }
+function deleteDraft(id){ const w=WORKFLOWS.find(x=>x.id===id)||SELECTED;
+  showToast('🗑 '+w.name+' deleted — net-new endpoint'); }
+/* A's card "View" carries the clicked workflow into B's master-detail pane —
+   explicit handoff (toast) so the variant switch isn't a silent tab-flip. */
+function viewDetail(id){ const w=WORKFLOWS.find(x=>x.id===id)||SELECTED;
+  SELECTED=w; setVariant('B'); showToast('▦ Detail (master-detail B) — '+w.name); }
+
+function closeFlow(){ FLOW='browse'; syncFlowBtns(); render(); }
+function doRun(){ FLOW='thread'; syncFlowBtns(); render();
+  const t=document.getElementById('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); }
+
+function toggleMap(force){ MAP_OPEN = (force===undefined)? !MAP_OPEN : force; render(); }
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ if(MAP_OPEN){toggleMap(false);} else if(FLOW==='launch'||FLOW==='tweak'){closeFlow();} } });
+render();
+</script>
+</body>
+</html>

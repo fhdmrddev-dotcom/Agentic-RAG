@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 019 — Draft Refine + Read-Only Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 019 — Draft Refine + Read-Only Graph · NET-NEW (no graph lib)
+   Q: How do you refine a one-shot draft by FORM (talk available) and
+      see it as a READ-ONLY graph — a linear phase_index spine + dashed
+      skip_to_phase failure-branches — with NO drag-canvas?
+   Truth: PhaseSpec has NO depends_on / no DAG. Spine = i→i+1; the only
+      non-linear edge is a validator on_failure: skip_to_phase:<slug>.
+      Plain HTML/CSS node cards + ONE <svg> edge overlay. No graph lib.
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { height: calc(100vh - 52px); overflow: hidden; }
+/* one shared "ink on a bright surface" token — reused by every dark-text-on-primary/warning spot
+   so the three drifted literals (#0b0b16 / #1a1206 / hsl(240 60% 8%)) collapse to one value */
+:root { --color-on-bright: hsl(240 60% 8%); }
+
+/* ── builder head (shared) ── */
+.builder-head { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-6); border-bottom:1px solid var(--color-border); background:var(--color-bg-elev1); }
+.builder-head .bh-title { font-family:var(--font-headline); font-weight:600; font-size:var(--text-md); display:flex; align-items:center; gap:var(--space-2); }
+.builder-head .netnew { font-family:var(--font-mono); font-size:9px; padding:2px 7px; border-radius:var(--radius-full); background:var(--color-accent-violet); color:var(--color-text); }
+.builder-head .spacer { flex:1; }
+.viewonly { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-xs); padding:4px var(--space-3); border-radius:var(--radius-full); background:var(--color-muted); color:var(--color-text-muted); border:1px solid var(--color-border); font-family:var(--font-mono); }
+.viewonly .lk { color:var(--color-text-dim); }
+.lint-badge { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-xs); padding:4px var(--space-3); border-radius:var(--radius-full); background:var(--color-success-dim); color:var(--color-success); border:1px solid hsl(142 71% 45% / .35); }
+.publish-btn { font-size:var(--text-sm); font-weight:600; padding:7px var(--space-4); border-radius:var(--radius-md); background:var(--color-primary); color:var(--color-on-bright); border:none; cursor:pointer; transition:filter var(--dur-fast); }
+.publish-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.publish-btn:disabled { opacity:.4; cursor:not-allowed; background:var(--color-muted); color:var(--color-text-dim); }
+/* transient publish confirmation banner */
+.publish-toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:9000; background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:var(--space-3) var(--space-5); font-size:12px; color:var(--color-text); display:flex; align-items:center; gap:var(--space-2); animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.publish-toast .pt-dot { width:7px; height:7px; border-radius:50%; background:var(--color-primary); animation:brandPulse 1.4s infinite; }
+
+/* ── strictness summary chip (read-back of the dial 018 set) ── */
+.dial-chip { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-xs); padding:4px var(--space-3); border-radius:var(--radius-full); border:1px solid hsl(142 71% 45% / .35); background:var(--color-success-dim); color:var(--color-success); font-family:var(--font-mono); }
+
+/* ── stage banner (state-cycle) ── */
+.stage-banner { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2) var(--space-6); font-size:12px; border-bottom:1px solid var(--color-border-soft); background:var(--color-bg); }
+.stage-banner .sb-dot { width:7px; height:7px; border-radius:50%; background:var(--color-primary); }
+.stage-banner.composing .sb-dot { background:var(--color-warning); animation:brandPulse 1.4s infinite; }
+.stage-banner.confirming .sb-dot { background:var(--color-warning); }
+.stage-banner.done .sb-dot { background:var(--color-success); }
+/* state glyph so the status is legible without relying on dot hue (non-color-alone) */
+.stage-banner .sb-glyph { font-size:11px; line-height:1; }
+.stage-banner.draft .sb-glyph { color:var(--color-primary); }
+.stage-banner.confirming .sb-glyph { color:var(--color-warning); }
+.stage-banner.done .sb-glyph { color:var(--color-success); }
+.stage-banner .sb-txt { color:var(--color-text-muted); }
+.stage-banner .sb-txt b { color:var(--color-text); }
+.stage-banner .dots { display:inline-flex; gap:3px; margin-left:4px; }
+.stage-banner .dots i { width:4px; height:4px; border-radius:50%; background:var(--color-warning); animation:dotBounce 1.2s infinite; }
+.stage-banner .dots i:nth-child(2){animation-delay:.15s} .stage-banner .dots i:nth-child(3){animation-delay:.3s}
+
+/* ── grey-area checkpoint (no silent substitution) ── */
+.checkpoint { margin:var(--space-4) auto 0; max-width:560px; border:1px solid var(--color-warning); background:var(--color-warning-dim); border-radius:var(--radius-lg); padding:var(--space-4); animation:fadeSlideUp var(--dur-slow) var(--ease-out); }
+.checkpoint .ck-h { display:flex; align-items:center; gap:var(--space-2); font-size:12px; font-weight:600; color:var(--color-warning); }
+.checkpoint .ck-body { font-size:13px; color:var(--color-text); margin-top:var(--space-2); line-height:1.55; }
+.checkpoint .ck-body code { font-family:var(--font-mono); font-size:11px; color:var(--color-text); background:var(--color-muted); padding:1px 5px; border-radius:4px; }
+.checkpoint .ck-actions { display:flex; gap:var(--space-2); margin-top:var(--space-3); }
+.ck-btn { font-size:12px; padding:5px var(--space-3); border-radius:var(--radius-sm); cursor:pointer; border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); }
+.ck-btn.primary { background:var(--color-warning); color:var(--color-on-bright); border:none; font-weight:600; }
+.ck-btn:hover { filter:brightness(1.1); }
+
+/* ─────────────────────────────────────────────────────────────
+   SHARED NODE VOCABULARY — 5 of 6 type glyphs borrowed VERBATIM from
+   run-surface PhaseCard.tsx (⚙ programmatic · ✎ llm_single · 🤖 llm_agent
+   · ⛓ llm_batch_agents · ☺ llm_human_input). The 6th, ◆ "Deliverable"
+   for llm_emit, is NET-NEW vocab — PhaseCard.tsx predates the llm_emit type
+   (added 101.1), so there is no run-surface glyph to borrow (BRIEF §4.4).
+   Also carries: status atom · scope chip · skill chip · gate chip.
+   ───────────────────────────────────────────────────────────── */
+.node-type { display:inline-flex; align-items:center; gap:6px; font-size:11px; }
+.node-type .glyph { width:18px; height:18px; border-radius:5px; display:grid; place-items:center; font-size:11px; }
+.gl-prog  { background:var(--color-muted); color:var(--color-text-muted); }
+.gl-single{ background:var(--color-primary-dim); color:var(--color-primary); }
+.gl-agent { background:var(--color-success-dim); color:var(--color-success); }
+.gl-batch { background:hsl(258 90% 66% / .15); color:var(--color-accent-violet); }
+.gl-human { background:var(--color-warning-dim); color:var(--color-warning); }
+.gl-emit  { background:linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); color:var(--color-text); }
+.node-type .tlabel { font-weight:600; color:var(--color-text); }
+.idx-atom { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); border:1px solid var(--color-border-soft); border-radius:var(--radius-sm); padding:0 5px; }
+
+/* node meta chips (all REAL fields) */
+.nchips { display:flex; gap:5px; flex-wrap:wrap; align-items:center; margin-top:7px; }
+.nchip { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; padding:2px 6px; border-radius:var(--radius-sm); border:1px solid var(--color-border-soft); color:var(--color-text-muted); }
+.nchip.scope { color:var(--color-success); border-color:hsl(142 71% 45% / .35); background:var(--color-success-dim); }
+.nchip.skill { color:var(--color-accent-violet); border-color:hsl(258 90% 66% / .4); background:hsl(258 90% 66% / .1); }
+.nchip.gate  { color:var(--color-warning); border-color:hsl(38 92% 60% / .35); background:var(--color-warning-dim); }
+.nchip.cite  { color:var(--color-primary); border-color:var(--color-primary-glow); background:var(--color-primary-dim); }
+.nchip.tool  { color:var(--color-text-muted); }
+
+/* ── (A) VERTICAL SPINE ── */
+.body-area { display:grid; height:calc(100vh - 52px - 53px - 34px); overflow:hidden; }
+.body-area.vA { grid-template-columns: 1fr; }
+.spine-wrap { overflow-y:auto; padding:var(--space-6) var(--space-6) 80px; background:var(--color-bg); }
+.spine-inner { max-width:720px; margin:0 auto; }
+.graph-cap { font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-4); display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+.graph-cap .legend-edge { display:inline-flex; align-items:center; gap:5px; }
+.le-solid { width:22px; height:0; border-top:2px solid var(--color-text-dim); }
+.le-dash { width:22px; height:0; border-top:2px dashed var(--color-warning); }
+
+.spine { list-style:none; margin:0; padding:0; }
+.spine > li { position:relative; padding-left:34px; padding-bottom:var(--space-3); }
+.spine > li:last-child { padding-bottom:0; }
+.spine > li::before { content:''; position:absolute; left:13px; top:38px; bottom:-6px; width:2px; background:var(--color-border-soft); }
+.spine > li:last-child::before { display:none; }
+.spine-node { position:absolute; left:2px; top:14px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-family:var(--font-mono); font-size:10px; background:hsl(220 30% 7%); border:1.5px solid var(--color-border); color:var(--color-text-dim); z-index:1; }
+.spine > li.is-emit .spine-node { border-color:var(--color-accent-violet); color:var(--color-accent-violet); box-shadow:0 0 0 3px hsl(258 90% 66% / .12); }
+.spine > li.is-batch .spine-node { border-color:var(--color-accent-violet); }
+
+.snode { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); padding:var(--space-3); cursor:pointer; transition:border-color var(--dur-fast), transform var(--dur-fast); }
+.snode:hover { border-color:var(--color-primary-glow); transform:translateY(-1px); }
+.snode.open { border-color:var(--color-primary); box-shadow:var(--shadow-glow-primary); }
+.snode.is-emit { border-left:3px solid var(--color-accent-violet); }
+.snode.is-batch { border-left:3px solid var(--color-accent-violet); }
+.snode-top { display:flex; align-items:center; gap:var(--space-2); }
+.snode-top .sn-name { font-weight:600; font-size:var(--text-sm); flex:1; }
+.snode-top .chev { color:var(--color-text-dim); font-size:11px; transition:transform var(--dur-fast); }
+.snode.open .chev { transform:rotate(90deg); }
+.snode .sn-purpose { font-size:11.5px; color:var(--color-text-muted); margin-top:5px; }
+
+/* dashed skip branch label under a gated node */
+.skip-branch { margin:6px 0 0 0; display:flex; align-items:center; gap:7px; font-size:10px; font-family:var(--font-mono); color:var(--color-warning); padding-left:2px; }
+.skip-branch .arc { width:30px; height:14px; border-left:2px dashed var(--color-warning); border-bottom:2px dashed var(--color-warning); border-radius:0 0 0 8px; }
+/* dashed on-fail rail in the spine gutter — runs from the gated node's bullet down to the target's bullet
+   (geometry-measured post-render so it lands ON the target node, not in empty space) */
+.spine-inner { position:relative; }
+.spine-skiprail { position:absolute; width:2px; border-left:2px dashed var(--color-warning); pointer-events:none; z-index:0; }
+.spine-skiprail::after { content:'⤳'; position:absolute; bottom:-7px; left:-5px; font-size:11px; color:var(--color-warning); }
+.terminus-cap { margin-top:var(--space-2); font-size:10px; font-family:var(--font-mono); color:var(--color-accent-violet); display:flex; align-items:center; gap:6px; }
+
+/* inline per-phase FORM (opens on click) */
+.pform { margin-top:var(--space-3); padding-top:var(--space-3); border-top:1px solid var(--color-border-soft); animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.pform-h { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); display:flex; align-items:center; gap:6px; }
+.pform-h .talk-mini { margin-left:auto; font-size:10px; padding:2px 8px; border-radius:var(--radius-full); border:1px solid var(--color-primary-glow); color:var(--color-primary); background:var(--color-primary-dim); cursor:pointer; text-transform:none; letter-spacing:0; }
+.pform-h .talk-mini:hover { filter:brightness(1.12); }
+.pf-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-3); }
+.pf-field { display:flex; flex-direction:column; gap:4px; }
+.pf-field.full { grid-column:1 / -1; }
+.pf-field label { font-size:10px; color:var(--color-text-dim); display:flex; align-items:center; gap:5px; }
+.pf-field .info { width:13px; height:13px; border-radius:50%; border:1px solid var(--color-border); color:var(--color-text-dim); display:inline-grid; place-items:center; font-size:8px; cursor:help; position:relative; }
+.pf-field .info:hover .pop { display:block; }
+.pf-field .pop { display:none; position:absolute; bottom:18px; left:0; width:220px; background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:7px 9px; font-size:10.5px; color:var(--color-text-muted); line-height:1.5; z-index:50; box-shadow:var(--shadow-md); text-transform:none; letter-spacing:0; }
+.pf-input { background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 8px; color:var(--color-text); font-family:inherit; font-size:12px; }
+.pf-input:focus { outline:none; border-color:var(--color-primary); }
+textarea.pf-input { resize:vertical; min-height:54px; font-size:12px; line-height:1.5; }
+select.pf-input { cursor:pointer; }
+.pf-input.greyed { background:var(--color-muted); color:var(--color-text-dim); cursor:not-allowed; }
+.pf-static { font-family:var(--font-mono); font-size:11px; color:var(--color-text); background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 8px; overflow-wrap:anywhere; min-width:0; }
+.pf-coming { font-size:9px; color:var(--color-text-dim); font-family:var(--font-mono); margin-top:3px; }
+/* tool whitelist chips inside the form */
+.toolwl { display:flex; flex-wrap:wrap; gap:5px; }
+.tw-chip { display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10px; padding:3px 8px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.tw-chip.on { background:var(--color-success-dim); border-color:hsl(142 71% 45% / .4); color:var(--color-success); }
+.tw-chip.on::before { content:'✓ '; }
+.tw-chip:hover { border-color:var(--color-primary-glow); }
+.cite-seg { display:inline-flex; border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; }
+.cite-seg button { background:transparent; border:none; color:var(--color-text-muted); font-family:var(--font-mono); font-size:10px; padding:5px 10px; cursor:pointer; border-right:1px solid var(--color-border); transition:all var(--dur-fast); }
+.cite-seg button:last-child { border-right:none; }
+.cite-seg button.on { background:var(--color-primary-dim); color:var(--color-primary); }
+.cite-seg button:hover:not(.on) { background:var(--color-accent); color:var(--color-text); }
+.cite-caption { font-size:10px; color:var(--color-text-dim); margin-top:5px; line-height:1.5; }
+.placeholder-link { font-family:var(--font-mono); font-size:10px; color:var(--color-accent-violet); }
+
+/* ── (B) HORIZONTAL FLOW ── */
+.body-area.vB { grid-template-columns: 1fr 320px; }
+.flow-canvas { position:relative; overflow:auto; background:var(--color-bg); padding:var(--space-8) var(--space-6); }
+.flow-canvas .canvas-cap { position:sticky; left:0; top:0; }
+.flow-svg { position:absolute; top:0; left:0; pointer-events:none; overflow:visible; }
+.flow-row { position:relative; display:flex; align-items:flex-start; gap:56px; padding-top:var(--space-6); width:max-content; }
+.fnode { position:relative; width:184px; min-height:156px; box-sizing:border-box; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); padding:var(--space-3); cursor:pointer; transition:border-color var(--dur-fast), transform var(--dur-fast); z-index:2; }
+.fnode:hover { border-color:var(--color-primary-glow); transform:translateY(-2px); }
+.fnode.open { border-color:var(--color-primary); box-shadow:var(--shadow-glow-primary); }
+.fnode.is-emit { border:1px solid var(--color-accent-violet); box-shadow:0 0 0 3px hsl(258 90% 66% / .1); }
+.fnode.is-batch { border-left:3px solid var(--color-accent-violet); }
+.fnode-idx { position:absolute; top:-10px; left:10px; font-family:var(--font-mono); font-size:9px; background:var(--color-bg-elev1); border:1px solid var(--color-border); border-radius:var(--radius-full); padding:1px 7px; color:var(--color-text-dim); }
+.fnode-top { display:flex; align-items:center; gap:7px; }
+.fnode .fn-name { font-weight:600; font-size:12px; line-height:1.3; margin-top:6px; }
+.fnode .fn-purpose { font-size:10.5px; color:var(--color-text-muted); margin-top:4px; line-height:1.4; }
+/* terminus tag */
+.term-tag { position:absolute; bottom:-9px; right:8px; font-family:var(--font-mono); font-size:8px; background:var(--color-accent-violet); color:var(--color-text); padding:1px 6px; border-radius:var(--radius-full); }
+/* skip-branch marker on a gated node (B) */
+.fnode .gate-flag { position:absolute; top:-10px; right:8px; font-size:9px; font-family:var(--font-mono); color:var(--color-warning); background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .4); padding:1px 6px; border-radius:var(--radius-full); }
+
+/* side inspector (B) */
+.b-inspector { border-left:1px solid var(--color-border); background:var(--color-bg-elev1); overflow-y:auto; padding:var(--space-4); }
+.b-inspector .ins-empty { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-2); color:var(--color-text-dim); text-align:center; font-size:12px; }
+.b-inspector .ins-empty .big { font-size:26px; opacity:.5; }
+.ins-head { display:flex; align-items:center; gap:var(--space-2); padding-bottom:var(--space-3); border-bottom:1px solid var(--color-border-soft); margin-bottom:var(--space-3); }
+.ins-head .ih-name { font-weight:600; font-size:var(--text-sm); }
+
+/* ── (C) FORM HERO + MINI-GRAPH RAIL ── */
+.body-area.vC { grid-template-columns: 88px 1fr; }
+.mini-rail { position:relative; border-right:1px solid var(--color-border); background:var(--color-bg-elev1); overflow-y:auto; padding:var(--space-4) 0; display:flex; flex-direction:column; align-items:center; gap:0; }
+/* dashed on-fail rail bridging the gated dot down to its skip target (geometry-measured post-render) */
+.mr-skiprail { position:absolute; left:12px; width:2px; border-left:2px dashed var(--color-warning); pointer-events:none; z-index:0; }
+.mr-skiprail::after { content:'⤳'; position:absolute; bottom:-6px; left:-5px; font-size:10px; color:var(--color-warning); }
+.mini-rail .mr-cap { font-size:8px; font-family:var(--font-mono); color:var(--color-text-dim); text-transform:uppercase; letter-spacing:.05em; text-align:center; margin-bottom:var(--space-2); }
+.mr-node { position:relative; display:flex; flex-direction:column; align-items:center; }
+.mr-dot { width:36px; height:36px; border-radius:var(--radius-md); display:grid; place-items:center; font-size:14px; border:1.5px solid var(--color-border); background:hsl(220 30% 7%); cursor:pointer; transition:all var(--dur-fast); position:relative; }
+.mr-dot:hover { border-color:var(--color-primary-glow); }
+.mr-dot.active { border-color:var(--color-primary); box-shadow:var(--shadow-glow-primary); }
+.mr-dot.is-emit { border-color:var(--color-accent-violet); background:linear-gradient(135deg, hsl(239 100% 82% / .12), hsl(258 90% 66% / .18)); }
+.mr-dot .mr-i { position:absolute; top:-5px; left:-5px; font-family:var(--font-mono); font-size:7px; background:var(--color-bg-elev1); border:1px solid var(--color-border); border-radius:var(--radius-full); padding:0 4px; color:var(--color-text-dim); }
+.mr-link { width:2px; height:18px; background:var(--color-border-soft); }
+.mr-link.last { display:none; }
+.mr-skip { position:absolute; right:-4px; top:9px; font-size:9px; color:var(--color-warning); }
+.mr-label { font-size:8px; color:var(--color-text-dim); text-align:center; margin-top:3px; max-width:72px; line-height:1.2; }
+.mr-node.active .mr-label { color:var(--color-text); }
+
+.form-hero { overflow-y:auto; padding:var(--space-6) var(--space-8) 80px; background:var(--color-bg); }
+.fh-inner { max-width:640px; margin:0 auto; }
+.fh-head { display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-2); }
+.fh-head .fh-name { font-family:var(--font-headline); font-size:var(--text-xl); font-weight:600; }
+.fh-pos { font-family:var(--font-mono); font-size:11px; color:var(--color-text-dim); }
+.fh-purpose { font-size:13px; color:var(--color-text-muted); margin-bottom:var(--space-5); line-height:1.55; max-width:560px; }
+.fh-nav { display:flex; gap:var(--space-2); margin-top:var(--space-6); padding-top:var(--space-4); border-top:1px solid var(--color-border-soft); }
+.fh-nav button { font-size:12px; padding:7px var(--space-4); border-radius:var(--radius-md); border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.fh-nav button:hover:not(:disabled) { border-color:var(--color-primary-glow); color:var(--color-text); }
+.fh-nav button:disabled { opacity:.4; cursor:not-allowed; }
+.fh-nav .spacer { flex:1; }
+.fh-card { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:var(--space-5); }
+.fh-card.is-emit { border-color:hsl(258 90% 66% / .4); }
+
+/* talk popover (big moves available) */
+#talkPop { position:fixed; z-index:8002; width:340px; background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+#talkBackdrop { position:fixed; inset:0; z-index:8001; background:rgba(0,0,0,.3); }
+.tp-h { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3); border-bottom:1px solid var(--color-border); font-size:12px; font-weight:600; }
+.tp-h .bot { width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); }
+.tp-body { padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-2); max-height:260px; overflow-y:auto; }
+.tp-msg { font-size:12px; line-height:1.5; }
+.tp-msg.ai { color:var(--color-text-muted); }
+.tp-msg.example { font-size:11px; color:var(--color-primary); border:1px dashed var(--color-primary-glow); border-radius:var(--radius-sm); padding:5px 8px; cursor:pointer; }
+.tp-msg.example:hover { background:var(--color-primary-dim); }
+.tp-composer { padding:var(--space-3); border-top:1px solid var(--color-border); }
+.tp-input { width:100%; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-2) var(--space-3); color:var(--color-text); font-family:inherit; font-size:12px; resize:none; }
+.talk-send { flex-shrink:0; font-size:11px; font-weight:600; padding:7px var(--space-3); border-radius:var(--radius-md); background:var(--color-primary); color:var(--color-on-bright); border:none; cursor:pointer; transition:filter var(--dur-fast); }
+.talk-send:hover { filter:brightness(1.08); }
+.tp-hint { font-size:9px; color:var(--color-text-dim); margin-top:5px; text-align:center; }
+
+/* ── (D) SYNTHESIS — A's vertical spine + B's side-panel form (PUSH/SPLIT) ──
+   The body is a 2-col grid: a FLEXIBLE graph column that SHRINKS to make room,
+   and a FIXED-WIDTH inspector that pushes (never overlays, never slides over).
+   minmax(0,1fr) on the graph column is the key: it lets the grid track shrink
+   below its content's intrinsic width, so the fixed 400px panel + flexible graph
+   ALWAYS fit the viewport — no horizontal scrollbar at any desktop width.
+   At rest the panel collapses to a thin 44px rail so the graph reads clean. */
+.body-area.vD { grid-template-columns: minmax(0, 1fr) 44px; transition:grid-template-columns var(--dur-base) var(--ease-out); }
+.body-area.vD.panel-open { grid-template-columns: minmax(0, 1fr) 400px; }
+/* the graph column reuses A's .spine-wrap; min-width:0 lets it shrink (belt-and-braces with minmax) */
+.body-area.vD .spine-wrap { min-width:0; }
+.body-area.vD .spine-inner { max-width:680px; }
+
+/* the fixed-width inspector PANEL (push/split, not overlay) */
+.d-panel { border-left:1px solid var(--color-border); background:var(--color-bg-elev1); overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+/* RESTING RAIL — thin, calm, just a vertical hint that an inspector lives here */
+.d-rail { width:44px; height:100%; display:flex; flex-direction:column; align-items:center; padding:var(--space-4) 0; gap:var(--space-3); color:var(--color-text-dim); }
+.d-rail .dr-glyph { font-size:16px; opacity:.6; }
+.d-rail .dr-vlabel { writing-mode:vertical-rl; transform:rotate(180deg); font-size:9px; font-family:var(--font-mono); letter-spacing:.12em; text-transform:uppercase; color:var(--color-text-dim); margin-top:var(--space-2); }
+/* OPEN PANEL — header (name + close) + scrolling form body */
+.d-panel-open { width:400px; height:100%; display:flex; flex-direction:column; animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+.dp-head { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-4) var(--space-4) var(--space-3); border-bottom:1px solid var(--color-border-soft); }
+.dp-head .dp-name { font-weight:600; font-size:var(--text-sm); flex:1; line-height:1.3; }
+.dp-back { flex-shrink:0; width:26px; height:26px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; display:grid; place-items:center; font-size:13px; transition:all var(--dur-fast); }
+.dp-back:hover { border-color:var(--color-primary-glow); color:var(--color-text); }
+.dp-sub { padding:var(--space-3) var(--space-4) 0; display:flex; align-items:center; gap:6px; }
+.dp-body { flex:1; overflow-y:auto; padding:var(--space-3) var(--space-4) 80px; }
+/* RESTING EMPTY STATE — only visible if you'd rather show the calm card than the rail
+   (kept for the 3-second test reference; D uses the rail by default) */
+.d-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-2); color:var(--color-text-dim); text-align:center; font-size:12px; padding:var(--space-6); }
+.d-empty .big { font-size:26px; opacity:.5; }
+/* MOBILE — match the app's existing right-side workspace panel: at narrow widths the
+   push/split would crush the graph, so the panel becomes a bottom-sheet (full-width
+   row 2) instead of a side column. Sketch-level note only — not over-built here. */
+@media (max-width: 760px){
+  .body-area.vD, .body-area.vD.panel-open { grid-template-columns:1fr; grid-template-rows:1fr auto; }
+  .d-panel { border-left:none; border-top:1px solid var(--color-border); max-height:55vh; }
+  .d-panel-open, .d-rail { width:auto; }
+  .d-rail { flex-direction:row; height:auto; padding:var(--space-2) var(--space-4); }
+  .d-rail .dr-vlabel { writing-mode:horizontal-tb; transform:none; margin-top:0; }
+}
+
+/* toolbar */
+.toolbar-toggle { display:flex; gap:3px; }
+.toolbar-toggle button.on { background:var(--color-primary) !important; color:var(--color-on-bright) !important; font-weight:600; }
+.sketch-toolbar { bottom:auto; top:60px; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 019 · Draft Refine + Read-Only Graph</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Vertical spine</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Horizontal flow</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Form-hero + rail</button>
+  <button class="variant-tab" data-v="D" onclick="setVariant('D')">D · Synthesis: spine + side-panel <span class="star">★</span> Selected</button>
+</nav>
+
+<div class="shell" id="shell"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">state</span>
+  <div class="toolbar-toggle" id="stToggle">
+    <button data-s="draft" class="on" onclick="setStage('draft')">draft</button>
+    <button data-s="confirming" onclick="setStage('confirming')">grey-area</button>
+    <button data-s="done" onclick="setStage('done')">resolved</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   DOMAIN MODEL — continues the 018 vendor-risk workflow, EXTENDED to
+   exercise ALL SIX real phase_types in ONE graph. Real enums only.
+   folder_scope = a BOUND list of folder ids (never a path/prose).
+   The ONLY non-linear edge = a freshness gate on_failure: skip_to_phase.
+   ═══════════════════════════════════════════════════════════════ */
+
+// the project-bound folder (resolved at authoring time — name + bound id)
+const PROJECT_FOLDER = { name:'Vendor Risk — 2026 Reviews', id:'fld_9c41a7' };
+const KB_SUBFOLDER   = { name:'Vendor Risk — 2026 Reviews / Assessments', id:'fld_a8d2e0' };
+
+// real registry tool names (from get_tools — the eligible whitelist)
+const TOOL_REGISTRY = ['search_documents','execute_code','fetch_url','list_folders','read_document'];
+
+// template placeholders link back to the 018 fill-contract
+const TEMPLATE = { file:'vendor-risk-brief.docx', placeholders:['{{vendor_name}}','{{tier}}','{{key_findings}}','{{residual_risk}}','{{reviewed_on}}'] };
+
+// PhaseSpec list — ordered by phase_index. Each carries ONLY its real
+// type-conditioned fields. validators are PER-PHASE.
+const PHASES = [
+  { idx:0, slug:'fetch-assessments', name:'Pull latest assessments', type:'programmatic',
+    glyph:'⚙', tlabel:'Server step',
+    purpose:'Fetches & normalizes the newest vendor assessment records before any AI runs.',
+    fields:{ fn:'load_recent_assessments', input_keys:['as_of_date','vendor_list'] } },
+
+  { idx:1, slug:'search-kb', name:'Search the assessment folder', type:'llm_agent',
+    glyph:'🤖', tlabel:'AI agent step',
+    purpose:'One agent loops over allowed tools to gather supporting evidence from the scoped KB folder.',
+    fields:{ prompt:'For each vendor, find the supporting evidence and prior incidents in the scoped folder. Cite every claim.',
+      available_tools:['search_documents','read_document'], max_steps:12, wall_clock_seconds:240,
+      model:'claude-sonnet-4-6', folder_scope:[KB_SUBFOLDER], skill_ref:null },
+    validators:[ { kind:'freshness', on_failure:'skip_to_phase:human-confirm', timing:'pre',
+      config:{ max_age_days:90, check_versions:true }, label:'freshness · ≤90d' } ] },
+
+  { idx:2, slug:'per-vendor-analyze', name:'Analyze each vendor', type:'llm_batch_agents',
+    glyph:'⛓', tlabel:'Parallel agents',
+    purpose:'Fans out one agent per vendor; merges their findings in numbered order.',
+    fields:{ prompt:'Assess this single vendor: score residual risk, list the top findings, flag tier changes.',
+      available_tools:['search_documents','read_document'], max_steps:8, wall_clock_seconds:180,
+      max_parallel_agents:5, merge_strategy:'concat_numbered',
+      model:'claude-sonnet-4-6', folder_scope:[KB_SUBFOLDER], skill_ref:'risk-scoring-rubric' } },
+
+  { idx:3, slug:'draft-narrative', name:'Draft the summary narrative', type:'llm_single',
+    glyph:'✎', tlabel:'AI write step',
+    purpose:'Writes the cross-vendor narrative from the merged per-vendor findings.',
+    fields:{ prompt:'Write an executive narrative summarizing portfolio-wide vendor risk from the merged findings.',
+      model:'claude-opus-4-8', temperature:0.3, folder_scope:[KB_SUBFOLDER], skill_ref:null } },
+
+  { idx:4, slug:'human-confirm', name:'Risk-committee confirm', type:'llm_human_input',
+    glyph:'☺', tlabel:'Needs you',
+    purpose:'Pauses for the risk committee to confirm or send the narrative back before the deliverable renders.',
+    fields:{ prompt:'Review the draft portfolio narrative. Confirm to render the brief, or return it with notes.',
+      options:['Confirm — render the brief','Return with notes'], timeout_seconds:300 } },
+
+  { idx:5, slug:'emit-brief', name:'Render the vendor-risk brief', type:'llm_emit',
+    glyph:'◆', tlabel:'Deliverable', // ◆/"Deliverable" = NET-NEW vocab (no PhaseCard.tsx glyph for llm_emit — §4.4)
+    purpose:'Fills the brief template from the confirmed narrative — the deliverable terminus.',
+    fields:{ prompt:'Fill every placeholder in vendor-risk-brief.docx from the confirmed narrative and per-vendor findings.',
+      emitter:'render_template', model:'claude-opus-4-8',
+      citation_policy:'strict', integrity_policy:'strict',
+      folder_scope:[KB_SUBFOLDER], skill_ref:null } },
+];
+
+const TYPE_CLASS = { programmatic:'gl-prog', llm_single:'gl-single', llm_agent:'gl-agent', llm_batch_agents:'gl-batch', llm_human_input:'gl-human', llm_emit:'gl-emit' };
+const KIND_CLASS = { programmatic:'is-prog', llm_batch_agents:'is-batch', llm_emit:'is-emit' };
+
+let CUR_V='A', STAGE='draft', OPEN_IDX=null, RAIL_IDX=0;
+
+/* ── helpers ── */
+function fldName(scopeArr){ return scopeArr && scopeArr.length ? scopeArr[0].name : null; }
+function fldId(scopeArr){ return scopeArr && scopeArr.length ? scopeArr[0].id : null; }
+function nodeClass(p){ return KIND_CLASS[p.type]||''; }
+
+// chips that every node carries (scope · skill · gate · cite) — all REAL fields
+function nodeChips(p, opts){
+  opts = opts||{};
+  let out = '';
+  if(p.fields.folder_scope && p.fields.folder_scope.length){
+    out += `<span class="nchip scope" title="folder_scope is a BOUND list of folder ids">📁 ${fldName(p.fields.folder_scope)} <span style="opacity:.6">${fldId(p.fields.folder_scope)}</span></span>`;
+  }
+  if(p.fields.skill_ref){
+    out += `<span class="nchip skill" title="skill_ref">✦ ${p.fields.skill_ref}</span>`;
+  }
+  if(p.validators && p.validators.length){
+    out += p.validators.map(v=>`<span class="nchip gate" title="validator — on_failure: ${v.on_failure}">⚑ ${v.label}</span>`).join('');
+  }
+  if(p.type==='llm_emit'){
+    out += `<span class="nchip cite" title="citation_policy enum">⛓ cite: ${p.fields.citation_policy}</span>`;
+  }
+  return out;
+}
+
+// the dashed skip target slug for a phase, if any
+function skipTarget(p){
+  if(!p.validators) return null;
+  for(const v of p.validators){ const m=/^skip_to_phase:(.+)$/.exec(v.on_failure); if(m) return {slug:m[1], gate:v.label}; }
+  return null;
+}
+function phaseBySlug(slug){ return PHASES.find(p=>p.slug===slug); }
+
+/* ═══════════════ PER-PHASE FORM — conditioned on phase_type ═══════════════ */
+function infoPop(text){ return `<span class="info">ⓘ<span class="pop">${text}</span></span>`; }
+
+function toolWhitelist(selected, idx){
+  return `<div class="toolwl">${TOOL_REGISTRY.map(t=>{
+    const on = selected.includes(t);
+    return `<span class="tw-chip ${on?'on':''}" onclick="toggleTool(this,${idx},'${t}')">${t}</span>`;
+  }).join('')}</div>`;
+}
+
+function citationSeg(cur, idx){
+  const opts=['strict','flag','partial','draft'];
+  const caps={ strict:'honest fail — deliverable NOT produced if anything uncited.', flag:'delivers WITH [unverified] marks + a coverage summary.', partial:'BLANKS uncited values (null over invent) + a gap list.', draft:'no enforcement — prepends “DRAFT — citations not enforced”.' };
+  return `<div class="cite-seg">${opts.map(o=>`<button class="${o===cur?'on':''}" onclick="setCite(this,'${o}',${idx})">${o}</button>`).join('')}</div>
+    <div class="cite-caption" id="citeCap">${caps[cur]}</div>`;
+}
+
+// renders the editable form body for a phase — ONLY its real fields
+function formBody(p){
+  const f = p.fields, T = p.type, idx = p.idx;
+  let rows = '';
+  if(T==='programmatic'){
+    rows = `
+      <div class="pf-field">
+        <label>fn ${infoPop('A key into PROGRAMMATIC_PHASE_REGISTRY. No LLM, no tools, no model on a server step.')}</label>
+        <select class="pf-input" onchange="setField(${idx},'fn',this.value)"><option>${f.fn}</option><option>load_assessment_index</option><option>normalize_vendors</option></select>
+      </div>
+      <div class="pf-field">
+        <label>input_keys</label>
+        <input class="pf-input" value="${f.input_keys.join(', ')}" onchange="setListField(${idx},'input_keys',this.value)">
+      </div>
+      <div class="pf-field full" style="margin-top:2px"><div class="cite-caption">⚙ Server step — deterministic. No tools / model / KB scope (none apply to this type).</div></div>`;
+  } else if(T==='llm_single'){
+    rows = `
+      <div class="pf-field full">
+        <label>prompt</label>
+        <textarea class="pf-input" oninput="setField(${idx},'prompt',this.value)">${f.prompt}</textarea>
+      </div>
+      <div class="pf-field">
+        <label>model</label>
+        <select class="pf-input" onchange="setField(${idx},'model',this.value)"><option>${f.model}</option><option>gpt-5.5</option><option>gemini-2.6-pro</option><option>deepseek-v3.3</option></select>
+      </div>
+      <div class="pf-field">
+        <label>temperature ${infoPop('0 = deterministic, higher = more varied prose.')}</label>
+        <input class="pf-input" type="number" step="0.1" min="0" max="1" value="${f.temperature}" onchange="setField(${idx},'temperature',this.value)">
+      </div>
+      <div class="pf-field full">
+        <label>folder_scope ${infoPop('A bound list of folder ids — requires project_folder_id. Resolved at authoring time, never a path.')}</label>
+        <div class="pf-static">📁 ${fldName(f.folder_scope)} <span style="color:var(--color-text-dim)">${fldId(f.folder_scope)}</span></div>
+      </div>
+      <div class="pf-field full">
+        <label>skill_ref ${infoPop('Optional. Names a skill; the run-time snapshot is materialized then, not now.')}</label>
+        <div class="pf-static" style="color:var(--color-text-dim)">${f.skill_ref || 'none'}</div>
+      </div>`;
+  } else if(T==='llm_agent'){
+    rows = `
+      <div class="pf-field full">
+        <label>prompt</label>
+        <textarea class="pf-input" oninput="setField(${idx},'prompt',this.value)">${f.prompt}</textarea>
+      </div>
+      <div class="pf-field full">
+        <label>available_tools — per-phase whitelist ${infoPop('Real registry tool names from get_tools. Only these are callable in this phase.')}</label>
+        ${toolWhitelist(f.available_tools, idx)}
+      </div>
+      <div class="pf-field">
+        <label>max_steps</label>
+        <input class="pf-input" type="number" value="${f.max_steps}" onchange="setField(${idx},'max_steps',this.value)">
+      </div>
+      <div class="pf-field">
+        <label>wall_clock_seconds</label>
+        <input class="pf-input" type="number" value="${f.wall_clock_seconds}" onchange="setField(${idx},'wall_clock_seconds',this.value)">
+      </div>
+      <div class="pf-field">
+        <label>model</label>
+        <select class="pf-input" onchange="setField(${idx},'model',this.value)"><option>${f.model}</option><option>gpt-5.5</option><option>gemini-2.6-pro</option></select>
+      </div>
+      <div class="pf-field">
+        <label>folder_scope</label>
+        <div class="pf-static">📁 ${fldName(f.folder_scope)} <span style="color:var(--color-text-dim)">${fldId(f.folder_scope)}</span></div>
+      </div>
+      ${p.validators&&p.validators.length?`<div class="pf-field full">
+        <label>validator — freshness gate ${infoPop('freshness is the only timing=pre, net-new gate. max_age_days is mandatory; on_failure routes the run.')}</label>
+        <div class="pf-static" style="color:var(--color-warning)">⚑ freshness · max_age_days=${p.validators[0].config.max_age_days} · check_versions=${p.validators[0].config.check_versions} → on_failure: <b>skip_to_phase: ${p.validators[0].on_failure.split(':')[1]}</b></div>
+      </div>`:''}`;
+  } else if(T==='llm_batch_agents'){
+    rows = `
+      <div class="pf-field full">
+        <label>prompt — runs once per item</label>
+        <textarea class="pf-input" oninput="setField(${idx},'prompt',this.value)">${f.prompt}</textarea>
+      </div>
+      <div class="pf-field full">
+        <label>available_tools — per-phase whitelist</label>
+        ${toolWhitelist(f.available_tools, idx)}
+      </div>
+      <div class="pf-field">
+        <label>max_parallel_agents ${infoPop('Internal fan-out WITHIN this one node — NOT a graph branch. The spine stays linear.')}</label>
+        <input class="pf-input" type="number" value="${f.max_parallel_agents}" onchange="setField(${idx},'max_parallel_agents',this.value)">
+      </div>
+      <div class="pf-field">
+        <label>merge_strategy</label>
+        <select class="pf-input" onchange="setField(${idx},'merge_strategy',this.value)"><option ${f.merge_strategy==='concat_numbered'?'selected':''}>concat_numbered</option><option ${f.merge_strategy==='concat'?'selected':''}>concat</option></select>
+      </div>
+      <div class="pf-field">
+        <label>max_steps</label>
+        <input class="pf-input" type="number" value="${f.max_steps}" onchange="setField(${idx},'max_steps',this.value)">
+      </div>
+      <div class="pf-field">
+        <label>model</label>
+        <select class="pf-input" onchange="setField(${idx},'model',this.value)"><option>${f.model}</option></select>
+      </div>
+      <div class="pf-field full">
+        <label>folder_scope</label>
+        <div class="pf-static">📁 ${fldName(f.folder_scope)} <span style="color:var(--color-text-dim)">${fldId(f.folder_scope)}</span></div>
+      </div>
+      <div class="pf-field full">
+        <label>skill_ref</label>
+        <div class="pf-static" style="color:var(--color-accent-violet)">✦ ${f.skill_ref}</div>
+      </div>`;
+  } else if(T==='llm_human_input'){
+    rows = `
+      <div class="pf-field full">
+        <label>prompt — shown to the person</label>
+        <textarea class="pf-input" oninput="setField(${idx},'prompt',this.value)">${f.prompt}</textarea>
+      </div>
+      <div class="pf-field full">
+        <label>options ${infoPop('The choices the person picks from. A human-pause type — no model, no tools, no KB scope.')}</label>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${f.options.map((o,oi)=>`<input class="pf-input" value="${o}" onchange="setOption(${idx},${oi},this.value)">`).join('')}
+        </div>
+      </div>
+      <div class="pf-field">
+        <label>timeout_seconds</label>
+        <input class="pf-input" type="number" value="${f.timeout_seconds}" onchange="setField(${idx},'timeout_seconds',this.value)">
+      </div>
+      <div class="pf-field"><div class="cite-caption" style="margin-top:18px">☺ Needs you — pauses the run. No model/tools/scope on this type.</div></div>`;
+  } else if(T==='llm_emit'){
+    rows = `
+      <div class="pf-field full">
+        <label>prompt — the forced emit instruction</label>
+        <textarea class="pf-input" oninput="setField(${idx},'prompt',this.value)">${f.prompt}</textarea>
+      </div>
+      <div class="pf-field">
+        <label>emitter</label>
+        <div class="pf-static">${f.emitter}</div>
+      </div>
+      <div class="pf-field">
+        <label>model</label>
+        <select class="pf-input" onchange="setField(${idx},'model',this.value)"><option>${f.model}</option><option>gpt-5.5</option></select>
+      </div>
+      <div class="pf-field full">
+        <label>template placeholders — the 018 fill-contract ${infoPop('Pulled from DocxTemplate.get_undeclared_template_variables(). The emit must fill every one.')}</label>
+        <div class="pf-static" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <span style="color:var(--color-text-dim)">${TEMPLATE.file} →</span>
+          ${TEMPLATE.placeholders.map(ph=>`<span class="placeholder-link">${ph}</span>`).join('')}
+        </div>
+      </div>
+      <div class="pf-field full">
+        <label>citation_policy — POST-verdict disposition ${infoPop('Real enum: strict|flag|partial|draft. The verdict computation is UNCHANGED; this only governs delivery of uncited leaves. The publish judge runs regardless.')}</label>
+        ${citationSeg(f.citation_policy, idx)}
+      </div>
+      <div class="pf-field full">
+        <label>integrity_policy</label>
+        <select class="pf-input greyed" disabled><option>strict</option></select>
+        <div class="pf-coming">⏳ documented_limit coming with Phase 106 emitters — declared, not yet wired.</div>
+      </div>
+      <div class="pf-field full">
+        <label>folder_scope</label>
+        <div class="pf-static">📁 ${fldName(f.folder_scope)} <span style="color:var(--color-text-dim)">${fldId(f.folder_scope)}</span></div>
+      </div>
+      <div class="pf-field full">
+        <label>skill_ref ${infoPop('Optional. Names a skill; the run-time snapshot is materialized then, not now. Part of the llm_emit field set per the WorkflowDefinition schema.')}</label>
+        <div class="pf-static" style="color:var(--color-text-dim)">${f.skill_ref || 'none'}</div>
+      </div>`;
+  }
+  return `<div class="pf-grid">${rows}</div>`;
+}
+
+/* ── interaction stubs — write edits BACK into the PHASES model so they survive re-render ── */
+// generic scalar field writer: setField(idx,'max_steps', this.value)
+function setField(idx, key, val){ const p=PHASES[idx]; if(!p) return; p.fields[key]=val; }
+// comma-separated list field (e.g. input_keys)
+function setListField(idx, key, val){ const p=PHASES[idx]; if(!p) return; p.fields[key]=val.split(',').map(s=>s.trim()).filter(Boolean); }
+// one option line inside a human_input options[] array
+function setOption(idx, oi, val){ const p=PHASES[idx]; if(!p||!p.fields.options) return; p.fields.options[oi]=val; }
+
+function toggleTool(el, idx, tool){
+  el.classList.toggle('on');
+  const p=PHASES[idx]; if(!p) return;
+  const list=p.fields.available_tools||(p.fields.available_tools=[]);
+  const at=list.indexOf(tool);
+  if(el.classList.contains('on')){ if(at<0) list.push(tool); }
+  else if(at>=0){ list.splice(at,1); }
+}
+function setCite(el,val,idx){ el.parentElement.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===el));
+  const p=PHASES[idx]; if(p) p.fields.citation_policy=val; // persist so reopening the node keeps the choice
+  const caps={ strict:'honest fail — deliverable NOT produced if anything uncited.', flag:'delivers WITH [unverified] marks + a coverage summary.', partial:'BLANKS uncited values (null over invent) + a gap list.', draft:'no enforcement — prepends “DRAFT — citations not enforced”.' };
+  const c=document.getElementById('citeCap'); if(c) c.textContent=caps[val]; }
+
+/* ═══════════════ GREY-AREA CHECKPOINT (no silent substitution) ═══════════════ */
+function checkpointHTML(){
+  if(STAGE!=='confirming') return '';
+  return `<div class="checkpoint">
+    <div class="ck-h">⚠ One thing I had to read into your request — confirm before it binds</div>
+    <div class="ck-body">You said “search the assessment folder.” The closest real folder under your project is
+      <code>${KB_SUBFOLDER.name}</code> <span style="color:var(--color-text-dim);font-family:var(--font-mono);font-size:11px">${KB_SUBFOLDER.id}</span>.
+      I'll bind that as the <code>folder_scope</code> for the search, parallel-analyze and emit phases. I did <b>not</b> guess a folder that doesn't exist.</div>
+    <div class="ck-actions">
+      <button class="ck-btn primary" onclick="setStage('done')">✓ Yes, bind that folder</button>
+      <button class="ck-btn" onclick="setStage('draft')">Pick a different folder</button>
+    </div>
+  </div>`;
+}
+
+/* ═══════════════ VARIANT A — VERTICAL SPINE ═══════════════
+   inlineForm=true (A's default): clicking a node expands its form INLINE beneath
+   the node. inlineForm=false (variant D): the SAME spine renders, the open node
+   still lights up (.open glow) as the selection anchor, but the form is suppressed
+   here — it appears in D's fixed side-panel instead. Same render, two presentations. */
+function spineHTML(inlineForm){
+  if(inlineForm===undefined) inlineForm=true;
+  const items = PHASES.map(p=>{
+    const open = OPEN_IDX===p.idx;
+    const skip = skipTarget(p);
+    const isEmit = p.type==='llm_emit';
+    return `<li class="${nodeClass(p)} ${isEmit?'is-emit':''}">
+      <span class="spine-node" id="spineNode${p.idx}">${isEmit?'◆':p.idx}</span>
+      <div class="snode ${nodeClass(p)} ${open?'open':''}" onclick="toggleNode(${p.idx})">
+        <div class="snode-top">
+          <span class="node-type"><span class="glyph ${TYPE_CLASS[p.type]}">${p.glyph}</span><span class="tlabel">${p.name}</span></span>
+          <span class="idx-atom">${p.type}</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="sn-purpose">${p.purpose}</div>
+        <div class="nchips">${nodeChips(p)}</div>
+        ${isEmit?`<div class="terminus-cap">◆ deliverable terminus · ${TEMPLATE.file} · citation_policy <b>${p.fields.citation_policy}</b></div>`:''}
+        ${(inlineForm&&open)?`<div class="pform" onclick="event.stopPropagation()">
+          <div class="pform-h">refine by form · fields for <b style="color:var(--color-text)">&nbsp;${p.type}&nbsp;</b>
+            <span class="talk-mini" onclick="openTalk(event,${p.idx})">💬 talk for a big move</span></div>
+          ${formBody(p)}
+        </div>`:''}
+      </div>
+      ${skip?`<div class="skip-branch"><span class="arc"></span>on fail (${skip.gate}) → skip to <b>${skip.slug}</b> <span style="opacity:.6">(${phaseBySlug(skip.slug)?phaseBySlug(skip.slug).name:''})</span></div>`:''}
+    </li>`;
+  }).join('');
+  return `<div class="spine-wrap"><div class="spine-inner">
+    ${graphCap()}
+    ${checkpointHTML()}
+    <ol class="spine" style="margin-top:var(--space-4)">${items}</ol>
+    <div class="spine-skiprail" id="spineSkipRail" style="display:none" title="on fail → skip to target"></div>
+  </div></div>`;
+}
+
+/* ═══════════════ VARIANT D — SYNTHESIS (A's spine + B's side panel) ═══════════════
+   LEFT  = A's vertical phase_index spine VERBATIM (spineHTML with the inline form OFF).
+   RIGHT = a FIXED-WIDTH inspector that PUSHES the graph column (split, not overlay).
+   At rest the panel is a thin 44px rail (calm — the graph reads clean, 3-sec test);
+   click a node and the grid track grows to 400px, showing THAT node's phase_type-
+   conditioned form via the shared formBody() — exactly B's inspector body, reused. */
+function dPanelHTML(){
+  if(OPEN_IDX===null){
+    // RESTING RAIL — thin vertical hint; no node selected. Calm, non-blocking.
+    return `<div class="d-panel" aria-label="phase inspector (collapsed)">
+      <div class="d-rail">
+        <div class="dr-glyph" title="Select a phase to refine its fields">⚙</div>
+        <div class="dr-vlabel">select a phase to refine its fields</div>
+      </div>
+    </div>`;
+  }
+  // OPEN — the clicked node's form, reusing B's body (formBody) verbatim.
+  const p = PHASES[OPEN_IDX];
+  return `<div class="d-panel">
+    <div class="d-panel-open">
+      <div class="dp-head">
+        <span class="node-type"><span class="glyph ${TYPE_CLASS[p.type]}">${p.glyph}</span><span class="dp-name">${p.name}</span></span>
+        <button class="dp-back" onclick="toggleNode(${p.idx})" title="Close — return the graph to full width" aria-label="close inspector">✕</button>
+      </div>
+      <div class="dp-sub">
+        <span class="idx-atom">phase_index ${p.idx}</span>
+        <span class="idx-atom">${p.type}</span>
+      </div>
+      <div class="dp-body">
+        <div class="pform-h" style="margin-bottom:var(--space-3)">refine by form · fields for <b style="color:var(--color-text)">${p.type}</b>
+          <span class="talk-mini" onclick="openTalk(event,${p.idx})">💬 talk</span></div>
+        <div class="nchips" style="margin-bottom:var(--space-4)">${nodeChips(p)}</div>
+        ${formBody(p)}
+      </div>
+    </div>
+  </div>`;
+}
+
+// draw the dashed on-fail rail in the spine gutter, measured from the real bullet positions so it
+// runs from the gated node's bullet down to the skip-target's bullet (lands ON the node, not in space)
+function positionSpineSkip(){
+  const inner=document.querySelector('.spine-inner'), seg=document.getElementById('spineSkipRail');
+  if(!inner||!seg) return;
+  const fromI = PHASES.findIndex(p=>skipTarget(p)); if(fromI<0) return;
+  const toI = PHASES.findIndex(p=>p.slug===skipTarget(PHASES[fromI]).slug); if(toI<0) return;
+  const fromDot=document.getElementById('spineNode'+PHASES[fromI].idx), toDot=document.getElementById('spineNode'+PHASES[toI].idx);
+  if(!fromDot||!toDot) return;
+  const ib=inner.getBoundingClientRect(), fb=fromDot.getBoundingClientRect(), tb=toDot.getBoundingClientRect();
+  const top = (fb.bottom - ib.top);   // leave the gated bullet's bottom
+  const bottom = (tb.top - ib.top);   // reach the target bullet's top
+  // sit just left of the solid spine gutter (bullets center ≈ left:13px) so the two rails read as parallel
+  seg.style.left = (fb.left - ib.left - 6) + 'px';
+  seg.style.top = top + 'px';
+  seg.style.height = Math.max(0, bottom-top) + 'px';
+  seg.style.display = 'block';
+}
+
+function graphCap(){
+  return `<div class="graph-cap">
+    <span>READ-ONLY GRAPH · ordered by <b style="color:var(--color-text-muted)">phase_index</b></span>
+    <span class="legend-edge"><span class="le-solid"></span> run order (i→i+1)</span>
+    <span class="legend-edge"><span class="le-dash"></span> on-fail branch (skip_to_phase)</span>
+    <span style="color:var(--color-text-dim)">· no depends_on · no parallel lanes · inspect, don't drag</span>
+  </div>`;
+}
+
+/* ═══════════════ VARIANT B — HORIZONTAL FLOW ═══════════════ */
+function flowHTML(){
+  // nodes left-to-right; SVG overlay draws solid spine + dashed skip.
+  // Edge geometry is MEASURED from the real node rects post-render (positionFlowEdges),
+  // never guessed — so the edges touch the pills even when heights differ.
+  const nodesHTML = PHASES.map(p=>{
+    const open = OPEN_IDX===p.idx;
+    const isEmit = p.type==='llm_emit';
+    const skip = skipTarget(p);
+    return `<div id="fnode${p.idx}" class="fnode ${nodeClass(p)} ${isEmit?'is-emit':''} ${open?'open':''}" onclick="toggleNode(${p.idx})">
+      <span class="fnode-idx">#${p.idx}</span>
+      ${skip?`<span class="gate-flag" id="gateFlag${p.idx}" title="on fail → ${skip.slug}">⚑ ${skip.gate}</span>`:''}
+      <div class="fnode-top"><span class="node-type"><span class="glyph ${TYPE_CLASS[p.type]}">${p.glyph}</span><span class="tlabel" style="font-size:10px">${p.tlabel}</span></span></div>
+      <div class="fn-name">${p.name}</div>
+      <div class="fn-purpose">${p.purpose}</div>
+      <div class="nchips">${nodeChips(p)}</div>
+      ${isEmit?`<span class="term-tag">◆ deliverable</span>`:''}
+    </div>`;
+  }).join('');
+
+  // SVG shell only — defs + empty groups the measure pass fills in.
+  return `<div class="flow-canvas" id="flowCanvas">
+    <div class="canvas-cap">${graphCap()}</div>
+    <svg class="flow-svg" id="flowSvg" width="100%" height="100%" style="top:0;left:0">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--color-text-dim)"/></marker>
+        <marker id="arrowW" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--color-warning)"/></marker>
+      </defs>
+      <g id="flowEdges"></g>
+    </svg>
+    <div class="flow-row" id="flowRow">${nodesHTML}</div>
+    ${STAGE==='confirming'?checkpointHTML():''}
+  </div>`;
+}
+
+// measure real node rects, then draw the solid spine (node-right → next-node-left, at each node's
+// true vertical center) and the ONE dashed skip from the gate-flag corner down to the target's top.
+function positionFlowEdges(){
+  const canvas=document.getElementById('flowCanvas'), svg=document.getElementById('flowSvg'), g=document.getElementById('flowEdges');
+  if(!canvas||!svg||!g) return;
+  // size the SVG coordinate space to the full scrollable canvas so absolute edge coords map 1:1
+  svg.setAttribute('width', canvas.scrollWidth);
+  svg.setAttribute('height', canvas.scrollHeight);
+  const cb=canvas.getBoundingClientRect();
+  const sx0=canvas.scrollLeft, sy0=canvas.scrollTop;
+  const rectOf=el=>{ const r=el.getBoundingClientRect(); return { left:r.left-cb.left+sx0, right:r.right-cb.left+sx0, top:r.top-cb.top+sy0, bottom:r.bottom-cb.top+sy0, cx:(r.left+r.right)/2-cb.left+sx0, cy:(r.top+r.bottom)/2-cb.top+sy0 }; };
+  const nodeR = PHASES.map(p=>{ const el=document.getElementById('fnode'+p.idx); return el?rectOf(el):null; });
+  let out='';
+  // solid spine: right edge of node i → left edge of node i+1, each at its own measured center-y
+  for(let i=0;i<PHASES.length-1;i++){
+    const a=nodeR[i], b=nodeR[i+1]; if(!a||!b) continue;
+    out += `<line x1="${a.right}" y1="${a.cy}" x2="${b.left-6}" y2="${b.cy}" stroke="var(--color-text-dim)" stroke-width="2" marker-end="url(#arrow)"></line>`;
+  }
+  // dashed skip: from the gated node's gate-flag corner down to the target node's TOP edge
+  const fromI = PHASES.findIndex(p=>skipTarget(p));
+  if(fromI>=0){
+    const skip = skipTarget(PHASES[fromI]);
+    const toI = PHASES.findIndex(p=>p.slug===skip.slug);
+    const a=nodeR[fromI], b=nodeR[toI];
+    const flagEl=document.getElementById('gateFlag'+PHASES[fromI].idx);
+    if(a&&b){
+      const fr = flagEl?rectOf(flagEl):{ cx:a.cx, top:a.top };
+      const sx=fr.cx, sy=fr.top;                 // leave from the gate-flag
+      const ex=b.cx, ey=b.top-6;                 // land on the target's top edge
+      const dip=Math.max(sy,ey)+64;              // arc below the row, derived from real tops
+      out += `<path d="M ${sx} ${sy} C ${sx} ${dip}, ${ex} ${dip}, ${ex} ${ey}" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowW)"></path>
+        <circle cx="${sx}" cy="${sy}" r="3" fill="var(--color-warning)"></circle>
+        <text x="${(sx+ex)/2}" y="${dip+16}" fill="var(--color-warning)" font-family="var(--font-mono)" font-size="10" text-anchor="middle">on fail (${skip.gate}) → skip_to_phase: ${skip.slug}</text>`;
+    }
+  }
+  g.innerHTML = out;
+}
+
+function bInspectorHTML(){
+  if(OPEN_IDX===null){
+    return `<div class="b-inspector"><div class="ins-empty">
+      <div class="big">◎</div>
+      <div>Click a node to refine it by form.</div>
+      <div style="font-size:10px;color:var(--color-text-dim)">View only — no drag, no connect-the-dots.</div>
+    </div></div>`;
+  }
+  const p = PHASES[OPEN_IDX];
+  return `<div class="b-inspector">
+    <div class="ins-head">
+      <span class="node-type"><span class="glyph ${TYPE_CLASS[p.type]}">${p.glyph}</span><span class="ih-name">${p.name}</span></span>
+    </div>
+    <div class="pform-h" style="margin-bottom:var(--space-3)">refine by form · <b style="color:var(--color-text)">${p.type}</b>
+      <span class="talk-mini" onclick="openTalk(event,${p.idx})">💬 talk</span></div>
+    ${formBody(p)}
+  </div>`;
+}
+
+/* ═══════════════ VARIANT C — FORM HERO + MINI-GRAPH RAIL ═══════════════ */
+function railHTML(){
+  const nodes = PHASES.map((p,i)=>{
+    const skip = skipTarget(p);
+    const isEmit = p.type==='llm_emit';
+    return `<div class="mr-node ${RAIL_IDX===p.idx?'active':''}">
+      <div id="mrDot${p.idx}" class="mr-dot ${RAIL_IDX===p.idx?'active':''} ${isEmit?'is-emit':''}" onclick="jumpRail(${p.idx})" title="${p.name} · ${p.type}">
+        <span class="mr-i">#${p.idx}</span>${p.glyph}${skip?'<span class="mr-skip" title="on-fail branch">⤳</span>':''}
+      </div>
+      <div class="mr-label">${p.name}</div>
+      <div class="mr-link ${i===PHASES.length-1?'last':''}"></div>
+    </div>`;
+  }).join('');
+  return `<div class="mini-rail" id="miniRail"><div class="mr-cap">phase<br>index</div>${nodes}
+    <div class="mr-skiprail" id="mrSkipRail" style="display:none" title="on fail → skip to target"></div>
+    <div style="margin-top:auto;padding:var(--space-3) 6px 0;font-size:8px;color:var(--color-text-dim);text-align:center;font-family:var(--font-mono)">view only<br>⤳ = on-fail</div>
+  </div>`;
+}
+
+// position the dashed on-fail rail from the gated dot's bottom to its target dot's top — measured, not guessed
+function positionRailSkip(){
+  const rail=document.getElementById('miniRail'), seg=document.getElementById('mrSkipRail');
+  if(!rail||!seg) return;
+  const fromP = PHASES.findIndex(p=>skipTarget(p)); if(fromP<0) return;
+  const toP = PHASES.findIndex(p=>p.slug===skipTarget(PHASES[fromP]).slug); if(toP<0) return;
+  const fromDot=document.getElementById('mrDot'+PHASES[fromP].idx), toDot=document.getElementById('mrDot'+PHASES[toP].idx);
+  if(!fromDot||!toDot) return;
+  const rb=rail.getBoundingClientRect(), fb=fromDot.getBoundingClientRect(), tb=toDot.getBoundingClientRect();
+  const top = (fb.bottom - rb.top) + rail.scrollTop;          // from the gated dot's bottom edge
+  const bottom = (tb.top - rb.top) + rail.scrollTop;          // to the target dot's top edge
+  seg.style.top = top+'px';
+  seg.style.height = Math.max(0, bottom-top)+'px';
+  seg.style.display = 'block';
+}
+
+function formHeroHTML(){
+  const p = PHASES[RAIL_IDX];
+  const isEmit = p.type==='llm_emit';
+  const skip = skipTarget(p);
+  return `<div class="form-hero"><div class="fh-inner">
+    ${graphCap()}
+    ${STAGE==='confirming'?checkpointHTML():''}
+    <div class="fh-head" style="margin-top:var(--space-5)">
+      <span class="node-type"><span class="glyph ${TYPE_CLASS[p.type]}" style="width:26px;height:26px;font-size:15px">${p.glyph}</span></span>
+      <span class="fh-name">${p.name}</span>
+      <span class="fh-pos">${p.tlabel} · phase_index ${p.idx} · ${p.type}</span>
+      ${isEmit?'<span class="nchip cite" style="margin-left:auto">◆ deliverable terminus</span>':''}
+    </div>
+    <div class="fh-purpose">${p.purpose}${skip?` <span style="color:var(--color-warning)">On fail this phase's freshness gate skips to <b>${skip.slug}</b>.</span>`:''}</div>
+    <div class="fh-card ${isEmit?'is-emit':''}">
+      <div class="pform-h" style="margin-bottom:var(--space-4)">refine by form · fields for <b style="color:var(--color-text)">${p.type}</b>
+        <span class="talk-mini" onclick="openTalk(event,${p.idx})">💬 talk for a big move</span></div>
+      <div class="nchips" style="margin-bottom:var(--space-4)">${nodeChips(p)}</div>
+      ${formBody(p)}
+    </div>
+    <div class="fh-nav">
+      <button onclick="jumpRail(${Math.max(0,p.idx-1)})" ${p.idx===0?'disabled':''}>← previous phase</button>
+      <span class="spacer"></span>
+      <button onclick="jumpRail(${Math.min(PHASES.length-1,p.idx+1)})" ${p.idx===PHASES.length-1?'disabled':''}>next phase →</button>
+    </div>
+  </div></div>`;
+}
+
+/* ═══════════════ TALK POPOVER (big moves available) ═══════════════ */
+function openTalk(e, idx){
+  e.stopPropagation();
+  closeTalk();
+  const p = PHASES[idx];
+  const bd=document.createElement('div'); bd.id='talkBackdrop'; bd.onclick=closeTalk; document.body.appendChild(bd);
+  const el=document.createElement('div'); el.id='talkPop'; el.onclick=ev=>ev.stopPropagation();
+  el.innerHTML=`
+    <div class="tp-h"><span class="bot"></span> Refine “${p.name}” by talking</div>
+    <div class="tp-body">
+      <div class="tp-msg ai">Forms cover the per-field tweaks. For a bigger move, just say it — I'll restructure and re-validate the graph.</div>
+      <div class="tp-msg example" onclick="talkExample(this)">“Add a web-search step before this one”</div>
+      <div class="tp-msg example" onclick="talkExample(this)">“Make the freshness gate stricter — ≤30 days”</div>
+      <div class="tp-msg example" onclick="talkExample(this)">“Switch the emit to flag mode, not strict”</div>
+      <div class="tp-msg ai" id="tpTyping" style="display:none;align-items:center;gap:6px"><span class="dots" style="display:inline-flex;gap:3px"><i style="width:4px;height:4px;border-radius:50%;background:var(--color-primary);animation:dotBounce 1.2s infinite"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--color-primary);animation:dotBounce 1.2s infinite .15s"></i><i style="width:4px;height:4px;border-radius:50%;background:var(--color-primary);animation:dotBounce 1.2s infinite .3s"></i></span> re-drafting the spine…</div>
+    </div>
+    <div class="tp-composer">
+      <div style="display:flex;gap:6px;align-items:flex-end">
+        <textarea class="tp-input" id="tpInput" rows="2" placeholder="Describe the change in plain English…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();talkSend();}"></textarea>
+        <button class="talk-send" onclick="talkSend()" title="Send (Enter)">Send ▸</button>
+      </div>
+      <div class="tp-hint">talk makes big moves · forms handle the fields · the GRAPH is view-only (no drag/connect) — talk still restructures the draft</div>
+    </div>`;
+  document.body.appendChild(el);
+  const a = e.currentTarget.getBoundingClientRect();
+  el.style.top = Math.min(a.bottom+8, window.innerHeight-340)+'px';
+  el.style.left = Math.max(8, Math.min(a.left-150, window.innerWidth-352))+'px';
+  el.querySelector('textarea').focus();
+}
+// clicking an example drops it into the composer + shows the typing indicator (visible terminus)
+function talkExample(elc){
+  const inp=document.getElementById('tpInput'); if(inp){ inp.value=elc.textContent.replace(/[“”]/g,''); inp.focus(); }
+  const t=document.getElementById('tpTyping'); if(t) t.style.display='flex';
+}
+// stub send — shows the re-drafting indicator so the "talk for a big move" path has a visible terminus
+function talkSend(){
+  const inp=document.getElementById('tpInput'); if(inp && !inp.value.trim()) return;
+  const t=document.getElementById('tpTyping'); if(t) t.style.display='flex';
+  if(inp){ inp.value=''; }
+}
+function closeTalk(){ ['talkPop','talkBackdrop'].forEach(id=>{const e=document.getElementById(id); if(e) e.remove();}); }
+
+/* ═══════════════ HEAD + STAGE BANNER ═══════════════ */
+function stageBannerHTML(){
+  if(STAGE==='draft'){
+    return `<div class="stage-banner draft"><span class="sb-dot"></span><span class="sb-glyph" aria-hidden="true">✎</span>
+      <span class="sb-txt"><b>Draft ready</b> — the AI emitted all 6 phases in one shot. Click any node to refine it by form, or talk for a bigger move.</span></div>`;
+  }
+  if(STAGE==='confirming'){
+    return `<div class="stage-banner confirming"><span class="sb-dot"></span><span class="sb-glyph" aria-hidden="true">⚠</span>
+      <span class="sb-txt"><b>1 grey area to confirm</b> — I read a folder reference and need you to bind it. No silent substitution.</span></div>`;
+  }
+  return `<div class="stage-banner done"><span class="sb-dot"></span><span class="sb-glyph" aria-hidden="true">✓</span>
+    <span class="sb-txt"><b>All resolved</b> — every folder, tool and gate is bound. Ready to publish (runs the 8-stage gauntlet).</span></div>`;
+}
+
+function headHTML(){
+  return `<div class="builder-head">
+    <span class="bh-title">◆ Vendor-risk workflow <span class="netnew">NET-NEW · no graph lib</span></span>
+    <span class="spacer"></span>
+    <span class="dial-chip" title="the strictness dial 018 set — read back here">⚑ STRICT · citations strict · output valid · freshness ≤90d · judge</span>
+    <span class="viewonly"><span class="lk">🔒</span> View only · inspect, don't drag</span>
+    <span class="lint-badge">✓ lint clean · reachable · terminal · inputs satisfied</span>
+    <button class="publish-btn" onclick="publishStub()" ${STAGE==='confirming'?'disabled title="Resolve the grey area before publishing"':''}>Publish ▸</button>
+  </div>`;
+}
+
+/* ── publish stub — visible feedback so the primary CTA is not a dead control ── */
+function publishStub(){
+  if(STAGE==='confirming') return; // grey area blocks publish (button is disabled too)
+  const old=document.getElementById('publishToast'); if(old) old.remove();
+  const t=document.createElement('div'); t.id='publishToast'; t.className='publish-toast';
+  t.innerHTML=`<span class="pt-dot"></span> Publish → running the 8-stage gauntlet… (freezes this version, forks a new draft to edit)`;
+  document.body.appendChild(t);
+  setTimeout(()=>{ const e=document.getElementById('publishToast'); if(e) e.remove(); }, 3200);
+}
+
+/* ═══════════════ RENDER ═══════════════ */
+function render(){
+  let body;
+  if(CUR_V==='A') body = `<div class="body-area vA">${spineHTML()}</div>`;
+  else if(CUR_V==='B') body = `<div class="body-area vB">${flowHTML()}${bInspectorHTML()}</div>`;
+  else if(CUR_V==='C') body = `<div class="body-area vC">${railHTML()}${formHeroHTML()}</div>`;
+  // D — A's spine (inline form OFF) + the fixed-width push/split panel. The grid
+  // grows the panel track to 400px only when a node is selected (panel-open).
+  else body = `<div class="body-area vD ${OPEN_IDX!==null?'panel-open':''}">${spineHTML(false)}${dPanelHTML()}</div>`;
+  document.getElementById('shell').innerHTML = headHTML() + stageBannerHTML() + body;
+  // measure-then-draw the read-only edges from real node geometry (no magic-number anchoring)
+  if(CUR_V==='A') requestAnimationFrame(positionSpineSkip);
+  if(CUR_V==='B') requestAnimationFrame(positionFlowEdges);
+  if(CUR_V==='C') requestAnimationFrame(positionRailSkip);
+  // D reuses A's spine + its dashed on-fail skiprail — measure it the same way.
+  // The panel push is a CSS grid-template-columns transition, so the spine column
+  // shifts over ~200ms; re-measure when the transition settles so the dashed rail
+  // re-anchors to the moved bullets (not just the pre-transition positions).
+  if(CUR_V==='D'){
+    requestAnimationFrame(positionSpineSkip);
+    const ba=document.querySelector('.body-area.vD');
+    if(ba) ba.addEventListener('transitionend', ()=>{ if(CUR_V==='D') positionSpineSkip(); }, { once:true });
+  }
+}
+function setVariant(v){ CUR_V=v; OPEN_IDX=null; closeTalk(); document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); render(); }
+function setStage(s){ STAGE=s; document.querySelectorAll('#stToggle button').forEach(b=>b.classList.toggle('on',b.dataset.s===s)); render(); }
+function toggleNode(idx){ OPEN_IDX = (OPEN_IDX===idx)?null:idx; render(); }
+function jumpRail(idx){ RAIL_IDX=idx; render(); }
+// keep the measured edges aligned to the pills on window resize (A + B + C + D)
+window.addEventListener('resize', ()=>{ if(CUR_V==='A'||CUR_V==='D') positionSpineSkip(); else if(CUR_V==='B') positionFlowEdges(); else if(CUR_V==='C') positionRailSkip(); });
+render();
+</script>
+</body>
+</html>
