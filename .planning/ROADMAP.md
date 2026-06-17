@@ -105,7 +105,11 @@
   1. Opening a document shows a detail panel that displays each metadata value alongside its per-field confidence (reusing the `ConfidenceChip` primitive); low confidence reads as visibly tentative.
   2. User can manually edit/override any extracted metadata value inline; the edit persists into `documents.metadata` and writes a `metadata.update` audit row (verified live).
   3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 112-01-PLAN.md — Backend: PATCH /documents/{id}/metadata (RLS-404 + run_in_threadpool + field allow-list + _source hard-stamp + metadata.update audit) + 6 backend Wave-0 test stubs (META-05)
+  - [ ] 112-02-PLAN.md — Re-extract precedence merge guard at the single ingest_document write site (preserve _source='user', drop their _confidence, degrade-doesn't-wipe) + live re-extract test (META-05)
+  - [ ] 112-03-PLAN.md — Frontend foundation: ConfidenceChip primitive (hardcoded 0.75/0.50 tiers, honest Edited/Extracted states) + DocumentMetadata/_confidence/_source type extension + updateDocumentMetadata/listMetadataFields client methods (META-02)
+  - [ ] 112-04-PLAN.md — DocumentDetailPanel push/split shell (PanelSection Metadata accordion, custom fields, inline edit, Saved-only-after-write receipt, mobile bottom-sheet) + IngestionPage wiring + DocumentList inline-MetadataPanel retire + WCAG AA vitest-axe (META-02/META-05)
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **document detail panel** — the shared shell for META display/edit + REL panel + CLASS suggestion) BEFORE plan. (UX-02 cross-cutting acceptance.)
 
@@ -198,7 +202,7 @@
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
-| 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/? | Not started | - |
+| 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/4 | Planned (4 plans / 3 waves) | - |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
