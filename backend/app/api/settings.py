@@ -42,6 +42,7 @@ class FullSettingsResponse(BaseModel):
     # Phase 111.1 — the stored provider the picker reads to show the current selection.
     embedding_provider: str
     extraction_provider: str
+    extraction_model: str
     # Reranking
     rerank_enabled: bool
     rerank_provider: str
@@ -99,6 +100,7 @@ class SettingsUpdate(BaseModel):
     # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
     embedding_provider: str | None = None      # D-06 explicit embedding provider
     extraction_provider: str | None = None     # D-09 #1 explicit extraction provider
+    extraction_model: str | None = None         # the operator's selected extraction model (was silently dropped — verify-work 111.1)
     confidence_bucket_high: float | None = None    # D-12 portable confidence bucket
     confidence_bucket_medium: float | None = None  # D-12 portable confidence bucket
     # Reranking
@@ -154,6 +156,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # Phase 111.1 — surface the stored provider so the picker can read it back.
         embedding_provider=s.embedding_provider,
         extraction_provider=s.extraction_provider,
+        extraction_model=s.extraction_model,
         rerank_enabled=s.rerank_enabled,
         rerank_provider=s.rerank_provider,
         rerank_model=s.rerank_model,
@@ -269,6 +272,8 @@ async def update_settings(
         updates["embedding_provider"] = body.embedding_provider
     if body.extraction_provider is not None:
         updates["extraction_provider"] = body.extraction_provider
+    if body.extraction_model is not None:
+        updates["extraction_model"] = body.extraction_model
     if body.confidence_bucket_high is not None:
         updates["confidence_bucket_high"] = body.confidence_bucket_high
     if body.confidence_bucket_medium is not None:

@@ -1548,6 +1548,7 @@ export interface FullAppSettings {
   // selection (routes by stored provider, never name-inference — D-06 / D-09).
   embedding_provider: string
   extraction_provider: string
+  extraction_model: string
   rerank_enabled: boolean
   rerank_provider: string
   rerank_model: string

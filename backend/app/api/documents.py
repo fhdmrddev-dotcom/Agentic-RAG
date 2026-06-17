@@ -1397,31 +1397,39 @@ def ingest_document(
                 sample_for_extraction,
             )
 
-            model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
-            # D-09 #1 (BUG-260616-01 / EMBED-01 data-egress cure): prefer the stored
-            # explicit `extraction_provider`. When the operator pinned a provider in
-            # Settings (e.g. `lmstudio`/`ollama`), trust it and SKIP name-inference
-            # entirely — a slashed local id (`google/gemma-3-4b`) can no longer be
-            # mis-inferred to `openrouter` and ship document text to the cloud.
-            # Name-inference stays ONLY as the last-resort legacy fallback for pre-111.1
-            # rows that never set `extraction_provider` (D-08 back-compat — byte-identical).
-            provider = (getattr(app_settings, "extraction_provider", "") or "").strip().lower() \
-                or (get_model_capability(model) or {}).get("provider")
-            defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
-            DynModel = build_metadata_model(defs)
-            emit_tool = {
-                "type": "function",
-                "function": {
-                    "name": "emit_document_metadata",
-                    "description": (
-                        "Emit structured metadata for this document with a per-field "
-                        "0-1 confidence."
-                    ),
-                    "parameters": DynModel.model_json_schema(),
-                },
-            }
-            sampled = sample_for_extraction(text, app_settings.extraction_window_cap)
+            # verify-work 111.1: the WHOLE enriched setup is inside the degrade try now.
+            # build_metadata_model() raises ValueError on an unknown/typo'd custom
+            # field_type (reachable only via a direct DB write — the CRUD API hard-validates
+            # field_type), and resolve/read/sample can also fail; previously those sat
+            # OUTSIDE the try so a metadata-config problem hard-FAILED the whole ingest
+            # (status=failed, no chunks). The "metadata failure never breaks ingestion"
+            # contract (D-111-8) requires ANY enriched failure to degrade to metadata=None.
+            metadata_dict = None
             try:
+                model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
+                # D-09 #1 (BUG-260616-01 / EMBED-01 data-egress cure): prefer the stored
+                # explicit `extraction_provider`. When the operator pinned a provider in
+                # Settings (e.g. `lmstudio`/`ollama`), trust it and SKIP name-inference
+                # entirely — a slashed local id (`google/gemma-3-4b`) can no longer be
+                # mis-inferred to `openrouter` and ship document text to the cloud.
+                # Name-inference stays ONLY as the last-resort legacy fallback for pre-111.1
+                # rows that never set `extraction_provider` (D-08 back-compat — byte-identical).
+                provider = (getattr(app_settings, "extraction_provider", "") or "").strip().lower() \
+                    or (get_model_capability(model) or {}).get("provider")
+                defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
+                DynModel = build_metadata_model(defs)
+                emit_tool = {
+                    "type": "function",
+                    "function": {
+                        "name": "emit_document_metadata",
+                        "description": (
+                            "Emit structured metadata for this document with a per-field "
+                            "0-1 confidence."
+                        ),
+                        "parameters": DynModel.model_json_schema(),
+                    },
+                }
+                sampled = sample_for_extraction(text, app_settings.extraction_window_cap)
                 result = asyncio.run(extract_metadata_enriched(
                     sampled=sampled,
                     model=model,
@@ -1431,15 +1439,15 @@ def ingest_document(
                     user_settings=app_settings,
                 ))
                 emitted = result.get("emitted")
-            except Exception:  # noqa: BLE001 — degrade layer 2 at the call site; doc still completes (D-111-8)
+                # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
+                # `confidence` field out of the dump and renames it to the nested
+                # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
+                # left the flat `confidence` key in the dump (the populated-dict default
+                # survives exclude_none), polluting the `metadata @>` containment filter.
+                metadata_dict = attach_confidence(emitted.model_dump(exclude_none=True)) if emitted else None
+            except Exception:  # noqa: BLE001 — degrade layer 2: ANY enriched failure → metadata=None; doc still completes (D-111-8)
                 log.warning("enriched metadata extraction failed; degrading to None", exc_info=True)
-                emitted = None
-            # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
-            # `confidence` field out of the dump and renames it to the nested
-            # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
-            # left the flat `confidence` key in the dump (the populated-dict default
-            # survives exclude_none), polluting the `metadata @>` containment filter.
-            metadata_dict = attach_confidence(emitted.model_dump(exclude_none=True)) if emitted else None
+                metadata_dict = None
         else:
             metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
             metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None

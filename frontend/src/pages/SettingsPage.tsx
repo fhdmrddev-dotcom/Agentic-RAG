@@ -581,10 +581,12 @@ export function SettingsPage() {
     setEmbeddingProvider(data.embedding_provider || "openai")
     const exProvider = data.extraction_provider || "openai"
     setExtractionProvider(exProvider)
-    // The extraction model/base_url/key aren't in the settings contract today; seed
-    // the UI from the matching preset so the picker + footer read coherently.
+    // The extraction base_url/key aren't in the settings contract; seed those from the
+    // matching preset. The MODEL now round-trips from the server (verify-work 111.1 fix:
+    // it was previously dropped on save) — prefer the persisted value, fall back to the
+    // preset default for an old backend / never-set value.
     const exPreset = EXTRACTION_PRESETS.find((p) => p.key === exProvider)
-    setExtractionModel(exPreset?.model ?? "")
+    setExtractionModel(data.extraction_model || exPreset?.model || "")
     setExtractionBaseUrl(exPreset?.base_url ?? "")
     setExtractionApiKey(exPreset?.local ? (exPreset.dummyKey ?? "") : (data.embedding_has_api_key ? KEY_PLACEHOLDER : ""))
     setRerankEnabled(data.rerank_enabled)
