@@ -1,9 +1,10 @@
 ---
 phase: 112-metadata-enrichment-document-detail-panel-manual-edit
 verified: 2026-06-18T02:20:00Z
-status: human_needed
-score: 3/3 must-haves verified (automated checks)
+status: passed
+score: 3/3 must-haves verified (automated) + 5/5 human-UAT resolved (4 pass + 1 fixed)
 overrides_applied: 0
+human_verification_resolved: "2026-06-18 — all 5 G-4 lived-experience gates resolved in 112-HUMAN-UAT.md (status: complete): #1 desktop push/split pass, #2 mobile bottom-sheet (issue: docs invisible <768px → IngestionPage made responsive, re-verified live @390px), #3 greyscale Low distinguishable (temp-fixture proven), #4 keyboard sweep pass, #5 end-to-end edit→PATCH→audit→Edited-chip pass (Claude-driven browser+DB, CR-01 extra=allow holds end-to-end). 0 open issues."
 human_verification:
   - test: "Desktop push/split panel feel — click a document row in the live Documents page"
     expected: "The list column shrinks but stays fully visible; the 430px detail panel slides into place on the right; list remains interactive; panel closes cleanly and list re-expands; focus returns to the clicked row"
