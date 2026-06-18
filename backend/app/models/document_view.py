@@ -12,23 +12,22 @@ Two layers live here:
    change, no data migration of live view rows — the D-113-6 payoff).
 
 2. The **request/response models** (``ViewCreate`` / ``ViewUpdate`` /
-   ``ViewResponse`` / ``ViewResolveResponse``) — clone the ``metadata_field.py``
-   create/update/response shape. ``ViewResolveResponse.documents`` reuses
-   ``DocumentResponse`` from ``models/document.py`` so a resolved view listing is
-   byte-shape-identical to ``GET /documents``.
+   ``ViewResponse``) — clone the ``metadata_field.py`` create/update/response shape.
 
-CAUTION (the 112 CR-01 lesson): ``DocumentResponse.metadata`` is
-``DocumentMetadata`` with ``model_config = ConfigDict(extra="allow")``. It is
-reused here UNCHANGED — do NOT tighten it to ``extra="ignore"`` anywhere in the
-resolve path, or ``_source`` / ``_confidence`` are silently stripped from rows.
+NOTE (IN-03 — the 112 CR-01 lesson): there is deliberately NO
+``ViewResolveResponse`` model. ``GET /{view_id}/resolve`` returns a plain
+``{"documents": [...], "total": N}`` dict with NO ``response_model`` so resolved
+rows round-trip the exact metadata blob ``GET /documents`` returns. A typed
+response model whose nested ``metadata`` is ``DocumentMetadata`` would have to
+keep ``extra="allow"`` or it silently strips ``_source`` / ``_confidence`` from
+rows — so the model was removed rather than left dangling one import away from
+re-triggering that regression.
 """
 
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
-
-from app.models.document import DocumentResponse
 
 
 # ── filter AST (stored shape — reject-unknown-op by Literal discriminator) ─────
@@ -63,10 +62,3 @@ class ViewResponse(BaseModel):
     filter_expr: dict
     folder_scope: UUID | None = None
     is_global: bool = False
-
-
-class ViewResolveResponse(BaseModel):
-    # Reuse DocumentResponse (extra="allow" on its nested metadata intact — 112
-    # CR-01) so the view listing round-trips the same blob GET /documents does.
-    documents: list[DocumentResponse]
-    total: int
