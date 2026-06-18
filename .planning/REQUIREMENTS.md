@@ -18,10 +18,10 @@
 
 ### Metadata Enrichment (META) — built first; unblocks classification
 - [ ] **META-01**: User can define custom metadata fields (beyond the built-in title/author/date/type/topics/language/summary) that the system extracts on ingest.
-- [ ] **META-02**: User can see a per-field confidence score for each extracted metadata value.
+- [x] **META-02**: User can see a per-field confidence score for each extracted metadata value.
 - [ ] **META-03**: Metadata extraction uses the user-selected (or an admin-configured) model — not the hardwired `gpt-4o`.
 - [ ] **META-04**: Metadata extraction reads beyond the first 3,000 characters (configurable/larger window or title-page + tail sampling) so late title-page/byline data isn't missed.
-- [ ] **META-05**: User can manually edit/override an extracted metadata value, audit-logged.
+- [x] **META-05**: User can manually edit/override an extracted metadata value, audit-logged.
 
 ### Configurable / Multi-Provider Embeddings (EMBED) — retires the OpenAI embedding SPOF (SEED-048)
 - [ ] **EMBED-01**: Admin can select the embedding provider (OpenAI / Google / local Ollama / local LM Studio / other OpenAI-compatible `/v1/embeddings`) from Settings — embeddings are no longer effectively OpenAI-only.
@@ -94,8 +94,8 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | EMBED-04 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
 | EMBED-05 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
 | EMBED-06 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
-| META-02 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
-| META-05 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Pending |
+| META-02 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Complete |
+| META-05 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Complete |
 | VIEW-01 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
 | VIEW-02 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
 | VIEW-04 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |

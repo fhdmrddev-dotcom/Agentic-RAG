@@ -34,7 +34,7 @@
 - [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ COMPLETE 2026-06-15 (2/2 plans; live-verified on :54322; gsd-verifier 7/7 PASSED; code review 0C/0W/3I — secure-phase pending)
 - [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
 - [x] **Phase 111.1: Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)** — Embedding-provider picker + local presets + re-embed-on-change lifecycle; retires the OpenAI embedding SPOF (SEED-048). ✅ COMPLETE 2026-06-17 — all 3 gates clear (verify-work 5/5 incl. post-restart cold-start smoke + secure verified 0-open + validate nyquist-compliant; live local-infra UAT). **(INSERTED · G-2 sketch)**
-- [ ] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)**
+- [x] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)** ✅ COMPLETE 2026-06-18 — all 3 gates clear (verify 3/3 + 5/5 human-UAT incl. mobile-responsive fix; secure 16/16 threats_open 0; validate 43/43 nyquist-compliant). Shared detail-panel shell for 117/118.
 - [ ] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing.
 - [ ] **Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar** — Typed/indexed date columns + relative-date operators; the view/filter builder UI; sidebar render-as-folder. **(G-2 sketch)**
 - [ ] **Phase 115: Virtual Folders — Agent Tool** — The agent can run a saved view / metadata query as a tool to answer questions in chat.
@@ -106,10 +106,10 @@
   2. User can manually edit/override any extracted metadata value inline; the edit persists into `documents.metadata` and writes a `metadata.update` audit row (verified live).
   3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
 **Plans**: 4 plans
-  - [ ] 112-01-PLAN.md — Backend: PATCH /documents/{id}/metadata (RLS-404 + run_in_threadpool + field allow-list + _source hard-stamp + metadata.update audit) + 6 backend Wave-0 test stubs (META-05)
-  - [ ] 112-02-PLAN.md — Re-extract precedence merge guard at the single ingest_document write site (preserve _source='user', drop their _confidence, degrade-doesn't-wipe) + live re-extract test (META-05)
-  - [ ] 112-03-PLAN.md — Frontend foundation: ConfidenceChip primitive (hardcoded 0.75/0.50 tiers, honest Edited/Extracted states) + DocumentMetadata/_confidence/_source type extension + updateDocumentMetadata/listMetadataFields client methods (META-02)
-  - [ ] 112-04-PLAN.md — DocumentDetailPanel push/split shell (PanelSection Metadata accordion, custom fields, inline edit, Saved-only-after-write receipt, mobile bottom-sheet) + IngestionPage wiring + DocumentList inline-MetadataPanel retire + WCAG AA vitest-axe (META-02/META-05)
+  - [x] 112-01-PLAN.md — Backend: PATCH /documents/{id}/metadata (RLS-404 + run_in_threadpool + field allow-list + _source hard-stamp + metadata.update audit) + 6 backend Wave-0 test stubs (META-05)
+  - [x] 112-02-PLAN.md — Re-extract precedence merge guard at the single ingest_document write site (preserve _source='user', drop their _confidence, degrade-doesn't-wipe) + live re-extract test (META-05)
+  - [x] 112-03-PLAN.md — Frontend foundation: ConfidenceChip primitive (hardcoded 0.75/0.50 tiers, honest Edited/Extracted states) + DocumentMetadata/_confidence/_source type extension + updateDocumentMetadata/listMetadataFields client methods (META-02)
+  - [x] 112-04-PLAN.md — DocumentDetailPanel push/split shell (PanelSection Metadata accordion, custom fields, inline edit, Saved-only-after-write receipt, mobile bottom-sheet) + IngestionPage wiring + DocumentList inline-MetadataPanel retire + WCAG AA vitest-axe (META-02/META-05)
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **document detail panel** — the shared shell for META display/edit + REL panel + CLASS suggestion) BEFORE plan. (UX-02 cross-cutting acceptance.)
 
@@ -202,7 +202,7 @@
 | 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
-| 112. Metadata Enrichment — Detail Panel + Manual Edit | 0/4 | Planned (4 plans / 3 waves) | - |
+| 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
