@@ -18,7 +18,7 @@ findings:
   warning: 5
   info: 4
   total: 9
-status: issues_found
+status: resolved
 ---
 
 # Phase 113: Code Review Report
@@ -26,7 +26,20 @@ status: issues_found
 **Reviewed:** 2026-06-18T00:00:00Z
 **Depth:** standard
 **Files Reviewed:** 9
-**Status:** issues_found
+**Status:** resolved (2026-06-18 — see Resolution below)
+
+## Resolution (2026-06-18)
+
+Each WARNING was adversarially re-verified against the live code (workflow `wf_771026c7-211`, 5 agents) before action, then resolved:
+
+| Finding | Verified severity | Action | Commit |
+|---|---|---|---|
+| **WR-01** update_view 422-vs-404 ordering | **info** — NOT actually an oracle (the branch is a pure function of the caller's own filter vs their own whitelist; carries zero info about the target row, so SC#3's uniform-404 already held). | Fixed anyway for contract-by-construction + 112-analog consistency: own-scoped 404 now precedes filter validation; added live `test_cross_user_invalid_filter_patch_404`. | `4fa47c9a` |
+| **WR-02** `user_id` → `.or_()` interpolation | **low** — not reachable today (`user_id` is a server-validated JWT-subject UUID), but the one unparameterized runtime-value-into-DSL spot on a service-role (RLS-bypassed) gate. | Hardened: `_uid()` wraps `user_id` in `UUID(...)` before both `.or_()` sites; added 3 `_uid` unit guards. | `d09dce81` |
+| **WR-03** global-view owner-id leak | **low** — real but pre-existing **app-wide** (global folders + skills disclose owner `user_id` identically); opaque UUIDs only; does NOT undercut SC#3. | Deferred app-wide (fixing only views would be inconsistent) → **SEED-091** with concrete re-open triggers (v3.2 Multi-Tenancy / non-opaque owner field / audit). | `95cbf459` |
+| **IN-03** dead `ViewResolveResponse` model | quality — a 112-CR-01 metadata-strip landmine one import from the resolve route. | Removed the dead model + now-unused `DocumentResponse` import. | `c1ddec18` |
+
+IN-01/02/04 reviewed and deferred (IN-01 is a semantic no-op under the shipped eq/and-only scope, owned by Phase 114's additive operators; IN-02 self-admits "Fix: None required"; IN-04's security-load-bearing lines are covered by the WR-02 fix). Full suite re-ran green after the changes: **20 passed** live against :54322 (7 compiler unit + 3 service-guard unit + 3 CRUD + 5 resolve + 2 folder-scope).
 
 ## Summary
 

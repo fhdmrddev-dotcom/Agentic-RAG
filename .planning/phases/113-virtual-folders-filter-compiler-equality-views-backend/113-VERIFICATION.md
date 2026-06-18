@@ -1,13 +1,14 @@
 ---
 phase: 113-virtual-folders-filter-compiler-equality-views-backend
 verified: 2026-06-18T00:00:00Z
-status: human_needed
+status: passed
 score: 4/4 must-haves verified
 overrides_applied: 0
-human_verification:
+human_verification_resolved:
   - test: "Run the full Phase 113 test suite against live local Supabase (:54322)"
-    expected: "16 passed, 0 failed — 7 unit + 2 CRUD + 5 resolve + 2 folder-scope"
-    why_human: "Integration tests require a live local Supabase instance; verifier cannot run tests against :54322"
+    expected: "16 passed (now 20 after WR-01/WR-02 hardening added 3 unit guards + 1 cross-user-invalid-filter integration test)"
+    result: "PASS — orchestrator independently ran the suite against live :54322 twice: 16 passed pre-hardening, 20 passed post-hardening (exit 0). why_human ('verifier cannot run tests against :54322') resolved by the orchestrator."
+review_findings_resolved: "WR-01 fixed (4fa47c9a), WR-02 hardened (d09dce81), IN-03 removed (c1ddec18); WR-03 deferred app-wide -> SEED-091 (95cbf459). See 113-REVIEW.md Resolution."
 ---
 
 # Phase 113: Virtual Folders — Filter Compiler + Equality Views Backend Verification Report
