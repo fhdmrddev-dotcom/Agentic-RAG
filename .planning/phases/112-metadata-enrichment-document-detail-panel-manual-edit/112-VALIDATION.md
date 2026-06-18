@@ -1,10 +1,11 @@
 ---
 phase: 112
 slug: metadata-enrichment-document-detail-panel-manual-edit
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-06-18
+validated: 2026-06-18
 ---
 
 # Phase 112 — Validation Strategy
@@ -42,11 +43,22 @@ created: 2026-06-18
 
 ## Per-Task Verification Map
 
-> Populated by the planner/Nyquist auditor against the final task IDs. Each task below maps to one or more SPEC acceptance criteria (AC1–AC11) and the Wave 0 test files. The planner MUST attach an `<automated>` verify (or a Wave 0 dependency) to every task per the sign-off rules.
+> Populated post-execution (2026-06-18 validation audit) against the 4 shipped plans + the CR-01 code-review fix. Every requirement maps to ≥1 automated test; all 43 tests ran GREEN (21 backend incl. live :54322, 22 frontend) at audit time.
 
-| Task ID | Plan | Wave | Requirement | AC | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|----|-----------|-------------------|-------------|--------|
-| {populated at plan time} | — | — | META-02/05 | AC1–11 | unit / integration / component / a11y | see SPEC→Test map below | ❌ W0 | ⬜ pending |
+| Plan | Wave | Requirement | AC | Test Type | Test File | Automated Command | File | Status |
+|------|------|-------------|----|-----------|-----------|-------------------|------|--------|
+| 01 | W0 | META-05 | — | unit | `test_112_patch_metadata.py` (9) | `pytest tests/unit/test_112_patch_metadata.py` | ✅ | ✅ green (9/9) |
+| 01 | W0 | META-05 | AC5 | integration (live) | `test_112_patch_audit.py` (1) | `pytest tests/integration/test_112_patch_audit.py` | ✅ | ✅ green (live :54322) |
+| 01 | W0 | META-05 | AC6 | integration (live) | `test_112_patch_rls.py` (2) | `pytest tests/integration/test_112_patch_rls.py` | ✅ | ✅ green (live :54322) |
+| 01 | W0 | META-05 | AC8 | integration (live) | `test_112_flat_filter_with_source.py` (3) | `pytest tests/integration/test_112_flat_filter_with_source.py` | ✅ | ✅ green (live :54322) |
+| 01 | W0 | META-02 | AC9 | integration (live) | `test_112_custom_field_patch.py` (1) | `pytest tests/integration/test_112_custom_field_patch.py` | ✅ | ✅ green (live :54322) |
+| 02 | W1 | META-05 | AC7 | integration (live) | `test_112_reextract_merge.py` (3) | `pytest tests/integration/test_112_reextract_merge.py` | ✅ | ✅ green (live :54322; base-checkout-proven load-bearing) |
+| 03 | W0 | META-02 | AC2/AC3 | component (vitest) | `ConfidenceChip.test.tsx` (8) | `vitest run src/components/metadata/ConfidenceChip.test.tsx` | ✅ | ✅ green (8/8) |
+| 04 | W1 | META-05 | AC10 | component (vitest) | `InlineEdit.test.tsx` (7) | `vitest run src/components/metadata/InlineEdit.test.tsx` | ✅ | ✅ green (7/7) |
+| 04 | W1 | META-02/05/UX-01 | AC1/AC3/AC11 | a11y (vitest-axe) | `DocumentDetailPanel.a11y.test.tsx` (7) | `vitest run src/components/metadata/DocumentDetailPanel.a11y.test.tsx` | ✅ | ✅ green (7/7, axe no-violations) |
+| CR-01 | review-fix | META-02 | AC5/AC9 | unit (regression) | `test_112_response_model_preserves_metadata.py` (2) | `pytest tests/unit/test_112_response_model_preserves_metadata.py` | ✅ | ✅ green (2/2 — `_source`/`_confidence`/custom keys survive `response_model`) |
+
+**Totals:** 10 test files · 43 automated tests · all GREEN at audit (2026-06-18). Live integration tests confirmed against local Supabase :54322 (reachable at audit time).
 
 ### SPEC Acceptance Criteria → Test Map (11 criteria)
 
@@ -64,12 +76,12 @@ created: 2026-06-18
 | AC10 | click-to-edit, Enter save, Esc cancel; empty field add | component (vitest + user-event) | `npx vitest run src/components/metadata/InlineEdit.test.tsx` | ✅ |
 | AC11 | aXe no AA failures; full keyboard; reduced-motion still shows receipt | a11y (vitest-axe) + manual keyboard sweep | `npx vitest run src/components/metadata/*.a11y.test.tsx` | ✅ (axe) / Partial (keyboard) |
 
-### Live-DB assertion map (the non-negotiable Nyquist gate)
+### Live-DB assertion map (the non-negotiable Nyquist gate) — ✅ ALL 4 ENCODED + GREEN (2026-06-18, live :54322)
 
-- **Audit row written:** after PATCH, `SELECT count(*) FROM audit_log WHERE action_type='metadata.update' AND metadata->>'document_id'=$1` increments by 1 (baseline today = 0).
-- **`@>` still matches:** `SELECT 1 WHERE metadata @> '{"document_type":"..."}'` still returns the row with `_source` present (proven live in research — encode as a test).
-- **Re-extract preserves source=user:** edit field A via PATCH → trigger `/reextract` → poll `documents.metadata` until `status='completed'` → assert `metadata->'A' == edited` AND `metadata->'_source'->>'A' == 'user'` AND an un-edited field B changed.
-- **Edit round-trips on reload:** PATCH → re-`GET /documents` (or re-fetch the row) → value + `_source='user'` persist (covers the Realtime best-effort reconcile path).
+- ✅ **Audit row written:** `test_112_patch_audit.py::test_patch_writes_metadata_update_audit_row` — count 0→1 for `action_type='metadata.update'` keyed to the doc id; persisted row reflects the edit + `_source`. GREEN.
+- ✅ **`@>` still matches:** `test_112_flat_filter_with_source.py` (3 tests) — containment matches with BOTH `_confidence` AND `_source` present (document_type + title) + negative control. GREEN.
+- ✅ **Re-extract preserves source=user:** `test_112_reextract_merge.py` (3 tests) — drives the REAL `ingest_document`; preserve field A + refresh field B + no `_confidence` on the user field; degrade-doesn't-wipe; cleared-stays-cleared. Base-checkout-proven to FAIL without the merge guard (load-bearing). GREEN.
+- ✅ **Edit round-trips on reload:** `test_112_custom_field_patch.py` + `test_112_response_model_preserves_metadata.py` — custom field PATCH round-trips on reload; `_source`/`_confidence`/custom keys survive `response_model` serialization (CR-01 regression). GREEN. *(Full browser UI→reconcile→chip-render round-trip remains the G-4 human gate #5.)*
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -77,17 +89,18 @@ created: 2026-06-18
 
 ## Wave 0 Requirements
 
-Test stubs to create before/with the first implementing wave (all map to SPEC ACs):
+Test stubs to create before/with the first implementing wave (all map to SPEC ACs) — ✅ ALL SHIPPED + GREEN (2026-06-18):
 
-- [ ] `backend/tests/unit/test_112_patch_metadata.py` — route validation (field allow-list, `_`-prefix reject, lowercasing) — META-05
-- [ ] `backend/tests/integration/test_112_patch_audit.py` — live PATCH writes the audit row (AC5)
-- [ ] `backend/tests/integration/test_112_patch_rls.py` — non-owner → 404 (AC6)
-- [ ] `backend/tests/integration/test_112_reextract_merge.py` — `_source='user'` preserved across re-extract; degrade-doesn't-wipe (AC7)
-- [ ] `backend/tests/integration/test_112_flat_filter_with_source.py` — `@>` holds with `_source` present (AC8; extend `test_111_flat_filter_compat.py`)
-- [ ] `backend/tests/integration/test_112_custom_field_patch.py` — custom `field_key` PATCH round-trip (AC9)
-- [ ] `frontend/src/components/metadata/ConfidenceChip.test.tsx` — tier mapping + honest states + never-"High"-unscored (AC2/AC3)
-- [ ] `frontend/src/components/metadata/InlineEdit.test.tsx` — Enter/Esc/blur/add-empty (AC10)
-- [ ] `frontend/src/components/metadata/*.a11y.test.tsx` — vitest-axe no-AA-failures (AC11)
+- [x] `backend/tests/unit/test_112_patch_metadata.py` — route validation (field allow-list, `_`-prefix reject, lowercasing) — META-05 · 9/9 GREEN
+- [x] `backend/tests/integration/test_112_patch_audit.py` — live PATCH writes the audit row (AC5) · GREEN live :54322
+- [x] `backend/tests/integration/test_112_patch_rls.py` — non-owner → 404 (AC6) · GREEN live :54322
+- [x] `backend/tests/integration/test_112_reextract_merge.py` — `_source='user'` preserved across re-extract; degrade-doesn't-wipe; cleared-stays-cleared (AC7) · GREEN live :54322 (landed in Plan 02, base-checkout-proven load-bearing)
+- [x] `backend/tests/integration/test_112_flat_filter_with_source.py` — `@>` holds with `_source` present (AC8) · GREEN live :54322
+- [x] `backend/tests/integration/test_112_custom_field_patch.py` — custom `field_key` PATCH round-trip (AC9) · GREEN live :54322
+- [x] `frontend/src/components/metadata/ConfidenceChip.test.tsx` — tier mapping + honest states + never-"High"-unscored (AC2/AC3) · 8/8 GREEN
+- [x] `frontend/src/components/metadata/InlineEdit.test.tsx` — Enter/Esc/blur/add-empty (AC10) · 7/7 GREEN
+- [x] `frontend/src/components/metadata/DocumentDetailPanel.a11y.test.tsx` — vitest-axe no-AA-failures (AC11) · 7/7 GREEN
+- [x] **Added (CR-01 review-fix):** `backend/tests/unit/test_112_response_model_preserves_metadata.py` — `_source`/`_confidence`/custom keys survive `response_model` (AC5/AC9 regression) · 2/2 GREEN
 
 *No framework install needed (pytest + vitest + vitest-axe all present).*
 
@@ -108,12 +121,30 @@ Test stubs to create before/with the first implementing wave (all map to SPEC AC
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (9 stub files above)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] The 4 live-DB assertions are encoded as integration tests against :54322
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (10 stub files — all shipped + green)
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s (backend unit ~4.6s; full live integration ~5s; frontend ~4.4s)
+- [x] The 4 live-DB assertions are encoded as integration tests against :54322 (all GREEN)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ✅ validated 2026-06-18 — NYQUIST-COMPLIANT
+
+---
+
+## Validation Audit 2026-06-18
+
+State A audit (existing pre-execution draft) reconciled against the 4 shipped plans + the CR-01 review-fix. Re-ran the full Phase 112 suite live: **21 backend tests GREEN** (11 unit + 10 integration against live Supabase :54322) + **22 frontend tests GREEN** (8 ConfidenceChip + 7 InlineEdit + 7 a11y) = **43/43 automated tests GREEN**.
+
+| Metric | Count |
+|--------|-------|
+| Requirements (META-02, META-05, UX-01) | 3 |
+| SPEC acceptance criteria (AC1–AC11) | 11 |
+| Test files | 10 |
+| Automated tests | 43 (all GREEN) |
+| Gaps found | 0 |
+| Resolved (auditor) | 0 (none needed) |
+| Escalated to manual-only | 0 net-new (4 pre-declared G-4 gates retained) |
+
+**Outcome:** No MISSING gaps. Every AC has automated verification except the 4 pre-declared G-4 lived-experience manual gates (AC1 panel feel, AC4 greyscale, AC11 keyboard sweep, AC7 end-to-end UI round-trip), already routed to `112-HUMAN-UAT.md`. No `gsd-nyquist-auditor` spawn required (zero gaps to fill). `nyquist_compliant: true`.
