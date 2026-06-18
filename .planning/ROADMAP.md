@@ -122,7 +122,10 @@
   2. A view can combine multiple equality conditions (AND) and optionally scope to a folder subtree (VIEW-04/05); the filter-AST compiler uses a closed operator registry with field-whitelist + all literals bound as `$n` (no eval, no string interpolation).
   3. A globally-shared (`is_global`) view exposes its *definition* but resolves *results/counts/facets over each viewer's own visible set* — two users see different result sets for the same shared view, with no cross-user content/count/existence leakage; cross-user miss returns 404-not-403 (VIEW-06). Verified live in secure-phase (the leak test, not the DEFINER label).
   4. An injection/SSTI attempt placed in a filter value is neutralized (parameterized — no SQL/template execution).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 113-01-PLAN.md — AST models + net-new closed-registry filter compiler + Wave 0 unit scaffold (incl. SC#4 injection test)
+- [ ] 113-02-PLAN.md — document_view_service CRUD (clone metadata_field_service; is_global=false hard-set)
+- [ ] 113-03-PLAN.md — /document-views router (CRUD + per-viewer leak-safe resolve) + main.py mount + live :54322 integration tests
 **UI hint**: no
 
 #### Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar
