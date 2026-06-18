@@ -59,7 +59,7 @@ from app.services import document_view_service, metadata_field_service, view_fil
 from app.services.audit_service import write_audit_entry
 from app.services.harness.scope import resolve_project_subtree
 from app.utils.db import aexec
-from app.utils.folder_utils import get_globally_visible_folder_ids
+from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
 
 router = APIRouter(prefix="/document-views", tags=["document-views"])
 
@@ -217,11 +217,26 @@ async def resolve_view(
     # 3. Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an
     #    unreachable scope contributes no narrowing (D-113-5). Owner-scoped to the
     #    CALLER, so a global view's scope can never reach another user's folders.
+    #
+    #    resolve_project_subtree walks from the scope ROOT and ALWAYS includes that
+    #    root id in its output, even when the root is a folder the caller can't see
+    #    (a seeded global view pointing at another user's private folder). Narrowing
+    #    on such a subtree would zero out the caller's docs — the exact opposite of
+    #    D-113-5. So intersect the resolved subtree with the caller's VISIBLE folder
+    #    ids; if nothing the caller can see survives, the scope is unreachable →
+    #    drop the narrowing entirely (the view resolves over the caller's full
+    #    visible set, never erroring or resolving empty).
     subtree = None
     if view.get("folder_scope"):
-        subtree = await resolve_project_subtree(
+        raw_subtree = await resolve_project_subtree(
             view["folder_scope"], supabase=supabase, user_id=caller
         )
+        if raw_subtree:
+            visible_ids = {f["id"] for f in await fetch_visible_folders(supabase, caller)}
+            reachable = [fid for fid in raw_subtree if fid in visible_ids]
+            # Non-empty → narrow to the caller-visible subtree; empty (unreachable
+            # scope) → leave subtree=None so no narrowing is applied (D-113-5).
+            subtree = reachable or None
 
     def _apply(q):
         """Compose the metadata filter + subtree scope onto a documents query leg."""
