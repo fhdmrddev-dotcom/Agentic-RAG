@@ -34,6 +34,8 @@ inject a real local client built from backend/.env (the conftest plants a fake
 cloud SUPABASE_URL, so the tests must supply the real local one).
 """
 
+from uuid import UUID
+
 from supabase import Client
 
 from app.dependencies import get_supabase
@@ -44,6 +46,20 @@ _TABLE = "document_views"
 
 def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
+
+
+def _uid(user_id) -> str:
+    """Coerce ``user_id`` to a canonical UUID string before it is interpolated into
+    a PostgREST ``.or_()`` filter grammar (WR-02 hardening).
+
+    ``user_id`` is the JWT-subject UUID from ``get_current_user`` and is not
+    attacker-influenced today, but ``get_supabase()`` is the SERVICE-ROLE client
+    (RLS bypassed) — these app-level predicates are the SOLE owner-scoping gate.
+    Wrapping it in ``UUID(...)`` makes the one unparameterized runtime-value-into-
+    DSL spot safe by construction: any value that is not a well-formed UUID raises
+    ``ValueError`` instead of breaking out of the ``user_id.eq.<...>`` term.
+    """
+    return str(UUID(str(user_id)))
 
 
 async def create_view(
@@ -82,7 +98,7 @@ async def list_views(user_id, supabase: Client | None = None) -> list[dict]:
     result = await aexec(
         client.table(_TABLE)
         .select("*")
-        .or_(f"user_id.eq.{user_id},is_global.eq.true")
+        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")
         .order("name")
     )
     seen: set = set()
@@ -106,7 +122,7 @@ async def get_view(view_id, user_id, supabase: Client | None = None) -> dict | N
         client.table(_TABLE)
         .select("*")
         .eq("id", view_id)
-        .or_(f"user_id.eq.{user_id},is_global.eq.true")  # own OR global; not-readable → empty
+        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")  # own OR global; not-readable → empty
     )
     return (result.data or [None])[0]
 
