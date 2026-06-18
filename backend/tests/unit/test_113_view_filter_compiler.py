@@ -28,7 +28,6 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_eq_compiles():
     """SC#2 / D-113-6: a single ``eq`` condition compiles to ``{field: value}``."""
     from app.models.document_view import ViewCondition, ViewFilter
@@ -42,7 +41,6 @@ def test_eq_compiles():
     assert mf == {"document_type": "invoice"}
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_and_folds_conditions():
     """SC#2 / VIEW-04: two ``eq`` under ``op:and`` fold into ONE metadata_filter
     dict (AND-of-keys — JSONB containment is implicitly AND)."""
@@ -60,7 +58,6 @@ def test_and_folds_conditions():
     assert mf == {"document_type": "invoice", "author": "Acme"}
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_empty_filter_no_narrowing():
     """D-113-9: an empty ``conditions`` list compiles to ``{}`` (no narrowing) —
     VALID, not rejected (the caller skips ``.contains()`` entirely)."""
@@ -72,7 +69,6 @@ def test_empty_filter_no_narrowing():
     assert mf == {}
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_unknown_op_rejected():
     """D-113-6 / Pitfall 5: an unknown op is rejected at BOTH layers —
     Pydantic ``Literal`` rejects at parse, and a registry miss fails closed
@@ -103,7 +99,6 @@ def test_unknown_op_rejected():
         compile_filter(smuggled)
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_unknown_field_rejected_at_save():
     """D-113-10: ``validate_fields`` with a field NOT in the whitelist raises
     ``ValueError`` (router maps to 422 at save)."""
@@ -126,7 +121,6 @@ def test_unknown_field_rejected_at_save():
     validate_fields(ok, whitelist)  # must not raise
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_underscore_field_excluded():
     """D-113-8 / Pitfall 3: a ``_``-prefixed field (``_confidence``/``_source``) is
     rejected by ``validate_fields`` — display-only nested keys are NEVER a filter
@@ -153,7 +147,6 @@ def test_underscore_field_excluded():
         validate_fields(src, whitelist)
 
 
-@pytest.mark.xfail(strict=False, reason="Task 2/3: AST + compiler not landed yet")
 def test_injection_value_neutralized():
     """SC#4 (first-class): a SQL/SSTI/JNDI payload in a VALUE compiles to exactly
     that literal — it rides as a JSON literal, never executed / interpolated /
