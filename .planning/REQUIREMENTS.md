@@ -32,12 +32,12 @@
 - [ ] **EMBED-06**: A destructive-change confirmation names the re-embed (and its cost) before any embedding model/dimension change commits.
 
 ### Metadata-Driven Views / "Virtual Folders" (VIEW)
-- [ ] **VIEW-01**: User can save a metadata filter as a named view that appears in the sidebar like a folder.
-- [ ] **VIEW-02**: A view's contents are live; one document can appear in multiple views with no duplication.
+- [x] **VIEW-01**: User can save a metadata filter as a named view that appears in the sidebar like a folder.
+- [x] **VIEW-02**: A view's contents are live; one document can appear in multiple views with no duplication.
 - [ ] **VIEW-03**: View filters support equals / one-of / contains / is-empty / numeric & date comparisons, including relative dates ("expiring within N days").
-- [ ] **VIEW-04**: User can combine multiple filter conditions (AND) in one view.
-- [ ] **VIEW-05**: User can optionally scope a view to a folder subtree.
-- [ ] **VIEW-06**: User can share a view globally without exposing documents the viewer is not allowed to see.
+- [x] **VIEW-04**: User can combine multiple filter conditions (AND) in one view.
+- [x] **VIEW-05**: User can optionally scope a view to a folder subtree.
+- [x] **VIEW-06**: User can share a view globally without exposing documents the viewer is not allowed to see.
 - [ ] **VIEW-07**: The agent can run a saved view / metadata query as a tool to answer questions in chat.
 
 ### Document Relationships (REL)
@@ -96,11 +96,11 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | EMBED-06 | Phase 111.1 — Configurable / Multi-Provider Embeddings | Pending |
 | META-02 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Complete |
 | META-05 | Phase 112 — Metadata Enrichment (Detail Panel + Manual Edit) | Complete |
-| VIEW-01 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
-| VIEW-02 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
-| VIEW-04 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
-| VIEW-05 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
-| VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Pending |
+| VIEW-01 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
+| VIEW-02 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
+| VIEW-04 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
+| VIEW-05 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
+| VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Pending |
 | VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Pending |
 | REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |

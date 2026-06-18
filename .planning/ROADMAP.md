@@ -206,7 +206,7 @@
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
-| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete   | 2026-06-18 |
+| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
