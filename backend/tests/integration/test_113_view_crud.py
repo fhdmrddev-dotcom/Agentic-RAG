@@ -266,3 +266,66 @@ async def test_cross_user_miss_404(pg_pool, test_user):
         await pg_pool.execute("DELETE FROM public.document_views WHERE user_id = $1", user_b)
         await pg_pool.execute("DELETE FROM audit_log WHERE user_id = $1", user_b)
         await pg_pool.execute("DELETE FROM auth.users WHERE id = $1", user_b)
+
+
+@pytest.mark.asyncio
+async def test_cross_user_invalid_filter_patch_404(pg_pool, test_user):
+    """User B PATCHing User A's view with an INVALID filter → 404, never 422 (WR-01).
+
+    Ownership is gated BEFORE filter-field validation, so an unowned id uniformly
+    404s regardless of filter validity — closing the 422-vs-404 ordering oracle.
+    A request with an UNKNOWN filter field would 422 if validation ran first; the
+    own-scoped 404 must win.
+    """
+    if not await _table_exists(pg_pool, "document_views"):
+        pytest.skip("migration 071 not applied (document_views absent)")
+
+    from app.api.document_views import create_view, update_view
+    from app.models.document_view import (
+        ViewCondition,
+        ViewCreate,
+        ViewFilter,
+        ViewUpdate,
+    )
+
+    sb = _supabase_or_skip()
+
+    # User A owns a private view.
+    a_view = await create_view(
+        body=ViewCreate(name="A private", filter_expr=_filter_eq("document_type", "report")),
+        current_user={"id": str(test_user)},
+        supabase=sb,
+    )
+    a_view_id = str(a_view["id"])
+
+    # User B exists but does NOT own that view.
+    user_b = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+        user_b, f"phase-113-crud-b-{user_b}@test.local",
+    )
+    b_ctx = {"id": str(user_b)}
+
+    # An INVALID filter (unknown, non-whitelisted field) that WOULD 422 if
+    # validation ran before the ownership check.
+    bad_filter = ViewFilter(
+        op="and",
+        conditions=[ViewCondition(field="not_a_real_field", op="eq", value="x")],
+    )
+    try:
+        with pytest.raises(HTTPException) as ei:
+            await update_view(
+                view_id=a_view_id,
+                body=ViewUpdate(filter_expr=bad_filter),
+                current_user=b_ctx,
+                supabase=sb,
+            )
+        assert ei.value.status_code == 404, (
+            "cross-user PATCH with an invalid filter must 404 (ownership before "
+            f"validation), not {ei.value.status_code} — a 422 here would be a "
+            "filter-validity oracle on an id the caller does not own"
+        )
+    finally:
+        await pg_pool.execute("DELETE FROM public.document_views WHERE user_id = $1", user_b)
+        await pg_pool.execute("DELETE FROM audit_log WHERE user_id = $1", user_b)
+        await pg_pool.execute("DELETE FROM auth.users WHERE id = $1", user_b)

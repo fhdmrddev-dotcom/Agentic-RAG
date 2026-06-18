@@ -151,6 +151,16 @@ async def update_view(
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Ownership BEFORE validation (WR-01): confirm the caller owns this view before
+    # running filter-field validation, so an unowned/absent id uniformly returns 404
+    # regardless of whether the submitted filter_expr is valid — no 422-vs-404
+    # ordering oracle. Mirrors the 112 PATCH analog (documents.py:1380), which
+    # SELECTs ownership first. get_view is own-OR-global, so require STRICT ownership
+    # here: a global view the caller does not own is not updatable either.
+    existing = await document_view_service.get_view(view_id, current_user["id"], supabase=supabase)
+    if existing is None or str(existing.get("user_id")) != str(current_user["id"]):
+        raise HTTPException(status_code=404, detail="View not found")  # NEVER 403 — no existence leak
+
     # Re-validate the AST fields if the update carries a new filter_expr (D-113-10).
     if body.filter_expr is not None:
         whitelist = await _build_whitelist(current_user["id"], supabase)
@@ -169,7 +179,7 @@ async def update_view(
         current_user["id"], view_id, data, supabase=supabase
     )
     if updated is None:
-        raise HTTPException(status_code=404, detail="View not found")  # NEVER 403 — no existence leak
+        raise HTTPException(status_code=404, detail="View not found")  # NEVER 403 — defense-in-depth (ownership already gated above)
     return updated
 
 
