@@ -123,7 +123,7 @@
   3. A globally-shared (`is_global`) view exposes its *definition* but resolves *results/counts/facets over each viewer's own visible set* — two users see different result sets for the same shared view, with no cross-user content/count/existence leakage; cross-user miss returns 404-not-403 (VIEW-06). Verified live in secure-phase (the leak test, not the DEFINER label).
   4. An injection/SSTI attempt placed in a filter value is neutralized (parameterized — no SQL/template execution).
 **Plans**: 3 plans
-- [ ] 113-01-PLAN.md — AST models + net-new closed-registry filter compiler + Wave 0 unit scaffold (incl. SC#4 injection test)
+- [x] 113-01-PLAN.md — AST models + net-new closed-registry filter compiler + Wave 0 unit scaffold (incl. SC#4 injection test)
 - [ ] 113-02-PLAN.md — document_view_service CRUD (clone metadata_field_service; is_global=false hard-set)
 - [ ] 113-03-PLAN.md — /document-views router (CRUD + per-viewer leak-safe resolve) + main.py mount + live :54322 integration tests
 **UI hint**: no
@@ -206,7 +206,7 @@
 | 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
-| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 0/? | Not started | - |
+| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 1/3 | In Progress|  |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |

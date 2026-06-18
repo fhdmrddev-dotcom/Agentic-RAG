@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-18T19:04:03.692Z"
-last_activity: 2026-06-18 -- Phase 113 planning complete
+last_updated: "2026-06-18T19:08:48.466Z"
+last_activity: 2026-06-18 -- Phase 113 execution started
 progress:
   total_phases: 11
   completed_phases: 4
@@ -22,10 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** **v3.0 Document Management — defining requirements (started 2026-06-15).** Turn the incidental DM capabilities into a first-class metadata-driven surface (M-Files-aligned Tier A): metadata enrichment (un-pin extraction off the hardwired `gpt-4o`, lift the 3,000-char window, custom fields + per-field confidence) → metadata-driven views/"virtual folders" → document relationships → auto-classification. Folds in SEED-040 (model picker), light SEED-046 (governance health), minimal SEED-012 slice, SEED-069. DM Tier B → deferred (v3.5). Skill Studio deferred → v3.1 (Workflow+Skill Eval Studio). Re-sequenced PRD roadmap: `.planning/PRDs/SEQUENCE.md`. **Next = define + scope requirements, then `/gsd:plan-phase`.**
+**Current focus:** Phase 113 — virtual-folders-filter-compiler-equality-views-backend
 
 ## Current Position
 
+Phase: 113 (virtual-folders-filter-compiler-equality-views-backend) — EXECUTING
 **Phase: 113 — Virtual Folders — Filter Compiler + Equality Views (backend) — READY TO PLAN** — v3.0 Document Management (next CORE: metadata-driven saved views over the `documents.metadata @>` flat-containment invariant that 111/112 kept load-bearing). **NEXT = /gsd:discuss-phase 113** (no CONTEXT yet) or `/gsd:plan-phase 113`.
 
 _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Metadata Enrichment — Document Detail Panel + Manual Edit (META-02, META-05) — ✅ COMPLETE.** 4 plans / 3 waves (W1 = 112-01 backend PATCH + 112-03 frontend foundation [parallel]; W2 = 112-02 re-extract merge guard; W3 = 112-04 document detail panel). Delivered: `PATCH /documents/{id}/metadata` (audited owner-scoped single-field write + `_source='user'` stamp + `metadata.update` audit), re-extract precedence merge guard at the single `ingest_document` write site, net-new `ConfidenceChip` (honest tiers High≥0.75/Med≥0.50/Low<0.50 + neutral Edited/Extracted states), `DocumentDetailPanel` right-side push/split shell (the shared shell 117/118 plug into) + `InlineEdit`, custom-field display+edit. Code review CR-01 (response_model stripped `_source`/`_confidence` → chips vanished) fixed + IN-05 regression. **GATE 1 — verify: 3/3 automated + 5/5 human-UAT** (`112-HUMAN-UAT.md` complete; #2 mobile bug — docs invisible <768px → `IngestionPage` made responsive, re-verified live @390px; #5 end-to-end edit→PATCH→audit→Edited-chip Claude-driven browser+DB). **GATE 2 — secure: 16/16 threats CLOSED, threats_open 0** (`112-SECURITY.md`, SECURED). **GATE 3 — validate: NYQUIST-COMPLIANT** (`112-VALIDATION.md`; 43/43 automated GREEN — 21 backend incl. live :54322 + 22 frontend; 0 gaps). Open (non-blocking, roll forward): design note D-1 (panel width on the 4-column Documents page → collapse folder tree when panel opens), optional `_confidence` backfill for older folder docs. Orchestrator owned STATE/ROADMAP writes (balloon guard — SDK begin-phase ballooned 525→1244, repaired from clean HEAD eb996f7c). Worktrees ON.
@@ -33,10 +34,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: Not started
-Status: Ready to execute
+Plan: 1 of 3
+Status: Executing Phase 113
 Resume file: .planning/phases/113-virtual-folders-filter-compiler-equality-views-backend/113-CONTEXT.md
-Last activity: 2026-06-18 -- Phase 113 planning complete
+Last activity: 2026-06-18 -- Phase 113 execution started
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
