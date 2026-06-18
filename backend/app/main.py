@@ -402,7 +402,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -420,6 +420,7 @@ app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
+app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
