@@ -66,9 +66,11 @@ export function ViewsGroup({
   // WR-04: a ref mirror of `counts` so `fetchCount` can read the LATEST cache for its
   // pre-network gate WITHOUT closing over `counts` (which would recreate the callback
   // every counts-change and let the first-sight effect capture a stale closure). The
-  // ref is always current; the callback stays stable (empty dep array).
+  // ref is synced in an effect (not during render) and the callback stays stable.
   const countsRef = useRef(counts)
-  countsRef.current = counts
+  useEffect(() => {
+    countsRef.current = counts
+  }, [counts])
 
   const fetchCount = useCallback((id: string, { force = false }: { force?: boolean } = {}) => {
     if (inFlight.current.has(id)) return
@@ -98,7 +100,6 @@ export function ViewsGroup({
   // ids — adding one view fetches exactly one count.
   useEffect(() => {
     for (const v of views) fetchCount(v.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [views, fetchCount])
 
   const handleSelect = (view: SavedView) => {
