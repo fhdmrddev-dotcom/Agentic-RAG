@@ -13,9 +13,10 @@ handler is the new in-process surface Phase 115 adds, so the leak must be re-pro
 there: the handler reuses the extracted leak-safe `resolve_filter` verbatim, scoping
 every documents leg from the CALLER (the dispatching user), never the view owner.
 
-Kept xfail until Plan 02 ships the handler; RUN LIVE in secure-phase (the gate that
-flips it from xfail to a real pass). Imports are inside the test bodies so collection
-never errors on the not-yet-built handler.
+Plan 03 un-xfailed this (the handler shipped in Plan 02, dual-wired in Plan 03); it now
+runs LIVE against :54322 here and again in secure-phase (the non-vacuous T-115-03-01
+backstop). Skips cleanly when local Postgres is unreachable. Imports are inside the test
+bodies so collection never errors on the not-yet-built handler.
 
 Asserts (per VALIDATION.md + the 113 analog):
   (a) User A sees ONLY A's invoice matches; User B sees ONLY B's.
@@ -232,7 +233,6 @@ def _ref_files(payload):
     return {r.get("filename") for r in refs}
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships _handle_query_documents_by_view; run live in secure-phase")
 @pytest.mark.asyncio
 async def test_tool_global_view_resolves_per_viewer_no_cross_user_leak(pg_pool, two_users_global_view):
     """Two users, ONE global view by NAME → DIFFERENT per-viewer result sets via the HANDLER (SC#2)."""
@@ -274,7 +274,6 @@ async def test_tool_global_view_resolves_per_viewer_no_cross_user_leak(pg_pool, 
     assert a_files.isdisjoint(b_files), "no filename may leak across callers via the tool"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the catalog fallback; run live in secure-phase")
 @pytest.mark.asyncio
 async def test_tool_unseeable_view_name_falls_back_to_catalog_not_leak(pg_pool, two_users_global_view):
     """An unseeable / unknown view NAME → CATALOG (404-equivalent: never 403, never A's data)."""

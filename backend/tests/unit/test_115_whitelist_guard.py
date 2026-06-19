@@ -26,7 +26,6 @@ def _close_spawn(coro, *a, **k):
         pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 registers the tool; the guard refuses it when excluded")
 @pytest.mark.asyncio
 async def test_excluded_tool_refused_clean_envelope(make_tool_context):
     """A phase whitelist EXCLUDING query_documents_by_view → the clean refusal envelope."""
@@ -43,7 +42,6 @@ async def test_excluded_tool_refused_clean_envelope(make_tool_context):
     assert "query_documents_by_view" not in payload["allowed"]
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 registers query_documents_by_view in _TOOL_REGISTRY")
 @pytest.mark.asyncio
 async def test_included_tool_dispatches(make_tool_context, monkeypatch):
     """A phase whitelist INCLUDING the tool dispatches it to its handler (not refused)."""
@@ -63,7 +61,6 @@ async def test_included_tool_dispatches(make_tool_context, monkeypatch):
     assert result.result == "ok"  # not the refusal envelope
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 registers query_documents_by_view in _TOOL_REGISTRY")
 @pytest.mark.asyncio
 async def test_deep_mode_none_dispatches(make_tool_context, monkeypatch):
     """phase_whitelist=None (Deep Mode) → the guard is a no-op → the tool dispatches."""
