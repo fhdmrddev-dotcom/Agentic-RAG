@@ -27,6 +27,7 @@ The current chapter — **Document Management (v3.0)** — is about making the a
 - **Open any document's info card.** Click a document in your library and a side panel slides open showing every detail the system pulled out of it — title, author, topics, dates, and more.
 - **See how sure the system is.** Each detail is marked with a confidence rating, and anything it's only loosely guessing at is clearly flagged so you know what's worth double-checking.
 - **Fix anything by hand.** Correct any value right there in the panel; your edit is saved and quietly recorded.
+- **Organize documents into self-updating smart folders.** Use the new point-and-click builder to filter by type, date, number range, or "expiring within 90 days," save it with a name, and it appears in your sidebar like a folder — staying current on its own as documents change.
 - **Choose your document search engine (in Settings).** You can pick which service makes your documents searchable — including a private "runs on your own computer" option — with a clear warning before any switch. *(Caveats below.)*
 
 Everything else built so far is **groundwork** — real, tested, and important, but invisible until the screens that use it arrive in upcoming chapters.
@@ -51,11 +52,13 @@ Until now the app was locked to a single outside company to make your documents 
 Gives each document a proper info card you can open, read, and fix by hand — like the details pane on a file, but **honest about how sure it is** of each fact, and it **keeps a record** whenever you change something. *(This is the visible payoff of Phases 110 and 111.)*
 
 **Phase 113 — The smart-folders engine** &nbsp; 🔧 Groundwork
-Built the safe, behind-the-scenes engine for **"smart folders."** Soon you'll be able to save a search — like *"all invoices from Acme"* — as a named, **self-updating** list. The same document can appear in several lists at once without ever being copied, and a list you share with a teammate only ever shows them documents they're already allowed to see. *The on-screen controls to create and view these arrive in Phase 114.*
+Built the safe, behind-the-scenes engine for **"smart folders."** It's the part that stores a saved search — like *"all invoices from Acme"* — as a named, **self-updating** list, and figures out live which documents match. The same document can appear in several lists at once without ever being copied, and a list you share with a teammate only ever shows them documents they're already allowed to see. *The on-screen controls that put this engine to work arrived in Phase 114 — see below.*
+
+**Phase 114 — Smart folders, for real** &nbsp; 🟢 Use it now
+This is where smart folders become something you actually use. There's now a **point-and-click builder** — no search syntax to learn — where you stack up conditions like *type is Invoice*, *amount is over 5,000*, or *expiring within the next 90 days*, and **save the result as a named smart folder**. It shows up in your **sidebar like a normal folder** and **keeps itself up to date** — new documents that match appear on their own, and the same document can live in several smart folders at once without ever being copied. Text matches ignore capitalization, and "within the next N days"-style date filters always count from today, so a saved folder never quietly goes stale. *(This is the visible payoff of the Phase 113 engine.)*
 
 ### ⏳ Coming next (not built yet)
 
-- **Phase 114 — Smart folders become real on screen.** The point-and-click builder to create a smart folder, filter by dates and ranges, and have it show up in your sidebar like a normal folder. *This is when smart folders become something you can actually use.*
 - **Phase 115 — Your assistant can use your smart folders.** Ask a question in chat and the assistant can run one of your saved searches to answer it.
 - **Phase 116 — Linking documents together.** The ability to say "this contract relates to that invoice," and let the assistant pull up related documents. *(Mostly groundwork + an assistant skill.)*
 - **Phase 117 — See a document's links.** A "related documents" section on the info card, showing what's connected to what (and hiding anything you're not allowed to see).
