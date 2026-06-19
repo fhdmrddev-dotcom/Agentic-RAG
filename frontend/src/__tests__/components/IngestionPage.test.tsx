@@ -129,8 +129,12 @@ describe("IngestionPage", () => {
   it("renders two-panel layout with FolderTree and DocumentUpload", async () => {
     const { IngestionPage } = await import("@/pages/IngestionPage")
     renderPage(<IngestionPage />)
-    // Folder tree panel: "Folders" section label
-    expect(screen.getByText("Folders")).toBeInTheDocument()
+    // Folder tree panel: "Folders" section label.
+    // Phase 114 Plan 06 composition renders "Folders" twice — the desktop
+    // folder-tree section header (FolderTree) AND the md:hidden mobile
+    // bottom-sheet trigger (IngestionPage). jsdom ignores the responsive
+    // hide, so both sit in the DOM; assert the Folders surface is present.
+    expect(screen.getAllByText("Folders").length).toBeGreaterThanOrEqual(1)
     // Upload component with "Upload to Root" (default — no folder selected)
     expect(screen.getByText("Upload to Root")).toBeInTheDocument()
   })
