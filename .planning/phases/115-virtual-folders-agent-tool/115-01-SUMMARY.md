@@ -129,6 +129,10 @@ None — no external service configuration, no migration (zero schema change). P
 - **Secure-phase** has `test_115_tool_global_leak.py` ready to flip from xfail to a live two-user proof once Plan 02 ships the handler.
 - No blockers.
 
+## Self-Check: PASSED
+
+All 11 created files verified present on disk; all 4 commits (`164cd48c`, `0b3b4411`, `c71fc484`, `3df9af12`) verified in git log. Live 113/114 regression suite 39/39 green; 115 scaffold suite exits 0.
+
 ---
 *Phase: 115-virtual-folders-agent-tool*
 *Completed: 2026-06-19*
