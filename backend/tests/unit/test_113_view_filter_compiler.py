@@ -13,14 +13,19 @@ collection). Each test that asserts not-yet-built behavior is
 ``@pytest.mark.xfail(strict=False)``; Tasks 2-3 un-mark each stub to GREEN (the
 098/099/101.1/102 un-mark-on-landing convention).
 
-The assertions are written to the FINAL contract (per <interfaces>): an ``eq``
-condition compiles to ``{field: value}``; multiple ``eq`` under ``op:and`` fold
-into ONE metadata_filter dict (AND-of-keys, VIEW-04); an empty conditions list
-compiles to ``{}`` (no narrowing, D-113-9); an unknown op is rejected at parse
-(Pydantic ``Literal``) AND fails closed at compile (``KeyError``); an unknown or
-``_``-prefixed field is rejected at save (``validate_fields`` raises
-``ValueError``); and a SQL/SSTI/JNDI payload in a VALUE compiles to the exact
-literal — never executed / templated (SC#4).
+R-114-A — the compile-output contract WIDENED in Phase 114: ``compile_filter`` now
+returns an ordered ``list[Fragment]`` of bound WHERE-fragment descriptors, NOT a
+single ``metadata @> $1::jsonb`` containment dict. The three containment-dict
+tests below were rewritten to the Fragment shape (an ``eq`` on ``document_type``
+→ ONE typed-leg Fragment on the promoted ``document_type_norm`` column with a
+lowercased value; two AND conditions → an ordered two-Fragment list; an empty
+``conditions`` list → ``[]``). The SC#4 injection test stays green in spirit — the
+SQL/SSTI/JNDI payload rides as the exact BOUND LITERAL in the Fragment value
+(byte-for-byte), never executed / interpolated / templated. The ``op``/field-name
+guards (``test_unknown_op_rejected``, ``test_unknown_field_rejected_at_save``,
+``test_underscore_field_excluded``) are unchanged — an unknown op is rejected at
+parse (Pydantic ``Literal``) AND fails closed at compile (``KeyError``); an unknown
+or ``_``-prefixed field is rejected at save by ``validate_fields`` (``ValueError``).
 """
 
 from __future__ import annotations
@@ -29,7 +34,11 @@ import pytest
 
 
 def test_eq_compiles():
-    """SC#2 / D-113-6: a single ``eq`` condition compiles to ``{field: value}``."""
+    """SC#2 / D-113-6 / R-114-A: a single ``eq`` condition compiles to ONE typed-leg
+    Fragment. The widened contract (114): ``compile_filter`` returns a
+    ``list[Fragment]``, not a ``{field: value}`` containment dict. ``document_type``
+    rides the promoted, indexed ``document_type_norm`` column with a LOWERCASED
+    value (case-insensitive exact, D-114-10)."""
     from app.models.document_view import ViewCondition, ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
@@ -37,13 +46,21 @@ def test_eq_compiles():
         op="and",
         conditions=[ViewCondition(field="document_type", op="eq", value="invoice")],
     )
-    mf = compile_filter(flt)
-    assert mf == {"document_type": "invoice"}
+    frags = compile_filter(flt)
+    assert isinstance(frags, list) and len(frags) == 1
+    f = frags[0]
+    assert f.leg == "typed"
+    assert f.field == "document_type_norm"
+    assert f.builder == "eq"
+    assert f.value == "invoice"
 
 
 def test_and_folds_conditions():
-    """SC#2 / VIEW-04: two ``eq`` under ``op:and`` fold into ONE metadata_filter
-    dict (AND-of-keys — JSONB containment is implicitly AND)."""
+    """SC#2 / VIEW-04 / R-114-A: two conditions under ``op:and`` produce an ORDERED
+    ``list[Fragment]`` — one Fragment per AND condition (flat-AND preserved; the
+    resolve route chains the builder calls, PostgREST ANDs filters). ``document_type``
+    → indexed typed leg (lowercased); ``author`` (free-text) → case-insensitive
+    ``ilike`` custom leg (D-114-10)."""
     from app.models.document_view import ViewCondition, ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
@@ -54,19 +71,23 @@ def test_and_folds_conditions():
             ViewCondition(field="author", op="eq", value="Acme"),
         ],
     )
-    mf = compile_filter(flt)
-    assert mf == {"document_type": "invoice", "author": "Acme"}
+    frags = compile_filter(flt)
+    assert isinstance(frags, list) and len(frags) == 2
+    # Order preserved (flat AND).
+    dt, author = frags
+    assert dt.leg == "typed" and dt.field == "document_type_norm" and dt.value == "invoice"
+    assert author.leg == "custom" and author.field == "author" and author.builder == "ilike"
 
 
 def test_empty_filter_no_narrowing():
-    """D-113-9: an empty ``conditions`` list compiles to ``{}`` (no narrowing) —
-    VALID, not rejected (the caller skips ``.contains()`` entirely)."""
+    """D-113-9 / R-114-A: an empty ``conditions`` list compiles to ``[]`` (no
+    narrowing) — VALID, not rejected (the caller applies no filter)."""
     from app.models.document_view import ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
     flt = ViewFilter(op="and", conditions=[])
-    mf = compile_filter(flt)
-    assert mf == {}
+    frags = compile_filter(flt)
+    assert frags == []
 
 
 def test_unknown_op_rejected():
@@ -78,10 +99,12 @@ def test_unknown_op_rejected():
     from app.models.document_view import ViewCondition, ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
-    # Layer 1 — Pydantic Literal["eq"] rejects a condition op != "eq" at parse.
+    # Layer 1 — the Literal-discriminated ``ViewCondition.op`` rejects a condition op
+    # outside the closed set at parse. R-114-A: ``gte`` is now a VALID widened
+    # operator, so the example is swapped to ``regex`` (genuinely not in the Literal).
     with pytest.raises(ValidationError):
         ViewFilter.model_validate(
-            {"op": "and", "conditions": [{"field": "x", "op": "gte", "value": 1}]}
+            {"op": "and", "conditions": [{"field": "x", "op": "regex", "value": 1}]}
         )
 
     # Layer 1 — Pydantic Literal["and"] rejects a combinator op != "and" at parse.
@@ -148,18 +171,25 @@ def test_underscore_field_excluded():
 
 
 def test_injection_value_neutralized():
-    """SC#4 (first-class): a SQL/SSTI/JNDI payload in a VALUE compiles to exactly
-    that literal — it rides as a JSON literal, never executed / interpolated /
-    templated. Byte-for-byte equality of the value is the proof."""
+    """SC#4 (first-class): a SQL/SSTI/JNDI payload in a VALUE rides as a BOUND
+    LITERAL in the Fragment — never executed / interpolated / templated. R-114-A:
+    only the wrapper shape changed (``list[Fragment]`` not a dict); the byte-for-byte
+    value check is preserved. ``title`` (free-text, ``ilike`` exact, no wildcards) is
+    used so the value is untouched — the typed ``document_type`` leg lowercases its
+    value (case-insensitivity), which is not the right field for a byte-for-byte
+    proof."""
     from app.models.document_view import ViewCondition, ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
     payload = "'; DROP TABLE documents;-- {{7*7}} ${jndi:ldap://x}"
     flt = ViewFilter(
         op="and",
-        conditions=[ViewCondition(field="document_type", op="eq", value=payload)],
+        conditions=[ViewCondition(field="title", op="eq", value=payload)],
     )
-    mf = compile_filter(flt)
-    # Exact literal — no SQL executed, no template rendered, no substitution.
-    assert mf == {"document_type": payload}
-    assert mf["document_type"] == payload  # byte-for-byte
+    frags = compile_filter(flt)
+    # Exact literal in the bound Fragment value — no SQL executed, no template
+    # rendered, no substitution. The resolve route binds frags[0].value as a
+    # PostgREST param; it is never concatenated into SQL.
+    assert len(frags) == 1
+    assert frags[0].value == payload  # byte-for-byte — the payload rides as a literal
+    assert frags[0].field == "title"  # field name is a constant, never interpolated
