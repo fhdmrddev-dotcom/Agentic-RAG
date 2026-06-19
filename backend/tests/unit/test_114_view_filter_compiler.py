@@ -380,3 +380,131 @@ def test_unknown_op_still_fails_closed_after_widening():
     )
     with pytest.raises(KeyError):
         compile_filter(smuggled)
+
+
+# ── operand validation (114 review WR-01 / WR-02) ──────────────────────────────
+
+
+def test_validate_operands_rejects_range_on_custom_number():
+    """WR-01: a range op on a CUSTOM NUMBER field is rejected (the custom leg compares
+    metadata->>'field' lexically, not numerically — no clean cast via supabase-py)."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    for op in ("gte", "lte", "between", "before", "after"):
+        flt = ViewFilter(
+            op="and",
+            conditions=[ViewCondition(field="amount", op=op, value=100, value2=200)],
+        )
+        with pytest.raises(ValueError, match="numeric field"):
+            validate_operands(flt, number_custom_fields={"amount"})
+
+
+def test_validate_operands_allows_eq_on_custom_number():
+    """WR-01: equality (and is_empty) on a custom number field is still allowed —
+    only ORDER comparisons are lexically wrong."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    validate_operands(
+        ViewFilter(op="and", conditions=[ViewCondition(field="amount", op="eq", value=100)]),
+        number_custom_fields={"amount"},
+    )
+    validate_operands(
+        ViewFilter(op="and", conditions=[ViewCondition(field="amount", op="is_empty")]),
+        number_custom_fields={"amount"},
+    )
+
+
+def test_validate_operands_allows_range_on_builtin_date():
+    """WR-01: the promoted built-in ``date`` uses the typed date_typed column (numeric/
+    indexed, correct) — range ops on it are NOT rejected (date is not a custom number)."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    validate_operands(
+        ViewFilter(op="and", conditions=[ViewCondition(field="date", op="between",
+                                                       value="2026-01-01", value2="2026-12-31")]),
+        number_custom_fields={"amount"},  # date is not in the numeric set
+    )
+
+
+def test_validate_operands_rejects_empty_one_of():
+    """WR-02: an empty ``one_of`` membership list (→ .in_(col, []) malformed/over-broad)
+    is rejected rather than reaching _apply."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    for empty in ([], None):
+        flt = ViewFilter(
+            op="and",
+            conditions=[ViewCondition(field="document_type", op="one_of", values=empty)],
+        )
+        with pytest.raises(ValueError, match="at least one value"):
+            validate_operands(flt)
+
+
+def test_validate_operands_requires_between_bounds():
+    """WR-02: ``between`` requires BOTH a start and an end value."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    # missing value2
+    with pytest.raises(ValueError, match="both a start and an end"):
+        validate_operands(
+            ViewFilter(op="and", conditions=[ViewCondition(field="date", op="between", value="2026-01-01")])
+        )
+    # missing value
+    with pytest.raises(ValueError, match="both a start and an end"):
+        validate_operands(
+            ViewFilter(op="and", conditions=[ViewCondition(field="date", op="between", value2="2026-12-31")])
+        )
+
+
+def test_validate_operands_requires_scalar_for_eq_gte():
+    """WR-02: ``eq``/``gte``/``lte``/``before``/``after``/``contains`` require a scalar
+    value — a missing scalar would reach getattr(q, builder)(col, None)."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    for op in ("eq", "gte", "lte", "before", "after", "contains"):
+        with pytest.raises(ValueError, match="requires a value"):
+            validate_operands(
+                ViewFilter(op="and", conditions=[ViewCondition(field="title", op=op)])
+            )
+
+
+def test_validate_operands_relative_requires_numeric_amount():
+    """WR-02: relative ops (within_next/older_than) require a numeric N amount."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    # valid numeric N passes
+    validate_operands(
+        ViewFilter(op="and", conditions=[ViewCondition(field="date", op="within_next", value=90, unit="days")])
+    )
+    # missing N rejected
+    with pytest.raises(ValueError, match="numeric amount"):
+        validate_operands(
+            ViewFilter(op="and", conditions=[ViewCondition(field="date", op="older_than", unit="days")])
+        )
+
+
+def test_validate_operands_happy_path_no_raise():
+    """A well-formed multi-condition filter (no custom numbers) validates cleanly."""
+    from app.models.document_view import ViewCondition, ViewFilter
+    from app.services.view_filter_compiler import validate_operands
+
+    validate_operands(
+        ViewFilter(
+            op="and",
+            conditions=[
+                ViewCondition(field="document_type", op="eq", value="invoice"),
+                ViewCondition(field="document_type", op="one_of", values=["invoice", "receipt"]),
+                ViewCondition(field="date", op="between", value="2026-01-01", value2="2026-12-31"),
+                ViewCondition(field="author", op="is_empty"),
+                ViewCondition(field="date", op="within_next", value=30, unit="days"),
+            ],
+        ),
+        number_custom_fields=set(),
+    )

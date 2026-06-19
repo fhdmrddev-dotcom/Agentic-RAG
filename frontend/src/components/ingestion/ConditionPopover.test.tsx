@@ -115,6 +115,32 @@ describe("ConditionPopover", () => {
     expect(onApply).toHaveBeenCalledWith({ field: "title", op: "is_empty" })
   })
 
+  it("WR-01: a custom number field offers ONLY eq / is_empty — no range ops", () => {
+    // Custom number ranges compare lexically on metadata->>'field' (silently wrong),
+    // so range operators must not be offered (the server rejects them too).
+    render(
+      <ConditionPopover
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        customFields={[
+          {
+            id: "f1",
+            field_key: "amount",
+            field_type: "number",
+            enabled: true,
+            is_global: false,
+          },
+        ]}
+      />,
+    )
+    fireEvent.change(screen.getByLabelText("Field"), { target: { value: "amount" } })
+    const ops = operatorOptionValues()
+    expect(ops).toEqual(expect.arrayContaining(["eq", "is_empty"]))
+    expect(ops).not.toContain("gte")
+    expect(ops).not.toContain("lte")
+    expect(ops).not.toContain("between")
+  })
+
   it("renders NO on-screen type/operator matrix (no static matrix table)", () => {
     const { container } = render(<ConditionPopover onApply={vi.fn()} onCancel={vi.fn()} />)
     // The deleted-in-sketch-030 matrix would be a <table>; the adaptive control has none.

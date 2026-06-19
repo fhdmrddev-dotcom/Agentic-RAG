@@ -142,6 +142,7 @@ async def test_user(pg_pool):
     for sql in (
         ("DELETE FROM public.documents WHERE user_id = $1", user_id),
         ("DELETE FROM public.document_views WHERE user_id = $1", user_id),
+        ("DELETE FROM public.metadata_field_definitions WHERE user_id = $1", user_id),
         ("DELETE FROM audit_log WHERE user_id = $1", user_id),
         ("DELETE FROM auth.users WHERE id = $1", user_id),
     ):
@@ -186,6 +187,17 @@ async def _seed_doc(pool, user_id, *, metadata, created_at, is_latest=True, vers
         metadata, created_at, is_latest, version,
     )
     return doc_id
+
+
+async def _seed_field_def(pool, user_id, *, field_key, field_type):
+    """Seed an ENABLED custom metadata field def so the resolve whitelist + the
+    operand validator (WR-01) see its type."""
+    await pool.execute(
+        "INSERT INTO public.metadata_field_definitions "
+        "(id, user_id, field_key, field_type, is_global, enabled) "
+        "VALUES ($1, $2, $3, $4, false, true)",
+        uuid4(), user_id, field_key, field_type,
+    )
 
 
 def _filter(field, op, **kw):
@@ -315,3 +327,36 @@ async def test_adhoc_leak_safe_from_caller(pg_pool, test_user, second_user):
     ids_a = {d["id"] for d in out_a["documents"]}
     assert str(doc_a) in ids_a, "A sees A's own doc"
     assert str(doc_b) not in ids_a, "A must NEVER see B's doc via the ad-hoc resolve (VIEW-06)"
+
+
+@pytest.mark.asyncio
+async def test_adhoc_rejects_range_on_custom_number_live(pg_pool, test_user):
+    """WR-01: a range op on a CUSTOM NUMBER field is rejected at resolve (422) — never
+    a silently-wrong lexical comparison. Drives the LIVE validator through the field
+    def whitelist (which carries the number type)."""
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+    if not await _table_exists(pg_pool, "metadata_field_definitions"):
+        pytest.skip("metadata_field_definitions table absent")
+
+    from fastapi import HTTPException
+
+    from app.api.document_views import resolve_adhoc
+    from app.models.document_view import AdHocResolve
+
+    sb = _supabase_or_skip()
+    await _seed_field_def(pg_pool, test_user, field_key="amount", field_type="number")
+
+    with pytest.raises(HTTPException) as exc:
+        await resolve_adhoc(
+            body=AdHocResolve(filter_expr=_filter("amount", "gte", value=100)),
+            current_user={"id": str(test_user)}, supabase=sb,
+        )
+    assert exc.value.status_code == 422, "range op on a custom number field is a 422 (WR-01)"
+
+    # Equality on the same custom number field is still allowed (only ORDER is wrong).
+    ok = await resolve_adhoc(
+        body=AdHocResolve(filter_expr=_filter("amount", "eq", value=100), count_only=True),
+        current_user={"id": str(test_user)}, supabase=sb,
+    )
+    assert "total" in ok, "eq on a custom number field still resolves (WR-01 allows equality)"

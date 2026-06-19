@@ -100,20 +100,30 @@ def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None
 _METADATA_BUILTINS = set(DocumentMetadata.model_fields)
 
 
-async def _build_whitelist(user_id: str, supabase: Client) -> set[str]:
-    """Assemble the live filterable-field whitelist for the caller.
+async def _build_field_meta(user_id: str, supabase: Client) -> tuple[set[str], set[str]]:
+    """Assemble the live filterable-field whitelist + the numeric custom-field set.
 
-    Built-in metadata keys ∪ the field_keys of the caller's ENABLED custom field
-    definitions (own + global). `_`-prefixed keys are excluded by
-    `validate_fields` itself (they can never be whitelisted — D-111-9 invariant),
-    so they are not added here regardless of any def's key.
+    Returns ``(whitelist, number_custom_fields)`` from ONE def fetch:
+      * ``whitelist`` — built-in metadata keys ∪ the field_keys of the caller's
+        ENABLED custom field defs (own + global). `_`-prefixed keys are excluded by
+        ``validate_fields`` itself (they can never be whitelisted — D-111-9), so they
+        are not added here regardless of any def's key.
+      * ``number_custom_fields`` — the field_keys of the ENABLED custom defs whose
+        ``field_type`` is ``number``; consumed by ``validate_operands`` to reject
+        range operators on a lexically-compared custom number leg (WR-01).
     """
-    enabled_custom = {
-        d["field_key"]
-        for d in await metadata_field_service.list_field_definitions(user_id, supabase=supabase)
-        if d.get("enabled")
+    defs = await metadata_field_service.list_field_definitions(user_id, supabase=supabase)
+    enabled_custom = {d["field_key"] for d in defs if d.get("enabled")}
+    number_custom = {
+        d["field_key"] for d in defs if d.get("enabled") and d.get("field_type") == "number"
     }
-    return _METADATA_BUILTINS | enabled_custom
+    return _METADATA_BUILTINS | enabled_custom, number_custom
+
+
+async def _build_whitelist(user_id: str, supabase: Client) -> set[str]:
+    """Back-compat thin wrapper: just the whitelist (see ``_build_field_meta``)."""
+    whitelist, _ = await _build_field_meta(user_id, supabase)
+    return whitelist
 
 
 @router.get("", response_model=list[ViewResponse])
@@ -137,10 +147,13 @@ async def create_view(
     (D-113-10): an unknown or `_`-prefixed field → 422. The service hard-sets
     `is_global=False` (D-113-3); the body never supplies it.
     """
-    # 1. Field-whitelist validation at SAVE (D-113-10) — unknown / `_`-field → 422.
-    whitelist = await _build_whitelist(current_user["id"], supabase)
+    # 1. Field-whitelist + operand validation at SAVE (D-113-10 / WR-01 / WR-02) —
+    #    unknown/`_`-field, a range op on a custom number field, or a malformed
+    #    operand (empty one_of, missing scalar/between bound) → 422.
+    whitelist, number_fields = await _build_field_meta(current_user["id"], supabase)
     try:
         view_filter_compiler.validate_fields(body.filter_expr, whitelist)
+        view_filter_compiler.validate_operands(body.filter_expr, number_fields)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
@@ -192,11 +205,13 @@ async def update_view(
     if existing is None or str(existing.get("user_id")) != str(current_user["id"]):
         raise HTTPException(status_code=404, detail="View not found")  # NEVER 403 — no existence leak
 
-    # Re-validate the AST fields if the update carries a new filter_expr (D-113-10).
+    # Re-validate the AST fields + operands if the update carries a new filter_expr
+    # (D-113-10 / WR-01 / WR-02).
     if body.filter_expr is not None:
-        whitelist = await _build_whitelist(current_user["id"], supabase)
+        whitelist, number_fields = await _build_field_meta(current_user["id"], supabase)
         try:
             view_filter_compiler.validate_fields(body.filter_expr, whitelist)
+            view_filter_compiler.validate_operands(body.filter_expr, number_fields)
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
         # Store the validated AST as a plain dict (jsonb), not the Pydantic model.
@@ -336,17 +351,25 @@ async def _resolve_filter(
     else ``{"documents": [...], "total": N}`` (the plain-dict, no-response_model shape
     so rows round-trip the exact metadata blob — the 112 CR-01 lesson).
     """
+    # Re-validate fields + operands against the LIVE field metadata at resolve (not
+    # just at save) — a field could have been deleted/disabled or retyped since save
+    # (T-114-02-03 defense-in-depth / WR-01 / WR-02). For the AD-HOC path this IS the
+    # save-time check (no prior create validated it).
+    whitelist, number_fields = await _build_field_meta(caller, supabase)
+    try:
+        view_filter_compiler.validate_fields(flt, whitelist)
+        view_filter_compiler.validate_operands(flt, number_fields)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
     # Compile the AST → an ordered list[Fragment] (R-114-A); [] when empty → no
     # narrowing (D-113-9). The attacker-controlled value rides as a bound Fragment
     # literal carried into a PostgREST builder param — NEVER string-interpolated into
     # SQL or the .or_/.in_ grammar (SC#4 / T-114-02-03).
     fragments = view_filter_compiler.compile_filter(flt)
 
-    # Re-validate the custom-leg field names against the LIVE whitelist at resolve
-    # (not just at save) before they become a metadata->>'field' selector — a field
-    # could have been deleted/disabled since save (T-114-02-03 defense-in-depth). For
-    # the ad-hoc path this IS the save-time check (no prior create validated it).
-    whitelist = await _build_whitelist(caller, supabase)
+    # Defense-in-depth: re-check the custom-leg field names are still whitelisted
+    # before they become a metadata->>'field' selector (a field deleted since save).
     for frag in fragments:
         if frag.leg == "custom" and frag.field not in whitelist:
             raise HTTPException(

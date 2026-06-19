@@ -41,12 +41,22 @@ const BUILTIN_FIELDS: FilterField[] = [
 
 /** Type-aware operator vocabulary (114-RESEARCH mapping table + sketch 030).
  *  `enum` mirrors `string` minus free-text `contains`; `date` carries the
- *  direction-encoding relative operators. */
+ *  direction-encoding relative operators.
+ *
+ *  WR-01 (114 review): custom `number` fields offer ONLY `eq`/`is_empty` — NOT
+ *  range ops (`gte`/`lte`/`between`). A custom number lives in `metadata` and the
+ *  filter compares it as TEXT via `metadata->>'field'` (lexical, not numeric: "9" >
+ *  "100"), and a clean numeric cast is not expressible through supabase-py builders.
+ *  Offering a range op here would silently return the wrong document set, breaking
+ *  the "N documents match" trust contract. The server REJECTS range ops on a custom
+ *  number field (422) regardless, so the UI must not present them. (Built-in `date`
+ *  ranges stay — they resolve through the typed, numerically-correct `date_typed`
+ *  column.) */
 const OPS_BY_TYPE: Record<MetadataFieldDef["field_type"], ViewConditionOp[]> = {
   string: ["eq", "one_of", "contains", "is_empty"],
   enum: ["eq", "one_of", "is_empty"],
   date: ["within_next", "older_than", "before", "after", "between", "is_empty"],
-  number: ["gte", "lte", "between", "eq", "is_empty"],
+  number: ["eq", "is_empty"],
   boolean: ["eq", "is_empty"],
 }
 

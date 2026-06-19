@@ -57,6 +57,7 @@ __all__ = [
     "register_operator",
     "compile_filter",
     "validate_fields",
+    "validate_operands",
 ]
 
 
@@ -192,6 +193,71 @@ def compile_filter(flt: ViewFilter) -> list[Fragment]:
         else:
             fragments.append(result)
     return fragments  # [] when empty -> caller applies no narrowing
+
+
+# Operators that impose an ORDER comparison (range). On a custom field these resolve
+# to `metadata->>'field' <op> value`, where `->>` returns TEXT — so the comparison is
+# LEXICAL, not numeric (WR-01). For ISO `YYYY-MM-DD` dates that happens to sort
+# correctly as text, but for NUMBERS it is silently wrong ("9" > "100"). PostgREST /
+# supabase-py cannot express a `::numeric` cast on a json-path selector (sanitize_param
+# quotes the `::`, turning it into a quoted identifier — verified), so range ops on a
+# CUSTOM NUMBER field are rejected at validate time rather than returning wrong rows.
+_RANGE_OPS: frozenset[str] = frozenset({"gte", "lte", "between", "before", "after"})
+
+# Operators requiring a scalar `value` operand (WR-02 — a missing scalar would reach
+# `getattr(q, builder)(col, None)` and emit a malformed/over-broad filter).
+_SCALAR_REQUIRED_OPS: frozenset[str] = frozenset(
+    {"eq", "gte", "lte", "before", "after", "contains"}
+)
+
+
+def validate_operands(flt: ViewFilter, number_custom_fields: set[str] | None = None) -> None:
+    """Validate per-operator operand presence + type-safety (WR-01 / WR-02 — 114 review).
+
+    Raises ``ValueError`` (the router maps it to 422) so a hand-crafted or
+    malformed AST can NEVER reach ``_apply`` and emit a wrong/over-broad PostgREST
+    filter. The client guards the happy path, but the server is the trust boundary
+    (T-114-05-01) — these checks run at SAVE, UPDATE, and RESOLVE.
+
+    WR-01 — a range operator (``gte``/``lte``/``between``/``before``/``after``) on a
+    CUSTOM NUMBER field is rejected: the custom leg compares ``metadata->>'field'``
+    LEXICALLY (text), not numerically, and a clean numeric cast is not expressible via
+    supabase-py builders. (The promoted built-in ``date`` uses the typed ``date_typed``
+    column — numerically correct — so it is exempt; ISO dates also sort correctly as
+    text.) ``number_custom_fields`` is the set of custom field_keys whose
+    ``field_type`` is ``number`` (assembled by the router); ``None``/empty means no
+    numeric custom fields are known, so the check is a no-op.
+
+    WR-02 — operand-presence checks:
+      * ``one_of`` requires a non-empty ``values`` list (an empty list → ``.in_(col,
+        [])``, a malformed/over-broad PostgREST ``in.()``);
+      * ``between`` requires BOTH ``value`` and ``value2``;
+      * ``eq``/``gte``/``lte``/``before``/``after``/``contains`` require a scalar
+        ``value``;
+      * relative ops (``within_next``/``older_than``) require a numeric ``value`` (N).
+    """
+    numeric = number_custom_fields or set()
+    for c in flt.conditions:
+        # WR-01: range op on a custom number field → lexically wrong, reject.
+        if c.op in _RANGE_OPS and c.field in numeric:
+            raise ValueError(
+                f"range filters are not supported on the numeric field {c.field!r} "
+                "(only equality is available for custom number fields)"
+            )
+        # WR-02: operand-presence per operator.
+        if c.op == "one_of":
+            if not c.values:
+                raise ValueError(f"{c.op!r} requires at least one value")
+        elif c.op == "between":
+            if c.value is None or c.value2 is None:
+                raise ValueError("'between' requires both a start and an end value")
+        elif c.op in ("within_next", "older_than"):
+            if not isinstance(c.value, (int, float)) or isinstance(c.value, bool):
+                raise ValueError(f"{c.op!r} requires a numeric amount")
+        elif c.op in _SCALAR_REQUIRED_OPS:
+            if c.value is None:
+                raise ValueError(f"{c.op!r} requires a value")
+        # is_empty takes no operand — nothing to check.
 
 
 def validate_fields(flt: ViewFilter, whitelist: set[str]) -> None:
