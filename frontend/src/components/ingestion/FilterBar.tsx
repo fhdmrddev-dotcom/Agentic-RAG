@@ -73,6 +73,12 @@ export interface FilterBarProps {
    *  the save name pre-fills from `editingView.name`. When null/undefined the bar
    *  is in CREATE mode (unchanged POST path). */
   editingView?: SavedView | null
+  /** Phase 114 (CR-01): when the host page ALREADY resolves the filter into the
+   *  document list, it passes the own+global match count here so the bar reuses it
+   *  instead of firing its OWN count round-trip — one filter change = one request.
+   *  `undefined` (the default / standalone use) makes the bar self-count via
+   *  `resolveFilterCount`. `null` means "count not yet known" (resolving). */
+  matchCount?: number | null
   /** Debounce window for the live count (ms). Default 300 (RESEARCH). */
   debounceMs?: number
 }
@@ -84,8 +90,13 @@ export function FilterBar({
   onActiveFilter,
   onViewSaved,
   editingView,
+  matchCount,
   debounceMs = 300,
 }: FilterBarProps) {
+  // When the host page supplies a match count (it already resolves the filter into
+  // the list), the bar reuses it and SKIPS its own count round-trip (114 CR-01 —
+  // one filter change = one request). `undefined` = standalone, self-count.
+  const externalCount = matchCount !== undefined
   // Uncontrolled fallback so the bar works standalone (and in tests) without a
   // wiring page; when `value` is provided the bar is fully controlled.
   const [internal, setInternal] = useState<ViewFilter>(value ?? EMPTY_FILTER)
@@ -112,9 +123,11 @@ export function FilterBar({
   const reqIdRef = useRef(0)
 
   useEffect(() => {
+    // When the host page supplies the count (it resolves the filter itself), the
+    // bar does NOT self-count — it just mirrors the page's number (CR-01).
+    if (externalCount) return
     if (timerRef.current) clearTimeout(timerRef.current)
-    // No conditions = "no narrowing" — nothing to count (and a transient empty
-    // view would just count everything). Clear the count and skip the round-trip.
+    // No conditions = "no narrowing" — nothing to count. Clear and skip the trip.
     if (conditions.length === 0) {
       setCount(null)
       setCounting(false)
@@ -140,7 +153,7 @@ export function FilterBar({
     }
     // Re-run when the conditions list changes (deep — via JSON).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(conditions), debounceMs])
+  }, [JSON.stringify(conditions), debounceMs, externalCount])
 
   // ── Save-as-view ──────────────────────────────────────────────────────────
   const [naming, setNaming] = useState(false)
@@ -194,7 +207,11 @@ export function FilterBar({
     setFilter({ op: "and", conditions: conditions.filter((_, j) => j !== i) })
   }
 
-  const isZero = count === 0
+  // The effective count + busy state: the host-supplied value when controlled
+  // (`matchCount`: number = known, null = resolving), else the self-counted state.
+  const effectiveCount = externalCount ? matchCount ?? null : count
+  const effectiveCounting = externalCount ? matchCount === null : counting
+  const isZero = effectiveCount === 0
   const editingCondition = useMemo<ViewCondition | undefined>(
     () => (typeof editing === "number" ? conditions[editing] : undefined),
     [editing, conditions],
@@ -249,11 +266,11 @@ export function FilterBar({
               data-testid="match-count"
               data-zero={isZero ? "true" : "false"}
             >
-              {counting && count === null
+              {effectiveCounting && effectiveCount === null
                 ? "counting…"
-                : count === null
+                : effectiveCount === null
                   ? ""
-                  : `${count} ${count === 1 ? "document" : "documents"} match`}
+                  : `${effectiveCount} ${effectiveCount === 1 ? "document" : "documents"} match`}
             </span>
           )}
 

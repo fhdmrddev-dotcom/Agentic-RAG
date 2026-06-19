@@ -89,3 +89,22 @@ class ViewResponse(BaseModel):
     filter_expr: dict
     folder_scope: UUID | None = None
     is_global: bool = False
+
+
+# ── stateless ad-hoc resolve (114 CR-01) ───────────────────────────────────────
+class AdHocResolve(BaseModel):
+    """The body of the STATELESS ``POST /document-views/resolve`` endpoint (114 CR-01).
+
+    The live FilterBar / IngestionPage previews an UNSAVED filter WITHOUT persisting
+    a transient ``document_views`` row (which fired a per-keystroke ``view.create``
+    audit row that was never cleaned up — an audit-log pollution / data-integrity
+    defect). This carries the same ``filter_expr`` AST inline; the endpoint runs the
+    identical compile + caller-scoped own+global two-leg resolve as ``resolve_view``
+    but performs NO DB write and NO audit. ``count_only`` returns just ``{total}``;
+    otherwise ``{documents, total}``. ``folder_scope`` is optional (parity with a
+    saved view's scope).
+    """
+
+    filter_expr: ViewFilter
+    count_only: bool = False
+    folder_scope: UUID | None = None

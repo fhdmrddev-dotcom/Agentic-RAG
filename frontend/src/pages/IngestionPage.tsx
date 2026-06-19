@@ -15,11 +15,10 @@ import { useAuth } from "@/hooks/useAuth"
 import {
   listMetadataFields,
   listViews,
-  createView,
   resolveView,
-  deleteView,
+  resolveAdHoc,
+  updateView,
 } from "@/lib/api"
-import { supabase } from "@/lib/supabase"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -52,26 +51,6 @@ function useIsMobile(): boolean {
   return isMobile
 }
 
-/** Minimal authed PATCH for an in-place view rename (the backend
- *  `PATCH /document-views/{id}` route exists; there is no client `updateView`
- *  helper and `api.ts` is outside this plan's file scope, so the call is composed
- *  here from the shared supabase session — the same auth-header shape `api.ts`
- *  uses internally). */
-async function renameViewRequest(id: string, name: string): Promise<void> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) throw new Error("Not authenticated")
-  const res = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL as string}/document-views/${id}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name }),
-    },
-  )
-  if (!res.ok) throw new Error("Failed to rename view")
-}
-
 export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
@@ -100,6 +79,10 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   // The documents resolved by the active filter / selected view (drives the list
   // when a filter is active; null = "no active filter, show the folder view").
   const [filteredDocs, setFilteredDocs] = useState<Document[] | null>(null)
+  // The own+global DISTINCT-deduped match count from the SAME resolve that fills the
+  // list (114 CR-01: the page and the FilterBar share ONE resolve per filter change —
+  // the bar no longer fires its own separate count round-trip). null while unknown.
+  const [matchCount, setMatchCount] = useState<number | null>(null)
   const filterReqId = useRef(0)
 
   // Load the field defs (for the operator menu) + the saved views once.
@@ -182,35 +165,33 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   }, [documents])
 
   // ── Resolve an active filter into the list (the SAME surface for ad-hoc + saved,
-  // D-114-1). The shipped resolve path is by-view-id only; an ad-hoc filter is
-  // resolved through a transient create→resolve→delete (mirrors the count helper
-  // in api.ts — uses only the shipped endpoint shapes). An empty filter clears the
-  // override so the folder view shows again. ──────────────────────────────────
+  // D-114-1). A saved view resolves by id (`resolveView`); an UNSAVED ad-hoc filter
+  // resolves via the stateless `resolveAdHoc` endpoint (114 CR-01) — NO transient
+  // create/delete, NO audit pollution. This is the SINGLE resolve per filter change:
+  // it fills the list AND captures the own+global match count, which the FilterBar
+  // consumes (it no longer fires its own count round-trip). An empty filter clears
+  // the override so the folder view shows again. ───────────────────────────────
   const resolveFilterIntoList = useCallback(async (f: ViewFilter, savedViewId?: string) => {
     if (f.conditions.length === 0) {
       setFilteredDocs(null)
+      setMatchCount(null)
       return
     }
     const myReq = ++filterReqId.current
     try {
-      let docs: Document[] = []
-      if (savedViewId) {
-        const { documents: d } = await resolveView(savedViewId)
-        docs = d ?? []
-      } else {
-        // Ad-hoc: resolve via a throwaway view (always cleaned up).
-        const transient = await createView(`__live_list_${Date.now()}`, f)
-        try {
-          const { documents: d } = await resolveView(transient.id)
-          docs = d ?? []
-        } finally {
-          await deleteView(transient.id).catch(() => {})
-        }
-      }
+      const { documents: d, total } = savedViewId
+        ? await resolveView(savedViewId)
+        : await resolveAdHoc(f)
       // Ignore a stale resolve if a newer filter change superseded it.
-      if (myReq === filterReqId.current) setFilteredDocs(docs)
+      if (myReq === filterReqId.current) {
+        setFilteredDocs(d ?? [])
+        setMatchCount(total)
+      }
     } catch {
-      if (myReq === filterReqId.current) setFilteredDocs(null)
+      if (myReq === filterReqId.current) {
+        setFilteredDocs(null)
+        setMatchCount(null)
+      }
     }
   }, [])
 
@@ -261,7 +242,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   }, [refreshViews])
 
   const handleRenameView = useCallback(async (id: string, name: string) => {
-    await renameViewRequest(id, name)
+    await updateView(id, { name })
     setViews((prev) => prev.map((v) => (v.id === id ? { ...v, name } : v)))
   }, [])
 
@@ -471,6 +452,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                     onChange={handleFilterChange}
                     onViewSaved={handleViewSaved}
                     editingView={editingView}
+                    matchCount={matchCount}
                   />
                 </div>
               )}

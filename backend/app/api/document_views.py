@@ -52,6 +52,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentMetadata
 from app.models.document_view import (
+    AdHocResolve,
     ViewCreate,
     ViewFilter,
     ViewResponse,
@@ -266,16 +267,85 @@ async def resolve_view(
     if view is None:
         raise HTTPException(status_code=404, detail="View not found")  # 404-not-403, no existence leak
 
-    # 2. Compile the saved AST → an ordered list[Fragment] (R-114-A); [] when empty →
-    #    no narrowing (D-113-9). The attacker-controlled value rides as a bound
-    #    Fragment literal carried into a PostgREST builder param — NEVER
-    #    string-interpolated into SQL or the .or_/.in_ grammar (SC#4 / T-114-02-03).
+    # 2. Compile + caller-scoped own+global two-leg resolve via the SHARED core
+    #    (114 CR-01: the same core serves the saved-view resolve AND the stateless
+    #    ad-hoc /resolve endpoint). The saved AST → an ordered list[Fragment]
+    #    (R-114-A); the attacker-controlled value rides as a bound Fragment literal
+    #    (SC#4); every leg is scoped from the CALLER, never view["user_id"] (VIEW-06).
     flt = ViewFilter.model_validate(view["filter_expr"] or {"op": "and", "conditions": []})
+    return await _resolve_filter(
+        caller=caller,
+        flt=flt,
+        folder_scope=view.get("folder_scope"),
+        count_only=count_only,
+        supabase=supabase,
+    )
+
+
+@router.post("/resolve")
+async def resolve_adhoc(
+    body: AdHocResolve,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """STATELESS ad-hoc resolve/count for an UNSAVED filter (114 CR-01).
+
+    The live FilterBar / IngestionPage preview an unsaved filter as the user builds
+    it. Phase 113/114 had NO ad-hoc-by-body endpoint, so the client faked one with a
+    ``createView → resolve → deleteView`` dance — which fired a ``view.create``
+    GOVERNANCE AUDIT row on EVERY debounced keystroke that was never cleaned up,
+    flooding the compliance audit log (DMF-01) with ``__live_*`` throwaway rows, AND
+    double-round-tripped (the page + the bar each ran their own transient cycle).
+
+    This endpoint takes the ``filter_expr`` AST inline and runs the IDENTICAL
+    compile + caller-scoped own+global two-leg resolve as ``resolve_view`` (the
+    SHARED ``_resolve_filter`` core) — with NO ``document_views`` write and NO audit
+    entry. ``count_only`` returns ``{total}`` (the live "N documents match" preview +
+    the page's list resolve share THIS one path now); otherwise ``{documents, total}``.
+
+    Leak-safety (VIEW-06) is preserved by construction: ``_resolve_filter`` scopes
+    every leg from the CALLER, never a view owner (there IS no view here — the caller
+    IS the only scope). SC#4 holds — the value rides as a bound PostgREST param via
+    the compiler + ``_apply``, never interpolated. ``folder_scope`` (optional) is
+    caller-owner-scoped exactly like a saved view's scope.
+    """
+    return await _resolve_filter(
+        caller=current_user["id"],
+        flt=body.filter_expr,
+        folder_scope=str(body.folder_scope) if body.folder_scope is not None else None,
+        count_only=body.count_only,
+        supabase=supabase,
+    )
+
+
+async def _resolve_filter(
+    *,
+    caller: str,
+    flt: ViewFilter,
+    folder_scope: str | None,
+    count_only: bool,
+    supabase: Client,
+):
+    """The SHARED, leak-safe resolve core (114 CR-01) — used by BOTH the saved-view
+    ``resolve_view`` and the stateless ad-hoc ``resolve_adhoc`` endpoints.
+
+    Caller MUST have already done any readability gate (a saved view's 404-not-403);
+    this core never reads a view owner — every documents query leg is scoped from
+    ``caller`` (the VIEW-06 invariant). It performs NO DB write and NO audit entry, so
+    it is safe to call on every keystroke. Returns ``{"total": N}`` when ``count_only``
+    else ``{"documents": [...], "total": N}`` (the plain-dict, no-response_model shape
+    so rows round-trip the exact metadata blob — the 112 CR-01 lesson).
+    """
+    # Compile the AST → an ordered list[Fragment] (R-114-A); [] when empty → no
+    # narrowing (D-113-9). The attacker-controlled value rides as a bound Fragment
+    # literal carried into a PostgREST builder param — NEVER string-interpolated into
+    # SQL or the .or_/.in_ grammar (SC#4 / T-114-02-03).
     fragments = view_filter_compiler.compile_filter(flt)
 
-    # 2b. Re-validate the custom-leg field names against the LIVE whitelist at resolve
-    #     (not just at save) before they become a metadata->>'field' selector — a field
-    #     could have been deleted/disabled since save (T-114-02-03 defense-in-depth).
+    # Re-validate the custom-leg field names against the LIVE whitelist at resolve
+    # (not just at save) before they become a metadata->>'field' selector — a field
+    # could have been deleted/disabled since save (T-114-02-03 defense-in-depth). For
+    # the ad-hoc path this IS the save-time check (no prior create validated it).
     whitelist = await _build_whitelist(caller, supabase)
     for frag in fragments:
         if frag.leg == "custom" and frag.field not in whitelist:
@@ -284,22 +354,22 @@ async def resolve_view(
                 detail=f"filter field {frag.field!r} is no longer available",
             )
 
-    # 3. Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an
-    #    unreachable scope contributes no narrowing (D-113-5). Owner-scoped to the
-    #    CALLER, so a global view's scope can never reach another user's folders.
+    # Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an unreachable
+    # scope contributes no narrowing (D-113-5). Owner-scoped to the CALLER, so a
+    # global view's scope can never reach another user's folders.
     #
-    #    resolve_project_subtree walks from the scope ROOT and ALWAYS includes that
-    #    root id in its output, even when the root is a folder the caller can't see
-    #    (a seeded global view pointing at another user's private folder). Narrowing
-    #    on such a subtree would zero out the caller's docs — the exact opposite of
-    #    D-113-5. So intersect the resolved subtree with the caller's VISIBLE folder
-    #    ids; if nothing the caller can see survives, the scope is unreachable →
-    #    drop the narrowing entirely (the view resolves over the caller's full
-    #    visible set, never erroring or resolving empty).
+    # resolve_project_subtree walks from the scope ROOT and ALWAYS includes that root
+    # id in its output, even when the root is a folder the caller can't see (a seeded
+    # global view pointing at another user's private folder). Narrowing on such a
+    # subtree would zero out the caller's docs — the exact opposite of D-113-5. So
+    # intersect the resolved subtree with the caller's VISIBLE folder ids; if nothing
+    # the caller can see survives, the scope is unreachable → drop the narrowing
+    # entirely (the view resolves over the caller's full visible set, never erroring
+    # or resolving empty).
     subtree = None
-    if view.get("folder_scope"):
+    if folder_scope:
         raw_subtree = await resolve_project_subtree(
-            view["folder_scope"], supabase=supabase, user_id=caller
+            folder_scope, supabase=supabase, user_id=caller
         )
         if raw_subtree:
             visible_ids = {f["id"] for f in await fetch_visible_folders(supabase, caller)}

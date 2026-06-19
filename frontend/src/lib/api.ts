@@ -2111,30 +2111,38 @@ export async function resolveView(
   return res.json() as Promise<{ documents?: Document[]; total: number }>
 }
 
-/** Live "N documents match" count for an AD-HOC (unsaved) filter (D-114-2).
+/** POST /document-views/resolve — STATELESS ad-hoc resolve/count for an UNSAVED
+ *  filter (114 CR-01). Carries the `filter_expr` AST inline; the backend runs the
+ *  SAME caller-scoped own+global two-leg resolve as the saved-view route but writes
+ *  NO `document_views` row and NO audit entry — so it is safe to call on every
+ *  debounced keystroke. `count_only` returns `{total}`; otherwise `{documents,
+ *  total}` (plain rows so `_source`/`_confidence` survive, 112 CR-01).
  *
- *  The shipped count path gates by view id (`count_only` is a query param on the
- *  by-id resolve route — there is NO ad-hoc-by-body count endpoint, per
- *  114-02-SUMMARY). So an unsaved filter is counted by creating a transient view,
- *  reading its count-only resolve, and deleting it — using ONLY the endpoint
- *  shapes Plan 02 shipped (no divergent endpoint invented). The transient view is
- *  always deleted, even on a count failure, so the keystroke preview never leaves
- *  orphan rows behind. An empty filter (`conditions: []`) is "no narrowing" and
- *  needs no round-trip — the caller short-circuits before calling this. */
+ *  This REPLACES the old `createView → resolve → deleteView` dance, which fired a
+ *  `view.create` governance-audit row per keystroke that was never cleaned up
+ *  (audit-log pollution) and double-round-tripped (the page + the bar each ran
+ *  their own transient cycle). */
+export async function resolveAdHoc(
+  filter_expr: ViewFilter,
+  opts: { count_only?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/resolve`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ filter_expr, count_only: opts.count_only ?? false }),
+  })
+  if (!res.ok) throw new Error("Failed to resolve filter")
+  return res.json() as Promise<{ documents?: Document[]; total: number }>
+}
+
+/** Live "N documents match" count for an AD-HOC (unsaved) filter (D-114-2).
+ *  Thin count-only wrapper over the stateless `resolveAdHoc` endpoint (114 CR-01) —
+ *  NO transient view, NO audit pollution. An empty filter (`conditions: []`) is "no
+ *  narrowing" and needs no round-trip — the caller short-circuits before calling. */
 export async function resolveFilterCount(filter_expr: ViewFilter): Promise<number> {
-  // 1. Create a transient, throwaway view carrying the ad-hoc filter.
-  const transient = await createView(
-    `__live_count_${Date.now()}`,
-    filter_expr,
-  )
-  try {
-    // 2. Read the own+global DISTINCT-deduped count (count_only — no full rows).
-    const { total } = await resolveView(transient.id, { count_only: true })
-    return total
-  } finally {
-    // 3. Always clean up the throwaway view (best-effort; deleteView swallows 404).
-    await deleteView(transient.id).catch(() => {})
-  }
+  const { total } = await resolveAdHoc(filter_expr, { count_only: true })
+  return total
 }
 
 // -- Feedback API functions ---------------------------------------------------
