@@ -52,14 +52,15 @@ EXPECTED_TOOLS = [
 ]
 
 
-def test_registry_has_exactly_25_entries():
-    """_TOOL_REGISTRY must contain exactly 25 tool handlers after Phase 101 Plan 04.
+def test_registry_has_exactly_26_entries():
+    """_TOOL_REGISTRY must contain exactly 26 tool handlers after Phase 115.
 
     (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
-    Plan 02 + ask_user from Plan 03 = 24; + render_template from Phase 101 = 25).
+    Plan 02 + ask_user from Plan 03 = 24; + render_template from Phase 101 = 25;
+    + query_documents_by_view from Phase 115 = 26).
     Phase-end gate.
     """
-    assert len(_TOOL_REGISTRY) == 25
+    assert len(_TOOL_REGISTRY) == 26
 
 
 def test_registry_contains_all_expected_tools():
