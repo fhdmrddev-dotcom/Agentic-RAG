@@ -33,12 +33,39 @@ from pydantic import BaseModel
 # ── filter AST (stored shape — reject-unknown-op by Literal discriminator) ─────
 class ViewCondition(BaseModel):
     field: str
-    op: Literal["eq"]  # 113: ONLY eq. 114 widens this Literal additively.
-    value: str | int | float | bool  # scalar literal (bound as a param at resolve)
+    # 114 (VIEW-03) widens the operator Literal ADDITIVELY (no shape change, no
+    # data migration of live ``document_views.filter_expr`` rows — the D-113-6
+    # payoff). The closed Literal stays the parse-time reject-unknown-op layer
+    # (Pitfall 5); the names match ``114-RESEARCH.md`` §"Operator → Fragment
+    # Mapping" exactly. ``eq`` stays first so a pre-114 ``{op:eq}`` row parses
+    # unchanged.
+    op: Literal[
+        "eq",
+        "gte",
+        "lte",
+        "one_of",
+        "contains",
+        "is_empty",
+        "within_next",
+        "older_than",
+        "before",
+        "after",
+        "between",
+    ]
+    value: str | int | float | bool | None = None  # scalar literal (bound at resolve)
+    # Additive optional operands — all default-absent so existing ``{op:and, eq}``
+    # rows parse unchanged (the D-113-6 payoff). ``value2`` carries the upper
+    # bound for ``between``; ``values`` carries the membership list for
+    # ``one_of``; ``unit`` carries the relative-date span unit for
+    # ``within_next``/``older_than`` (the window math itself is deferred to the
+    # resolve route's server clock, D-114-16 — never baked here).
+    value2: str | int | float | None = None
+    values: list[str | int | float] | None = None
+    unit: Literal["days", "weeks", "months"] | None = None
 
 
 class ViewFilter(BaseModel):
-    op: Literal["and"]  # 113: ONLY and (flat AND-of-conditions, D-113-7)
+    op: Literal["and"]  # 113/114: ONLY and (flat AND-of-conditions, D-113-7; OR/NOT deferred)
     conditions: list[ViewCondition] = []  # empty = no narrowing (D-113-9)
 
 
