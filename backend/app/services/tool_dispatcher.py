@@ -34,6 +34,18 @@ from app.services.audit_service import write_audit_entry
 from app.services.sandbox_service import sandbox_manager, harvest_output_files
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
+# Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
+# resolve core IN-PROCESS (no FastAPI self-call). ``ViewFilter`` + the two view/field
+# services are cycle-safe at module level (they import only pydantic/dependencies/db).
+# ``resolve_filter`` / ``ResolveError`` / ``_build_field_meta`` live in
+# ``document_view_resolver``, which transitively imports ``harness.scope`` →
+# ``task_service`` → back to THIS module — a real import cycle if pulled at module load.
+# They are bound LAZILY via ``_ensure_resolver()`` into THESE module globals (sentinels
+# below) so (a) the cycle is broken and (b) the unit-test ``monkeypatch.setattr(td,
+# "resolve_filter", ...)`` still targets the exact name the handler calls (patch-where-used:
+# a non-None monkeypatched value is preserved, never re-imported).
+from app.models.document_view import ViewFilter
+from app.services import document_view_service, metadata_field_service
 from app.services.workspace_service import (
     write_file as ws_write_file,
     read_file as ws_read_file,
@@ -123,6 +135,40 @@ class ToolResult:
     citations: list[dict] = field(default_factory=list)  # New citation objects
     similarity_score: float | None = None  # Avg similarity to accumulate
     sub_agent_record: dict | None = None  # Sub-agent metadata (analyze_document)
+
+
+# ---------------------------------------------------------------------------
+# Phase 115 (VIEW-07) — lazy resolver binding (cycle-break + monkeypatch-friendly)
+# ---------------------------------------------------------------------------
+# Sentinels: bound on first use by _ensure_resolver(). Declared at module scope so a
+# test can `monkeypatch.setattr(td, "resolve_filter", spy)` and the handler picks up the
+# spy (a non-None value is NEVER overwritten by the lazy import — patch-where-used).
+resolve_filter = None  # type: ignore[assignment]
+ResolveError = None  # type: ignore[assignment]
+_build_field_meta = None  # type: ignore[assignment]
+
+
+def _ensure_resolver() -> None:
+    """Bind the document_view_resolver symbols into THIS module's globals on first use.
+
+    Deferred (not a top-level import) to break the cycle:
+    tool_dispatcher → document_view_resolver → harness.scope → harness/__init__ →
+    phase_types → task_service → tool_dispatcher. Only assigns a global that is still the
+    ``None`` sentinel, so a test's monkeypatched ``resolve_filter`` survives untouched.
+    """
+    g = globals()
+    if g.get("resolve_filter") is None or g.get("ResolveError") is None or g.get("_build_field_meta") is None:
+        from app.services.document_view_resolver import (
+            ResolveError as _RE,
+            _build_field_meta as _bfm,
+            resolve_filter as _rf,
+        )
+        if g.get("resolve_filter") is None:
+            g["resolve_filter"] = _rf
+        if g.get("ResolveError") is None:
+            g["ResolveError"] = _RE
+        if g.get("_build_field_meta") is None:
+            g["_build_field_meta"] = _bfm
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +297,161 @@ async def _handle_query_documents(args: dict, ctx: ToolContext) -> ToolResult:
         folder_ids=ctx.folder_subtree_ids,
     )
     return ToolResult(result=tool_result)
+
+
+async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 115 (VIEW-07) — the conversational mouth of the 113/114 virtual-folders work.
+
+    Three modes off a single flat, polymorphic arg set (``view`` XOR ``filter`` + an
+    optional ``limit`` — D-115 / RESEARCH §"State of the Art": NO anyOf/oneOf, the only
+    cross-provider-safe shape for function-calling):
+
+      * CATALOG  — neither ``view`` nor ``filter`` (or an UNKNOWN ``view`` name): return
+        the caller's saved views + the filterable fields. The ``filterable_fields`` list
+        is IDENTICAL to the whitelist the compiler validates against (``_build_field_meta``
+        — no drift). No resolve, so NO audit.
+      * SAVED-VIEW — a ``view`` NAME → own-or-global ``get_view_by_name`` (the model never
+        sees a UUID) → resolve. An unknown name falls through to CATALOG (D-115-6 — never a
+        distinguishable 403/existence leak).
+      * INLINE-FILTER — a ``filter`` object → ``ViewFilter.model_validate`` → resolve. A
+        malformed shape (Pydantic ``ValidationError``) is mapped to a calm tool-result.
+
+    Honesty is load-bearing: the TRUE total comes from ``resolve_filter(count_only=True)``
+    (NEVER ``len(shown_rows)`` — the silent-undercount trap); a truncation note + a
+    ``truncated`` flag are emitted when ``total > shown``; rows + ``source_refs`` are the
+    CALLER's only (VIEW-06 — ``resolve_filter`` caller-scopes own+global). A VIEW listing
+    has no chunk passage, so the citable channel is ``source_refs`` only (citations=[],
+    D-115-4); ``source_refs`` is ALSO embedded in the JSON ``result`` the model reads so it
+    can cite by id+filename.
+
+    Errors NEVER escape into the agent loop (T-115-02-05): a ``ResolveError`` (bad field) or
+    a Pydantic ``ValidationError`` (malformed inline filter) becomes a calm ``ToolResult``
+    JSON string that points the model back at the catalog. Pitfall 4: ``ctx.folder_subtree_ids``
+    is NEVER threaded into ``resolve_filter`` — the view owns its own ``folder_scope``.
+
+    D-115-10: every concrete resolve fires the EXISTING ``search.query`` audit tagged
+    ``via:"view"``/``via:"filter"`` (no new audit enum, no migration); fire-and-forget so a
+    write failure never breaks the answer.
+    """
+    from pydantic import ValidationError
+
+    _ensure_resolver()  # bind resolve_filter / ResolveError / _build_field_meta (cycle-break)
+
+    view_name = (args.get("view") or "").strip()
+    inline = args.get("filter")
+    caller = ctx.current_user["id"]
+
+    async def _catalog() -> ToolResult:
+        # CATALOG — saved views + the filterable-field whitelist. The whitelist is the
+        # SAME source the compiler validates against (_build_field_meta) so the catalog
+        # advertises exactly what resolve accepts (no drift). Counts are omitted (lazy —
+        # RESEARCH §A3: a catalog call should be cheap, not N resolves).
+        views = await document_view_service.list_views(caller, supabase=ctx.supabase)
+        whitelist, _ = await _build_field_meta(caller, ctx.supabase)
+        return ToolResult(result=json.dumps({
+            "mode": "catalog",
+            "views": [{"name": v["name"]} for v in views],
+            "filterable_fields": sorted(whitelist),
+            "hint": "Call again with `view` (a name above) or `filter` (using a field above).",
+        }))
+
+    if not view_name and inline is None:
+        return await _catalog()
+
+    # ---- resolve the filter_expr: saved view by name, or inline ----
+    if view_name:
+        view = await document_view_service.get_view_by_name(
+            view_name, caller, supabase=ctx.supabase
+        )
+        if view is None:
+            return await _catalog()  # unknown view → catalog, NEVER an existence leak (D-115-6)
+        try:
+            flt = ViewFilter.model_validate(
+                view.get("filter_expr") or {"op": "and", "conditions": []}
+            )
+        except (ValidationError, ValueError) as e:
+            # A stored view row whose filter_expr no longer parses (e.g. a future-shape
+            # drift) — calm string, never a raise into the loop.
+            return ToolResult(result=json.dumps({
+                "status": "invalid_filter",
+                "message": f"saved view {view['name']!r} could not be parsed: {e}",
+                "hint": "call with no arguments to see your saved views and filterable fields",
+            }))
+        folder_scope = view.get("folder_scope")
+        via_meta = {"via": "view", "view_id": view["id"], "view_name": view["name"]}
+    else:
+        try:
+            flt = ViewFilter.model_validate(inline)
+        except (ValidationError, ValueError) as e:
+            return ToolResult(result=json.dumps({
+                "status": "invalid_filter",
+                "message": f"the filter shape is invalid: {e}",
+                "hint": "call with no arguments to see filterable fields",
+            }))
+        folder_scope = None
+        via_meta = {"via": "filter", "filter": inline}
+
+    limit = max(1, min(int(args.get("limit") or 20), 50))  # default 20, hard cap 50 (D-115-3)
+
+    try:
+        total = (await resolve_filter(
+            caller=caller, flt=flt, folder_scope=folder_scope,
+            count_only=True, supabase=ctx.supabase,
+        ))["total"]
+        full = await resolve_filter(
+            caller=caller, flt=flt, folder_scope=folder_scope,
+            count_only=False, supabase=ctx.supabase,
+        )
+    except ResolveError as e:  # the extracted core raises this, NOT HTTPException
+        return ToolResult(result=json.dumps({
+            "status": "invalid_filter",
+            "message": e.detail,
+            "hint": "call with no arguments to see filterable fields",
+        }))
+
+    rows = (full.get("documents") or [])[:limit]
+    compact = [{
+        "document_id": d["id"],
+        "filename": d["filename"],
+        "document_type": (d.get("metadata") or {}).get("document_type"),
+        "date": (d.get("metadata") or {}).get("date"),
+        "author": (d.get("metadata") or {}).get("author"),
+    } for d in rows]
+    source_refs = [{"document_id": d["id"], "filename": d["filename"]} for d in rows]
+
+    # D-115-10: reuse the existing search.query audit (no new enum, no migration), tagged
+    # via:"view"/"filter". Fire-and-forget — a write failure never breaks the answer.
+    # getattr-guard: a duck-typed test/duck ctx may omit `spawn`; a missing hook must not
+    # turn a clean answer into an exception (the answer is the point).
+    _spawn = getattr(ctx, "spawn", None)
+    if callable(_spawn):
+        try:
+            _spawn(write_audit_entry(
+                user_id=caller,
+                action_type="search.query",
+                metadata={**via_meta, "document_ids": [d["id"] for d in rows]},
+                supabase=ctx.supabase,
+            ))
+        except Exception:  # noqa: BLE001 — audit is best-effort; never block the answer
+            logger.exception("query_documents_by_view audit spawn failed for caller=%s", caller)
+
+    shown = len(compact)
+    note = (
+        f"{total} match; {shown} newest shown." if total > shown
+        else f"{total} match."
+    )
+    return ToolResult(
+        result=json.dumps({
+            "mode": "results",
+            "total": total,
+            "shown": shown,
+            "truncated": total > shown,
+            "note": note,
+            "documents": compact,
+            "source_refs": source_refs,  # citable channel, also embedded so the model can cite
+        }),
+        source_refs=source_refs,
+    )
 
 
 async def _handle_web_search(args: dict, ctx: ToolContext) -> ToolResult:

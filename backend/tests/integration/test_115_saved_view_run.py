@@ -191,7 +191,6 @@ async def test_get_view_by_name_unknown_returns_none(pg_pool, seeded_user_with_v
     assert row is None, "an unknown name must return None (existence-leak guard)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 builds saved-view-by-name resolve")
 @pytest.mark.asyncio
 async def test_saved_view_by_name_resolves(pg_pool, seeded_user_with_view):
     """A `view` NAME → own-or-global lookup → resolve to the caller's matching docs."""
@@ -213,7 +212,6 @@ async def test_saved_view_by_name_resolves(pg_pool, seeded_user_with_view):
     assert ctx_data["memo"] not in ids, "the non-matching memo must NOT appear"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 falls back to catalog on an unknown view name")
 @pytest.mark.asyncio
 async def test_unknown_view_name_falls_back_to_catalog(pg_pool, seeded_user_with_view):
     """An UNKNOWN view name → CATALOG (never a 403, never another user's data, no error)."""

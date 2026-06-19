@@ -139,7 +139,6 @@ async def seeded_user(pg_pool):
                 pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 builds catalog mode + the handler")
 @pytest.mark.asyncio
 async def test_catalog_filterable_fields_equals_compiler_whitelist(pg_pool, seeded_user):
     """Catalog `filterable_fields` ≡ the compiler whitelist (built-ins ∪ enabled custom defs)."""

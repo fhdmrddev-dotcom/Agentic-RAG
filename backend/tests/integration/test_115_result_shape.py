@@ -164,7 +164,6 @@ async def user_with_many_docs(pg_pool):
                 pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 builds the resolve result shape (total + refs + truncation)")
 @pytest.mark.asyncio
 async def test_result_shape_true_total_refs_and_truncation(pg_pool, user_with_many_docs):
     """TRUE total via count-only + a truncation note when capped + shaped source_refs."""

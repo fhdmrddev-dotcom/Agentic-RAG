@@ -17,7 +17,6 @@ import json
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 creates _handle_query_documents_by_view (catalog mode)")
 @pytest.mark.asyncio
 async def test_empty_args_returns_catalog(make_tool_context):
     """Empty args → a catalog dict (saved views + filterable fields), never a resolve."""
@@ -33,7 +32,6 @@ async def test_empty_args_returns_catalog(make_tool_context):
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 maps a ResolveError to a calm ToolResult string")
 @pytest.mark.asyncio
 async def test_bad_inline_filter_returns_calm_string_not_raise(make_tool_context):
     """An inline `filter` with a bad field → a calm ToolResult JSON string (NO raise).
@@ -64,7 +62,6 @@ async def test_bad_inline_filter_returns_calm_string_not_raise(make_tool_context
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 routes a well-formed inline filter to resolve")
 @pytest.mark.asyncio
 async def test_well_formed_inline_filter_routes_to_resolve(make_tool_context, monkeypatch):
     """A well-formed inline `filter` routes through `resolve_filter` (resolve mode)."""
