@@ -137,7 +137,13 @@
   2. A guided condition builder (no raw DSL) lets the user compose a view's filter; saved views render in the sidebar as a distinct "Views" group with a visual affordance that they are saved queries (not real folders the user can drop files into), reusing the global-folder indicator pattern.
   3. `EXPLAIN` shows index use (not a seq scan) for a view query at ~10k docs; sidebar render does not degrade with corpus size.
   4. The builder + sidebar match the Deep Midnight / Aether design system, are mobile-responsive, and meet WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-**Plans**: TBD
+**Plans**: 6 plans (5 waves; backend before frontend)
+  - [ ] 114-01-PLAN.md (Wave 1) — Widen the filter compiler to bound WHERE-fragment descriptors + register the additive operators (gte/lte/one_of/contains/is_empty/relative-date) at the seam + author migration 074 (2 GENERATED STORED typed columns, un-applied) + rewrite the 3 113 containment tests (injection test stays green)
+  - [ ] 114-02-PLAN.md (Wave 2) — Resolve route: two-leg _apply (typed columns + custom-field casts) + server-clock relative-date derivation (114->115 handoff) + additive count-only mode (own+global DISTINCT dedupe)
+  - [ ] 114-03-PLAN.md (Wave 3, **autonomous:false BLOCKING**) — Apply migration 074 to live :54322 (SQL-editor, NEVER db push) + regen full-schema.sql + live bad-date/auto-backfill + SC#3 EXPLAIN index-use at ~10k seed
+  - [ ] 114-04-PLAN.md (Wave 1 parallel) — Extract the shared NavRow primitive (fix folder-tree debt) + refactor FolderNode/FolderTree onto it + Move-to-folder document-row action (reuse MoveToFolderDialog)
+  - [ ] 114-05-PLAN.md (Wave 4) — The no-DSL FilterBar chip strip + type-aware ConditionPopover + RelativeDateControl + live amber-at-zero count + Save-as-view
+  - [ ] 114-06-PLAN.md (Wave 5, **autonomous:false**) — Views sidebar group (from NavRow, funnel icon + lazy count) + IngestionPage wiring (view<->filter loading, sidebar->rail collapse, responsive list) + G-4 Chrome-MCP lived-experience UAT
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **view/filter builder**) BEFORE plan. (UX-02 cross-cutting acceptance.)
 
@@ -207,7 +213,7 @@
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
-| 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/? | Not started | - |
+| 114. Virtual Folders — Range/Date + Builder + Sidebar | 0/6 | Planned     | - |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
