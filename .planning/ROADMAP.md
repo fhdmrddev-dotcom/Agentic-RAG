@@ -142,7 +142,7 @@
   - [x] 114-02-PLAN.md (Wave 2) — Resolve route: two-leg _apply (typed columns + custom-field casts) + server-clock relative-date derivation (114->115 handoff) + additive count-only mode (own+global DISTINCT dedupe)
   - [x] 114-03-PLAN.md (Wave 3, **autonomous:false BLOCKING**) — Apply migration 074 to live :54322 (SQL-editor, NEVER db push) + regen full-schema.sql + live bad-date/auto-backfill + SC#3 EXPLAIN index-use at ~10k seed
   - [x] 114-04-PLAN.md (Wave 1 parallel) — Extract the shared NavRow primitive (fix folder-tree debt) + refactor FolderNode/FolderTree onto it + Move-to-folder document-row action (reuse MoveToFolderDialog)
-  - [ ] 114-05-PLAN.md (Wave 4) — The no-DSL FilterBar chip strip + type-aware ConditionPopover + RelativeDateControl + live amber-at-zero count + Save-as-view
+  - [x] 114-05-PLAN.md (Wave 4) — The no-DSL FilterBar chip strip + type-aware ConditionPopover + RelativeDateControl + live amber-at-zero count + Save-as-view
   - [ ] 114-06-PLAN.md (Wave 5, **autonomous:false**) — Views sidebar group (from NavRow, funnel icon + lazy count) + IngestionPage wiring (view<->filter loading, sidebar->rail collapse, responsive list) + G-4 Chrome-MCP lived-experience UAT
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **view/filter builder**) BEFORE plan. (UX-02 cross-cutting acceptance.)
@@ -213,7 +213,7 @@
 | 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
-| 114. Virtual Folders — Range/Date + Builder + Sidebar | 4/6 | In Progress|  |
+| 114. Virtual Folders — Range/Date + Builder + Sidebar | 5/6 | In Progress|  |
 | 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
