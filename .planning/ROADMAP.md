@@ -155,7 +155,10 @@
   1. The agent can run a saved view (or an ad-hoc metadata query) as a tool to answer a question in chat; the tool is registered in `_TOOL_REGISTRY` AND advertised in the `get_tools` schema (the Phase 101 `render_template` schema-visibility bug guarded against — verified the model actually calls it).
   2. The tool resolves results over the caller's visible set (own-or-global-folder), never leaking another user's documents; respects `ctx.phase_whitelist` for free via the `dispatch_tool` guard.
   3. **SC#10 4-axis UAT**: the new agent tool is exercised cross-provider (native-7), in a multi-tool prompt (e.g. view-query + `search_documents`), with a parallel-thread row and a long-message row; authored in VALIDATION.md.
-**Plans**: TBD
+**Plans**: 3 plans (3 waves; sequential — extract resolver → handler → dual-wiring; zero migration, threads.py untouched)
+  - [ ] 115-01-PLAN.md (Wave 1) — Extract the leak-safe `_resolve_filter` core into `document_view_resolver.py` (raises `ResolveError`, no FastAPI) + rewrap the 113/114 routes byte-identically + 10 Wave-0 test scaffolds
+  - [ ] 115-02-PLAN.md (Wave 2) — `_handle_query_documents_by_view` (catalog + saved-view-by-name + inline-filter modes, honest TRUE-total + truncation note + source_refs, calm-error-not-throw, `search.query` audit `via:view/filter`) + `get_view_by_name` helper
+  - [ ] 115-03-PLAN.md (Wave 3) — SC#1 dual-wiring: the Gemini-safe `QUERY_DOCUMENTS_BY_VIEW_TOOL` schema (no anyOf/oneOf) in `_TOOL_REGISTRY` AND `get_tools()` + SC#2 whitelist-guard test + the LIVE two-user leak proof driving the handler
 **UI hint**: no
 
 #### Phase 116: Document Relationships — Backend + Agent Tool
@@ -214,7 +217,7 @@
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
-| 115. Virtual Folders — Agent Tool | 0/? | Not started | - |
+| 115. Virtual Folders — Agent Tool | 0/3 | Planned | - |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
 | 118. Auto-Classification | 0/? | Not started | - |
