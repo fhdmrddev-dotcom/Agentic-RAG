@@ -32,6 +32,7 @@ const defaultProps = {
   expandedIds: new Set<string>(),
   editingId: null,
   deletingId: null,
+  currentUserId: "user-1",
   onSelect: vi.fn(),
   onToggleExpand: vi.fn(),
   onStartRename: vi.fn(),
@@ -44,6 +45,7 @@ const defaultProps = {
   creatingInParentId: null,
   onCreateCommit: vi.fn(),
   onCreateCancel: vi.fn(),
+  onToggleGlobal: vi.fn(),
 }
 
 describe("FolderNode", () => {
@@ -173,5 +175,41 @@ describe("FolderNode", () => {
     // Redesign uses bg-primary/10 for selected highlight
     const row = container.querySelector(".bg-primary\\/10")
     expect(row).toBeInTheDocument()
+  })
+
+  // Phase 114 (D-114-13/8): per-folder counts render on every row, not just Root.
+  it("renders a per-folder document count when provided", () => {
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={makeNode()}
+        {...defaultProps}
+        folderDocumentCounts={{ "node-1": 12 }}
+      />
+    )
+    expect(screen.getByText("12")).toBeInTheDocument()
+  })
+
+  it("renders a 0 count when the folder has no documents in the count map", () => {
+    renderWithTooltip(
+      <FolderNodeComponent node={makeNode()} {...defaultProps} folderDocumentCounts={{}} />
+    )
+    expect(screen.getByText("0")).toBeInTheDocument()
+  })
+
+  it("renders recursive children when expanded", () => {
+    const parent = makeNode({
+      id: "node-1",
+      name: "Parent",
+      children: [makeNode({ id: "child-1", name: "Nested child" })],
+    })
+    renderWithTooltip(
+      <FolderNodeComponent
+        node={parent}
+        {...defaultProps}
+        expandedIds={new Set(["node-1"])}
+      />
+    )
+    // Recursion preserved: the child row renders when the parent is expanded.
+    expect(screen.getByText("Nested child")).toBeInTheDocument()
   })
 })

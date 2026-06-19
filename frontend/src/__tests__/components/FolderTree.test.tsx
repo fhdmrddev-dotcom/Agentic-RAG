@@ -45,16 +45,36 @@ const sampleFolders: Folder[] = [
 const defaultProps = {
   folders: sampleFolders,
   selectedFolderId: null,
+  currentUserId: "user-1",
   onSelectFolder: vi.fn(),
   onCreateFolder: vi.fn().mockResolvedValue({}),
   onRenameFolder: vi.fn().mockResolvedValue(undefined),
   onDeleteFolder: vi.fn().mockResolvedValue(undefined),
+  onToggleGlobal: vi.fn().mockResolvedValue(undefined),
 }
 
 describe("FolderTree", () => {
   it("renders 'Root' node", () => {
     renderWithTooltip(<FolderTree {...defaultProps} />)
     expect(screen.getByText("Root")).toBeInTheDocument()
+  })
+
+  it("renders the Root document count through the shared NavRow", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} rootDocumentCount={5} />)
+    expect(screen.getByText("Root")).toBeInTheDocument()
+    expect(screen.getByText("5")).toBeInTheDocument()
+  })
+
+  it("renders per-folder counts on non-Root rows (D-114-13)", () => {
+    renderWithTooltip(
+      <FolderTree
+        {...defaultProps}
+        folderDocumentCounts={{ "folder-1": 8 }}
+      />
+    )
+    // Alpha (folder-1) now shows a count, not just Root.
+    expect(screen.getByText("Alpha")).toBeInTheDocument()
+    expect(screen.getByText("8")).toBeInTheDocument()
   })
 
   it("renders folder tree from flat list (node names appear)", () => {

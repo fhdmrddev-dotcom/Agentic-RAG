@@ -3,6 +3,7 @@ import { Plus, Folder as FolderIcon, FolderOpen } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { buildFolderTree } from "@/lib/folderTree"
 import { FolderNode } from "./FolderNode"
+import { NavRow } from "./NavRow"
 import { FolderCreateInput } from "./FolderCreateInput"
 import type { Folder } from "@/types"
 
@@ -11,6 +12,9 @@ interface FolderTreeProps {
   selectedFolderId: string | null
   currentUserId: string
   rootDocumentCount?: number
+  /** Per-folder document counts keyed by folder id (Phase 114 D-114-13/8). Threaded
+   *  to every FolderNode so counts render on every row, not just Root. */
+  folderDocumentCounts?: Record<string, number>
   onSelectFolder: (id: string | null) => void
   onCreateFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
   onRenameFolder: (id: string, name: string) => Promise<void>
@@ -23,6 +27,7 @@ export function FolderTree({
   selectedFolderId,
   currentUserId,
   rootDocumentCount,
+  folderDocumentCounts,
   onSelectFolder,
   onCreateFolder,
   onRenameFolder,
@@ -131,23 +136,15 @@ export function FolderTree({
         </Tooltip>
       </div>
 
-      {/* Root node */}
-      <div
-        className={[
-          "flex items-center gap-2 py-1.5 px-2 rounded-lg cursor-pointer transition-colors duration-150",
-          isRootSelected
-            ? "bg-primary/10 text-primary font-medium shadow-sm shadow-primary/5"
-            : "hover:bg-accent/60",
-        ].join(" ")}
-        onClick={() => onSelectFolder(null)}
-      >
-        <div className="h-4 w-4 shrink-0" />
-        <RootIcon className={isRootSelected ? "h-4 w-4 shrink-0 text-primary" : "h-4 w-4 shrink-0 text-amber-500/70"} />
-        <span className="text-sm truncate flex-1">Root</span>
-        <span className="text-xs text-muted-foreground ml-auto">
-          {rootDocumentCount ?? 0}
-        </span>
-      </div>
+      {/* Root node — also renders through the shared NavRow (D-114-13). It already
+          had a count; now it shares the same row as every folder. */}
+      <NavRow
+        icon={RootIcon}
+        name="Root"
+        count={rootDocumentCount ?? 0}
+        isSelected={isRootSelected}
+        onSelect={() => onSelectFolder(null)}
+      />
 
       {/* Create input at root level */}
       {creatingInParentId === "root" && (
@@ -178,6 +175,7 @@ export function FolderTree({
             deletingId={deletingId}
             creatingInParentId={creatingInParentId}
             currentUserId={currentUserId}
+            folderDocumentCounts={folderDocumentCounts}
             onSelect={onSelectFolder}
             onToggleExpand={handleToggleExpand}
             onStartRename={handleStartRename}

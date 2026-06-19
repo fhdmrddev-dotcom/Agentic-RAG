@@ -79,6 +79,17 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
     return documents.filter((d) => d.folder_id == null).length
   }, [documents])
 
+  // Phase 114 (D-114-13/8): per-folder document counts so every NavRow shows a
+  // count (parity with the mandated View count). Sourced from the documents the
+  // page already holds — no per-folder resolve call (would degrade at ~10k docs).
+  const folderDocumentCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const d of documents) {
+      if (d.folder_id) counts[d.folder_id] = (counts[d.folder_id] ?? 0) + 1
+    }
+    return counts
+  }, [documents])
+
   // The folder tree is rendered identically on desktop (inline sidebar) and mobile
   // (bottom-sheet) — define it once. Selecting a folder also dismisses the mobile
   // sheet (harmless on desktop, where the sheet is never open).
@@ -88,6 +99,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
       selectedFolderId={selectedFolderId}
       currentUserId={user?.id ?? ""}
       rootDocumentCount={rootDocumentCount}
+      folderDocumentCounts={folderDocumentCounts}
       onSelectFolder={(id) => {
         setSelectedFolderId(id)
         setFolderSheetOpen(false)
