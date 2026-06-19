@@ -95,6 +95,100 @@ QUERY_DOCUMENTS_TOOL = {
     },
 }
 
+# Phase 115 (VIEW-07) — the one new agent tool: list ALL documents matching a saved
+# view or exact metadata criteria (complete, deterministic, newest-first; NO semantic
+# ranking, NO query string). Cross-provider-safe shape (RESEARCH §Pattern 1, D-115-13):
+# two FLAT optional fields `view` XOR `filter` + optional `limit`, the either/or
+# invariant stated in PROSE (never anyOf/oneOf — Gemini function-calling rejects them),
+# the nested `filter` mirroring render_template's nested-object-with-required precedent
+# (production-proven across the native-7), and the condition `op` enum matching
+# ViewCondition.op (models/document_view.py:42-64) EXACTLY so the parsed object validates
+# against ViewFilter.model_validate(...) without translation.
+QUERY_DOCUMENTS_BY_VIEW_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "query_documents_by_view",  # final name — D-115-12
+        "description": (
+            "List ALL documents matching a saved view or exact metadata criteria — "
+            "complete, deterministic, newest-first, NO semantic ranking and NO search "
+            "query string. Use this for 'show me all X', 'how many X', 'list my "
+            "contracts', 'open my Invoices view', 'which docs expire within 90 days'. "
+            "This is NOT search_documents (which needs a natural-language query and "
+            "returns ranked top-K passages) and NOT query_documents (free SQL). "
+            "Provide EXACTLY ONE of: `view` (a saved view name) OR `filter` (inline "
+            "metadata conditions). Provide NEITHER to discover what saved views and "
+            "filterable fields exist (a catalog is returned — then call again with a "
+            "concrete choice). Never provide both."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "string",
+                    "description": (
+                        "Name of a saved view to run (e.g. 'Invoices', 'Expiring "
+                        "Contracts'). Case-insensitive. Omit to use `filter` or to "
+                        "request the catalog."
+                    ),
+                },
+                "filter": {
+                    "type": "object",
+                    "description": (
+                        "An inline metadata filter (use INSTEAD of `view`). A flat "
+                        "AND-list of conditions; every condition matches exactly."
+                    ),
+                    "properties": {
+                        "op": {"type": "string", "enum": ["and"]},
+                        "conditions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "field": {
+                                        "type": "string",
+                                        "description": "A filterable field (call with no args to see the catalog of fields).",
+                                    },
+                                    "op": {
+                                        "type": "string",
+                                        "enum": [
+                                            "eq", "gte", "lte", "one_of", "contains",
+                                            "is_empty", "within_next", "older_than",
+                                            "before", "after", "between",
+                                        ],
+                                    },
+                                    "value": {"type": ["string", "number", "boolean", "null"]},
+                                    "value2": {
+                                        "type": ["string", "number", "null"],
+                                        "description": "Upper bound for 'between'.",
+                                    },
+                                    "values": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Membership list for 'one_of'.",
+                                    },
+                                    "unit": {
+                                        "type": "string",
+                                        "enum": ["days", "weeks", "months"],
+                                        "description": "Span unit for within_next/older_than.",
+                                    },
+                                },
+                                "required": ["field", "op"],
+                            },
+                        },
+                    },
+                    "required": ["op", "conditions"],
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max rows to return (default 20, hard cap 50). The TRUE total is always reported.",
+                },
+            },
+            # No top-level required → catalog mode (neither field) is reachable.
+        },
+    },
+}
+
+
 LS_TOOL = {
     "type": "function",
     "function": {
@@ -873,13 +967,18 @@ EXPLORER_SYSTEM_PROMPT = (
 def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict]:
     """Return the active tool list based on per-user effective settings."""
     effective = user_settings if user_settings is not None else None
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, QUERY_DOCUMENTS_BY_VIEW_TOOL,
+             LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
              # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
              WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
+    # Phase 115 (VIEW-07) — D-115-8: Deep-visible so the model actually SEES it (SC#1).
+    # The inverse of render_template (registered in _TOOL_REGISTRY but NOT advertised here —
+    # harness-only); this tool MUST be in BOTH. apply_tool_budget only trims on the HARNESS
+    # path (Google max_tools:16); Deep stays byte-identical with this tool present.
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
     if web_enabled:

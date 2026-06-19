@@ -13,8 +13,6 @@ schema while RED.
 
 import json
 
-import pytest
-
 
 def _find_schema():
     """Return the QUERY_DOCUMENTS_BY_VIEW_TOOL schema dict, or skip if not built yet."""
@@ -23,7 +21,6 @@ def _find_schema():
     return QUERY_DOCUMENTS_BY_VIEW_TOOL
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 defines QUERY_DOCUMENTS_BY_VIEW_TOOL")
 def test_schema_has_no_anyof_or_oneof():
     """No `anyOf` / `oneOf` anywhere in the schema (Gemini rejects them — D-115-13)."""
     schema = _find_schema()
@@ -32,7 +29,6 @@ def test_schema_has_no_anyof_or_oneof():
     assert "oneOf" not in blob, "schema must NOT use oneOf (Gemini 400)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 defines the optional view/filter args")
 def test_view_and_filter_are_optional():
     """`view` and `filter` are NOT in `parameters.required` (catalog mode reachable)."""
     schema = _find_schema()
@@ -42,7 +38,6 @@ def test_view_and_filter_are_optional():
     assert "filter" not in required, "filter must be optional (an arg-less call → catalog)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 defines the nested filter op enum")
 def test_filter_op_enum_matches_viewcondition_literal_exactly():
     """The nested `filter.properties.conditions.items.properties.op.enum` ≡ ViewCondition.op."""
     import typing

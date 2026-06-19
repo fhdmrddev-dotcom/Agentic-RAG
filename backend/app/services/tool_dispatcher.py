@@ -2580,6 +2580,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "ask_user": _handle_ask_user,
     # Phase 101 (TMPL-02 / TMPL-03) — template fill (G-5: handler + one line; threads.py untouched)
     "render_template": _handle_render_template,
+    # Phase 115 (VIEW-07) — registry + get_tools BOTH (the inverse of render_template); threads.py untouched (G-5)
+    "query_documents_by_view": _handle_query_documents_by_view,
 }
 
 

@@ -14,10 +14,7 @@ Imports are inside the test bodies so collection never errors on the not-yet-bui
 handler / schema while RED.
 """
 
-import pytest
 
-
-@pytest.mark.xfail(strict=False, reason="Plan 03 registers query_documents_by_view in _TOOL_REGISTRY")
 def test_tool_registered_in_dispatcher():
     """`query_documents_by_view` is a key in `tool_dispatcher._TOOL_REGISTRY`."""
     import app.services.tool_dispatcher as td
@@ -26,7 +23,6 @@ def test_tool_registered_in_dispatcher():
     assert callable(td._TOOL_REGISTRY["query_documents_by_view"])
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 adds the schema to openai_service.get_tools()")
 def test_tool_schema_present_in_get_tools():
     """The `query_documents_by_view` schema is emitted by `openai_service.get_tools()`.
 
@@ -47,7 +43,6 @@ def test_tool_schema_present_in_get_tools():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 dual-registration consistency")
 def test_registry_and_schema_agree():
     """Every Phase-115 registry entry has a matching get_tools schema (no orphan)."""
     import app.services.tool_dispatcher as td
