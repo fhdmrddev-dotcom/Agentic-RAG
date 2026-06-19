@@ -80,8 +80,13 @@ def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None
     calendar — the window is NEVER baked at save time nor on the client (Pitfall 6).
 
     * ``within_next`` → ``(today, today + N)`` — the ``today`` LOWER bound is the
-      overdue-exclusion (D-114-5: "coming due soon," not "overdue + soon").
-    * ``older_than``  → ``(None, today - N)`` — document age, ``date <= today - N``.
+      overdue-exclusion (D-114-5: "coming due soon," not "overdue + soon"). Both ends
+      inclusive (the resolve route chains ``.gte(today).lte(today+N)``).
+    * ``older_than``  → ``(None, today - N)`` — document age. The resolve route applies
+      this upper bound STRICTLY via ``.lt`` (WR-03 / D-114-4: ``date < today - N``), so
+      a document dated EXACTLY ``today - N`` is NOT "older than N" — it is excluded.
+      (This helper returns the same bound DATE either way; the strict-vs-inclusive
+      choice lives at the ``_apply`` builder call.)
 
     PHASE 115 HANDOFF: the agent-tool MUST reuse this resolver / this helper so its
     relative windows recompute live; it MUST NOT re-derive its own window math.
@@ -427,14 +432,17 @@ async def _resolve_filter(
 
             if frag.builder in ("within_next", "older_than"):
                 # Relative-date window from the SERVER CLOCK at resolve time (D-114-16).
-                # value = N, value2 = unit. within_next → .gte(today).lte(today+N)
-                # (the .gte(today) lower bound EXCLUDES overdue, D-114-5);
-                # older_than → .lte(today-N).
+                # value = N, value2 = unit.
+                #   within_next → .gte(today).lte(today+N) — inclusive both ends; the
+                #     .gte(today) lower bound EXCLUDES overdue (D-114-5);
+                #   older_than  → .lt(today-N) — STRICT upper bound (WR-03: D-114-4 is
+                #     "date < today-N", so a doc dated EXACTLY today-N is NOT "older
+                #     than N"; the code now matches that contract, no off-by-one).
                 low, high = _relative_window(frag.builder, frag.value, frag.value2)
                 if low is not None:
                     q = q.gte(col, low)
                 if high is not None:
-                    q = q.lte(col, high)
+                    q = q.lt(col, high) if frag.builder == "older_than" else q.lte(col, high)
             elif frag.builder == "or_":
                 # one_of — membership over one field. Bind the list via .in_
                 # (PostgREST QUOTES each member → SC#4-safe), never an interpolated

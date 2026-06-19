@@ -477,3 +477,37 @@ async def test_typed_leg_within_next_excludes_overdue_live(pg_pool, test_user):
     assert str(soon) in ids, "a doc due in 45 days is within the 90-day window (crosses a month)"
     assert str(overdue) not in ids, "an overdue doc is EXCLUDED (D-114-5 .gte(today) lower bound)"
     assert str(far) not in ids, "a doc due in 200 days is beyond the 90-day window"
+
+
+@pytest.mark.asyncio
+async def test_typed_leg_older_than_boundary_is_strict_live(pg_pool, test_user):
+    """WR-03: `older_than` uses a STRICT `<` upper bound (D-114-4 `date < today-N`).
+
+    A doc dated EXACTLY `today - N` must be EXCLUDED (not "older than N"); a doc dated
+    `today - N - 1` must be INCLUDED. GREEN since migration 074 (date_typed) is live.
+    """
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+    if not await _column_exists(pg_pool, "documents", "date_typed"):
+        pytest.fail("date_typed absent — migration 074 not applied (Plan 03)")
+
+    from app.api.document_views import create_view, resolve_view
+    from app.models.document_view import ViewCreate
+
+    sb = _supabase_or_skip()
+    today = date.today()
+    base = datetime(2025, 6, 7, tzinfo=timezone.utc)
+    # boundary = exactly today-30; just_older = today-31; not_older = today-29
+    boundary = await _seed_doc(pg_pool, test_user, metadata={"date": (today - timedelta(days=30)).isoformat()}, created_at=base)
+    just_older = await _seed_doc(pg_pool, test_user, metadata={"date": (today - timedelta(days=31)).isoformat()}, created_at=base)
+    not_older = await _seed_doc(pg_pool, test_user, metadata={"date": (today - timedelta(days=29)).isoformat()}, created_at=base)
+
+    view = await create_view(
+        body=ViewCreate(name="Stale", filter_expr=_filter("date", "older_than", value=30, unit="days")),
+        current_user={"id": str(test_user)}, supabase=sb,
+    )
+    out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
+    ids = {d["id"] for d in out["documents"]}
+    assert str(just_older) in ids, "a doc dated today-31 IS older than 30 days (included)"
+    assert str(boundary) not in ids, "a doc dated EXACTLY today-30 is NOT older than 30 (strict <, WR-03)"
+    assert str(not_older) not in ids, "a doc dated today-29 is younger than 30 days (excluded)"

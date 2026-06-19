@@ -156,6 +156,7 @@ def _op_within_next(cond) -> Fragment:
 def _op_older_than(cond) -> Fragment:
     """``older_than`` — document age ``date < today-N`` (D-114-4). Window computed
     server-side at resolve time (D-114-16); carries ONLY N + ``unit``. The resolve
-    route expands to ``.lte(today-N)`` on ``date_typed``."""
+    route expands to ``.lt(today-N)`` on ``date_typed`` — STRICT (WR-03): a doc dated
+    EXACTLY ``today-N`` is excluded, matching the D-114-4 ``<`` contract."""
     return Fragment(leg="typed", field=PROMOTED_TYPED_COLUMNS["date"],
                     builder="older_than", value=cond.value, value2=cond.unit)
