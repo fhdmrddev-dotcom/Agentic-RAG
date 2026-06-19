@@ -283,8 +283,14 @@ def test_relative_window_clamps_absurd_n_no_overflow():
 
 
 def test_relative_window_recomputes_live():
-    """The window derives from date.today() at CALL time (D-114-16 — drifts with calendar)."""
-    from app.api import document_views
+    """The window derives from date.today() at CALL time (D-114-16 — drifts with calendar).
+
+    Phase 115 extracted ``_relative_window`` into ``app.services.document_view_resolver``;
+    patch ``date`` where the helper now READS it (the resolver module) — the standard
+    "patch where it's used" rule. The behavior (window anchors on the live server clock)
+    is byte-identical; only the patch target moved with the extraction.
+    """
+    from app.services import document_view_resolver
 
     sentinel = date(2099, 6, 1)
 
@@ -293,13 +299,13 @@ def test_relative_window_recomputes_live():
         def today(cls):
             return sentinel
 
-    orig = document_views.date
+    orig = document_view_resolver.date
     try:
-        document_views.date = _FrozenDate
-        low, high = document_views._relative_window("within_next", 5, "days")
+        document_view_resolver.date = _FrozenDate
+        low, high = document_view_resolver._relative_window("within_next", 5, "days")
         assert low == "2099-06-01" and high == "2099-06-06", "window anchors on the live clock"
     finally:
-        document_views.date = orig
+        document_view_resolver.date = orig
 
 
 # ── case-insensitive matching at the compiler leg (GREEN now) ────────────────────
