@@ -34,7 +34,7 @@
 ### Metadata-Driven Views / "Virtual Folders" (VIEW)
 - [x] **VIEW-01**: User can save a metadata filter as a named view that appears in the sidebar like a folder.
 - [x] **VIEW-02**: A view's contents are live; one document can appear in multiple views with no duplication.
-- [ ] **VIEW-03**: View filters support equals / one-of / contains / is-empty / numeric & date comparisons, including relative dates ("expiring within N days").
+- [x] **VIEW-03**: View filters support equals / one-of / contains / is-empty / numeric & date comparisons, including relative dates ("expiring within N days").
 - [x] **VIEW-04**: User can combine multiple filter conditions (AND) in one view.
 - [x] **VIEW-05**: User can optionally scope a view to a folder subtree.
 - [x] **VIEW-06**: User can share a view globally without exposing documents the viewer is not allowed to see.
@@ -101,7 +101,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | VIEW-04 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-05 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
-| VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Pending |
+| VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Complete |
 | VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Pending |
 | REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
 | REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
