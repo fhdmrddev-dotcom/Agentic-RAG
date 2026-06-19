@@ -157,7 +157,7 @@
   3. **SC#10 4-axis UAT**: the new agent tool is exercised cross-provider (native-7), in a multi-tool prompt (e.g. view-query + `search_documents`), with a parallel-thread row and a long-message row; authored in VALIDATION.md.
 **Plans**: 3 plans (3 waves; sequential — extract resolver → handler → dual-wiring; zero migration, threads.py untouched)
   - [x] 115-01-PLAN.md (Wave 1) — Extract the leak-safe `_resolve_filter` core into `document_view_resolver.py` (raises `ResolveError`, no FastAPI) + rewrap the 113/114 routes byte-identically + 10 Wave-0 test scaffolds
-  - [ ] 115-02-PLAN.md (Wave 2) — `_handle_query_documents_by_view` (catalog + saved-view-by-name + inline-filter modes, honest TRUE-total + truncation note + source_refs, calm-error-not-throw, `search.query` audit `via:view/filter`) + `get_view_by_name` helper
+  - [x] 115-02-PLAN.md (Wave 2) — `_handle_query_documents_by_view` (catalog + saved-view-by-name + inline-filter modes, honest TRUE-total + truncation note + source_refs, calm-error-not-throw, `search.query` audit `via:view/filter`) + `get_view_by_name` helper
   - [ ] 115-03-PLAN.md (Wave 3) — SC#1 dual-wiring: the Gemini-safe `QUERY_DOCUMENTS_BY_VIEW_TOOL` schema (no anyOf/oneOf) in `_TOOL_REGISTRY` AND `get_tools()` + SC#2 whitelist-guard test + the LIVE two-user leak proof driving the handler
 **UI hint**: no
 
@@ -217,7 +217,7 @@
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
-| 115. Virtual Folders — Agent Tool | 1/3 | In Progress|  |
+| 115. Virtual Folders — Agent Tool | 2/3 | In Progress|  |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
 | 118. Auto-Classification | 0/? | Not started | - |
