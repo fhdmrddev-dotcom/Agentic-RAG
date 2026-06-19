@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Plus, X } from "lucide-react"
 import type { MetadataFieldDef, SavedView, ViewCondition, ViewConditionOp, ViewFilter } from "@/types"
 import { ConditionPopover } from "./ConditionPopover"
-import { createView, resolveFilterCount } from "@/lib/api"
+import { createView, updateView, resolveFilterCount } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 /**
@@ -68,6 +68,11 @@ export interface FilterBarProps {
   /** Fires after a successful Save-as-view so the page/Plan 06 can refresh the
    *  sidebar Views group with the new saved filter. */
   onViewSaved?: (view: SavedView) => void
+  /** Phase 114 (D-114-3): when set, the bar is in EDIT mode — Save PATCHes this
+   *  same saved view (updateView) instead of POSTing a new one (createView), and
+   *  the save name pre-fills from `editingView.name`. When null/undefined the bar
+   *  is in CREATE mode (unchanged POST path). */
+  editingView?: SavedView | null
   /** Debounce window for the live count (ms). Default 300 (RESEARCH). */
   debounceMs?: number
 }
@@ -78,6 +83,7 @@ export function FilterBar({
   onChange,
   onActiveFilter,
   onViewSaved,
+  editingView,
   debounceMs = 300,
 }: FilterBarProps) {
   // Uncontrolled fallback so the bar works standalone (and in tests) without a
@@ -141,15 +147,31 @@ export function FilterBar({
   const [viewName, setViewName] = useState("")
   const [saving, setSaving] = useState(false)
 
+  // Phase 114 (D-114-3): in EDIT mode the save-name pre-fills from the view being
+  // edited, so a Save updates the SAME row under its existing name (the user can
+  // still rename inline). Re-seed whenever the edited view changes; CREATE mode
+  // (editingView null) keeps the blank default.
+  useEffect(() => {
+    if (editingView) setViewName(editingView.name)
+  }, [editingView])
+
   async function handleSave() {
     const name = viewName.trim()
     if (!name || conditions.length === 0) return
     setSaving(true)
     try {
-      const saved = await createView(name, { op: "and", conditions })
+      // EDIT mode (D-114-3): PATCH the same saved view instead of POSTing a new
+      // one, so a Save after "Edit view" updates that view in place.
+      const saved = editingView
+        ? await updateView(editingView.id, {
+            name,
+            filter_expr: { op: "and", conditions },
+          })
+        : await createView(name, { op: "and", conditions })
       onViewSaved?.(saved)
       setNaming(false)
-      setViewName("")
+      // Keep the name in edit mode (it tracks editingView); reset only in create.
+      if (!editingView) setViewName("")
     } finally {
       setSaving(false)
     }
@@ -269,7 +291,7 @@ export function FilterBar({
                 className="text-xs text-primary hover:underline"
                 onClick={() => setNaming(true)}
               >
-                Save as view
+                {editingView ? "Update view" : "Save as view"}
               </button>
             ))}
         </div>

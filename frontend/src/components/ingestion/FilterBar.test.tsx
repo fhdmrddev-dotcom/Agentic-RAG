@@ -7,24 +7,29 @@
  * composed {op:"and", conditions:[...]}; and the bar is controlled (a saved view
  * can be loaded back in via `value`).
  */
+import { useState } from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react"
 import { FilterBar } from "@/components/ingestion/FilterBar"
 import type { ViewFilter } from "@/types"
 
-// Mock only the two api functions FilterBar calls.
+// Mock only the api functions FilterBar calls.
 const resolveFilterCount = vi.fn()
 const createView = vi.fn()
+const updateView = vi.fn()
 vi.mock("@/lib/api", () => ({
   resolveFilterCount: (...args: unknown[]) => resolveFilterCount(...args),
   createView: (...args: unknown[]) => createView(...args),
+  updateView: (...args: unknown[]) => updateView(...args),
 }))
 
 beforeEach(() => {
   resolveFilterCount.mockReset()
   createView.mockReset()
+  updateView.mockReset()
   resolveFilterCount.mockResolvedValue(42)
   createView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_global: false })
+  updateView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_global: false })
 })
 
 /** Compose one `title is invoice` condition through the popover. */
@@ -103,6 +108,55 @@ describe("FilterBar", () => {
       op: "and",
       conditions: [{ field: "title", op: "eq", value: "invoice" }],
     })
+    // Create mode must NOT PATCH an existing view (the D-114-3 regression guard).
+    expect(updateView).not.toHaveBeenCalled()
+    await waitFor(() => expect(onViewSaved).toHaveBeenCalled())
+  })
+
+  it("edit mode (editingView set): Save PATCHes the SAME view, never POSTs a new one (D-114-3)", async () => {
+    const onViewSaved = vi.fn()
+    const editingView = {
+      id: "view-42",
+      name: "Invoices",
+      filter_expr: {
+        op: "and" as const,
+        conditions: [{ field: "title", op: "eq" as const, value: "invoice" }],
+      },
+      is_global: false,
+    }
+    // Wrap so onChange feeds back into `value` — mirrors how IngestionPage drives
+    // the controlled bar (setFilter), so a chip edit actually re-renders the chip.
+    function Harness() {
+      const [filter, setFilter] = useState<ViewFilter>(editingView.filter_expr)
+      return (
+        <FilterBar
+          debounceMs={10}
+          value={filter}
+          onChange={setFilter}
+          editingView={editingView}
+          onViewSaved={onViewSaved}
+        />
+      )
+    }
+    render(<Harness />)
+    // The save trigger reads "Update view" in edit mode and pre-fills the name.
+    fireEvent.click(screen.getByText("Update view"))
+    expect((screen.getByLabelText("View name") as HTMLInputElement).value).toBe("Invoices")
+    // Edit the existing chip so the saved filter actually changes.
+    fireEvent.click(screen.getByText(/title is invoice/i))
+    fireEvent.change(screen.getByLabelText("Value"), { target: { value: "receipt" } })
+    fireEvent.click(screen.getByText("Apply"))
+    // Save → PATCH the same view id, NOT a fresh createView POST.
+    fireEvent.click(screen.getByText("Save"))
+    await waitFor(() => expect(updateView).toHaveBeenCalled())
+    expect(updateView).toHaveBeenCalledWith("view-42", {
+      name: "Invoices",
+      filter_expr: {
+        op: "and",
+        conditions: [{ field: "title", op: "eq", value: "receipt" }],
+      },
+    })
+    expect(createView).not.toHaveBeenCalled()
     await waitFor(() => expect(onViewSaved).toHaveBeenCalled())
   })
 

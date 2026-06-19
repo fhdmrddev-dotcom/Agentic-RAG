@@ -81,6 +81,10 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   // selection (state-based nav, NO react-router). Selecting a view clears the
   // folder selection and vice-versa.
   const [selectedViewId, setSelectedViewId] = useState<string | null>(null)
+  // Phase 114 (D-114-3): the view currently being EDITED. When set the FilterBar's
+  // Save PATCHes this same view (updateView) instead of POSTing a new one; cleared
+  // after a successful save and whenever the user starts composing ad-hoc again.
+  const [editingView, setEditingView] = useState<SavedView | null>(null)
   // Phase 112 (D-01): the open document for the right-side push/split detail panel.
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const isMobile = useIsMobile()
@@ -214,6 +218,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   const handleSelectFolder = useCallback((id: string | null) => {
     setSelectedFolderId(id)
     setSelectedViewId(null) // mutually exclusive (UX-01)
+    setEditingView(null) // leaving the view surface exits edit mode (D-114-3)
     setFilter(EMPTY_FILTER)
     setFilteredDocs(null)
     setFolderSheetOpen(false)
@@ -222,24 +227,27 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   const handleSelectView = useCallback((view: SavedView) => {
     setSelectedViewId(view.id)
     setSelectedFolderId(null) // mutually exclusive (UX-01)
+    setEditingView(null) // viewing (not editing) — a Save here would be a new view
     setFilter(view.filter_expr) // load the filter back INTO the bar (D-114-1)
     setFolderSheetOpen(false)
     void resolveFilterIntoList(view.filter_expr, view.id)
   }, [resolveFilterIntoList])
 
   const handleEditView = useCallback((view: SavedView) => {
-    // Edit reopens the bar pre-filled (D-114-3/9). Loading the filter is the
-    // in-scope half of edit-in-place; the FilterBar's Save currently POSTs a new
-    // view (the PATCH-on-save wiring lives in FilterBar/api.ts, outside this
-    // plan's file scope — see SUMMARY deviation).
+    // Edit reopens the bar pre-filled AND enters edit mode (D-114-3/9): the
+    // FilterBar's Save now PATCHes this same view (editingView prop → updateView)
+    // instead of POSTing a new one.
     setSelectedViewId(view.id)
     setSelectedFolderId(null)
+    setEditingView(view)
     setFilter(view.filter_expr)
     void resolveFilterIntoList(view.filter_expr, view.id)
   }, [resolveFilterIntoList])
 
   // The FilterBar drives the list as conditions change (ad-hoc == saved). Editing
-  // the bar drops the saved-view label (you are now composing, D-114-1).
+  // the bar drops the saved-view label (you are now composing, D-114-1). It does
+  // NOT exit edit mode — an explicit "Edit view" still saves back to that view;
+  // edit mode is cleared on save or on a context switch (select folder/view).
   const handleFilterChange = useCallback((next: ViewFilter) => {
     setFilter(next)
     setSelectedViewId(null)
@@ -249,6 +257,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   const handleViewSaved = useCallback((view: SavedView) => {
     refreshViews()
     setSelectedViewId(view.id)
+    setEditingView(null) // save completed — back to viewing the saved row (D-114-3)
   }, [refreshViews])
 
   const handleRenameView = useCallback(async (id: string, name: string) => {
@@ -258,6 +267,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
 
   const handleDeletedView = useCallback((id: string) => {
     setViews((prev) => prev.filter((v) => v.id !== id))
+    setEditingView((cur) => (cur?.id === id ? null : cur)) // can't edit a deleted view
     if (selectedViewId === id) {
       setSelectedViewId(null)
       setFilter(EMPTY_FILTER)
@@ -460,6 +470,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                     value={filter}
                     onChange={handleFilterChange}
                     onViewSaved={handleViewSaved}
+                    editingView={editingView}
                   />
                 </div>
               )}

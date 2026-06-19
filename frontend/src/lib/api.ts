@@ -2054,6 +2054,27 @@ export async function createView(
   return res.json() as Promise<SavedView>
 }
 
+/** PATCH /document-views/{id} — update an OWNED saved view in place (the
+ *  `ViewUpdate` body shape: every field optional, the backend applies only the
+ *  keys present via `exclude_none=True`). Used by the FilterBar's edit-on-save
+ *  path (D-114-3): after "Edit view" a Save PATCHes the SAME row instead of
+ *  POSTing a new one. Mirrors `createView`'s auth-header + fetch shape; the
+ *  backend re-runs whitelist validation when `filter_expr` is present and
+ *  returns the updated view. 404 on a cross-user / absent id (never 403). */
+export async function updateView(
+  id: string,
+  body: { name?: string; filter_expr?: ViewFilter; folder_scope?: string | null },
+): Promise<SavedView> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update view")
+  return res.json() as Promise<SavedView>
+}
+
 /** GET /document-views — the caller's own + global saved views (leak-safe
  *  server-side, Phase 113). Selecting one loads its `filter_expr` back into the
  *  filter bar (D-114-1). */
