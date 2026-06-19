@@ -211,12 +211,14 @@ def test_one_of_or_group_lowercased():
             ],
         )
     )
-    # An OR-group fragment carries the lowercased membership list as its value(s).
+    # An OR-group fragment carries the lowercased membership list in `values` (IN-02:
+    # `value` is NOT set — membership lives only in `values`).
     assert len(frags) == 1
     f = frags[0]
     assert f.builder == "or_"
-    assert "invoice" in (f.value if isinstance(f.value, (list, tuple)) else [])
-    assert "receipt" in (f.value if isinstance(f.value, (list, tuple)) else [])
+    assert f.value is None, "IN-02: one_of carries membership in `values`, not `value`"
+    assert "invoice" in (f.values or [])
+    assert "receipt" in (f.values or [])
 
 
 def test_contains_ilike_substring():

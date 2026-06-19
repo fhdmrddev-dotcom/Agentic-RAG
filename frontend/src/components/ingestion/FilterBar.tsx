@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Plus, X } from "lucide-react"
+import { EMPTY_FILTER } from "@/types"
 import type { MetadataFieldDef, SavedView, ViewCondition, ViewConditionOp, ViewFilter } from "@/types"
 import { ConditionPopover } from "./ConditionPopover"
 import { createView, updateView, resolveFilterCount } from "@/lib/api"
@@ -25,8 +26,6 @@ import { cn } from "@/lib/utils"
  * Terminology is "saved filters," never "query" (sketch 029-A). All field-
  * whitelist validation + value binding stays server-side (T-114-05-01).
  */
-
-const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
 
 /** Plain-language operator labels for the chip summary (sans, never jargon). */
 const CHIP_OP_LABEL: Record<ViewConditionOp, string> = {

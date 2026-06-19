@@ -22,6 +22,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { EMPTY_FILTER } from "@/types"
 import type { Document, MetadataFieldDef, SavedView, ViewFilter } from "@/types"
 import type { ActiveView } from "@/App"
 
@@ -35,8 +36,6 @@ const MOBILE_BREAKPOINT = 768
 // persisted (mirrors the workspace-panel collapse-to-rail precedent). The pin
 // records the user's MANUAL intent so auto-collapse on panel-open doesn't yo-yo.
 const SIDEBAR_PIN_KEY = "documents.sidebar.pinnedExpanded"
-
-const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
 
 function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(

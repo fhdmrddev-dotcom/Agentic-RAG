@@ -277,6 +277,11 @@ export interface ViewFilter {
   conditions: ViewCondition[]
 }
 
+/** The empty (no-narrowing) filter (IN-04: single-sourced — FilterBar + IngestionPage
+ *  both reference this instead of each declaring their own). An empty `conditions`
+ *  list means "no filter active" (the folder view shows; no resolve round-trip). */
+export const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
+
 /** A saved view (mirrors the backend `ViewResponse`). Selecting one loads its
  *  `filter_expr` back into the same filter bar (D-114-1); seeded global views
  *  carry `is_global` (the tooltip-labeled `G` pill in the Views sidebar). */

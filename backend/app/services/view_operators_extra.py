@@ -34,16 +34,12 @@ from app.services.view_filter_compiler import (
     NORMALIZED_LOWER_FIELDS,
     PROMOTED_TYPED_COLUMNS,
     Fragment,
+    _lower,  # IN-01: single-sourced from the compiler (no duplicate-drift risk)
     register_operator,
 )
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
-def _lower(value: object) -> object:
-    """Lowercase a string VALUE for a normalized field; leave non-strings as-is."""
-    return value.lower() if isinstance(value, str) else value
-
-
 def _is_promoted_date(field: str) -> bool:
     """``date`` is promoted to the indexed ``date_typed`` column."""
     return field == "date"
@@ -110,7 +106,10 @@ def _op_one_of(cond) -> Fragment:
     lowered = [_lower(v) for v in raw] if cond.field in NORMALIZED_LOWER_FIELDS else list(raw)
     leg = "typed" if cond.field in PROMOTED_TYPED_COLUMNS else "custom"
     field = PROMOTED_TYPED_COLUMNS.get(cond.field, cond.field)
-    return Fragment(leg=leg, field=field, builder="or_", value=lowered, values=lowered)
+    # IN-02: the membership rides ONLY in `values` — the resolve route reads
+    # `frag.values` for the .in_/.or_ branch. Setting `value` to the list too is
+    # misleading (every other op's `value` is a scalar) and invites a future bug.
+    return Fragment(leg=leg, field=field, builder="or_", values=lowered)
 
 
 # ── contains (substring ILIKE %v%, D-114-11) ─────────────────────────────────────
