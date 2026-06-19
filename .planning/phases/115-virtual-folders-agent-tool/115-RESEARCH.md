@@ -382,7 +382,12 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
 
 **No assumed package names** — phase installs nothing, so the slopsquatting vector is absent.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three were Claude's-discretion items (CONTEXT.md §"Claude's Discretion"), not external blockers, and are now locked in the plans:
+> - **Q1 RESOLVED:** no thread-clip in v1 — literal "run the view" semantics (Plan 02-T2 Pitfall-4 note).
+> - **Q2 RESOLVED:** lazy/omit catalog per-view counts in v1, mirroring D-114-8 (Plan 02-T2).
+> - **Q3 RESOLVED:** tool name = `query_documents_by_view` per D-115-12 (Plan 03-T1).
 
 1. **Folder-scoped-thread interaction (Pitfall 4).**
    - What we know: `_handle_search_documents` clips results to `ctx.folder_subtree_ids` when the thread is folder-scoped; `_resolve_filter` does its own caller+view scoping and ignores the thread subtree.
