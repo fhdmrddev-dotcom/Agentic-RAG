@@ -71,6 +71,13 @@ router = APIRouter(prefix="/document-views", tags=["document-views"])
 # operator's N + unit into a server-clock-anchored date window.
 _UNIT_DAYS: dict[str, int] = {"days": 1, "weeks": 7, "months": 30}
 
+# WR-05: cap the relative span at ~100 years. A user could enter an absurd N
+# (e.g. 999_999_999 months → today + timedelta(days=~3e10)), which raises
+# OverflowError in Python date arithmetic — an unhandled 500 reachable from the UI.
+# Clamping to a sane maximum keeps the bound well inside `date`'s range (year 9999)
+# while covering every realistic document-age / due-date window.
+_MAX_RELATIVE_DAYS: int = 36500  # ~100 years
+
 
 def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None, str | None]:
     """Compute a relative-date window from the SERVER CLOCK at resolve time (D-114-16).
@@ -88,15 +95,30 @@ def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None
       (This helper returns the same bound DATE either way; the strict-vs-inclusive
       choice lives at the ``_apply`` builder call.)
 
+    WR-05: the span is CLAMPED to ``[0, _MAX_RELATIVE_DAYS]`` (~100 years) and the
+    ``date ± timedelta`` is guarded against ``OverflowError`` (it falls back to the
+    clamp date if Python's ``date`` range is somehow exceeded) — an absurd N from the
+    UI can never raise an unhandled 500.
+
     PHASE 115 HANDOFF: the agent-tool MUST reuse this resolver / this helper so its
     relative windows recompute live; it MUST NOT re-derive its own window math.
     """
     today = date.today()  # server clock — recompute every resolve (drifts with calendar)
-    span = n * _UNIT_DAYS.get(unit or "days", 1)
+    # Clamp the span: a negative/zero N collapses to 0; an absurd N caps at ~100 years
+    # (WR-05) so the date arithmetic below can never OverflowError into a 500.
+    span = max(0, min(n * _UNIT_DAYS.get(unit or "days", 1), _MAX_RELATIVE_DAYS))
     if builder == "within_next":
-        return today.isoformat(), (today + timedelta(days=span)).isoformat()
+        try:
+            upper = (today + timedelta(days=span)).isoformat()
+        except OverflowError:
+            upper = date.max.isoformat()
+        return today.isoformat(), upper
     if builder == "older_than":
-        return None, (today - timedelta(days=span)).isoformat()
+        try:
+            upper = (today - timedelta(days=span)).isoformat()
+        except OverflowError:
+            upper = date.min.isoformat()
+        return None, upper
     return None, None
 
 # The immutable built-in metadata keys (single-sourced from DocumentMetadata, the

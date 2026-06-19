@@ -260,6 +260,28 @@ def test_relative_window_units():
     assert date.fromisoformat(h_months) == today + timedelta(days=30)
 
 
+def test_relative_window_clamps_absurd_n_no_overflow():
+    """WR-05: an absurd N (e.g. 999_999_999 months) is CLAMPED, never an OverflowError.
+
+    Without the clamp, today + timedelta(days=~3e10) raises OverflowError (an
+    unhandled 500 reachable from the UI). The span caps at ~100 years (_MAX_RELATIVE_DAYS)
+    and the result is a valid ISO date well inside Python's date range.
+    """
+    from app.api.document_views import _MAX_RELATIVE_DAYS, _relative_window
+
+    today = date.today()
+    # within_next with an absurd N — must NOT raise, must clamp to today + MAX.
+    low, high = _relative_window("within_next", 999_999_999, "months")
+    assert low == today.isoformat()
+    assert date.fromisoformat(high) == today + timedelta(days=_MAX_RELATIVE_DAYS), \
+        "an absurd within_next N clamps to the ~100-year cap (no OverflowError)"
+
+    # older_than with an absurd N — clamps to today - MAX (still a valid date).
+    low2, high2 = _relative_window("older_than", 999_999_999, "months")
+    assert low2 is None
+    assert date.fromisoformat(high2) == today - timedelta(days=_MAX_RELATIVE_DAYS)
+
+
 def test_relative_window_recomputes_live():
     """The window derives from date.today() at CALL time (D-114-16 — drifts with calendar)."""
     from app.api import document_views

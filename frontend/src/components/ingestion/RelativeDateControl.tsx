@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Minus, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +26,22 @@ export type RelativeUnit = "days" | "weeks" | "months"
 /** ≈days per unit — mirrors the backend `_UNIT_DAYS` so the preview matches the
  *  server's window math (months ≈ 30 days). */
 const UNIT_DAYS: Record<RelativeUnit, number> = { days: 1, weeks: 7, months: 30 }
+
+/** WR-05: cap the span at ~100 years (matches the backend `_MAX_RELATIVE_DAYS`), so
+ *  the committed N can never drive the server into a `date` OverflowError. The N cap
+ *  depends on the unit (N × UNIT_DAYS[unit] ≤ MAX_SPAN_DAYS). */
+const MAX_SPAN_DAYS = 36500
+
+/** The largest valid N for a given unit (≥ 1, ≤ MAX_SPAN_DAYS / unit-days). */
+function maxNForUnit(unit: RelativeUnit): number {
+  return Math.max(1, Math.floor(MAX_SPAN_DAYS / UNIT_DAYS[unit]))
+}
+
+/** Clamp a (possibly non-integer / out-of-range) N to [1, maxNForUnit]. */
+function clampN(n: number, unit: RelativeUnit): number {
+  if (!Number.isFinite(n)) return 1
+  return Math.min(Math.max(1, Math.floor(n)), maxNForUnit(unit))
+}
 
 const UNIT_LABEL: Record<RelativeUnit, string> = {
   days: "days",
@@ -75,7 +91,19 @@ export function RelativeDateControl({
   unit,
   onChange,
 }: RelativeDateControlProps) {
-  const n = Math.max(1, value || 1)
+  const n = clampN(value, unit)
+
+  // WR-05: the number input keeps its OWN draft string so the user can transiently
+  // clear the field (or type a multi-digit number) without the value snapping to 1
+  // mid-edit and fighting the cursor. The committed N is clamped on change-to-valid
+  // and on blur; an empty/invalid blur reverts to the last valid N.
+  const [draft, setDraft] = useState<string>(String(n))
+  useEffect(() => {
+    // Re-seed the draft when the committed value changes from outside (e.g. the
+    // stepper buttons or a unit change re-clamps), but never while the user is
+    // mid-edit on a value that already clamps to the same N.
+    setDraft(String(n))
+  }, [n])
 
   // Recompute the preview whenever N / unit / direction change. Note: this is a
   // client-side approximation for display; the server re-derives the real window
@@ -95,26 +123,42 @@ export function RelativeDateControl({
             aria-label="Decrease"
             className="px-2 py-1 bg-muted hover:bg-accent disabled:opacity-40"
             disabled={n <= 1}
-            onClick={() => onChange({ value: Math.max(1, n - 1), unit })}
+            onClick={() => onChange({ value: clampN(n - 1, unit), unit })}
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
           <input
             type="number"
             min={1}
+            max={maxNForUnit(unit)}
             aria-label="Amount"
-            value={n}
+            value={draft}
             onChange={(e) => {
-              const next = parseInt(e.target.value, 10)
-              onChange({ value: Number.isNaN(next) ? 1 : Math.max(1, next), unit })
+              // Keep the raw draft so the field can be transiently empty mid-edit.
+              setDraft(e.target.value)
+              // Commit a clamped value only when the draft parses to a real number;
+              // an empty/invalid draft leaves the last committed N untouched (WR-05).
+              const parsed = parseInt(e.target.value, 10)
+              if (!Number.isNaN(parsed)) {
+                onChange({ value: clampN(parsed, unit), unit })
+              }
+            }}
+            onBlur={() => {
+              // On blur, snap the draft back to the committed, clamped N — so an empty
+              // or out-of-range field never lingers (WR-05).
+              const parsed = parseInt(draft, 10)
+              const committed = Number.isNaN(parsed) ? n : clampN(parsed, unit)
+              setDraft(String(committed))
+              onChange({ value: committed, unit })
             }}
             className="w-14 text-center text-sm bg-background border-x border-input py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <button
             type="button"
             aria-label="Increase"
-            className="px-2 py-1 bg-muted hover:bg-accent"
-            onClick={() => onChange({ value: n + 1, unit })}
+            className="px-2 py-1 bg-muted hover:bg-accent disabled:opacity-40"
+            disabled={n >= maxNForUnit(unit)}
+            onClick={() => onChange({ value: clampN(n + 1, unit), unit })}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -124,7 +168,12 @@ export function RelativeDateControl({
         <select
           aria-label="Unit"
           value={unit}
-          onChange={(e) => onChange({ value: n, unit: e.target.value as RelativeUnit })}
+          onChange={(e) => {
+            // Switching units can push N over the new unit's cap (months has a smaller
+            // max than days) — re-clamp against the chosen unit (WR-05).
+            const nextUnit = e.target.value as RelativeUnit
+            onChange({ value: clampN(n, nextUnit), unit: nextUnit })
+          }}
           className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         >
           {(Object.keys(UNIT_LABEL) as RelativeUnit[]).map((u) => (

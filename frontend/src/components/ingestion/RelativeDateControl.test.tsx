@@ -87,4 +87,40 @@ describe("RelativeDateControl", () => {
     )
     expect(screen.getByText(/Updates automatically/i)).toBeInTheDocument()
   })
+
+  it("WR-05: allows a transient empty field mid-edit without snapping N to 1", () => {
+    const onChange = vi.fn()
+    render(
+      <RelativeDateControl direction="within_next" value={30} unit="days" onChange={onChange} />,
+    )
+    const input = screen.getByLabelText("Amount")
+    // Clear the field — the draft goes empty; no onChange commit fires for an empty
+    // parse (the value must NOT snap to 1 mid-edit).
+    fireEvent.change(input, { target: { value: "" } })
+    expect(input).toHaveValue(null) // an empty number input
+    expect(onChange).not.toHaveBeenCalledWith({ value: 1, unit: "days" })
+    // On blur an empty field reverts to the last committed N (30).
+    fireEvent.blur(input)
+    expect(onChange).toHaveBeenLastCalledWith({ value: 30, unit: "days" })
+  })
+
+  it("WR-05: clamps an absurd N to the ~100-year cap on commit (no server overflow)", () => {
+    const onChange = vi.fn()
+    render(
+      <RelativeDateControl direction="within_next" value={30} unit="months" onChange={onChange} />,
+    )
+    // 999999999 months × 30 days >> 36500-day cap → clamps to floor(36500/30) = 1216.
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "999999999" } })
+    expect(onChange).toHaveBeenLastCalledWith({ value: 1216, unit: "months" })
+  })
+
+  it("WR-05: truncates a decimal entry to an integer", () => {
+    const onChange = vi.fn()
+    render(
+      <RelativeDateControl direction="within_next" value={2} unit="days" onChange={onChange} />,
+    )
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1.9" } })
+    // parseInt("1.9") → 1; clampN keeps it at 1 (no fractional N reaches the server).
+    expect(onChange).toHaveBeenLastCalledWith({ value: 1, unit: "days" })
+  })
 })
