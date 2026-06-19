@@ -127,6 +127,42 @@ async def get_view(view_id, user_id, supabase: Client | None = None) -> dict | N
     return (result.data or [None])[0]
 
 
+async def get_view_by_name(
+    name: str, user_id, supabase: Client | None = None
+) -> dict | None:
+    """Return the caller-readable view named ``name`` (own-or-global), else None.
+
+    The Phase 115 agent tool resolves a saved view from a HUMAN NAME (the model never
+    sees a view UUID — D-115-6). Own-or-global readability matches ``get_view``: the
+    caller can name their own view OR a globally-seeded one; an unknown/unseeable name
+    collapses to None so the handler routes to the catalog rather than leaking a
+    distinguishable 403 (the existence-leak guard, D-115-6 / T-115-02-02).
+
+    Matching is case-insensitive on the trimmed name. When BOTH an own and a global
+    view share a name, the OWN view wins (own-first preference) — the user's saved
+    intent shadows a shared default.
+
+    WR-02 hardening: the ``name`` is NEVER interpolated into a PostgREST ``.or_()`` /
+    ``.eq()`` filter grammar. We reuse the already-owner-scoped ``list_views`` (which
+    runs the safe ``user_id.eq.<uuid>,is_global.eq.true`` predicate with the ``_uid``
+    UUID-coercion guard) and filter the returned rows in Python — so there is no new
+    runtime-value-into-DSL surface for a view name to break out of.
+    """
+    target = name.strip().lower()
+    if not target:
+        return None
+    rows = await list_views(user_id, supabase=supabase)
+    own_uid = _uid(user_id)
+    matches = [r for r in rows if (r.get("name") or "").strip().lower() == target]
+    if not matches:
+        return None
+    # Own-first preference: an own view of this name shadows a global one.
+    for r in matches:
+        if r.get("user_id") == own_uid:
+            return r
+    return matches[0]
+
+
 async def update_view(
     user_id, view_id: str, data: dict, supabase: Client | None = None
 ) -> dict | None:

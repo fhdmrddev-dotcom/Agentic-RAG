@@ -165,6 +165,32 @@ async def seeded_user_with_view(pg_pool):
                 pass
 
 
+@pytest.mark.asyncio
+async def test_get_view_by_name_own_resolves(pg_pool, seeded_user_with_view):
+    """get_view_by_name returns the caller's own view by case-insensitive name."""
+    from app.services import document_view_service
+
+    sb = _supabase_or_skip()
+    caller = str(seeded_user_with_view["user_id"])
+
+    row = await document_view_service.get_view_by_name("invoices", caller, supabase=sb)
+    assert row is not None, "an own view must resolve by case-insensitive name"
+    assert row["id"] == str(seeded_user_with_view["view_id"])
+    assert row.get("user_id") == caller
+
+
+@pytest.mark.asyncio
+async def test_get_view_by_name_unknown_returns_none(pg_pool, seeded_user_with_view):
+    """An unknown name returns None (the handler routes None → catalog, no leak)."""
+    from app.services import document_view_service
+
+    sb = _supabase_or_skip()
+    caller = str(seeded_user_with_view["user_id"])
+
+    row = await document_view_service.get_view_by_name("No Such View", caller, supabase=sb)
+    assert row is None, "an unknown name must return None (existence-leak guard)"
+
+
 @pytest.mark.xfail(strict=False, reason="Plan 02 builds saved-view-by-name resolve")
 @pytest.mark.asyncio
 async def test_saved_view_by_name_resolves(pg_pool, seeded_user_with_view):
