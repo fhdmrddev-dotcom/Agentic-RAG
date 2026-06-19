@@ -19,7 +19,6 @@ All imports are INSIDE the test bodies so collection never errors on a missing
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 01 Task 2 creates document_view_resolver")
 def test_resolver_module_exports_public_api():
     """`resolve_filter` + `ResolveError` import from the extracted service module."""
     from app.services.document_view_resolver import ResolveError, resolve_filter  # noqa: F401
@@ -28,7 +27,6 @@ def test_resolver_module_exports_public_api():
     assert issubclass(ResolveError, Exception)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 01 Task 2 creates document_view_resolver")
 def test_resolver_module_imports_no_fastapi():
     """The extracted core must NOT depend on FastAPI — no HTTPException symbol.
 
@@ -42,7 +40,6 @@ def test_resolver_module_imports_no_fastapi():
     assert not hasattr(m, "status"), "resolver must not import fastapi.status"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 01 Task 2 creates document_view_resolver")
 def test_resolve_error_carries_detail_and_status():
     """`ResolveError` carries a `.detail` string and a `.status` int (default 422)."""
     from app.services.document_view_resolver import ResolveError
