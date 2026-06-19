@@ -224,6 +224,71 @@ export interface MetadataFieldDef {
   enabled: boolean
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 114 (VIEW-03 / UX-01) — the no-DSL filter-AST CLIENT contract.
+//
+// Mirrors the backend filter AST (backend/app/models/document_view.py
+// ViewCondition / ViewFilter) BYTE-FOR-BYTE so the builder can assemble the
+// `filter_expr` POST /document-views accepts and round-trip a saved view's
+// `filter_expr` back into the bar. The client ONLY assembles the AST — ALL
+// field-whitelist validation + value binding happens server-side (the client is
+// NOT a trust boundary; a hand-crafted payload cannot inject SQL or filter on a
+// non-whitelisted/`_`-prefixed field — T-114-05-01). Operator words are the
+// SAME 11 the backend `Literal` lists; the UI labels them in plain language
+// (never "query"). The optional operands are additive so an existing `{op:eq}`
+// row parses unchanged: `value2` carries the upper bound for `between`; `values`
+// carries the membership list for `one_of`; `unit` carries the relative-date
+// span unit for `within_next`/`older_than` (the window math itself is derived
+// server-side at resolve time — D-114-16, the client readout is preview-only).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The 11 operators the backend `ViewCondition.op` Literal accepts (Phase 114). */
+export type ViewConditionOp =
+  | "eq"
+  | "gte"
+  | "lte"
+  | "one_of"
+  | "contains"
+  | "is_empty"
+  | "within_next"
+  | "older_than"
+  | "before"
+  | "after"
+  | "between"
+
+/** One AND-ed condition: field → type-aware operator → value(s). All operands
+ *  except `field`/`op` are optional (an `is_empty` carries none). */
+export interface ViewCondition {
+  field: string
+  op: ViewConditionOp
+  value?: string | number | boolean | null
+  /** Upper bound for `between` (and the optional far end of a date `between`). */
+  value2?: string | number | null
+  /** Membership list for `one_of`. */
+  values?: Array<string | number> | null
+  /** Relative-date span unit for `within_next`/`older_than`. */
+  unit?: "days" | "weeks" | "months" | null
+}
+
+/** The flat AND-of-conditions filter the builder produces and the backend stores
+ *  in `document_views.filter_expr`. `op` stays `"and"` (OR/NOT deferred). */
+export interface ViewFilter {
+  op: "and"
+  conditions: ViewCondition[]
+}
+
+/** A saved view (mirrors the backend `ViewResponse`). Selecting one loads its
+ *  `filter_expr` back into the same filter bar (D-114-1); seeded global views
+ *  carry `is_global` (the tooltip-labeled `G` pill in the Views sidebar). */
+export interface SavedView {
+  id: string
+  user_id?: string | null
+  name: string
+  filter_expr: ViewFilter
+  folder_scope?: string | null
+  is_global: boolean
+}
+
 export interface Folder {
   id: string
   user_id: string

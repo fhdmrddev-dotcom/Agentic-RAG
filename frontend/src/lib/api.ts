@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -2014,6 +2014,106 @@ export async function listMetadataFields(): Promise<MetadataFieldDef[]> {
   const res = await fetch(`${API_BASE}/metadata-fields`, { headers })
   if (!res.ok) throw new Error("Failed to load metadata fields")
   return res.json() as Promise<MetadataFieldDef[]>
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 114 (VIEW-03 / UX-01) — saved-view ("virtual folder") CRUD + count.
+//
+// Thin consumers of the already-leak-safe document-views router (Plans 02/03):
+//   POST   /document-views                       create a named saved view
+//   GET    /document-views                       list own + global views
+//   DELETE /document-views/{id}                  delete an owned view
+//   GET    /document-views/{id}/resolve?count_only=true   → {total: N}
+//   GET    /document-views/{id}/resolve                    → {documents, total}
+//
+// The client ONLY assembles the `filter_expr` AST — ALL field-whitelist
+// validation + value binding happens server-side (T-114-05-01: the client is not
+// a trust boundary). Mirrors the `listMetadataFields` fetch-wrapper conventions.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /document-views — persist the current filter as a named saved view
+ *  (D-114-1: Save-as-view just persists what you're looking at). The server
+ *  hard-sets `is_global=false` (the body never supplies it). Returns the new
+ *  `SavedView`. */
+export async function createView(
+  name: string,
+  filter_expr: ViewFilter,
+  folder_scope?: string | null,
+): Promise<SavedView> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name,
+      filter_expr,
+      ...(folder_scope ? { folder_scope } : {}),
+    }),
+  })
+  if (!res.ok) throw new Error("Failed to save view")
+  return res.json() as Promise<SavedView>
+}
+
+/** GET /document-views — the caller's own + global saved views (leak-safe
+ *  server-side, Phase 113). Selecting one loads its `filter_expr` back into the
+ *  filter bar (D-114-1). */
+export async function listViews(): Promise<SavedView[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views`, { headers })
+  if (!res.ok) throw new Error("Failed to list views")
+  return res.json() as Promise<SavedView[]>
+}
+
+/** DELETE /document-views/{id} — remove an owned view (204; 404 on a cross-user
+ *  miss, never 403 — D-113-4). Idempotent from the UI's perspective. */
+export async function deleteView(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete view")
+}
+
+/** GET /document-views/{id}/resolve — resolve a SAVED view. `count_only` returns
+ *  just `{total: N}` (the live builder count + per-view sidebar badges, D-114-15);
+ *  the full resolve returns `{documents, total}`. The returned `documents` are
+ *  plain rows (no response_model) so `_source`/`_confidence` survive (112 CR-01). */
+export async function resolveView(
+  id: string,
+  opts: { count_only?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number }> {
+  const headers = await getAuthHeaders()
+  const qs = opts.count_only ? "?count_only=true" : ""
+  const res = await fetch(`${API_BASE}/document-views/${id}/resolve${qs}`, { headers })
+  if (!res.ok) throw new Error("Failed to resolve view")
+  return res.json() as Promise<{ documents?: Document[]; total: number }>
+}
+
+/** Live "N documents match" count for an AD-HOC (unsaved) filter (D-114-2).
+ *
+ *  The shipped count path gates by view id (`count_only` is a query param on the
+ *  by-id resolve route — there is NO ad-hoc-by-body count endpoint, per
+ *  114-02-SUMMARY). So an unsaved filter is counted by creating a transient view,
+ *  reading its count-only resolve, and deleting it — using ONLY the endpoint
+ *  shapes Plan 02 shipped (no divergent endpoint invented). The transient view is
+ *  always deleted, even on a count failure, so the keystroke preview never leaves
+ *  orphan rows behind. An empty filter (`conditions: []`) is "no narrowing" and
+ *  needs no round-trip — the caller short-circuits before calling this. */
+export async function resolveFilterCount(filter_expr: ViewFilter): Promise<number> {
+  // 1. Create a transient, throwaway view carrying the ad-hoc filter.
+  const transient = await createView(
+    `__live_count_${Date.now()}`,
+    filter_expr,
+  )
+  try {
+    // 2. Read the own+global DISTINCT-deduped count (count_only — no full rows).
+    const { total } = await resolveView(transient.id, { count_only: true })
+    return total
+  } finally {
+    // 3. Always clean up the throwaway view (best-effort; deleteView swallows 404).
+    await deleteView(transient.id).catch(() => {})
+  }
 }
 
 // -- Feedback API functions ---------------------------------------------------
