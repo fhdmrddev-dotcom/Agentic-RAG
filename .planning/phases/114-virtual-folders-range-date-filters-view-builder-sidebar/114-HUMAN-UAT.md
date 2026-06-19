@@ -36,7 +36,7 @@ result: PASS — clicking a row opened the DocumentDetailPanel (metadata + Confi
 
 ### 6. State matrix — dark theme + mobile (Aether / Deep Midnight; WCAG)
 expected: new components render on-brand in both themes; mobile is usable, no <768px invisible-docs regression.
-result: PASS (core) — Deep Midnight dark theme rendered the rail, chip, table, and detail panel cleanly with legible contrast. At 390px the detail panel became a full-width bottom-sheet (drag handle) with all metadata legible — no recurrence of the Phase-112 <768px invisible-docs bug. NOTE: exhaustive WCAG contrast measurement + full keyboard-reach of every row action were not numerically measured this pass.
+result: PASS (core) — Deep Midnight dark theme rendered the rail, chip, table, and detail panel cleanly with legible contrast. At 390px the detail panel became a full-width bottom-sheet (drag handle) with all metadata legible — no recurrence of the Phase-112 <768px invisible-docs bug. WCAG measured 2026-06-20 via Lighthouse (snapshot, desktop) on the live Documents page (builder open + view selected): **accessibility 87/100, best-practices 100**. The 2 failing audits — color-contrast (19 nodes, predominantly the shared app-wide `text-muted-foreground/60` token) + button-name (46 nodes, predominantly pre-existing DocumentList/nav icon buttons) — are cross-cutting design-system issues, NOT 114-introduced (114's own controls carry accessible names). Operator elected to complete 114 and log the app-wide WCAG AA remediation as **SEED-092**.
 
 ## Summary
 
