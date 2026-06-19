@@ -8,12 +8,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw } from "lucide-react"
+import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw, FolderInput } from "lucide-react"
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
 import { fetchDocumentVersions, restoreDocumentVersion, reingestDocument } from "@/lib/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFileIcon } from "@/lib/fileIcons"
 import { cn } from "@/lib/utils"
+import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
 import type { Document } from "@/types"
 
 interface Props {
@@ -185,6 +186,10 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
   const [reingestingId, setReingestingId] = useState<string | null>(null)
+  // Phase 114 (D-114-14): the Move-to-folder document-row action. A single dialog
+  // keyed to the active row's document — reuses the existing MoveToFolderDialog +
+  // PATCH /documents/{id}/move (zero net-new backend). No drag-drop is built.
+  const [moveTarget, setMoveTarget] = useState<Document | null>(null)
 
   // BUG-260516-03: surface the reingest action that previously only existed
   // on the Library Health page. Same /documents/{id}/reingest endpoint
@@ -356,6 +361,19 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setMoveTarget(doc)}
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                          >
+                            <FolderInput className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Move to folder</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setDeleteTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                           >
@@ -482,6 +500,22 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Phase 114 (D-114-14): Move-to-folder — reuses the existing dialog +
+          PATCH /documents/{id}/move. onMoved refreshes the list so the moved doc
+          drops out of the current folder view. */}
+      {moveTarget && (
+        <MoveToFolderDialog
+          open={moveTarget !== null}
+          documentId={moveTarget.id}
+          documentName={moveTarget.filename}
+          onClose={() => setMoveTarget(null)}
+          onMoved={() => {
+            setMoveTarget(null)
+            onRefresh()
+          }}
+        />
+      )}
     </>
   )
 }
