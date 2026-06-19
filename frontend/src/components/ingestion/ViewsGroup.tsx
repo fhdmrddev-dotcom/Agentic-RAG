@@ -63,30 +63,43 @@ export function ViewsGroup({
   // (and refreshed on (re)selection), never eagerly for every view at mount.
   const [counts, setCounts] = useState<Record<string, number>>({})
   const inFlight = useRef<Set<string>>(new Set())
+  // WR-04: a ref mirror of `counts` so `fetchCount` can read the LATEST cache for its
+  // pre-network gate WITHOUT closing over `counts` (which would recreate the callback
+  // every counts-change and let the first-sight effect capture a stale closure). The
+  // ref is always current; the callback stays stable (empty dep array).
+  const countsRef = useRef(counts)
+  countsRef.current = counts
 
   const fetchCount = useCallback((id: string, { force = false }: { force?: boolean } = {}) => {
     if (inFlight.current.has(id)) return
-    if (!force && counts[id] !== undefined) return
+    // Pre-network gate reads the live ref (not a stale closure) — skip an already
+    // cached count unless forced (so SC#3 holds: no redundant fetch at ~10k docs).
+    if (!force && countsRef.current[id] !== undefined) return
     inFlight.current.add(id)
     resolveView(id, { count_only: true })
-      .then(({ total }) => setCounts((prev) => ({ ...prev, [id]: total })))
+      // Stale-safe commit: gate inside the functional updater too (defense-in-depth
+      // against an interleaved resolve of the same id).
+      .then(({ total }) =>
+        setCounts((prev) =>
+          force || prev[id] === undefined ? { ...prev, [id]: total } : prev,
+        ),
+      )
       .catch(() => {
         /* leave the count absent; NavRow renders gracefully without it */
       })
       .finally(() => {
         inFlight.current.delete(id)
       })
-  }, [counts])
+  }, [])
 
   // First-sight lazy fetch: when the set of views changes, fetch any count we do
-  // not yet have. This runs per-view (not a single eager all-counts sweep) and
-  // skips already-cached ids — so adding one view fetches exactly one count.
+  // not yet have. `fetchCount` is now stable (no `counts` dep), so the effect cannot
+  // capture a stale closure; the ref-backed gate inside `fetchCount` skips cached
+  // ids — adding one view fetches exactly one count.
   useEffect(() => {
-    for (const v of views) {
-      if (counts[v.id] === undefined) fetchCount(v.id)
-    }
+    for (const v of views) fetchCount(v.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [views])
+  }, [views, fetchCount])
 
   const handleSelect = (view: SavedView) => {
     onSelectView(view)
@@ -95,6 +108,9 @@ export function ViewsGroup({
   }
 
   const handleCommitRename = async (id: string, newName: string) => {
+    // WR-07: NavRow only commits a NON-empty trimmed name now (blank keeps the editor
+    // open with a hint on Enter, or is an explicit cancel on blur). The guard remains
+    // as defense-in-depth: a blank here closes the editor with no rename (cancel).
     const name = newName.trim()
     setEditingId(null)
     if (!name) return

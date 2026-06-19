@@ -88,6 +88,54 @@ describe("NavRow", () => {
     expect(onCancelRename).toHaveBeenCalled()
   })
 
+  it("WR-07: Enter on a blank name keeps the editor open with a hint (no empty commit)", () => {
+    const onCommitRename = vi.fn()
+    renderWithTooltip(
+      <NavRow icon={FolderIcon} name="Old" isEditing onCommitRename={onCommitRename} />,
+    )
+    const input = screen.getByRole("textbox")
+    fireEvent.change(input, { target: { value: "   " } }) // whitespace-only = blank
+    fireEvent.keyDown(input, { key: "Enter" })
+    // No empty rename committed; the editor shows a validation hint and stays open.
+    expect(onCommitRename).not.toHaveBeenCalled()
+    expect(screen.getByText("Name can't be empty")).toBeInTheDocument()
+    expect(screen.getByRole("textbox")).toBeInTheDocument()
+  })
+
+  it("WR-07: blur with a blank name is an explicit cancel, not a silent empty rename", () => {
+    const onCommitRename = vi.fn()
+    const onCancelRename = vi.fn()
+    renderWithTooltip(
+      <NavRow
+        icon={FolderIcon}
+        name="Old"
+        isEditing
+        onCommitRename={onCommitRename}
+        onCancelRename={onCancelRename}
+      />,
+    )
+    const input = screen.getByRole("textbox")
+    fireEvent.change(input, { target: { value: "" } })
+    fireEvent.blur(input)
+    expect(onCommitRename).not.toHaveBeenCalled()
+    expect(onCancelRename).toHaveBeenCalled() // intentional cancel (revert to old name)
+  })
+
+  it("WR-07: the hint clears as soon as the user types a valid name", () => {
+    const onCommitRename = vi.fn()
+    renderWithTooltip(
+      <NavRow icon={FolderIcon} name="Old" isEditing onCommitRename={onCommitRename} />,
+    )
+    const input = screen.getByRole("textbox")
+    fireEvent.change(input, { target: { value: "" } })
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(screen.getByText("Name can't be empty")).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: "Renamed" } })
+    expect(screen.queryByText("Name can't be empty")).not.toBeInTheDocument()
+    fireEvent.keyDown(input, { key: "Enter" })
+    expect(onCommitRename).toHaveBeenCalledWith("Renamed")
+  })
+
   it("shows the tooltip-labeled G pill when isGlobal is true", () => {
     const { container } = renderWithTooltip(
       <NavRow icon={FolderIcon} name="Shared" count={3} isGlobal />,

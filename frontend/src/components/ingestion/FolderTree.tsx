@@ -57,6 +57,10 @@ export function FolderTree({
   }
 
   const handleCommitRename = async (id: string, newName: string) => {
+    // WR-07: NavRow now only commits a NON-empty trimmed name (a blank name keeps the
+    // editor open with a hint on Enter, or is an explicit cancel on blur), so this
+    // path always receives a real name. The guard stays as defense-in-depth: a blank
+    // here is treated as a no-op cancel (close the editor, no rename).
     if (!newName) {
       setEditingId(null)
       return

@@ -75,11 +75,19 @@ export function NavRow({
   onCancelRename,
 }: NavRowProps) {
   const [editValue, setEditValue] = useState(name)
+  // WR-07: an empty-name commit must NOT silently vanish. On Enter with a blank name
+  // we keep the editor OPEN and show a validation hint; on blur with a blank name we
+  // treat it as an INTENTIONAL cancel (revert visibly to the old name) rather than a
+  // silent no-op. This makes "rename to blank" deliberate, not incidental.
+  const [hint, setHint] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
-  // Re-seed the edit value whenever an edit session opens.
+  // Re-seed the edit value (and clear any stale hint) whenever an edit session opens.
   useEffect(() => {
-    if (isEditing) setEditValue(name)
+    if (isEditing) {
+      setEditValue(name)
+      setHint(null)
+    }
   }, [isEditing, name])
 
   // Single soft indent guide + ~3-level cap (replaces the dense hand-drawn branch
@@ -122,25 +130,49 @@ export function NavRow({
 
         {/* Name or inline-rename input */}
         {isEditing ? (
-          <input
-            ref={editInputRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={() => onCommitRename?.(editValue.trim())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                onCommitRename?.(editValue.trim())
-              }
-              if (e.key === "Escape") {
-                e.preventDefault()
-                onCancelRename?.()
-              }
-            }}
-            className="flex-1 min-w-0 px-1.5 py-0.5 text-sm bg-background border border-primary/30 rounded-md outline-none focus:ring-1 focus:ring-primary/40"
-            autoFocus
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+            <input
+              ref={editInputRef}
+              value={editValue}
+              aria-invalid={hint ? "true" : undefined}
+              onChange={(e) => {
+                setEditValue(e.target.value)
+                if (hint) setHint(null) // clear the hint as soon as the user types
+              }}
+              onBlur={() => {
+                // WR-07: blur with a blank name is an INTENTIONAL cancel (revert to the
+                // old name), never a silent rename-to-empty. A non-empty name commits.
+                if (editValue.trim()) onCommitRename?.(editValue.trim())
+                else onCancelRename?.()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  // WR-07: Enter on a blank name keeps the editor OPEN with a hint
+                  // instead of committing an empty (silently-reverting) name.
+                  if (!editValue.trim()) {
+                    setHint("Name can't be empty")
+                    return
+                  }
+                  onCommitRename?.(editValue.trim())
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault()
+                  onCancelRename?.()
+                }
+              }}
+              className={cn(
+                "w-full min-w-0 px-1.5 py-0.5 text-sm bg-background border rounded-md outline-none focus:ring-1",
+                hint
+                  ? "border-destructive/60 focus:ring-destructive/40"
+                  : "border-primary/30 focus:ring-primary/40",
+              )}
+              autoFocus
+            />
+            {hint && (
+              <span className="block mt-0.5 text-[11px] text-destructive">{hint}</span>
+            )}
+          </div>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
