@@ -8,12 +8,22 @@ Supabase client on :54322 over seeded `documents` rows. Proves:
   - query-not-copy (VIEW-02) — ONE document is resolvable through TWO distinct
     views with no duplication; a view is a query, not a copy.
   - empty filter (D-113-9) — an empty `conditions` list resolves to ALL in-scope
-    docs (no `.contains()` narrowing).
+    docs (no narrowing).
   - is_latest only — superseded (`is_latest=False`) versions never appear.
   - `test_injection_value_neutralized_live` (SC#4 live half / T-113-11) — a view
     whose `eq` value is a SQL/SSTI payload resolves to 0 matches AND the
-    `documents` table is intact (row count unchanged). The compiled filter is
-    bound as one `$1::jsonb` via `.contains()` — never string-interpolated.
+    `documents` table is intact (row count unchanged). The value rides as a bound
+    PostgREST param — never string-interpolated.
+
+Phase 114 Plan 02 contract update (R-114-A / the 01→02 handoff): `compile_filter`
+now returns an ordered `list[Fragment]` and the resolve route's widened `_apply`
+walks them across two legs. The Phase-113 `document_type` eq filters used here are
+now retargeted onto MIGRATION-FREE legs (`language` → custom `metadata->>'language'`
+`.eq`; free-text `author` → `.ilike`) so these rows prove the contract-break is
+closed and PASS NOW — WITHOUT depending on the typed `document_type_norm` column,
+which lands in Plan 03 (migration 074). The typed-column-leg behavior
+(`document_type`/`date` resolving through `document_type_norm`/`date_typed`) is
+covered by `test_114_resolve_range_date.py`'s `xfail`-until-Plan-03 typed-leg rows.
 
 Live-DB harness copied verbatim from test_111_metadata_fields_crud.py (skips
 cleanly when :54322 is unreachable). The two-user cross-user GLOBAL-view leak
@@ -190,21 +200,23 @@ async def test_order_and_count(pg_pool, test_user):
 
     sb = _supabase_or_skip()
     base = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    # Three invoices (oldest → newest) + one non-matching report.
-    inv_old = await _seed_doc(pg_pool, test_user, metadata={"document_type": "invoice", "title": "old"}, created_at=base)
-    inv_mid = await _seed_doc(pg_pool, test_user, metadata={"document_type": "invoice", "title": "mid"}, created_at=base + timedelta(days=1))
-    inv_new = await _seed_doc(pg_pool, test_user, metadata={"document_type": "invoice", "title": "new"}, created_at=base + timedelta(days=2))
-    await _seed_doc(pg_pool, test_user, metadata={"document_type": "report", "title": "noise"}, created_at=base + timedelta(days=3))
+    # Three English docs (oldest → newest) + one non-matching French doc. `language`
+    # resolves through the MIGRATION-FREE custom leg (metadata->>'language' .eq), so
+    # this row passes NOW — it does not depend on the typed document_type_norm column.
+    inv_old = await _seed_doc(pg_pool, test_user, metadata={"language": "en", "title": "old"}, created_at=base)
+    inv_mid = await _seed_doc(pg_pool, test_user, metadata={"language": "en", "title": "mid"}, created_at=base + timedelta(days=1))
+    inv_new = await _seed_doc(pg_pool, test_user, metadata={"language": "en", "title": "new"}, created_at=base + timedelta(days=2))
+    await _seed_doc(pg_pool, test_user, metadata={"language": "fr", "title": "noise"}, created_at=base + timedelta(days=3))
 
     view = await create_view(
-        body=ViewCreate(name="Invoices", filter_expr=_filter_eq("document_type", "invoice")),
+        body=ViewCreate(name="English", filter_expr=_filter_eq("language", "en")),
         current_user={"id": str(test_user)},
         supabase=sb,
     )
     out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
 
     ids = [d["id"] for d in out["documents"]]
-    assert set(ids) == {str(inv_old), str(inv_mid), str(inv_new)}, "only the 3 invoices match, report excluded"
+    assert set(ids) == {str(inv_old), str(inv_mid), str(inv_new)}, "only the 3 English docs match, the French doc excluded"
     assert out["total"] == 3 == len(out["documents"]), "total must equal the listing length"
     # newest-first (created_at desc)
     assert ids[0] == str(inv_new) and ids[-1] == str(inv_old), f"must be newest-first, got {ids}"
@@ -220,15 +232,16 @@ async def test_query_not_copy_one_doc_two_views(pg_pool, test_user):
     from app.models.document_view import ViewCreate
 
     sb = _supabase_or_skip()
-    # One doc carrying BOTH document_type=invoice AND author=Acme.
+    # One doc carrying BOTH language=en AND author=Acme — both MIGRATION-FREE legs
+    # (language → custom .eq; author → free-text .ilike), so this row passes NOW.
     doc_id = await _seed_doc(
         pg_pool, test_user,
-        metadata={"document_type": "invoice", "author": "Acme", "title": "shared"},
+        metadata={"language": "en", "author": "Acme", "title": "shared"},
         created_at=__import__("datetime").datetime(2025, 2, 1, tzinfo=__import__("datetime").timezone.utc),
     )
 
     v_type = await create_view(
-        body=ViewCreate(name="By type", filter_expr=_filter_eq("document_type", "invoice")),
+        body=ViewCreate(name="By language", filter_expr=_filter_eq("language", "en")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
     v_author = await create_view(
@@ -286,17 +299,18 @@ async def test_only_latest_versions_resolve(pg_pool, test_user):
 
     sb = _supabase_or_skip()
     base = datetime(2025, 4, 1, tzinfo=timezone.utc)
+    # `language` resolves through the MIGRATION-FREE custom leg (no typed column).
     old_ver = await _seed_doc(
-        pg_pool, test_user, metadata={"document_type": "contract"},
+        pg_pool, test_user, metadata={"language": "de"},
         created_at=base, is_latest=False, version=1,
     )
     new_ver = await _seed_doc(
-        pg_pool, test_user, metadata={"document_type": "contract"},
+        pg_pool, test_user, metadata={"language": "de"},
         created_at=base, is_latest=True, version=2,
     )
 
     view = await create_view(
-        body=ViewCreate(name="Contracts", filter_expr=_filter_eq("document_type", "contract")),
+        body=ViewCreate(name="German", filter_expr=_filter_eq("language", "de")),
         current_user={"id": str(test_user)}, supabase=sb,
     )
     out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
@@ -319,21 +333,24 @@ async def test_injection_value_neutralized_live(pg_pool, test_user):
     sb = _supabase_or_skip()
     # A benign doc so the table is non-empty and we can prove it survives.
     benign = await _seed_doc(
-        pg_pool, test_user, metadata={"document_type": "invoice"},
+        pg_pool, test_user, metadata={"language": "en"},
         created_at=datetime(2025, 5, 1, tzinfo=timezone.utc),
     )
 
     payload = "'; DROP TABLE documents;-- {{7*7}} ${jndi:ldap://x}"
     count_before = await pg_pool.fetchval("SELECT count(*) FROM documents")
 
+    # `language` resolves through the MIGRATION-FREE custom .eq leg
+    # (metadata->>'language'). The payload rides as a BOUND PostgREST param — never
+    # string-interpolated into SQL or the filter grammar (SC#4 / T-114-02-03).
     view = await create_view(
-        body=ViewCreate(name="evil", filter_expr=_filter_eq("document_type", payload)),
+        body=ViewCreate(name="evil", filter_expr=_filter_eq("language", payload)),
         current_user={"id": str(test_user)}, supabase=sb,
     )
     out = await resolve_view(view_id=str(view["id"]), current_user={"id": str(test_user)}, supabase=sb)
 
-    # The payload is a bound JSON literal — it matches NOTHING (no doc has that
-    # exact document_type) and is NEVER executed as SQL/template.
+    # The payload is a bound literal — it matches NOTHING (no doc has that exact
+    # language) and is NEVER executed as SQL/template.
     assert out["total"] == 0, "the injection payload must resolve to 0 matches"
     assert out["documents"] == []
 

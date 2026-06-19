@@ -233,8 +233,13 @@ def test_contains_ilike_substring():
 
 
 def test_is_empty_or_group():
-    """Task 2 / D-114-12: ``is_empty`` → a null-or-empty OR-group Fragment (absent
-    OR ``''``/``[]``)."""
+    """D-114-12: ``is_empty`` → a custom-leg Fragment with a DISTINCT
+    ``builder="is_empty"`` marker (absent OR ``''``/``[]``).
+
+    Plan 02 contract: ``is_empty`` carries ``builder="is_empty"`` (NOT ``"or_"``,
+    which the resolve route reserves for ``one_of`` membership) so the resolve-route
+    dispatch is unambiguous — it expands ``is_empty`` to an ``.or_(…is.null,…eq.,…eq.[])``
+    predicate whose RHS tokens are HARD-CODED, never user input."""
     from app.models.document_view import ViewCondition, ViewFilter
     from app.services.view_filter_compiler import compile_filter
 
@@ -242,7 +247,8 @@ def test_is_empty_or_group():
         ViewFilter(op="and", conditions=[ViewCondition(field="author", op="is_empty")])
     )
     assert len(frags) == 1
-    assert frags[0].builder in ("or_", "is_")
+    assert frags[0].leg == "custom" and frags[0].field == "author"
+    assert frags[0].builder == "is_empty", "is_empty carries its own distinct builder marker"
 
 
 def test_between_carries_value2():

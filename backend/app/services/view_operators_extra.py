@@ -131,11 +131,12 @@ def _op_contains(cond) -> Fragment:
 @register_operator("is_empty")
 def _op_is_empty(cond) -> Fragment:
     """``is_empty`` — a field the model never extracted (key absent) OR set to
-    ``''``/``[]`` counts as empty (D-114-12). An OR-group Fragment the resolve route
-    expands to ``.or_(field.is.null,field.eq.'',field.eq.'[]')`` on
-    ``metadata->>'field'`` (the empty test is always on the raw metadata key)."""
-    return Fragment(leg="custom", field=cond.field, builder="or_",
-                    value=["is.null", "eq.", "eq.[]"], values=["is.null", "eq.", "eq.[]"])
+    ``''``/``[]`` counts as empty (D-114-12). Carries a DISTINCT ``builder="is_empty"``
+    (NOT ``"or_"``, which the resolve route reserves for ``one_of`` membership) so the
+    dispatch is unambiguous: the resolve route expands it to an ``.or_(…is.null,…eq.,
+    …eq.[])`` predicate on ``metadata->>'field'`` whose three RHS tokens are HARD-CODED
+    literals (never user input — the empty test is always on the raw metadata key)."""
+    return Fragment(leg="custom", field=cond.field, builder="is_empty")
 
 
 # ── relative-date (carry N + unit; window math DEFERRED to resolve, D-114-16) ────

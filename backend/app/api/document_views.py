@@ -44,6 +44,8 @@ UI surface. Per A2/D-113-10: the optional `stale_fields` resolve-warning is
 deferred wholesale to Phase 119 (not shipped here).
 """
 
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
@@ -62,6 +64,34 @@ from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders, get_globally_visible_folder_ids
 
 router = APIRouter(prefix="/document-views", tags=["document-views"])
+
+# Relative-date unit → days (D-114-16 / sketch 030 — "months count as ≈30 days;
+# the headline dates are the contract"). Used by `_relative_window` to turn an
+# operator's N + unit into a server-clock-anchored date window.
+_UNIT_DAYS: dict[str, int] = {"days": 1, "weeks": 7, "months": 30}
+
+
+def _relative_window(builder: str, n: int, unit: str | None) -> tuple[str | None, str | None]:
+    """Compute a relative-date window from the SERVER CLOCK at resolve time (D-114-16).
+
+    Returns ``(lower_iso, upper_iso)`` ISO date bounds (either may be ``None`` for an
+    open-ended bound), recomputed every call so a saved relative view drifts with the
+    calendar — the window is NEVER baked at save time nor on the client (Pitfall 6).
+
+    * ``within_next`` → ``(today, today + N)`` — the ``today`` LOWER bound is the
+      overdue-exclusion (D-114-5: "coming due soon," not "overdue + soon").
+    * ``older_than``  → ``(None, today - N)`` — document age, ``date <= today - N``.
+
+    PHASE 115 HANDOFF: the agent-tool MUST reuse this resolver / this helper so its
+    relative windows recompute live; it MUST NOT re-derive its own window math.
+    """
+    today = date.today()  # server clock — recompute every resolve (drifts with calendar)
+    span = n * _UNIT_DAYS.get(unit or "days", 1)
+    if builder == "within_next":
+        return today.isoformat(), (today + timedelta(days=span)).isoformat()
+    if builder == "older_than":
+        return None, (today - timedelta(days=span)).isoformat()
+    return None, None
 
 # The immutable built-in metadata keys (single-sourced from DocumentMetadata, the
 # documents.py:1355 convention — under extra="allow", model_fields still returns
@@ -200,6 +230,7 @@ async def delete_view(
 @router.get("/{view_id}/resolve")
 async def resolve_view(
     view_id: str,
+    count_only: bool = False,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -209,6 +240,23 @@ async def resolve_view(
     is scoped from the CALLER, NEVER from `view["user_id"]`. A seeded global view
     resolves to DIFFERENT result sets per caller. Returns a complete listing
     (query-not-copy, D-113-1), newest-first, with a total count.
+
+    The saved AST compiles (Plan 01) to an ordered ``list[Fragment]`` of bound
+    WHERE-fragment descriptors (R-114-A). `_apply` walks them across two legs — the
+    promoted typed indexed columns (`document_type_norm` / `date_typed`) and a
+    whitelisted `metadata->>'field'` custom leg — chaining supabase-py builder calls
+    so every VALUE rides as a bound PostgREST param (SC#4). Both legs are scoped
+    identically from the CALLER, then merged + DISTINCT-deduped by id (VIEW-06).
+
+    RELATIVE-DATE / PHASE 115 HANDOFF (D-114-16): relative-date windows
+    (`within_next` / `older_than`) are computed HERE from the server clock at resolve
+    time (never baked at save, never on the client) so a saved "expiring within 90
+    days" view drifts with the calendar. Phase 115's agent-tool MUST reuse this
+    resolver, never re-derive its own window math.
+
+    ``count_only=True`` (D-114-15) returns just ``{"total": N}`` — the own+global
+    DISTINCT-deduped count without materializing full rows — for the live builder
+    preview and the per-view sidebar badges.
     """
     caller = current_user["id"]
 
@@ -218,11 +266,23 @@ async def resolve_view(
     if view is None:
         raise HTTPException(status_code=404, detail="View not found")  # 404-not-403, no existence leak
 
-    # 2. Compile the saved AST → metadata_filter jsonb dict ({} when empty → no
-    #    narrowing, D-113-9). The attacker-controlled value rides as a bound
-    #    JSON literal — never string-interpolated (SC#4 / T-113-11).
+    # 2. Compile the saved AST → an ordered list[Fragment] (R-114-A); [] when empty →
+    #    no narrowing (D-113-9). The attacker-controlled value rides as a bound
+    #    Fragment literal carried into a PostgREST builder param — NEVER
+    #    string-interpolated into SQL or the .or_/.in_ grammar (SC#4 / T-114-02-03).
     flt = ViewFilter.model_validate(view["filter_expr"] or {"op": "and", "conditions": []})
-    metadata_filter = view_filter_compiler.compile_filter(flt)
+    fragments = view_filter_compiler.compile_filter(flt)
+
+    # 2b. Re-validate the custom-leg field names against the LIVE whitelist at resolve
+    #     (not just at save) before they become a metadata->>'field' selector — a field
+    #     could have been deleted/disabled since save (T-114-02-03 defense-in-depth).
+    whitelist = await _build_whitelist(caller, supabase)
+    for frag in fragments:
+        if frag.leg == "custom" and frag.field not in whitelist:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"filter field {frag.field!r} is no longer available",
+            )
 
     # 3. Resolve folder_scope → a subtree LIST (never a set — Pitfall 1); an
     #    unreachable scope contributes no narrowing (D-113-5). Owner-scoped to the
@@ -249,12 +309,89 @@ async def resolve_view(
             subtree = reachable or None
 
     def _apply(q):
-        """Compose the metadata filter + subtree scope onto a documents query leg."""
-        if metadata_filter:  # D-113-9: empty → skip .contains() entirely
-            q = q.contains("metadata", metadata_filter)  # → metadata @> $1::jsonb (param-bound, SC#4)
+        """Walk the ordered list[Fragment] + subtree scope onto a documents query leg.
+
+        Two legs, one dispatch (R-114-A / RESEARCH §"Two-leg split"):
+          * ``leg="typed"``       → the CONSTANT promoted column name
+            (`document_type_norm` / `date_typed`); builder call straight on the column.
+          * ``leg="custom"``      → a `metadata->>'field'` selector; ``field`` is a
+            WHITELISTED key (re-validated above), never raw input.
+          * ``leg="containment"`` → the surviving `metadata @> {field: value}` `@>`
+            fast path (boolean/number eq).
+
+        Every value rides as a bound PostgREST param. AND across conditions is the
+        chained builder calls (PostgREST ANDs filters), preserving the flat-AND AST.
+        """
+        for frag in fragments:
+            if frag.leg == "containment":
+                # boolean/number eq — the @> fast path (case-sensitive exact is correct)
+                q = q.contains("metadata", {frag.field: frag.value})
+                continue
+
+            # Column selector: a CONSTANT typed column name, or a metadata->>'key'
+            # JSON-path on a whitelisted key (the key is NOT attacker input).
+            col = frag.field if frag.leg == "typed" else f"metadata->>{frag.field}"
+
+            if frag.builder in ("within_next", "older_than"):
+                # Relative-date window from the SERVER CLOCK at resolve time (D-114-16).
+                # value = N, value2 = unit. within_next → .gte(today).lte(today+N)
+                # (the .gte(today) lower bound EXCLUDES overdue, D-114-5);
+                # older_than → .lte(today-N).
+                low, high = _relative_window(frag.builder, frag.value, frag.value2)
+                if low is not None:
+                    q = q.gte(col, low)
+                if high is not None:
+                    q = q.lte(col, high)
+            elif frag.builder == "or_":
+                # one_of — membership over one field. Bind the list via .in_
+                # (PostgREST QUOTES each member → SC#4-safe), never an interpolated
+                # .or_ grammar string built from user values (T-114-02-03).
+                q = q.in_(col, frag.values or [])
+            elif frag.builder == "is_empty":
+                # is_empty — absent OR ''/'[]'. The field is whitelisted (a constant
+                # here, re-validated above); the three RHS predicates are HARD-CODED
+                # literals, never user input → the .or_ grammar carries no
+                # attacker-controlled token (T-114-02-03 / D-114-12).
+                q = q.or_(f"{col}.is.null,{col}.eq.,{col}.eq.[]")
+            else:
+                # eq / gte / lte / ilike — direct builder on the column; the value is
+                # a bound param. between carries value2 → chain a .lte upper bound.
+                q = getattr(q, frag.builder)(col, frag.value)
+                if frag.value2 is not None:
+                    q = q.lte(col, frag.value2)
+
         if subtree:  # VIEW-05 — narrow to the subtree LIST (never a set — Pitfall 1)
             q = q.in_("folder_id", subtree)  # → folder_id = ANY($n)
         return q
+
+    global_folder_ids = await get_globally_visible_folder_ids(supabase, caller)
+
+    # ---- count-only mode (D-114-15) — own+global DISTINCT dedupe, no full rows ----
+    if count_only:
+        # Select ids only (NEVER `*` — avoids the silent >1000 undercount; mirrors
+        # the resolve dedupe exactly, RESEARCH §"Count-Only Path" option 1). The
+        # union of id SETS across the two legs is the DISTINCT total — a caller-owned
+        # doc living in a globally-visible folder matches BOTH legs but is counted
+        # once (Pitfall 1: NEVER own.count + global.count). Same caller-scoping as
+        # full resolve → a count over another user's docs is impossible by
+        # construction (T-114-02-02 / VIEW-06).
+        own_ids = {
+            d["id"]
+            for d in (await aexec(_apply(
+                supabase.table("documents").select("id")
+                .eq("user_id", caller).eq("is_latest", True)
+            ))).data or []
+        }
+        glob_ids: set[str] = set()
+        if global_folder_ids:
+            glob_ids = {
+                d["id"]
+                for d in (await aexec(_apply(
+                    supabase.table("documents").select("id")
+                    .in_("folder_id", global_folder_ids).eq("is_latest", True)
+                ))).data or []
+            }
+        return {"total": len(own_ids | glob_ids)}
 
     # ---- CALLER-SCOPED listing (clone list_documents) — scope from CALLER, never view.user_id ----
     own = _apply(
@@ -265,7 +402,6 @@ async def resolve_view(
     )
     own_docs = (await aexec(own)).data or []
 
-    global_folder_ids = await get_globally_visible_folder_ids(supabase, caller)
     global_docs: list[dict] = []
     if global_folder_ids:
         glob = _apply(
