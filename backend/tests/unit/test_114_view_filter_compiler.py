@@ -115,7 +115,6 @@ def test_one_of_carries_values_between_carries_value2():
 # ── widened compiler output: per-operator Fragment (Task 2 — xfail until landed) ─
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_eq_document_type_typed_leg_lowercased():
     """Task 2 / D-114-10: ``eq`` on ``document_type`` → a typed-leg Fragment on
     ``document_type_norm`` with a LOWERCASED value (indexed, case-insensitive)."""
@@ -135,7 +134,6 @@ def test_eq_document_type_typed_leg_lowercased():
     assert f.value == "invoice"  # lowercased query value (Pitfall 3 — indexed path)
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_eq_boolean_custom_keeps_containment():
     """Task 2: ``eq`` on a boolean custom field keeps the ``@>`` containment fast
     path (case-sensitive exact is correct there)."""
@@ -152,7 +150,6 @@ def test_eq_boolean_custom_keeps_containment():
     assert frags[0].value is True
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_eq_free_text_ilike():
     """Task 2 / D-114-10: ``eq`` on free-text (title) → a case-insensitive ``ilike``
     Fragment (the un-normalized fields get lower-on-both-sides semantics)."""
@@ -169,7 +166,6 @@ def test_eq_free_text_ilike():
     assert frags[0].leg == "custom"
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_gte_lte_on_date_typed_leg():
     """Task 2: ``gte``/``lte`` on the built-in ``date`` → typed-leg Fragments on
     ``date_typed`` (the indexed range fast path)."""
@@ -186,7 +182,6 @@ def test_gte_lte_on_date_typed_leg():
     assert lte[0].leg == "typed" and lte[0].field == "date_typed" and lte[0].builder == "lte"
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_gte_on_custom_number_cast_leg():
     """Task 2: ``gte`` on a custom number field → a custom-leg cast Fragment on
     ``metadata->>'field'`` (correct but non-indexed)."""
@@ -202,7 +197,6 @@ def test_gte_on_custom_number_cast_leg():
     assert frags[0].value == 10
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_one_of_or_group_lowercased():
     """Task 2 / D-113-7 / D-114-10: ``one_of`` on ``document_type`` → an OR-group
     Fragment over one field with lowercased values."""
@@ -225,7 +219,6 @@ def test_one_of_or_group_lowercased():
     assert "receipt" in (f.value if isinstance(f.value, (list, tuple)) else [])
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_contains_ilike_substring():
     """Task 2 / D-114-11: ``contains`` → an ``ilike`` ``%v%`` substring Fragment."""
     from app.models.document_view import ViewCondition, ViewFilter
@@ -239,7 +232,6 @@ def test_contains_ilike_substring():
     assert "report" in str(frags[0].value)
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_is_empty_or_group():
     """Task 2 / D-114-12: ``is_empty`` → a null-or-empty OR-group Fragment (absent
     OR ``''``/``[]``)."""
@@ -253,7 +245,6 @@ def test_is_empty_or_group():
     assert frags[0].builder in ("or_", "is_")
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_between_carries_value2():
     """Task 2: ``between`` on ``date`` → a Fragment carrying value + value2 on
     ``date_typed``."""
@@ -276,7 +267,6 @@ def test_between_carries_value2():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_before_after_compile_to_date_bounds():
     """Task 2: fixed ``before``/``after`` on ``date`` → ``lte``/``gte`` typed-leg
     Fragments on ``date_typed``."""
@@ -319,7 +309,6 @@ def test_within_next_window_math_deferred():
 # ── case-insensitive matching (Task 2) ─────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Case-insensitivity lands with the Fragment compiler in Task 2")
 def test_case_insensitive_document_type_value_lowercased():
     """Task 2 / D-114-10 / Pitfall 3: ``document_type`` is matched by a LOWERCASED
     query value on the indexed typed leg — NOT ``ilike`` (which would defeat the
@@ -336,7 +325,6 @@ def test_case_insensitive_document_type_value_lowercased():
     assert f.value == "invoice"
 
 
-@pytest.mark.xfail(strict=False, reason="Case-insensitivity lands with the Fragment compiler in Task 2")
 def test_case_insensitive_free_text_ilike():
     """Task 2 / D-114-10: a genuinely un-normalized free-text field (author) gets
     a case-insensitive ``ilike`` Fragment, not value-lowercasing."""
@@ -353,7 +341,6 @@ def test_case_insensitive_free_text_ilike():
 # ── SC#4 injection rides as a bound literal in the new Fragment shape (Task 2) ──
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_injection_value_rides_as_bound_literal():
     """SC#4: a SQL/SSTI/JNDI payload in a VALUE compiles to exactly that literal in
     the Fragment ``value`` — never executed / interpolated / templated. The bound
@@ -374,7 +361,6 @@ def test_injection_value_rides_as_bound_literal():
     assert payload in str(f.value)  # byte-for-byte present, never templated/executed
 
 
-@pytest.mark.xfail(strict=False, reason="Fragment compiler lands in Task 2")
 def test_unknown_op_still_fails_closed_after_widening():
     """Task 2 / Pitfall 5: after the widening, a smuggled op NOT in the registry
     still fails closed (``KeyError``). The widened Literal just gains members; the

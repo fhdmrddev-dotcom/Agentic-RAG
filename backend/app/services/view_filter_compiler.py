@@ -1,29 +1,39 @@
-"""The filter-AST → metadata_filter compiler — the net-new component of Phase 113.
+"""The filter-AST → WHERE-fragment compiler — net-new in Phase 113, widened in 114.
 
 A PURE module (no I/O, no DB, no ``eval``, no string interpolation of field names
 OR values). It transforms a validated :class:`~app.models.document_view.ViewFilter`
-AST into a single ``metadata_filter`` jsonb dict that the resolve route binds as
-one ``$1::jsonb`` via supabase-py ``.contains("metadata", filter_dict)``
-(``metadata @> $1::jsonb``). The attacker-controlled value rides as a JSON literal
-matched by ``@>`` — it is NEVER concatenated into SQL or rendered as a template
-(SC#4).
+AST into an ordered ``list[Fragment]`` of bound WHERE-fragment descriptors. The
+resolve route's ``_apply`` is the SOLE place a supabase-py builder call happens —
+every attacker-controlled VALUE rides as a bound PostgREST param (``.eq``/``.gte``/
+``.lte``/``.ilike``/...), and every FIELD name is a whitelisted constant. It is
+NEVER concatenated into SQL or rendered as a template (SC#4).
 
 Two mechanisms, both cloned from shipped harness code:
 
 1. **Closed operator registry** (mirrors ``harness/validators.py`` ``VALIDATOR_REGISTRY``
    + ``@register_validator``): a closed ``OPERATOR_REGISTRY`` dict + a
-   ``register_operator`` decorator. Phase 113 registers ONLY ``eq``; an op not in
+   ``register_operator`` decorator. Phase 113 registered ONLY ``eq``; an op not in
    the registry fails closed (``KeyError``) at compile — never ``eval``'d /
    ``getattr``'d / dynamically imported. Phase 114 adds ``gte`` / ``lte`` /
    ``one_of`` / ``contains`` / ``is_empty`` / relative-date operators PURELY
-   ADDITIVELY by importing an extra ops module ONCE (the seam noted below) — the
-   ``eq`` path and the AST shape are untouched (D-113-6 "no compiler rewrite").
+   ADDITIVELY by importing :mod:`app.services.view_operators_extra` ONCE (the seam
+   below) — the registry just gains members; the closed dispatch stays closed.
 
 2. **Bound-literal parameterization** (mirrors ``harness/freshness.py``'s
-   ``ANY($1::uuid[])`` ``$N``-placeholder discipline): the ``eq`` path produces a
-   plain ``{field: value}`` dict contribution. The resolve route binds the folded
-   dict as a single param via ``.contains()`` — the compiler itself never touches
-   SQL. There is no f-string SQL, no ``.format()``-into-query anywhere here.
+   ``ANY($1::uuid[])`` ``$N``-placeholder discipline): every operator fn returns a
+   :class:`Fragment` whose ``value``/``value2`` are plain bound literals. The
+   resolve route binds them as PostgREST params via the builder named by
+   ``Fragment.builder`` — the compiler itself never touches SQL. There is no
+   f-string SQL, no ``.format()``-into-query anywhere here.
+
+R-114-A — the one place Phase 113's "purely additive, ``eq`` untouched" promise
+deliberately bends: case-insensitive text matching (D-114-10) widens the compiler
+output from "one ``metadata @> $1::jsonb`` containment dict" to "an ordered list of
+bound Fragment descriptors." Containment (``leg="containment"``) survives ONLY for
+boolean/number ``eq`` where case-sensitive exact is correct; everything else maps
+to a typed-column leg (the promoted ``document_type_norm``/``date_typed``) or a
+custom ``metadata->>'field'`` leg. Treated as a tested contract change, not a
+silent regression.
 
 Field-name safety lives in :func:`validate_fields` (save-time): a ``_``-prefixed
 field (``_confidence`` / ``_source`` — display-only nested keys, the D-111-9 /
@@ -33,32 +43,88 @@ D-112-D02 invariant) or a field not in the live whitelist raises ``ValueError``
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
 from app.models.document_view import ViewFilter
 
 __all__ = [
+    "Fragment",
     "OPERATOR_REGISTRY",
+    "PROMOTED_TYPED_COLUMNS",
+    "NORMALIZED_LOWER_FIELDS",
+    "FREE_TEXT_FIELDS",
     "register_operator",
     "compile_filter",
     "validate_fields",
 ]
 
 
+# ── leg-selection field sets (R-114-A / Pitfall 3) ─────────────────────────────
+# The TWO hot fields promoted to typed, btree-indexed GENERATED-STORED columns in
+# migration 074 (R-114-B). The compiler maps these built-in field names to their
+# typed column name; the resolve route's ``_apply`` reads ``Fragment.field`` as a
+# CONSTANT column name (never user input) on the indexed fast path.
+PROMOTED_TYPED_COLUMNS: dict[str, str] = {
+    "document_type": "document_type_norm",
+    "date": "date_typed",
+}
+
+# Fields ALREADY stored lowercase at every write path (ingest documents.py:1575-1582,
+# manual edit :1422-1426, extraction prompt embedding_service.py:147). For these we
+# just LOWERCASE THE QUERY VALUE and use ``.eq`` (indexed for document_type via its
+# typed column) — NOT ``ilike``, which would defeat the index (Pitfall 3).
+NORMALIZED_LOWER_FIELDS: frozenset[str] = frozenset({"document_type", "language"})
+
+# Genuinely un-normalized free-text fields → case-insensitive ``ilike`` on BOTH
+# sides (D-114-10). These are the only fields that warrant ILIKE for ``eq``.
+FREE_TEXT_FIELDS: frozenset[str] = frozenset({"title", "author", "summary"})
+
+
+# ── WHERE-fragment descriptor (the widened compiler output, R-114-A) ───────────
+@dataclass
+class Fragment:
+    """A single bound WHERE-fragment descriptor — data only, NO SQL.
+
+    ``leg`` picks which ``_apply`` leg consumes it:
+      * ``"typed"``       — a promoted indexed column (``document_type_norm`` /
+        ``date_typed``); ``field`` is the CONSTANT typed column name.
+      * ``"custom"``      — a ``metadata->>'field'`` access; ``field`` is the
+        WHITELISTED original field name (re-validated at resolve, never raw input).
+      * ``"containment"`` — the surviving ``metadata @> {field: value}`` ``@>``
+        fast path (boolean/number ``eq`` only); ``field`` is the original key.
+
+    ``builder`` names the supabase-py PostgREST builder the resolve route calls
+    (``eq``/``gte``/``lte``/``ilike``/``is_``/``or_``/``contains``). ``value`` (and
+    ``value2`` for ``between``) are BOUND LITERALS — they ride as PostgREST params,
+    never interpolated (SC#4). ``values`` carries an OR-group membership list (for
+    ``one_of``/``is_empty`` where ``builder="or_"``).
+    """
+
+    leg: str  # "typed" | "custom" | "containment"
+    field: str  # typed column name | whitelisted metadata key | containment key
+    builder: str  # "eq" | "gte" | "lte" | "ilike" | "is_" | "or_" | "contains"
+    value: object = None  # bound literal
+    value2: object = None  # bound literal (between upper bound)
+    values: list | None = None  # OR-group membership (one_of / is_empty legs)
+
+
 # ── closed operator registry (mirror harness/validators.py VALIDATOR_REGISTRY) ─
-# op -> fn(field, value) -> partial metadata_filter contribution. A CLOSED dict:
-# an op not present is NEVER eval'd / dynamically imported — compile_filter raises
-# KeyError on a registry miss (fail closed, defense-in-depth even though Pydantic
-# Literal["eq"] already rejects unknown ops at parse).
-OPERATOR_REGISTRY: dict[str, Callable[[str, object], dict]] = {}
+# op -> fn(condition) -> Fragment | list[Fragment]. A CLOSED dict: an op not present
+# is NEVER eval'd / dynamically imported — compile_filter raises KeyError on a
+# registry miss (fail closed, defense-in-depth even though the Pydantic Literal on
+# ViewCondition.op already rejects unknown ops at parse).
+OPERATOR_REGISTRY: dict[str, Callable[..., object]] = {}
 
 
-def register_operator(op: str) -> Callable[
-    [Callable[[str, object], dict]], Callable[[str, object], dict]
-]:
-    """Decorator: register an operator fn under ``op`` in :data:`OPERATOR_REGISTRY`."""
+def register_operator(op: str) -> Callable[[Callable[..., object]], Callable[..., object]]:
+    """Decorator: register an operator fn under ``op`` in :data:`OPERATOR_REGISTRY`.
 
-    def deco(fn: Callable[[str, object], dict]) -> Callable[[str, object], dict]:
+    The registered fn takes a :class:`~app.models.document_view.ViewCondition` and
+    returns a :class:`Fragment` or a ``list[Fragment]`` (data only, no SQL).
+    """
+
+    def deco(fn: Callable[..., object]) -> Callable[..., object]:
         OPERATOR_REGISTRY[op] = fn
         return fn
 
@@ -66,39 +132,66 @@ def register_operator(op: str) -> Callable[
 
 
 @register_operator("eq")
-def _op_eq(field: str, value: object) -> dict:
-    """``eq`` contributes ``{field: value}`` to the metadata_filter jsonb.
+def _op_eq(cond) -> Fragment:
+    """``eq`` — case-insensitive equality (D-114-10), leg chosen by field kind.
 
-    The value is placed into a plain dict UNCHANGED — it is later bound as one
-    ``$1::jsonb`` param by the resolve route's ``.contains()`` call, never
-    interpolated into SQL or a JSON literal string (SC#4).
+    * promoted ``document_type`` → typed leg on ``document_type_norm`` with a
+      LOWERCASED value (indexed, exact, case-insensitive because both sides are
+      lowercase — Pitfall 3).
+    * ``language`` (already lowercase) → custom leg, ``.eq`` with a lowercased value.
+    * free-text (``title``/``author``/``summary``) → custom leg, ``.ilike`` for
+      case-insensitive exact (no wildcards).
+    * boolean/number/anything else custom → the ``@>`` containment fast path
+      SURVIVES (case-sensitive exact is correct there).
+
+    The VALUE is a bound literal in every leg — never interpolated (SC#4).
     """
-    return {field: value}
+    field, value = cond.field, cond.value
+    if field == "document_type":
+        return Fragment(leg="typed", field=PROMOTED_TYPED_COLUMNS[field], builder="eq",
+                        value=_lower(value))
+    if field == "language":
+        return Fragment(leg="custom", field=field, builder="eq", value=_lower(value))
+    if field in FREE_TEXT_FIELDS:
+        return Fragment(leg="custom", field=field, builder="ilike", value=value)
+    # boolean / number / custom string / enum / topics → containment @> fast path
+    return Fragment(leg="containment", field=field, builder="contains", value=value)
 
 
-# Phase 114 SEAM: add the additive operators by importing an extra module ONCE
-# here (e.g. ``from . import view_operators_extra  # noqa: F401``) so its
-# @register_operator("gte") / ("one_of") / ... side-effects populate the registry.
-# Phase 113 registers ONLY ``eq`` + the AST honors ONLY ``and`` — no rewrite of
-# this file is needed to widen the operator set (D-113-6).
+def _lower(value: object) -> object:
+    """Lowercase a string VALUE for case-insensitive matching on a normalized
+    field; leave non-strings (numbers/booleans) untouched."""
+    return value.lower() if isinstance(value, str) else value
 
 
-def compile_filter(flt: ViewFilter) -> dict:
-    """Fold every condition into ONE ``metadata_filter`` jsonb dict (resolve-time).
+# Phase 114 SEAM: add the additive operators by importing the extra ops module ONCE
+# here so its @register_operator("gte") / ("one_of") / ... side-effects populate the
+# registry. The import is deliberately AT THE END of module init (after Fragment +
+# register_operator are defined) to avoid a circular import.
+from . import view_operators_extra  # noqa: E402,F401
 
-    The ``eq``-only path is AND-of-keys (JSONB containment is implicitly AND), so
-    multiple ``eq`` conditions under ``op:and`` merge into ``{k1: v1, k2: v2}``
-    (VIEW-04). An empty ``conditions`` list returns ``{}`` — the caller skips
-    ``.contains()`` entirely (no narrowing, D-113-9). An op NOT in
+
+def compile_filter(flt: ViewFilter) -> list[Fragment]:
+    """Compile every condition into an ordered ``list[Fragment]`` (resolve-time).
+
+    Each condition maps through the closed registry to ONE Fragment or a list of
+    Fragments (``one_of``/``is_empty`` may yield an OR-group fragment). The flat-AND
+    AST (D-113-7) is preserved as the order of the returned list — ``_apply`` chains
+    the builder calls (PostgREST ANDs filters). An empty ``conditions`` list returns
+    ``[]`` — the caller applies no narrowing (D-113-9). An op NOT in
     :data:`OPERATOR_REGISTRY` raises ``KeyError`` (fail closed, Pitfall 5).
     """
-    metadata_filter: dict = {}
+    fragments: list[Fragment] = []
     for c in flt.conditions:
         fn = OPERATOR_REGISTRY.get(c.op)  # closed lookup; unknown -> None
         if fn is None:
             raise KeyError(f"operator {c.op!r} not registered")  # FAIL CLOSED
-        metadata_filter.update(fn(c.field, c.value))  # eq -> {field: value}
-    return metadata_filter  # {} when empty -> caller skips .contains()
+        result = fn(c)
+        if isinstance(result, list):
+            fragments.extend(result)
+        else:
+            fragments.append(result)
+    return fragments  # [] when empty -> caller applies no narrowing
 
 
 def validate_fields(flt: ViewFilter, whitelist: set[str]) -> None:
