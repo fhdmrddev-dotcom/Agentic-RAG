@@ -123,3 +123,11 @@ None. The relative-date operators intentionally carry only `N + unit` (the windo
 - `80e904c0` — feat(114-01): widen view filter AST + add Wave-0 compiler test scaffold
 - `7028d2ae` — feat(114-01): widen compiler to Fragment output + register VIEW-03 operators
 - `d25f05db` — feat(114-01): rewrite 113 tests to Fragment contract + author migration 074
+- `2e9da769` — docs(114-01): complete filter compiler Fragment widening plan (this SUMMARY)
+
+## Self-Check: PASSED
+
+- Created files exist: `view_operators_extra.py`, `test_114_view_filter_compiler.py`, `074_view_typed_columns.sql`, `114-01-SUMMARY.md` — all FOUND.
+- Commits exist: `80e904c0`, `7028d2ae`, `d25f05db`, `2e9da769` — all FOUND.
+- Unit verification green: `test_113` (7 passed) + `test_114` (18 passed, 1 xfailed = deferred relative-date window).
+- Migration `074` authored, not applied (full-schema.sql untouched).
