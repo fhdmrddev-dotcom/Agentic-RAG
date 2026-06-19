@@ -26,7 +26,23 @@ findings:
   warning: 7
   info: 6
   total: 14
-status: issues_found
+status: resolved
+resolved: 2026-06-20
+resolution_commits: [eb187b32, e6feb1d3, 4da23739, 61bff2cc, 3d449d4d, 6ad107e2, 76e1c2e1]
+---
+
+> **RESOLUTION (2026-06-20):** All findings addressed in a focused fix pass (operator-authorized).
+> - **CR-01 (BLOCKER)** — `eb187b32`: new stateless `POST /document-views/resolve` (shared `_resolve_filter` core, no persist / no audit); api.ts rewired off the transient create/delete dance; double round-trip collapsed; 9 junk `__live_*` audit rows purged. **Live-proven:** exercising the builder's live count created 0 new `view.create` rows + 0 transient views.
+> - **WR-01** — `e6feb1d3`: custom-number range ops rejected (422) instead of lexically-wrong (numeric `::` cast not cleanly expressible in postgrest 2.29; `date` exempt via `date_typed`); client `OPS_BY_TYPE.number` reduced.
+> - **WR-02** — `e6feb1d3`: `validate_operands` rejects empty `one_of`, missing `between` bounds, missing scalars, non-numeric N (422 at create/update/resolve).
+> - **WR-03** — `4da23739`: `older_than` now strict `.lt` (code + docstring agree); boundary test added.
+> - **WR-05** — `61bff2cc`: server clamps span + guards `OverflowError`; client clamps N on edit.
+> - **WR-06** — `eb187b32`: dropped bespoke `renameViewRequest` → uses `updateView`.
+> - **WR-04** — `3d449d4d`/`76e1c2e1`: `fetchCount` no longer closes over `counts` (countsRef + functional updater).
+> - **WR-07** — `3d449d4d`: rename-to-blank keeps editor open with a hint / explicit revert.
+> - **IN-01/02/04** — `6ad107e2`: single-sourced `_lower`, dropped redundant `one_of` `value`, shared `EMPTY_FILTER`. IN-03/05/06 skipped (pre-existing / would require migration re-apply).
+>
+> Verification: backend 113/114 suite 71 passed / 1 intentional xfail (new `test_114_resolve_adhoc.py` proves zero audit/view writes); 66 frontend tests green; tsc clean. See `114-06-SUMMARY.md` for the phase record.
 ---
 
 # Phase 114: Code Review Report
