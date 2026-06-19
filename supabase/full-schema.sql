@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict EHlldUEEwEkozAZ2HH9D5IWdIYyrHiXmexVT9SU1OVmAzwyIjz4vhX3V0gtmIdt
+\restrict ObS78xFqEYyXAywriENoyOSWKd05xgkc0ecyarj2qt3IEV4TmlwvS1YDD31wllF
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -218,6 +218,28 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: view_iso_to_date(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.view_iso_to_date(s text) RETURNS date
+    LANGUAGE plpgsql IMMUTABLE STRICT
+    AS $_$
+BEGIN
+  IF s !~ '^\d{4}-\d{2}-\d{2}$' THEN
+    RETURN NULL;  -- not ISO YYYY-MM-DD shape
+  END IF;
+  RETURN make_date(
+    substring(s FROM 1 FOR 4)::int,   -- year
+    substring(s FROM 6 FOR 2)::int,   -- month
+    substring(s FROM 9 FOR 2)::int    -- day
+  );
+EXCEPTION WHEN others THEN
+  RETURN NULL;  -- calendar-invalid (2026-13-99 / 2026-02-31) → NULL, never raises
+END;
+$_$;
 
 
 --
@@ -512,6 +534,8 @@ CREATE TABLE public.documents (
     full_markdown text,
     ingestion_step text,
     extractor text,
+    document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
+    date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -1455,6 +1479,20 @@ CREATE INDEX idx_document_views_org_id ON public.document_views USING btree (org
 --
 
 CREATE INDEX idx_document_views_user_id ON public.document_views USING btree (user_id);
+
+
+--
+-- Name: idx_documents_date_typed; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_date_typed ON public.documents USING btree (date_typed);
+
+
+--
+-- Name: idx_documents_document_type_norm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (document_type_norm);
 
 
 --
@@ -2938,5 +2976,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EHlldUEEwEkozAZ2HH9D5IWdIYyrHiXmexVT9SU1OVmAzwyIjz4vhX3V0gtmIdt
+\unrestrict ObS78xFqEYyXAywriENoyOSWKd05xgkc0ecyarj2qt3IEV4TmlwvS1YDD31wllF
 

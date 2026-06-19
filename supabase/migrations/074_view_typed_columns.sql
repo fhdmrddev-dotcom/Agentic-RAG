@@ -18,10 +18,18 @@
 --
 -- Immutability facts (load-bearing — a GENERATED expression may use ONLY immutable
 -- functions, postgresql.org/docs ddl-generated-columns):
---   * lower(text)        — immutable.            ✅ valid in a generation expression.
---   * (text)::date       — immutable (no session-timezone dependency). ✅ valid.
---   * (text)::timestamptz — NOT immutable (reads session timezone).     ❌ rejected.
--- => the `date` column casts to `date`, NEVER `timestamptz`.
+--   * lower(text)              — immutable.                ✅ valid in a generation expr.
+--   * (text)::date             — STABLE (the text→date I/O cast is DateStyle-sensitive)
+--                                — ❌ REJECTED by Postgres in a generation expr.
+--   * to_date(text, fmt)       — STABLE.                   — ❌ REJECTED too.
+--   * (text)::timestamptz      — NOT immutable (session timezone). ❌ rejected.
+--   * make_date(int,int,int)   — IMMUTABLE.                ✅ the safe parse primitive.
+-- => the `date` column parses via an IMMUTABLE plpgsql helper (`view_iso_to_date`)
+--    that regex-guards the ISO shape, parses the y/m/d substrings via make_date, and
+--    wraps the parse in an EXCEPTION block returning NULL on any bad value (R-114-B).
+--    [VERIFIED at apply time on local PG 15 :54322 — Plan 03, Open Q2/Assumption A1:
+--     the original `(metadata->>'date')::date` cast is rejected "generation expression
+--     is not immutable"; this helper is the immutable, calendar-safe replacement.]
 --
 -- Wrapped in one BEGIN; ... COMMIT; so a partial failure rolls back atomically.
 
@@ -41,29 +49,54 @@ ALTER TABLE public.documents
   GENERATED ALWAYS AS (lower(metadata->>'document_type')) STORED;
 
 -- ============================================================================
--- Section 2 — date → ISO-regex-guarded typed `date` column
+-- Section 2 — date → ISO-regex-guarded, calendar-safe, IMMUTABLE-parsed `date` column
 -- ----------------------------------------------------------------------------
--- The CASE guard is LOAD-BEARING (R-114-B): the extraction prompt is told to PREFER
--- ISO 8601 (YYYY-MM-DD) but that is NOT a guarantee. A stored value that does not
--- match `^\d{4}-\d{2}-\d{2}$` yields NULL — it breaks neither this ALTER (the
--- auto-backfill of every existing row) nor any future insert. The cast is `::date`
--- (immutable), never `::timestamptz` (stable → rejected in a generation expr).
+-- The guard is LOAD-BEARING (R-114-B): the extraction prompt is told to PREFER ISO
+-- 8601 (YYYY-MM-DD) but that is NOT a guarantee. A stored value that does not match
+-- `^\d{4}-\d{2}-\d{2}$` — OR that matches the shape but is calendar-invalid
+-- (`2026-13-99`, `2026-02-31` — Pitfall 2) — yields NULL. It breaks neither this
+-- ALTER (the auto-backfill of every existing row) nor any future insert.
 --
--- NOTE (Pitfall 2): the regex validates SHAPE, not calendar validity — a value like
--- `2026-13-99` passes the regex but would still fail `::date`. Plan 03's bad-date
--- dataset test (run against the FULL dataset on :54322) is the gate that proves no
--- regex-passing-but-invalid date exists before this ships; if one is found, the
--- regex is tightened (e.g. month `0[1-9]|1[0-2]`) per Open Q2.
+-- WHY A HELPER FN (Open Q2 / Assumption A1, decided at apply time): the originally
+-- authored `CASE ... (metadata->>'date')::date` is REJECTED by Postgres —
+-- "generation expression is not immutable" — because the text→date I/O cast (and
+-- to_date()) is STABLE (DateStyle-sensitive). A generation expression may use ONLY
+-- immutable functions. `make_date(int,int,int)` IS immutable, but raises
+-- DatetimeFieldOverflow on a calendar-invalid value (so it can't sit bare in the
+-- expression either — a bad stored row would error the backfill). The fix: an
+-- IMMUTABLE plpgsql helper that regex-guards the shape, parses via make_date, and
+-- traps the overflow in an EXCEPTION block returning NULL. A function declared
+-- IMMUTABLE is permitted in a generation expression. This is STRICTLY SAFER than the
+-- original `::date` would have been — it also NULLs calendar-invalid dates that the
+-- shape regex alone would have let through to a hard error.
 -- ============================================================================
+
+-- IMMUTABLE ISO-date parser: NULL on non-ISO shape AND on calendar-invalid values.
+-- STRICT → NULL input short-circuits to NULL. The EXCEPTION block is the R-114-B
+-- "never raises on a bad date" guarantee.
+CREATE OR REPLACE FUNCTION public.view_iso_to_date(s text)
+RETURNS date
+LANGUAGE plpgsql
+IMMUTABLE
+STRICT
+AS $fn$
+BEGIN
+  IF s !~ '^\d{4}-\d{2}-\d{2}$' THEN
+    RETURN NULL;  -- not ISO YYYY-MM-DD shape
+  END IF;
+  RETURN make_date(
+    substring(s FROM 1 FOR 4)::int,   -- year
+    substring(s FROM 6 FOR 2)::int,   -- month
+    substring(s FROM 9 FOR 2)::int    -- day
+  );
+EXCEPTION WHEN others THEN
+  RETURN NULL;  -- calendar-invalid (2026-13-99 / 2026-02-31) → NULL, never raises
+END;
+$fn$;
+
 ALTER TABLE public.documents
   ADD COLUMN date_typed date
-  GENERATED ALWAYS AS (
-    CASE
-      WHEN metadata->>'date' ~ '^\d{4}-\d{2}-\d{2}$'
-      THEN (metadata->>'date')::date
-      ELSE NULL
-    END
-  ) STORED;
+  GENERATED ALWAYS AS (public.view_iso_to_date(metadata->>'date')) STORED;
 
 -- ============================================================================
 -- Section 3 — btree indexes on the two promoted columns (SC#3 index-use)
