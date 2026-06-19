@@ -284,3 +284,32 @@ _Run `/gsd:sketch-wrap-up` again to package the Phase 111.1 settings session (02
 **Build Phase 112 (this surface):** `/gsd:spec-phase 112` → `/gsd:discuss-phase 112` (cross-check open `surface: Agentic-RAG` bugs; lock the per-field `source` marker + tier thresholds + the metadata-PATCH contract as the gray areas) → `/gsd:plan-phase 112` → `/gsd:execute-phase 112`. **G-2 (sketch-before-plan) is satisfied** by 027 + 028. UX-01 (Deep Midnight / mobile / WCAG AA) + UX-02 are cross-cutting acceptance.
 
 **Phases that INHERIT this shell (reuse, do not rebuild):** Phase 117 (relationship panel) and Phase 118 (classification suggestion) add accordion sections to THIS panel; Phase 119 (governance health) links its low-confidence-metadata signal back into the `ConfidenceChip`. The skill now spans 19 reference files across six sessions and auto-loads during build for the document detail panel, the `ConfidenceChip`, inline metadata editing, and the documents-page right-side panel.
+
+---
+
+## 2026-06-19 — Phase 114: Virtual Folders (Filter/View Builder, Saved Views, NavRow, Layout)
+
+**Sketches processed:** 5 (all included) — 029, 030, 031, 032, 033 (all winner A)
+**Design areas (3 new reference files):** Filter & View Builder (029+030) · Saved Views & Left Nav / NavRow (031+033) · Documents-Page Composition (032)
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode)
+
+### Included Sketches
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 029 | filter-builder-bar | A — chip strip | Filter & View Builder |
+| 030 | operator-and-relative-date-control | A — operator-encodes-direction | Filter & View Builder |
+| 031 | views-sidebar-group | A — NavRow parity | Saved Views & Left Nav |
+| 033 | foldertree-navrow-polish | A — unified NavRow | Saved Views & Left Nav |
+| 032 | documents-page-full-composition | A — sidebar→rail (pinnable) | Documents-Page Composition |
+
+### Excluded Sketches
+None. (`017-cross-thread-run-stop` is an empty stray dir — no README, not a finished sketch; not wrapped.)
+
+### Design Direction
+v3.0 makes metadata *queryable*. A no-DSL chip-strip filter/view builder on the Documents page (ad-hoc filtering IS the builder; Save-as-view persists it); a relative-date control where the operator carries the direction with a live resolved-window readout; saved Views as honest "saved filters" built from a shared NavRow; a light folder-tree polish so Folders and Views read as peers; and a user-pinnable sidebar→rail collapse resolving the 4-column crunch (a shared-shell layout inherited by Phases 117/118).
+
+### Key Decisions
+- Deleted the developer-facing operator/type matrix (fixed the wrap + jargon); stripped phase numbers / "chunks" / "query" / decision-IDs from shippable copy; ConfidenceChip fixed to the locked order; operators in plain sans.
+- NO re-extraction, NO stored-data backfill — `GENERATED…STORED` typed columns (ISO-guarded date cast); case-insensitivity = query-value lowercasing + `ILIKE` for free-text; compiler widens `@>` → bound WHERE-fragments (SC#4 injection test stays green).
+- Folder-tree NavRow polish inlined into Phase 114 (operator decision); drag-drop criterion struck + a "Move to folder" row action added reusing `MoveToFolderDialog` (operator decision).
+- Grounded + revised by a 5-investigator integration audit (workflow `wf_dc339594-8bb`).
