@@ -412,21 +412,19 @@ async def test_view06_leak_safety_two_user_custom_leg_live(pg_pool, test_user, s
     assert getattr(exc.value, "status_code", None) == 404, "cross-user view read is 404, never 403"
 
 
-# ── live typed-leg resolve (XFAIL until Plan 03 applies migration 074) ───────────
+# ── live typed-leg resolve (GREEN since Plan 03 applied migration 074) ───────────
 
-@pytest.mark.xfail(strict=False, reason="document_type_norm column lands in Plan 03 (migration 074)")
 @pytest.mark.asyncio
 async def test_typed_leg_document_type_eq_case_insensitive_live(pg_pool, test_user):
     """`document_type` eq resolves via document_type_norm — case-insensitive, indexed.
 
-    XFAIL: the document_type_norm column does not exist until Plan 03 applies
-    migration 074. Plan 03 un-marks this. (If the column already exists — e.g. a
-    dev DB where 074 was applied early — this passes and reports xpass.)
+    GREEN since Plan 03 applied migration 074 (document_type_norm exists live). The
+    column-existence guard below fails loudly if the migration was ever rolled back.
     """
     if not await _table_exists(pg_pool, "documents"):
         pytest.skip("documents table absent")
     if not await _column_exists(pg_pool, "documents", "document_type_norm"):
-        pytest.fail("document_type_norm not present yet — expected until Plan 03 (xfail)")
+        pytest.fail("document_type_norm absent — migration 074 not applied (Plan 03)")
 
     from app.api.document_views import create_view, resolve_view
     from app.models.document_view import ViewCreate
@@ -447,17 +445,17 @@ async def test_typed_leg_document_type_eq_case_insensitive_live(pg_pool, test_us
     assert out["total"] == 1
 
 
-@pytest.mark.xfail(strict=False, reason="date_typed column lands in Plan 03 (migration 074)")
 @pytest.mark.asyncio
 async def test_typed_leg_within_next_excludes_overdue_live(pg_pool, test_user):
     """`within_next` resolves today→today+N on date_typed, EXCLUDING overdue (D-114-5).
 
-    XFAIL: date_typed lands in Plan 03 (migration 074). Plan 03 un-marks this.
+    GREEN since Plan 03 applied migration 074 (date_typed exists live). The
+    column-existence guard below fails loudly if the migration was ever rolled back.
     """
     if not await _table_exists(pg_pool, "documents"):
         pytest.skip("documents table absent")
     if not await _column_exists(pg_pool, "documents", "date_typed"):
-        pytest.fail("date_typed not present yet — expected until Plan 03 (xfail)")
+        pytest.fail("date_typed absent — migration 074 not applied (Plan 03)")
 
     from app.api.document_views import create_view, resolve_view
     from app.models.document_view import ViewCreate

@@ -339,17 +339,17 @@ async def test_count_only_leak_safe_from_caller(pg_pool, test_user, other_user):
     assert count["total"] == 1, "count is caller-scoped — never counts another user's docs (VIEW-06)"
 
 
-@pytest.mark.xfail(strict=False, reason="document_type_norm column lands in Plan 03 (migration 074)")
 @pytest.mark.asyncio
 async def test_count_only_typed_leg_equals_full(pg_pool, test_user):
     """count_only over a typed-leg (document_type) view equals full-resolve length.
 
-    XFAIL: document_type_norm lands in Plan 03 (migration 074). Plan 03 un-marks this.
+    GREEN since Plan 03 applied migration 074 (document_type_norm exists live). The
+    column-existence guard below fails loudly if the migration was ever rolled back.
     """
     if not await _table_exists(pg_pool, "documents"):
         pytest.skip("documents table absent")
     if not await _column_exists(pg_pool, "documents", "document_type_norm"):
-        pytest.fail("document_type_norm not present yet — expected until Plan 03 (xfail)")
+        pytest.fail("document_type_norm absent — migration 074 not applied (Plan 03)")
 
     from app.api.document_views import create_view, resolve_view
     from app.models.document_view import ViewCreate
