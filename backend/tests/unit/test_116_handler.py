@@ -200,10 +200,10 @@ class _EdgeResult:
 
 
 class _EdgeQuery:
-    """Chainable stub that records the `(source|target)_doc_id` eq and returns canned rows.
+    """Chainable stub that records the `(source|target)_doc_id` in_() and returns canned rows.
 
     The handler builds: table("document_relationships").select(...).eq("user_id", ...)
-    .eq("source_doc_id"|"target_doc_id", subject_id). `aexec` calls `.execute()`. We key
+    .in_("source_doc_id"|"target_doc_id", version_ids). `aexec` calls `.execute()`. We key
     the canned rows off which directional column was filtered.
     """
 
@@ -215,6 +215,9 @@ class _EdgeQuery:
         return self
 
     def eq(self, col, val):
+        return self
+
+    def in_(self, col, vals):
         if col == "source_doc_id":
             self._dir = "outgoing"
         elif col == "target_doc_id":
@@ -229,11 +232,35 @@ class _EdgeQuery:
         return _EdgeResult([])
 
 
+class _DocVersionQuery:
+    """Stub for the CR-02 `_subject_version_ids` lookup: table("documents").select("id")
+    .eq("user_id", owner).eq("filename", fname). Returns the canned version-id rows so the
+    handler enumerates edges over the subject's lineage. A single-version subject yields
+    just [subject_id]."""
+
+    def __init__(self, version_id_rows):
+        self._rows = version_id_rows
+
+    def select(self, *a, **k):
+        return self
+
+    def eq(self, col, val):
+        return self
+
+    def execute(self):
+        return _EdgeResult(list(self._rows))
+
+
 class _EdgeClient:
-    def __init__(self, edges_by_dir):
+    def __init__(self, edges_by_dir, *, version_ids=None):
         self._edges = edges_by_dir
+        # Single-version subject by default: _subject_version_ids resolves to [subject.id]
+        # via the [subject["id"]] fallback when this is empty (the unit tests model one version).
+        self._version_id_rows = [{"id": vid} for vid in (version_ids or [])]
 
     def table(self, name):
+        if name == "documents":
+            return _DocVersionQuery(self._version_id_rows)
         assert name == "document_relationships"
         return _EdgeQuery(self._edges)
 
