@@ -23,6 +23,22 @@ findings:
   info: 3
   total: 9
 status: issues_found
+gap_closure_116_05:
+  reviewed: 2026-06-20T12:00:00Z
+  depth: standard
+  files_reviewed: 5
+  files_reviewed_list:
+    - backend/app/services/document_relationship_service.py
+    - backend/app/services/tool_dispatcher.py
+    - backend/app/api/document_relationships.py
+    - backend/tests/integration/test_116_tool_leak.py
+    - backend/tests/integration/test_116_version_stable.py
+  findings:
+    critical: 0
+    warning: 0
+    info: 1
+    total: 1
+  status: clean
 ---
 
 # Phase 116: Code Review Report
@@ -346,4 +362,117 @@ real code) + 1 verifier per warning. Verdicts (all high-confidence):
 _Reviewed: 2026-06-20_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Adversarial verification: 10-agent workflow (3 lenses/blocker), orchestrator-corroborated_
+_Depth: standard_
+
+
+---
+
+## Gap-Closure Review — Plan 116-05 (CR-01 + CR-02 Fixes)
+
+**Reviewed:** 2026-06-20
+**Depth:** standard
+**Commits:** 1df5239c, 36e4f2b9, db412c59, c43405b8
+**Files Reviewed:** 5
+**Status:** clean
+
+### Summary
+
+The 116-05 gap-closure diff correctly closes both confirmed BLOCKERs and all three
+folded nits (WR-02/03/04) from the Plans 01–04 review. The two new regression tests
+are non-vacuous: each has a concrete cross-check that proves the test cannot trivially
+pass against a no-op fix. The shared-path constraint (threads.py, SSE, dispatch_tool)
+is respected — no line outside `_handle_get_related_documents` is touched in
+`tool_dispatcher.py`. No tool-schema change was introduced, preserving the Gemini-safe
+guarantee. One INFO item is noted (unbounded version-lineage query) and is explicitly
+out of v1 scope.
+
+**CR-01 fix verdict: CORRECT.** The two-part guard (is_latest gate on the global leg
++ post-follow folder re-check) precisely mirrors `list_documents`'s access model and
+closes the private-latest leak without false-negatives on the own-leg or the
+legitimate global-latest case. All traced paths produce the expected outcome.
+
+**CR-02 fix verdict: CORRECT.** The `_subject_version_ids` helper is correctly scoped
+to the subject's `(user_id, filename)` lineage with `_uid()` applied, never widened
+across documents, with a safe fallback for missing fields. The `.in_(version_ids)` edge
+enumeration is owner-scoped by the `user_id=caller` predicate, so the widening
+introduces no cross-user edge enumeration risk.
+
+**WR-02/03/04 fold-ins verdict: CORRECT.** `_uid()` is now applied uniformly on all
+write paths (insert payload and delete `.eq()`), matching the re-fetch and the
+resolver. The audit-write comments in `document_relationships.py` now accurately
+describe the in-band blocking pattern. The self-link comment now names the step-2
+guard as the sole rejector for readable self-links.
+
+**Unit test stub update verdict: CORRECT.** `_EdgeQuery.in_()` now correctly routes
+directional discrimination, `_EdgeClient` correctly dispatches the documents table to
+`_DocVersionQuery`, and the empty-version-id-rows default triggers the fallback to
+`[subject["id"]]` — so existing unit tests run against the new `.in_()` handler
+behavior without change.
+
+### Critical Issues
+
+None.
+
+### Warnings
+
+None.
+
+### Info
+
+#### IN-116-05-01: `_subject_version_ids` has no `.limit()` — unbounded lineage query
+
+**File:** `backend/app/services/document_relationship_service.py:133-139`
+**Issue:** The version-lineage lookup `client.table("documents").select("id").eq("user_id",
+_uid(owner)).eq("filename", fname)` has no `.limit()`. For a document with a large
+number of versions (e.g. a frequently re-uploaded report), this returns all version
+rows without a cap. In practice the number of versions per `(user_id, filename)` is
+small (typically < 10), and the plan notes rename does not exist so the lineage is
+strictly bounded by upload frequency. This is a quality note, not a correctness defect,
+and performance is out of v1 review scope.
+**Fix (optional):** Add `.limit(500)` or similar defensive cap so an edge case (e.g. a
+scripted re-upload loop) cannot produce a very large `version_ids` list that inflates
+the subsequent `.in_()` PostgREST query. Not required before shipping.
+
+### Detailed Logic Trace (adversarial — each path verified)
+
+**CR-01 fix paths:**
+
+| Caller | Doc state | Own-leg | Global-leg | from_global | Step 2 | Step 2b | Result |
+|--------|-----------|---------|------------|-------------|--------|---------|--------|
+| non-owner B | v1 in global folder (is_latest=False), v2 private (is_latest=True) | miss (B != A) | miss (is_latest=False gate) | False | — | skipped | **None** (CORRECT: no leak) |
+| owner A | v1 in global folder (is_latest=False), v2 private (is_latest=True) | HIT (A owns v1) | not reached | False | follow to v2 | skipped | **v2** (CORRECT: owner follows own latest) |
+| non-owner B | v1 in global folder (is_latest=True, is the current latest) | miss | HIT (is_latest=True, folder in global_ids) | True | row is already latest | v1.folder_id in global_ids → PASS | **v1** (CORRECT: B reads global latest) |
+| non-owner B | v1 in global folder (is_latest=True), then re-uploaded v2 to same global folder | miss | HIT for v1 (is_latest=False now) → miss | False | — | — | **None** (CORRECT: v1 no longer latest) |
+| non-owner B | subject v2 (another user's global doc, is_latest=True) passed directly | miss | HIT (is_latest=True, in global folder) | True | row is latest | v2.folder_id in global_ids → PASS | **v2** (CORRECT) |
+
+Key invariant confirmed: `from_global=True` is only set inside `if global_folder_ids:`,
+so `global_folder_ids` is guaranteed non-empty whenever Step 2b runs. The
+`folder_id not in global_folder_ids` check correctly treats `folder_id=None` (private)
+as not-in-set → returns None.
+
+**CR-02 fix path:**
+
+`_subject_version_ids(subject)` queries `documents WHERE user_id=subject["user_id"] AND
+filename=subject["filename"]` — returns ALL version UUIDs for the lineage. The edge
+queries then use `.in_("source_doc_id", version_ids)` / `.in_("target_doc_id",
+version_ids)` with `.eq("user_id", _uid(caller))` still constraining to caller-owned
+edges. An edge created against v1's UUID is found when the in-list includes v1's UUID,
+even if the subject resolved to v2 (the latest). The output `subject` field in the
+ToolResult still reports the resolved-latest `subject_id`, which is correct per D-116-4.
+
+**Cross-user subject safety:** When the subject belongs to a DIFFERENT user (a globally
+accessible doc owned by A, resolved by caller B), `_subject_version_ids` queries
+A's lineage (all versions of A's doc). The edge queries are constrained by
+`.eq("user_id", B)` — so only B's own edges are returned, even when the in-list
+contains all of A's version UUIDs. No cross-user edge enumeration is possible.
+
+**Shared-path safety confirmed:** The only change to `tool_dispatcher.py` is inside
+`_handle_get_related_documents` (lines 560–590 in the post-fix file). `dispatch_tool`,
+`_TOOL_REGISTRY`, and every other handler are byte-identical. `threads.py` is untouched.
+No tool schema changes — `openai_service.py` is not in the diff.
+
+---
+
+_Gap-closure reviewed: 2026-06-20_
+_Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
