@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T10:55:36.616Z"
+last_updated: "2026-06-20T12:20:00.000Z"
 last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 33
-  completed_plans: 32
-  percent: 64
+  completed_plans: 33
+  percent: 66
 ---
 
 # Project State
@@ -26,7 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 116 (document-relationships-backend-agent-tool) — EXECUTING (Plan 4 of 4 — agent tool DONE, only the BLOCKING migration-apply Plan 04 remains)
+Phase: 116 (document-relationships-backend-agent-tool) — EXECUTION COMPLETE (Plan 4 of 4 done — all 4 plans executed; migration 075 idempotency index LIVE; operator-approved. NEXT = verify/secure/validate gates: /gsd:verify-work 116)
+
+**116-04 (Wave 3, REL-01 BLOCKING migration apply) — EXECUTED + OPERATOR-APPROVED 2026-06-20** (1 auto task / 1 commit — `f5ace0b6` apply + regen + un-mark; 1 BLOCKING human-verify gate cleared on DB evidence; SUMMARY `2ef370d0`): crossed migration 075 into the live local DB. **`scripts/apply_migration_075.py`** (psycopg2-direct, mirrors `apply_migration_072.py`) applied `CREATE UNIQUE INDEX IF NOT EXISTS document_relationships_idempotency_idx ON public.document_relationships (user_id, source_doc_id, target_doc_id, rel_type)` in ONE transaction, read-back from `pg_indexes` confirms the index exists (re-verified live: `USING btree (user_id, source_doc_id, target_doc_id, rel_type)`), and **dev data preserved 36→36 docs / 0→0 edges** — NO `db push`/`db reset` (the CLAUDE.md hard rule, the 100/102/111/114 precedent). **`supabase/full-schema.sql` regenerated** via `bash scripts/regenerate-full-schema.sh` (no `--reset`) — the index now appears (2 occurrences: table-attached + standalone CREATE), produced by the dump not hand-edited. **The race-immune `test_duplicate_create_returns_existing_one_row`** in `test_116_idempotency.py` un-marked (the Plan-02 index-gated xfail auto-promotes now the live `pg_indexes` probe finds the index) → a duplicate insert hits the live 23505 → service returns the existing edge → exactly one row; green live on :54322 (2 passed). **This is the SOLE race-immune idempotency guarantee** the app-code SELECT-then-INSERT 23505-catch (Plan 01) relies on — Pitfall 3 (TOCTOU duplicate edges) closed. **1 deviation [Rule 2]:** committed `scripts/apply_migration_075.py` as a tracked audit-trail artifact (matches the 072/073/074 precedent — apply scripts are kept under `scripts/`, not throwaway). **BLOCKING operator gate:** operator typed "approved" on the four DB-evidence items (index live over the 4-tuple, dev data preserved no-wipe, full-schema regenerated, idempotency test green), orchestrator-reconfirmed before approval. threads.py untouched; no file deletions. SUMMARY: `116-04-SUMMARY.md` (Self-Check: PASSED). REL-01 complete (already marked by Plan 02; confirmed). **Phase 116 execution COMPLETE 4/4 — NEXT = /gsd:verify-work 116** (SC#1/#2 must-haves + SC#10 4-axis cross-provider UAT).
 
 **116-03 (Wave 2, REL-04 agent tool) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `84827bb3` Gemini-safe schema + leak-safe handler dual-wired, `3980f29b` LIVE non-vacuous two-user leak proof + read integration + registry-count lockstep): shipped the read-only `get_related_documents` agent tool (REL-04). **`GET_RELATED_DOCUMENTS_TOOL`** (openai_service.py) — two FLAT scalar-string fields (`document_id`, `filename`), NO anyOf/oneOf, NO multi-type `type` arrays (the a5b0b917 Gemini trap avoided by construction); either/or in prose; advertised in `get_tools()`. **`_handle_get_related_documents`** (tool_dispatcher.py) — resolves the subject via the SHARED `_resolve_readable_latest` (id preferred, else exact filename), two OWN-scoped edge queries (outgoing `source_doc_id==subject`, incoming `target_doc_id==subject`), each edge's OTHER endpoint RE-CHECKED for caller-readability → unseeable → masked `{"document_id":None,"filename":"linked document (no access)",...}` (D-116-9 SC#2 net-new behavior, NO source_ref) → incoming rows carry the inverse label (`_INVERSE_LABEL` D-116-2: superseded_by/amended_by/referenced_by/has_attachment); every failure path a calm `ToolResult` string, NEVER a raise (115 WR-01/WR-03 lesson). **SC#1 dual-wiring**: in BOTH `_TOOL_REGISTRY` AND `get_tools()`. **NO read audit** (OQ1/A2 — D-116-12 audits only create/remove). **LIVE on :54322 — non-vacuous two-user mask proof** (`test_116_tool_leak.py` 2/2): each user owns their OWN edge subject→target (own-scoped contract, RESEARCH 297/351), subject is A's GLOBAL-folder doc both read, target is A's PRIVATE doc only A reads → B sees the mask via B's edge, A sees the real filename via A's. **3 deviations [all Rule 1]**: (1) the live proof caught the Plan-01 leak fixture was UNREACHABLE under own-scoped edges (B-queries-A's-edge → 0 rows) → redesigned to per-user own edges, faithful + non-vacuous ("static would false-green" value delivered); (2) phase-end registry-count gate 26→27 (the lockstep the Task-1 registry line owns, mirrors 115's 25→26); (3) tier-2 handler unit tests rewritten from MagicMock-smoke (un-serializable) to a controlled resolver stub. **Net-new unit failures = 0** (base-checkout: base 62 → HEAD 60, same 3 handler-dependent files excluded; the 2-delta are both my own lockstep updates; fails-at-HEAD-not-base set EMPTY). threads.py / dispatch_tool guard / provider services untouched (G-5, no cross-provider regression). Pre-existing `D README.md` (075.4-era, not this plan) left untouched + logged to deferred-items. SUMMARY: `116-03-SUMMARY.md` (Self-Check: PASSED). REL-04 marked complete. NEXT = Plan 04 (BLOCKING — apply migration 075 to :54322 + regenerate full-schema.sql; the agent tool needs no schema change).
 
@@ -43,10 +45,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 4 of 4
-Status: Ready to execute
+Plan: 4 of 4 — EXECUTION COMPLETE
+Status: Phase 116 execution complete (4/4 plans) — ready for verify/secure/validate
 Resume file: None
-Last activity: 2026-06-20 -- 116-03 executed (agent tool get_related_documents: Gemini-safe dual-wired schema + leak-safe both-direction handler with per-viewer masking + calm errors; LIVE non-vacuous two-user leak proof on :54322; REL-04 complete; net-new failures 0; threads.py untouched). NEXT = Plan 04 (BLOCKING migration-075 apply + full-schema regen)
+Last activity: 2026-06-20 -- 116-04 executed + OPERATOR-APPROVED (BLOCKING migration-075 apply): document_relationships_idempotency_idx LIVE on :54322 via psycopg2-direct (no reset, dev data preserved 36 docs / 0 edges); full-schema.sql regenerated (no --reset, index present); race-immune idempotency test un-marked + green live (duplicate → 23505 → existing edge → one row); REL-01 complete; threads.py untouched. Phase 116 execution COMPLETE 4/4. NEXT = /gsd:verify-work 116
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
