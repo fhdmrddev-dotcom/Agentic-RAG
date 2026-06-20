@@ -45,7 +45,6 @@ def _iter_type_values(node):
             yield from _iter_type_values(item)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships GET_RELATED_DOCUMENTS_TOOL")
 def test_schema_has_no_anyof_or_oneof():
     """No `anyOf` / `oneOf` anywhere in the schema (Gemini rejects them)."""
     schema = _find_schema()
@@ -54,7 +53,6 @@ def test_schema_has_no_anyof_or_oneof():
     assert "oneOf" not in blob, "schema must NOT use oneOf (Gemini 400)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships GET_RELATED_DOCUMENTS_TOOL")
 def test_schema_has_no_multi_type_array():
     """NO property `type` is a LIST anywhere (the a5b0b917 Gemini multi-type-array trap).
 
@@ -70,7 +68,6 @@ def test_schema_has_no_multi_type_array():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships GET_RELATED_DOCUMENTS_TOOL")
 def test_both_subject_fields_are_scalar_strings():
     """`document_id` and `filename` each have `type == "string"` (flat scalar, not a list)."""
     schema = _find_schema()
@@ -79,7 +76,6 @@ def test_both_subject_fields_are_scalar_strings():
     assert props["filename"]["type"] == "string", "filename must be a scalar string"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships GET_RELATED_DOCUMENTS_TOOL")
 def test_subject_fields_are_optional_either_or_in_prose():
     """Neither subject field is hard-`required` (either/or is expressed in prose, not shape).
 

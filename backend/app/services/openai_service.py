@@ -189,6 +189,58 @@ QUERY_DOCUMENTS_BY_VIEW_TOOL = {
 }
 
 
+# Phase 116 (REL-04) — get_related_documents: traverse the human-curated relationship
+# graph (D-116-8). SIMPLER than QUERY_DOCUMENTS_BY_VIEW_TOOL by design: two flat scalar-
+# string fields, NO anyOf/oneOf, NO multi-type `type` arrays. The a5b0b917 discipline —
+# avoiding anyOf/oneOf is NECESSARY-NOT-SUFFICIENT for Gemini; a multi-type `type:[...]`
+# array ALSO 400s google-genai (Phase 115 live UAT). The "provide exactly one" either/or
+# lives in PROSE, never in the schema shape; the handler resolves whichever one is given.
+GET_RELATED_DOCUMENTS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_related_documents",
+        "description": (
+            "List the typed relationships a document has with OTHER documents — the "
+            "human-curated links, NOT semantic similarity. Returns BOTH directions: "
+            "OUTGOING edges (this document supersedes / amends / references / is "
+            "attached_to another) AND INCOMING edges, surfaced with the inverse label "
+            "(superseded_by / amended_by / referenced_by / has_attachment). Use this for "
+            "'what does this document supersede', 'which documents reference this one', "
+            "'show me the related / linked / attached documents', 'what amends this "
+            "contract', 'is there a newer version linked here'. This is NOT "
+            "search_documents (semantic) and NOT query_documents_by_view (metadata). "
+            "Identify the subject document by `document_id` (preferred) OR its exact "
+            "`filename`. Provide EXACTLY ONE of the two — never both. A linked document "
+            "you cannot access is shown as 'linked document (no access)' so you learn a "
+            "relationship exists without seeing its contents."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "string",
+                    "description": (
+                        "The id of the subject document whose relationships you want "
+                        "(preferred — unambiguous). Omit if you only have the filename."
+                    ),
+                },
+                "filename": {
+                    "type": "string",
+                    "description": (
+                        "The EXACT filename of the subject document (use INSTEAD of "
+                        "`document_id` when you do not have the id). Case-insensitive "
+                        "exact match — not a partial/substring search."
+                    ),
+                },
+            },
+            # No top-level `required` — the either/or is prose-only (a hard XOR in the
+            # schema would push a Gemini-unsafe shape). The handler returns a calm
+            # 'provide exactly one' result when neither is given.
+        },
+    },
+}
+
+
 LS_TOOL = {
     "type": "function",
     "function": {
@@ -968,6 +1020,7 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     """Return the active tool list based on per-user effective settings."""
     effective = user_settings if user_settings is not None else None
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, QUERY_DOCUMENTS_BY_VIEW_TOOL,
+             GET_RELATED_DOCUMENTS_TOOL,
              LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
@@ -975,6 +1028,10 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
              # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
              WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
+    # Phase 116 (REL-04) — D-116-10 / SC#1: get_related_documents is Deep-visible here
+    # AND registered in tool_dispatcher._TOOL_REGISTRY (the dual-wiring contract — a
+    # registry entry the model never SEES is dead; the Phase-101 render_template
+    # half-wired bug, guarded by the 115 precedent). MUST be in BOTH.
     # Phase 115 (VIEW-07) — D-115-8: Deep-visible so the model actually SEES it (SC#1).
     # The inverse of render_template (registered in _TOOL_REGISTRY but NOT advertised here —
     # harness-only); this tool MUST be in BOTH. apply_tool_budget only trims on the HARNESS

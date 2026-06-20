@@ -46,6 +46,11 @@ from app.services.sql_service import query_documents
 # a non-None monkeypatched value is preserved, never re-imported).
 from app.models.document_view import ViewFilter
 from app.services import document_view_service, metadata_field_service
+# Phase 116 (REL-04) — get_related_documents reuses the SAME shared resolver
+# (_resolve_readable_latest) IN-PROCESS for leak-safe per-viewer masking. The
+# relationship service imports only pydantic/dependencies/db/folder_utils → cycle-safe
+# at module level (unlike document_view_resolver, which transitively pulls harness).
+from app.services import document_relationship_service
 from app.services.workspace_service import (
     write_file as ws_write_file,
     read_file as ws_read_file,
@@ -462,6 +467,173 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
             "note": note,
             "documents": compact,
             "source_refs": source_refs,  # citable channel, also embedded so the model can cite
+        }),
+        source_refs=source_refs,
+    )
+
+
+# Phase 116 (REL-04 / D-116-2) — the inverse-label map: an INCOMING edge (the subject is
+# the TARGET of the verb) is surfaced to the model with the relationship read from the
+# subject's point of view. "A supersedes B" → from B's side, B is "superseded_by" A.
+_INVERSE_LABEL = {
+    "supersedes": "superseded_by",
+    "amends": "amended_by",
+    "references": "referenced_by",
+    "attached_to": "has_attachment",
+}
+
+# Phase 116 (REL-04 / D-116-9) — the leak-safe mask for an endpoint the CALLER cannot
+# currently read. We surface the EXISTENCE of the link (so the model learns "there is a
+# related document you can't see") but NEVER the unreadable target's real filename, id,
+# or metadata. Proven non-vacuous LIVE two-user (test_116_tool_leak.py).
+_NO_ACCESS_MASK = "linked document (no access)"
+
+
+async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 116 (REL-04) — traverse the human-curated relationship graph (D-116-8).
+
+    The leak-safe read tool over the directional ``document_relationships`` edges. Clone
+    of ``_handle_query_documents_by_view``'s contract: compact rows + ``source_refs``,
+    every failure path a calm ``ToolResult`` JSON string (NEVER a raise into the agent
+    loop — the 115 WR-01/WR-03 lesson; ``agent_loop.py`` catches ValueError as a backstop
+    but this handler must not depend on it).
+
+    Flow:
+      1. Resolve the SUBJECT to its latest accessible version via the SHARED
+         ``_resolve_readable_latest`` (``document_id`` preferred; else exact ``filename``).
+         Neither arg / an unseeable id / an unknown filename → a calm "not found, here's
+         what to do" string. No leak: an id the caller cannot read resolves to None.
+      2. Two own-scoped queries on the subject's LATEST id (the table is user-scoped):
+         OUTGOING (``source_doc_id == subject``) and INCOMING (``target_doc_id ==
+         subject``). Both via ``aexec``.
+      3. For EACH edge's OTHER endpoint, RE-CHECK caller-readability via the SAME shared
+         resolver (D-116-9, SC#2 — the net-new behavior). An unseeable endpoint renders
+         as ``_NO_ACCESS_MASK`` with ``document_id: None`` — never the real
+         filename/id/metadata — and contributes NO ``source_refs`` entry.
+      4. Compact rows carry ``direction`` (outgoing|incoming) and a ``label`` (the
+         ``rel_type`` for outgoing, ``_INVERSE_LABEL[rel_type]`` for incoming, D-116-2).
+
+    Read-audit policy (RESEARCH OQ1 / A2, Claude's discretion): NO read audit — D-116-12
+    mandates an audit only for create/remove, no SC requires a read receipt, and adding
+    one would need a new enum value. A read is a pure traversal of the caller's own graph.
+    Pitfall: ``ctx.folder_subtree_ids`` is NEVER threaded — relationships are whole-KB,
+    own-scoped, and the per-endpoint readability re-check is the SOLE access gate.
+    """
+    caller = ctx.current_user["id"]
+    doc_id = (args.get("document_id") or "").strip()
+    filename = (args.get("filename") or "").strip()
+
+    # ── 1. resolve the subject (calm string on any miss — never a raise) ─────────
+    if not doc_id and not filename:
+        return ToolResult(result=json.dumps({
+            "status": "no_subject",
+            "message": "Provide exactly one of `document_id` or `filename` to identify the document.",
+            "hint": "Pass the subject document's id (preferred) or its exact filename.",
+        }))
+
+    try:
+        if doc_id:
+            subject = await document_relationship_service._resolve_readable_latest(
+                doc_id, caller, by_filename=False, supabase=ctx.supabase
+            )
+        else:
+            subject = await document_relationship_service._resolve_readable_latest(
+                filename, caller, by_filename=True, supabase=ctx.supabase
+            )
+    except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
+        logger.exception("get_related_documents subject resolve failed for caller=%s", caller)
+        return ToolResult(result=json.dumps({
+            "status": "unavailable",
+            "message": f"could not look up that document right now: {e}",
+            "hint": "try again, or identify the document a different way (id vs filename)",
+        }))
+
+    if subject is None:
+        which = f"document_id {doc_id!r}" if doc_id else f"filename {filename!r}"
+        return ToolResult(result=json.dumps({
+            "status": "not_found",
+            "message": f"No document you can access matches {which}.",
+            "hint": "Check the id/filename, or use search_documents / query_documents_by_view to find it first.",
+        }))
+
+    subject_id = subject["id"]
+
+    # ── 2. own-scoped outgoing + incoming edge queries on the LATEST subject id ──
+    try:
+        outgoing = await aexec(
+            ctx.supabase.table("document_relationships")
+            .select("id, source_doc_id, target_doc_id, rel_type")
+            .eq("user_id", document_relationship_service._uid(caller))
+            .eq("source_doc_id", subject_id)
+        )
+        incoming = await aexec(
+            ctx.supabase.table("document_relationships")
+            .select("id, source_doc_id, target_doc_id, rel_type")
+            .eq("user_id", document_relationship_service._uid(caller))
+            .eq("target_doc_id", subject_id)
+        )
+    except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
+        logger.exception("get_related_documents edge query failed for caller=%s", caller)
+        return ToolResult(result=json.dumps({
+            "status": "unavailable",
+            "message": f"could not load this document's relationships right now: {e}",
+            "hint": "try again in a moment",
+        }))
+
+    # ── 3 + 4. resolve each OTHER endpoint per-viewer; mask the unseeable (D-116-9) ──
+    compact: list[dict] = []
+    source_refs: list[dict] = []
+
+    async def _append_edge(edge: dict, *, direction: str) -> None:
+        rel_type = edge["rel_type"]
+        # The OTHER endpoint: for an outgoing edge it's the target; for incoming, the source.
+        other_id = edge["target_doc_id"] if direction == "outgoing" else edge["source_doc_id"]
+        label = rel_type if direction == "outgoing" else _INVERSE_LABEL.get(rel_type, rel_type)
+        # Re-check readability FROM THE CALLER (never the link owner) — the SC#2 gate.
+        try:
+            other = await document_relationship_service._resolve_readable_latest(
+                other_id, caller, by_filename=False, supabase=ctx.supabase
+            )
+        except Exception:  # noqa: BLE001 — a readability hiccup masks (fail-closed), never raises
+            logger.exception("get_related_documents endpoint resolve failed for caller=%s", caller)
+            other = None
+        if other is None:
+            # Masked: existence shown, identity hidden. No citable ref for an unseeable doc.
+            compact.append({
+                "document_id": None,
+                "filename": _NO_ACCESS_MASK,
+                "rel_type": rel_type,
+                "direction": direction,
+                "label": label,
+            })
+            return
+        compact.append({
+            "document_id": other["id"],
+            "filename": other["filename"],
+            "rel_type": rel_type,
+            "direction": direction,
+            "label": label,
+        })
+        source_refs.append({"document_id": other["id"], "filename": other["filename"]})
+
+    for edge in (outgoing.data or []):
+        await _append_edge(edge, direction="outgoing")
+    for edge in (incoming.data or []):
+        await _append_edge(edge, direction="incoming")
+
+    total = len(compact)
+    note = (
+        f"{total} related document(s) for {subject['filename']!r}." if total
+        else f"No relationships found for {subject['filename']!r}."
+    )
+    return ToolResult(
+        result=json.dumps({
+            "mode": "relationships",
+            "subject": {"document_id": subject_id, "filename": subject["filename"]},
+            "total": total,
+            "note": note,
+            "documents": compact,
+            "source_refs": source_refs,  # seeable endpoints only; also embedded so the model can cite
         }),
         source_refs=source_refs,
     )
@@ -2595,6 +2767,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "render_template": _handle_render_template,
     # Phase 115 (VIEW-07) — registry + get_tools BOTH (the inverse of render_template); threads.py untouched (G-5)
     "query_documents_by_view": _handle_query_documents_by_view,
+    # Phase 116 (REL-04) — registry + get_tools BOTH (SC#1 dual-wiring); G-5: handler + one line, threads.py untouched
+    "get_related_documents": _handle_get_related_documents,
 }
 
 

@@ -17,7 +17,6 @@ handler / schema while RED. These become GREEN in Plan 03.
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 registers get_related_documents")
 def test_tool_registered_in_dispatcher():
     """`get_related_documents` is a key in `tool_dispatcher._TOOL_REGISTRY`."""
     import app.services.tool_dispatcher as td
@@ -26,7 +25,6 @@ def test_tool_registered_in_dispatcher():
     assert callable(td._TOOL_REGISTRY["get_related_documents"])
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 advertises the schema in get_tools")
 def test_tool_schema_present_in_get_tools():
     """The `get_related_documents` schema is emitted by `openai_service.get_tools()`.
 
@@ -47,7 +45,6 @@ def test_tool_schema_present_in_get_tools():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 wires both registry + schema")
 def test_registry_and_schema_agree():
     """The Phase-116 registry entry has a matching get_tools schema (no orphan)."""
     import app.services.tool_dispatcher as td
