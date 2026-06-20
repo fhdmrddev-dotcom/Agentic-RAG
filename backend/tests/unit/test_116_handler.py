@@ -31,7 +31,6 @@ import pytest
 
 # ── tier 1: MODEL parse gate (Plan 02 makes this GREEN) ────────────────────────
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships RelationshipCreate")
 def test_rel_type_literal_rejects_forged_type():
     """A 5th rel_type value fails Pydantic parse (the parse-time 422 gate, T-116-01-01)."""
     from pydantic import ValidationError
@@ -119,7 +118,6 @@ class _FakeClient:
         return _FakeQuery(name, self._rec)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships _resolve_readable_latest")
 @pytest.mark.asyncio
 async def test_resolve_readable_latest_unresolvable_returns_none():
     """A bad / unseeable id resolves to None (no leak, no raise)."""
@@ -133,7 +131,6 @@ async def test_resolve_readable_latest_unresolvable_returns_none():
     assert out is None
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships _resolve_readable_latest")
 def test_resolver_does_not_reuse_partial_match_antipattern():
     """The service must NOT import / call `resolve_document_id` (own-only + partial ilike)."""
     import inspect
@@ -147,7 +144,6 @@ def test_resolver_does_not_reuse_partial_match_antipattern():
     assert "_resolve_readable_latest" in src
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships create_relationship idempotency")
 @pytest.mark.asyncio
 async def test_create_relationship_is_idempotent_on_23505():
     """Second identical create → the 23505 is caught and the existing edge re-fetched."""
@@ -169,7 +165,6 @@ async def test_create_relationship_is_idempotent_on_23505():
     assert out == existing, "an idempotent create returns the EXISTING edge (no duplicate, no error)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships own-scoped delete")
 @pytest.mark.asyncio
 async def test_delete_relationship_own_scoped():
     """delete returns True when the caller owns the row, False on a cross-user/absent miss."""
