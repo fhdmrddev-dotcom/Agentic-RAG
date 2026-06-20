@@ -320,6 +320,30 @@ current implementation and pass once CR-01/CR-02 are fixed.
 
 ---
 
+## Adversarial Verification (orchestrator, 2026-06-20)
+
+Before acting on the review, the orchestrator ran a 10-agent adversarial-verification
+workflow — 3 distinct-lens refuters per BLOCKER (each instructed to REFUTE by tracing the
+real code) + 1 verifier per warning. Verdicts (all high-confidence):
+
+| Finding | Verdict | Reproducible | Disposition |
+|---|---|---|---|
+| **CR-01** (cross-user leak via global-leg follow-to-latest) | **3/3 confirmed_real** | 3/3 yes | **REAL — must fix** |
+| **CR-02** (edges orphaned after re-upload; LOCKED D-116-1 violated) | **3/3 confirmed_real** | correctness | **REAL — must fix** |
+| WR-01 (bare `"23505"` sniff) | 1/1 **uncertain** | n/a | **Downgrade → nit.** The literal observation is true, but the harmful consequence does NOT occur today: a different-constraint 23505 → empty re-fetch → falls through to `raise` (original error re-raised, not swallowed), and the idempotency index is the ONLY unique constraint on the table (grep 071-075). Matches the uniform codebase convention (`documents.py:500`). Optional hardening, not a defect. |
+| WR-02 (`_uid()` inconsistency on write paths) | 1/1 confirmed | no | Real but **defense-in-depth/consistency only** — `.eq()` value position is parameterized; not a live injection. Low. |
+| WR-03 (in-band audit `await`, mislabeled "fire-and-forget") | 1/1 confirmed | no | Real latency/robustness gap, but **inherited pattern** — `document_views.py:129` shares it; not a 116 regression. Low. |
+| WR-04 (overstated self-link ordering comment) | 1/1 confirmed | no | Doc-only; the response (status+detail) IS uniform, so no live oracle. Trivial. |
+
+**Independent corroboration (orchestrator read of the real code):**
+- CR-01 premise — `folder_utils.py:48-56` returns global folders **cross-user** (`user_id != caller`); `folders` RLS is `auth.uid()=user_id OR is_global` (migration 014:26). The by-id global leg (`service.py:158-164`) lacks `.eq("is_latest", True)` (unlike the filename leg `:102` and `documents.py:558`); follow-to-latest (`service.py:178-185`) has **no folder re-check**. Re-upload keeps the old version's `folder_id` while inserting a new latest in a different folder (`documents.py:457-487`), so v1-global-stale / v2-private-latest is reachable WITHOUT even `move_document`. A non-owner replaying v1's id gets v2's private id+filename — which `list_documents` would never surface (strictly more permissive). The D-116-9 mask never fires (resolver returns non-None). `test_116_tool_leak.py` is vacuous on this vector (single-version private target).
+- CR-02 — each version is a NEW `uuid4()` row (`documents.py:472`); `create_relationship` stores submitted ids verbatim (`service.py:207-214`); the handler queries edges by the resolved-**latest** `subject_id` (`tool_dispatcher.py:559,567,573`). Edge created at v1 (`source_doc_id=A`) is missed once latest is v2 (`B`). No DB trigger re-points edges (grep 071-075 clean). The two `test_116_version_stable.py` rows false-green because they assert the SUBJECT follows forward, never that an EDGE survives a re-upload.
+
+**Routing:** CR-01 + CR-02 are confirmed phase-goal defects (REL-04 leak-safety; REL-01/SC#1 follow-to-latest). They are NOT advisory — phase verification cannot honestly pass with a live cross-user leak. → gap closure (`/gsd:plan-phase 116 --gaps`): fix the resolver visibility re-check (CR-01), the edge-version-set query (CR-02, read-side, no migration), add the two missing non-vacuous regression tests (IN-03), and fold the WR-02/03/04 nits.
+
+---
+
 _Reviewed: 2026-06-20_
 _Reviewer: Claude (gsd-code-reviewer)_
+_Adversarial verification: 10-agent workflow (3 lenses/blocker), orchestrator-corroborated_
 _Depth: standard_
