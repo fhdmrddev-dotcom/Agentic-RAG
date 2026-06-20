@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-agentic-rag
-description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), or any chat-surface component that touches the agent's mid-execution moment.
+description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, or any chat-surface component that touches the agent's mid-execution moment.
 ---
 
 <context>
@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117)
 </context>
 
 <design_direction>
@@ -98,6 +98,46 @@ v3.0 makes metadata *queryable*: a no-DSL filter/view builder on the Documents p
 - **Folder-tree polish = ONE shared NavRow (033-A).** Extract a single row from `FolderNode`; build Folders AND Views from it (counts everywhere, flat Views, one soft indent guide + ~3-level cap, labeled `G`, keyboard/touch-reachable actions). Inlined into 114; **build Views from the fixed row, never a clone**.
 - **Documents-page composition (032-A).** The 4-column crunch (sidebar + filter bar + list + 430px Phase-112 detail panel) resolves by collapsing the sidebar to a ~50px icon rail when the panel opens — **user-pinnable + session-persisted**; the filter bar collapses to a summary chip; `DocumentList` column-shedding is net-new. This is a **SHARED-SHELL layout inherited by Phases 117/118** (same panel). `references/documents-page-composition.md`.
 - **Integration truths (audit-verified, load-bearing):** NO re-extraction and NO stored-data backfill — typed `date`/`document_type` columns are `GENERATED…STORED` derivations from existing `documents.metadata` (ISO-regex-guarded date cast). Case-insensitivity is mostly **query-value lowercasing** (`document_type`/`language` already stored lowercase; free-text uses `ILIKE`). The Phase 113 compiler output widens `@>` → bound WHERE-fragments (tested; the SC#4 injection test stays green); the AST grows optional `value2`/`values`/`unit` additively.
+
+## Document Relationships — Panel Section & Link Picker (Phase 117)
+
+v3.0 makes the document's typed relationships visible and editable — as ONE accordion section added
+to the EXISTING Phase 112/028 `DocumentDetailPanel` (the shared shell reserves the `Relationships`
+slot). **This extends the shell; it does NOT build a new surface.** Sketches 034 + 035 (both winner
+A), hardened by the 3-lens fidelity audit `wf_1ec2afac-687`. Full reference:
+`references/document-relationships-panel.md`.
+
+- **Relationships section = chip-led, grouped-by-direction accordion (034-A).** Two labeled subgroups
+  in fixed order — **Outgoing** (`A → X`) then **Incoming** (`Y → A`) — each row a rel-type pill chip
+  (verb word + per-type dot) + filename + a remove ✕, with `+ Add link` at the section foot. Chip-led
+  beat sentence-led (B) and compact/dense (C) on the 3-second direction read.
+- **Incoming rows use INVERSE labels mirrored 1:1 from the backend (D-117-6).** "Supersedes" outgoing
+  → "Superseded by" incoming — **from the backend `_INVERSE_LABEL` map, never invented in the client.**
+- **Create = outgoing-only; remove = either-direction (D-117-1/2 — deliberate asymmetry, locked
+  against review drift).** To author "X supersedes this," open X's panel. You own (and can remove) an
+  edge from either end.
+- **The masked "no access" row is load-bearing honesty, present by default (D-117-8, SC#2).** Renders
+  the verbatim `_NO_ACCESS_MASK` string — never leaks id/title, never reads as error/empty, still
+  removable. The read seam is leak-safe by construction (Phase 116 `is_latest`-gate + folder re-check).
+- **Mutation = re-fetch, NOT optimistic → NO undo (D-117-9).** The audit pass *removed* an early
+  "Undo" (it implies reversibility the backend lacks). The honest beat is a brief `↻ updating` flash
+  (`role="status"`), then the fresh list. Honest 4-state set: populated ≠ empty ≠ loading ≠ error.
+- **Create-link picker = the `MoveToFolderDialog` shell, `Select` → searchable typeahead (035-A,
+  D-117-3).** A `Select` dies past ~30 docs; a KB holds thousands. Type-first: rel-type segmented
+  chips on top, then the typeahead, a live "this document references → X" preview, confirm disabled
+  until valid. Inline-in-accordion create (C) was the rejected foil. **Candidate exclusion is PER
+  TYPE (D-117-4)** — self + already-linked-with-the-selected-type drop out; switching type re-opens
+  candidates; an honest "N already … — hidden" note updates.
+- **A11y is load-bearing (audit-locked, ships as truth).** Remove ✕ must be keyboard/touch-reachable
+  (hover-only was a HIGH fail — touch has no hover); icon buttons carry `aria-label`; the typeahead is
+  a **net-new combobox** (`role=combobox/listbox/option` + `aria-activedescendant`; the `Select` swap
+  loses the APG roles shadcn gave for free; focus-trap/restore stay free from the reused `Dialog`);
+  the masked string + all meaningful copy use the panel-scoped AA token (≥4.5:1, never the global
+  3.59–3.64:1 dim); `updating`=`role=status`, error=`role=alert`.
+- **Honest net-new wire (117):** Phase 116 shipped POST/DELETE but **NO REST read** — 117 adds a `GET`
+  read endpoint whose leak-safe traversal is **extracted into a shared `document_relationship_service`
+  and shared with the agent tool, never forked** (D-117-7, share-don't-fork); plus the typeahead
+  candidate source + per-type exclusion, the `api.ts` client fns, and the `Relationships` section.
 </design_direction>
 
 <findings_index>
@@ -160,6 +200,12 @@ v3.0 makes metadata *queryable*: a no-DSL filter/view builder on the Documents p
 | Saved Views & Left Nav (NavRow) | [references/saved-views-and-left-nav.md](references/saved-views-and-left-nav.md) | **031-A + 033-A.** Extract ONE shared `NavRow`; build Folders AND Views from it (counts everywhere, flat Views, one soft indent guide + ~3-level cap, tooltip-labeled `G`, keyboard/touch-reachable actions) — **never clone the flawed `FolderNode`**. Views = a group below Folders: funnel icon, lazy count badge, Edit/Rename/Delete; "saved filters" never "query". Differentiator = icon + count + no new-subfolder action (no drag-drop exists → criterion struck; add a **"Move to folder"** row action reusing `MoveToFolderDialog`). Inlined into Phase 114. |
 | Documents-Page Composition | [references/documents-page-composition.md](references/documents-page-composition.md) | **032-A.** The 4-column crunch (sidebar + filter bar + list + 430px detail panel) resolves by collapsing the sidebar to a ~50px icon rail when the panel opens — **user-pinnable + session-persisted**; filter bar → summary chip; `DocumentList` column-shedding is net-new; overlay-drawer is the rejected foil. **SHARED-SHELL layout inherited by Phases 117/118.** Mobile: nav drawer + detail bottom-sheet + filter summary chip. |
 
+**Document relationships — panel section & link picker (sketches 034–035, Phase 117):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Document Relationships Panel | [references/document-relationships-panel.md](references/document-relationships-panel.md) | **034-A + 035-A.** ONE accordion section added to the EXISTING Phase 112/028 `DocumentDetailPanel` (extend the shell, **not a new surface**). Chip-led, **grouped-by-direction** (Outgoing then Incoming), each row a rel-type pill chip + filename + a keyboard/touch-reachable remove ✕; **incoming uses INVERSE labels mirrored 1:1 from the backend `_INVERSE_LABEL`** (never invented). **Create = outgoing-only, remove = either-direction** (deliberate asymmetry, locked vs review drift). The masked **"linked document (no access)"** row (verbatim `_NO_ACCESS_MASK`, no id/title leak) is present by default — honesty, not error/empty. **Mutation = re-fetch, NOT optimistic → NO undo** (D-117-9; the audit killed an early Undo). Create-link picker = the **`MoveToFolderDialog` shell with `Select` → searchable typeahead** (D-117-3 — a Select dies past ~30 docs); type-first (rel-type chips → typeahead → "references → X" preview); **per-type exclusion** of self + already-linked (D-117-4). **A11y load-bearing (audit-locked):** the typeahead is a **net-new combobox** (`role=combobox/listbox/option` + `aria-activedescendant` — the Select swap loses APG roles), remove reachable on keyboard/touch, panel-scoped AA token for the masked string + all copy, `updating`=`role=status`/error=`role=alert`. **Net-new wire:** a `GET` read endpoint (116 shipped POST/DELETE only) whose leak-safe traversal is **extracted into a shared `document_relationship_service`, never forked** (D-117-7). |
+
 ## Theme
 
 The winning theme file is at [sources/themes/default.css](sources/themes/default.css). Tokens are direct mirrors of `frontend/src/index.css :.dark` — so transitioning sketches to React code should be a straight port, not a rebuild.
@@ -192,6 +238,8 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/031-views-sidebar-group/](sources/031-views-sidebar-group/) — winner: A (Views group; shared NavRow parity; honest saved-filters)
 - [sources/032-documents-page-full-composition/](sources/032-documents-page-full-composition/) — winner: A (sidebar→rail user-pinnable; shared-shell layout; mobile)
 - [sources/033-foldertree-navrow-polish/](sources/033-foldertree-navrow-polish/) — winner: A (unified Folders+Views NavRow; Before/After of today's tree)
+- [sources/034-relationship-section/](sources/034-relationship-section/) — winner: A (chip-led grouped-by-direction relationships accordion; masked no-access row; State strip cycles populated/empty/loading/error)
+- [sources/035-link-target-picker/](sources/035-link-target-picker/) — winner: A (dialog · type-first create-link picker; MoveToFolderDialog shell + searchable typeahead; per-type exclusion; simulate-failure error line)
 
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
@@ -251,10 +299,18 @@ Load and apply this skill when:
 - Touching the Phase 113/114 view-filter compiler or resolve route from the UI side — the count-only mode, the case-insensitive query-value lowercasing, the WHERE-fragment output contract
 - Working on any phase tagged `document-management`, `virtual-folders`, `metadata-filter`, `views`, `sidebar`, `folder-tree`, or on Phase 114 (and the shared-shell layout for 117/118)
 
+**Document Relationships — panel section & link picker (sketches 034–035, Phase 117) — load when:**
+
+- Adding the `Relationships` accordion section to the existing `DocumentDetailPanel` — the chip-led grouped-by-direction list, the inverse-labeled incoming rows, the masked "no access" row, the keyboard/touch-reachable remove, where `+ Add link` sits (`references/document-relationships-panel.md`)
+- Building the create-link target picker — the `MoveToFolderDialog` shell with its `Select` swapped for a searchable typeahead, the rel-type chips, the per-type self/already-linked exclusion, the live "references → X" preview, the honest error line, and the **net-new combobox a11y** (`role=combobox/listbox/option` + `aria-activedescendant`)
+- Wiring the net-new `GET` relationships read seam — **extract the leak-safe traversal into a shared `document_relationship_service` and share it with the agent tool, never fork** (D-117-7); the `api.ts` read/create/delete client fns; re-fetch-not-optimistic mutation (no undo)
+- Touching the `_INVERSE_LABEL` / `_NO_ACCESS_MASK` vocabulary from the UI side — mirror the backend maps verbatim, never invent wording
+- Working on any phase tagged `document-relationships`, `detail-panel`, `accordion`, `typeahead`, `move-to-folder-dialog`, or on Phase 117 (the relationships section on the shared 112/118 detail shell)
+
 Skip when:
 
 - Working on non-chat, non-panel surfaces (settings, skill studio, auth)
-- Working on the plain document-library table ONLY — but note this skill DOES cover the Phase 112 detail panel AND the Phase 114 filter/view builder + saved-Views sidebar + folder-tree NavRow that now live on that surface
+- Working on the plain document-library table ONLY — but note this skill DOES cover the Phase 112 detail panel (incl. the Phase 117 relationships section + create-link picker) AND the Phase 114 filter/view builder + saved-Views sidebar + folder-tree NavRow that now live on that surface
 - Working on backend-only changes (no UI touch)
 </when_to_load>
 
@@ -305,4 +361,9 @@ Skip when:
 - 031-views-sidebar-group (winner: A — Views group; shared NavRow parity)
 - 032-documents-page-full-composition (winner: A — sidebar→rail user-pinnable; shared-shell layout)
 - 033-foldertree-navrow-polish (winner: A — unified Folders+Views NavRow)
+
+**Phase 117 — Document Relationships: Panel Section & Link Picker (2026-06-20):**
+
+- 034-relationship-section (winner: A — chip-led grouped-by-direction relationships accordion; inverse incoming labels; masked no-access row; re-fetch-not-optimistic)
+- 035-link-target-picker (winner: A — dialog · type-first create-link picker; MoveToFolderDialog shell + searchable typeahead; per-type exclusion; net-new combobox a11y)
 </metadata>

@@ -313,3 +313,55 @@ v3.0 makes metadata *queryable*. A no-DSL chip-strip filter/view builder on the 
 - NO re-extraction, NO stored-data backfill — `GENERATED…STORED` typed columns (ISO-guarded date cast); case-insensitivity = query-value lowercasing + `ILIKE` for free-text; compiler widens `@>` → bound WHERE-fragments (SC#4 injection test stays green).
 - Folder-tree NavRow polish inlined into Phase 114 (operator decision); drag-drop criterion struck + a "Move to folder" row action added reusing `MoveToFolderDialog` (operator decision).
 - Grounded + revised by a 5-investigator integration audit (workflow `wf_dc339594-8bb`).
+
+---
+
+## 2026-06-20 — Phase 117: Document Relationships (Panel Section & Link Picker)
+
+**Sketches processed:** 2 (both included) — 034, 035 (both winner A)
+**Design areas (1 new reference file):** Document Relationships — Panel Section & Link Picker (034 + 035 → `references/document-relationships-panel.md`)
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode — now 20 reference files across eight sessions; sketches 001–016, 018–035 processed)
+
+### Included Sketches
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 034 | relationship-section | A — Chip-led grouped-by-direction | Document Relationships — Panel Section & Link Picker |
+| 035 | link-target-picker | A — Dialog · type-first | Document Relationships — Panel Section & Link Picker |
+
+### Excluded Sketches
+None — both included, packaged as ONE design area (one cohesive surface on the shared 112/028 detail shell).
+
+### Design Direction
+Phase 117 makes a document's **typed relationships** visible and editable as **ONE accordion section
+added to the EXISTING Phase 112/028 `DocumentDetailPanel`** — it extends the shared shell, it does
+NOT build a new surface. Stays on the established calm-instrument, Aether Deep Midnight, push/split +
+stacked-accordion terms. Both winners are Variant A (operator, 2026-06-20), then hardened by the
+3-lens adversarial fidelity audit `wf_1ec2afac-687` (7/7 backend build-note claims verified TRUE; 2
+HIGH a11y defects fixed before lock; an early "Undo" removed to honor re-fetch-not-optimistic).
+
+### Key Decisions
+- **Relationships section = chip-led, grouped-by-direction accordion (034-A)** — Outgoing (`A → X`)
+  then Incoming (`Y → A`); rel-type pill chip (verb + per-type dot) + filename + remove ✕; `+ Add
+  link` at the section foot. Beat sentence-led (B) and compact/dense (C) on the 3-second read.
+- **Incoming uses INVERSE labels mirrored 1:1 from the backend `_INVERSE_LABEL` (D-117-6)** — never
+  invented in the client.
+- **Create = outgoing-only; remove = either-direction (D-117-1/2)** — a deliberate asymmetry locked
+  against review drift.
+- **Masked "no access" row present by default (D-117-8, SC#2)** — verbatim `_NO_ACCESS_MASK`, no
+  id/title leak, reads as a real-but-unreadable link (not error/empty), still removable.
+- **Mutation = re-fetch, NOT optimistic → NO undo (D-117-9)**; honest 4-state set (populated ≠ empty
+  ≠ loading ≠ error); the beat is a brief `↻ updating` (`role=status`), then the fresh list.
+- **Create-link picker = the `MoveToFolderDialog` shell, `Select` → searchable typeahead (035-A,
+  D-117-3)** — type-first; per-type exclusion of self + already-linked (D-117-4); inline-in-accordion
+  create (C) rejected.
+- **A11y load-bearing (audit-locked):** the typeahead is a **net-new combobox**
+  (`role=combobox/listbox/option` + `aria-activedescendant` — the `Select` swap loses APG roles);
+  remove reachable on keyboard/touch; panel-scoped AA token for the masked string + all copy;
+  `updating`=`role=status`/error=`role=alert`.
+- **Honest net-new wire:** Phase 116 shipped POST/DELETE but NO REST read — 117 adds a `GET` read
+  endpoint whose leak-safe traversal is **extracted into a shared `document_relationship_service` and
+  shared with the agent tool, never forked** (D-117-7).
+
+### Downstream
+`/gsd:plan-phase 117` — G-2 (sketch-before-plan) satisfied by 034 + 035; the plan MUST own the
+D-117-7 shared `GET` read seam (extract + share-don't-fork). Then `/gsd:execute-phase 117`.

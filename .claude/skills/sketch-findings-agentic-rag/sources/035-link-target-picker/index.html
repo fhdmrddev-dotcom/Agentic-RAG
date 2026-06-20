@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 035 — Link Target Picker</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+  .stage { min-height: calc(100vh - 52px); padding: var(--space-6); display: flex; flex-direction: column; align-items: center; }
+  .caption { font-size: var(--text-xs); color: var(--color-text-dim); text-align: center; max-width: 560px; margin: 0 auto var(--space-5); line-height: 1.6; }
+  .caption b { color: var(--color-text-muted); }
+
+  /* faux page backdrop behind the dialog (gives the dialog a real home) */
+  .backdrop { position: relative; width: 100%; max-width: 920px; height: 360px; border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden; background: var(--color-bg); }
+  .bd-grid { display: grid; grid-template-columns: 52px minmax(0,1fr) 360px; height: 100%; filter: blur(1px); opacity: 0.5; }
+  .bd-rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); }
+  .bd-list { padding: var(--space-3); }
+  .bd-line { height: 12px; background: var(--color-muted); border-radius: 4px; margin: 10px 4px; }
+  .bd-panel { border-left: 1px solid var(--color-border); background: var(--color-surface); padding: var(--space-3); }
+  .bd-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; }
+
+  /* tdots reused across both files */
+  .tdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .t-supersedes .tdot { background: var(--color-primary); }
+  .t-amends     .tdot { background: var(--color-accent-violet); }
+  .t-references .tdot { background: var(--color-text-dim); }
+  .t-attached_to .tdot { background: var(--color-warning); }
+
+  /* ── Dialog (MoveToFolderDialog shell) ── */
+  .dlg { width: 460px; max-width: calc(100vw - 32px); background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: var(--space-5); }
+  .dlg-static { margin: 0 auto; }
+  .dlg h3 { font-family: var(--font-headline); font-size: var(--text-md); margin: 0 0 4px; }
+  .dlg .dsub { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: var(--space-4); }
+  .dlg .dsub b { color: var(--color-text); font-weight: 600; }
+  .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin: var(--space-3) 0 6px; }
+
+  /* segmented rel-type chips */
+  .type-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .type-pick { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); font-size: var(--text-sm);
+    cursor: pointer; transition: all var(--dur-fast); }
+  .type-pick:hover { border-color: var(--color-primary); color: var(--color-text); }
+  .type-pick.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  /* typeahead */
+  .ta-wrap { position: relative; }
+  .ta-input { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 9px 12px 9px 32px; color: var(--color-text); font-size: var(--text-sm); font-family: var(--font-sans); outline: none; }
+  .ta-input:focus { border-color: var(--color-primary); box-shadow: var(--shadow-glow-primary); }
+  .ta-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--color-text-dim); font-size: 13px; pointer-events: none; }
+  .ta-clear { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--color-text-dim);
+    cursor: pointer; font-size: 13px; padding: 3px; }
+  .ta-list { margin-top: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);
+    max-height: 184px; overflow: auto; box-shadow: var(--shadow-md); }
+  .ta-opt { padding: 8px 12px; font-size: var(--text-sm); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .ta-opt.cur, .ta-opt:hover { background: var(--color-primary-dim); }
+  .ta-opt .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ta-opt .hl { color: var(--color-primary); font-weight: 600; }
+  .ta-none { padding: 10px 12px; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .ta-excl { padding: 7px 12px; font-size: 11px; color: var(--color-text-muted); font-style: italic; border-top: 1px dashed var(--color-border); }
+  .ta-chosen { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--color-primary-glow);
+    background: var(--color-primary-dim); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--color-text); }
+  .ta-chosen .chg { margin-left: auto; background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 11px; }
+
+  /* preview + states */
+  .preview-line { font-size: var(--text-sm); color: var(--color-text-muted); margin: var(--space-4) 0 0;
+    padding: 9px 12px; background: var(--color-bg); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); }
+  .preview-line.ready { border-color: var(--color-primary-glow); }
+  .preview-line b { color: var(--color-text); }
+  .preview-line .verb { color: var(--color-primary); font-weight: 600; }
+  .err-line { font-size: var(--text-xs); color: hsl(0 80% 80%); margin-top: var(--space-3); display: flex; align-items: center; gap: 6px; }
+  .ok-line { font-size: var(--text-sm); color: var(--color-success); margin-top: var(--space-3); display: flex; align-items: center; gap: 7px;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .dlg-foot { display: flex; align-items: center; gap: 8px; margin-top: var(--space-5); }
+  .sim { margin-right: auto; font-size: 10px; color: var(--color-text-dim); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: var(--font-mono); }
+  .sim input { accent-color: var(--color-danger); }
+  .btn { font-size: var(--text-sm); padding: 7px 15px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--color-border);
+    background: var(--color-surface); color: var(--color-text-muted); }
+  .btn:hover { color: var(--color-text); }
+  .btn.primary { background: var(--color-primary); color: hsl(216 45% 6%); border-color: var(--color-primary); font-weight: 600; }
+  .btn.primary:hover { color: hsl(216 45% 6%); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* sentence builder (variant B) */
+  .sentence { font-size: var(--text-md); line-height: 2.1; color: var(--color-text); }
+  .sentence .lead { color: var(--color-text-muted); }
+  .inline-sel { position: relative; display: inline-block; }
+  .inline-sel .trg { background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-sm); padding: 3px 10px; font-size: var(--text-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .inline-sel .menu { position: absolute; top: 110%; left: 0; z-index: 20; background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-md); min-width: 170px; padding: 4px; }
+  .inline-sel .menu .mi { padding: 7px 10px; font-size: var(--text-sm); border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 7px; color: var(--color-text-muted); }
+  .inline-sel .menu .mi:hover, .inline-sel .menu .mi.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .blank { display: inline-block; min-width: 200px; border-bottom: 1.5px solid var(--color-primary); }
+  .blank-input { background: transparent; border: none; outline: none; color: var(--color-text); font-size: var(--text-md); font-family: var(--font-sans);
+    width: 230px; padding: 2px 0; }
+  .blank-input::placeholder { color: var(--color-text-dim); font-style: italic; }
+
+  /* ── Variant C: inline-in-section foil ── */
+  .panel-frame { width: 420px; max-width: calc(100vw - 32px); margin: 0 auto; background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5) var(--space-5); }
+  .foil-flag { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; color: var(--color-warning); background: var(--color-warning-dim);
+    border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-md); padding: 8px 11px; margin-bottom: var(--space-4); }
+  .sec-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; color: var(--color-text); font-size: var(--text-xs);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; border-bottom: 1px solid var(--color-border); }
+  .sec-head .count { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); background: var(--color-accent);
+    padding: 1px 7px; border-radius: var(--radius-full); }
+  .ex-row { display: flex; align-items: center; gap: 8px; padding: 7px 4px; font-size: var(--text-sm); }
+  .ex-row .rel-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 9px; border-radius: var(--radius-full);
+    background: var(--color-accent); color: var(--color-text-muted); }
+  .ex-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim); margin: var(--space-3) 0 2px; }
+  .inline-form { border: 1px solid var(--color-primary-glow); background: var(--color-primary-dim); border-radius: var(--radius-md);
+    padding: var(--space-3); margin-top: var(--space-3); animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .inline-form .lbl { margin-top: 0; }
+  .add-link { width: 100%; text-align: left; padding: 8px 11px; margin-top: var(--space-3); border: 1px dashed var(--color-border);
+    background: transparent; color: var(--color-text-muted); font-size: var(--text-sm); border-radius: var(--radius-md); cursor: pointer;
+    display: flex; align-items: center; gap: 7px; }
+  .add-link:hover { border-color: var(--color-primary); color: var(--color-text); }
+
+  .toast { position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); background: var(--color-surface-hi);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 9px 16px; font-size: var(--text-sm);
+    color: var(--color-text); box-shadow: var(--shadow-lg); z-index: 9990; display: flex; align-items: center; gap: 8px;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .notes { width: 100%; max-width: 760px; margin: var(--space-6) auto 0; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg); padding: var(--space-3) var(--space-4); }
+  .notes h4 { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin: 0 0 var(--space-2); cursor: pointer; }
+  .notes ul { margin: 0; padding-left: 18px; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; }
+  .notes .net { color: var(--color-accent-violet); font-weight: 600; }
+  .notes .ok { color: var(--color-success); font-weight: 600; }
+  .notes.collapsed .notes-body { display: none; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">035 · Link Target Picker</span>
+  <button class="variant-tab active" onclick="show('a',event)">A · Dialog · type-first<span class="star">★</span>Selected</button>
+  <button class="variant-tab" onclick="show('b',event)">B · Dialog · sentence-builder</button>
+  <button class="variant-tab" onclick="show('c',event)">C · Inline foil ⚠</button>
+</div>
+
+<div id="variant-a" class="variant"></div>
+<div id="variant-b" class="variant" style="display:none"></div>
+<div id="variant-c" class="variant" style="display:none"></div>
+
+<div id="toast-root"></div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVp(440)">📱</button>
+  <button onclick="setVp(0)">🖥</button>
+</div>
+
+<script>
+// ───────────────────────── grounded data ─────────────────────────
+const SUBJECT = { icon:'📕', name:'Project Charter.pdf' };
+const SELF = 'Project Charter.pdf';
+
+const OUT_LABEL = { supersedes:'Supersedes', amends:'Amends', references:'References', attached_to:'Attached to' };
+const TYPES = ['supersedes','amends','references','attached_to'];
+
+// the caller's VISIBLE KB (the typeahead searches THIS, server-side in the build).
+const KB = [
+  { icon:'📕', name:'Project Charter.pdf' },     // SELF — always excluded
+  { icon:'📊', name:'Risk Register.xlsx' },
+  { icon:'📄', name:'Stakeholder Map.docx' },
+  { icon:'📑', name:'Steering Committee Deck.pptx' },
+  { icon:'📕', name:'Charter Amendment 1.pdf' },
+  { icon:'📄', name:'Q3 Status Report.docx' },
+  { icon:'📊', name:'Budget Plan.xlsx' },
+  { icon:'📕', name:'Project Brief (draft).pdf' },
+  { icon:'📄', name:'Comms Plan.docx' },
+  { icon:'📄', name:'Vendor Contract.docx' },
+  { icon:'📊', name:'Timeline.xlsx' },
+  { icon:'📑', name:'Kickoff Deck.pptx' },
+  { icon:'📕', name:'Scope Statement.pdf' },
+];
+// already-linked outgoing edges, keyed by rel_type (D-117-4: exclusion is PER TYPE).
+const ALREADY = {
+  references:  ['Risk Register.xlsx', 'Stakeholder Map.docx'],
+  attached_to: ['Steering Committee Deck.pptx'],
+  amends:      [],
+  supersedes:  [],
+};
+
+// per-variant state
+const ST = {
+  a: { type:'references', q:'', target:null, cur:0, simErr:false, done:false },
+  b: { type:'references', q:'', target:null, cur:0, simErr:false, done:false, menu:false },
+  c: { type:'references', q:'', target:null, cur:0, open:false, done:false },
+};
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// D-117-4: candidates = visible docs − self − already-linked-with-the-chosen-type − query
+function candidates(type, q){
+  const excl = new Set([SELF, ...(ALREADY[type]||[])]);
+  const ql = q.trim().toLowerCase();
+  const all = KB.filter(d => !excl.has(d.name));
+  const matched = all.filter(d => d.name.toLowerCase().includes(ql));
+  return { matched, hiddenAlready: (ALREADY[type]||[]).length };
+}
+function highlight(name, q){
+  const ql = q.trim(); if (!ql) return esc(name);
+  const i = name.toLowerCase().indexOf(ql.toLowerCase()); if (i<0) return esc(name);
+  return esc(name.slice(0,i)) + '<span class="hl">' + esc(name.slice(i,i+ql.length)) + '</span>' + esc(name.slice(i+ql.length));
+}
+
+// ───────────────────────── typeahead block (shared by A) ─────────────────────────
+function typeahead(v){
+  const s = ST[v];
+  if (s.target){
+    return `<div class="ta-chosen">${s.target.icon} ${esc(s.target.name)}
+      <button class="chg" onclick="clearTarget('${v}')">change</button></div>`;
+  }
+  const { matched, hiddenAlready } = candidates(s.type, s.q);
+  const list = matched.length
+    ? matched.map((d,i)=>`<div class="ta-opt ${i===s.cur?'cur':''}" data-i="${i}"
+        onclick="choose('${v}',${i})"><span>${d.icon}</span><span class="nm">${highlight(d.name, s.q)}</span></div>`).join('')
+    : `<div class="ta-none">No matching documents.</div>`;
+  const exclNote = hiddenAlready
+    ? `<div class="ta-excl">${hiddenAlready} document${hiddenAlready>1?'s':''} already ${OUT_LABEL[s.type].toLowerCase()} this — hidden so every pick is actionable.</div>`
+    : '';
+  return `<div class="ta-wrap">
+      <span class="ta-icon">🔎</span>
+      <input class="ta-input" id="ta-${v}" placeholder="Search your documents…" value="${esc(s.q)}"
+        oninput="onQ('${v}',this.value)" onkeydown="onKey('${v}',event)" autocomplete="off" />
+      ${s.q?`<button class="ta-clear" onclick="onQ('${v}','')">✕</button>`:''}
+    </div>
+    <div class="ta-list">${list}${exclNote}</div>`;
+}
+
+function previewLine(v){
+  const s = ST[v];
+  if (s.done) return `<div class="ok-line">🛡 Link added · audit logged · list re-fetched from server</div>`;
+  if (s.target) return `<div class="preview-line ready">This document <span class="verb">${OUT_LABEL[s.type].toLowerCase()}</span> → <b>${esc(s.target.name)}</b></div>`;
+  return `<div class="preview-line">Pick a type and a target — the link reads <i>“this document ${OUT_LABEL[s.type].toLowerCase()} → …”</i></div>`;
+}
+function errLine(v){ return ST[v].simErr && ST[v]._showErr ? `<div class="err-line">⚠ Couldn't add the link. Please try again.</div>` : ''; }
+function simToggle(v){ return `<label class="sim"><input type="checkbox" ${ST[v].simErr?'checked':''} onchange="ST['${v}'].simErr=this.checked"> simulate failure</label>`; }
+
+// ───────────────────────── variant A : dialog, type-first ─────────────────────────
+function dialogA(){
+  const v='a', s=ST[v];
+  return `<div class="dlg dlg-static">
+    <h3>Add a relationship</h3>
+    <div class="dsub">From <b>${SUBJECT.icon} ${SUBJECT.name}</b> · outgoing link (D-117-1)</div>
+    <div class="lbl">Relationship type</div>
+    <div class="type-row">${TYPES.map(t=>`<button class="type-pick t-${t} ${s.type===t?'on':''}" onclick="setType('${v}','${t}')"><span class="tdot"></span>${OUT_LABEL[t]}</button>`).join('')}</div>
+    <div class="lbl">Target document</div>
+    ${typeahead(v)}
+    ${previewLine(v)}
+    ${errLine(v)}
+    <div class="dlg-foot">
+      ${simToggle(v)}
+      <button class="btn" onclick="resetV('${v}')">Cancel</button>
+      <button class="btn primary" ${s.target&&!s.done?'':'disabled'} onclick="confirm('${v}')">Add link</button>
+    </div>
+  </div>`;
+}
+
+// ───────────────────────── variant B : dialog, sentence-builder ─────────────────────────
+function dialogB(){
+  const v='b', s=ST[v];
+  const targetBlank = s.target
+    ? `<span class="ta-chosen" style="display:inline-flex;vertical-align:middle">${s.target.icon} ${esc(s.target.name)}<button class="chg" onclick="clearTarget('${v}')">change</button></span>`
+    : `<span class="blank"><input class="blank-input" id="ta-${v}" placeholder="search a document…" value="${esc(s.q)}" oninput="onQ('${v}',this.value)" onkeydown="onKey('${v}',event)" autocomplete="off" /></span>`;
+  const menu = s.menu
+    ? `<div class="menu">${TYPES.map(t=>`<div class="mi t-${t} ${s.type===t?'on':''}" onclick="setType('${v}','${t}');ST['${v}'].menu=false;render()"><span class="tdot"></span>${OUT_LABEL[t]}</div>`).join('')}</div>`
+    : '';
+  const list = (!s.target && s.q) ? `<div style="margin-top:10px">${typeaheadListOnly(v)}</div>` : '';
+  return `<div class="dlg dlg-static">
+    <h3>Add a relationship</h3>
+    <div class="dsub">Build the sentence — it's always an outgoing link from this document.</div>
+    <div class="sentence">
+      <span class="lead">This document</span>
+      <span class="inline-sel">
+        <button class="trg t-${s.type}" onclick="ST['${v}'].menu=!ST['${v}'].menu;render()"><span class="tdot"></span>${OUT_LABEL[s.type].toLowerCase()} ▾</button>
+        ${menu}
+      </span>
+      ${targetBlank}
+    </div>
+    ${list}
+    ${previewLine(v)}
+    ${errLine(v)}
+    <div class="dlg-foot">
+      ${simToggle(v)}
+      <button class="btn" onclick="resetV('${v}')">Cancel</button>
+      <button class="btn primary" ${s.target&&!s.done?'':'disabled'} onclick="confirm('${v}')">Add link</button>
+    </div>
+  </div>`;
+}
+function typeaheadListOnly(v){
+  const s=ST[v]; const { matched, hiddenAlready } = candidates(s.type, s.q);
+  const list = matched.length
+    ? matched.map((d,i)=>`<div class="ta-opt ${i===s.cur?'cur':''}" onclick="choose('${v}',${i})"><span>${d.icon}</span><span class="nm">${highlight(d.name,s.q)}</span></div>`).join('')
+    : `<div class="ta-none">No matching documents.</div>`;
+  const exclNote = hiddenAlready ? `<div class="ta-excl">${hiddenAlready} already ${OUT_LABEL[s.type].toLowerCase()} this — hidden.</div>` : '';
+  return `<div class="ta-list">${list}${exclNote}</div>`;
+}
+
+// ───────────────────────── variant C : inline foil ─────────────────────────
+function inlineC(){
+  const v='c', s=ST[v];
+  const form = s.open ? `<div class="inline-form t-${s.type}">
+      <div class="lbl">Relationship type</div>
+      <div class="type-row">${TYPES.map(t=>`<button class="type-pick t-${t} ${s.type===t?'on':''}" onclick="setType('${v}','${t}')"><span class="tdot"></span>${OUT_LABEL[t]}</button>`).join('')}</div>
+      <div class="lbl">Target document</div>
+      ${typeahead(v)}
+      ${previewLine(v)}
+      <div class="dlg-foot" style="margin-top:14px">
+        <button class="btn" onclick="ST['${v}'].open=false;resetV('${v}')">Cancel</button>
+        <button class="btn primary" ${s.target&&!s.done?'':'disabled'} onclick="confirm('${v}')">Add link</button>
+      </div>
+    </div>`
+    : `<button class="add-link" onclick="ST['${v}'].open=true;render()">＋ Add link</button>`;
+  return `<div class="panel-frame">
+    <div class="foil-flag"><span>⚠</span><span><b>Foil — deviates from D-117-3</b>, which locks reusing the <code>MoveToFolderDialog</code> dialog shell. Shown so you can feel inline-in-section vs a modal before confirming the locked path.</span></div>
+    <div class="sec-head"><span>▾</span> Relationships <span class="count">3</span></div>
+    <div class="ex-sub">Outgoing · this document → others</div>
+    <div class="ex-row"><span class="rel-chip t-references"><span class="tdot"></span>References</span> 📊 Risk Register.xlsx</div>
+    <div class="ex-row"><span class="rel-chip t-attached_to"><span class="tdot"></span>Attached to</span> 📑 Steering Committee Deck.pptx</div>
+    <div class="ex-sub">Incoming · others → this document</div>
+    <div class="ex-row"><span class="rel-chip t-amends"><span class="tdot"></span>Amended by</span> 📕 Charter Amendment 1.pdf</div>
+    ${form}
+  </div>`;
+}
+
+// ───────────────────────── render ─────────────────────────
+function render(){
+  document.getElementById('variant-a').innerHTML = `<div class="stage">
+    <p class="caption">Creating an <b>outgoing</b> link — the rel-type chips sit on top, then a searchable
+      typeahead over your visible documents. <b>Self + already-linked-with-this-type are excluded</b> (D-117-4);
+      switch the type to watch the candidate set change.</p>
+    ${backdrop(dialogA())}
+    ${notesBlock()}
+  </div>`;
+  document.getElementById('variant-b').innerHTML = `<div class="stage">
+    <p class="caption">The link as a <b>fill-in-the-blank sentence</b> — relationship is an inline dropdown,
+      target is the typeahead. Reads as plain language; same exclusion + preview behavior.</p>
+    ${backdrop(dialogB())}
+    ${notesBlock()}
+  </div>`;
+  document.getElementById('variant-c').innerHTML = `<div class="stage">
+    <p class="caption"><b>Foil:</b> the create form expands <b>inline inside the accordion</b> — no modal.
+      Snappier in flow, but deviates from the locked D-117-3 dialog shell (and competes with the
+      already-dense panel). Shown for comparison.</p>
+    ${inlineC()}
+    ${notesBlock()}
+  </div>`;
+  // refocus the active input
+  const active = visibleVariant();
+  const inp = document.getElementById('ta-'+active);
+  if (inp && document.activeElement !== inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+function backdrop(dlg){
+  return `<div class="backdrop">
+    <div class="bd-grid"><div class="bd-rail"></div>
+      <div class="bd-list">${'<div class="bd-line"></div>'.repeat(6)}</div>
+      <div class="bd-panel">${'<div class="bd-line"></div>'.repeat(5)}</div></div>
+    <div class="bd-scrim">${dlg}</div>
+  </div>`;
+}
+function notesBlock(){
+  return `<div class="notes collapsed">
+    <h4 onclick="this.parentElement.classList.toggle('collapsed')">ⓘ Build notes — what's real vs net-new ▾</h4>
+    <div class="notes-body"><ul>
+      <li><span class="ok">REAL today:</span> <code>POST /document-relationships</code> (visible-both gate → idempotent persist → <code>relationship.create</code> audit) is the create call (Phase 116).</li>
+      <li><span class="ok">REUSE:</span> the <code>MoveToFolderDialog</code> dialog + confirm + error-line shell — <b>keep the shell</b>, swap its plain <code>Select</code> for this searchable typeahead (D-117-3): a KB can hold thousands of docs, a scroll-only Select dies past ~30.</li>
+      <li><span class="net">NET-NEW (117):</span> the typeahead candidate source + the <b>self & already-linked-per-type</b> exclusion (D-117-4) — client filter over a visible-docs fetch vs a server param is researcher's discretion (pick the least-complex correct option).</li>
+      <li>Create is <b>outgoing-only</b> (D-117-1) — to author "X supersedes this", open X's panel. Idempotent create (D-116-6) is the safety net if a stale candidate slips through.</li>
+      <li>On success → <b>re-fetch</b> the list (D-117-9), don't optimistically insert: only the server computes follow-to-latest + inverse labels + masking. The dialog keeps its own error line (D-117-10).</li>
+      <li><span class="net">A11y the build must add (net-new):</span> the typeahead is a <b>combobox</b> — wire the APG roles the swapped-in <code>Select</code> loses: <code>role="combobox"</code> + <code>aria-expanded</code>/<code>aria-controls</code>/<code>aria-activedescendant</code> on the input (the highlighted row = <code>aria-activedescendant</code>), <code>role="listbox"</code> on the list, <code>role="option"</code>+id per candidate. Focus-trap + restore-to-trigger come free from the reused shadcn <code>Dialog</code> — keep the input INSIDE it so the swap preserves both.</li>
+      <li>The in-flight beat (submitting → disabled confirm) is <b>inherited free</b> from the <code>MoveToFolderDialog</code> shell (<code>loading</code> state: confirm label flips + Cancel/confirm disable) — keep it on the typeahead swap; the sketch collapses the POST+re-fetch round-trip to instant only for brevity.</li>
+      <li>Meaningful copy (the "N already … hidden" exclusion note, "No matching documents") uses the panel-scoped AA token, never the global dim 3.59–3.64:1 (SC#3 WCAG 2.1 AA).</li>
+    </ul></div>
+  </div>`;
+}
+
+// ───────────────────────── interactions ─────────────────────────
+function setType(v,t){ ST[v].type=t; ST[v].cur=0; if (ST[v].target && (ALREADY[t]||[]).includes(ST[v].target.name)) ST[v].target=null; render(); }
+function onQ(v,val){ ST[v].q=val; ST[v].target=null; ST[v].cur=0; ST[v]._showErr=false; render(); }
+function clearTarget(v){ ST[v].target=null; ST[v].q=''; ST[v].cur=0; render(); }
+function choose(v,i){ const { matched } = candidates(ST[v].type, ST[v].q); const d=matched[i]; if(!d) return; ST[v].target=d; ST[v].q=d.name; render(); }
+function onKey(v,e){
+  const { matched } = candidates(ST[v].type, ST[v].q); const n=matched.length;
+  if (e.key==='ArrowDown'){ e.preventDefault(); ST[v].cur=Math.min(ST[v].cur+1, n-1); render(); }
+  else if (e.key==='ArrowUp'){ e.preventDefault(); ST[v].cur=Math.max(ST[v].cur-1, 0); render(); }
+  else if (e.key==='Enter'){ e.preventDefault(); if(n) choose(v, ST[v].cur); }
+  else if (e.key==='Escape'){ e.preventDefault(); clearTarget(v); }
+}
+function resetV(v){ const open = ST[v].open; ST[v]={ type:'references', q:'', target:null, cur:0, simErr:ST[v].simErr, done:false, menu:false, open:false }; render(); }
+function confirm(v){
+  const s=ST[v]; if(!s.target) return;
+  if (s.simErr){ s._showErr=true; render(); return; }
+  s.done=true; render();
+  showToast('Link added — list re-fetched.');
+  setTimeout(()=>{ resetV(v); }, 2200);
+}
+let toastTimer=null;
+function showToast(msg){ clearTimeout(toastTimer);
+  document.getElementById('toast-root').innerHTML = `<div class="toast">✓ ${esc(msg)}</div>`;
+  toastTimer=setTimeout(()=>{ document.getElementById('toast-root').innerHTML=''; }, 3000);
+}
+
+// ───────────────────────── shell ─────────────────────────
+function visibleVariant(){ for (const v of ['a','b','c']){ const el=document.getElementById('variant-'+v); if (el && el.style.display!=='none') return v; } return 'a'; }
+function show(id,e){ document.querySelectorAll('.variant').forEach(x=>x.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block'; e.target.classList.add('active'); render(); }
+function setVp(w){ document.querySelectorAll('.variant').forEach(v=>{ v.style.maxWidth=w?w+'px':''; v.style.margin=w?'0 auto':''; }); }
+
+render();
+</script>
+</body>
+</html>
