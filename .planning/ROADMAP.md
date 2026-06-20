@@ -227,9 +227,13 @@
   2. The panel supports creating a link (reusing the `MoveToFolderDialog` document-picker pattern for relationship target selection) and removing one, reflecting changes live.
   3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
 
-**Plans**: TBD
+**Plans**: 4 plans (4 waves — backend foundation before consuming frontend)
+- [ ] 117-01-PLAN.md (Wave 1) — extract the leak-safe read into shared `get_related_documents` (D-117-7) + refactor the agent handler (behavior-preserving, 116 suite stays green) + carry `relationship_id` through (A6) + 3 Wave-0 backend test scaffolds
+- [ ] 117-02-PLAN.md (Wave 2) — thin authenticated `GET /document-relationships?document_id=` route (no fork, no audit, uniform 404) + LIVE two-user ROUTE leak proof on :54322 + no-fork grep guard GREEN
+- [ ] 117-03-PLAN.md (Wave 3) — frontend types (RelationshipRow nullable masked id) + 3 api.ts client fns (list/create/delete, 404-tolerant)
+- [ ] 117-04-PLAN.md (Wave 4) — `RelationshipsSection` (grouped Outgoing/Incoming, inverse labels, masked rows, honest states, re-fetch-not-optimistic, reachable remove) + `CreateLinkDialog` (MoveToFolderDialog shell, type-first bespoke typeahead combobox, per-type exclusion) mounted in `DocumentDetailPanel` + 3 frontend Wave-0 tests
 **UI hint**: yes
-**G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) BEFORE plan. (UX-02 cross-cutting acceptance.)
+**G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) — SATISFIED (sketches 034 + 035, winner A, operator-approved 2026-06-20, audit-hardened `wf_1ec2afac-687`; `references/document-relationships-panel.md`). (UX-02 cross-cutting acceptance.)
 
 #### Phase 118: Auto-Classification
 

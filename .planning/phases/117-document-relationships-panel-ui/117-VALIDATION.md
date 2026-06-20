@@ -41,7 +41,12 @@ created: 2026-06-20
 
 ## Per-Task Verification Map
 
-> Task IDs are TBD until PLAN.md files exist (planner runs after this draft). Keyed to SC + Wave 0 file until reconciled at execute/validate time.
+> Plans now exist (planner ran 2026-06-20). Plan→Wave-0-file mapping:
+> - **117-01** (Wave 1, backend extraction + handler refactor): creates `test_117_route_leak.py`, `test_117_get_read.py`, `test_117_no_fork.py` (RED scaffolds); 116 regression backstop.
+> - **117-02** (Wave 2, GET route): greens `test_117_no_fork.py` + drives `test_117_route_leak.py`/`test_117_get_read.py` LIVE on :54322.
+> - **117-03** (Wave 3, types + api.ts): tsc-only (no new test file).
+> - **117-04** (Wave 4, components): creates `RelationshipsSection.test.tsx`, `RelationshipsSection.a11y.test.tsx`, `CreateLinkDialog.test.tsx`.
+> Status reconciled to ✅/❌ at execute/validate time.
 
 | Req / SC | Behavior | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |----------|----------|------------|-----------------|-----------|-------------------|-------------|--------|
