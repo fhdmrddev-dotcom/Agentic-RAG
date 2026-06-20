@@ -231,13 +231,55 @@ def test_sanitize_passes_through_scalar_type() -> None:
     assert "nullable" not in out
 
 
-def test_sanitize_passes_through_type_array_without_null() -> None:
-    """``type: ["string", "integer"]`` (a union of two non-null types) is not
-    Phase 084's nullable-optional shape -- leave unchanged."""
+def test_sanitize_collapses_type_array_without_null_to_first_member() -> None:
+    """Phase 115: Google's Tool validation rejects ANY list-valued ``type`` (it
+    requires a single Type enum), so even a no-null union must collapse to its
+    first member -- not stay a type-array. (Pre-115 this stayed unchanged, which
+    was a latent Gemini-reject that never fired because no tool used the shape.)"""
     from app.services.google_service import _sanitize_schema_for_google
     out = _sanitize_schema_for_google({"type": ["string", "integer"]})
-    assert out["type"] == ["string", "integer"]
-    assert "nullable" not in out
+    assert out["type"] == "string"
+    assert "nullable" not in out  # no "null" member -> not nullable
+
+
+def test_sanitize_collapses_multitype_array_with_null_for_115_value() -> None:
+    """Phase 115 regression: query_documents_by_view's filter.conditions[].value
+    used ``["string","number","boolean","null"]`` (3 real types + null). The old
+    2-element-only guard passed it through unchanged -> google-genai raised a 400
+    ValidationError that broke EVERY Gemini Deep run (caught by the SC#10
+    cross-provider UAT). It must now collapse to {type:string, nullable:true}."""
+    from app.services.google_service import _sanitize_schema_for_google
+    out = _sanitize_schema_for_google({"type": ["string", "number", "boolean", "null"]})
+    assert out["type"] == "string"
+    assert out["nullable"] is True
+
+
+def test_query_documents_by_view_tool_sanitizes_gemini_safe() -> None:
+    """Phase 115 regression: the whole query_documents_by_view schema must contain
+    NO residual list-valued ``type`` after sanitization, and the google Tool must
+    CONSTRUCT (it ValidationError'd at construction before the fix). Static
+    anyOf/oneOf-only checks passed while this was broken -- this asserts the live
+    Gemini contract."""
+    from app.services.openai_service import QUERY_DOCUMENTS_BY_VIEW_TOOL
+    from app.services.google_service import _sanitize_schema_for_google, _convert_tools_to_google
+
+    san = _sanitize_schema_for_google(QUERY_DOCUMENTS_BY_VIEW_TOOL["function"]["parameters"])
+
+    def _list_typed_paths(o, path="root"):
+        bad = []
+        if isinstance(o, dict):
+            if isinstance(o.get("type"), list):
+                bad.append(f"{path}.type={o['type']}")
+            for k, v in o.items():
+                bad += _list_typed_paths(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, v in enumerate(o):
+                bad += _list_typed_paths(v, f"{path}[{i}]")
+        return bad
+
+    assert _list_typed_paths(san) == [], f"residual list-typed `type` (Gemini-reject): {_list_typed_paths(san)}"
+    tools = _convert_tools_to_google([QUERY_DOCUMENTS_BY_VIEW_TOOL])
+    assert tools and len(tools[0].function_declarations) == 1
 
 
 def test_sanitize_translates_recursively_inside_nested_object_properties() -> None:
