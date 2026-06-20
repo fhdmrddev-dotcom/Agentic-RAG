@@ -77,18 +77,22 @@ async def create_relationship(
     Order (no ordering oracle — D-116-5 / T-116-02-01):
       1. VISIBLE-BOTH gate FIRST: resolve BOTH endpoints from the CALLER; either
          unreadable → uniform 422 (BEFORE the self-link/CHECK consideration).
-      2. Self-link guard: source == target → the SAME uniform 422.
+      2. Self-link guard: source == target → the SAME uniform 422. (Both branches return
+         the identical status+detail, so the RESPONSE carries no ordering oracle; step 2
+         specifically rejects the READABLE self-link — it is NOT dead code: WR-04.)
       3. Idempotent persist (the 23505-catch returns the existing edge).
-      4. Fire the ``relationship.create`` governance receipt (DMF-01).
+      4. Write the ``relationship.create`` governance receipt (DMF-01) — a BLOCKING
+         (error-swallowing) audit write on the response path, not fire-and-forget (WR-03).
     """
     caller = current_user["id"]
 
     # 1. VISIBLE-BOTH gate (D-116-5 / T-116-02-01). Resolve BOTH endpoints from the
     #    CALLER (own ∪ globally-visible-folder, latest version). If EITHER returns None,
     #    the caller cannot see that endpoint → a UNIFORM 422 that names neither which
-    #    endpoint nor why (no probe-by-link existence oracle). This runs BEFORE the
-    #    self-link / CHECK gate so an unseeable id and a self-link are indistinguishable
-    #    by error shape (mirrors document_views.py:154-162 ownership-before-validation).
+    #    endpoint nor why (no probe-by-link existence oracle). Both this branch AND the
+    #    step-2 self-link branch return the identical status+detail, so the RESPONSE
+    #    carries no ordering oracle (a probe can't distinguish unseeable-endpoint from
+    #    self-link by error shape — mirrors document_views.py:154-162).
     source_doc = await document_relationship_service._resolve_readable_latest(
         body.source_doc_id, caller, supabase=supabase
     )
@@ -104,7 +108,9 @@ async def create_relationship(
     # 2. Self-link guard (CHECK no_self_rel, migration 071:66). Compare the SUBMITTED
     #    ids — the same uniform 422 (a self-link is rejected indistinguishably from an
     #    unseeable endpoint, Pitfall 4). The Pydantic model does NOT reject this (both
-    #    ends are free str), so the router owns this check.
+    #    ends are free str), so the router owns this check. NOTE (WR-04): this branch is
+    #    the SOLE rejector for a READABLE self-link (one that passes step 1) — it is NOT
+    #    dead code; do not remove it on the assumption step 1 already covers it.
     if body.source_doc_id == body.target_doc_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -132,8 +138,12 @@ async def create_relationship(
             )
         raise
 
-    # 4. Fire the governance receipt (DMF-01). write_audit_entry is async and SWALLOWS
-    #    errors, so the LIVE round-trip is the real proof (test_116_audit_live.py).
+    # 4. Write the governance receipt (DMF-01). This is a BLOCKING (error-swallowing)
+    #    audit write on the response path — it is awaited in-band, NOT fire-and-forget
+    #    (WR-03): a failure won't 500 (errors are swallowed), but a slow audit round-trip
+    #    adds to the create latency. Full decoupling (BackgroundTasks) is out of scope —
+    #    the inherited pattern matches document_views.py. The LIVE round-trip is the real
+    #    proof (test_116_audit_live.py).
     await write_audit_entry(
         user_id=caller,
         action_type="relationship.create",
@@ -169,7 +179,9 @@ async def delete_relationship(
         # Uniform 404 on a cross-user/absent miss — never a forbidden status, no leak.
         raise HTTPException(status_code=404, detail="Relationship not found")
 
-    # Governance receipt AFTER a confirmed delete (D-116-12). Fire-and-forget / swallows.
+    # Governance receipt AFTER a confirmed delete (D-116-12). BLOCKING (error-swallowing)
+    # audit write on the response path — awaited in-band, NOT fire-and-forget (WR-03);
+    # the inherited pattern matches document_views.py, full decoupling is out of scope.
     await write_audit_entry(
         user_id=caller,
         action_type="relationship.delete",

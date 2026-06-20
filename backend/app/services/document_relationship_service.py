@@ -108,6 +108,38 @@ async def _latest_by_filename(
     return None
 
 
+async def _subject_version_ids(
+    subject_row: dict, *, supabase: Client | None = None
+) -> list[str]:
+    """Return ALL ``documents.id`` values sharing the subject's ``(user_id, filename)``
+    lineage — every version, latest or not (CR-02 / gap-closure Plan 05).
+
+    A re-upload INSERTs a NEW uuid row and flips the prior versions ``is_latest=False``
+    (``documents.py:441-486``); ``(user_id, filename)`` is the stable lineage handle
+    (rename does not exist — RESEARCH grep-proof). An edge stored against a creation-time
+    (now-old) version id must still be found after the subject is re-uploaded, so the
+    handler enumerates edges over this FULL version-id set via ``.in_()`` rather than the
+    single resolved-latest id.
+
+    Scoped STRICTLY to the subject's own ``(user_id, filename)`` — never widened across
+    different documents. If the lineage lookup yields nothing, falls back to
+    ``[subject_row["id"]]`` so the ``.in_()`` is never empty.
+    """
+    client = _client(supabase)
+    owner = subject_row.get("user_id")
+    fname = subject_row.get("filename")
+    if owner is None or fname is None:
+        return [subject_row["id"]]
+    versions = await aexec(
+        client.table("documents")
+        .select("id")
+        .eq("user_id", _uid(owner))
+        .eq("filename", fname)
+    )
+    ids = [v["id"] for v in (versions.data or []) if v.get("id")]
+    return ids or [subject_row["id"]]
+
+
 async def _resolve_readable_latest(
     doc_id_or_filename: str,
     caller,
@@ -234,7 +266,10 @@ async def create_relationship(
     """
     client = _client(supabase)
     payload = {
-        "user_id": str(user_id),
+        # WR-02 (gap-closure Plan 05): _uid() (not bare str()) on the service-role
+        # owner-scoping gate — uniform with the re-fetch (:_uid below) and the resolver;
+        # a malformed value raises ValueError instead of risking a broken user_id predicate.
+        "user_id": _uid(user_id),
         "source_doc_id": source_doc_id,
         "target_doc_id": target_doc_id,
         "rel_type": rel_type,
@@ -267,6 +302,7 @@ async def delete_relationship(
         client.table(_TABLE)
         .delete()
         .eq("id", rel_id)
-        .eq("user_id", str(user_id))
+        # WR-02 (gap-closure Plan 05): _uid() uniform on the owner-scoping gate.
+        .eq("user_id", _uid(user_id))
     )
     return bool(result.data)

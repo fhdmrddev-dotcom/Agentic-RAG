@@ -503,9 +503,11 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
          ``_resolve_readable_latest`` (``document_id`` preferred; else exact ``filename``).
          Neither arg / an unseeable id / an unknown filename → a calm "not found, here's
          what to do" string. No leak: an id the caller cannot read resolves to None.
-      2. Two own-scoped queries on the subject's LATEST id (the table is user-scoped):
-         OUTGOING (``source_doc_id == subject``) and INCOMING (``target_doc_id ==
-         subject``). Both via ``aexec``.
+      2. Two own-scoped queries over the subject's FULL ``(user_id, filename)`` version-id
+         set (the table is user-scoped): OUTGOING (``source_doc_id IN versions``) and
+         INCOMING (``target_doc_id IN versions``). Both via ``aexec``. Enumerating over the
+         version set (CR-02) means an edge created against an OLD version id still surfaces
+         after a re-upload (the LOCKED D-116-1 follow-to-latest guarantee).
       3. For EACH edge's OTHER endpoint, RE-CHECK caller-readability via the SAME shared
          resolver (D-116-9, SC#2 — the net-new behavior). An unseeable endpoint renders
          as ``_NO_ACCESS_MASK`` with ``document_id: None`` — never the real
@@ -558,19 +560,27 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
 
     subject_id = subject["id"]
 
-    # ── 2. own-scoped outgoing + incoming edge queries on the LATEST subject id ──
+    # ── 2. own-scoped outgoing + incoming edge queries over the subject's FULL version set ──
+    # CR-02 (gap-closure Plan 05): an edge stores a creation-time id; after a re-upload the
+    # subject's latest id is a NEW uuid, so an edge keyed on an OLD version would be missed
+    # by a single-id query → the link silently orphans (the LOCKED D-116-1 follow-to-latest
+    # guarantee). Enumerate edges over ALL of the subject's (user_id, filename) version ids
+    # via .in_() — scoped STRICTLY to the subject's own lineage (no cross-document widening).
     try:
+        version_ids = await document_relationship_service._subject_version_ids(
+            subject, supabase=ctx.supabase
+        )
         outgoing = await aexec(
             ctx.supabase.table("document_relationships")
             .select("id, source_doc_id, target_doc_id, rel_type")
             .eq("user_id", document_relationship_service._uid(caller))
-            .eq("source_doc_id", subject_id)
+            .in_("source_doc_id", version_ids)
         )
         incoming = await aexec(
             ctx.supabase.table("document_relationships")
             .select("id, source_doc_id, target_doc_id, rel_type")
             .eq("user_id", document_relationship_service._uid(caller))
-            .eq("target_doc_id", subject_id)
+            .in_("target_doc_id", version_ids)
         )
     except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
         logger.exception("get_related_documents edge query failed for caller=%s", caller)
