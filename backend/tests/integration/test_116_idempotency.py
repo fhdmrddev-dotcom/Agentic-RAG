@@ -222,10 +222,12 @@ async def test_duplicate_create_does_not_raise(pg_pool, one_user_two_docs):
 async def test_duplicate_create_returns_existing_one_row(pg_pool, one_user_two_docs):
     """Same (source,target,rel_type) twice → ONE row, returns the existing edge (D-116-6).
 
-    Index-gated: when migration 075's partial unique index is live (post-Plan 04), this
-    is the enforced race-immune guarantee. When the index is ABSENT (pre-Plan 04), the
-    second create INSERTs a duplicate row (no 23505 to catch); we xfail the strict
-    assertion and clean up the duplicate so teardown stays FK-safe.
+    Race-immune guarantee, UN-MARKED in Plan 04: migration 075's partial unique index
+    `document_relationships_idempotency_idx` is now live, so a duplicate create hits the
+    23505 unique-violation → `create_relationship` re-fetches → returns the EXISTING edge
+    (same id) and the table holds exactly ONE row. The index is the only race-immune
+    guarantee (the app-code 23505-catch needs the constraint to throw). If the index is
+    ever missing, this test FAILS LOUDLY (regression signal) rather than silently xfailing.
     """
     if not await _table_exists(pg_pool, "document_relationships"):
         pytest.skip("migration 071 not applied (document_relationships absent)")
@@ -234,7 +236,15 @@ async def test_duplicate_create_returns_existing_one_row(pg_pool, one_user_two_d
 
     sb = _supabase_or_skip()
     ctx = one_user_two_docs
-    index_live = await _index_exists(pg_pool, _IDEM_INDEX)
+
+    # Plan 04 applied migration 075 — the index MUST be live for the race-immune
+    # guarantee to hold. A missing index is a regression, not an xfail.
+    assert await _index_exists(pg_pool, _IDEM_INDEX), (
+        f"migration 075 index '{_IDEM_INDEX}' is NOT live on the DB — apply "
+        "supabase/migrations/075_document_relationships_idempotency_index.sql "
+        "(psycopg2-direct / SQL editor; NEVER db push/reset). The race-immune "
+        "one-row idempotency guarantee depends on it."
+    )
 
     first = await svc.create_relationship(
         user_id=ctx["user"], source_doc_id=ctx["src"], target_doc_id=ctx["tgt"],
@@ -251,23 +261,6 @@ async def test_duplicate_create_returns_existing_one_row(pg_pool, one_user_two_d
         ctx["user"], uuid4().__class__(ctx["src"]), uuid4().__class__(ctx["tgt"]),
     )
 
-    if not index_live:
-        # Pre-Plan 04: the duplicate landed (no index → no 23505 → no re-fetch path).
-        # The strict guarantee is not yet enforceable. Clean up the duplicate so the
-        # FK-safe teardown still works, then xfail the strict claim.
-        assert len(rows) == 2, (
-            "pre-index: a duplicate row is expected (the 23505-catch needs the index)"
-        )
-        await pg_pool.execute(
-            "DELETE FROM document_relationships WHERE id = $1 AND user_id = $2",
-            second["id"] != first["id"] and uuid4().__class__(second["id"]) or uuid4().__class__(rows[1]["id"]),
-            ctx["user"],
-        )
-        pytest.xfail(
-            f"migration 075 index '{_IDEM_INDEX}' not applied (Plan 04 applies it) — "
-            "the race-immune one-row guarantee is not yet enforceable"
-        )
-
-    # Post-Plan 04: the index makes the second create idempotent — one row, same id.
+    # The index makes the second create idempotent — one row, same id.
     assert len(rows) == 1, "with the index live, a duplicate create must yield ONE row"
     assert str(second["id"]) == str(first["id"]), "the second create must return the existing edge"

@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ObS78xFqEYyXAywriENoyOSWKd05xgkc0ecyarj2qt3IEV4TmlwvS1YDD31wllF
+\restrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -1353,6 +1353,13 @@ CREATE INDEX document_chunks_search_vector_idx ON public.document_chunks USING g
 --
 
 CREATE INDEX document_images_document_idx ON public.document_images USING btree (document_id);
+
+
+--
+-- Name: document_relationships_idempotency_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX document_relationships_idempotency_idx ON public.document_relationships USING btree (user_id, source_doc_id, target_doc_id, rel_type);
 
 
 --
@@ -2976,5 +2983,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ObS78xFqEYyXAywriENoyOSWKd05xgkc0ecyarj2qt3IEV4TmlwvS1YDD31wllF
+\unrestrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 
