@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T18:58:22.697Z"
+last_updated: "2026-06-20T19:10:49.896Z"
 last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 38
-  completed_plans: 35
+  completed_plans: 36
   percent: 73
 ---
 
@@ -26,7 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 117 (document-relationships-panel-ui) — EXECUTING
+Phase: 117 (document-relationships-panel-ui) — EXECUTING (2 of 4 plans complete)
+
+**117-02 (Wave 2, REL-02 REST read seam — net-new authenticated GET) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `11bd6f86` thin GET route, `343016e8` LIVE two-user ROUTE leak + read-shape tests; SUMMARY `117-02-SUMMARY.md`): added the net-new authenticated **`GET /document-relationships?document_id={id}`** to the existing Phase-116 router — a THIN wrapper: auth (caller-scoped JWT) → the shared `document_relationship_service.get_related_documents` (Plan 01) → the plain dict; `None` (unreadable/unknown subject) → UNIFORM 404 (no existence-probe oracle, mirrors `document_views.py:resolve_view`); **NO `response_model`** (the 112 CR-01 lesson — preserves `direction`/`label`/`relationship_id`/masked rows); **NO audit** (`VALID_ACTION_TYPES` has no `relationship.read` enum, confirmed); **NO bare supabase call** (the shared fn rides `aexec`); **NO fork** (the route contains 0 mask strings + 0 `.in_(` edge queries; `test_117_no_fork.py` GREEN). POST/DELETE byte-untouched. **The net-new caller surface the 116 TOOL-only suite never exercised** → this plan adds the **LIVE two-user ROUTE leak proof**: 3 route tests drive the REAL HTTP endpoint via a FastAPI `TestClient` with `get_current_user` overridden to inject A vs B + `get_supabase` overridden to the REAL service-role client (so the WHOLE handler runs — auth boundary → threadpool-wrapped shared fn → 404 mapping, not the in-process fn): B over a subject A also reads sees the far endpoint MASKED (`document_id` None + mask string), NEVER A's private id/filename/metadata; A over the SAME subject sees the REAL filename (non-vacuity — the mask is access-driven, not a blanket null); an unknown id AND a real-but-unreadable subject both collapse to the SAME 404 (never 403/200 — no oracle). Plus a route-level `direction`/`label`/`relationship_id` read-shape proof. **All 4 new route tests PASS live on :54322** (verified not-skipped); **full `116 or 117` set 40 passed / 7 xpassed / 0 failed** (up from Plan 01's 36+7 — 116 regression fully preserved). **1 deviation [Rule 1]:** removed two literal substrings from the route docstring (`"linked document (no access)"` and `relationship.read`) because the no-fork grep guard + the plan's acceptance grep are literal-substring checks — describing-without-quoting keeps them honest + GREEN (route behavior unchanged). `threads.py` byte-untouched (G-5; `git diff 0801317d` = 0). **Net-new failures = 0** (base-checkout of the ONE changed source file: base 60 failed/963 passed == HEAD 60 failed/963 passed). No new package, no new migration. SUMMARY: `117-02-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 03 (frontend — the `api.ts` client fns + types + the relationship `PanelSection` in `DocumentDetailPanel`, the picker dialog).
 
 **117-01 (Wave 1, REL-02 backend read seam — D-117-7 share-don't-fork) — EXECUTED 2026-06-20** (3 tasks / 3 commits — `f7def525` Wave-0 scaffolds, `28fe4257` shared-fn extraction, `ca91f564` thin-caller refactor; SUMMARY `68898b89`): extracted the leak-safe outgoing+incoming relationship read traversal — previously living ONLY inside `tool_dispatcher._handle_get_related_documents` — into the shared FastAPI-free **`document_relationship_service.get_related_documents(caller, *, document_id, filename, supabase)`** (mirrors the Phase 115 `resolve_filter`→`document_view_resolver.py` move), then refactored the agent handler into a THIN caller of it. One leak-safe core, consumed by the agent tool now + the net-new GET route (Plan 02) next — no fork that could drift and re-open the SC#1 leak. Subject resolve via `_resolve_readable_latest` (sole access gate), edge queries over the full `(user_id, filename)` version set via `.in_()` (CR-02 follow-to-latest), per-edge other-endpoint readability re-check → unseeable masks as `_NO_ACCESS_MASK` + `document_id:None` (CR-01/D-117-8); returns a plain dict `{subject, total, documents, source_refs}` or `None` (no raise). **A6 shape change:** each row additively carries `relationship_id` (= edge id) for the panel's remove ✕ — the handler previously dropped it; the 116 strict-shape tests access keys (not exact-key sets), so it's non-breaking. **Relocated `_INVERSE_LABEL`/`_NO_ACCESS_MASK`** into the service (single source of truth for both callers + the frontend mirror). Three Wave-0 backend scaffolds: `test_117_route_leak.py` (LIVE two-user leak proof driving the SHARED fn — the boundary the Plan-02 route inherits; **marked for secure-phase, D-117-8**), `test_117_get_read.py` (GET-shape over the version set + follow-to-latest + create-appears/remove-reflects), `test_117_no_fork.py` (source-grep guard). **2 deviations [Rule 1 + Rule 3]:** (1) the no-fork guard token set reconciled — `_resolve_readable_latest` legitimately appears in the route (the 116 create gate's visible-both share, NOT a fork, mirroring how `document_views.py` calls `resolve_filter`), so the guard checks the two TRUE fork tokens (mask string + `.in_(` edge query) which live ONLY in the service; (2) the base-checkout net-new-failure proof reverted the uncommitted Task-3 refactor → re-applied byte-identical + re-verified. **117 set GREEN live on :54322** (get-read 3 + route-leak 2 + no-fork 3); **116 regression byte-identical** — full `116 or 117` set **36 passed / 7 xpassed**. `threads.py` byte-untouched (G-5; `git diff ee30436b` = 0). **Net-new failures = 0** (base-checkout: HEAD 60 failed/963 passed == base 60 failed/963 passed, identical failure SETS — pre-existing rot). No new package, no new migration. SUMMARY: `117-01-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 02 (net-new authenticated `GET /document-relationships` thin wrapper calling the shared fn — no audit on read, no fork).
 
@@ -55,7 +57,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-20
