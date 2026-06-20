@@ -1,8 +1,8 @@
 ---
 phase: 115-virtual-folders-agent-tool
 verified: 2026-06-20T00:00:00Z
-status: human_needed
-score: 3/3 must-haves verified
+status: passed
+score: 3/3 must-haves verified + 4/4 live cross-provider human-UAT (115-HUMAN-UAT.md complete; SC#10 8/8 providers after the Gemini schema fix a5b0b917)
 overrides_applied: 0
 re_verification: false
 human_verification:
