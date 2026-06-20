@@ -294,6 +294,74 @@ export interface SavedView {
   is_global: boolean
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 117 (REL-02 / UX-01) — the document-relationships CLIENT contract.
+//
+// Mirrors the backend payloads EXACTLY so the Relationships panel (Plan 04)
+// renders the server's truth without re-deriving anything:
+//   - the GET read response from
+//     `document_relationship_service.get_related_documents` (Plan 01) — the ONE
+//     leak-safe outgoing+incoming traversal: `{subject, total, documents[],
+//     source_refs}`, each row carrying `direction`/`label`/`relationship_id` and a
+//     NULLABLE `document_id` (the masked "no access" row, D-117-8);
+//   - the POST 201 create response (`RelationshipResponse`,
+//     models/document_relationship.py:50-63).
+// The backend OWNS the rel-type vocabulary (the `Literal`) + the inverse-label
+// wording (`_INVERSE_LABEL`); the frontend mirrors these keys for display casing
+// (D-117-6) and never invents its own. The client is NOT a trust boundary —
+// every access decision is server-side (the per-viewer readability re-check).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The 4 relationship types the backend `RelationshipCreate.rel_type` Literal
+ *  accepts (models/document_relationship.py:47) — a closed union; a 5th value is
+ *  a 422 at parse. Read from the subject's perspective ("this supersedes X"). */
+export type RelType = "supersedes" | "amends" | "references" | "attached_to"
+
+/** One compact relationship row in the GET read payload (mirrors a
+ *  `get_related_documents` `documents[]` entry, document_relationship_service.py).
+ *  An OUTGOING row's `label` is the `rel_type` verbatim; an INCOMING row's `label`
+ *  is the backend's inverse label (`superseded_by`/`amended_by`/`referenced_by`/
+ *  `has_attachment`, D-117-6) — the frontend casing-map mirrors those keys. */
+export interface RelationshipRow {
+  /** `null` when the OTHER endpoint is MASKED (the caller can't read it). The
+   *  backend NEVER sends an id/title for a masked row (D-117-8 — "linked document
+   *  (no access)"); typing this `string | null` makes a leaked-id render a type
+   *  error, so the UI cannot accidentally surface it. The server is the gate. */
+  document_id: string | null
+  /** The related document's real filename, OR the no-access mask string
+   *  ("linked document (no access)") when `document_id` is null. */
+  filename: string
+  rel_type: RelType
+  direction: "outgoing" | "incoming"
+  /** The backend's raw label (snake_case): `rel_type` for outgoing rows, the
+   *  inverse label for incoming rows. The display map handles casing (D-117-6). */
+  label: string
+  /** The edge row id — the remove ✕ DELETEs `/document-relationships/{id}`. The
+   *  read traversal always carries it; optional here so a partial payload is
+   *  still well-typed (a row without it simply has no remove affordance). */
+  relationship_id?: string
+}
+
+/** The GET /document-relationships?document_id= read response (mirrors
+ *  `get_related_documents`'s plain dict: subject + total + the compact rows). */
+export interface RelatedDocumentsResponse {
+  subject: { document_id: string; filename: string }
+  total: number
+  documents: RelationshipRow[]
+}
+
+/** A persisted relationship row — the POST 201 create body (mirrors the backend
+ *  `RelationshipResponse`, models/document_relationship.py:50-63). `user_id` /
+ *  `created_at` are nullable to match the permissive backend model. */
+export interface Relationship {
+  id: string
+  user_id?: string | null
+  source_doc_id: string
+  target_doc_id: string
+  rel_type: string
+  created_at?: string | null
+}
+
 export interface Folder {
   id: string
   user_id: string
