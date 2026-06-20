@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T18:33:06.940Z"
-last_activity: 2026-06-20 -- Phase 117 planning complete
+last_updated: "2026-06-20T18:58:22.697Z"
+last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 38
-  completed_plans: 34
+  completed_plans: 35
   percent: 73
 ---
 
@@ -22,11 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 117 — document relationships — panel ui
+**Current focus:** Phase 117 — document-relationships-panel-ui
 
 ## Current Position
 
-Phase: 117
+Phase: 117 (document-relationships-panel-ui) — EXECUTING
+
+**117-01 (Wave 1, REL-02 backend read seam — D-117-7 share-don't-fork) — EXECUTED 2026-06-20** (3 tasks / 3 commits — `f7def525` Wave-0 scaffolds, `28fe4257` shared-fn extraction, `ca91f564` thin-caller refactor; SUMMARY `68898b89`): extracted the leak-safe outgoing+incoming relationship read traversal — previously living ONLY inside `tool_dispatcher._handle_get_related_documents` — into the shared FastAPI-free **`document_relationship_service.get_related_documents(caller, *, document_id, filename, supabase)`** (mirrors the Phase 115 `resolve_filter`→`document_view_resolver.py` move), then refactored the agent handler into a THIN caller of it. One leak-safe core, consumed by the agent tool now + the net-new GET route (Plan 02) next — no fork that could drift and re-open the SC#1 leak. Subject resolve via `_resolve_readable_latest` (sole access gate), edge queries over the full `(user_id, filename)` version set via `.in_()` (CR-02 follow-to-latest), per-edge other-endpoint readability re-check → unseeable masks as `_NO_ACCESS_MASK` + `document_id:None` (CR-01/D-117-8); returns a plain dict `{subject, total, documents, source_refs}` or `None` (no raise). **A6 shape change:** each row additively carries `relationship_id` (= edge id) for the panel's remove ✕ — the handler previously dropped it; the 116 strict-shape tests access keys (not exact-key sets), so it's non-breaking. **Relocated `_INVERSE_LABEL`/`_NO_ACCESS_MASK`** into the service (single source of truth for both callers + the frontend mirror). Three Wave-0 backend scaffolds: `test_117_route_leak.py` (LIVE two-user leak proof driving the SHARED fn — the boundary the Plan-02 route inherits; **marked for secure-phase, D-117-8**), `test_117_get_read.py` (GET-shape over the version set + follow-to-latest + create-appears/remove-reflects), `test_117_no_fork.py` (source-grep guard). **2 deviations [Rule 1 + Rule 3]:** (1) the no-fork guard token set reconciled — `_resolve_readable_latest` legitimately appears in the route (the 116 create gate's visible-both share, NOT a fork, mirroring how `document_views.py` calls `resolve_filter`), so the guard checks the two TRUE fork tokens (mask string + `.in_(` edge query) which live ONLY in the service; (2) the base-checkout net-new-failure proof reverted the uncommitted Task-3 refactor → re-applied byte-identical + re-verified. **117 set GREEN live on :54322** (get-read 3 + route-leak 2 + no-fork 3); **116 regression byte-identical** — full `116 or 117` set **36 passed / 7 xpassed**. `threads.py` byte-untouched (G-5; `git diff ee30436b` = 0). **Net-new failures = 0** (base-checkout: HEAD 60 failed/963 passed == base 60 failed/963 passed, identical failure SETS — pre-existing rot). No new package, no new migration. SUMMARY: `117-01-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 02 (net-new authenticated `GET /document-relationships` thin wrapper calling the shared fn — no audit on read, no fork).
 
 > **✅ VERIFICATION GAPS CLOSED (gap-closure 116-05 EXECUTED 2026-06-20 — `116-05-SUMMARY.md`):** Both confirmed BLOCKERs from `116-VERIFICATION.md` (4/6 must-haves) are now fixed and proven by NON-VACUOUS live regression tests (RED at base, GREEN after fix on :54322). Both were read-side defects — NO migration.
 > - **CR-01 (SC#2/REL-04 leak-safety) — CLOSED:** `_resolve_readable_latest` global-by-id leg is now `.eq("is_latest", True)`-gated (folds IN-01) AND a global-leg match's followed-to-latest row is re-verified to STILL be in the caller's global-visible folder set before returning (else `None`). A non-owner replaying an old-global id whose latest moved private now gets `None` → the D-116-9 mask fires. Own leg unchanged. `test_116_tool_leak.py::test_global_old_version_does_not_leak_private_latest` was RED (leaked v2's private id/filename/`metadata title="A-versioned-PRIVATE-v2"` to B) → GREEN; non-vacuity: owner A follows v1→own latest v2.
@@ -53,10 +55,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: Not started
+Plan: 2 of 4
 Status: Ready to execute
-Resume file: .planning/phases/117-document-relationships-panel-ui/117-CONTEXT.md
-Last activity: 2026-06-20 -- Phase 117 planning complete
+Resume file: None
+Last activity: 2026-06-20
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
