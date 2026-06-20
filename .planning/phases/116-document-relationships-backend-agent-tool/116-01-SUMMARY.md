@@ -132,6 +132,10 @@ None - no external service configuration required this plan. Migration 075 is au
 - **Plan 04 (BLOCKING)** applies migration 075 + regenerates `full-schema.sql` (which makes the idempotency tests race-immune, not just SELECT-then-INSERT).
 - No blockers.
 
+## Self-Check: PASSED
+
+All 14 created files verified present; all 3 commits (`9ec29971`, `f9bce905`, `443c5648`) verified in git log.
+
 ---
 *Phase: 116-document-relationships-backend-agent-tool*
 *Completed: 2026-06-20*

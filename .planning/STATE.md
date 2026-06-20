@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T10:01:48.746Z"
-last_activity: 2026-06-20 -- Phase 116 planning complete
+last_updated: "2026-06-20T10:22:59.002Z"
+last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 33
-  completed_plans: 29
+  completed_plans: 30
   percent: 64
 ---
 
@@ -22,11 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 116 — document relationships — backend + agent tool
+**Current focus:** Phase 116 — document-relationships-backend-agent-tool
 
 ## Current Position
 
-Phase: 116
+Phase: 116 (document-relationships-backend-agent-tool) — EXECUTING (Plan 2 of 4)
+
+**116-01 (Wave 1, REL-01/03/04 substrate) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `9ec29971` 10 Wave-0 scaffolds + migration 075 FILE, `f9bce905` models + service): landed the Phase 116 substrate. `RelationshipCreate` (Literal rel_type → forged type 422 at parse; DB CHECK 071:68 defense-in-depth) + `RelationshipResponse`. `document_relationship_service.py` clones `document_view_service` (`_client`, `_uid` verbatim, `_TABLE`): **`_resolve_readable_latest`** — the shared FastAPI-free own-or-global EXACT-filename latest-version resolver (RESEARCH OQ2 one-core-no-fork; follows a creation-time id FORWARD to its current `(user_id, filename, is_latest=True)` row — read-time follow-to-latest D-116-1a); `create_relationship` idempotent via 23505-catch → re-fetch existing edge (D-116-6); `delete_relationship` own-scoped (`.eq user_id`) → False on cross-user miss → router 404. Migration `075_document_relationships_idempotency_index.sql` (additive partial unique index `(user_id, source_doc_id, target_doc_id, rel_type)` — the only race-immune guarantee; **FILE only, un-applied — Plan 04 BLOCKING applies it + regenerates full-schema.sql**). 10 Wave-0 scaffolds (4 unit + 6 integration; suite exits 0): `test_116_tool_schema` recursively rejects anyOf/oneOf AND multi-type `type` arrays (the a5b0b917 Gemini trap); `test_116_tool_leak` is the NON-vacuous two-user mask proof (clone of `test_115_tool_global_leak` harness). Anti-pattern (own-only + partial-ilike `resolve_document_id`) NOT reused; no bare `.execute()` (all via aexec). 1 deviation [Rule 1]: reworded 2 service docstrings that named `resolve_document_id`/`.execute()` literally and tripped source-grep acceptance tests (cosmetic, no behavior change). **Net-new unit failures = 0** (base-checkout proof: base 60 failed/943 passed → with-plan 60 failed/951 passed; +8 = new GREEN test_116_handler rows). threads.py untouched (G-5). SUMMARY: `116-01-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 02 (REST surface — clone document_views CRUD against this service).
+
 **Phase: 114 — Virtual Folders — Range/Date Filters + View Builder + Sidebar — READY TO DISCUSS** — v3.0 Document Management (frontend + typed/indexed date columns + relative-date operators that register ADDITIVELY onto the 113 closed compiler; the guided view/filter builder UI + sidebar render-as-folder). **G-2 sketch FIRES** (live UI builder). No CONTEXT yet. **Phase 113 is now ALL THREE GATES CLEAR (validate-phase done 2026-06-19 — nyquist-compliant, 23/23 green live, zero gaps). NEXT = /gsd:discuss-phase 114** (G-2: sketch first).
 
 _Prior (113, 2026-06-18/19 — ALL THREE GATES CLEAR: verify 4/4 + secure 15/15 + validate nyquist-compliant 23/23 live, zero gaps):_ **Phase: 113 — Virtual Folders — Filter Compiler + Equality Views (backend; VIEW-01/02/04/05/06) — ✅ COMPLETE.** Validate-phase 2026-06-19 (State A audit): stale plan-time draft reconciled to executed reality — 10 unit + 13 integration on :54322 all green; **SC#3/VIEW-06 two-user global-view leak proof promoted manual-only → automated (`test_113_view_global_leak.py` 3/3)**; zero manual-only remaining; `113-VALIDATION.md` @ `28108651`. SECURE 2026-06-19: **15/15 threats CLOSED, threats_open 0** (113-SECURITY.md, register authored at plan-time; AR-113-01 = WR-03 global-view owner-UUID disclosure ACCEPTED → SEED-091, pre-existing app-wide). The deferred **SC#3/VIEW-06 two-user live GLOBAL-view leak test was authored + RUN live (`test_113_view_global_leak.py` 3/3 on :54322, orchestrator-reconfirmed not-skipped + assertions non-vacuous: disjoint ids+filenames, differing totals, 404-not-403)** — the "static would false-green" lesson honored, RLS/DEFINER label is NOT proof. Auditor touched no app/ impl files. 3 plans sequential-on-main-tree (113-01 closed-registry filter-AST→`metadata @> $1::jsonb` compiler + Pydantic AST + 7 unit incl. SC#4 injection → 113-02 `document_view_service.py` clone of `metadata_field_service` [is_global hard-False, aexec, own-OR-global 404-not-403] → 113-03 `/document-views` router [CRUD + per-viewer leak-safe resolve scoped from the CALLER not the view owner, VIEW-06] + main.py mount + live :54322 integration). ZERO migrations (table+RLS+audit+GIN live from 110). **verify 4/4 must-haves + 20/20 live tests on :54322 (orchestrator independently re-ran twice) + regression 69/69 prior-phase + schema-drift none.** Code review 0C/5W/4I → ALL resolved after a 5-agent adversarial re-verification (workflow `wf_771026c7-211`): WR-01 reviewer framing was WRONG (the 422-vs-404 branch is NOT an oracle — pure function of the caller's own filter; uniform-404 already held) but reordered own-scoped-404-before-validation anyway for contract-by-construction (`4fa47c9a`); WR-02 `user_id`→`.or_()` hardened with `_uid()=str(UUID(...))` guard on the service-role/RLS-bypassed gate (`d09dce81`); IN-03 dead `ViewResolveResponse` model removed (112 CR-01 landmine, `c1ddec18`); WR-03 global-view owner-UUID leak = real but **PRE-EXISTING APP-WIDE** (global folders+skills identical) → deferred app-wide to SEED-091 (`95cbf459`). KEY: secure-phase would NOT have caught WR-01/02/03 (none maps to a declared PLAN threat) — but the live SC#3 leak test (now run) plus the WR-01/02 code fixes closed the gap by construction. Remaining gate: validate-phase (Nyquist). begin-phase clean this run (no balloon).
@@ -36,10 +39,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: Not started
+Plan: 2 of 4
 Status: Ready to execute
-Resume file: .planning/phases/116-document-relationships-backend-agent-tool/116-CONTEXT.md
-Last activity: 2026-06-20 -- Phase 116 planning complete
+Resume file: None
+Last activity: 2026-06-20 -- 116-01 executed (substrate: models + shared resolver + idempotent create + own-scoped delete + migration 075 file + 10 Wave-0 scaffolds)
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
