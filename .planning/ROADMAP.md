@@ -231,7 +231,7 @@
 - [x] 117-01-PLAN.md (Wave 1) — extract the leak-safe read into shared `get_related_documents` (D-117-7) + refactor the agent handler (behavior-preserving, 116 suite stays green) + carry `relationship_id` through (A6) + 3 Wave-0 backend test scaffolds
 - [x] 117-02-PLAN.md (Wave 2) — thin authenticated `GET /document-relationships?document_id=` route (no fork, no audit, uniform 404) + LIVE two-user ROUTE leak proof on :54322 + no-fork grep guard GREEN
 - [x] 117-03-PLAN.md (Wave 3) — frontend types (RelationshipRow nullable masked id) + 3 api.ts client fns (list/create/delete, 404-tolerant)
-- [ ] 117-04-PLAN.md (Wave 4) — `RelationshipsSection` (grouped Outgoing/Incoming, inverse labels, masked rows, honest states, re-fetch-not-optimistic, reachable remove) + `CreateLinkDialog` (MoveToFolderDialog shell, type-first bespoke typeahead combobox, per-type exclusion) mounted in `DocumentDetailPanel` + 3 frontend Wave-0 tests
+- [x] 117-04-PLAN.md (Wave 4) — `RelationshipsSection` (grouped Outgoing/Incoming, inverse labels, masked rows, honest states, re-fetch-not-optimistic, reachable remove) + `CreateLinkDialog` (MoveToFolderDialog shell, type-first bespoke typeahead combobox, per-type exclusion) mounted in `DocumentDetailPanel` + 3 frontend Wave-0 tests
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) — SATISFIED (sketches 034 + 035, winner A, operator-approved 2026-06-20, audit-hardened `wf_1ec2afac-687`; `references/document-relationships-panel.md`). (UX-02 cross-cutting acceptance.)
 
@@ -276,7 +276,7 @@
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
-| 117. Document Relationships — Panel UI | 3/4 | In Progress|  |
+| 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
 | 118. Auto-Classification | 0/? | Not started | - |
 | 119. Document Governance Health | 0/? | Not started | - |
 

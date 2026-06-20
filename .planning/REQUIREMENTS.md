@@ -42,7 +42,7 @@
 
 ### Document Relationships (REL)
 - [x] **REL-01**: User can create a typed link between two documents (supersedes / amends / references / attached-to).
-- [ ] **REL-02**: User can see a document's relationships in a panel on its detail view.
+- [x] **REL-02**: User can see a document's relationships in a panel on its detail view.
 - [x] **REL-03**: User can remove a relationship.
 - [x] **REL-04**: The agent can retrieve a document's related documents via a `get_related_documents` tool.
 
@@ -106,7 +106,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
-| REL-02 | Phase 117 — Document Relationships (Panel UI) | Pending |
+| REL-02 | Phase 117 — Document Relationships (Panel UI) | Complete |
 | CLASS-01 | Phase 118 — Auto-Classification | Pending |
 | CLASS-02 | Phase 118 — Auto-Classification | Pending |
 | CLASS-03 | Phase 118 — Auto-Classification | Pending |
