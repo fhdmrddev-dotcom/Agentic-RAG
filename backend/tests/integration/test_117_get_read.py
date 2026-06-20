@@ -325,3 +325,69 @@ async def test_created_link_appears(pg_pool, user_with_two_docs):
     assert removed is True
     gone = await svc.get_related_documents(caller, document_id=ctx["subject"], supabase=sb)
     assert gone.get("total", 0) == 0, f"the removed link must disappear from the read; got {gone}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan 02 — confirm the read SHAPE (direction / label / relationship_id) surfaces
+# through the REAL HTTP route, not just the in-process shared fn. Drives the route
+# via a TestClient with the auth + supabase boundary deps overridden (the handler
+# body — including the no-response_model plain-dict return that the 112 CR-01 lesson
+# requires — runs unchanged).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _route_client(caller_id: str, sb):
+    """A TestClient hitting the REAL GET route authed as ``caller_id`` against the REAL
+    service-role supabase. Overrides ONLY the auth + client boundary deps; restores the
+    app's prior overrides on teardown so a route test never contaminates the next test."""
+    from fastapi.testclient import TestClient
+
+    from app.dependencies import get_current_user, get_supabase
+    from app.main import app
+
+    prev = dict(app.dependency_overrides)
+    app.dependency_overrides[get_current_user] = lambda: {"id": caller_id, "email": f"{caller_id}@test.local"}
+    app.dependency_overrides[get_supabase] = lambda: sb
+
+    def _teardown():
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(prev)
+
+    return TestClient(app), _teardown
+
+
+@pytest.mark.asyncio
+async def test_route_returns_direction_label_relationship_id(pg_pool, one_user_both_directions):
+    """The REAL GET route returns subject/total/documents with direction + label +
+    relationship_id for BOTH directions (inverse label on the incoming row) — the exact
+    shape the panel (Plan 04) renders. The no-response_model plain-dict return preserves
+    these keys (the 112 CR-01 lesson — a tight response_model would strip them)."""
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    sb = _supabase_or_skip()
+    ctx = one_user_both_directions
+
+    client, teardown = _route_client(str(ctx["user"]), sb)
+    try:
+        resp = client.get("/document-relationships", params={"document_id": ctx["subject"]})
+    finally:
+        teardown()
+
+    assert resp.status_code == 200, f"a readable subject must be 200 over the route; got {resp.status_code}: {resp.text}"
+    out = resp.json()
+    assert out["subject"]["document_id"] == ctx["subject"]
+    assert out.get("total") == 2, f"expected 1 outgoing + 1 incoming over the route, got {out}"
+
+    by_dir = {(r["direction"], r["label"]): r for r in out["documents"]}
+    # OUTGOING keeps the verb; INCOMING flips to the inverse label (D-116-2 / D-117-6).
+    assert ("outgoing", "supersedes") in by_dir, f"missing outgoing supersedes edge over the route: {out}"
+    assert by_dir[("outgoing", "supersedes")]["document_id"] == ctx["superseded"]
+    assert ("incoming", "referenced_by") in by_dir, f"missing incoming referenced_by edge over the route: {out}"
+    assert by_dir[("incoming", "referenced_by")]["document_id"] == ctx["referer"]
+
+    # Every row carries relationship_id (the panel's remove ✕ needs it) over the route (A6).
+    assert by_dir[("outgoing", "supersedes")]["relationship_id"] == ctx["rel_out"]
+    assert by_dir[("incoming", "referenced_by")]["relationship_id"] == ctx["rel_in"]
+    for r in out["documents"]:
+        assert r.get("relationship_id"), f"every route row must carry relationship_id: {r}"

@@ -1,16 +1,24 @@
-"""Phase 117 Wave-0 — the two-user cross-viewer leak proof at the SHARED-FN boundary.
+"""Phase 117 — the two-user cross-viewer leak proof at the SHARED-FN AND the HTTP-ROUTE.
 
-THE mandatory live proof of REL-02 / SC#1 / D-117-8 leak-safe masking at the boundary
-the NEW GET route (Plan 02) will inherit. The panel cannot call an agent tool, so D-117-7
-extracts the leak-safe outgoing+incoming traversal into the shared
-``document_relationship_service.get_related_documents`` (Task 2). This file drives THAT
-shared fn directly with two real callers — proving the masking holds in the extracted
-core, so the route that wraps it (Plan 02) cannot leak. Plan 02 adds the test that drives
-the HTTP route itself; the shared-core boundary proven here is what the route inherits.
+THE mandatory live proof of REL-02 / SC#1 / D-117-8 leak-safe masking at BOTH the shared-core
+boundary (Plan 01) AND the net-new GET route (Plan 02 — the caller the secure-phase must
+confirm). The panel cannot call an agent tool, so D-117-7 extracts the leak-safe
+outgoing+incoming traversal into the shared
+``document_relationship_service.get_related_documents`` (Plan 01) and Plan 02 adds the THIN
+``GET /document-relationships?document_id={id}`` route over it.
+
+  * The shared-fn tests (``test_shared_fn_*``) drive the extracted core directly with two
+    real callers — proving the masking holds in the core the route inherits.
+  * The ROUTE tests (``test_route_*``, Plan 02) drive the REAL HTTP endpoint via a FastAPI
+    ``TestClient`` with ``get_current_user`` overridden to inject A vs B and ``get_supabase``
+    overridden to the REAL service-role client — so the WHOLE route handler runs (the JWT
+    auth boundary → the threadpool-wrapped shared fn → the uniform-404 mapping), not just the
+    in-process fn. This is the net-new caller surface that the 116 suite (TOOL boundary only)
+    never exercised; a route fork would re-open the SC#1 leak here.
 
 This clones ``test_116_tool_leak.py``'s harness VERBATIM (asyncpg pool, ``_supabase_or_skip``,
 FK-safe seed/teardown, OWN-scoped per-user edges, GLOBAL-folder subject both read, PRIVATE
-target only owner reads) but exercises the SHARED FN instead of the tool handler:
+target only owner reads):
 
   * SUBJECT — A's GLOBAL-folder doc → BOTH A and B can read it (so both resolve the
     subject; the masking is genuinely on the TARGET, not "B can't read the subject").
@@ -20,12 +28,15 @@ target only owner reads) but exercises the SHARED FN instead of the tool handler
     ``"linked document (no access)"`` with ``document_id is None`` — never the private
     id / filename / metadata.
 
-Marked for secure-phase confirmation (the LIVE two-user proof — D-117-8): the RLS label /
-caller-scope comment is NOT proof (the D-102 / D-110-5 "static would false-green" lesson);
-only two real callers driving the REAL shared fn against live :54322 closes this threat.
+Marked for secure-phase confirmation (the LIVE two-user ROUTE proof — D-117-8 / T-117-02-01):
+the RLS label / caller-scope comment is NOT proof (the D-102 / D-110-5 "static would
+false-green" lesson); only two real callers driving the REAL route against live :54322 closes
+this threat. The non-vacuity twin (A sees the real filename over the SAME subject) proves the
+mask is access-driven, not a blanket null.
 
-Imports are inside the test bodies so collection never errors while the shared fn is still
-unbuilt (RED until Task 2). The masked-row assertion is xfail(strict=False) until then.
+Imports are inside the test bodies so collection never errors. The shared fn + the route both
+ship by Plan 02, so the assertions run GREEN live; the historic xfail markers on the shared-fn
+tests are kept harmless (xfail strict=False → xpass).
 """
 
 import asyncio
@@ -323,4 +334,153 @@ async def test_shared_fn_shows_real_filename_for_owner(pg_pool, two_users_with_l
     assert _MASK not in blob_a, "A must NOT see the mask for a target A can read"
     assert ctx["target"] in {r.get("document_id") for r in out_a.get("source_refs", [])}, (
         "A (who can read the target) must get a citable source_ref for it"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan 02 — the LIVE two-user proof at the HTTP ROUTE boundary (the net-new caller
+# the secure-phase must confirm). Drives the REAL ``GET /document-relationships``
+# handler via a FastAPI TestClient with ``get_current_user`` overridden to inject A
+# vs B and ``get_supabase`` overridden to the REAL service-role client — so the WHOLE
+# route runs (auth dependency → the threadpool-wrapped shared fn → the uniform-404
+# mapping), not the in-process fn. A route fork would re-open the leak HERE.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _route_client(caller_id: str, sb):
+    """A FastAPI TestClient hitting the REAL route, authed as ``caller_id`` against the
+    REAL service-role supabase. Overrides ONLY the two boundary deps (auth + client) so
+    the handler body — the actual ``get_relationships`` route, its 404 mapping, and the
+    shared fn it calls — runs unchanged. Returns ``(client, teardown)``; the caller MUST
+    invoke ``teardown()`` to restore the app's dependency overrides (so a route test never
+    contaminates the next test's auth/client)."""
+    from fastapi.testclient import TestClient
+
+    from app.dependencies import get_current_user, get_supabase
+    from app.main import app
+
+    prev = dict(app.dependency_overrides)
+    app.dependency_overrides[get_current_user] = lambda: {"id": caller_id, "email": f"{caller_id}@test.local"}
+    app.dependency_overrides[get_supabase] = lambda: sb
+
+    def _teardown():
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(prev)
+
+    return TestClient(app), _teardown
+
+
+@pytest.mark.asyncio
+async def test_route_masks_unreadable_endpoint_for_other_viewer(pg_pool, two_users_with_link):
+    """B, GETting the SAME subject A can also read over the REAL HTTP route, sees the far
+    endpoint MASKED (``document_id is None`` + the mask string) and NEVER the private target's
+    id / filename / metadata — the net-new route caller cannot leak (T-117-02-01 / SC#1).
+
+    [SECURE-PHASE: the LIVE two-user ROUTE leak proof — confirm non-vacuous on :54322, driving
+    the REAL endpoint (not the in-process fn), not via the RLS label.]"""
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    sb = _supabase_or_skip()
+    ctx = two_users_with_link
+
+    client, teardown = _route_client(str(ctx["user_b"]), sb)
+    try:
+        resp = client.get("/document-relationships", params={"document_id": ctx["subject"]})
+    finally:
+        teardown()
+
+    # B genuinely resolved the SUBJECT (it's in A's global folder) → a real traversal, not a 404.
+    assert resp.status_code == 200, (
+        f"B must read the global-folder SUBJECT over the route (non-vacuous setup); got "
+        f"{resp.status_code}: {resp.text}"
+    )
+    body = resp.json()
+    # NON-VACUITY: the edge ROW is present for B (the masked row), so the mask path demonstrably ran.
+    assert body.get("total", 0) >= 1, (
+        f"B must see the related-edge ROW (masked) over the route, proving the mask path ran; got {body}"
+    )
+
+    masked = [r for r in body["documents"] if r["filename"] == _MASK]
+    assert masked, f"the unreadable endpoint must render as {_MASK!r} over the route; got {body}"
+    assert all(r["document_id"] is None for r in masked), (
+        "a masked row must carry document_id=None over the route — never the unreadable target's id"
+    )
+
+    blob = json.dumps(body)
+    assert ctx["target_real_title"] not in blob, (
+        "B must NEVER see the unreadable target's real filename / metadata over the route"
+    )
+    assert ctx["target"] not in blob, "B must NEVER see the unreadable target's id over the route"
+    assert ctx["target"] not in {r.get("document_id") for r in body.get("source_refs", [])}, (
+        "the masked endpoint must contribute NO citable source_ref for B over the route"
+    )
+
+
+@pytest.mark.asyncio
+async def test_route_shows_real_filename_for_owner(pg_pool, two_users_with_link):
+    """A, GETting the SAME subject over the REAL route, sees the target's REAL filename — the
+    mask is ACCESS-DRIVEN per-viewer, not a blanket null (the non-vacuity twin of the route
+    mask proof; proves the masked B-result above is genuine, not "the route always nulls")."""
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    sb = _supabase_or_skip()
+    ctx = two_users_with_link
+
+    client, teardown = _route_client(str(ctx["user_a"]), sb)
+    try:
+        resp = client.get("/document-relationships", params={"document_id": ctx["subject"]})
+    finally:
+        teardown()
+
+    assert resp.status_code == 200, f"A must read its own subject over the route; got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert body.get("total", 0) >= 1, f"A must see its own edge over the route; got {body}"
+
+    blob_a = json.dumps(body)
+    assert ctx["target_real_title"] in blob_a, (
+        "A (who can read the target) MUST see its real filename over the route — the mask is per-viewer"
+    )
+    assert _MASK not in blob_a, "A must NOT see the mask over the route for a target A can read"
+    assert ctx["target"] in {r.get("document_id") for r in body.get("source_refs", [])}, (
+        "A (who can read the target) must get a citable source_ref over the route"
+    )
+
+
+@pytest.mark.asyncio
+async def test_route_uniform_404_for_unreadable_or_unknown_subject(pg_pool, two_users_with_link):
+    """An unreadable/unknown subject over the route is a UNIFORM 404 — never 403, never a 200
+    with a partial leak (T-117-02-03 — no existence-probe oracle; mirrors resolve_view).
+
+    Two probes, both 404: (1) a syntactically-valid but NONEXISTENT document id; (2) the
+    same id driven as B against... a private doc only A can read. Both collapse to the SAME
+    404 so a probe can't distinguish 'exists but unseeable' from 'does not exist'."""
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+
+    sb = _supabase_or_skip()
+    ctx = two_users_with_link
+
+    # (1) a well-formed-but-unknown id → 404 (not 403, not 200).
+    unknown_id = str(uuid4())
+    client, teardown = _route_client(str(ctx["user_b"]), sb)
+    try:
+        resp_unknown = client.get("/document-relationships", params={"document_id": unknown_id})
+        # (2) B asking for A's PRIVATE target (a real doc B cannot read) → the SAME 404,
+        #     never a 403 and never a 200 that would confirm the doc exists.
+        resp_private = client.get("/document-relationships", params={"document_id": ctx["target"]})
+    finally:
+        teardown()
+
+    assert resp_unknown.status_code == 404, (
+        f"an unknown subject must be a uniform 404 (no oracle); got {resp_unknown.status_code}: {resp_unknown.text}"
+    )
+    assert resp_private.status_code == 404, (
+        "a real-but-unreadable subject (B asking for A's private doc) must be the SAME 404 — "
+        f"never 403, never 200; got {resp_private.status_code}: {resp_private.text}"
+    )
+    # The two indistinguishable responses are the no-oracle proof: same status, same shape.
+    assert resp_unknown.status_code == resp_private.status_code, (
+        "exists-but-unseeable and does-not-exist must be INDISTINGUISHABLE (no existence oracle)"
     )
