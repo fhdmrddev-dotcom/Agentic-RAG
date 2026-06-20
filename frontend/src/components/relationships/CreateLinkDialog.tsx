@@ -216,7 +216,11 @@ export function CreateLinkDialog({
               type="text"
               role="combobox"
               aria-expanded={listVisible}
-              aria-controls={listboxId}
+              // Only reference the listbox while it is actually in the tree (WR-04):
+              // the <ul id={listboxId}> is conditionally rendered on listVisible, so a
+              // static aria-controls would dangle (point at a non-existent element)
+              // when collapsed. aria-expanded already conveys popup presence.
+              aria-controls={listVisible ? listboxId : undefined}
               aria-activedescendant={activeOptionId}
               aria-autocomplete="list"
               autoComplete="off"
