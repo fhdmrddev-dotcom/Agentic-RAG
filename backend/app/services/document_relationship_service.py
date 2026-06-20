@@ -134,14 +134,26 @@ async def _resolve_readable_latest(
     Returns the latest accessible ``documents`` row dict or None. Never raises on a miss
     (the calm-resolution contract). The own-only + partial-match filename lookup in
     ``retrieval_service`` is NOT reused (T-116-01-04 / D-116-3).
+
+    Leak-safety invariant (CR-01 / gap-closure Plan 05): readable = own-latest ∪
+    global-latest, exactly mirroring ``list_documents`` (``documents.py:540-561``). A
+    global-leg match NEVER launders an old version into a PRIVATE latest — the global
+    by-id leg is ``is_latest``-gated (so an old version in a global folder is not
+    independently readable) AND the follow-to-latest target of a global match is
+    re-verified to still sit in the caller's global-visible folder set before it is
+    returned (so a latest that moved out of view → None).
     """
     if by_filename:
         return await _latest_by_filename(doc_id_or_filename, caller, supabase=supabase)
 
     client = _client(supabase)
 
-    # Step 1 — can the caller READ this id at all? (own OR global-folder, any version row
-    # that exists). We fetch the row to learn its owner + filename.
+    # Step 1 — can the caller READ this id at all? (own OR global-folder). We fetch the
+    # row to learn its owner + filename. Track whether the match came from the GLOBAL leg
+    # (vs the OWN leg) — the Step-2 visibility re-check below applies ONLY to the global
+    # path (the caller always owns its own follow-to-latest target, user_id == caller).
+    global_folder_ids: list[str] = []
+    from_global = False
     own = await aexec(
         client.table("documents")
         .select("*")
@@ -152,7 +164,10 @@ async def _resolve_readable_latest(
     row = own.data[0] if own.data else None
 
     if row is None:
-        # Not the caller's own — is it in a globally-visible folder the caller can see?
+        # Not the caller's own — is it the LATEST version in a globally-visible folder?
+        # An OLD version sitting in a global folder is NOT independently readable
+        # (mirror ``_latest_by_filename:102`` and ``list_documents:558``), so the global
+        # by-id leg is ``is_latest``-gated. (Fold-in IN-01 — the symmetric is_latest gate.)
         global_folder_ids = await get_globally_visible_folder_ids(client, str(caller))
         if global_folder_ids:
             glob = await aexec(
@@ -160,9 +175,12 @@ async def _resolve_readable_latest(
                 .select("*")
                 .eq("id", doc_id_or_filename)
                 .in_("folder_id", global_folder_ids)
+                .eq("is_latest", True)
                 .limit(1)
             )
-            row = glob.data[0] if glob.data else None
+            if glob.data:
+                row = glob.data[0]
+                from_global = True
 
     if row is None:
         return None  # unreadable / unknown id → None (no existence leak, no raise)
@@ -170,20 +188,31 @@ async def _resolve_readable_latest(
     # Step 2 — follow forward to the LATEST accessible version of the SAME document
     # (same owner + filename), so an old-version id resolves to the current row.
     if row.get("is_latest"):
-        return row
-    owner = row.get("user_id")
-    fname = row.get("filename")
-    if owner is None or fname is None:
-        return row
-    latest = await aexec(
-        client.table("documents")
-        .select("*")
-        .eq("user_id", _uid(owner))
-        .eq("filename", fname)
-        .eq("is_latest", True)
-        .limit(1)
-    )
-    return latest.data[0] if latest.data else row
+        latest_row = row
+    else:
+        owner = row.get("user_id")
+        fname = row.get("filename")
+        if owner is None or fname is None:
+            return row
+        latest = await aexec(
+            client.table("documents")
+            .select("*")
+            .eq("user_id", _uid(owner))
+            .eq("filename", fname)
+            .eq("is_latest", True)
+            .limit(1)
+        )
+        latest_row = latest.data[0] if latest.data else row
+
+    # Step 2b (CR-01 post-follow visibility re-check): when the source row matched via the
+    # GLOBAL leg, the followed-to-latest row must ITSELF still be caller-visible — i.e. its
+    # folder is still in the caller's global-visible set. If the latest moved OUT of view
+    # (e.g. re-uploaded/moved into a private folder), return None so a non-owner can never
+    # launder an old-global id into the owner's PRIVATE latest. The OWN leg needs no
+    # re-check (the caller owns its follow-to-latest target across versions).
+    if from_global and latest_row.get("folder_id") not in global_folder_ids:
+        return None
+    return latest_row
 
 
 async def create_relationship(
