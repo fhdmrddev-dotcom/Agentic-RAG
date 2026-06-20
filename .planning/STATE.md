@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: executing
-last_updated: "2026-06-20T13:20:00.000Z"
+status: ready_to_plan
+last_updated: 2026-06-20T13:42:36.991Z
 last_activity: 2026-06-20 -- Phase 116 gap-closure 116-05 executed (CR-01 + CR-02 BLOCKERs closed)
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 35
   completed_plans: 34
-  percent: 66
+  percent: 64
+stopped_at: Phase 116 complete (5/5) — ready to discuss Phase 117
 ---
 
 # Project State
@@ -22,11 +23,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 116 — document-relationships-backend-agent-tool
+**Current focus:** Phase 117 — document relationships — panel ui
 
 ## Current Position
 
-Phase: 116 (document-relationships-backend-agent-tool) — EXECUTING (gap closure 116-05 DONE; 5/5 plans)
+Phase: 117
 
 > **✅ VERIFICATION GAPS CLOSED (gap-closure 116-05 EXECUTED 2026-06-20 — `116-05-SUMMARY.md`):** Both confirmed BLOCKERs from `116-VERIFICATION.md` (4/6 must-haves) are now fixed and proven by NON-VACUOUS live regression tests (RED at base, GREEN after fix on :54322). Both were read-side defects — NO migration.
 > - **CR-01 (SC#2/REL-04 leak-safety) — CLOSED:** `_resolve_readable_latest` global-by-id leg is now `.eq("is_latest", True)`-gated (folds IN-01) AND a global-leg match's followed-to-latest row is re-verified to STILL be in the caller's global-visible folder set before returning (else `None`). A non-owner replaying an old-global id whose latest moved private now gets `None` → the D-116-9 mask fires. Own leg unchanged. `test_116_tool_leak.py::test_global_old_version_does_not_leak_private_latest` was RED (leaked v2's private id/filename/`metadata title="A-versioned-PRIVATE-v2"` to B) → GREEN; non-vacuity: owner A follows v1→own latest v2.
@@ -53,10 +54,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 5 of 5 (gap-closure 116-05 done)
-Status: Executing Phase 116 — gap closure complete, awaiting /gsd:verify-work 116
+Plan: Not started
+Status: Ready to plan
 Resume file: None
-Last activity: 2026-06-20 -- Phase 116 gap-closure 116-05 executed (CR-01 + CR-02 BLOCKERs closed)
+Last activity: 2026-06-20
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
