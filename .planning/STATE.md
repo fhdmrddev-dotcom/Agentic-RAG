@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T19:10:49.896Z"
+last_updated: "2026-06-20T19:22:00.000Z"
 last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 38
-  completed_plans: 36
-  percent: 73
+  completed_plans: 38
+  percent: 76
 ---
 
 # Project State
@@ -26,7 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 117 (document-relationships-panel-ui) — EXECUTING (2 of 4 plans complete)
+Phase: 117 (document-relationships-panel-ui) — EXECUTING (3 of 4 plans complete)
+
+**117-03 (Wave 3, REL-02 frontend interface seam — types + API client) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `3f3078bb` relationship TS types, `4fc2ea14` 3 client fns; SUMMARY `117-03-SUMMARY.md`): the interface-first frontend foundation Plan 04's components implement against. **`types/index.ts`** (+68 lines, no existing type touched): `RelType` (the closed `"supersedes"|"amends"|"references"|"attached_to"` union, mirrors `RelationshipCreate.rel_type` Literal), `RelationshipRow` (the compact GET row — **`document_id: string | null`**, the masked "no access" endpoint encoded as a TYPE-LEVEL leak guard so the UI cannot render a leaked id, D-117-8; + `filename`/`rel_type`/`direction`/`label`/optional `relationship_id`, mirrors `get_related_documents`'s `documents[]`), `RelatedDocumentsResponse` (`subject`+`total`+`documents[]` — the plain GET dict), `Relationship` (the POST 201 body, mirrors `RelationshipResponse`). **`api.ts`** (+68/-1, adjacent to the `document-views` family, same `getAuthHeaders`+`fetch`+throw conventions): `listRelationships(documentId)` → `GET /document-relationships?document_id=` → `RelatedDocumentsResponse` (throws on non-ok → honest error state); `createRelationship(source_doc_id, target_doc_id, rel_type)` → `POST` with the EXACT body `{source_doc_id, target_doc_id, rel_type}` → `Relationship`; `deleteRelationship(id)` → `DELETE /{id}`, **404-tolerant** (`status !== 404` — own-scoped no-op, the `deleteView` pattern). **1 deviation [Rule 3]:** omitted the unused `RelationshipRow` from the `api.ts` import (the 3 fns don't reference it; `noUnusedLocals` + `verbatimModuleSyntax` would have failed `tsc`) — it stays exported from `types/index.ts` for Plan 04's row render. Decision: `relationship_id` typed OPTIONAL per the plan spec though the backend always sends it (superset-safe; the consumer null-checks before wiring the remove ✕). **`tsc --noEmit` clean (EXIT 0)** on the final state; all Task 1+2 acceptance greps pass. **Net-new failures = 0** (base-checkout of the 2 changed non-test files: base AND HEAD both ran 17 failed / 806 passed / 823 total across the SAME 7 pre-existing streaming/chat/provider/model-info test files — `diff` of failing-file lists EMPTY; none touch relationship types or the api client). Frontend-only; no backend change, no new package, no new migration, `threads.py` untouched (G-5). SUMMARY: `117-03-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 04 (the `RelationshipsSection` PanelSection in `DocumentDetailPanel` + the `CreateLinkDialog` typeahead picker — the UI that consumes this seam; G-2 sketch `document-relationships-panel.md` is the locked visual contract).
 
 **117-02 (Wave 2, REL-02 REST read seam — net-new authenticated GET) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `11bd6f86` thin GET route, `343016e8` LIVE two-user ROUTE leak + read-shape tests; SUMMARY `117-02-SUMMARY.md`): added the net-new authenticated **`GET /document-relationships?document_id={id}`** to the existing Phase-116 router — a THIN wrapper: auth (caller-scoped JWT) → the shared `document_relationship_service.get_related_documents` (Plan 01) → the plain dict; `None` (unreadable/unknown subject) → UNIFORM 404 (no existence-probe oracle, mirrors `document_views.py:resolve_view`); **NO `response_model`** (the 112 CR-01 lesson — preserves `direction`/`label`/`relationship_id`/masked rows); **NO audit** (`VALID_ACTION_TYPES` has no `relationship.read` enum, confirmed); **NO bare supabase call** (the shared fn rides `aexec`); **NO fork** (the route contains 0 mask strings + 0 `.in_(` edge queries; `test_117_no_fork.py` GREEN). POST/DELETE byte-untouched. **The net-new caller surface the 116 TOOL-only suite never exercised** → this plan adds the **LIVE two-user ROUTE leak proof**: 3 route tests drive the REAL HTTP endpoint via a FastAPI `TestClient` with `get_current_user` overridden to inject A vs B + `get_supabase` overridden to the REAL service-role client (so the WHOLE handler runs — auth boundary → threadpool-wrapped shared fn → 404 mapping, not the in-process fn): B over a subject A also reads sees the far endpoint MASKED (`document_id` None + mask string), NEVER A's private id/filename/metadata; A over the SAME subject sees the REAL filename (non-vacuity — the mask is access-driven, not a blanket null); an unknown id AND a real-but-unreadable subject both collapse to the SAME 404 (never 403/200 — no oracle). Plus a route-level `direction`/`label`/`relationship_id` read-shape proof. **All 4 new route tests PASS live on :54322** (verified not-skipped); **full `116 or 117` set 40 passed / 7 xpassed / 0 failed** (up from Plan 01's 36+7 — 116 regression fully preserved). **1 deviation [Rule 1]:** removed two literal substrings from the route docstring (`"linked document (no access)"` and `relationship.read`) because the no-fork grep guard + the plan's acceptance grep are literal-substring checks — describing-without-quoting keeps them honest + GREEN (route behavior unchanged). `threads.py` byte-untouched (G-5; `git diff 0801317d` = 0). **Net-new failures = 0** (base-checkout of the ONE changed source file: base 60 failed/963 passed == HEAD 60 failed/963 passed). No new package, no new migration. SUMMARY: `117-02-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 03 (frontend — the `api.ts` client fns + types + the relationship `PanelSection` in `DocumentDetailPanel`, the picker dialog).
 
@@ -57,7 +59,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-20
