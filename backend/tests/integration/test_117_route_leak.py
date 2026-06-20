@@ -484,3 +484,47 @@ async def test_route_uniform_404_for_unreadable_or_unknown_subject(pg_pool, two_
     assert resp_unknown.status_code == resp_private.status_code, (
         "exists-but-unseeable and does-not-exist must be INDISTINGUISHABLE (no existence oracle)"
     )
+
+
+@pytest.mark.asyncio
+async def test_route_uniform_404_for_malformed_subject(pg_pool, two_users_with_link):
+    """A MALFORMED (non-UUID) document_id over the route is the SAME uniform 404 as an
+    unknown subject — never a 500, never a 422/403 (WR-01 regression).
+
+    documents.id is a uuid column, so a non-UUID query param makes PostgREST raise
+    22P02 → supabase-py APIError; before the WR-01 fix that propagated uncaught and the
+    route returned 500. A 500 is BOTH a robustness bug AND an existence oracle (malformed
+    →500 is distinguishable from well-formed-unknown→404). This asserts the route now
+    collapses the malformed path to the SAME 404 the unknown path uses. Non-vacuous: it
+    pins the status to 404 EXACTLY (an unhandled 500, or a 422/403, fails this)."""
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+
+    sb = _supabase_or_skip()
+    ctx = two_users_with_link
+
+    client, teardown = _route_client(str(ctx["user_a"]), sb)
+    try:
+        resp_malformed = client.get(
+            "/document-relationships", params={"document_id": "not-a-uuid"}
+        )
+        # The well-formed-unknown twin, for the indistinguishability assertion below.
+        resp_unknown = client.get(
+            "/document-relationships", params={"document_id": str(uuid4())}
+        )
+    finally:
+        teardown()
+
+    assert resp_malformed.status_code == 404, (
+        "a malformed (non-UUID) document_id must be a uniform 404 — never a 500 (the "
+        f"pre-fix bug), never 422/403; got {resp_malformed.status_code}: {resp_malformed.text}"
+    )
+    assert resp_malformed.status_code != 500, (
+        "a malformed document_id must NOT surface as an unhandled 500 (WR-01)"
+    )
+    # malformed and well-formed-unknown must be INDISTINGUISHABLE (no existence oracle).
+    assert resp_malformed.status_code == resp_unknown.status_code, (
+        "malformed-id and well-formed-unknown-id must collapse to the SAME 404 — a "
+        f"divergence is an oracle; got malformed={resp_malformed.status_code} "
+        f"unknown={resp_unknown.status_code}"
+    )

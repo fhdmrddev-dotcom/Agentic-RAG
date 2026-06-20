@@ -2171,9 +2171,13 @@ export async function resolveFilterCount(filter_expr: ViewFilter): Promise<numbe
  *  renders its honest error state, distinct from empty — D-117-10). */
 export async function listRelationships(documentId: string): Promise<RelatedDocumentsResponse> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/document-relationships?document_id=${documentId}`, {
-    headers,
-  })
+  // encodeURIComponent the id (IN-02, folded into WR-01): doc ids are UUIDs today so
+  // this is safe in practice, but defensive URL construction keeps a non-UUID/whitespace
+  // value from corrupting the query (and pairs with the route's uniform-404 hardening).
+  const res = await fetch(
+    `${API_BASE}/document-relationships?document_id=${encodeURIComponent(documentId)}`,
+    { headers },
+  )
   if (!res.ok) throw new Error("Failed to load relationships")
   return res.json() as Promise<RelatedDocumentsResponse>
 }

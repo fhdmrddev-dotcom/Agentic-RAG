@@ -100,9 +100,22 @@ async def get_relationships(
     (mirrors ``resolve_view``, which writes no audit). ``threads.py`` is untouched (G-5).
     """
     caller = current_user["id"]
-    result = await document_relationship_service.get_related_documents(
-        caller, document_id=document_id, supabase=supabase
-    )
+    try:
+        result = await document_relationship_service.get_related_documents(
+            caller, document_id=document_id, supabase=supabase
+        )
+    except Exception:  # noqa: BLE001 — WR-01
+        # A malformed (non-UUID) document_id makes PostgREST raise 22P02 →
+        # supabase-py APIError, and aexec (utils/db.py) does NOT catch it, so the
+        # bare call would surface as an unhandled 500. A 500 is BOTH a robustness
+        # bug AND an existence oracle (malformed→500 is distinguishable from
+        # well-formed-unknown→404). Collapse ANY resolve/traversal failure to the
+        # SAME uniform 404 the unknown-subject path uses below, so the route stays a
+        # non-oracle and matches the agent-tool caller's catch-everything posture
+        # (tool_dispatcher._handle_get_related_documents). The route — NOT the shared
+        # service fn — owns this mapping (D-117-7: shared read core, per-caller
+        # error→response mapping).
+        raise HTTPException(status_code=404, detail="Document not found")
     if result is None:
         # Uniform 404 on an unreadable/unknown subject — no existence leak, no 403, no
         # 200-with-partial-leak (T-117-02-03; mirrors document_views.py:resolve_view).
@@ -137,12 +150,25 @@ async def create_relationship(
     #    step-2 self-link branch return the identical status+detail, so the RESPONSE
     #    carries no ordering oracle (a probe can't distinguish unseeable-endpoint from
     #    self-link by error shape — mirrors document_views.py:154-162).
-    source_doc = await document_relationship_service._resolve_readable_latest(
-        body.source_doc_id, caller, supabase=supabase
-    )
-    target_doc = await document_relationship_service._resolve_readable_latest(
-        body.target_doc_id, caller, supabase=supabase
-    )
+    #    A malformed (non-UUID) endpoint id makes _resolve_readable_latest's
+    #    PostgREST query raise 22P02 → APIError (aexec does not catch it), which
+    #    runs BEFORE the None-gate below and would surface as a 500 (WR-01). Collapse
+    #    that to the SAME uniform 422 + identical detail the unseeable/self-link/forged
+    #    paths use, so a malformed body value carries no oracle either. Lower risk than
+    #    the GET path (the panel always sends real ids) but kept uniform for
+    #    consistency.
+    try:
+        source_doc = await document_relationship_service._resolve_readable_latest(
+            body.source_doc_id, caller, supabase=supabase
+        )
+        target_doc = await document_relationship_service._resolve_readable_latest(
+            body.target_doc_id, caller, supabase=supabase
+        )
+    except Exception:  # noqa: BLE001 — WR-01: malformed id → uniform 422, never 500
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_INVALID_LINK_DETAIL,
+        )
     if source_doc is None or target_doc is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
