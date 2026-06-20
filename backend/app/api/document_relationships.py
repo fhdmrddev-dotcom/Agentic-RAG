@@ -66,6 +66,50 @@ router = APIRouter(prefix="/document-relationships", tags=["document-relationshi
 _INVALID_LINK_DETAIL = "Both documents must be readable and distinct"
 
 
+@router.get("")
+async def get_relationships(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Read a document's outgoing + incoming typed links (REL-02 / D-117-7).
+
+    The net-new REST read seam the Phase 117 relationship PANEL consumes (the panel
+    cannot call an agent tool). It is a THIN wrapper — auth → the SHARED leak-safe read
+    core → the plain dict — and deliberately re-implements NOTHING (the "share, do NOT
+    fork" invariant, mirroring how ``document_views.py:resolve_view`` wraps the shared
+    ``resolve_filter``; ``test_117_no_fork.py`` is the guard against drift):
+
+      1. ``Depends(get_current_user)`` (JWT) scopes from the CALLER (``current_user["id"]``),
+         NEVER the subject/edge owner (T-117-02-05 / SC#1). No net-new auth.
+      2. Delegate to ``document_relationship_service.get_related_documents`` (Plan 01) — the
+         ONE leak-safe outgoing+incoming traversal: subject resolve (the sole access gate),
+         edge queries over the subject's full ``(user_id, filename)`` version set
+         (follow-to-latest), per-endpoint caller-readability re-check → an unreadable endpoint
+         is masked (``document_id: None`` + the no-access mask string the SERVICE owns,
+         D-117-8). The shared fn already rides ``aexec``/``run_in_threadpool`` for every query
+         (D-v2.5-01), so this route adds NO bare supabase call (T-117-02-04).
+      3. A ``None`` return (unreadable / unknown subject) maps to a UNIFORM 404 — never a
+         403, never a 200-with-partial-leak — so the route is no existence-probe oracle
+         (T-117-02-03, mirrors ``resolve_view``'s 404-not-403). Otherwise return the plain
+         dict directly: NO ``response_model`` (the 112 CR-01 lesson — a tight response_model
+         would strip ``direction``/``label``/``relationship_id``/the masked rows).
+
+    Writes NO audit row: ``audit_service.VALID_ACTION_TYPES`` has only the create/delete
+    relationship action types — there is no read action type, and reads are not audited
+    (mirrors ``resolve_view``, which writes no audit). ``threads.py`` is untouched (G-5).
+    """
+    caller = current_user["id"]
+    result = await document_relationship_service.get_related_documents(
+        caller, document_id=document_id, supabase=supabase
+    )
+    if result is None:
+        # Uniform 404 on an unreadable/unknown subject — no existence leak, no 403, no
+        # 200-with-partial-leak (T-117-02-03; mirrors document_views.py:resolve_view).
+        raise HTTPException(status_code=404, detail="Document not found")
+    return result
+
+
 @router.post("", response_model=RelationshipResponse, status_code=status.HTTP_201_CREATED)
 async def create_relationship(
     body: RelationshipCreate,
