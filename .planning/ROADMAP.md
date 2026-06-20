@@ -172,7 +172,7 @@
 **Plans**: 4 plans
   - [x] 116-01-PLAN.md (Wave 1) — substrate: RelationshipCreate/Response models (Literal rel_type) + document_relationship_service (shared `_resolve_readable_latest` own-or-global latest resolver, `_uid` guard, 23505-catch idempotent create, own-scoped delete) + migration 075 idempotency-index FILE + 10 Wave-0 test scaffolds
   - [x] 116-02-PLAN.md (Wave 2) — REST write surface (REL-01/03): `POST /document-relationships` (visible-both gate, uniform 422, no ordering oracle → idempotent persist → `relationship.create` audit) + `DELETE /{id}` (own-scoped 404-not-403 + `relationship.delete` audit) + main.py mount; version-stable read-time resolution proven live
-  - [ ] 116-03-PLAN.md (Wave 2) — agent tool (REL-04): Gemini-safe `GET_RELATED_DOCUMENTS_TOOL` (two flat scalar strings, no anyOf/oneOf/multi-type arrays) dual-wired `_TOOL_REGISTRY` + `get_tools()` + `_handle_get_related_documents` (both directions + inverse labels + leak-safe "no access" masking + calm errors); LIVE non-vacuous two-user leak proof
+  - [x] 116-03-PLAN.md (Wave 2) — agent tool (REL-04): Gemini-safe `GET_RELATED_DOCUMENTS_TOOL` (two flat scalar strings, no anyOf/oneOf/multi-type arrays) dual-wired `_TOOL_REGISTRY` + `get_tools()` + `_handle_get_related_documents` (both directions + inverse labels + leak-safe "no access" masking + calm errors); LIVE non-vacuous two-user leak proof
   - [ ] 116-04-PLAN.md (Wave 3, BLOCKING) — apply migration 075 to :54322 (psycopg2-direct, no reset) + regenerate full-schema.sql + un-mark the race-immune idempotency assertion; operator DB-evidence checkpoint
 **UI hint**: no
 
@@ -222,7 +222,7 @@
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
-| 116. Document Relationships — Backend + Agent Tool | 2/4 | In Progress|  |
+| 116. Document Relationships — Backend + Agent Tool | 3/4 | In Progress|  |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
 | 118. Auto-Classification | 0/? | Not started | - |
 | 119. Document Governance Health | 0/? | Not started | - |
