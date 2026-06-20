@@ -217,7 +217,7 @@
 | 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
-| 115. Virtual Folders — Agent Tool | 3/3 | Complete   | 2026-06-19 |
+| 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 0/? | Not started | - |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
 | 118. Auto-Classification | 0/? | Not started | - |

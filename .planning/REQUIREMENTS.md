@@ -38,7 +38,7 @@
 - [x] **VIEW-04**: User can combine multiple filter conditions (AND) in one view.
 - [x] **VIEW-05**: User can optionally scope a view to a folder subtree.
 - [x] **VIEW-06**: User can share a view globally without exposing documents the viewer is not allowed to see.
-- [ ] **VIEW-07**: The agent can run a saved view / metadata query as a tool to answer questions in chat.
+- [x] **VIEW-07**: The agent can run a saved view / metadata query as a tool to answer questions in chat.
 
 ### Document Relationships (REL)
 - [ ] **REL-01**: User can create a typed link between two documents (supersedes / amends / references / attached-to).
@@ -102,7 +102,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | VIEW-05 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Complete |
-| VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Pending |
+| VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Complete |
 | REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
 | REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
 | REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
