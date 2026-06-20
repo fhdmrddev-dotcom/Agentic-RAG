@@ -150,6 +150,17 @@ async def _seed_doc_version(pool, user_id, *, filename, version, is_latest):
     return str(doc_id)
 
 
+async def _seed_relationship(pool, owner_id, source_id, target_id, rel_type="references"):
+    """Insert an own-scoped edge keyed on creation-time ids (mirrors test_116_tool_leak.py)."""
+    rel_id = uuid4()
+    await pool.execute(
+        "INSERT INTO public.document_relationships "
+        "(id, user_id, source_doc_id, target_doc_id, rel_type) VALUES ($1, $2, $3, $4, $5)",
+        rel_id, owner_id, source_id, target_id, rel_type,
+    )
+    return str(rel_id)
+
+
 @pytest_asyncio.fixture
 async def user_with_versioned_doc(pg_pool):
     """Seed a user + one document at v1 (is_latest). FK-safe teardown."""
@@ -170,6 +181,13 @@ async def user_with_versioned_doc(pg_pool):
                 await pg_pool.execute(*sql)
             except Exception:
                 pass
+
+
+def _make_ctx(sb, caller):
+    """Minimal handler ctx bag — supabase + the dispatching user + Deep-Mode whitelist."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(supabase=sb, current_user={"id": caller}, phase_whitelist=None)
 
 
 @pytest.mark.asyncio
@@ -245,3 +263,79 @@ async def test_link_follows_latest_after_restore(pg_pool, user_with_versioned_do
     assert out is not None, "the link must still resolve after a restore"
     assert str(out["id"]) == ctx["v1"], "the v2 id must follow to the restored v1 (latest) row"
     assert out["is_latest"] is True
+
+
+def _parsed_doc_ids(payload):
+    """Every related-doc id surfaced by the handler (compact rows + source_refs)."""
+    ids = set()
+    for r in (payload.get("documents") or []):
+        if r.get("document_id"):
+            ids.add(str(r["document_id"]))
+    for r in (payload.get("source_refs") or []):
+        if r.get("document_id"):
+            ids.add(str(r["document_id"]))
+    return ids
+
+
+@pytest.mark.asyncio
+async def test_edge_survives_reupload_in_handler(pg_pool, user_with_versioned_doc):
+    """CR-02 regression (gap-closure Plan 05): an edge created against v1's id must STILL
+    surface in get_related_documents after the subject is re-uploaded to v2.
+
+    RED against the pre-fix handler: edges store creation-time ids and the handler queries
+    edges by the SINGLE resolved-latest subject_id. After a re-upload latest is v2's id, so
+    the v1-keyed edge is never found → total 0 (the link silently vanishes). GREEN after
+    the fix: edges are enumerated over the subject's FULL version-id set via .in_(), so the
+    v1-keyed edge surfaces under the v2 subject.
+
+    Non-vacuity guard: BEFORE the re-upload, the handler driven on v1's id ALSO surfaces the
+    edge — proving the test verifies SURVIVAL across the re-upload, not a trivially-present row.
+    """
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    from app.services.tool_dispatcher import _handle_get_related_documents
+
+    sb = _supabase_or_skip()
+    ctx = user_with_versioned_doc
+    caller = str(ctx["user"])
+
+    # A SECOND readable target doc U owns (the edge's other endpoint).
+    target_filename = f"target-{uuid4()}.txt"
+    target_id = await _seed_doc_version(
+        pg_pool, ctx["user"], filename=target_filename, version=1, is_latest=True
+    )
+    # Edge keyed on the SUBJECT's creation-time v1 id (source) → target (references).
+    await _seed_relationship(pg_pool, ctx["user"], ctx["v1"], target_id, "references")
+
+    # NON-VACUITY GUARD — BEFORE re-upload, the handler on v1's id surfaces the target.
+    pre = json.loads((await _handle_get_related_documents(
+        {"document_id": ctx["v1"]}, _make_ctx(sb, caller))).result)
+    assert pre.get("total", 0) >= 1, (
+        f"non-vacuity: the edge must surface on the v1 subject BEFORE re-upload; got {pre}"
+    )
+    assert target_id in _parsed_doc_ids(pre), (
+        f"non-vacuity: the target id must be present BEFORE re-upload; got {pre}"
+    )
+
+    # Re-upload the SUBJECT: flip v1 to is_latest=False, INSERT v2 (new uuid, is_latest=True).
+    await pg_pool.execute(
+        "UPDATE documents SET is_latest = false WHERE user_id = $1 AND filename = $2",
+        ctx["user"], ctx["filename"],
+    )
+    v2 = await _seed_doc_version(
+        pg_pool, ctx["user"], filename=ctx["filename"], version=2, is_latest=True
+    )
+
+    # CR-02 ASSERTION — the SAME edge must STILL surface under the v2 subject id.
+    post = json.loads((await _handle_get_related_documents(
+        {"document_id": v2}, _make_ctx(sb, caller))).result)
+    assert post.get("total", 0) >= 1, (
+        "CR-02 ORPHAN: the edge created at v1's id must still surface after a re-upload to "
+        f"v2 (the LOCKED D-116-1 follow-to-latest guarantee), but total was {post.get('total')}: {post}"
+    )
+    assert target_id in _parsed_doc_ids(post), (
+        f"CR-02: the target id must STILL be present under the v2 subject after re-upload; got {post}"
+    )

@@ -308,6 +308,116 @@ async def test_unreadable_endpoint_is_masked_for_other_viewer(pg_pool, two_users
     )
 
 
+@pytest_asyncio.fixture
+async def old_global_new_private_versions(pg_pool):
+    """Seed the CR-01 follow-to-latest LEAK vector (gap-closure Plan 05).
+
+    Owner A has ONE filename with TWO versions:
+      * v1 — is_latest=False, in A's GLOBAL folder (so a non-owner B can READ v1's id).
+      * v2 — is_latest=True, in A's PRIVATE scope (folder_id=NULL, owned by A): only A reads it.
+
+    A re-upload keeps the old version's row (and its folder_id) while inserting the new
+    latest in a different folder (documents.py:441-486), so this state is reachable in
+    production WITHOUT even move_document. A non-owner B who replays v1's id must NOT be
+    followed forward to A's PRIVATE v2 — list_documents would NEVER surface v2 to B, so
+    the resolver must return None (the D-116-9 mask then fires). Non-owner B is seeded so
+    we can drive the resolver as a real cross-user caller.
+    """
+    if not await _table_exists(pg_pool, "folders"):
+        pytest.skip("folders table absent")
+
+    user_a = await _seed_user(pg_pool, "ogvp-a")
+    user_b = await _seed_user(pg_pool, "ogvp-b")
+
+    global_folder = await _seed_global_folder(pg_pool, user_a, name="A-shared-versions")
+    filename = f"versioned-{uuid4()}.txt"
+
+    # v1 — OLD version (is_latest=False), still sitting in A's GLOBAL folder → B can read v1's id.
+    v1_id = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, "
+        "status, metadata, created_at, is_latest, version_number, folder_id) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10, $11)",
+        v1_id, user_a, filename, f"{user_a}/{v1_id}.txt", 100, "text/plain", "completed",
+        {"title": "A-versioned-v1"}, False, 1, global_folder,
+    )
+    # v2 — the CURRENT latest (is_latest=True), MOVED to A's PRIVATE scope (folder_id=NULL).
+    v2_id = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, "
+        "status, metadata, created_at, is_latest, version_number, folder_id) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10, $11)",
+        v2_id, user_a, filename, f"{user_a}/{v2_id}.txt", 100, "text/plain", "completed",
+        {"title": "A-versioned-PRIVATE-v2"}, True, 2, None,
+    )
+
+    ctx = {
+        "user_a": user_a, "user_b": user_b, "global_folder": global_folder,
+        "filename": filename, "v1_id": str(v1_id), "v2_id": str(v2_id),
+        "v2_real_title": "A-versioned-PRIVATE-v2",
+    }
+    try:
+        yield ctx
+    finally:
+        for uid in (user_a, user_b):
+            for sql in (
+                ("DELETE FROM public.document_relationships WHERE user_id = $1", uid),
+                ("DELETE FROM public.documents WHERE user_id = $1", uid),
+                ("DELETE FROM public.folders WHERE user_id = $1", uid),
+                ("DELETE FROM audit_log WHERE user_id = $1", uid),
+                ("DELETE FROM auth.users WHERE id = $1", uid),
+            ):
+                try:
+                    await pg_pool.execute(*sql)
+                except Exception:
+                    pass
+
+
+@pytest.mark.asyncio
+async def test_global_old_version_does_not_leak_private_latest(
+    pg_pool, old_global_new_private_versions
+):
+    """CR-01 regression (gap-closure Plan 05): a non-owner replaying an OLD version's id
+    (still in a global folder) must NOT be followed forward to the owner's PRIVATE latest.
+
+    RED against the pre-fix resolver: the global-by-id leg lacks ``.eq("is_latest", True)``
+    and the follow-to-latest step has no folder re-check, so B's v1-id resolves to v2's
+    PRIVATE id/filename/metadata — strictly more permissive than ``list_documents``.
+    GREEN after the fix: the resolver returns None for B (the D-116-9 mask then fires).
+
+    Non-vacuity guard: owner A (who owns BOTH versions) resolving v1's id legitimately
+    follows forward to A's OWN latest v2 — proving the test is not "always None".
+    """
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+
+    from app.services import document_relationship_service as svc
+
+    sb = _supabase_or_skip()
+    ctx = old_global_new_private_versions
+
+    # CR-01 ASSERTION — a NON-OWNER replaying v1's (global, old) id must get None.
+    leaked = await svc._resolve_readable_latest(
+        ctx["v1_id"], str(ctx["user_b"]), supabase=sb
+    )
+    assert leaked is None, (
+        "CR-01 LEAK: a non-owner replaying an old-global version id must NOT be followed "
+        "forward to the owner's PRIVATE latest version. _resolve_readable_latest must return "
+        f"None for B, but returned {leaked!r} (this exposes v2's private id/filename/metadata)."
+    )
+
+    # NON-VACUITY GUARD — owner A resolving the SAME v1 id legitimately follows to A's OWN
+    # latest v2 (A owns both versions). Proves the test is not trivially "always None".
+    own = await svc._resolve_readable_latest(
+        ctx["v1_id"], str(ctx["user_a"]), supabase=sb
+    )
+    assert own is not None and str(own["id"]) == ctx["v2_id"], (
+        "non-vacuity: owner A must follow v1's id forward to its OWN latest v2 "
+        f"(expected {ctx['v2_id']}, got {own!r})"
+    )
+    assert own["is_latest"] is True
+
+
 @pytest.mark.asyncio
 async def test_readable_endpoint_shows_real_filename_for_owner(pg_pool, two_users_with_link):
     """A (who CAN read the target) sees the target's REAL filename — the mask is per-viewer."""
