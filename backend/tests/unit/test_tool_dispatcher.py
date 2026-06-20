@@ -49,18 +49,23 @@ EXPECTED_TOOLS = [
     "ask_user",
     # Phase 101 Plan 04: render_template (TMPL-02 / TMPL-03) — phase-end 25
     "render_template",
+    # Phase 115 Plan 03: query_documents_by_view (VIEW-07) — phase-end 26
+    "query_documents_by_view",
+    # Phase 116 Plan 03: get_related_documents (REL-04) — phase-end 27
+    "get_related_documents",
 ]
 
 
-def test_registry_has_exactly_26_entries():
-    """_TOOL_REGISTRY must contain exactly 26 tool handlers after Phase 115.
+def test_registry_has_exactly_27_entries():
+    """_TOOL_REGISTRY must contain exactly 27 tool handlers after Phase 116.
 
     (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
     Plan 02 + ask_user from Plan 03 = 24; + render_template from Phase 101 = 25;
-    + query_documents_by_view from Phase 115 = 26).
+    + query_documents_by_view from Phase 115 = 26; + get_related_documents from
+    Phase 116 = 27).
     Phase-end gate.
     """
-    assert len(_TOOL_REGISTRY) == 26
+    assert len(_TOOL_REGISTRY) == 27
 
 
 def test_registry_contains_all_expected_tools():

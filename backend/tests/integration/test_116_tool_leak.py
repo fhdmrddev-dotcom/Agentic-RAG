@@ -155,6 +155,18 @@ async def _seed_user(pool, label):
     return user_id
 
 
+async def _seed_global_folder(pool, owner_id, *, name):
+    """A folder owned by `owner_id` with is_global=true → its docs are visible to EVERYONE
+    (the global-folder model, migration 014/015/019). The SUBJECT lives here so user B can
+    read it even though A owns it."""
+    folder_id = uuid4()
+    await pool.execute(
+        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, true)",
+        folder_id, owner_id, name,
+    )
+    return folder_id
+
+
 async def _seed_doc(pool, user_id, *, title, folder_id=None, is_latest=True, version=1):
     doc_id = uuid4()
     await pool.execute(
@@ -180,26 +192,49 @@ async def _seed_relationship(pool, owner_id, source_id, target_id, rel_type="ref
 
 @pytest_asyncio.fixture
 async def two_users_with_link(pg_pool):
-    """Seed User A, User B, a SUBJECT both can see (a global-folder doc), and a TARGET
-    only A can see, linked subject→target. FK-safe teardown of everything seeded.
+    """Seed the NON-VACUOUS per-viewer masking scenario over OWN-SCOPED edges.
 
-    Plan 03 fills the real "make the subject visible to both / the target visible only
-    to A" wiring against the live global-folder model (a global folder for the subject;
-    A's private folder for the target). The scaffold records the intent.
+    The design contract (RESEARCH §"Pitfall 2", line 297/351): the `document_relationships`
+    table is user-scoped, so the tool returns the CALLER's OWN edges. The leak is that a
+    TARGET on one of the caller's own edges may be a doc that caller can no longer read
+    (it was readable at link time — e.g. in a global folder — then moved to someone else's
+    private scope). The handler must mask THAT target's identity for that caller while
+    still showing it un-masked to a caller who CAN read it.
+
+    The faithful two-user proof, therefore, gives BOTH users their OWN edge to the SAME
+    target (each owns an own-scoped row → each sees it via the tool), where the target is
+    readable to A (A owns it, private folder) but NOT to B:
+
+      * SUBJECT — A's GLOBAL-folder doc → BOTH A and B can read it (so both resolve the
+        subject; the masking is genuinely on the TARGET, not "B can't read the subject").
+      * TARGET — A's PRIVATE doc (folder_id=NULL, owned by A) → only A can read it.
+      * A's edge   subject→target  → A (who reads the target) sees its REAL filename.
+      * B's edge   subject→target  → B (who can NOT read the target) sees the MASK.
+
+    Each user owns ONLY their own edge (own-scoped), so the mask demonstrably triggers for
+    B but not A — the "static would false-green" lesson honored. Seeding B's edge directly
+    (service-role) simulates "B linked it while it was visible, then it became invisible".
     """
+    if not await _table_exists(pg_pool, "folders"):
+        pytest.skip("folders table absent")
+
     user_a = await _seed_user(pg_pool, "a")
     user_b = await _seed_user(pg_pool, "b")
 
-    # SUBJECT — Plan 03 places it in a global folder so BOTH A and B can read it.
-    subject = await _seed_doc(pg_pool, user_a, title="A-subject")
-    # TARGET — stays in A's private scope, so B can NOT read it (the masked endpoint).
-    target = await _seed_doc(pg_pool, user_a, title="A-secret-target")
+    # SUBJECT — in A's GLOBAL folder, so BOTH A and B can read it.
+    global_folder = await _seed_global_folder(pg_pool, user_a, name="A-shared")
+    subject = await _seed_doc(pg_pool, user_a, title="A-subject", folder_id=global_folder)
+    # TARGET — A's PRIVATE scope (folder_id=NULL, not global, owned by A): only A reads it.
+    target = await _seed_doc(pg_pool, user_a, title="A-secret-target", folder_id=None)
 
-    rel_id = await _seed_relationship(pg_pool, user_a, subject, target, "references")
+    # OWN-SCOPED edges: A owns A's edge, B owns B's edge — both subject→target.
+    rel_a = await _seed_relationship(pg_pool, user_a, subject, target, "references")
+    rel_b = await _seed_relationship(pg_pool, user_b, subject, target, "references")
 
     ctx = {
-        "user_a": user_a, "user_b": user_b,
-        "subject": str(subject), "target": str(target), "rel_id": str(rel_id),
+        "user_a": user_a, "user_b": user_b, "global_folder": global_folder,
+        "subject": str(subject), "target": str(target),
+        "rel_a": str(rel_a), "rel_b": str(rel_b),
         "target_real_title": "A-secret-target",
     }
     try:
@@ -209,6 +244,7 @@ async def two_users_with_link(pg_pool):
             for sql in (
                 ("DELETE FROM public.document_relationships WHERE user_id = $1", uid),
                 ("DELETE FROM public.documents WHERE user_id = $1", uid),
+                ("DELETE FROM public.folders WHERE user_id = $1", uid),
                 ("DELETE FROM audit_log WHERE user_id = $1", uid),
                 ("DELETE FROM auth.users WHERE id = $1", uid),
             ):
@@ -230,7 +266,6 @@ def _ref_filenames(payload):
     return {r.get("filename") for r in refs}
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships the masking handler")
 @pytest.mark.asyncio
 async def test_unreadable_endpoint_is_masked_for_other_viewer(pg_pool, two_users_with_link):
     """B (who shares the subject but not the target) sees the mask, never the real target."""
@@ -245,6 +280,17 @@ async def test_unreadable_endpoint_is_masked_for_other_viewer(pg_pool, two_users
     out_b = json.loads((await _handle_get_related_documents(
         {"document_id": ctx["subject"]}, _make_ctx(sb, str(ctx["user_b"])))).result)
 
+    # NON-VACUITY GUARD 1: B genuinely resolved the SUBJECT (it's in A's global folder),
+    # so this is a real traversal — not "B sees nothing because B can't read the subject".
+    assert out_b.get("status") not in ("not_found", "no_subject"), (
+        f"B must be able to read the global-folder SUBJECT (non-vacuous setup); got {out_b}"
+    )
+    # NON-VACUITY GUARD 2: the edge EXISTS for B (the masked row is present), so the mask
+    # demonstrably triggered — B is not simply seeing an empty relationship list.
+    assert out_b.get("total", 0) >= 1, (
+        f"B must see the related-edge ROW (masked), proving the mask path ran; got {out_b}"
+    )
+
     blob = json.dumps(out_b)
     # (b) B NEVER sees the target's real filename or metadata title.
     assert ctx["target_real_title"] not in blob, (
@@ -256,9 +302,12 @@ async def test_unreadable_endpoint_is_masked_for_other_viewer(pg_pool, two_users
         f"an unreadable linked endpoint must render as {_MASK!r} (the existence is shown, "
         "the identity masked)"
     )
+    # source_refs must NOT carry the unseeable endpoint (nothing citable for B).
+    assert ctx["target"] not in {r.get("document_id") for r in out_b.get("source_refs", [])}, (
+        "the masked endpoint must contribute NO citable source_ref for B"
+    )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships the masking handler")
 @pytest.mark.asyncio
 async def test_readable_endpoint_shows_real_filename_for_owner(pg_pool, two_users_with_link):
     """A (who CAN read the target) sees the target's REAL filename — the mask is per-viewer."""
@@ -281,3 +330,7 @@ async def test_readable_endpoint_shows_real_filename_for_owner(pg_pool, two_user
         ctx["target_real_title"] in blob_a
     ), "A (who can read the target) MUST see its real filename — the mask is per-viewer"
     assert _MASK not in blob_a, "A must NOT see the mask for a target A can read"
+    # A's source_refs DO carry the (seeable) target id — the citable channel is real for A.
+    assert ctx["target"] in {r.get("document_id") for r in out_a.get("source_refs", [])}, (
+        "A (who can read the target) must get a citable source_ref for it"
+    )
