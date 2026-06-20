@@ -26,7 +26,16 @@ findings:
   warning: 4
   info: 5
   total: 9
-status: issues_found
+warnings_resolved: 4
+status: resolved
+resolution:
+  date: 2026-06-21
+  commits:
+    - e7032acf  # WR-01
+    - 1741c41d  # WR-02
+    - b1a4188c  # WR-03
+    - 3ef7c509  # WR-04
+  info_deferred: [IN-01, IN-03, IN-04, IN-05]  # IN-02 folded into WR-01
 ---
 
 # Phase 117: Code Review Report
@@ -34,7 +43,15 @@ status: issues_found
 **Reviewed:** 2026-06-21
 **Depth:** standard
 **Files Reviewed:** 18
-**Status:** issues_found
+**Status:** resolved (4/4 warnings fixed 2026-06-21; IN-02 folded into WR-01; IN-01/03/04/05 deferred — see resolution log below)
+
+> **Resolution (2026-06-21):** All 4 warnings fixed + committed atomically on `v2.5-dev`, Phase-117 backend (live :54322) + frontend suites GREEN, `tsc --noEmit` clean.
+> - **WR-01** `e7032acf` — GET route maps malformed/transient resolve → uniform 404 (no 500, no oracle); POST resolves hardened → uniform 422; `listRelationships` uses `encodeURIComponent` (IN-02); non-vacuous malformed-id regression test added to `test_117_route_leak.py`.
+> - **WR-02** `1741c41d` — `handleRemove` surfaces a transient `role="alert"` "couldn't remove" beat on non-404 delete failure (was silent); authoritative re-fetch retained.
+> - **WR-03** `b1a4188c` — `createRelationship` carries `res.status` via `ApiError`; `handleConfirm` renders a non-retry "That link can't be created" for 422.
+> - **WR-04** `3ef7c509` — `aria-controls={listVisible ? listboxId : undefined}` (dangling ref dropped when listbox collapsed).
+>
+> Deferred Info (non-blocking backlog): **IN-01** stale `aria-activedescendant` clamp, **IN-03** masked-row key fallback collision, **IN-04** redundant double-close, **IN-05** in-band error-swallowing audit write (inherited `document_views` pattern, not a regression).
 
 ## Summary
 
