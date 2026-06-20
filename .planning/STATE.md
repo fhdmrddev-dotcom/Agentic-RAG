@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: verifying
-last_updated: "2026-06-20T19:45:51.234Z"
-last_activity: 2026-06-20
+status: phase_complete
+last_updated: "2026-06-21T00:00:00.000Z"
+last_activity: 2026-06-21
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 38
   completed_plans: 38
-  percent: 82
+  percent: 91
 ---
 
 # Project State
@@ -22,11 +22,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 117 — document-relationships-panel-ui
+**Current focus:** Phase 118 — Auto-Classification (next; G-2 sketch fires)
 
 ## Current Position
 
-Phase: 117 (document-relationships-panel-ui) — ALL 4 PLANS EXECUTED (ready for verification)
+Phase: 117 (document-relationships-panel-ui) — ✅ **COMPLETE 2026-06-21 — ALL THREE GATES CLEAR.** NEXT = `/gsd:discuss-phase 118` (Auto-Classification; G-2 sketch fires — live suggestion UI).
+
+**117 close-out (2026-06-21):** code-review (0C/4W/5I; WR-01..04 FIXED `e7032acf`/`1741c41d`/`b1a4188c`/`3ef7c509` — GET malformed `document_id`→uniform 404 not 500 + POST resolves→422 + `encodeURIComponent` + WR-01 malformed-id regression test; WR-02 transient "couldn't remove" alert; WR-03 non-retry 422 message via `ApiError` status; WR-04 `aria-controls` only when listbox present; review marked resolved `099d1204`) → **verify-work 6/6** (`117-UAT.md`, Claude-driven Chrome DevTools MCP + psycopg2 DB truth: automated suite re-green; grouped/masked render with DOM leak-check clean; type-first typeahead create with per-type re-derived exclusion + APG keyboard + DB-confirmed re-fetch; either-direction+masked remove with DB truth; **mobile bottom-sheet with the coarse-pointer ✕ always-on proven live** — the audit #1 a11y fix; **live two-user leak proof** — B over a global-shared subject A linked sees total 0 / zero trace because edges are own-scoped, A sees the real row; all seeded UAT data cleaned up) → **secure-phase 18/18 threats_open 0** (`117-SECURITY.md` @ `132d8661`; 12 mitigate verified in source + live tests + 6 accept AR-117-01..06; orchestrator HAND-VERIFIED the leak-safe mask path `document_relationship_service.py:399-435` non-vacuous — owner-scoped edge queries + per-caller readability re-check → `document_id:None`+mask, the D-102 "static would false-green" discipline; corrected auditor frontmatter overcount 20→18) → **validate-phase NYQUIST-COMPLIANT** (`117-VALIDATION.md` @ `7dd29e96`; State A reconcile of the plan-time draft to executed reality — 13/13 SC rows COVERED, backend 13 [route_leak 6 + get_read 4 + no_fork 3] + frontend 32 [RelationshipsSection 11 + a11y 6 + CreateLinkDialog 8 + DocumentDetailPanel.a11y 7] all GREEN, 0 gaps, no auditor spawn; manual-only lived-experience rows completed in UAT). REL-02 delivered end-to-end. Frontend + thin GET route; `threads.py` untouched (G-5); no new migration, no new package. **NEXT = Phase 118 (Auto-Classification — `/gsd:discuss-phase 118`; G-2 sketch fires).**
+
+---
+
+_Prior (117 execution, 2026-06-20):_ Phase: 117 (document-relationships-panel-ui) — ALL 4 PLANS EXECUTED
 
 **117-04 (Wave 4, REL-02 panel UI — RelationshipsSection + CreateLinkDialog) — EXECUTED 2026-06-20** (3 tasks / 3 commits — `fa90f932` RelationshipsSection + CreateLinkDialog + a11y CSS, `361bbb18` CreateLinkDialog test, `d3df332b` panel mount; SUMMARY `117-04-SUMMARY.md`): the user-facing Relationships surface, built INSIDE the existing Phase-112 `DocumentDetailPanel` (NOT a new surface), honoring the LOCKED G-2 sketch `document-relationships-panel.md` (034-A + 035-A). **`RelationshipsSection.tsx`** — chip-led, grouped-by-direction (Outgoing then Incoming, count subheaders, per-type chip dots); **inverse labels mirrored 1:1 from the backend** via `relationshipLabels.ts` (`OUTGOING_LABEL`/`INCOMING_LABEL` keyed by the closed `RelType` union → compile-time drift guard, D-117-6); **masked "no access" rows** (`document_id===null` → verbatim mask via panel-AA token, never an id/title, still removable — D-117-8/2); **re-fetch-not-optimistic, NO Undo** (own `listRelationships` fetch keyed on docId, re-fetched on mount + per-mutation; transient `↻ updating` role=status beat keeps the prior list — D-117-9); **honest states** empty (calm) ≠ loading (role=status skeleton) ≠ error (role=alert + Try again) ≠ masked (D-117-10). **`CreateLinkDialog.tsx`** — keeps the `MoveToFolderDialog` shell, swaps only the plain `Select` for a **type-first** typeahead: rel-type segmented chips on top + a bespoke searchable combobox over `listDocuments()` + a live "this `<verb>` → X" preview + confirm-disabled-until-target; **per-type candidate exclusion** (self always hidden + already-linked-OUTGOING-with-the-chosen-type hidden, RE-DERIVED on rel-type change, computed from the section's `existingOutgoing` prop — D-117-4); **APG combobox a11y wired BY HAND** (no cmdk — `role=combobox`+`aria-expanded`/`-controls`/`-activedescendant` on the input, `role=listbox`, `role=option`+id; Arrow keys move the active descendant; input stays inside the shadcn Dialog so focus-trap/restore are free). **The audit's #1 a11y fix shipped:** remove ✕ keyboard-operable (`:focus-visible`) AND always-on coarse-pointer via `.rel-x-touch @media(pointer:coarse)` in `index.css` (the `<768px` bottom-sheet has no hover). **Task-3 mount:** a second `<PanelSection title="Relationships" count={relTotal}>` AFTER Metadata; the section lifts its total up for the badge (reset on `doc.id` change); Metadata section + panel shell + mobile bottom-sheet + `IngestionPage` untouched. **2 deviations [Rule 3 + Rule 1]:** (1) `CreateLinkDialog.tsx` shipped in the Task-1 commit because `RelationshipsSection` imports it + Task-1's a11y test exercises its combobox roles (dependency order; its dedicated test is Task 2); (2) mocked the new `listRelationships`/`listDocuments` in the existing `DocumentDetailPanel.a11y.test.tsx` — the new child mount fired real api calls → a stray role=status/role=alert collided with the metadata-receipt assertions (multiple-alerts error); mocking to empty restored 7/7. **`tsc --noEmit` clean (EXIT 0)**; **29/29** across the 4 panel+relationship test files (15 RelationshipsSection + 7 CreateLinkDialog + 7 DocumentDetailPanel.a11y); all task acceptance greps pass (combobox roles ≥3, zero Select import, no cmdk, coarse-pointer rule present, RelationshipsSection mounted). **Net-new failures = 0** (full suite 17 failed / 828 passed / 845 — the 7 failing files are the IDENTICAL pre-existing streaming/chat/provider/model-info roster from `117-03-SUMMARY.md`; pass count rose 806→828 = +22 new tests; passed files 76→78). Frontend-only; no new package, no new migration, `threads.py` + `IngestionPage` untouched (G-5). SUMMARY: `117-04-SUMMARY.md` (Self-Check: PASSED). REL-02 marked complete. **Deferred to verify-phase (per CONTEXT/VALIDATION):** G-4 lived-experience UI UAT + the two-user LIVE leak proof (D-117-8 — verify LIVE, not via the type/RLS label). NEXT = `/gsd:verify-work 117`.
 
