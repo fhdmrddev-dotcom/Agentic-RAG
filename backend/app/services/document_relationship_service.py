@@ -48,6 +48,25 @@ from app.utils.folder_utils import get_globally_visible_folder_ids
 
 _TABLE = "document_relationships"
 
+# Phase 116 (REL-04 / D-116-2), RELOCATED here in Phase 117 (D-117-7) — the inverse-label
+# map. An INCOMING edge (the subject is the TARGET of the verb) is surfaced with the
+# relationship read from the subject's point of view: "A supersedes B" → from B's side, B
+# is "superseded_by" A. Single source of truth for BOTH callers (the agent handler imports
+# it from here; the frontend mirrors these keys for display casing — D-117-6).
+_INVERSE_LABEL = {
+    "supersedes": "superseded_by",
+    "amends": "amended_by",
+    "references": "referenced_by",
+    "attached_to": "has_attachment",
+}
+
+# Phase 116 (REL-04 / D-116-9), RELOCATED here in Phase 117 (D-117-7) — the leak-safe mask
+# for an endpoint the CALLER cannot currently read. The EXISTENCE of the link is surfaced
+# (so a viewer learns "there is a related document you can't see") but NEVER the unreadable
+# target's real filename, id, or metadata. Proven non-vacuous LIVE two-user
+# (test_117_route_leak.py / test_116_tool_leak.py).
+_NO_ACCESS_MASK = "linked document (no access)"
+
 
 def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
@@ -306,3 +325,133 @@ async def delete_relationship(
         .eq("user_id", _uid(user_id))
     )
     return bool(result.data)
+
+
+async def get_related_documents(
+    caller,
+    *,
+    document_id: str | None = None,
+    filename: str | None = None,
+    supabase: Client | None = None,
+) -> dict | None:
+    """The SHARED, leak-safe outgoing+incoming relationship read traversal (Phase 117 / D-117-7).
+
+    Extracted VERBATIM from ``tool_dispatcher._handle_get_related_documents`` (the only prior
+    implementation, CR-01/CR-02-hardened) so there is exactly ONE leak-safe read core — the
+    agent tool (``_handle_get_related_documents``) AND the new GET route (Plan 02) both CALL
+    this in-process; neither re-implements it (the 115 ``resolve_filter`` precedent). A fork
+    would re-open the SC#1 cross-user leak.
+
+    FastAPI-free: returns a plain dict (mirroring the read-path-returns-plain-dict rule —
+    112 CR-01), raises nothing into the agent loop (the 115 WR-01/WR-03 lesson). Identify the
+    subject by ``document_id`` (preferred) or exact ``filename`` (exactly one).
+
+    Flow (the canonical leak-safe read):
+      1. Resolve the SUBJECT to its latest accessible version via ``_resolve_readable_latest``
+         (the sole access gate, CR-01). An unseeable id / unknown filename → ``None`` (the
+         caller maps it: the handler to its calm "not_found" string, the route to a 404).
+      2. Two own-scoped edge queries over the subject's FULL ``(user_id, filename)`` version-id
+         set (``_subject_version_ids``, CR-02): OUTGOING (``source_doc_id IN versions``) +
+         INCOMING (``target_doc_id IN versions``), both via ``aexec``. Enumerating over the
+         version set means an edge keyed on an OLD version still surfaces after a re-upload
+         (the LOCKED D-116-1 follow-to-latest guarantee).
+      3. For EACH edge's OTHER endpoint, RE-CHECK caller-readability via the SAME shared
+         resolver. An unseeable endpoint renders as ``_NO_ACCESS_MASK`` with
+         ``document_id: None`` — never the real id/filename/metadata — and contributes NO
+         ``source_refs`` entry (the D-116-9 / D-117-8 mask). A readability hiccup masks
+         (fail-closed), never raises.
+      4. Each compact row carries ``direction`` (outgoing|incoming), a ``label`` (the
+         ``rel_type`` for outgoing, ``_INVERSE_LABEL[rel_type]`` for incoming, D-116-2), AND
+         ``relationship_id`` (= the edge ``id``) — the A6 additive field the panel's remove ✕
+         needs (``DELETE /{id}``). The agent handler previously dropped the edge id; carrying
+         it through is additive and harmless to the agent (which ignores it).
+
+    Returns ``{subject: {document_id, filename}, total, documents: [...rows...], source_refs}``
+    for a readable subject, or ``None`` when the subject is unreadable/unknown. ``folder_subtree_ids``
+    is NEVER threaded — relationships are whole-KB, own-scoped, and the per-endpoint readability
+    re-check is the SOLE access gate.
+    """
+    doc_id = (document_id or "").strip()
+    fname = (filename or "").strip()
+    if not doc_id and not fname:
+        return None
+
+    # ── 1. resolve the subject (None on any miss — never a raise) ────────────────
+    if doc_id:
+        subject = await _resolve_readable_latest(
+            doc_id, caller, by_filename=False, supabase=supabase
+        )
+    else:
+        subject = await _resolve_readable_latest(
+            fname, caller, by_filename=True, supabase=supabase
+        )
+    if subject is None:
+        return None
+
+    subject_id = subject["id"]
+    client = _client(supabase)
+
+    # ── 2. own-scoped outgoing + incoming edge queries over the subject's FULL version set ──
+    version_ids = await _subject_version_ids(subject, supabase=supabase)
+    outgoing = await aexec(
+        client.table(_TABLE)
+        .select("id, source_doc_id, target_doc_id, rel_type")
+        .eq("user_id", _uid(caller))
+        .in_("source_doc_id", version_ids)
+    )
+    incoming = await aexec(
+        client.table(_TABLE)
+        .select("id, source_doc_id, target_doc_id, rel_type")
+        .eq("user_id", _uid(caller))
+        .in_("target_doc_id", version_ids)
+    )
+
+    # ── 3 + 4. resolve each OTHER endpoint per-viewer; mask the unseeable (D-117-8) ──
+    compact: list[dict] = []
+    source_refs: list[dict] = []
+
+    async def _append_edge(edge: dict, *, direction: str) -> None:
+        rel_type = edge["rel_type"]
+        rel_id = edge["id"]  # A6 — carry the edge id through for the panel's remove ✕.
+        # The OTHER endpoint: for an outgoing edge it's the target; for incoming, the source.
+        other_id = edge["target_doc_id"] if direction == "outgoing" else edge["source_doc_id"]
+        label = rel_type if direction == "outgoing" else _INVERSE_LABEL.get(rel_type, rel_type)
+        # Re-check readability FROM THE CALLER (never the link owner) — the SC#1 gate.
+        try:
+            other = await _resolve_readable_latest(
+                other_id, caller, by_filename=False, supabase=supabase
+            )
+        except Exception:  # noqa: BLE001 — a readability hiccup masks (fail-closed), never raises
+            other = None
+        if other is None:
+            # Masked: existence shown, identity hidden. No citable ref for an unseeable doc.
+            compact.append({
+                "document_id": None,
+                "filename": _NO_ACCESS_MASK,
+                "rel_type": rel_type,
+                "direction": direction,
+                "label": label,
+                "relationship_id": rel_id,
+            })
+            return
+        compact.append({
+            "document_id": other["id"],
+            "filename": other["filename"],
+            "rel_type": rel_type,
+            "direction": direction,
+            "label": label,
+            "relationship_id": rel_id,
+        })
+        source_refs.append({"document_id": other["id"], "filename": other["filename"]})
+
+    for edge in (outgoing.data or []):
+        await _append_edge(edge, direction="outgoing")
+    for edge in (incoming.data or []):
+        await _append_edge(edge, direction="incoming")
+
+    return {
+        "subject": {"document_id": subject_id, "filename": subject["filename"]},
+        "total": len(compact),
+        "documents": compact,
+        "source_refs": source_refs,
+    }
