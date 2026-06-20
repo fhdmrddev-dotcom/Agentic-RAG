@@ -206,12 +206,13 @@
   2. The agent retrieves a document's related documents via a `get_related_documents` tool registered in `_TOOL_REGISTRY` AND advertised in `get_tools` (REL-04); a relationship pointing at a document the caller can't see renders as "linked document (no access)" — never leaking the target's title/metadata.
   3. **SC#10 4-axis UAT**: `get_related_documents` is exercised cross-provider (native-7), multi-tool, parallel-thread, and long-message; authored in VALIDATION.md.
 
-**Plans**: 4 plans
+**Plans**: 5 plans (4 + 1 gap-closure)
 
   - [x] 116-01-PLAN.md (Wave 1) — substrate: RelationshipCreate/Response models (Literal rel_type) + document_relationship_service (shared `_resolve_readable_latest` own-or-global latest resolver, `_uid` guard, 23505-catch idempotent create, own-scoped delete) + migration 075 idempotency-index FILE + 10 Wave-0 test scaffolds
   - [x] 116-02-PLAN.md (Wave 2) — REST write surface (REL-01/03): `POST /document-relationships` (visible-both gate, uniform 422, no ordering oracle → idempotent persist → `relationship.create` audit) + `DELETE /{id}` (own-scoped 404-not-403 + `relationship.delete` audit) + main.py mount; version-stable read-time resolution proven live
   - [x] 116-03-PLAN.md (Wave 2) — agent tool (REL-04): Gemini-safe `GET_RELATED_DOCUMENTS_TOOL` (two flat scalar strings, no anyOf/oneOf/multi-type arrays) dual-wired `_TOOL_REGISTRY` + `get_tools()` + `_handle_get_related_documents` (both directions + inverse labels + leak-safe "no access" masking + calm errors); LIVE non-vacuous two-user leak proof
   - [x] 116-04-PLAN.md (Wave 3, BLOCKING) — apply migration 075 to :54322 (psycopg2-direct, no reset) + regenerate full-schema.sql + un-mark the race-immune idempotency assertion; operator DB-evidence checkpoint
+  - [ ] 116-05-PLAN.md (Wave 4, GAP-CLOSURE) — close CR-01 (SC#2/REL-04 leak-safety: `is_latest` gate on the resolver global-by-id leg + post-follow folder/owner visibility re-check, mirroring `list_documents`) + CR-02 (SC#1/REL-01 LOCKED D-116-1 follow-to-latest: edge enumeration via `.in_()` over the subject's full `(user_id, filename)` version-id set, read-side, no migration); two NON-VACUOUS live regression tests (old-global/new-private leak → None; edge survives re-upload); fold WR-02/03/04 (WR-01 not worked)
 
 **UI hint**: no
 
