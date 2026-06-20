@@ -38,6 +38,7 @@ vi.mock("@/lib/api", async () => {
 })
 
 import { CreateLinkDialog } from "./CreateLinkDialog"
+import { ApiError } from "@/lib/api"
 
 function mkDoc(id: string, filename: string): Document {
   return {
@@ -180,8 +181,9 @@ describe("CreateLinkDialog — confirm gating + create", () => {
 })
 
 describe("CreateLinkDialog — error line (MoveToFolderDialog shape)", () => {
-  it("renders the dialog error line when createRelationship rejects", async () => {
-    createRelationship.mockRejectedValueOnce(new Error("422"))
+  it("renders the transient 'try again' line on a non-422 (network/5xx) failure", async () => {
+    // A generic Error (no ApiError status) is the transient path → "try again".
+    createRelationship.mockRejectedValueOnce(new Error("network"))
     const { onCreated } = renderDialog()
     const user = userEvent.setup()
     await screen.findByRole("listbox")
@@ -189,7 +191,24 @@ describe("CreateLinkDialog — error line (MoveToFolderDialog shape)", () => {
     await user.click(screen.getByRole("button", { name: /add link/i }))
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent(/action failed/i)
+    expect(alert).toHaveTextContent(/try again/i)
     // The dialog did NOT report success on a failed create.
+    expect(onCreated).not.toHaveBeenCalled()
+  })
+
+  it("renders a non-retry 'can't be created' line on a permanent 422 (WR-03)", async () => {
+    // A 422 is a permanent rejection (self-link / unseeable / forged type) — the
+    // dialog must NOT tell the user to "try again".
+    createRelationship.mockRejectedValueOnce(new ApiError("Failed to create link", 422))
+    const { onCreated } = renderDialog()
+    const user = userEvent.setup()
+    await screen.findByRole("listbox")
+    await user.click(screen.getByRole("option", { name: /free\.pdf/i }))
+    await user.click(screen.getByRole("button", { name: /add link/i }))
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/can.t be created/i)
+    // Crucially, a permanent rejection does NOT imply a retry.
+    expect(alert).not.toHaveTextContent(/try again/i)
     expect(onCreated).not.toHaveBeenCalled()
   })
 })

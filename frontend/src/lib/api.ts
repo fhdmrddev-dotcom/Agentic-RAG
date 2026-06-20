@@ -2187,7 +2187,12 @@ export async function listRelationships(documentId: string): Promise<RelatedDocu
  *  rel_type }` EXACTLY (mirrors `RelationshipCreate`). The server runs the
  *  visible-both gate + self-link guard; a non-ok (422 = unseeable endpoint /
  *  self-link / forged type, uniform) throws. Idempotent server-side (D-116-6).
- *  Returns the persisted `Relationship` (the POST 201 body). */
+ *  Returns the persisted `Relationship` (the POST 201 body).
+ *
+ *  Throws an `ApiError` carrying `res.status` (WR-03): a 422 is a PERMANENT
+ *  rejection (self-link / unseeable / forged type — uniform server-side, never
+ *  succeeds on retry), so the caller can render a non-retry-implying message and
+ *  reserve "try again" for network/5xx. */
 export async function createRelationship(
   source_doc_id: string,
   target_doc_id: string,
@@ -2199,7 +2204,7 @@ export async function createRelationship(
     headers,
     body: JSON.stringify({ source_doc_id, target_doc_id, rel_type }),
   })
-  if (!res.ok) throw new Error("Failed to create link")
+  if (!res.ok) throw new ApiError("Failed to create link", res.status)
   return res.json() as Promise<Relationship>
 }
 

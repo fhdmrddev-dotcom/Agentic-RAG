@@ -32,7 +32,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { listDocuments, createRelationship } from "@/lib/api"
+import { listDocuments, createRelationship, ApiError } from "@/lib/api"
 import type { Document, RelType, RelationshipRow } from "@/types"
 import { cn } from "@/lib/utils"
 import { OUTGOING_LABEL, REL_TYPES } from "./relationshipLabels"
@@ -139,8 +139,18 @@ export function CreateLinkDialog({
       await createRelationship(sourceDocId, target, relType)
       onCreated()
       onClose()
-    } catch {
-      setError("Action failed. Please try again.")
+    } catch (err) {
+      // A 422 is a PERMANENT rejection (self-link / unseeable endpoint / forged
+      // type — uniform server-side, never succeeds on retry). "Please try again"
+      // would be misleading guidance, so reserve it for transient network/5xx
+      // failures and surface a non-retry-implying message for 422 (WR-03). The
+      // candidate-exclusion already prevents the common duplicate case, so a 422
+      // here is genuinely a "can't", not a "try again".
+      if (err instanceof ApiError && err.status === 422) {
+        setError("That link can’t be created.")
+      } else {
+        setError("Action failed. Please try again.")
+      }
     } finally {
       setLoading(false)
     }
