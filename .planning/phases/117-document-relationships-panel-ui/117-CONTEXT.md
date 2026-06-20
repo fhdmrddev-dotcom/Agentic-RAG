@@ -182,7 +182,7 @@ panel sketch exists yet — the next step after this CONTEXT is the sketch, not 
   `_subject_version_ids`, `_uid`, `create_relationship`, `delete_relationship`. **The
   extraction target for D-117-7** (add a shared `get_related_documents`-style read fn here).
 - `backend/app/services/tool_dispatcher.py:492-649` `_handle_get_related_documents` +
-  `_INVERSE_LABEL` (~line 49) + `_NO_ACCESS_MASK` — **the canonical leak-safe read logic
+  `_INVERSE_LABEL` (~line 478) + `_NO_ACCESS_MASK` (~line 489) — **the canonical leak-safe read logic
   to extract/share** (D-117-7) and the **inverse-label vocabulary** the chips reuse
   (D-117-6). Do NOT re-derive this — extract it.
 
