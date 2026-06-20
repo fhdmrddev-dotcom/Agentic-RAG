@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T12:20:00.000Z"
-last_activity: 2026-06-20
+last_updated: "2026-06-20T13:01:45.759Z"
+last_activity: 2026-06-20 -- Phase 116 planning complete
 progress:
   total_phases: 11
   completed_phases: 7
-  total_plans: 33
+  total_plans: 34
   completed_plans: 33
-  percent: 66
+  percent: 64
 ---
 
 # Project State
@@ -51,10 +51,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 4 of 4 — EXECUTION COMPLETE
-Status: Phase 116 — all 4 plans executed, but verify_phase_goal returned GAPS_FOUND (4/6 must-haves). Phase NOT complete. NEXT = /gsd:plan-phase 116 --gaps
+Plan: gap plan 116-05 created (gap_closure) — 5 plans total; 116-01..04 executed, 116-05 ready
+Status: Ready to execute GAP CLOSURE — /gsd:execute-phase 116 --gaps-only (closes CR-01 leak + CR-02 orphan; plan-checker PASSED 12/12 dims, 0 blockers)
 Resume file: None
-Last activity: 2026-06-20 -- 116 execution complete 4/4 (migration 075 idempotency index LIVE, operator-approved), BUT code-review + 10-agent adversarial verification + gsd-verifier confirmed TWO real BLOCKERs the static suite false-greens: CR-01 (live cross-user leak — resolver global-leg lacks is_latest + no folder re-check on follow-to-latest → SC#2/REL-04 violated) + CR-02 (edges orphaned after re-upload — handler queries by resolved-latest id vs creation-time edge id → SC#1/REL-01 LOCKED D-116-1 violated). 116-VERIFICATION.md = gaps_found. NEXT = /gsd:plan-phase 116 --gaps (fix CR-01/CR-02 read-side, add 2 non-vacuous regression tests, fold WR-02/03/04).
+Last activity: 2026-06-20 -- Phase 116 gap closure PLANNED: 116-05-PLAN.md (gap_closure:true, wave 4, REL-01/REL-04) closes the 2 verify_phase_goal BLOCKERs — TDD-sequenced (RED non-vacuous leak+orphan tests → CR-01 resolver is_latest-gate + post-follow folder re-check → CR-02 edge .in_(version_id_set) + _subject_version_ids helper + WR-02/03/04 fold-ins → full regression gate). plan-checker PASSED all 12 dims (0 blockers/0 warnings, 1 info). NEXT = /gsd:execute-phase 116 --gaps-only
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
