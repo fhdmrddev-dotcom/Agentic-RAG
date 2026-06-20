@@ -41,9 +41,9 @@
 - [x] **VIEW-07**: The agent can run a saved view / metadata query as a tool to answer questions in chat.
 
 ### Document Relationships (REL)
-- [ ] **REL-01**: User can create a typed link between two documents (supersedes / amends / references / attached-to).
+- [x] **REL-01**: User can create a typed link between two documents (supersedes / amends / references / attached-to).
 - [ ] **REL-02**: User can see a document's relationships in a panel on its detail view.
-- [ ] **REL-03**: User can remove a relationship.
+- [x] **REL-03**: User can remove a relationship.
 - [ ] **REL-04**: The agent can retrieve a document's related documents via a `get_related_documents` tool.
 
 ### Auto-Classification (CLASS)
@@ -103,8 +103,8 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | VIEW-06 | Phase 113 — Virtual Folders (Filter Compiler + Equality Backend) | Complete |
 | VIEW-03 | Phase 114 — Virtual Folders (Range/Date + Builder + Sidebar) | Complete |
 | VIEW-07 | Phase 115 — Virtual Folders (Agent Tool) | Complete |
-| REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
-| REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
+| REL-01 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
+| REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Pending |
 | REL-02 | Phase 117 — Document Relationships (Panel UI) | Pending |
 | CLASS-01 | Phase 118 — Auto-Classification | Pending |

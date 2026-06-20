@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-20T10:22:59.002Z"
+last_updated: "2026-06-20T10:35:07.518Z"
 last_activity: 2026-06-20
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 33
-  completed_plans: 30
+  completed_plans: 31
   percent: 64
 ---
 
@@ -26,7 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: 116 (document-relationships-backend-agent-tool) — EXECUTING (Plan 2 of 4)
+Phase: 116 (document-relationships-backend-agent-tool) — EXECUTING (Plan 3 of 4)
+
+**116-02 (Wave 2, REL-01/03 REST surface) — EXECUTED 2026-06-20** (1 TDD task / 1 commit — `f85be344` POST/DELETE router + main.py mount + 4 live tests un-marked): shipped the write surface Phase 117 consumes. `api/document_relationships.py` clones `document_views.py` — **`POST /document-relationships`** (the VISIBLE-BOTH gate D-116-5: `_resolve_readable_latest` on BOTH endpoints from the CALLER BEFORE the self-link/CHECK gate → an unseeable id, a nonexistent id, AND a self-link all collapse to ONE uniform 422 with one detail string = no probe-by-link ordering oracle, T-116-02-01; then the idempotent persist; then the `relationship.create` audit) + **`DELETE /{id}`** (own-scoped → uniform 404 on cross-user/absent, NEVER 403 — `grep -c "403"` on the router = 0, the 3 "NEVER 403" comments reworded to "forbidden status" per the plan's strict acceptance grep [Rule 1, cosmetic]; + the `relationship.delete` audit AFTER a confirmed remove, which the document_views DELETE clone-target lacks — D-116-12). Mounted after `document_views.router`. **4 live tests un-marked on :54322, 9 passed / 1 xfailed:** crud (create-201 + unseeable-422 + nonexistent-422-same-detail + self-link-422-same-detail + cross-user-404 + owner-204 + absent-404), audit (create AND delete rows land live, metadata round-tripped), version-stable (re-upload + restore both follow-to-latest via `(user_id, filename, is_latest)`), idempotency (no-raise app-code claim PASSES; the strict one-row guarantee is **index-gated xfail** until Plan 04 applies migration 075 — a runtime `pg_indexes` probe auto-promotes it, + duplicate cleanup keeps teardown FK-safe). **Net-new failures = 0** (the 3 `test_lifespan.py` fails reproduce IDENTICALLY at base `main.py` — pre-existing rot, documented 111-03/110, import none of this plan's modules). threads.py byte-untouched (G-5). SUMMARY: `116-02-SUMMARY.md` (Self-Check: PASSED). REL-01/REL-03 marked complete. NEXT = Plan 03 (agent tool `get_related_documents` — reuses the SAME `_resolve_readable_latest` in-process for leak-safe per-viewer masking).
 
 **116-01 (Wave 1, REL-01/03/04 substrate) — EXECUTED 2026-06-20** (2 tasks / 2 commits — `9ec29971` 10 Wave-0 scaffolds + migration 075 FILE, `f9bce905` models + service): landed the Phase 116 substrate. `RelationshipCreate` (Literal rel_type → forged type 422 at parse; DB CHECK 071:68 defense-in-depth) + `RelationshipResponse`. `document_relationship_service.py` clones `document_view_service` (`_client`, `_uid` verbatim, `_TABLE`): **`_resolve_readable_latest`** — the shared FastAPI-free own-or-global EXACT-filename latest-version resolver (RESEARCH OQ2 one-core-no-fork; follows a creation-time id FORWARD to its current `(user_id, filename, is_latest=True)` row — read-time follow-to-latest D-116-1a); `create_relationship` idempotent via 23505-catch → re-fetch existing edge (D-116-6); `delete_relationship` own-scoped (`.eq user_id`) → False on cross-user miss → router 404. Migration `075_document_relationships_idempotency_index.sql` (additive partial unique index `(user_id, source_doc_id, target_doc_id, rel_type)` — the only race-immune guarantee; **FILE only, un-applied — Plan 04 BLOCKING applies it + regenerates full-schema.sql**). 10 Wave-0 scaffolds (4 unit + 6 integration; suite exits 0): `test_116_tool_schema` recursively rejects anyOf/oneOf AND multi-type `type` arrays (the a5b0b917 Gemini trap); `test_116_tool_leak` is the NON-vacuous two-user mask proof (clone of `test_115_tool_global_leak` harness). Anti-pattern (own-only + partial-ilike `resolve_document_id`) NOT reused; no bare `.execute()` (all via aexec). 1 deviation [Rule 1]: reworded 2 service docstrings that named `resolve_document_id`/`.execute()` literally and tripped source-grep acceptance tests (cosmetic, no behavior change). **Net-new unit failures = 0** (base-checkout proof: base 60 failed/943 passed → with-plan 60 failed/951 passed; +8 = new GREEN test_116_handler rows). threads.py untouched (G-5). SUMMARY: `116-01-SUMMARY.md` (Self-Check: PASSED). NEXT = Plan 02 (REST surface — clone document_views CRUD against this service).
 
@@ -39,10 +41,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Resume file: None
-Last activity: 2026-06-20 -- 116-01 executed (substrate: models + shared resolver + idempotent create + own-scoped delete + migration 075 file + 10 Wave-0 scaffolds)
+Last activity: 2026-06-20 -- 116-02 executed (REST surface: POST/DELETE typed-link CRUD + visible-both gate uniform-422 no-oracle + own-scoped 404 + create/delete audits; 4 live tests un-marked on :54322; REL-01/REL-03 complete)
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
