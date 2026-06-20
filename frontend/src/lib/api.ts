@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -2143,6 +2143,73 @@ export async function resolveAdHoc(
 export async function resolveFilterCount(filter_expr: ViewFilter): Promise<number> {
   const { total } = await resolveAdHoc(filter_expr, { count_only: true })
   return total
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 117 (REL-02 / UX-01) — document-relationships read + create + remove.
+//
+// Thin consumers of the leak-safe relationship router:
+//   GET    /document-relationships?document_id={id}   read outgoing + incoming
+//                                                      links (the net-new Plan 02
+//                                                      read seam) → RelatedDocumentsResponse
+//   POST   /document-relationships                     create an OUTGOING link
+//                                                      (visible-both gate server-side)
+//   DELETE /document-relationships/{id}                remove an owned link (204;
+//                                                      404-tolerant own-scoped delete)
+//
+// The client is NOT a trust boundary — the per-viewer readability re-check + the
+// visible-both create gate are enforced server-side. A masked row arrives with
+// `document_id: null` (D-117-8); the client never sees the hidden id/title. Mirrors
+// the `document-views` family fetch-wrapper conventions (getAuthHeaders + throw-on-
+// non-ok + the 404-tolerant DELETE).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /document-relationships?document_id= — a document's outgoing + incoming
+ *  typed links (the Plan 02 read seam). Returns the plain dict the panel renders
+ *  (subject + total + rows); a row's `document_id` is null for a masked "no access"
+ *  endpoint (D-117-8). 404 on an unreadable/unknown subject → throws (the section
+ *  renders its honest error state, distinct from empty — D-117-10). */
+export async function listRelationships(documentId: string): Promise<RelatedDocumentsResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-relationships?document_id=${documentId}`, {
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to load relationships")
+  return res.json() as Promise<RelatedDocumentsResponse>
+}
+
+/** POST /document-relationships — create an OUTGOING link from the open document
+ *  (D-117-1: outgoing-only authoring). Body is `{ source_doc_id, target_doc_id,
+ *  rel_type }` EXACTLY (mirrors `RelationshipCreate`). The server runs the
+ *  visible-both gate + self-link guard; a non-ok (422 = unseeable endpoint /
+ *  self-link / forged type, uniform) throws. Idempotent server-side (D-116-6).
+ *  Returns the persisted `Relationship` (the POST 201 body). */
+export async function createRelationship(
+  source_doc_id: string,
+  target_doc_id: string,
+  rel_type: RelType,
+): Promise<Relationship> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-relationships`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ source_doc_id, target_doc_id, rel_type }),
+  })
+  if (!res.ok) throw new Error("Failed to create link")
+  return res.json() as Promise<Relationship>
+}
+
+/** DELETE /document-relationships/{id} — remove an owned link (204; either
+ *  direction — D-117-2). Own-scoped server-side, so a cross-user/absent id is a
+ *  uniform 404 → treated as a no-op (404-tolerant, the `deleteView` pattern):
+ *  the link is gone either way, so a 404 is not an error from the UI's view. */
+export async function deleteRelationship(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-relationships/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to remove link")
 }
 
 // -- Feedback API functions ---------------------------------------------------
