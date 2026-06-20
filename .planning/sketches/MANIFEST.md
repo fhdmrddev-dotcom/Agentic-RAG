@@ -155,3 +155,21 @@ re-fetch-not-optimistic (D-117-9).
 |---|------|----------------|--------|------|
 | 034 | relationship-section | How do outgoing + incoming typed links read in the detail-panel accordion at a 3-sec scan — rel-type chip vs sentence, the masked "no access" row, the remove control, where "+ Add link" sits — within locked grouped-by-direction + inverse labels? | **A — chip-led grouped** ★ | phase-117, document-relationships, detail-panel, accordion, grouped-by-direction, inverse-labels, no-access-masking, honest-states |
 | 035 | link-target-picker | How does creating an outgoing link compose — rel-type chooser + searchable typeahead (MoveToFolderDialog shell), self + already-linked-per-type excluded, the error line, and a "this supersedes → X" preview? | **A — dialog · type-first** ★ | phase-117, document-relationships, create-link, typeahead, move-to-folder-dialog, outgoing-only, exclusion, honest-error |
+
+### Phase 118 session — Auto-Classification: suggestion surface + rule builder (2026-06-21)
+
+G-2 fired for **Phase 118 (Auto-Classification, CLASS-01/02/03)** — the G-2 sketch before
+discuss-phase. Grounded in the locked Aether Deep Midnight theme, the shared 027/028
+`DocumentDetailPanel` shell (which **reserves the `Classification` slot** these sketches fill —
+extend the shell, don't rebuild), the 029-A chip-strip condition builder, the 031 NavRow/`G`-pill
++ live-count patterns, and the 028/034 honest-provenance language. **Intake decision:** sketch
+BOTH surfaces; classification **rules live on a dedicated "Classification rules" surface reached
+from Documents** (sidebar "Automation" group, peer to Folders + Views). Load-bearing honesty: a
+rule match is **deterministic** → show matched rule + condition, never a fake confidence %;
+**"suggested" ≠ "moved"** (never a silent auto-move, CLASS-02); accept → move + `classification.apply`
+audit, **reversible** (CLASS-03).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 036 | classification-suggestion | How does an upload-time suggestion read + accept/dismiss — honest "suggested, not moved", matched-rule provenance (no fake %), reversible, audit receipt — in the detail-panel Classification section AND on the document row? | **A — on the doc** ★ | phase-118, auto-classification, suggestion, detail-panel, document-row, honesty, accept-dismiss, audit, reversible |
+| 037 | rule-builder-and-list | How does the dedicated Classification-rules surface compose — the rules list (status/scope/condition→action at a glance) + the builder (chip-strip condition → suggested folder/tag → scope) + a live "would match N" preview — reusing 029 chip-strip + 031 NavRow/G? | **A — list + side-panel builder** ★ | phase-118, auto-classification, rule-builder, rules-list, chip-strip, enable-disable, owner-global, live-count, dedicated-surface |
