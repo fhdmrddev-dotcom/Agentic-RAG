@@ -212,7 +212,7 @@
   - [x] 116-02-PLAN.md (Wave 2) — REST write surface (REL-01/03): `POST /document-relationships` (visible-both gate, uniform 422, no ordering oracle → idempotent persist → `relationship.create` audit) + `DELETE /{id}` (own-scoped 404-not-403 + `relationship.delete` audit) + main.py mount; version-stable read-time resolution proven live
   - [x] 116-03-PLAN.md (Wave 2) — agent tool (REL-04): Gemini-safe `GET_RELATED_DOCUMENTS_TOOL` (two flat scalar strings, no anyOf/oneOf/multi-type arrays) dual-wired `_TOOL_REGISTRY` + `get_tools()` + `_handle_get_related_documents` (both directions + inverse labels + leak-safe "no access" masking + calm errors); LIVE non-vacuous two-user leak proof
   - [x] 116-04-PLAN.md (Wave 3, BLOCKING) — apply migration 075 to :54322 (psycopg2-direct, no reset) + regenerate full-schema.sql + un-mark the race-immune idempotency assertion; operator DB-evidence checkpoint
-  - [ ] 116-05-PLAN.md (Wave 4, GAP-CLOSURE) — close CR-01 (SC#2/REL-04 leak-safety: `is_latest` gate on the resolver global-by-id leg + post-follow folder/owner visibility re-check, mirroring `list_documents`) + CR-02 (SC#1/REL-01 LOCKED D-116-1 follow-to-latest: edge enumeration via `.in_()` over the subject's full `(user_id, filename)` version-id set, read-side, no migration); two NON-VACUOUS live regression tests (old-global/new-private leak → None; edge survives re-upload); fold WR-02/03/04 (WR-01 not worked)
+  - [x] 116-05-PLAN.md (Wave 4, GAP-CLOSURE) — close CR-01 (SC#2/REL-04 leak-safety: `is_latest` gate on the resolver global-by-id leg + post-follow folder/owner visibility re-check, mirroring `list_documents`) + CR-02 (SC#1/REL-01 LOCKED D-116-1 follow-to-latest: edge enumeration via `.in_()` over the subject's full `(user_id, filename)` version-id set, read-side, no migration); two NON-VACUOUS live regression tests (old-global/new-private leak → None; edge survives re-upload); fold WR-02/03/04 (WR-01 not worked)
 
 **UI hint**: no
 
@@ -271,7 +271,7 @@
 | 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
 | 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
-| 116. Document Relationships — Backend + Agent Tool | 4/4 | Complete   | 2026-06-20 |
+| 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete   | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 0/? | Not started | - |
 | 118. Auto-Classification | 0/? | Not started | - |
 | 119. Document Governance Health | 0/? | Not started | - |
