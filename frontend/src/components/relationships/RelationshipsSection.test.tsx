@@ -167,6 +167,34 @@ describe("RelationshipsSection — re-fetch-not-optimistic + NO Undo (D-117-9)",
     await waitFor(() => expect(listRelationships).toHaveBeenCalledTimes(2))
   })
 
+  it("surfaces a transient 'couldn't remove' alert when a non-404 delete fails (WR-02)", async () => {
+    const user = userEvent.setup()
+    // deleteRelationship is 404-tolerant; reaching here means a genuine failure.
+    deleteRelationship.mockRejectedValueOnce(new Error("network"))
+    render(<RelationshipsSection docId="doc-1" />)
+    await screen.findByText("old-policy.pdf")
+
+    // No remove-error beat before any attempt.
+    expect(screen.queryByText(/couldn.t remove/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /remove supersedes link to old-policy.pdf/i }))
+
+    // The failed remove surfaces an honest role=alert beat — not silent.
+    const beat = await screen.findByText(/couldn.t remove that link/i)
+    expect(beat).toHaveAttribute("role", "alert")
+    // The authoritative re-fetch still ran (server truth), so the row reappears.
+    await waitFor(() => expect(listRelationships).toHaveBeenCalledTimes(2))
+  })
+
+  it("does NOT show the 'couldn't remove' beat on a successful delete", async () => {
+    const user = userEvent.setup()
+    render(<RelationshipsSection docId="doc-1" />)
+    await screen.findByText("old-policy.pdf")
+    await user.click(screen.getByRole("button", { name: /remove supersedes link to old-policy.pdf/i }))
+    await waitFor(() => expect(deleteRelationship).toHaveBeenCalledWith("rel-out-1"))
+    expect(screen.queryByText(/couldn.t remove/i)).not.toBeInTheDocument()
+  })
+
   it("renders NO 'Undo' control anywhere (an Undo would lie about reversibility)", async () => {
     render(<RelationshipsSection docId="doc-1" />)
     await screen.findByText("old-policy.pdf")

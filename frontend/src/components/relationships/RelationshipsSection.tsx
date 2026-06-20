@@ -63,6 +63,11 @@ export function RelationshipsSection({ docId, filename, onTotalChange }: Relatio
   // initial load skeleton so a remove doesn't blank the whole list.
   const [refreshing, setRefreshing] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+  // A transient "couldn't remove" beat (role="alert"). A non-404 delete failure used
+  // to be silently swallowed (WR-02): the authoritative re-fetch below would re-surface
+  // the row with no explanation. We flag the failed remove so the user gets a signal;
+  // the re-fetch still shows server truth (and clears this on the next successful pass).
+  const [removeError, setRemoveError] = useState(false)
 
   /** Local fetch, keyed on docId. `silent` = a post-mutation re-fetch (keep the old
    *  list visible under a ↻ beat instead of dropping to the skeleton). */
@@ -86,8 +91,10 @@ export function RelationshipsSection({ docId, filename, onTotalChange }: Relatio
     [docId, onTotalChange],
   )
 
-  // Fetch on mount + whenever the open document changes.
+  // Fetch on mount + whenever the open document changes. Clear any stale remove-error
+  // beat when the subject changes (it belonged to the previous document).
   useEffect(() => {
+    setRemoveError(false)
     void load()
   }, [load])
 
@@ -96,8 +103,17 @@ export function RelationshipsSection({ docId, filename, onTotalChange }: Relatio
    *  no-op; the re-fetch shows the server's truth either way. */
   const handleRemove = useCallback(
     async (relationshipId: string) => {
+      // Clear any prior remove error before this attempt.
+      setRemoveError(false)
       try {
         await deleteRelationship(relationshipId)
+      } catch {
+        // A genuine (non-404) delete failure — network/5xx. deleteRelationship is
+        // 404-tolerant (a vanished edge resolves), so reaching here means the remove
+        // really didn't take. Surface a transient beat so the user isn't left with a
+        // silently-reappearing row and no explanation (WR-02). The authoritative
+        // re-fetch below still shows server truth.
+        setRemoveError(true)
       } finally {
         // Re-fetch regardless: a 404-tolerant delete + the authoritative list.
         await load(true)
@@ -121,6 +137,15 @@ export function RelationshipsSection({ docId, filename, onTotalChange }: Relatio
           <RefreshCw aria-hidden="true" className="h-3 w-3 motion-safe:animate-spin" />
           updating…
         </span>
+      )}
+
+      {/* A failed remove (non-404) — a brief honest beat (WR-02). Distinct from the
+          load-error state: the list itself loaded fine, but the remove didn't take.
+          The re-fetch shows the row is still there; this explains WHY. */}
+      {removeError && (
+        <p role="alert" className="text-xs text-[hsl(0_80%_80%)]">
+          Couldn&rsquo;t remove that link &mdash; please try again.
+        </p>
       )}
 
       {state === "loading" && (
