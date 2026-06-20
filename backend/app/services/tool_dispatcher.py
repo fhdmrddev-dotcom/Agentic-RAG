@@ -472,23 +472,6 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
     )
 
 
-# Phase 116 (REL-04 / D-116-2) — the inverse-label map: an INCOMING edge (the subject is
-# the TARGET of the verb) is surfaced to the model with the relationship read from the
-# subject's point of view. "A supersedes B" → from B's side, B is "superseded_by" A.
-_INVERSE_LABEL = {
-    "supersedes": "superseded_by",
-    "amends": "amended_by",
-    "references": "referenced_by",
-    "attached_to": "has_attachment",
-}
-
-# Phase 116 (REL-04 / D-116-9) — the leak-safe mask for an endpoint the CALLER cannot
-# currently read. We surface the EXISTENCE of the link (so the model learns "there is a
-# related document you can't see") but NEVER the unreadable target's real filename, id,
-# or metadata. Proven non-vacuous LIVE two-user (test_116_tool_leak.py).
-_NO_ACCESS_MASK = "linked document (no access)"
-
-
 async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolResult:
     """Phase 116 (REL-04) — traverse the human-curated relationship graph (D-116-8).
 
@@ -498,34 +481,39 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
     loop — the 115 WR-01/WR-03 lesson; ``agent_loop.py`` catches ValueError as a backstop
     but this handler must not depend on it).
 
+    Phase 117 (D-117-7): the leak-safe outgoing+incoming TRAVERSAL was extracted into the
+    SHARED, FastAPI-free ``document_relationship_service.get_related_documents`` so the new
+    GET route (Plan 02) and this agent tool call ONE source of truth — there is no fork
+    that could drift and re-open the SC#1 leak (the 115 ``resolve_filter`` precedent). This
+    handler is now a THIN caller: parse the subject identifier, delegate the traversal,
+    then package the shared dict into the calm ``ToolResult`` (the ``mode``/``note`` framing
+    + ``source_refs`` the agent expects — byte-identical to before the extraction, plus the
+    additive per-row ``relationship_id`` the shared fn now carries, which the agent ignores).
+
     Flow:
-      1. Resolve the SUBJECT to its latest accessible version via the SHARED
-         ``_resolve_readable_latest`` (``document_id`` preferred; else exact ``filename``).
-         Neither arg / an unseeable id / an unknown filename → a calm "not found, here's
-         what to do" string. No leak: an id the caller cannot read resolves to None.
-      2. Two own-scoped queries over the subject's FULL ``(user_id, filename)`` version-id
-         set (the table is user-scoped): OUTGOING (``source_doc_id IN versions``) and
-         INCOMING (``target_doc_id IN versions``). Both via ``aexec``. Enumerating over the
-         version set (CR-02) means an edge created against an OLD version id still surfaces
-         after a re-upload (the LOCKED D-116-1 follow-to-latest guarantee).
-      3. For EACH edge's OTHER endpoint, RE-CHECK caller-readability via the SAME shared
-         resolver (D-116-9, SC#2 — the net-new behavior). An unseeable endpoint renders
-         as ``_NO_ACCESS_MASK`` with ``document_id: None`` — never the real
-         filename/id/metadata — and contributes NO ``source_refs`` entry.
-      4. Compact rows carry ``direction`` (outgoing|incoming) and a ``label`` (the
-         ``rel_type`` for outgoing, ``_INVERSE_LABEL[rel_type]`` for incoming, D-116-2).
+      1. Parse the subject identifier (``document_id`` preferred; else exact ``filename``).
+         Neither arg → a calm "no_subject" string.
+      2. Delegate the leak-safe traversal to the shared fn (subject resolve via
+         ``_resolve_readable_latest``, edge queries over the full version-id set, per-edge
+         other-endpoint readability re-check → masked unseeable endpoints). A ``None`` return
+         (unreadable/unknown subject) → the calm "not_found" string. Any unexpected
+         exception → the calm "unavailable" string (the handler never raises into the loop).
+      3. Package the shared dict into the ``ToolResult`` JSON: re-add the agent-facing
+         ``mode`` + ``note`` framing around the shared ``subject``/``total``/``documents``/
+         ``source_refs``.
 
     Read-audit policy (RESEARCH OQ1 / A2, Claude's discretion): NO read audit — D-116-12
     mandates an audit only for create/remove, no SC requires a read receipt, and adding
     one would need a new enum value. A read is a pure traversal of the caller's own graph.
     Pitfall: ``ctx.folder_subtree_ids`` is NEVER threaded — relationships are whole-KB,
-    own-scoped, and the per-endpoint readability re-check is the SOLE access gate.
+    own-scoped, and the per-endpoint readability re-check (inside the shared fn) is the SOLE
+    access gate.
     """
     caller = ctx.current_user["id"]
     doc_id = (args.get("document_id") or "").strip()
     filename = (args.get("filename") or "").strip()
 
-    # ── 1. resolve the subject (calm string on any miss — never a raise) ─────────
+    # ── 1. parse the subject identifier (calm string when neither arg given) ─────
     if not doc_id and not filename:
         return ToolResult(result=json.dumps({
             "status": "no_subject",
@@ -533,24 +521,24 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
             "hint": "Pass the subject document's id (preferred) or its exact filename.",
         }))
 
+    # ── 2. delegate the leak-safe traversal to the SHARED fn (D-117-7 — one core) ──
     try:
-        if doc_id:
-            subject = await document_relationship_service._resolve_readable_latest(
-                doc_id, caller, by_filename=False, supabase=ctx.supabase
-            )
-        else:
-            subject = await document_relationship_service._resolve_readable_latest(
-                filename, caller, by_filename=True, supabase=ctx.supabase
-            )
+        result = await document_relationship_service.get_related_documents(
+            caller,
+            document_id=doc_id or None,
+            filename=filename or None,
+            supabase=ctx.supabase,
+        )
     except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
-        logger.exception("get_related_documents subject resolve failed for caller=%s", caller)
+        logger.exception("get_related_documents traversal failed for caller=%s", caller)
         return ToolResult(result=json.dumps({
             "status": "unavailable",
-            "message": f"could not look up that document right now: {e}",
+            "message": f"could not load this document's relationships right now: {e}",
             "hint": "try again, or identify the document a different way (id vs filename)",
         }))
 
-    if subject is None:
+    # A None return = an unreadable/unknown subject (no leak) → the calm "not_found" string.
+    if result is None:
         which = f"document_id {doc_id!r}" if doc_id else f"filename {filename!r}"
         return ToolResult(result=json.dumps({
             "status": "not_found",
@@ -558,80 +546,10 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
             "hint": "Check the id/filename, or use search_documents / query_documents_by_view to find it first.",
         }))
 
-    subject_id = subject["id"]
-
-    # ── 2. own-scoped outgoing + incoming edge queries over the subject's FULL version set ──
-    # CR-02 (gap-closure Plan 05): an edge stores a creation-time id; after a re-upload the
-    # subject's latest id is a NEW uuid, so an edge keyed on an OLD version would be missed
-    # by a single-id query → the link silently orphans (the LOCKED D-116-1 follow-to-latest
-    # guarantee). Enumerate edges over ALL of the subject's (user_id, filename) version ids
-    # via .in_() — scoped STRICTLY to the subject's own lineage (no cross-document widening).
-    try:
-        version_ids = await document_relationship_service._subject_version_ids(
-            subject, supabase=ctx.supabase
-        )
-        outgoing = await aexec(
-            ctx.supabase.table("document_relationships")
-            .select("id, source_doc_id, target_doc_id, rel_type")
-            .eq("user_id", document_relationship_service._uid(caller))
-            .in_("source_doc_id", version_ids)
-        )
-        incoming = await aexec(
-            ctx.supabase.table("document_relationships")
-            .select("id, source_doc_id, target_doc_id, rel_type")
-            .eq("user_id", document_relationship_service._uid(caller))
-            .in_("target_doc_id", version_ids)
-        )
-    except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
-        logger.exception("get_related_documents edge query failed for caller=%s", caller)
-        return ToolResult(result=json.dumps({
-            "status": "unavailable",
-            "message": f"could not load this document's relationships right now: {e}",
-            "hint": "try again in a moment",
-        }))
-
-    # ── 3 + 4. resolve each OTHER endpoint per-viewer; mask the unseeable (D-116-9) ──
-    compact: list[dict] = []
-    source_refs: list[dict] = []
-
-    async def _append_edge(edge: dict, *, direction: str) -> None:
-        rel_type = edge["rel_type"]
-        # The OTHER endpoint: for an outgoing edge it's the target; for incoming, the source.
-        other_id = edge["target_doc_id"] if direction == "outgoing" else edge["source_doc_id"]
-        label = rel_type if direction == "outgoing" else _INVERSE_LABEL.get(rel_type, rel_type)
-        # Re-check readability FROM THE CALLER (never the link owner) — the SC#2 gate.
-        try:
-            other = await document_relationship_service._resolve_readable_latest(
-                other_id, caller, by_filename=False, supabase=ctx.supabase
-            )
-        except Exception:  # noqa: BLE001 — a readability hiccup masks (fail-closed), never raises
-            logger.exception("get_related_documents endpoint resolve failed for caller=%s", caller)
-            other = None
-        if other is None:
-            # Masked: existence shown, identity hidden. No citable ref for an unseeable doc.
-            compact.append({
-                "document_id": None,
-                "filename": _NO_ACCESS_MASK,
-                "rel_type": rel_type,
-                "direction": direction,
-                "label": label,
-            })
-            return
-        compact.append({
-            "document_id": other["id"],
-            "filename": other["filename"],
-            "rel_type": rel_type,
-            "direction": direction,
-            "label": label,
-        })
-        source_refs.append({"document_id": other["id"], "filename": other["filename"]})
-
-    for edge in (outgoing.data or []):
-        await _append_edge(edge, direction="outgoing")
-    for edge in (incoming.data or []):
-        await _append_edge(edge, direction="incoming")
-
-    total = len(compact)
+    # ── 3. package the shared dict into the agent-facing ToolResult (mode + note framing) ──
+    subject = result["subject"]
+    total = result["total"]
+    source_refs = result["source_refs"]
     note = (
         f"{total} related document(s) for {subject['filename']!r}." if total
         else f"No relationships found for {subject['filename']!r}."
@@ -639,10 +557,10 @@ async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolRes
     return ToolResult(
         result=json.dumps({
             "mode": "relationships",
-            "subject": {"document_id": subject_id, "filename": subject["filename"]},
+            "subject": subject,
             "total": total,
             "note": note,
-            "documents": compact,
+            "documents": result["documents"],
             "source_refs": source_refs,  # seeable endpoints only; also embedded so the model can cite
         }),
         source_refs=source_refs,
