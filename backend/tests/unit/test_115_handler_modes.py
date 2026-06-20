@@ -85,3 +85,59 @@ async def test_well_formed_inline_filter_routes_to_resolve(make_tool_context, mo
     result = await _handle_query_documents_by_view({"filter": good_filter}, ctx)
     assert isinstance(result, ToolResult)
     assert called.get("hit") is True, "a well-formed filter must reach resolve_filter"
+
+
+@pytest.mark.asyncio
+async def test_bad_limit_string_does_not_raise_into_loop(make_tool_context, monkeypatch):
+    """WR-01: a non-numeric `limit` (e.g. {"limit": "twenty"}) must NOT raise into the agent
+    loop. _normalize_optional_int coerces or returns None → the handler falls back to the
+    default and still returns a calm ToolResult (T-115-02-05 — errors never escape)."""
+    import app.services.tool_dispatcher as td
+    from app.services.tool_dispatcher import ToolResult, _handle_query_documents_by_view
+
+    async def _spy_resolve(*, caller, flt, folder_scope, count_only, supabase):
+        return {"total": 0} if count_only else {"documents": [], "total": 0}
+
+    monkeypatch.setattr(td, "resolve_filter", _spy_resolve, raising=False)
+
+    ctx = make_tool_context()
+    good_filter = {"op": "and", "conditions": [{"field": "document_type", "op": "eq", "value": "report"}]}
+
+    raised = None
+    try:
+        result = await _handle_query_documents_by_view({"filter": good_filter, "limit": "twenty"}, ctx)
+    except Exception as e:  # noqa: BLE001 — the anti-assertion: a bad limit may NOT escape
+        raised = e
+        result = None
+
+    assert raised is None, f"a non-numeric limit must not raise — got {raised!r}"
+    assert isinstance(result, ToolResult)
+
+
+@pytest.mark.asyncio
+async def test_catalog_db_error_returns_calm_string_not_raise(make_tool_context, monkeypatch):
+    """WR-03: catalog is the FIRST path the model is told to call; a transient DB error in
+    list_views/_build_field_meta must stay a calm ToolResult (status catalog_unavailable),
+    never raise into the loop (the same contract the resolve path already honors)."""
+    from app.services import document_view_service
+    from app.services.tool_dispatcher import ToolResult, _handle_query_documents_by_view
+
+    async def _boom(*a, **k):
+        raise RuntimeError("postgrest unreachable")
+
+    monkeypatch.setattr(document_view_service, "list_views", _boom)
+
+    ctx = make_tool_context()
+    raised = None
+    try:
+        result = await _handle_query_documents_by_view({}, ctx)  # empty args → catalog path
+    except Exception as e:  # noqa: BLE001 — the anti-assertion
+        raised = e
+        result = None
+
+    assert raised is None, f"a catalog DB error must not raise — got {raised!r}"
+    assert isinstance(result, ToolResult)
+    payload = json.loads(result.result)
+    assert payload.get("status") == "catalog_unavailable", (
+        f"a catalog DB error must return a calm catalog_unavailable string, got {payload}"
+    )

@@ -346,8 +346,18 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
         # SAME source the compiler validates against (_build_field_meta) so the catalog
         # advertises exactly what resolve accepts (no drift). Counts are omitted (lazy —
         # RESEARCH §A3: a catalog call should be cheap, not N resolves).
-        views = await document_view_service.list_views(caller, supabase=ctx.supabase)
-        whitelist, _ = await _build_field_meta(caller, ctx.supabase)
+        # WR-03: catalog is the FIRST path the model is told to call; a transient DB error in
+        # list_views/_build_field_meta must stay a calm ToolResult, never raise into the loop
+        # (T-115-02-05 — the same contract the resolve path already honors).
+        try:
+            views = await document_view_service.list_views(caller, supabase=ctx.supabase)
+            whitelist, _ = await _build_field_meta(caller, ctx.supabase)
+        except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
+            return ToolResult(result=json.dumps({
+                "status": "catalog_unavailable",
+                "message": f"could not load saved views / fields right now: {e}",
+                "hint": "try again, or call with a concrete `view` name or `filter`",
+            }))
         return ToolResult(result=json.dumps({
             "mode": "catalog",
             "views": [{"name": v["name"]} for v in views],
@@ -391,7 +401,10 @@ async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolR
         folder_scope = None
         via_meta = {"via": "filter", "filter": inline}
 
-    limit = max(1, min(int(args.get("limit") or 20), 50))  # default 20, hard cap 50 (D-115-3)
+    # WR-01: a non-numeric `limit` (e.g. {"limit": "twenty"}) must NOT raise into the agent
+    # loop — _normalize_optional_int coerces or returns None (→ default 20). T-115-02-05 contract.
+    _norm_limit = _normalize_optional_int(args.get("limit"))
+    limit = max(1, min(_norm_limit if _norm_limit is not None else 20, 50))  # default 20, hard cap 50 (D-115-3)
 
     try:
         total = (await resolve_filter(
