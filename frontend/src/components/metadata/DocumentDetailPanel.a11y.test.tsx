@@ -33,15 +33,23 @@ vi.mock("@/lib/supabase", () => ({
 }))
 
 // ── Partial-mock the api client: listMetadataFields + updateDocumentMetadata are
-//    observable + deterministic; everything else stays real. ──
+//    observable + deterministic; everything else stays real. The Phase 117
+//    RelationshipsSection now mounts inside the panel and fires its own
+//    listRelationships fetch — mock it to settle deterministically (empty) so the
+//    section's honest-states (role=status loading / role=alert error) don't bleed
+//    into these Metadata-focused assertions. ──
 const listMetadataFields = vi.fn<() => Promise<MetadataFieldDef[]>>()
 const updateDocumentMetadata = vi.fn<() => Promise<Document>>()
+const listRelationships = vi.fn()
+const listDocuments = vi.fn()
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
   return {
     ...actual,
     listMetadataFields: (...a: unknown[]) => listMetadataFields(...(a as [])),
     updateDocumentMetadata: (...a: unknown[]) => updateDocumentMetadata(...(a as [])),
+    listRelationships: (...a: unknown[]) => listRelationships(...(a as [])),
+    listDocuments: (...a: unknown[]) => listDocuments(...(a as [])),
   }
 })
 
@@ -77,6 +85,13 @@ const doc: Document = {
 beforeEach(() => {
   listMetadataFields.mockResolvedValue([])
   updateDocumentMetadata.mockResolvedValue(doc)
+  // Relationships section settles to a deterministic empty (no stray status/alert).
+  listRelationships.mockResolvedValue({
+    subject: { document_id: "doc-1", filename: "quarterly-report.pdf" },
+    total: 0,
+    documents: [],
+  })
+  listDocuments.mockResolvedValue([])
   // jsdom has no matchMedia — default to "motion allowed" (no reduce).
   Object.defineProperty(window, "matchMedia", {
     writable: true,

@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from "react"
 import { X, ShieldCheck } from "lucide-react"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "@/components/panel/PanelSection"
+import { RelationshipsSection } from "@/components/relationships/RelationshipsSection"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
@@ -132,6 +133,9 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // Per-field transient save/error receipts keyed by field_key.
   const [savedField, setSavedField] = useState<string | null>(null)
   const [errorField, setErrorField] = useState<string | null>(null)
+  // The Relationships section owns its own fetch; it lifts its loaded total up so the
+  // PanelSection can show a count badge (null = not yet loaded → no badge).
+  const [relTotal, setRelTotal] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -156,6 +160,12 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   useEffect(() => {
     closeButtonRef.current?.focus()
   }, [])
+
+  // Reset the relationships count when the open document changes so a stale badge
+  // never shows during the new doc's fetch (the section re-fetches on docId change).
+  useEffect(() => {
+    setRelTotal(null)
+  }, [doc.id])
 
   useEffect(
     () => () => {
@@ -208,7 +218,7 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
         </button>
       </div>
 
-      {/* Sections — ONLY Metadata this phase (117/118 add theirs to this shell). */}
+      {/* Sections — Metadata (112), then Relationships (117). 118 adds Classification. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <PanelSection
           title="Metadata"
@@ -227,6 +237,19 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
               />
             ))}
           </div>
+        </PanelSection>
+
+        {/* Relationships (Phase 117 REL-02) — the section owns its own fetch +
+            re-fetch (D-117-9); it lifts the loaded total up for the count badge. */}
+        <PanelSection
+          title="Relationships"
+          count={relTotal ?? undefined}
+        >
+          <RelationshipsSection
+            docId={doc.id}
+            filename={doc.filename}
+            onTotalChange={setRelTotal}
+          />
         </PanelSection>
       </div>
     </div>
