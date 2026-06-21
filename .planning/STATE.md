@@ -110,7 +110,7 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 | 123 | Skill Triggering Quality | TRIG-01, TRIG-03, CTX-03 | 5 | G-5 (`context_window.py`/`agent_loop.py` trim); SC#10 |
 | 124 | Workflow Studio UX — Soul + Strict↔Loose | WUX-01, WUX-02 | 4 | G-2 sketch (both); UI hint; G-5 (`PhaseTimeline.tsx`/`PhaseCard.tsx`) |
 
-**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent) — Phases 125-130:**
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent) — Phases 125-131:**
 
 | Phase | Name | REQ-IDs | SC# | Depends |
 |---|---|---|---|---|
@@ -120,8 +120,9 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 | 128 | Live Description Before tool_start | TDP-02 | 2 | 122 |
 | 129 | MiniMax/OpenRouter Arg Repair | MP-04 | 2 | 122 |
 | 130 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 |
+| 131 | Non-Python Skill-Script Honesty | SRH-01 | 3 | 120 (off COLL-01 seam) |
 
-- **Coverage:** 18/18 requirements mapped (12 CORE + 6 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Coverage:** 19/19 requirements mapped (12 CORE + 7 STRETCH); 0 unmapped. Every requirement → exactly one phase. *(Phase 131 / SRH-01 folded in 2026-06-22 — SEED-044 Layer 1, the honesty precursor to v3.2 DISC-01; surfaced by a JS-skill-import investigation.)*
 - **Sequencing rationale:** COLL-01 (confirmed LIVE bug, Mechanism A) sequenced EARLIEST (Phase 120), paired with CTX-01 (same collision/context-isolation fix). MP-03 (per-provider scoreboard) lands in the SAME phase as MP-01/MP-02 (122) so the scoreboard substrate gates any MP-02 tier flip. TRIG-01 (headline skill-quality deliverable) gets its own phase (123) with TRIG-03 + CTX-03 as adjacent skill-triggering items. WUX-01/WUX-02 (G-2 sketch-gated UX re-skin) cluster in 124; IA-01 (also G-2/frontend) lands first in 121 as the "one front door" prerequisite the WUX re-skin builds on.
 - **SC#10 (cross-provider mandate, EVAL axis per MP-03):** flagged on every phase touching streaming / agent loop / provider routing / UI state — 120, 121, 122, 123, 124 (+ dependent STRETCH 125, 126, 128, 129).
 - **UI hint:** 121, 124 (CORE) + 125, 127 (STRETCH).

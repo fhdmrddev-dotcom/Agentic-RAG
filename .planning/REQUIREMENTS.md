@@ -44,6 +44,7 @@ Tracked in the roadmap as STRETCH phases, gated behind CORE completion (v2.9 105
 - [ ] **TDP-02**: A tool's `description` streams live before `tool_start` (the preparing-window honesty improvement).
 - [ ] **MP-04**: MiniMax malformed-args boundary repair + OpenRouter `require_parameters` for broader provider robustness.
 - [ ] **COLL-02**: The `template_input` resolver is run-scoped too — defense-in-depth for the `render_template` path alongside COLL-01.
+- [ ] **SRH-01**: When a user imports or runs a skill that bundles a non-Python script the Python-only sandbox can't execute (e.g. `.js`), the system is honest about it — a clear message at import ("this skill includes a JavaScript step the sandbox doesn't run yet; its instructions still work") and a clean, specific failure at execution instead of silently running JS as Python. Optionally widen `read_skill_file` so the model can at least *read* the bundled JS as reference text. (SEED-044 Layer 1 — the honesty precursor to v3.2's DISC-01; additive, kept OFF the COLL-01 sandbox-injection seam. Folded into v3.1 2026-06-22 by operator after a JS-skill-import investigation.)
 
 ## Deferred (not in this milestone)
 
@@ -51,7 +52,7 @@ Tracked in the roadmap as STRETCH phases, gated behind CORE completion (v2.9 105
 
 - **SI-01**: `skill_versions` table + immutability trigger + eval tables (`eval_cases`/`runs`/`run_outputs`/`feedback`) + `run_skill_eval` + grader/comparator/analyzer roles + with-skill-vs-snapshot baseline + review viewer + skill publish gate. The PRD's net-new eval+versioning spine — large enough to be most of a milestone on its own.
 - **STD-01**: agentskills.io frontmatter enforcement (name rules, description ≤1024, optional `metadata.version`).
-- **DISC-01**: executable skill bundle / "run skill script" primitive (sequence AFTER COLL-01).
+- **DISC-01**: executable skill bundle / "run skill script" primitive — the FULL multi-language capability (Node in the sandbox image + un-hardcode `lang` + route `execute_code` by language; the ignored `language` arg at `tool_dispatcher.py:1175` + llm_sandbox's native `lang="javascript"` are the wiring points). Sequence AFTER COLL-01 (touches the same sandbox-injection seam). v3.1 ships only the honesty precursor **SRH-01**; this is the real execution layer. Note: even Anthropic's own docx/pptx skills document a Node create-from-scratch path — but our app's Python emission layer (Phases 100/101) already generates those documents, so JS execution is for running market skills' bundled scripts verbatim, not a document-generation blocker.
 
 ### Own-slot / backlog
 
@@ -96,11 +97,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TDP-02 (STRETCH) | Phase 128 | Pending (gated) |
 | MP-04 (STRETCH) | Phase 129 | Pending (gated) |
 | COLL-02 (STRETCH) | Phase 130 | Pending (gated) |
+| SRH-01 (STRETCH) | Phase 131 | Pending (gated) |
 
 **Coverage:**
 - v1 (CORE) requirements: 12 total — **12 mapped** (Phases 120-124)
-- STRETCH requirements: 6 (gated, in-roadmap) — **6 mapped** (Phases 125-130)
-- Mapped to phases: **18 / 18** ✓
+- STRETCH requirements: 7 (gated, in-roadmap) — **7 mapped** (Phases 125-131)
+- Mapped to phases: **19 / 19** ✓
 - Unmapped: **0** ✓
 
 **Phase map (CORE 120-124 · STRETCH 125-130):**
@@ -115,7 +117,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Phase 128 (STRETCH) — Live Description Before tool_start: TDP-02
 - Phase 129 (STRETCH) — MiniMax/OpenRouter Arg Repair: MP-04
 - Phase 130 (STRETCH) — template_input Resolver Run-Scope: COLL-02
+- Phase 131 (STRETCH) — Non-Python Skill-Script Honesty: SRH-01
 
 ---
 *Requirements defined: 2026-06-21*
-*Last updated: 2026-06-21 after roadmap creation (18/18 requirements mapped — CORE 120-124, STRETCH 125-130)*
+*Last updated: 2026-06-22 — folded SRH-01 (non-Python skill-script honesty; SEED-044 Layer 1) into v3.1 as STRETCH Phase 131 after a JS-skill-import investigation; full Node execution stays v3.2 DISC-01 (19/19 mapped — CORE 120-124, STRETCH 125-131)*

@@ -14,6 +14,8 @@
 
 *The 3 options + full rationale are retained below for the record; Option A is the chosen path.*
 
+> **Post-lock addendum 2026-06-22 — SRH-01 added (v3.1 STRETCH Phase 131).** A JS-skill-import investigation (workflow `wf_8f8177ba-805`, evidence code-verified) confirmed: a market skill bundling JavaScript imports cleanly and its instructions work, but the `.js` can never execute (Python-only sandbox, 3 layers) — the confusing 2026-05-31 incident (SEED-044). It also corrected an overstatement: Anthropic's OWN docx/pptx skills document a Node create-from-scratch path, so JS is not purely long-tail (though our Python emission layer already generates those docs). Decision: fold **SEED-044 Layer 1 (graceful-honest degradation)** into v3.1 as STRETCH **SRH-01 / Phase 131** (additive, OFF the COLL-01 seam). The **full multi-language execution capability stays DISC-01 → v3.2** (Node in the image + language routing; must sequence strictly after COLL-01 — same sandbox-injection seam). This does not change the CORE cut.
+
 ---
 
 **Bottom line up front:** the operator's full ask (skill quality + triggering + creation/eval + collision fix + UX simplification + full multi-provider + context/memory + task-desc parity + self-improving) is **~22 candidate requirements across 3 substantial substrates — genuinely 2-3 milestones, not one.** Both research waves reached this independently. The job now is to pick the v3.1 cut.
