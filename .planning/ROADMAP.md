@@ -271,7 +271,11 @@
   2. Each governance signal links to the action that fixes it (open document, re-extract, classify) (DGOV-02).
   3. The view is read-only aggregation over the new tables under their existing RLS (no new write path), matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
 
-**Plans**: TBD
+**Plans**: 2 plans (2 waves; backend router -> frontend page + nav triad)
+
+  - [ ] 119-01-PLAN.md (Wave 1) -- Backend document_governance.py router (3 owner-scoped paginated signal routes: broken-relationships via _resolve_readable_latest-None / unclassified via _classification.status=="suggested" / low-confidence via Python-scan of _confidence<0.5) + main.py mount + 6 Wave-0 test scaffolds incl. the two-user live leak harness (DGOV-01)
+  - [ ] 119-02-PLAN.md (Wave 2) -- Frontend GovernancePage (counter header + 3 stacked positive-empty-state cards + initializedTabsRef no-loop guard + own DocumentDetailPanel link-out) + link-out-only GovernanceRow + the D-119-2 navigation triad (App.tsx union + nav-items entry + ChatLayout branch -- all three in one plan) + Vitest reachability/no-loop/link-out (DGOV-01/DGOV-02/UX-01)
+
 **UI hint**: yes
 
 ### Progress
