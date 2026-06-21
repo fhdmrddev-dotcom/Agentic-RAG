@@ -31,7 +31,7 @@ from app.services.retrieval_service import search_documents, resolve_document_id
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
 from app.services.audit_service import write_audit_entry
-from app.services.sandbox_service import sandbox_manager, harvest_output_files
+from app.services.sandbox_service import sandbox_manager, harvest_output_files, snapshot_output_baseline
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
 # Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
@@ -866,6 +866,24 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
 
     try:
         session = sandbox_manager.get_or_create(ctx.thread_id)
+
+        # Phase 120 (COLL-01) — run-scope the harvest by SEEDING the per-run
+        # dedup baseline ONCE with a SHA-256 snapshot of every file already in
+        # /sandbox/output/ at run start. This excludes any pre-existing file
+        # (e.g. a prior workflow's leftover .docx) from this run's emitted
+        # delta — the harvest's existing `if h in previous_files: continue`
+        # dedup does the rest. D-120-01: per-RUN scope, NOT per-cell — guard so
+        # a multi-cell run seeds only on the FIRST cell (the per-cell
+        # accumulation `_previous_files_in_run.update(_iter_files)` below stays
+        # unchanged). D-120-02: NO /sandbox/output/ clear — we only stop
+        # re-emitting, never destroy files. D-v2.5-01: run_in_threadpool is
+        # MANDATORY — the snapshot does blocking container I/O. The same handler
+        # serves BOTH Deep and Harness, so this one seed site covers both.
+        if not getattr(ctx, "_output_baseline_seeded", False):
+            _baseline = await run_in_threadpool(snapshot_output_baseline, session)
+            _previous_files_in_run.update(_baseline)
+            ctx._output_baseline_seeded = True
+
         loop = asyncio.get_running_loop()
         sandbox_queue: asyncio.Queue = asyncio.Queue()
 
