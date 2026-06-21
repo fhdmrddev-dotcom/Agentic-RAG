@@ -1,5 +1,34 @@
 # Milestones
 
+## v3.0 Document Management (Shipped: 2026-06-21)
+
+**Phases completed:** 11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, 88 tasks.
+**Timeline:** 2026-06-15 → 2026-06-21 (7 days, 410 commits, 73 feat)
+**Files changed:** 699 files (+99,800 / −627 lines)
+**Requirements:** 24/24 functional REQ-IDs delivered + UX-01/UX-02 cross-cutting. No formal milestone audit run — substituted by per-phase rigor: **every phase passed `/gsd:verify-work` + `/gsd:secure-phase` + `/gsd:validate-phase`** (live cross-provider UAT on the agent-tool / upload-path phases).
+
+**Key accomplishments:**
+
+- **DM foundations (110)** — landed the shared backend substrate once (migration 071: 4 RLS tables + audit CHECK enum 11→19 + a default-ON `document_management_enabled` capability flag, with a boot/CI enum-drift hard-fail guard) so phases 111–119 add behavior, not schema. Every new table carries a nullable `org_id` for the v3.3 multi-tenancy re-key; `document_relationships` RLS corrected to user-scoped-only (DMF-01/02/03).
+- **Metadata enrichment (111/112)** — extraction is no longer pinned to `gpt-4o` (routes to the user/admin-configured model via `forced_emit` as its 4th caller), reads a larger head+tail window, and supports user-defined custom fields; the legacy OpenAI json_object path is preserved byte-identical as the reversible `legacy` mode. Per-field confidence renders as an honest `ConfidenceChip` in a net-new right-side `DocumentDetailPanel`; manual edits persist with a server-stamped `_source='user'` marker + a `metadata.update` audit row, and a re-extract precedence guard means a human correction is never wiped by a later degrade (META-01..05).
+- **Configurable multi-provider embeddings (111.1)** — retires the OpenAI embedding SPOF (SEED-048): a Settings provider picker (OpenAI / Google / Ollama / LM Studio / OpenAI-compatible) with a provider→model→dimensions auto-fill map, same-model parity across chunk + query embedding, and a guarded, RLS-scoped, destructive-change-confirmed re-embed background job (EMBED-01..06; migration 073).
+- **Virtual folders / metadata-driven views (113/114/115)** — a net-new closed-registry filter-AST → parameterized `metadata @> $1::jsonb` compiler (no raw end-user DSL), driven by a guided no-DSL chip-strip builder (equals / one-of / contains / is-empty / numeric / date + relative-date + AND + folder-subtree scope); saved views render as a live sidebar "Views" group and a viewer never sees documents they can't access (leak-safe global sharing, proven with live two-user tests). The agent can run a saved view or inline query as a `query_documents_by_view` tool (VIEW-01..07).
+- **Document relationships (116/117)** — typed links (supersedes / amends / references / attached-to) with an idempotent create + own-scoped delete, surfaced as a chip-led, grouped-by-direction relationships section inside the document detail panel (inverse labels, masked "no access" rows, a type-first typeahead create picker) and exposed to chat as a leak-safe `get_related_documents` tool (REL-01..04).
+- **Auto-classification (118)** — own + global enabled rules are evaluated first-match-wins in-Python on upload and write ONE never-silent `metadata._classification` suggestion (never a folder move); accept reversibly moves + audits-after-move + stamps the prior folder for Undo, dismiss clears it. An on-doc provenance card (rule + condition → folder, never a confidence %) + a one-glance row chip + a rules-authoring page with an Automation sidebar group (CLASS-01/02/03).
+- **Governance health (119)** — a light read-only `document_governance` surface with three owner-scoped signals (broken/dangling relationships, unclassified documents, low-confidence metadata) over the already-shipped DM tables, each row a pure link-out to the action that fixes it (open the document's detail panel); zero migration / write path / new package (DGOV-01/02).
+
+**Architectural decisions locked:**
+
+- **Document management is a metadata-driven Tier-A surface, not a full M-Files vault** — adopt the metadata / relationships / classification basics; reject object-types/classes/value-lists (fights the folder+metadata model) and silent autonomous auto-filing (fights the audit/honesty positioning). Classification is always suggest-then-confirm.
+- **Closed-registry filter compiler, never a raw DSL (D-v3.0-COMPILER)** — views compile a closed operator/field-registry AST to a parameterized jsonb containment query; a freeform end-user query language would be an injection + UX hazard.
+- **Share-don't-fork for leak-safe read cores (D-v3.0-SHARE-DONT-FORK)** — the saved-view resolve and the relationship traversal each live once (`document_view_resolver.py`, `document_relationship_service.py`) and are consumed by BOTH the agent tool and the REST route, so a forked second copy can't drift and re-open a cross-user leak.
+- **Gemini-safe tool schemas (D-v3.0-GEMINI-SCHEMA)** — agent-tool schemas avoid anyOf/oneOf AND multi-type `type:[...]` arrays; a 115 live-UAT run caught a multi-type array breaking all Gemini Deep tool use (no-anyOf is necessary but not sufficient). `threads.py` stayed byte-untouched across the entire milestone (G-5).
+- **Per-phase rigor substitutes for a formal milestone audit** — all 11 phases cleared verify + secure + validate with live evidence (e.g. 119: 12/12 threats closed; 117: 18/18; 116: 28/28; live two-user leak proofs on the agent-tool phases), so a formal audit adds ceremony without new signal (the v2.9 precedent).
+
+**Known deferred items at close:** 37 acknowledged (operator-approved — see STATE.md `## Deferred Items`). Triaged as **zero CORE blockers**: 4 UAT + 3 verification "gaps" are status-label lag on phases that were live-UAT'd after the file was stamped (116 SC#10 cross-provider rows carry forward; 119 has 0 open scenarios); 19 `[missing]` quick-task slugs are pre-GSD tracking cruft; 1 todo (the NL-authoring spike, satisfied by Phase 103); 10 dormant forward seeds (deployment / multi-tenancy / model-registry / compaction / modalities / sandbox-pkg / multi-language-skills / UI-polish / library-health / starter-workflows). Open `surface: Agentic-RAG` run-honesty / provider-polish reports roll forward into the next milestone's UAT blast radius.
+
+---
+
 ## v2.9 Workflow Studio (Shipped: 2026-06-15)
 
 **Phases completed:** 9 CORE phases (097–104, incl. inserted emission-layer phase 101.1), 57 plans. STRETCH phases 105–109 deferred to backlog (never started).
@@ -82,6 +111,7 @@
 - Live 4-axis cross-provider UAT (6 providers PASS) + WCAG 2.1 AA panel a11y re-verified in both themes (contrast fixed dark 7.21:1 / light 4.66:1) + Anthropic+Google deep-flow no-refresh pass + D-17 gemini-3 thought_signature closed-as-verified — recorded into 088-VALIDATION.md; Phase 088 verification gate complete.
 
 **Architectural decisions locked:**
+
 - FOUND-01: tool-dispatch chain extracted from `threads.py` (~3,800 LOC) into a registry-pattern `tool_dispatcher.py` — G-5 hot-file mandate satisfied; all new tools register here
 - 083-03: `_SINGLE_MODEL_PROVIDERS` frozenset drives tier-aware title-gen model routing; Kimi/Moonshot thinking filter is a provider-gated `<think>` state-machine (moonshot + deepseek only)
 - 084: per-thread workspace uses hybrid storage hidden behind `workspace_service.py` — inline bytea ≤256 KB / Supabase Storage bucket >256 KB; FK-chain RLS; owner endpoints return 404-not-403 to prevent existence leak

@@ -13,286 +13,19 @@
 - ✅ **v2.7 Agent Workspace & Panel** — Phases 083-088 (shipped 2026-05-30)
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
-- 🔨 **v3.0 Document Management** — ACTIVE (started 2026-06-15). SEED-005 Tier A as a product surface: **DM Foundations → metadata enrichment → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health.** 10 phases (**110-119**); the v2.9 STRETCH labels 105-109 are backlog candidates, not committed phases, so the range starts at 110 to avoid collision.
+- ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
 - 📋 **v3.1 Workflow + Skill Eval Studio** — re-scoped "Skill Studio" (eval/regression over the Phase 102 judge + golden-run, for workflows + composed skills). Next after v3.0 *unless a paying customer flips priority to the GTM track*. Brief: `PRDs/v3.1-skill-studio-eval.md`
 - 📋 **v3.2 Operator UX** → **v3.3 Multi-tenancy** → **v3.4 Open Platform (API/MCP)** → **v3.5 Automations** — the enterprise-GTM track. **Authoritative version map: `PRDs/SEQUENCE.md`.** (All re-sequenced 2026-06-15; briefs predate the v2.7–2.9 pivot and re-author at milestone start.)
 
 ---
 
-## v3.0 Document Management — 🔨 ACTIVE
+## v3.0 Document Management — ✅ SHIPPED 2026-06-21
 
-**Goal:** Turn the product's incidental document-management capabilities into a first-class, metadata-driven surface (M-Files-aligned Tier A) — documents structured, related, and trustworthy enough to power both direct use and every cited workflow deliverable.
+Full detail archived → **`.planning/milestones/v3.0-ROADMAP.md`** · requirements → **`.planning/milestones/v3.0-REQUIREMENTS.md`** · summary → **`.planning/MILESTONES.md`**.
 
-**Build order (dependency-driven — all four research sources converge here):** DM Foundations → Metadata Enrichment → Virtual Folders → Relationships → Auto-Classification → Governance Health. Enrichment is a **hard prerequisite** for classification. Each Tier A item is a full vertical (table + RLS + query path + agent tool + UI + audit-enum migration + cross-provider UAT) — realistically 2-3 phases each (research Pitfall 1).
+11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, shipped + validated — **every phase passed verify-work + secure-phase + validate-phase** (live cross-provider UAT on the agent-tool / upload-path phases; no formal milestone audit). Turned the product's incidental document handling into a first-class, metadata-driven surface (M-Files Tier A): user-defined custom metadata with per-field confidence + audited manual override, configurable multi-provider embeddings (retires the OpenAI SPOF), metadata-driven "virtual folders" (a closed-registry filter-AST → parameterized-jsonb compiler + a no-DSL builder + an agent tool), typed document relationships (a leak-safe share-don't-fork core + panel + agent tool), suggest-then-confirm auto-classification, and a light governance-health view. 24/24 functional requirements delivered; `threads.py` untouched all milestone (G-5); near-zero new deps.
 
-**Phase numbering:** 110-119 (10 phases). Continues past v2.9 CORE (ended at 104); avoids the deferred-STRETCH labels 105-109.
-
-**Coverage:** 24/24 functional requirements mapped (DMF 3, META 5, VIEW 7, REL 4, CLASS 3, DGOV 2). UX-01/UX-02 are cross-cutting acceptance attached to every UI-bearing phase.
-
-### Phases
-
-- [x] **Phase 110: DM Foundations** — Shared substrate: 4 new tables (RLS + nullable `org_id`) + audit-enum extension + frozenset sync + boot/CI subset assertion + the DM capability feature-flag (feature-independence seam). ✅ COMPLETE 2026-06-15 (2/2 plans; live-verified on :54322; gsd-verifier 7/7 PASSED; code review 0C/0W/3I — secure-phase pending)
-- [ ] **Phase 111: Metadata Enrichment — Extraction Backend** — Un-pin the extraction model, lift the 3k window, dynamic custom-field schema, per-field confidence storage.
-- [x] **Phase 111.1: Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)** — Embedding-provider picker + local presets + re-embed-on-change lifecycle; retires the OpenAI embedding SPOF (SEED-048). ✅ COMPLETE 2026-06-17 — all 3 gates clear (verify-work 5/5 incl. post-restart cold-start smoke + secure verified 0-open + validate nyquist-compliant; live local-infra UAT). **(INSERTED · G-2 sketch)**
-- [x] **Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit** — Net-new document detail panel surfacing metadata + per-field confidence + audited inline edit. **(G-2 sketch)** ✅ COMPLETE 2026-06-18 — all 3 gates clear (verify 3/3 + 5/5 human-UAT incl. mobile-responsive fix; secure 16/16 threats_open 0; validate 43/43 nyquist-compliant). Shared detail-panel shell for 117/118.
-- [x] **Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)** — `document_views` table, the net-new filter-AST → parameterized-SQL compiler, equality/AND/folder-scope, leak-safe global sharing. ✅ COMPLETE 2026-06-18 — 3/3 plans; verify 4/4 + 20/20 live tests on :54322; regression 69/69 prior-phase; code review 0C/5W/4I (WR-01/WR-02/IN-03 closed, WR-03→SEED-091). Secure-phase pending (SC#3 two-user global-view leak test runs there).
-- [ ] **Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar** — Typed/indexed date columns + relative-date operators; the view/filter builder UI; sidebar render-as-folder. **(G-2 sketch)**
-- [x] **Phase 115: Virtual Folders — Agent Tool** — The agent can run a saved view / metadata query as a tool to answer questions in chat. ✅ COMPLETE 2026-06-20 — 3/3 plans; verify 3/3 automated must-haves + live two-user leak proof on :54322; code review 0C/3W/3I; zero migrations, threads.py untouched. Secure-phase + validate-phase + 4 live cross-provider human-UAT rows pending (115-HUMAN-UAT.md).
-- [ ] **Phase 116: Document Relationships — Backend + Agent Tool** — Typed-link table, create/remove, `get_related_documents` tool (registry + advertised schema).
-- [x] **Phase 117: Document Relationships — Panel UI** — Relationship panel on the document detail surface (outgoing/incoming typed links, no-access masking). **(G-2 sketch)** ✅ COMPLETE 2026-06-21 — all 3 gates clear: code-review (0C/4W → WR-01..04 fixed) + verify 6/6 (Claude-driven Chrome MCP + DB, incl. live two-user leak proof) + secure 18/18 threats_open 0 (12 mitigate + 6 accept AR-117-01..06, orchestrator hand-verified the leak-safe mask path) + validate nyquist-compliant (13/13 covered, backend 13 + frontend 32 green, 0 gaps). REL-02 delivered.
-- [x] **Phase 118: Auto-Classification** — Classification rules → suggestion on upload (never silent auto-move) → accept/dismiss. **(G-2 sketch)** ✅ EXECUTED + verify-phase PASSED 2026-06-21 — 6/6 plans (3 waves, sequential-on-main-tree); verify 3/3 must-haves (CLASS-01 reachability gap — rules page unmounted — found by code review + verifier, gap-closed inline `6394d16e`: top-level nav route + ChatLayout branch); code review 1 BLOCKER (fixed) + 6W/4I; regression 176/0 prior-phase + frontend tsc clean; no migration, no new package, threads.py untouched (G-5). **secure-phase + validate-phase pending** (6 code-review WARNINGs incl. `_uid()` coercion at 3 service-role `.or_()` sites → assess in secure-phase; live cross-provider SC#10 UAT pending).
-- [ ] **Phase 119: Document Governance Health** — Light read-only governance view (broken relationships, unclassified docs, low-confidence metadata) with action links.
-
-### Phase Details
-
-#### Phase 110: DM Foundations
-
-**Goal**: Land the shared DM substrate once — the four new tables, RLS discipline, multi-tenancy forward-compat, and the audit-enum extension — so no later phase silently drops an audit row or fights a future org rewrite.
-**Depends on**: Nothing (first DM phase)
-**Requirements**: DMF-01, DMF-02, DMF-03
-**Success Criteria** (what must be TRUE):
-
-  1. The four new tables (`document_views`, `document_relationships`, `classification_rules`, `metadata_field_definitions`) exist with RLS enabled, each carrying a nullable `org_id uuid` (no FK) and a re-keyable `auth.uid() = user_id OR is_global` policy shape mirroring the `workflow_definitions` precedent.
-  2. The `audit_log` `action_type` CHECK enum is extended (min `view.create`, `relationship.create`, `classification.apply`, `metadata.update`) AND `VALID_ACTION_TYPES` (`audit_service.py:13`) is synced in the same phase; `full-schema.sql` regenerated (no reset).
-  3. A boot/CI assertion fails loudly if `VALID_ACTION_TYPES` is NOT a subset of the live DB CHECK enum (drift guard turns a silent 23514 reject into a boot failure).
-  4. A real audit row for each new action type INSERTs and SELECTs back **against the live DB** (verified live, not mocked — the D-102 "static would false-green" lesson).
-  5. A single DM capability flag (`app_settings`, default **on**) gates the new DM surfaces + tools so the whole capability can be cleanly toggled off; defaults on so v3.0 behavior is unchanged when unset. This is the feature-independence seam a future tier/entitlement system (SEED-080, v3.2) plugs into — no enforcement built here.
-
-**Plans**: 2 plans
-
-  - [x] 110-01-PLAN.md — Author migration 071 (4 RLS tables + audit enum 11->19 + DM capability flag) + frozenset/boot-guard sync + flag read chain + 6 Wave-0 tests ✅ EXECUTED 2026-06-15 (4 commits; migration un-applied — Plan 02 applies + verifies live; DMF-01/02/03 stay Pending until phase verification)
-  - [x] 110-02-PLAN.md — Apply migration 071 to :54322 (operator-authorized CLI, no wipe) + regen full-schema.sql + fix document_relationships RLS (user-scoped, no is_global) + 27 live verification tests GREEN (SC#1-5) ✅ EXECUTED 2026-06-15 (commit `25844c67`; full-suite net-new=0)
-
-#### Phase 111: Metadata Enrichment — Extraction Backend
-
-**Goal**: Replace the thin fixed-schema/hardwired-`gpt-4o`/3k-char extraction with a configurable, model-flexible, confidence-scored enrichment pipeline — the spine the M-Files "metadata not folders" story rests on and the hard prerequisite for classification.
-**Depends on**: Phase 110
-**Requirements**: META-01, META-03, META-04
-**Success Criteria** (what must be TRUE):
-
-  1. Metadata extraction routes through the user-selected (or an admin-configured `extraction_model` setting in `user_settings`/`app_settings`) model — not the hardwired `gpt-4o`; the effective model threads `_upload_pipeline → ingest_document → extract_metadata(model=...)`.
-  2. Extraction reads beyond `content[:3000]` (a configurable larger window or front-matter + tail sampling) so late title-page/byline data isn't missed.
-  3. User-defined custom metadata fields (from `metadata_field_definitions`) are extracted on ingest via a runtime Pydantic `create_model` schema; per-field confidence is stored flat under a `_confidence` sub-key so the existing `metadata @> filter` containment pre-filter still matches; `exclude_none=True` (empty `author` dropped, not coerced to `""`) is preserved as a guarded non-regression invariant.
-  4. **SC#10 4-axis UAT**: dynamic-schema structured extraction is verified across the native-7 (cross-provider) — extraction succeeds and returns valid confidence-scored fields on each provider; long-doc (≥ 5 KB) window-lift sampling exercised; rows authored in VALIDATION.md.
-
-**Plans**: 5 plans
-
-  - [x] 111-01-PLAN.md — Wave-0 test scaffolds + migration 072 file (un-applied) + first-class `lmstudio` provider + 3 app_settings-backed settings fields (META-03 foundation) — EXECUTED 2026-06-15 (3 tasks / 3 commits; net-new failures 0)
-  - [x] 111-02-PLAN.md — The enrichment engine: `build_metadata_model` + `sample_for_extraction` + explicit-scoped `read_enabled_field_defs` + async `extract_metadata_enriched` (forced_emit caller) (META-01/03/04) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 7 GREEN flipped; net-new failures 0)
-  - [x] 111-03-PLAN.md — `/metadata-fields` CRUD router + Pydantic models (field_type Literal + field_key validators) + `metadata.field.create` audit, mounted in main.py (META-01) — EXECUTED 2026-06-15 (2 tasks / 2 commits; 34/34 GREEN live; net-new failures 0)
-  - [x] 111-04-PLAN.md — `ingest_document` wiring: hoist load_app_settings + enriched/legacy branch + `asyncio.run` call site + `_confidence` attach + graceful degradation (META-01/03/04) — EXECUTED 2026-06-15 (1 TDD task / 1 commit; proved D-111-9 flat-filter compat; net-new failures 0)
-  - [x] 111-05-PLAN.md — [BLOCKING] Apply migration 072 to :54322 (psycopg2-direct/SQL-editor, NEVER db push) + read-back + regenerate full-schema.sql + live test_111 integration suite (META-01/03) — EXECUTED 2026-06-15 (operator-authorized psycopg2-direct apply; 4 cols live, 19 docs preserved; live suite 7 passed / 2 xpassed)
-
-**UI hint**: no
-
-#### Phase 111.1: Configurable / Multi-Provider Embeddings — incl. local Ollama + LM Studio (INSERTED)
-
-**Goal**: Make the embedding model a first-class, provider-pickable setting — including local Ollama/LM Studio — with a safe re-embed-on-change lifecycle, retiring the OpenAI embedding SPOF (SEED-048). Reuses Phase 111's `lmstudio` provider plumbing + admin-DB-setting pattern; lands before the DM read-path phases (113-119) that depend on retrieval quality. (Correction from a 5-agent investigation: embeddings are NOT OpenAI-hardwired today — `embedding_model`/`embedding_base_url`/`embedding_api_key`/`embedding_dimensions` are already configurable Settings with UI controls at `SettingsPage.tsx:934-950`; what's missing is a provider PICKER + local presets + the re-embed LIFECYCLE, plus a latent credential bug.)
-**Depends on**: Phase 111
-**Requirements**: EMBED-01, EMBED-02, EMBED-03, EMBED-04, EMBED-05, EMBED-06
-**Success Criteria** (what must be TRUE):
-
-  1. An admin can pick an embedding provider (incl. Ollama + LM Studio local) from Settings; selecting a local provider auto-fills its base_url (Ollama `http://localhost:11434/v1`, LM Studio `http://localhost:1234/v1`) + relaxes the API key to a dummy (EMBED-01/02), modeled on the existing rerank-provider `<select>` (`SettingsPage.tsx:959-967`).
-  2. Chunk-embedding and query-embedding use the SAME configured model + creds — the `embed_chunks` credential bug (drops `user_settings`; `embedding_service.py:94` / `documents.py:1405`) is fixed so a configured non-default embedder no longer embeds queries and chunks in mismatched vector spaces (EMBED-04; proven by a live cross-embedder ingest+search test).
-  3. Changing the embedding model/dimension triggers a guarded, RLS-scoped re-embed of existing chunks — `resize_embedding_column(N)` (`full-schema.sql:173-191`, currently never called) wired + a net-new batched re-embed background job over `document_chunks WHERE embedding IS NULL` (from preserved `content`); search recovers; a destructive-change UI confirmation names the re-embed first (EMBED-05/06). No silent vector-space mismatch.
-  4. **SC#10-style live UAT**: a local (LM Studio/Ollama) embedding model embeds + serves search; an OpenAI→local switch re-embeds and search still returns relevant cited results; search-threshold recalibration noted (confidence buckets `0.54/0.38` at `agent_loop.py:664-682` + `retrieval_match_threshold` 0.3 are calibrated for text-embedding-3-small and are NOT portable).
-
-**Design driver (the dimension-mismatch problem)**: `document_chunks.embedding` is a fixed `vector(1536)` column (`full-schema.sql:394`) + HNSW index with NO per-chunk record of which model produced a vector. **v1 = GLOBAL single embedding model + re-embed-on-change** (matches the single-column design). Optional: standardize one target dimension (1024) via Matryoshka truncation (pass `embedding_dimensions` into `embeddings.create(dimensions=…)` — a 1-line change at `openai_service.py:1473`, currently NOT passed) so truncation-capable providers coexist; add per-chunk `embedding_model`/`dimensions` tagging as a cross-space-search safety net. Per-folder embedding sets = OUT OF SCOPE (schema redesign). Realistic provider boundary = "any OpenAI-compatible `/v1/embeddings`" (OpenAI/Google/Jina/Mistral/Cohere/Ollama/LM Studio = zero new client code; Voyage + int8/binary = native-SDK, defer).
-**Carry-in (BUG-260616-01 — local-model routing trap; surfaced from Phase 111 UAT axis b):** the SAME root cause that motivates the embedding-provider picker also breaks LLM-side local routing today — provider is inferred from the model-id STRING, so a slashed local id (`google/gemma-3-4b`) mis-infers to `openrouter` (`config.py:362`) and `forced_emit` ships the call to OpenRouter's cloud instead of the local `:1234`/`:11434` server (data-egress surprise; no `lmstudio` inference pattern exists). Fold the SYMMETRIC fix into this phase: (a) explicit `(provider, model)` pairing — add `extraction_provider` beside `extraction_model` AND `embedding_provider`, route by the stored provider, skip name-inference when set; (b) make the `forced_emit` cross-provider block local-aware (resolve a local target provider's base_url + dummy key — `forced_emit.py:261-275`); (c) gate the OpenRouter "quality" mangling on `provider=="openrouter"` instead of `"/" in model` (`openai_service.py:1449-1456`) — as-is it appends `:exacto` + a `response-healing` plugin to any slashed local model id and 500s LM Studio/Ollama. **Live-proven 2026-06-16:** once these are bypassed, a 12B local model (gemma-4-12b-qat) extracts full confidence-scored metadata through the real engine; the blocker is purely this routing/mangling. Discuss-phase must route BUG-260616-01 (status: folded → 111.1).
-**Plans**: 6 plans
-
-  - [x] 111.1-01-PLAN.md — Substrate: Wave-0 test scaffolds + migration 073 file (un-applied; all DDL incl. match_document_chunks + resize_embedding_column) + settings schema/API for embedding_provider/extraction_provider/confidence buckets ✅ EXECUTED 2026-06-16 (Wave 1; 11 scaffolds + migration 073 file + 4 settings fields; net-new failures 0)
-  - [x] 111.1-02-PLAN.md — Data-egress routing fixes (BUG-260616-01 / D-09 x3): explicit extraction_provider, local-aware forced_emit, OpenRouter mangling gated on provider==openrouter ✅ EXECUTED 2026-06-16 (Wave 1 ∥; 3 D-09 fixes + 15 real-assertion tests; merge resolved 3 add/add test-file conflicts taking Plan 02 versions)
-  - [x] 111.1-03-PLAN.md — EMBED-04 embed_chunks cred fix + D-10 chunk-tag write + match_document_chunks filter caller + D-12 confidence buckets from settings ✅ EXECUTED 2026-06-16 (Wave 2; user_settings threaded through embed_chunks, chunk rows tagged embedding_model/dims, p_embedding_model stale-filter, confidence buckets from settings; net-new failures 0; live cross-embedder + match-filter stay xfail until Plan 04 migration apply)
-  - [x] 111.1-04-PLAN.md — [BLOCKING] apply migration 073 live to :54322 (SQL-editor/psycopg2, NEVER db push) + read-back + regen full-schema.sql + D-07 preset curation + live D-10 tests ✅ EXECUTED 2026-06-17 (Wave 3 checkpoint; operator authorized psycopg2-direct; docs 30→30 preserved, 0 NULL embedding_model, p_embedding_model live; auto-fixed stale 6-arg match_document_chunks overload via DROP FUNCTION; 3 live D-10 tests GREEN; PROVIDER-PRESETS.md curated — OpenAI/Google live-validated, local+Jina/Cohere/Mistral/Voyage UNVERIFIED; net-new failures 0)
-  - [x] 111.1-05-PLAN.md — Re-embed background job (batched, RLS-scoped, resumable, non-destructive, threadpool) + settings kickoff + progress/re-kick endpoints (EMBED-05) ✅ EXECUTED 2026-06-17 (Wave 4; reembed_service.py — eq(user_id) on every read+write, stale-predicate resume, write-new-never-delete, run_in_threadpool x8; kickoff on confirmed model/dim change with dims_changed-gated resize; GET /settings/reembed-progress reconcile-on-fetch + POST /settings/reembed re-kick; 2 reembed tests un-marked GREEN via rollback-txn live proof; net-new failures 0)
-  - [x] 111.1-06-PLAN.md — Frontend: reusable ProviderPicker (sketch 024) + ReembedConfirmModal (sketch 025) + ReembedStatusCard (sketch 026) + SettingsPage wiring (EMBED-01/02/03/06) ✅ EXECUTED 2026-06-17 (Wave 5; Tasks 1-2 built tsc-clean, Task 3 live UI walk APPROVED via Chrome MCP; picker auto-fill + always-on endpoint footer + CLOUD↔LOCAL + SAME-PICKER reuse, serious 5-fact confirm gate (Cancel = corpus untouched, DB-verified), extraction defaults modernized to live-/models IDs; live UAT found+fixed a real reembed progress count-cap bug (len→count=exact, 1000→1839); follow-ups: mount search pointer + SEED-088 dynamic registry)
-
-**UI hint**: yes
-**G-2**: /gsd:sketch (operator-approved mockup of the Settings embedding-provider picker + local presets + the destructive re-embed confirmation) BEFORE plan.
-
-#### Phase 112: Metadata Enrichment — Document Detail Panel + Manual Edit
-
-**Goal**: Give users a first-class place to SEE enriched metadata with per-field confidence and to correct it — establishing the net-new document detail panel that relationships (117) and classification (118) will also inhabit.
-**Depends on**: Phase 111
-**Requirements**: META-02, META-05
-**Success Criteria** (what must be TRUE):
-
-  1. Opening a document shows a detail panel that displays each metadata value alongside its per-field confidence (reusing the `ConfidenceChip` primitive); low confidence reads as visibly tentative.
-  2. User can manually edit/override any extracted metadata value inline; the edit persists into `documents.metadata` and writes a `metadata.update` audit row (verified live).
-  3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-
-**Plans**: 4 plans
-
-  - [x] 112-01-PLAN.md — Backend: PATCH /documents/{id}/metadata (RLS-404 + run_in_threadpool + field allow-list + _source hard-stamp + metadata.update audit) + 6 backend Wave-0 test stubs (META-05)
-  - [x] 112-02-PLAN.md — Re-extract precedence merge guard at the single ingest_document write site (preserve _source='user', drop their _confidence, degrade-doesn't-wipe) + live re-extract test (META-05)
-  - [x] 112-03-PLAN.md — Frontend foundation: ConfidenceChip primitive (hardcoded 0.75/0.50 tiers, honest Edited/Extracted states) + DocumentMetadata/_confidence/_source type extension + updateDocumentMetadata/listMetadataFields client methods (META-02)
-  - [x] 112-04-PLAN.md — DocumentDetailPanel push/split shell (PanelSection Metadata accordion, custom fields, inline edit, Saved-only-after-write receipt, mobile bottom-sheet) + IngestionPage wiring + DocumentList inline-MetadataPanel retire + WCAG AA vitest-axe (META-02/META-05)
-
-**UI hint**: yes
-**G-2**: /gsd:sketch (operator-approved mockup of the **document detail panel** — the shared shell for META display/edit + REL panel + CLASS suggestion) BEFORE plan. (UX-02 cross-cutting acceptance.)
-
-#### Phase 113: Virtual Folders — Filter Compiler + Equality Views (Backend)
-
-**Goal**: Land the saved-view data model and the one genuinely net-new component — a closed-registry filter-AST → parameterized-SQL compiler — proving equality/AND/folder-scope views compose the existing `search_documents` seam leak-safely.
-**Depends on**: Phase 111 (richer metadata to filter on)
-**Requirements**: VIEW-01, VIEW-02, VIEW-04, VIEW-05, VIEW-06
-**Success Criteria** (what must be TRUE):
-
-  1. A saved view (name + `filter_expr` jsonb + optional `folder_scope`) persists and resolves live contents through `search_documents(metadata_filter, folder_ids)` — query-not-copy, so one document appears in multiple views with no duplication (VIEW-01/02).
-  2. A view can combine multiple equality conditions (AND) and optionally scope to a folder subtree (VIEW-04/05); the filter-AST compiler uses a closed operator registry with field-whitelist + all literals bound as `$n` (no eval, no string interpolation).
-  3. A globally-shared (`is_global`) view exposes its *definition* but resolves *results/counts/facets over each viewer's own visible set* — two users see different result sets for the same shared view, with no cross-user content/count/existence leakage; cross-user miss returns 404-not-403 (VIEW-06). Verified live in secure-phase (the leak test, not the DEFINER label).
-  4. An injection/SSTI attempt placed in a filter value is neutralized (parameterized — no SQL/template execution).
-
-**Plans**: 3 plans
-
-- [x] 113-01-PLAN.md — AST models + net-new closed-registry filter compiler + Wave 0 unit scaffold (incl. SC#4 injection test)
-- [x] 113-02-PLAN.md — document_view_service CRUD (clone metadata_field_service; is_global=false hard-set)
-- [x] 113-03-PLAN.md — /document-views router (CRUD + per-viewer leak-safe resolve) + main.py mount + live :54322 integration tests
-
-**UI hint**: no
-
-#### Phase 114: Virtual Folders — Range/Date Filters + View Builder + Sidebar
-
-**Goal**: Complete virtual folders end-to-end — add the range/relative-date evaluator on typed indexed columns and the guided view/filter builder UI that renders saved views in the sidebar exactly like folders.
-**Depends on**: Phase 113
-**Requirements**: VIEW-03
-**Success Criteria** (what must be TRUE):
-
-  1. View filters support equals / one-of / contains / is-empty / numeric & date comparisons including relative dates ("expiring within N days"); "expiring in 90 days" returns correct rows across month/day boundaries because hot date/`document_type` fields are promoted to **typed, indexed columns** (btree), not lexically-compared lowercased JSONB strings (VIEW-03).
-  2. A guided condition builder (no raw DSL) lets the user compose a view's filter; saved views render in the sidebar as a distinct "Views" group with a visual affordance that they are saved queries (not real folders the user can drop files into), reusing the global-folder indicator pattern.
-  3. `EXPLAIN` shows index use (not a seq scan) for a view query at ~10k docs; sidebar render does not degrade with corpus size.
-  4. The builder + sidebar match the Deep Midnight / Aether design system, are mobile-responsive, and meet WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-
-**Plans**: 6 plans (5 waves; backend before frontend)
-
-  - [x] 114-01-PLAN.md (Wave 1) — Widen the filter compiler to bound WHERE-fragment descriptors + register the additive operators (gte/lte/one_of/contains/is_empty/relative-date) at the seam + author migration 074 (2 GENERATED STORED typed columns, un-applied) + rewrite the 3 113 containment tests (injection test stays green)
-  - [x] 114-02-PLAN.md (Wave 2) — Resolve route: two-leg _apply (typed columns + custom-field casts) + server-clock relative-date derivation (114->115 handoff) + additive count-only mode (own+global DISTINCT dedupe)
-  - [x] 114-03-PLAN.md (Wave 3, **autonomous:false BLOCKING**) — Apply migration 074 to live :54322 (SQL-editor, NEVER db push) + regen full-schema.sql + live bad-date/auto-backfill + SC#3 EXPLAIN index-use at ~10k seed
-  - [x] 114-04-PLAN.md (Wave 1 parallel) — Extract the shared NavRow primitive (fix folder-tree debt) + refactor FolderNode/FolderTree onto it + Move-to-folder document-row action (reuse MoveToFolderDialog)
-  - [x] 114-05-PLAN.md (Wave 4) — The no-DSL FilterBar chip strip + type-aware ConditionPopover + RelativeDateControl + live amber-at-zero count + Save-as-view
-  - [x] 114-06-PLAN.md (Wave 5, **autonomous:false**) — Views sidebar group (from NavRow, funnel icon + lazy count) + IngestionPage wiring (view<->filter loading, sidebar->rail collapse, responsive list) + G-4 Chrome-MCP lived-experience UAT
-
-**UI hint**: yes
-**G-2**: /gsd:sketch (operator-approved mockup of the **view/filter builder**) BEFORE plan. (UX-02 cross-cutting acceptance.)
-
-#### Phase 115: Virtual Folders — Agent Tool
-
-**Goal**: Make saved views and metadata queries answerable in chat — the agent can run a view as a tool, extending the M-Files-folderless story into the conversational surface.
-**Depends on**: Phase 113 (compiler), Phase 114 (full operator set)
-**Requirements**: VIEW-07
-**Success Criteria** (what must be TRUE):
-
-  1. The agent can run a saved view (or an ad-hoc metadata query) as a tool to answer a question in chat; the tool is registered in `_TOOL_REGISTRY` AND advertised in the `get_tools` schema (the Phase 101 `render_template` schema-visibility bug guarded against — verified the model actually calls it).
-  2. The tool resolves results over the caller's visible set (own-or-global-folder), never leaking another user's documents; respects `ctx.phase_whitelist` for free via the `dispatch_tool` guard.
-  3. **SC#10 4-axis UAT**: the new agent tool is exercised cross-provider (native-7), in a multi-tool prompt (e.g. view-query + `search_documents`), with a parallel-thread row and a long-message row; authored in VALIDATION.md.
-
-**Plans**: 3 plans (3 waves; sequential — extract resolver → handler → dual-wiring; zero migration, threads.py untouched)
-
-  - [x] 115-01-PLAN.md (Wave 1) — Extract the leak-safe `_resolve_filter` core into `document_view_resolver.py` (raises `ResolveError`, no FastAPI) + rewrap the 113/114 routes byte-identically + 10 Wave-0 test scaffolds
-  - [x] 115-02-PLAN.md (Wave 2) — `_handle_query_documents_by_view` (catalog + saved-view-by-name + inline-filter modes, honest TRUE-total + truncation note + source_refs, calm-error-not-throw, `search.query` audit `via:view/filter`) + `get_view_by_name` helper
-  - [x] 115-03-PLAN.md (Wave 3) — SC#1 dual-wiring: the Gemini-safe `QUERY_DOCUMENTS_BY_VIEW_TOOL` schema (no anyOf/oneOf) in `_TOOL_REGISTRY` AND `get_tools()` + SC#2 whitelist-guard test + the LIVE two-user leak proof driving the handler
-
-**UI hint**: no
-
-#### Phase 116: Document Relationships — Backend + Agent Tool
-
-**Goal**: Let users typed-link documents and let the agent traverse those links — establishing directional relationship edges and the `get_related_documents` tool over them.
-**Depends on**: Phase 110 (table substrate)
-**Requirements**: REL-01, REL-03, REL-04
-**Success Criteria** (what must be TRUE):
-
-  1. User can create a typed link (`supersedes` / `amends` / `references` / `attached_to`) between two documents and remove it; links reference document identity via latest-resolved/`is_latest` so a new version or restore does not orphan them (REL-01/03); a `relationship.create` audit row lands live.
-  2. The agent retrieves a document's related documents via a `get_related_documents` tool registered in `_TOOL_REGISTRY` AND advertised in `get_tools` (REL-04); a relationship pointing at a document the caller can't see renders as "linked document (no access)" — never leaking the target's title/metadata.
-  3. **SC#10 4-axis UAT**: `get_related_documents` is exercised cross-provider (native-7), multi-tool, parallel-thread, and long-message; authored in VALIDATION.md.
-
-**Plans**: 5 plans (4 + 1 gap-closure)
-
-  - [x] 116-01-PLAN.md (Wave 1) — substrate: RelationshipCreate/Response models (Literal rel_type) + document_relationship_service (shared `_resolve_readable_latest` own-or-global latest resolver, `_uid` guard, 23505-catch idempotent create, own-scoped delete) + migration 075 idempotency-index FILE + 10 Wave-0 test scaffolds
-  - [x] 116-02-PLAN.md (Wave 2) — REST write surface (REL-01/03): `POST /document-relationships` (visible-both gate, uniform 422, no ordering oracle → idempotent persist → `relationship.create` audit) + `DELETE /{id}` (own-scoped 404-not-403 + `relationship.delete` audit) + main.py mount; version-stable read-time resolution proven live
-  - [x] 116-03-PLAN.md (Wave 2) — agent tool (REL-04): Gemini-safe `GET_RELATED_DOCUMENTS_TOOL` (two flat scalar strings, no anyOf/oneOf/multi-type arrays) dual-wired `_TOOL_REGISTRY` + `get_tools()` + `_handle_get_related_documents` (both directions + inverse labels + leak-safe "no access" masking + calm errors); LIVE non-vacuous two-user leak proof
-  - [x] 116-04-PLAN.md (Wave 3, BLOCKING) — apply migration 075 to :54322 (psycopg2-direct, no reset) + regenerate full-schema.sql + un-mark the race-immune idempotency assertion; operator DB-evidence checkpoint
-  - [x] 116-05-PLAN.md (Wave 4, GAP-CLOSURE) — close CR-01 (SC#2/REL-04 leak-safety: `is_latest` gate on the resolver global-by-id leg + post-follow folder/owner visibility re-check, mirroring `list_documents`) + CR-02 (SC#1/REL-01 LOCKED D-116-1 follow-to-latest: edge enumeration via `.in_()` over the subject's full `(user_id, filename)` version-id set, read-side, no migration); two NON-VACUOUS live regression tests (old-global/new-private leak → None; edge survives re-upload); fold WR-02/03/04 (WR-01 not worked)
-
-**UI hint**: no
-
-#### Phase 117: Document Relationships — Panel UI
-
-**Goal**: Surface a document's typed relationships in a panel on its detail view so users can see and manage links visually.
-**Depends on**: Phase 116, Phase 112 (document detail panel shell)
-**Requirements**: REL-02
-**Success Criteria** (what must be TRUE):
-
-  1. A document's detail view shows a relationship panel listing outgoing and incoming typed links with the related filename + a relationship-type chip (REL-02); inaccessible targets render as "linked document (no access)".
-  2. The panel supports creating a link (reusing the `MoveToFolderDialog` document-picker pattern for relationship target selection) and removing one, reflecting changes live.
-  3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-
-**Plans**: 4 plans (4 waves — backend foundation before consuming frontend)
-
-- [x] 117-01-PLAN.md (Wave 1) — extract the leak-safe read into shared `get_related_documents` (D-117-7) + refactor the agent handler (behavior-preserving, 116 suite stays green) + carry `relationship_id` through (A6) + 3 Wave-0 backend test scaffolds
-- [x] 117-02-PLAN.md (Wave 2) — thin authenticated `GET /document-relationships?document_id=` route (no fork, no audit, uniform 404) + LIVE two-user ROUTE leak proof on :54322 + no-fork grep guard GREEN
-- [x] 117-03-PLAN.md (Wave 3) — frontend types (RelationshipRow nullable masked id) + 3 api.ts client fns (list/create/delete, 404-tolerant)
-- [x] 117-04-PLAN.md (Wave 4) — `RelationshipsSection` (grouped Outgoing/Incoming, inverse labels, masked rows, honest states, re-fetch-not-optimistic, reachable remove) + `CreateLinkDialog` (MoveToFolderDialog shell, type-first bespoke typeahead combobox, per-type exclusion) mounted in `DocumentDetailPanel` + 3 frontend Wave-0 tests
-
-**UI hint**: yes
-**G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) — SATISFIED (sketches 034 + 035, winner A, operator-approved 2026-06-20, audit-hardened `wf_1ec2afac-687`; `references/document-relationships-panel.md`). (UX-02 cross-cutting acceptance.)
-
-#### Phase 118: Auto-Classification
-
-**Goal**: Turn the now-richer metadata into routing intelligence — classification rules that produce a suggestion on upload (never a silent auto-move) the user can accept or dismiss.
-**Depends on**: Phase 111 (enriched metadata — HARD prerequisite), Phase 110 (rules table)
-**Requirements**: CLASS-01, CLASS-02, CLASS-03
-**Success Criteria** (what must be TRUE):
-
-  1. User can define classification rules (metadata condition → suggested folder/tag) stored in `classification_rules`, owner-private or global, enable/disable-able (CLASS-01).
-  2. On upload, a rule-eval pass in `ingest_document` (between metadata-build and persist) writes a *suggestion* into `metadata._classification` — never a silent auto-move; rule-matching reads are explicitly user-scoped in app code (no `auth.uid()` in a BackgroundTask) (CLASS-02).
-  3. User can accept or dismiss a classification suggestion from the document row/detail; accepting writes a `classification.apply` audit row (verified live) and performs the move; dismissing clears the suggestion. The whole flow is reversible (CLASS-03).
-  4. The classification UI matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-
-**Plans**: 6 plans
-
-  - [x] 118-01-PLAN.md — Backend primitives: rule Pydantic models + the net-new pure in-Python `classification_matcher` (AST→bool, reuses ViewFilter + validators) + 8 Wave-0 test scaffolds (CLASS-01/02)
-  - [x] 118-02-PLAN.md — `/classification-rules` CRUD service + router + main.py mount (is_global hard-false, own+global 404-not-403, match_expr validation, `classification.rule.create` audit) (CLASS-01)
-  - [x] 118-03-PLAN.md — `documents.py` edits: ingest rule-eval splice (user-scoped, first-match-wins suggestion, never silent move) + reversible accept/dismiss endpoints (`classification.apply` audit-after-move) (CLASS-02/03)
-  - [x] 118-04-PLAN.md — Frontend interface seam: types (ClassificationRule/Suggestion + `_classification`) + api client (rule CRUD + accept/dismiss; createRule omits is_global) + ActiveView union (CLASS-01/03)
-  - [x] 118-05-PLAN.md — On-doc surfaces: `ClassificationSection` (3rd PanelSection — provenance, no %, reversible accept/dismiss/Undo) + `DocumentList` row chip (sketch 036-A) (CLASS-03/UX-01)
-  - [x] 118-06-PLAN.md — Rules surface: `ClassificationRulesPage` + push/split `RuleBuilderPanel` (chip strip → folder-only action → scope → live resolveAdHoc preview + honesty line) + `AutomationGroup` sidebar (sketch 037-A) (CLASS-01/UX-01)
-
-**UI hint**: yes
-
-#### Phase 119: Document Governance Health
-
-**Goal**: Give users a light, read-only governance view of document-structure health — distinct from the retrieval (knowledge-health) dashboard — that surfaces and links to the fixes for the signals the upstream features produce.
-**Depends on**: Phase 116 (relationships), Phase 118 (classification), Phase 111 (confidence) — pure consumer, lands last
-**Requirements**: DGOV-01, DGOV-02
-**Success Criteria** (what must be TRUE):
-
-  1. A separate, light governance view (its own surface/route + queries — NOT cards bolted onto the knowledge-health dashboard) surfaces broken/dangling relationships, unclassified documents, and low-confidence metadata, reusing the `HealthPanel` card + paginated/actionable-empty-state patterns (DGOV-01).
-  2. Each governance signal links to the action that fixes it (open document, re-extract, classify) (DGOV-02).
-  3. The view is read-only aggregation over the new tables under their existing RLS (no new write path), matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
-
-**Plans**: 2 plans (2 waves; backend router -> frontend page + nav triad)
-
-  - [x] 119-01-PLAN.md (Wave 1) -- Backend document_governance.py router (3 owner-scoped paginated signal routes: broken-relationships via _resolve_readable_latest-None / unclassified via _classification.status=="suggested" / low-confidence via Python-scan of _confidence<0.5) + main.py mount + 6 Wave-0 test scaffolds incl. the two-user live leak harness (DGOV-01)
-  - [x] 119-02-PLAN.md (Wave 2) -- Frontend GovernancePage (counter header + 3 stacked positive-empty-state cards + initializedTabsRef no-loop guard + own DocumentDetailPanel link-out) + link-out-only GovernanceRow + the D-119-2 navigation triad (App.tsx union + nav-items entry + ChatLayout branch -- all three in one plan) + Vitest reachability/no-loop/link-out (DGOV-01/DGOV-02/UX-01)
-
-**UI hint**: yes
-
-### Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 110. DM Foundations | 2/2 | ✅ Executed (live-verified) | 2026-06-15 |
-| 111. Metadata Enrichment — Extraction Backend | 5/5 | ✅ Closed | 2026-06-16 |
-| 111.1 Configurable / Multi-Provider Embeddings | 6/6 | ✅ Closed (3 gates) | 2026-06-17 |
-| 112. Metadata Enrichment — Detail Panel + Manual Edit | 4/4 | Complete    | 2026-06-18 |
-| 113. Virtual Folders — Filter Compiler + Equality (Backend) | 3/3 | Complete    | 2026-06-18 |
-| 114. Virtual Folders — Range/Date + Builder + Sidebar | 6/6 | Complete    | 2026-06-19 |
-| 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
-| 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
-| 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
-| 118. Auto-Classification | 6/6 | Complete    | 2026-06-21 |
-| 119. Document Governance Health | 2/2 | Complete    | 2026-06-21 |
+**Next:** v3.1 Workflow + Skill Eval Studio (`/gsd:new-milestone`).
 
 ---
 
@@ -307,6 +40,23 @@ CORE phases 097–104 (9 phases incl. inserted 101.1, 57 plans) shipped + valida
 ---
 
 ## Shipped Milestones
+
+<details>
+<summary>v3.0 Document Management (Phases 110-119) -- SHIPPED 2026-06-21</summary>
+
+- [x] Phase 110: DM Foundations (2/2 plans) -- completed 2026-06-15
+- [x] Phase 111: Metadata Enrichment — Extraction Backend (5/5 plans) -- completed 2026-06-16
+- [x] Phase 111.1: Configurable / Multi-Provider Embeddings (6/6 plans) -- completed 2026-06-17
+- [x] Phase 112: Metadata Enrichment — Detail Panel + Manual Edit (4/4 plans) -- completed 2026-06-18
+- [x] Phase 113: Virtual Folders — Filter Compiler + Equality (Backend) (3/3 plans) -- completed 2026-06-18
+- [x] Phase 114: Virtual Folders — Range/Date + Builder + Sidebar (6/6 plans) -- completed 2026-06-19
+- [x] Phase 115: Virtual Folders — Agent Tool (3/3 plans) -- completed 2026-06-20
+- [x] Phase 116: Document Relationships — Backend + Agent Tool (5/5 plans) -- completed 2026-06-20
+- [x] Phase 117: Document Relationships — Panel UI (4/4 plans) -- completed 2026-06-20
+- [x] Phase 118: Auto-Classification (6/6 plans) -- completed 2026-06-21
+- [x] Phase 119: Document Governance Health (2/2 plans) -- completed 2026-06-21
+
+</details>
 
 <details>
 <summary>v2.9 Workflow Studio (Phases 097-104 CORE) -- SHIPPED 2026-06-15</summary>

@@ -480,6 +480,44 @@ Turned the v2.8 harness into an authorable capability: project=folder binding + 
 
 ---
 
+## Milestone: v3.0 — Document Management
+
+**Shipped:** 2026-06-21
+**Phases:** 11 (110, 111, 111.1, 112–119; incl. inserted embeddings 111.1) | **Plans:** 46 | **Tasks:** 88
+
+### What Was Built
+Turned the product's incidental document handling into a first-class, metadata-driven surface (M-Files Tier A): a shared DM substrate (audit enums + owner-private RLS + forward-compat `org_id` + a default-on feature flag), metadata enrichment (model-configurable extraction, larger window, user-defined custom fields, per-field confidence + audited manual override), configurable multi-provider embeddings (retiring the OpenAI SPOF), metadata-driven "virtual folders" (a closed-registry filter-AST → parameterized-jsonb compiler + a no-DSL builder + a saved-Views sidebar + an agent tool), typed document relationships (a leak-safe share-don't-fork core + a detail-panel section + an agent tool), suggest-then-confirm auto-classification, and a light governance-health view.
+
+### What Worked
+- **The leak-safe "share-don't-fork" pattern paid off twice.** Extracting the saved-view resolve (115) and the relationship traversal (117) into single shared cores consumed by BOTH the agent tool and the REST route meant the cross-user-leak invariant was proven once and couldn't drift — and live two-user leak proofs backed it on the agent-tool phases.
+- **Per-phase rigor (verify + secure + validate) again substituted for a milestone audit.** All 11 phases cleared three gates with live evidence; close-time confidence was high without a separate audit pass.
+- **A net-new substrate landed once (110) and the rest added behavior, not schema.** Putting the 4 RLS tables + audit enums + the feature flag down first kept phases 111–119 additive; `threads.py` stayed byte-untouched all milestone (G-5).
+- **Reused UI primitives kept the new surfaces consistent and cheap** — ConfidenceChip, the push/split DocumentDetailPanel shell, NavRow, HealthPanel cards, the MoveToFolderDialog picker — so each DM surface inherited Deep Midnight + a11y instead of re-inventing it (G-2 sketches gated the 3 riskiest surfaces).
+
+### What Was Inefficient
+- **A built-but-unreachable surface shipped in 118.** Plan 04 added a `"classification-rules"` ActiveView but no plan owned the ChatLayout render branch + nav entry, so the entire rules UI was built but unmountable. Code review (1 blocker) + the verifier both caught it; fixed inline. Lesson: a phase that adds an ActiveView member MUST own its mount + nav in-phase.
+- **Verification-status bookkeeping lagged reality.** Several phases (111.1/116/119) sat at `human_needed` and requirements (META/EMBED) at "Pending" long after the live UAT actually passed — surfaced as 7 of the 37 close-time "open" artifacts that were really just stale labels (corrected at close).
+- **A Gemini-only schema trap survived the static gates and was caught only live.** A multi-type `type:[...]` array in the 115 tool schema 400'd google-genai and broke all Gemini Deep tool use; the no-anyOf/oneOf rule was necessary but not sufficient. Now a named decision.
+- **A migration's GENERATED expression was rejected as non-immutable at apply time** (114's `(text)::date`), forcing an IMMUTABLE helper rewrite mid-execution — a reminder to verify generated-column immutability before authoring the migration.
+
+### Patterns Established
+- **Closed-registry filter compiler over a raw DSL** — compile a guided condition AST to a parameterized `metadata @> $1::jsonb`; never expose a freeform end-user query language (injection + UX hazard).
+- **Share-don't-fork for any leak-safe read path** — one core, two callers (agent tool + REST), so the access-control invariant can't drift.
+- **Suggest-then-confirm, never silent auto-action** — classification writes a suggestion + audit, never a silent move; reversible accept/dismiss preserves the audit/honesty positioning.
+- **Gemini schema discipline extended** — avoid anyOf/oneOf AND multi-type `type` arrays in any agent-tool schema.
+
+### Key Lessons
+- A new top-level surface isn't done until something mounts it — adding an ActiveView/route member and owning its mount + nav must live in the same phase (the 118 reachability gap).
+- Flip status labels when the work actually lands — `human_needed`/`Pending` left stale, read as "open" at close and cost triage; reconcile at phase close, not milestone close.
+- Leak-safety is cheapest to guarantee structurally (one shared core + a live two-user proof) and most expensive to retrofit after a fork drifts.
+
+### Cost Observations
+- Model mix: Opus 4.x for orchestration / planning / execution; live cross-provider UAT Claude- and operator-driven (Chrome DevTools MCP + psycopg2 DB cross-checks against local Supabase :54322).
+- Sessions: many across 7 days — 46 plans / 7 days ≈ 6.6 plans/day; 410 commits.
+- Notable: sequential-on-main-tree execution (worktrees off — venv/node_modules) was the default; near-zero new deps; one inserted phase (111.1 embeddings) + one inline reachability gap-closure (118).
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -495,3 +533,4 @@ Turned the v2.8 harness into an authorable capability: project=folder binding + 
 | v2.7 Agent Workspace & Panel | 6 | 28 | 4.67 | 3 days |
 | v2.8 Harness Engine & Workflow Mode | 10 | 67 | 6.7 | 9 days |
 | v2.9 Workflow Studio (CORE) | 9 | 57 | 6.3 | 8 days |
+| v3.0 Document Management | 11 | 46 | 4.2 | 7 days |
