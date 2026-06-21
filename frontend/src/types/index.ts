@@ -204,6 +204,13 @@ export interface DocumentMetadata {
    *  renders a neutral "Edited" chip — no score). Server hard-stamps this on PATCH
    *  so the client can never assert its own provenance. */
   _source?: Record<string, "user" | "extracted">
+  /** Phase 118 (CLASS-02) — the on-upload classification suggestion the backend
+   *  rule-eval pass stamps onto the doc's metadata (D-118-5). DISPLAY/ACTION-ONLY
+   *  provenance — never a flat `metadata_filter` match dimension (the `_`-prefix
+   *  reject already excludes it). The DocumentList row chip renders only while
+   *  `status === "suggested"`; the panel section renders the accepted receipt +
+   *  Undo. `undefined`/absent once the suggestion is dismissed. */
+  _classification?: ClassificationSuggestion
   /** Custom (user-defined) field_keys read through. The panel renders the union of
    *  built-ins + enabled custom defs (`MetadataFieldDef`), never raw keys. */
   [key: string]: unknown
@@ -360,6 +367,65 @@ export interface Relationship {
   target_doc_id: string
   rel_type: string
   created_at?: string | null
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 118 (CLASS-01 / CLASS-03) — auto-classification CLIENT contract.
+//
+// The frontend interface seam the on-doc plan (05) and the rules-page plan (06)
+// build against. Mirrors the backend payloads from Plans 02/03 EXACTLY so the UI
+// renders the server's truth without re-deriving anything:
+//   - `ClassificationRule` mirrors the rule CRUD response (`RuleResponse`,
+//     models/classification_rule.py) — a `SavedView` clone with `filter_expr`
+//     renamed to `match_expr` plus `suggest_folder_id`/`enabled`. The backend
+//     OWNS the `is_global` scope (hard-set false on create); the create body
+//     NEVER supplies it (mirrors `createView`).
+//   - `ClassificationSuggestion` mirrors the on-upload `_classification` object
+//     the ingest rule-eval pass stamps onto a doc's metadata (D-118-5) — the
+//     matched rule's provenance, the suggested folder (resolved fresh; nullable
+//     when the folder is gone, Pitfall 5), a `"suggested" | "accepted"` status,
+//     and `prior_folder_id` (stamped at ACCEPT time for the reversible Undo,
+//     D-118-6 — Undo reuses the existing `moveDocument(id, prior_folder_id)`).
+// The client is NOT a trust boundary — the leak-safe own+global rule reads, the
+// `match_expr` whitelist validation, and the accept-move folder re-check are all
+// enforced server-side. Never a confidence % — provenance only (the 028/036
+// honesty principle).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** A classification rule (mirrors the backend `RuleResponse`,
+ *  models/classification_rule.py). A `SavedView` clone — `filter_expr` becomes
+ *  `match_expr` (the SAME `ViewFilter` AST, evaluated in-Python at upload by the
+ *  net-new matcher), plus `suggest_folder_id` (the folder a match suggests; the
+ *  FK is `ON DELETE SET NULL` so it may be null) and `enabled` (the toggle rides
+ *  the UPDATE path — no separate endpoint). `is_global` is server-owned; the
+ *  create body never supplies it (the server hard-sets it false). */
+export interface ClassificationRule {
+  id: string
+  user_id?: string | null
+  name: string
+  match_expr: ViewFilter
+  suggest_folder_id: string | null
+  is_global: boolean
+  enabled: boolean
+}
+
+/** The on-upload classification suggestion stamped onto a doc's
+ *  `metadata._classification` (D-118-5) — the matched rule's provenance + the
+ *  suggested move. NEVER a confidence %; the human-readable `condition_summary`
+ *  is the frozen AST render the matched rule carried. `suggested_folder_name` is
+ *  resolved FRESH at suggestion-build time and is null/"(deleted)" when the
+ *  folder is gone (Pitfall 5). `status` flips to `"accepted"` after Accept (the
+ *  panel renders the audit receipt + Undo); the whole object is cleared on
+ *  Dismiss. `prior_folder_id` is stamped at ACCEPT time only (the Undo target —
+ *  Undo reuses the existing `moveDocument`), absent on a fresh suggestion. */
+export interface ClassificationSuggestion {
+  rule_id: string
+  rule_name: string
+  condition_summary: string
+  suggested_folder_id: string | null
+  suggested_folder_name: string | null
+  status: "suggested" | "accepted"
+  prior_folder_id?: string | null
 }
 
 export interface Folder {
