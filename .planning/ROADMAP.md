@@ -287,7 +287,7 @@
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
-| 118. Auto-Classification | 6/6 | Complete   | 2026-06-21 |
+| 118. Auto-Classification | 6/6 | Complete    | 2026-06-21 |
 | 119. Document Governance Health | 0/? | Not started | - |
 
 ---

@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
-status: verifying
-last_updated: "2026-06-21T03:43:13.237Z"
+status: ready_to_plan
+last_updated: 2026-06-21T06:14:17.119Z
 last_activity: 2026-06-21
 progress:
   total_phases: 11
@@ -11,6 +11,7 @@ progress:
   total_plans: 44
   completed_plans: 44
   percent: 91
+stopped_at: Phase 118 complete (6/6) — ready to discuss Phase 119
 ---
 
 # Project State
@@ -22,11 +23,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 118 — auto-classification
+**Current focus:** Phase 119 — document governance health
 
 ## Current Position
 
-Phase: 118 (auto-classification) — ALL 6 PLANS EXECUTED → READY FOR VERIFICATION
+Phase: 119
 
 **118-06 (Wave 3, CLASS-01/UX-01 — classification rules page: builder + Automation sidebar) — EXECUTED 2026-06-21** (2 TDD tasks / 2 commits — `56d07c5c` RuleBuilderPanel, `dc7ce84f` AutomationGroup + ClassificationRulesPage; SUMMARY `118-06-SUMMARY.md`): the rules-authoring surface of the LOCKED G-2 sketch 037-A (Winner A — rules list + right-side push/split builder). **`RuleBuilderPanel.tsx`** (net-new) — the builder in the 027/112/117 push/split shell (`minmax(0,1fr) <panel>`, no-router state-switch): a **chip-strip condition** reusing the 029/114 `ConditionPopover`/`ViewCondition` grammar verbatim (`field op value` + `＋condition`, flat AND) → a **📁 folder-only action** (a labeled `<select>` over own+global folders — the **🏷 tag radio DROPPED per D-118-1**, the only `tag` strings are the drop comments) → a **scope segmented** native-radio control (👤 Only me / 🌐 Global G, default Only me, AA) → a **live "would match N of M" preview** via the EXISTING `resolveAdHoc({count_only:true})` (a rule's `match_expr` is the SAME `ViewFilter` AST — **no new count fn, no new endpoint**, amber at zero) + the verbatim forward-only honesty line *"existing docs aren't moved — rules suggest on new uploads only"* (D-118-2). **Save** → `createRule(name, match_expr, suggest_folder_id)` with a body that **OMITS `is_global`** (server hard-sets it; the scope toggle is an authoring affordance not a create-body flag — T-118-06-01; the test asserts `createRule.mock.calls[0].toHaveLength(3)`) / `updateRule` when editing. **`AutomationGroup.tsx`** (net-new) — clones `ViewsGroup`: an uppercase "Automation" group header (peer to Folders + Views), each rule row built from the **SHARED `NavRow`** (never a FolderNode clone) with a `Zap` icon (green enabled / dim disabled = the 037-A dot), the tooltip-labeled `G` global pill (only for `is_global`), a **live `role="switch"` toggle** PATCHing `updateRule(id,{enabled})`, and Edit / Delete kebab (delete → inline confirm → `deleteRule`); the `condition (mono) → 📁 action` summary is a **static frozen render** under the row (the per-rule "would match N" is owned by the builder, not the row — D-118-2; so NO lazy `fetchCount`); honest empty state. **`ClassificationRulesPage.tsx`** (net-new, 201 lines) — the dedicated page (`App.tsx` `ActiveView` `"classification-rules"` from Plan 04 routes here): lists rules via `listRules()` in the `AutomationGroup`, opens `RuleBuilderPanel` in the right-side push/split panel (`430px`, no router; state-switch) on New rule / Edit, **honest states** loading (`role=status`) ≠ error (`role=alert` + Try again) ≠ calm empty, **re-fetch-not-optimistic** reconcile (`listRules`); folders + custom fields load alongside (degrade to empty, never a page error); single full-width column < 768px. **2 deviations [Rule 1 + Rule 3, BOTH test-harness only]:** (1) the toggle test regex matched the wrong accessible name — the enabled rule's toggle reads "Disable rule {name}", not "Enable…"; corrected the regex (component label is the intended action-relative a11y wording); (2) the Radix `DropdownMenu` kebab does not open under `fireEvent.click` in jsdom (pointer-capture + scrollIntoView APIs jsdom lacks) → added the standard Radix-+-jsdom shim + drove the menu with `@testing-library/user-event`, mirrored verbatim from the shipped `ViewsGroup.test.tsx`. **Plan-owned tests GREEN:** `vitest run RuleBuilderPanel AutomationGroup ClassificationRulesPage` → **3 files / 19 tests passed** (RuleBuilderPanel 7 + AutomationGroup 6 + ClassificationRulesPage 6). `tsc --noEmit` **EXIT 0**. All acceptance greps pass (no tag-radio; `resolveAdHoc` reuse; honesty line; createRule omits is_global; `NavRow` shared; `updateRule` live toggle; `RuleBuilderPanel` mounted; "Automation" header; 201 ≥ 50 min_lines). **Net-new failures = 0 (by construction)** — all 6 files net-new; **no existing source file imports any of the 3 new components** (`grep -rln` outside their own test files = empty → zero existing symbols modified); sibling-dir regression `vitest run NavRow ViewsGroup FilterBar DocumentList ClassificationSection` → **6 files / 59 passed**. `threads.py` byte-untouched (G-5; `git diff a7986c2b HEAD` = 0). No new package, no migration, no deletions. SUMMARY: `118-06-SUMMARY.md` (Self-Check: PASSED). CLASS-01 + UX-01 confirmed complete. **Scope note (not a deviation):** mounting `ClassificationRulesPage` into `ChatLayout` + a sidebar Automation launcher is a follow-on wiring step (`ChatLayout.tsx`/`IngestionPage.tsx` not in this plan's files). **Deferred to verify-phase:** G-4 lived-experience UI UAT (builder live count, toggle, edit/delete round-trip, mobile). **NEXT = /gsd:verify-work 118** (all 6 plans executed; SC#1-4 must-haves + SC#10 cross-provider upload-path UAT).
 
@@ -75,8 +76,8 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Plan: Not started
+Status: Ready to plan
 Resume file: None
 Last activity: 2026-06-21
 
