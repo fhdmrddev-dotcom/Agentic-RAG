@@ -187,11 +187,14 @@ async def test_any_field_below_cutoff_surfaces(pg_pool):
     try:
         low = await _seed_doc(
             pg_pool, uid, title="low",
-            metadata={"title": "low", "_confidence": {"document_type": 0.9, "author": 0.4}},
+            # author has a real (populated) value AND a 0.4 score → genuinely low-confidence.
+            metadata={"title": "low", "author": "J. Doe",
+                      "_confidence": {"document_type": 0.9, "author": 0.4}},
         )
         high = await _seed_doc(
             pg_pool, uid, title="high",
-            metadata={"title": "high", "_confidence": {"document_type": 0.9, "author": 0.75}},
+            metadata={"title": "high", "author": "A. Smith",
+                      "_confidence": {"document_type": 0.9, "author": 0.75}},
         )
 
         client, teardown = _route_client(str(uid), sb)
@@ -220,7 +223,9 @@ async def test_zero_point_zero_field_surfaces_live(pg_pool):
     try:
         zero = await _seed_doc(
             pg_pool, uid, title="zero",
-            metadata={"title": "zero", "_confidence": {"document_type": 0.0}},
+            # document_type has a populated value AND a 0.0 score → low (not missing).
+            metadata={"title": "zero", "document_type": "report",
+                      "_confidence": {"document_type": 0.0}},
         )
 
         client, teardown = _route_client(str(uid), sb)
@@ -231,5 +236,50 @@ async def test_zero_point_zero_field_surfaces_live(pg_pool):
 
         assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
         assert str(zero) in _ids(resp.json()), "a 0.0 confidence field must surface as low live"
+    finally:
+        await _cleanup(pg_pool, uid)
+
+
+@pytest.mark.asyncio
+async def test_empty_field_low_confidence_does_not_surface(pg_pool):
+    """BUG-260620 regression (live): a low ``_confidence`` score on an EMPTY/unextracted field is
+    MISSING metadata, not LOW-confidence metadata — the detail panel hides empty fields, so the
+    governance card must NOT surface such a doc (else the user clicks in and sees every field
+    high). Mirrors the panel's ``isLow`` (``!empty && ...``).
+
+    This was the exact live symptom: ``date``/``author`` extracted as ``None`` carried 0.1/0.2
+    scores and falsely flagged otherwise-high-confidence documents.
+    """
+    if not await _table_exists(pg_pool, "documents"):
+        pytest.skip("documents table absent")
+
+    sb = _supabase_or_skip()
+    uid = await _seed_user(pg_pool, "e")
+    try:
+        # `author`/`date` scored low but BLANK; `title` is the only populated field and is high.
+        blank = await _seed_doc(
+            pg_pool, uid, title="blankfields",
+            metadata={"title": "all high here", "author": None, "date": "",
+                      "_confidence": {"title": 0.95, "author": 0.1, "date": 0.2}},
+        )
+        # Non-vacuity twin: a doc with a POPULATED low field DOES still surface.
+        real = await _seed_doc(
+            pg_pool, uid, title="reallow",
+            metadata={"title": "t", "author": "J. Doe",
+                      "_confidence": {"title": 0.9, "author": 0.3}},
+        )
+
+        client, teardown = _route_client(str(uid), sb)
+        try:
+            resp = client.get("/document-governance/low-confidence")
+        finally:
+            teardown()
+
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
+        ids = _ids(resp.json())
+        assert str(blank) not in ids, (
+            "a doc whose only low fields are EMPTY must NOT surface (missing != low-confidence)"
+        )
+        assert str(real) in ids, "a doc with a populated low field must still surface (non-vacuity)"
     finally:
         await _cleanup(pg_pool, uid)

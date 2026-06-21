@@ -245,18 +245,45 @@ def _fetch_unclassified(
     return {"items": items, "total": res.count or 0, "offset": offset, "limit": limit}
 
 
+def _is_empty(value) -> bool:
+    """A field value the detail panel treats as empty (mirror of
+    ``DocumentDetailPanel.resolveFieldState``'s ``empty``): ``None``, an empty/whitespace
+    string, or an empty list. An empty-valued field is MISSING metadata, not LOW-confidence
+    metadata — so it must not drive the low-confidence signal (see ``_fetch_low_confidence``).
+    """
+    return (
+        value is None
+        or (isinstance(value, str) and value.strip() == "")
+        or (isinstance(value, list) and len(value) == 0)
+    )
+
+
 def _fetch_low_confidence(
     supabase: Client, user_id: str, offset: int = 0, limit: int = DEFAULT_LIMIT
 ) -> dict:
-    """D-119-5 — the caller's latest docs with ANY ``_confidence[field]`` below the cutoff.
+    """D-119-5 — the caller's latest docs with a populated, unconfirmed field whose
+    ``_confidence`` is below the cutoff.
 
     NOT PostgREST-expressible → fetch the caller's latest docs (capped) and scan in Python.
-    Guards (RESEARCH A4): skip docs with no ``_confidence`` dict; only consider values that are
-    ``isinstance(v, (int, float)) and not isinstance(v, bool)`` (``True``/``False`` are ``int``
-    subclasses — a naive ``v < 0.5`` would treat ``False`` as a 0.0 low score); ``0.0`` is a
-    LEGITIMATE low value (never truthiness-test). Each item carries the per-field below-cutoff
-    map (``low_fields``) and ``min_confidence`` (the worst field's score) for the row chip; the
-    list is sorted ascending by ``min_confidence`` (worst first), then page-sliced.
+    Number guards (RESEARCH A4): skip docs with no ``_confidence`` dict; only consider values
+    that are ``isinstance(v, (int, float)) and not isinstance(v, bool)`` (``True``/``False`` are
+    ``int`` subclasses — a naive ``v < 0.5`` would treat ``False`` as a 0.0 low score); ``0.0``
+    is a LEGITIMATE low value (never truthiness-test).
+
+    Field-eligibility guards (BUG-260620: a doc surfaced here but its opened detail panel showed
+    nothing low) — match the panel's ``isLow`` predicate (``DocumentDetailPanel.resolveFieldState``:
+    ``!empty && source !== "user" && score < LOW_TIER``) so the governance signal can never report
+    a field the panel hides:
+      * skip ``_``-prefixed keys (``_confidence``/``_source``/… are internal, never fields);
+      * skip fields whose VALUE is empty — the extractor left them blank, so they are *missing*
+        metadata, not *low-confidence* metadata (this was the live defect: ``date``/``author``
+        extracted as ``None`` carried a 0.1 score and falsely flagged the doc);
+      * skip fields the user confirmed (``metadata._source[field] == "user"``) — a user-set value
+        is authoritative regardless of the original extraction score.
+
+    Each item carries the per-field below-cutoff map (``low_fields``) and ``min_confidence`` (the
+    worst field's score) for the row chip; the list is sorted ascending by ``min_confidence``
+    (worst first), then page-sliced.
     """
     res = (
         supabase.table("documents")
@@ -269,15 +296,23 @@ def _fetch_low_confidence(
 
     rows = []
     for doc in (res.data or []):
-        confidence = (doc.get("metadata") or {}).get("_confidence")
+        metadata = doc.get("metadata") or {}
+        confidence = metadata.get("_confidence")
         if not isinstance(confidence, dict):
             continue  # no per-field confidence map → not a low-conf candidate
+        source_map = metadata.get("_source")
+        if not isinstance(source_map, dict):
+            source_map = {}
         low_fields = {
             field: value
             for field, value in confidence.items()
             # 0.0 is a real low value; guard non-numeric / None / bool (bool is an int subclass).
             if isinstance(value, (int, float)) and not isinstance(value, bool)
             and value < LOW_CONF_CUTOFF
+            # Match the panel's isLow: a real, populated, non-user-confirmed field only.
+            and not field.startswith("_")
+            and not _is_empty(metadata.get(field))
+            and source_map.get(field) != "user"
         }
         if not low_fields:
             continue

@@ -191,8 +191,13 @@ def _suggested_meta(title, *, folder_name="Contracts"):
 
 
 def _low_conf_meta(title, *, score=0.4):
-    """A doc with one below-cutoff `_confidence` field (the < 0.5 low signal, D-119-5)."""
-    return {"title": title, "_confidence": {"document_type": score}}
+    """A doc with one POPULATED below-cutoff `_confidence` field (the < 0.5 low signal, D-119-5).
+
+    The scored field MUST carry a real value: an empty/unextracted field is MISSING metadata,
+    not LOW-confidence metadata (BUG-260620), so the scan excludes score-only fields. A
+    `document_type` value here keeps this a genuine low-confidence true-positive.
+    """
+    return {"title": title, "document_type": "report", "_confidence": {"document_type": score}}
 
 
 @pytest_asyncio.fixture
