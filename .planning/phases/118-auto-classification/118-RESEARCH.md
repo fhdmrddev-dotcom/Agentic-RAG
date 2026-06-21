@@ -396,22 +396,27 @@ if metadata_dict:  # no metadata → nothing to match (graceful, never blocks in
 
 **Note:** None of these are compliance/security/retention assumptions — they are eval-order, key-collision, and gating-placement details the planner can lock with a one-line test or a CONTEXT confirm.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three were framed as non-blocking advisory items; each is resolved across the planning artifacts (PATTERNS.md + plans 118-01/03). Resolutions annotated inline below.
 
 1. **Should the ingest rule-eval pass respect the `document_management_enabled` flag?**
    - What we know: 113/112/111 put the DM gate at the UI surface, NOT in the backend write paths.
    - What's unclear: whether an operator who turns DM "off" expects new uploads to STOP getting suggestions written.
    - Recommendation: Follow the precedent (no backend gate) for v1; if the planner wants belt-and-suspenders, an early `return` when the flag is off is cheap. Flag for the planner; not blocking.
+   - **RESOLVED:** No backend gate — follows the 113 precedent. Plan 03 T1 implements the ingest pass without a flag guard.
 
 2. **`condition_summary` rendering — backend or frontend?**
    - What we know: D-118-5 wants a human-readable condition string in the suggestion object.
    - What's unclear: whether to render it once at suggest-time (backend, frozen) or derive it live in the panel (frontend, always current to the rule).
    - Recommendation: Render it backend at suggest-time and store it in the object (the rule could be edited/deleted later; the suggestion should show the condition that MATCHED, frozen — provenance, not live state). The panel can additionally link to the live rule. Not blocking.
+   - **RESOLVED:** Backend render at suggest-time, frozen in `build_suggestion` (Plan 01 T2) — provenance, not live state.
 
 3. **Row-chip data source on `DocumentList`.**
    - What we know: the chip needs the doc's `_classification` to render.
    - What's unclear: whether `DocumentList`'s existing doc rows already carry full `metadata` (they should — `GET /documents` returns the blob).
    - Recommendation: Confirm `Document.metadata` is on the list row type; if so the chip reads `doc.metadata._classification` with zero new fetch. Verify in `DocumentList.tsx` during planning.
+   - **RESOLVED (PATTERNS.md):** `Document.metadata` IS on the list-row type (`types/index.ts:391`) — the chip reads `doc.metadata?._classification` with zero new fetch (Plan 05 T2).
 
 ## Environment Availability
 
