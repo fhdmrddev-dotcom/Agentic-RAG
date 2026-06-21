@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 030 — Operator + Relative-Date Control</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-16); }
+  .intro { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+  .intro b { color: var(--color-text); }
+
+  /* ─── Operator-by-type reference matrix (always visible) ─── */
+  .opref { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-6); }
+  .opref h2 { font-family: var(--font-headline); font-size: var(--text-md); margin: 0 0 var(--space-1); }
+  .opref .sub { color: var(--color-text-dim); font-size: var(--text-xs); margin-bottom: var(--space-3); }
+  .optype { display: grid; grid-template-columns: 130px 1fr; gap: var(--space-2) var(--space-3); align-items: start; }
+  .optype .ft { font-size: var(--text-sm); color: var(--color-text); font-weight: 500; display: flex; align-items: center; gap: 6px; padding-top: 3px; }
+  .optype .ft .tt { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); background: var(--color-muted); padding: 1px 6px; border-radius: var(--radius-full); }
+  .optype .ops { display: flex; flex-wrap: wrap; gap: 5px; padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border-soft); }
+  .op-tag { font-family: var(--font-mono); font-size: 11px; padding: 2px 9px; border-radius: var(--radius-full); background: var(--color-muted); color: var(--color-text-muted); }
+  .op-tag.hot { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* ─── Control study card ─── */
+  .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5) var(--space-6); }
+  .card h3 { font-family: var(--font-headline); font-size: var(--text-lg); margin: 0 0 var(--space-1); }
+  .card .desc { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+
+  .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin-bottom: 6px; }
+  select, input { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px; font-family: var(--font-sans); font-size: var(--text-sm); outline: none; transition: border-color var(--dur-fast); }
+  select:focus, input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+
+  .stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; background: var(--color-bg); }
+  .stepper button { background: var(--color-muted); border: none; color: var(--color-text-muted); width: 30px; cursor: pointer; font-size: 15px; }
+  .stepper button:hover { background: var(--color-accent); color: var(--color-text); }
+  .stepper input { border: none; width: 54px; text-align: center; border-radius: 0; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+
+  .seg { display: inline-flex; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
+  .seg button { background: none; border: none; color: var(--color-text-muted); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: var(--text-sm); font-family: inherit; transition: all var(--dur-fast); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 600; }
+
+  .preset-chip { background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 7px 14px; font-size: var(--text-sm); cursor: pointer; font-family: inherit; transition: all var(--dur-fast); }
+  .preset-chip:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .preset-chip.on { background: var(--color-primary-dim); border-color: var(--color-primary-glow); color: var(--color-primary); font-weight: 600; }
+
+  .row { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; }
+  .ctl-col { display: flex; flex-direction: column; }
+
+  /* ─── Resolved window readout (the honesty) ─── */
+  .resolved { margin-top: var(--space-5); padding: var(--space-4); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .resolved .headline { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text); }
+  .resolved .headline .win { color: var(--color-success); }
+  .resolved .live-note { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--color-primary); margin-top: 6px; }
+  .resolved .live-note .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); animation: pulseGlow 2s infinite; }
+  .resolved .warn-note { font-size: var(--text-xs); color: var(--color-warning); margin-top: 6px; }
+  .resolved .matchn { float: right; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .resolved .matchn b { color: var(--color-primary); }
+
+  /* ─── Mini timeline ─── */
+  .tl { position: relative; height: 46px; margin-top: var(--space-4); }
+  .tl .axis { position: absolute; top: 28px; left: 0; right: 0; height: 2px; background: var(--color-border); }
+  .tl .band { position: absolute; top: 20px; height: 18px; background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / 0.5); border-radius: var(--radius-sm); }
+  .tl .today { position: absolute; top: 12px; bottom: 0; width: 2px; background: var(--color-primary); }
+  .tl .today::after { content: 'today'; position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--color-primary); font-family: var(--font-mono); white-space: nowrap; }
+  .tl .tick { position: absolute; top: 32px; font-size: 9px; color: var(--color-text-dim); font-family: var(--font-mono); transform: translateX(-50%); }
+  .tl .overdue { position: absolute; top: 20px; height: 18px; background: hsl(0 72% 51% / 0.08); border: 1px dashed hsl(0 72% 51% / 0.35); border-radius: var(--radius-sm); }
+  .tl .overdue-lbl { position: absolute; top: 0; font-size: 8px; color: var(--color-danger); font-family: var(--font-mono); }
+
+  .footnote { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: var(--space-4); }
+  .footnote code { font-family: var(--font-mono); background: var(--color-muted); padding: 1px 5px; border-radius: 4px; color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">030 · Relative-Date Control</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Operator-encodes-direction <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · One op + segmented mode</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Preset chips + custom</button>
+</div>
+
+<div class="wrap">
+  <p class="intro">The filter choices must <b>fit the field you pick</b>, and the <b>date</b> control must make “expiring within 90 days” / “older than 90 days” obvious — while being honest that the window <b>updates automatically</b> (the dates shift forward as time passes) and that “within next…” <b>leaves out already-overdue</b> items. “Today” is pinned to <b>Jun 19, 2026</b> here.</p>
+
+  <!-- The control adapts to the field; no type-system lecture needed (audit: the matrix was the wrap + jargon source — deleted) -->
+  <p class="intro" style="margin-bottom:var(--space-6)">The available choices change to fit the field you pick — choose a field, then choose how to match it.</p>
+
+  <!-- ══════════ VARIANT A ══════════ -->
+  <div id="va" class="variant">
+    <div class="card">
+      <h3>A · The operator itself encodes the direction</h3>
+      <p class="desc">One date operator dropdown carries the full vocabulary including the two relative entries. Pick <em>“within next…”</em> and a <code style="font-family:var(--font-mono)">[N] [unit]</code> stepper appears. Fewest moving parts; the menu does the explaining.</p>
+      <div class="row">
+        <div class="ctl-col"><div class="field-label">Field</div><select disabled><option>Date</option></select></div>
+        <div class="ctl-col"><div class="field-label">Operator</div>
+          <select id="a-op" onchange="A.op=this.value; renderA()">
+            <option value="within_next">within next…</option>
+            <option value="older_than">older than…</option>
+            <option value="before">before</option>
+            <option value="after">after</option>
+            <option value="between">between</option>
+          </select>
+        </div>
+        <div class="ctl-col" id="a-valwrap"></div>
+      </div>
+      <div class="resolved" id="a-resolved"></div>
+      <div class="tl" id="a-tl"></div>
+      <p class="footnote">Months count as about 30 days. The dates shown above are exactly what gets matched.</p>
+    </div>
+  </div>
+
+  <!-- ══════════ VARIANT B ══════════ -->
+  <div id="vb" class="variant" style="display:none">
+    <div class="card">
+      <h3>B · One “Date is…” operator, mode in the value area</h3>
+      <p class="desc">The operator menu stays short — just <em>“Date is…”</em>. A segmented control picks the mode; <em>Relative</em> reveals a direction toggle + <code style="font-family:var(--font-mono)">[N] [unit]</code>. Keeps the field→operator menu uniform with string/number fields; pushes the date complexity into the value control.</p>
+      <div class="row" style="margin-bottom:var(--space-4)">
+        <div class="ctl-col"><div class="field-label">Field</div><select disabled><option>Date</option></select></div>
+        <div class="ctl-col"><div class="field-label">Operator</div><select disabled><option>is…</option></select></div>
+        <div class="ctl-col"><div class="field-label">Mode</div>
+          <div class="seg" id="b-seg">
+            <button data-m="relative" class="on" onclick="B.mode='relative'; renderB()">Relative</button>
+            <button data-m="fixed" onclick="B.mode='fixed'; renderB()">On / before / after</button>
+            <button data-m="between" onclick="B.mode='between'; renderB()">Between</button>
+          </div>
+        </div>
+      </div>
+      <div class="row" id="b-valwrap"></div>
+      <div class="resolved" id="b-resolved"></div>
+      <div class="tl" id="b-tl"></div>
+    </div>
+  </div>
+
+  <!-- ══════════ VARIANT C ══════════ -->
+  <div id="vc" class="variant" style="display:none">
+    <div class="card">
+      <h3>C · Preset chips for the headline cases + Custom</h3>
+      <p class="desc">The real use-cases are few: “expiring soon”, “stale”, “this year”. Offer them as one-tap chips; <em>Custom…</em> always expands to the full <code style="font-family:var(--font-mono)">direction + N + unit</code>. Fastest for the 80% case, no menu hunting.</p>
+      <div class="row" style="flex-wrap:wrap;gap:var(--space-2)">
+        <button class="preset-chip" data-p="exp30" onclick="cPreset('exp30')">Expiring ≤ 30 days</button>
+        <button class="preset-chip on" data-p="exp90" onclick="cPreset('exp90')">Expiring ≤ 90 days</button>
+        <button class="preset-chip" data-p="old1y" onclick="cPreset('old1y')">Older than 1 year</button>
+        <button class="preset-chip" data-p="year" onclick="cPreset('year')">This calendar year</button>
+        <button class="preset-chip" data-p="custom" onclick="cPreset('custom')">Custom…</button>
+      </div>
+      <div id="c-custom" style="margin-top:var(--space-4); display:none"></div>
+      <div class="resolved" id="c-resolved"></div>
+      <div class="tl" id="c-tl"></div>
+      <p class="footnote">These are shortcuts for the most common date filters — pick Custom to set your own.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="vp(430)">📱</button><button onclick="vp(0)">🖥</button>
+</div>
+
+<script>
+const TODAY = new Date('2026-06-19T00:00:00');
+function addDays(b,n){ const d=new Date(b); d.setDate(d.getDate()+n); return d; }
+function fmt(d){ return d? d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : null; }
+const UNIT = { days:1, weeks:7, months:30 };
+
+// ── 36-doc corpus so the match count is real ──
+let seed=11; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+const DATES = Array.from({length:36}, ()=> addDays(TODAY, Math.floor(rnd()*600)-450));
+function countWindow(start,end){ return DATES.filter(d => (!start||d>=start) && (!end||d<=end)).length; }
+
+// compute {start,end,overdueShown} from a control state
+function windowOf(s){
+  const ud = UNIT[s.unit||'days'];
+  if(s.op==='within_next' || s.dir==='within_next') return { start:TODAY, end:addDays(TODAY, (+s.n||0)*ud), excl:true };
+  if(s.op==='older_than' || s.dir==='older_than')   return { start:null,  end:addDays(TODAY, -((+s.n||0)*ud)) };
+  if(s.op==='before') return { start:null, end:s.date1?new Date(s.date1):null };
+  if(s.op==='after')  return { start:s.date1?new Date(s.date1):null, end:null };
+  if(s.op==='between')return { start:s.date1?new Date(s.date1):null, end:s.date2?new Date(s.date2):null };
+  return {};
+}
+
+function resolvedHtml(s){
+  const w = windowOf(s);
+  let head;
+  if(w.start && w.end) head = `<span class="win">${fmt(w.start)} → ${fmt(w.end)}</span>`;
+  else if(w.start) head = `on/after <span class="win">${fmt(w.start)}</span>`;
+  else if(w.end) head = `before <span class="win">${fmt(w.end)}</span>`;
+  else head = `<span style="color:var(--color-text-dim)">pick a date…</span>`;
+  const n = countWindow(w.start, w.end);
+  const isRel = (s.op==='within_next'||s.op==='older_than'||s.dir==='within_next'||s.dir==='older_than');
+  return `<span class="matchn"><b>${n}</b> match</span>`+
+    `<div class="headline">→ ${head}</div>`+
+    (isRel? `<div class="live-note"><span class="dot"></span>Updates automatically — the dates shift forward as time passes</div>`:'')+
+    (w.excl? `<div class="warn-note">Shows items coming due in this window. Already-overdue items are not included.</div>`:'');
+}
+
+// ── timeline ──
+const AX_START = addDays(TODAY,-540), AX_END = addDays(TODAY,360);
+const AX_SPAN = (AX_END-AX_START);
+function pct(d){ return Math.max(0,Math.min(100, (d-AX_START)/AX_SPAN*100)); }
+function timelineHtml(s){
+  const w = windowOf(s);
+  const bs = w.start? pct(w.start) : 0;
+  const be = w.end? pct(w.end) : 100;
+  const todayP = pct(TODAY);
+  let bandStyle = `left:${Math.min(bs,be)}%; width:${Math.abs(be-bs)}%`;
+  let overdue = '';
+  if(w.excl){ overdue = `<div class="overdue" style="left:0;width:${todayP}%"></div><div class="overdue-lbl" style="left:4px">overdue · excluded</div>`; }
+  // ticks
+  const ticks = [-365,-180,0,180].map(off=>{ const d=addDays(TODAY,off); return `<span class="tick" style="left:${pct(d)}%">${off===0?'':fmt(d).replace(', '+d.getFullYear(),'')}</span>`; }).join('');
+  return `<div class="axis"></div>${overdue}<div class="band" style="${bandStyle}"></div><div class="today" style="left:${todayP}%"></div>${ticks}`;
+}
+
+// ════════ Variant A ════════
+const A = { op:'within_next', n:90, unit:'days', date1:'', date2:'' };
+function renderA(){
+  document.getElementById('a-op').value = A.op;
+  const w = document.getElementById('a-valwrap');
+  if(A.op==='within_next'||A.op==='older_than'){
+    w.innerHTML = `<div class="field-label">Value</div><div style="display:flex;gap:8px"><div class="stepper"><button onclick="A.n=Math.max(1,A.n-1);renderA()">−</button><input type="number" value="${A.n}" oninput="A.n=+this.value||0;renderA()"><button onclick="A.n=A.n+1;renderA()">+</button></div><select onchange="A.unit=this.value;renderA()">${['days','weeks','months'].map(u=>`<option ${u===A.unit?'selected':''}>${u}</option>`).join('')}</select></div>`;
+  } else if(A.op==='between'){
+    w.innerHTML = `<div class="field-label">Range</div><div style="display:flex;gap:8px"><input type="date" value="${A.date1}" oninput="A.date1=this.value;renderA()"><input type="date" value="${A.date2}" oninput="A.date2=this.value;renderA()"></div>`;
+  } else {
+    w.innerHTML = `<div class="field-label">Date</div><input type="date" value="${A.date1}" oninput="A.date1=this.value;renderA()">`;
+  }
+  document.getElementById('a-resolved').innerHTML = resolvedHtml(A);
+  document.getElementById('a-tl').innerHTML = timelineHtml(A);
+}
+
+// ════════ Variant B ════════
+const B = { mode:'relative', dir:'within_next', n:90, unit:'days', op:'within_next', date1:'', date2:'' };
+function syncB(){ // map mode/dir → op for windowOf
+  if(B.mode==='relative') B.op=B.dir;
+  else if(B.mode==='between') B.op='between';
+  else B.op=B.fixedOp||'before';
+}
+function renderB(){
+  document.querySelectorAll('#b-seg button').forEach(b=>b.classList.toggle('on', b.dataset.m===B.mode));
+  syncB();
+  const w = document.getElementById('b-valwrap');
+  if(B.mode==='relative'){
+    w.innerHTML = `<div class="ctl-col"><div class="field-label">Direction</div><div class="seg"><button class="${B.dir==='within_next'?'on':''}" onclick="B.dir='within_next';renderB()">Within next</button><button class="${B.dir==='older_than'?'on':''}" onclick="B.dir='older_than';renderB()">Older than</button></div></div>`+
+      `<div class="ctl-col"><div class="field-label">Amount</div><div class="stepper"><button onclick="B.n=Math.max(1,B.n-1);renderB()">−</button><input type="number" value="${B.n}" oninput="B.n=+this.value||0;renderB()"><button onclick="B.n=B.n+1;renderB()">+</button></div></div>`+
+      `<div class="ctl-col"><div class="field-label">Unit</div><select onchange="B.unit=this.value;renderB()">${['days','weeks','months'].map(u=>`<option ${u===B.unit?'selected':''}>${u}</option>`).join('')}</select></div>`;
+  } else if(B.mode==='between'){
+    w.innerHTML = `<div class="ctl-col"><div class="field-label">From</div><input type="date" value="${B.date1}" oninput="B.date1=this.value;renderB()"></div><div class="ctl-col"><div class="field-label">To</div><input type="date" value="${B.date2}" oninput="B.date2=this.value;renderB()"></div>`;
+  } else {
+    w.innerHTML = `<div class="ctl-col"><div class="field-label">When</div><select onchange="B.fixedOp=this.value;renderB()"><option value="before" ${B.fixedOp==='before'?'selected':''}>before</option><option value="after" ${B.fixedOp==='after'?'selected':''}>on / after</option></select></div><div class="ctl-col"><div class="field-label">Date</div><input type="date" value="${B.date1}" oninput="B.date1=this.value;renderB()"></div>`;
+  }
+  syncB();
+  document.getElementById('b-resolved').innerHTML = resolvedHtml(B);
+  document.getElementById('b-tl').innerHTML = timelineHtml(B);
+}
+
+// ════════ Variant C ════════
+const C = { preset:'exp90', op:'within_next', n:90, unit:'days', dir:'within_next', date1:'', date2:'' };
+function cPreset(p){
+  C.preset=p;
+  document.querySelectorAll('.preset-chip').forEach(c=>c.classList.toggle('on', c.dataset.p===p));
+  const cu = document.getElementById('c-custom');
+  if(p==='exp30'){ C.op='within_next'; C.n=30; C.unit='days'; cu.style.display='none'; }
+  else if(p==='exp90'){ C.op='within_next'; C.n=90; C.unit='days'; cu.style.display='none'; }
+  else if(p==='old1y'){ C.op='older_than'; C.n=365; C.unit='days'; cu.style.display='none'; }
+  else if(p==='year'){ C.op='between'; C.date1='2026-01-01'; C.date2='2026-12-31'; cu.style.display='none'; }
+  else if(p==='custom'){
+    cu.style.display='block';
+    C.op = C.dir;
+    cu.innerHTML = `<div class="row"><div class="ctl-col"><div class="field-label">Direction</div><div class="seg"><button class="${C.dir==='within_next'?'on':''}" onclick="C.dir='within_next';C.op='within_next';cPreset('custom')">Within next</button><button class="${C.dir==='older_than'?'on':''}" onclick="C.dir='older_than';C.op='older_than';cPreset('custom')">Older than</button></div></div><div class="ctl-col"><div class="field-label">Amount</div><div class="stepper"><button onclick="C.n=Math.max(1,C.n-1);cPreset('custom')">−</button><input type="number" value="${C.n}" oninput="C.n=+this.value||0;renderC()"><button onclick="C.n=C.n+1;cPreset('custom')">+</button></div></div><div class="ctl-col"><div class="field-label">Unit</div><select onchange="C.unit=this.value;cPreset('custom')">${['days','weeks','months'].map(u=>`<option ${u===C.unit?'selected':''}>${u}</option>`).join('')}</select></div></div>`;
+  }
+  renderC();
+}
+function renderC(){
+  document.getElementById('c-resolved').innerHTML = resolvedHtml(C);
+  document.getElementById('c-tl').innerHTML = timelineHtml(C);
+}
+
+function vp(w){ document.querySelector('.wrap').style.maxWidth = w?w+'px':'920px'; }
+function showVariant(id,e){ document.querySelectorAll('.variant').forEach(v=>v.style.display='none'); document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); document.getElementById('v'+id).style.display='block'; e.target.closest('.variant-tab').classList.add('active'); }
+
+renderA(); renderB(); cPreset('exp90');
+</script>
+</body>
+</html>

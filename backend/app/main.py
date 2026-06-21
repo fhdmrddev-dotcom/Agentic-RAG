@@ -230,6 +230,13 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
+    # Phase 110 DMF-01 / D-110-4 — audit-enum drift guard. MUST hard-fail (unlike the
+    # best-effort blocks above): a frozenset⊄live-CHECK drift = a silent prod audit hole.
+    # Mirrors the 075.4 UnknownProviderError-at-startup pattern. Runs per worker (read-only,
+    # idempotent; a drift crashes all WORKER_COUNT workers identically — the desired loud fail).
+    from app.services.audit_service import assert_action_types_synced
+    await assert_action_types_synced(await get_pg_pool())
+
     # Phase 091 HARNESS-03 — resume runs left `active` by a restart. CLAIMS each
     # run (CAS) so WORKER_COUNT=2 workers never double-execute (Pitfall 7), and
     # resumes a mid-ask_user phase correctly (answered → proceed; pending →
@@ -395,7 +402,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -412,6 +419,11 @@ app.include_router(workspace.router)
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
+app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
+app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
+app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
+app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
+app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

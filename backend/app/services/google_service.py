@@ -268,28 +268,44 @@ _GOOGLE_UNSUPPORTED_SCHEMA_KEYS: frozenset[str] = frozenset({
 
 
 def _translate_nullable_type(schema_dict: dict) -> dict:
-    """If schema_dict has ``type: [X, "null"]`` (Phase 084's OpenAI-strict-mode
-    optional shape), rewrite to ``type: X, nullable: True`` (Google's required
-    OpenAPI subset form). Returns a new dict, never mutates the input. No-op
-    otherwise.
+    """Collapse any list-valued ``type`` (JSON Schema multi-type / Phase 084's
+    OpenAI-strict ``[X, "null"]`` optional shape) into Google's required
+    single-type OpenAPI subset form: pick the FIRST non-null member as the
+    ``type`` and, when ``"null"`` was present, add ``nullable: True``. Returns a
+    new dict, never mutates the input. No-op for a scalar ``type``.
+
+    Google's google-genai Pydantic Tool validation REJECTS a list-valued
+    ``type`` — it requires a single Type enum — so EVERY multi-type array, not
+    only the 2-element ``[X, "null"]`` case, must be collapsed here or the whole
+    Tool fails to construct as a unit. Phase 115 surfaced the general case live:
+    ``query_documents_by_view``'s ``filter.conditions[].value`` /
+    ``value2`` used ``["string","number","boolean","null"]`` (3 real types + null),
+    which the old 2-element-only guard passed through unchanged → a 400
+    ValidationError broke EVERY Gemini Deep run (caught by the SC#10
+    cross-provider UAT, not the anyOf/oneOf-only static schema test). The chosen
+    member is the first non-null entry (``string`` for the polymorphic value
+    field) — the model expresses the literal as that type; the backend compiler
+    binds it and the shared OpenAI/Anthropic schema keeps the full type-array
+    untouched (provider-boundary fix, CLAUDE.md service-boundary rule).
 
     Examples:
-        {"type": ["string", "null"]}    -> {"type": "string", "nullable": True}
-        {"type": ["null", "integer"]}   -> {"type": "integer", "nullable": True}
-        {"type": ["string", "integer"]} -> unchanged (no null entry)
-        {"type": "string"}              -> unchanged (scalar)
+        {"type": ["string", "null"]}                      -> {"type": "string", "nullable": True}
+        {"type": ["null", "integer"]}                     -> {"type": "integer", "nullable": True}
+        {"type": ["string", "number", "boolean", "null"]} -> {"type": "string", "nullable": True}
+        {"type": ["string", "integer"]}                   -> {"type": "string"}
+        {"type": "string"}                                -> unchanged (scalar)
     """
     t = schema_dict.get("type")
-    if not isinstance(t, list) or len(t) != 2:
+    if not isinstance(t, list):
         return schema_dict
-    if "null" not in t:
-        return schema_dict
-    non_null = [x for x in t if x != "null"]
-    if len(non_null) != 1 or not isinstance(non_null[0], str):
-        return schema_dict
+    had_null = "null" in t
+    non_null = [x for x in t if x != "null" and isinstance(x, str)]
+    if not non_null:
+        return schema_dict  # degenerate (e.g. ["null"]) — leave untouched
     new_schema = {k: v for k, v in schema_dict.items() if k != "type"}
     new_schema["type"] = non_null[0]
-    new_schema["nullable"] = True
+    if had_null:
+        new_schema["nullable"] = True
     return new_schema
 
 

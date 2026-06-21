@@ -195,6 +195,237 @@ export interface DocumentMetadata {
   topics?: string[]
   language?: string
   summary?: string
+  /** Phase 112 (META-02) — per-field confidence map from enriched extraction
+   *  (Phase 111 `attach_confidence` renames `confidence` -> `_confidence`).
+   *  DISPLAY-ONLY (never a flat `metadata_filter` dimension, D-111-3/9).
+   *  Values are raw 0.0–1.0; the ConfidenceChip maps them to D-05 display tiers. */
+  _confidence?: Record<string, number>
+  /** Phase 112 — per-field provenance. `"user"` = manually overridden (the panel
+   *  renders a neutral "Edited" chip — no score). Server hard-stamps this on PATCH
+   *  so the client can never assert its own provenance. */
+  _source?: Record<string, "user" | "extracted">
+  /** Phase 118 (CLASS-02) — the on-upload classification suggestion the backend
+   *  rule-eval pass stamps onto the doc's metadata (D-118-5). DISPLAY/ACTION-ONLY
+   *  provenance — never a flat `metadata_filter` match dimension (the `_`-prefix
+   *  reject already excludes it). The DocumentList row chip renders only while
+   *  `status === "suggested"`; the panel section renders the accepted receipt +
+   *  Undo. `undefined`/absent once the suggestion is dismissed. */
+  _classification?: ClassificationSuggestion
+  /** Custom (user-defined) field_keys read through. The panel renders the union of
+   *  built-ins + enabled custom defs (`MetadataFieldDef`), never raw keys. */
+  [key: string]: unknown
+}
+
+/** Phase 112 (META-02) — mirrors the backend `MetadataFieldResponse`
+ *  (backend/app/models/metadata_field.py). Custom field defs live in
+ *  `metadata_field_definitions`; `field_type` is a closed vocab, and `enum`
+ *  carries `options: string[]`. Listed via `listMetadataFields()`. */
+export interface MetadataFieldDef {
+  id: string
+  user_id?: string | null
+  field_key: string
+  field_type: "string" | "date" | "number" | "boolean" | "enum"
+  description?: string | null
+  options?: string[] | null
+  is_global: boolean
+  enabled: boolean
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 114 (VIEW-03 / UX-01) — the no-DSL filter-AST CLIENT contract.
+//
+// Mirrors the backend filter AST (backend/app/models/document_view.py
+// ViewCondition / ViewFilter) BYTE-FOR-BYTE so the builder can assemble the
+// `filter_expr` POST /document-views accepts and round-trip a saved view's
+// `filter_expr` back into the bar. The client ONLY assembles the AST — ALL
+// field-whitelist validation + value binding happens server-side (the client is
+// NOT a trust boundary; a hand-crafted payload cannot inject SQL or filter on a
+// non-whitelisted/`_`-prefixed field — T-114-05-01). Operator words are the
+// SAME 11 the backend `Literal` lists; the UI labels them in plain language
+// (never "query"). The optional operands are additive so an existing `{op:eq}`
+// row parses unchanged: `value2` carries the upper bound for `between`; `values`
+// carries the membership list for `one_of`; `unit` carries the relative-date
+// span unit for `within_next`/`older_than` (the window math itself is derived
+// server-side at resolve time — D-114-16, the client readout is preview-only).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The 11 operators the backend `ViewCondition.op` Literal accepts (Phase 114). */
+export type ViewConditionOp =
+  | "eq"
+  | "gte"
+  | "lte"
+  | "one_of"
+  | "contains"
+  | "is_empty"
+  | "within_next"
+  | "older_than"
+  | "before"
+  | "after"
+  | "between"
+
+/** One AND-ed condition: field → type-aware operator → value(s). All operands
+ *  except `field`/`op` are optional (an `is_empty` carries none). */
+export interface ViewCondition {
+  field: string
+  op: ViewConditionOp
+  value?: string | number | boolean | null
+  /** Upper bound for `between` (and the optional far end of a date `between`). */
+  value2?: string | number | null
+  /** Membership list for `one_of`. */
+  values?: Array<string | number> | null
+  /** Relative-date span unit for `within_next`/`older_than`. */
+  unit?: "days" | "weeks" | "months" | null
+}
+
+/** The flat AND-of-conditions filter the builder produces and the backend stores
+ *  in `document_views.filter_expr`. `op` stays `"and"` (OR/NOT deferred). */
+export interface ViewFilter {
+  op: "and"
+  conditions: ViewCondition[]
+}
+
+/** The empty (no-narrowing) filter (IN-04: single-sourced — FilterBar + IngestionPage
+ *  both reference this instead of each declaring their own). An empty `conditions`
+ *  list means "no filter active" (the folder view shows; no resolve round-trip). */
+export const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
+
+/** A saved view (mirrors the backend `ViewResponse`). Selecting one loads its
+ *  `filter_expr` back into the same filter bar (D-114-1); seeded global views
+ *  carry `is_global` (the tooltip-labeled `G` pill in the Views sidebar). */
+export interface SavedView {
+  id: string
+  user_id?: string | null
+  name: string
+  filter_expr: ViewFilter
+  folder_scope?: string | null
+  is_global: boolean
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 117 (REL-02 / UX-01) — the document-relationships CLIENT contract.
+//
+// Mirrors the backend payloads EXACTLY so the Relationships panel (Plan 04)
+// renders the server's truth without re-deriving anything:
+//   - the GET read response from
+//     `document_relationship_service.get_related_documents` (Plan 01) — the ONE
+//     leak-safe outgoing+incoming traversal: `{subject, total, documents[],
+//     source_refs}`, each row carrying `direction`/`label`/`relationship_id` and a
+//     NULLABLE `document_id` (the masked "no access" row, D-117-8);
+//   - the POST 201 create response (`RelationshipResponse`,
+//     models/document_relationship.py:50-63).
+// The backend OWNS the rel-type vocabulary (the `Literal`) + the inverse-label
+// wording (`_INVERSE_LABEL`); the frontend mirrors these keys for display casing
+// (D-117-6) and never invents its own. The client is NOT a trust boundary —
+// every access decision is server-side (the per-viewer readability re-check).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The 4 relationship types the backend `RelationshipCreate.rel_type` Literal
+ *  accepts (models/document_relationship.py:47) — a closed union; a 5th value is
+ *  a 422 at parse. Read from the subject's perspective ("this supersedes X"). */
+export type RelType = "supersedes" | "amends" | "references" | "attached_to"
+
+/** One compact relationship row in the GET read payload (mirrors a
+ *  `get_related_documents` `documents[]` entry, document_relationship_service.py).
+ *  An OUTGOING row's `label` is the `rel_type` verbatim; an INCOMING row's `label`
+ *  is the backend's inverse label (`superseded_by`/`amended_by`/`referenced_by`/
+ *  `has_attachment`, D-117-6) — the frontend casing-map mirrors those keys. */
+export interface RelationshipRow {
+  /** `null` when the OTHER endpoint is MASKED (the caller can't read it). The
+   *  backend NEVER sends an id/title for a masked row (D-117-8 — "linked document
+   *  (no access)"); typing this `string | null` makes a leaked-id render a type
+   *  error, so the UI cannot accidentally surface it. The server is the gate. */
+  document_id: string | null
+  /** The related document's real filename, OR the no-access mask string
+   *  ("linked document (no access)") when `document_id` is null. */
+  filename: string
+  rel_type: RelType
+  direction: "outgoing" | "incoming"
+  /** The backend's raw label (snake_case): `rel_type` for outgoing rows, the
+   *  inverse label for incoming rows. The display map handles casing (D-117-6). */
+  label: string
+  /** The edge row id — the remove ✕ DELETEs `/document-relationships/{id}`. The
+   *  read traversal always carries it; optional here so a partial payload is
+   *  still well-typed (a row without it simply has no remove affordance). */
+  relationship_id?: string
+}
+
+/** The GET /document-relationships?document_id= read response (mirrors
+ *  `get_related_documents`'s plain dict: subject + total + the compact rows). */
+export interface RelatedDocumentsResponse {
+  subject: { document_id: string; filename: string }
+  total: number
+  documents: RelationshipRow[]
+}
+
+/** A persisted relationship row — the POST 201 create body (mirrors the backend
+ *  `RelationshipResponse`, models/document_relationship.py:50-63). `user_id` /
+ *  `created_at` are nullable to match the permissive backend model. */
+export interface Relationship {
+  id: string
+  user_id?: string | null
+  source_doc_id: string
+  target_doc_id: string
+  rel_type: string
+  created_at?: string | null
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 118 (CLASS-01 / CLASS-03) — auto-classification CLIENT contract.
+//
+// The frontend interface seam the on-doc plan (05) and the rules-page plan (06)
+// build against. Mirrors the backend payloads from Plans 02/03 EXACTLY so the UI
+// renders the server's truth without re-deriving anything:
+//   - `ClassificationRule` mirrors the rule CRUD response (`RuleResponse`,
+//     models/classification_rule.py) — a `SavedView` clone with `filter_expr`
+//     renamed to `match_expr` plus `suggest_folder_id`/`enabled`. The backend
+//     OWNS the `is_global` scope (hard-set false on create); the create body
+//     NEVER supplies it (mirrors `createView`).
+//   - `ClassificationSuggestion` mirrors the on-upload `_classification` object
+//     the ingest rule-eval pass stamps onto a doc's metadata (D-118-5) — the
+//     matched rule's provenance, the suggested folder (resolved fresh; nullable
+//     when the folder is gone, Pitfall 5), a `"suggested" | "accepted"` status,
+//     and `prior_folder_id` (stamped at ACCEPT time for the reversible Undo,
+//     D-118-6 — Undo reuses the existing `moveDocument(id, prior_folder_id)`).
+// The client is NOT a trust boundary — the leak-safe own+global rule reads, the
+// `match_expr` whitelist validation, and the accept-move folder re-check are all
+// enforced server-side. Never a confidence % — provenance only (the 028/036
+// honesty principle).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** A classification rule (mirrors the backend `RuleResponse`,
+ *  models/classification_rule.py). A `SavedView` clone — `filter_expr` becomes
+ *  `match_expr` (the SAME `ViewFilter` AST, evaluated in-Python at upload by the
+ *  net-new matcher), plus `suggest_folder_id` (the folder a match suggests; the
+ *  FK is `ON DELETE SET NULL` so it may be null) and `enabled` (the toggle rides
+ *  the UPDATE path — no separate endpoint). `is_global` is server-owned; the
+ *  create body never supplies it (the server hard-sets it false). */
+export interface ClassificationRule {
+  id: string
+  user_id?: string | null
+  name: string
+  match_expr: ViewFilter
+  suggest_folder_id: string | null
+  is_global: boolean
+  enabled: boolean
+}
+
+/** The on-upload classification suggestion stamped onto a doc's
+ *  `metadata._classification` (D-118-5) — the matched rule's provenance + the
+ *  suggested move. NEVER a confidence %; the human-readable `condition_summary`
+ *  is the frozen AST render the matched rule carried. `suggested_folder_name` is
+ *  resolved FRESH at suggestion-build time and is null/"(deleted)" when the
+ *  folder is gone (Pitfall 5). `status` flips to `"accepted"` after Accept (the
+ *  panel renders the audit receipt + Undo); the whole object is cleared on
+ *  Dismiss. `prior_folder_id` is stamped at ACCEPT time only (the Undo target —
+ *  Undo reuses the existing `moveDocument`), absent on a fresh suggestion. */
+export interface ClassificationSuggestion {
+  rule_id: string
+  rule_name: string
+  condition_summary: string
+  suggested_folder_id: string | null
+  suggested_folder_name: string | null
+  status: "suggested" | "accepted"
+  prior_folder_id?: string | null
 }
 
 export interface Folder {

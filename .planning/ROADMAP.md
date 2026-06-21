@@ -13,7 +13,19 @@
 - ✅ **v2.7 Agent Workspace & Panel** — Phases 083-088 (shipped 2026-05-30)
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
-- 📋 **v3.0 (next)** — TBD (start with `/gsd:new-milestone`; SEED-005 Enhanced Document Structure is the operator-confirmed candidate)
+- ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
+- 📋 **v3.1 Workflow + Skill Eval Studio** — re-scoped "Skill Studio" (eval/regression over the Phase 102 judge + golden-run, for workflows + composed skills). Next after v3.0 *unless a paying customer flips priority to the GTM track*. Brief: `PRDs/v3.1-skill-studio-eval.md`
+- 📋 **v3.2 Operator UX** → **v3.3 Multi-tenancy** → **v3.4 Open Platform (API/MCP)** → **v3.5 Automations** — the enterprise-GTM track. **Authoritative version map: `PRDs/SEQUENCE.md`.** (All re-sequenced 2026-06-15; briefs predate the v2.7–2.9 pivot and re-author at milestone start.)
+
+---
+
+## v3.0 Document Management — ✅ SHIPPED 2026-06-21
+
+Full detail archived → **`.planning/milestones/v3.0-ROADMAP.md`** · requirements → **`.planning/milestones/v3.0-REQUIREMENTS.md`** · summary → **`.planning/MILESTONES.md`**.
+
+11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, shipped + validated — **every phase passed verify-work + secure-phase + validate-phase** (live cross-provider UAT on the agent-tool / upload-path phases; no formal milestone audit). Turned the product's incidental document handling into a first-class, metadata-driven surface (M-Files Tier A): user-defined custom metadata with per-field confidence + audited manual override, configurable multi-provider embeddings (retires the OpenAI SPOF), metadata-driven "virtual folders" (a closed-registry filter-AST → parameterized-jsonb compiler + a no-DSL builder + an agent tool), typed document relationships (a leak-safe share-don't-fork core + panel + agent tool), suggest-then-confirm auto-classification, and a light governance-health view. 24/24 functional requirements delivered; `threads.py` untouched all milestone (G-5); near-zero new deps.
+
+**Next:** v3.1 Workflow + Skill Eval Studio (`/gsd:new-milestone`).
 
 ---
 
@@ -28,6 +40,23 @@ CORE phases 097–104 (9 phases incl. inserted 101.1, 57 plans) shipped + valida
 ---
 
 ## Shipped Milestones
+
+<details>
+<summary>v3.0 Document Management (Phases 110-119) -- SHIPPED 2026-06-21</summary>
+
+- [x] Phase 110: DM Foundations (2/2 plans) -- completed 2026-06-15
+- [x] Phase 111: Metadata Enrichment — Extraction Backend (5/5 plans) -- completed 2026-06-16
+- [x] Phase 111.1: Configurable / Multi-Provider Embeddings (6/6 plans) -- completed 2026-06-17
+- [x] Phase 112: Metadata Enrichment — Detail Panel + Manual Edit (4/4 plans) -- completed 2026-06-18
+- [x] Phase 113: Virtual Folders — Filter Compiler + Equality (Backend) (3/3 plans) -- completed 2026-06-18
+- [x] Phase 114: Virtual Folders — Range/Date + Builder + Sidebar (6/6 plans) -- completed 2026-06-19
+- [x] Phase 115: Virtual Folders — Agent Tool (3/3 plans) -- completed 2026-06-20
+- [x] Phase 116: Document Relationships — Backend + Agent Tool (5/5 plans) -- completed 2026-06-20
+- [x] Phase 117: Document Relationships — Panel UI (4/4 plans) -- completed 2026-06-20
+- [x] Phase 118: Auto-Classification (6/6 plans) -- completed 2026-06-21
+- [x] Phase 119: Document Governance Health (2/2 plans) -- completed 2026-06-21
+
+</details>
 
 <details>
 <summary>v2.9 Workflow Studio (Phases 097-104 CORE) -- SHIPPED 2026-06-15</summary>
@@ -143,7 +172,6 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 </details>
 
-
 ---
 
-*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. No active milestone — start the next with `/gsd:new-milestone` (SEED-005 Enhanced Document Structure is the operator-confirmed candidate; v2.9 STRETCH 105–109 are backlog carry-forwards).*
+*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. **Active milestone: v3.0 Document Management** (started 2026-06-15 — Phases 110-119; SEED-005 Tier A). Re-sequenced PRD roadmap + the deferral of Skill Studio → v3.1: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*

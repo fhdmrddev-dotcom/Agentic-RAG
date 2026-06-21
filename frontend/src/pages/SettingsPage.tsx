@@ -5,12 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { getSettings, updateSettings, getAuditLogs, exportAuditLogs } from "@/lib/api"
+import { getSettings, updateSettings, getReembedProgress, getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
+import {
+  ProviderPicker,
+  EMBEDDING_PRESETS,
+  EXTRACTION_PRESETS,
+  type ProviderPickerValue,
+} from "@/components/settings/ProviderPicker"
+import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
+import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -499,6 +507,21 @@ export function SettingsPage() {
   const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState("")
   const [embeddingDimensions, setEmbeddingDimensions] = useState(1536)
   const [embeddingApiKey, setEmbeddingApiKey] = useState("")
+  // Phase 111.1 — explicit provider (the picker stores the preset key; routes by
+  // stored provider, never name-inference — D-06).
+  const [embeddingProvider, setEmbeddingProvider] = useState("openai")
+  // Phase 111.1 — extraction picker (D-09 reuse). The backend surfaces+persists
+  // extraction_provider through the settings contract; the model/base_url/key are
+  // UI defaults that travel with the preset (sent on save, harmless if ignored).
+  const [extractionProvider, setExtractionProvider] = useState("openai")
+  const [extractionModel, setExtractionModel] = useState("")
+  const [extractionBaseUrl, setExtractionBaseUrl] = useState("")
+  const [extractionApiKey, setExtractionApiKey] = useState("")
+  // Phase 111.1 D-02/D-03 — confirm-on-save gate state. The modal fires BEFORE the
+  // PUT when the embedding model OR dims changed; only Confirm commits the save.
+  const [reembedModalOpen, setReembedModalOpen] = useState(false)
+  const [reembedChunkCount, setReembedChunkCount] = useState<number | null>(null)
+  const [pendingSearchSave, setPendingSearchSave] = useState<SettingsUpdate | null>(null)
 
   // Reranking
   const [rerankEnabled, setRerankEnabled] = useState(false)
@@ -553,6 +576,19 @@ export function SettingsPage() {
     setEmbeddingBaseUrl(data.embedding_base_url)
     setEmbeddingDimensions(data.embedding_dimensions)
     setEmbeddingApiKey(data.embedding_has_api_key ? KEY_PLACEHOLDER : "")
+    // Phase 111.1 — provider selection. Fall back to "openai" / "custom" so an old
+    // backend (or an unmapped provider) still renders a coherent picker.
+    setEmbeddingProvider(data.embedding_provider || "openai")
+    const exProvider = data.extraction_provider || "openai"
+    setExtractionProvider(exProvider)
+    // The extraction base_url/key aren't in the settings contract; seed those from the
+    // matching preset. The MODEL now round-trips from the server (verify-work 111.1 fix:
+    // it was previously dropped on save) — prefer the persisted value, fall back to the
+    // preset default for an old backend / never-set value.
+    const exPreset = EXTRACTION_PRESETS.find((p) => p.key === exProvider)
+    setExtractionModel(data.extraction_model || exPreset?.model || "")
+    setExtractionBaseUrl(exPreset?.base_url ?? "")
+    setExtractionApiKey(exPreset?.local ? (exPreset.dummyKey ?? "") : (data.embedding_has_api_key ? KEY_PLACEHOLDER : ""))
     setRerankEnabled(data.rerank_enabled)
     setRerankProvider(data.rerank_provider)
     setRerankModel(data.rerank_model)
@@ -624,28 +660,12 @@ export function SettingsPage() {
     }
   }
 
-  const handleSaveSearch = async () => {
+  // Phase 111.1 — the actual PUT (called directly on a no-change save, or AFTER the
+  // operator confirms the re-embed gate on a model/dim change).
+  const commitSearchSave = async (body: SettingsUpdate) => {
     setSavingSearch(true)
     setError(null)
     try {
-      const body: SettingsUpdate = {
-        embedding_model: embeddingModel,
-        embedding_api_key: embeddingApiKey || KEY_PLACEHOLDER,
-        embedding_base_url: embeddingBaseUrl,
-        embedding_dimensions: embeddingDimensions,
-        rerank_enabled: rerankEnabled,
-        rerank_provider: rerankProvider,
-        rerank_api_key: rerankApiKey || KEY_PLACEHOLDER,
-        rerank_model: rerankModel,
-        rerank_top_n: rerankTopN,
-        retrieval_top_k: retrievalTopK,
-        retrieval_match_threshold: retrievalThreshold,
-        hybrid_search_enabled: hybridEnabled,
-        hybrid_candidate_count: hybridCandidates,
-        vector_search_weight: vectorWeight,
-        keyword_search_weight: keywordWeight,
-        rrf_k: rrfK,
-      }
       const updated = await updateSettings(body)
       hydrate(updated)
       setSavedSearch(true)
@@ -655,6 +675,49 @@ export function SettingsPage() {
     } finally {
       setSavingSearch(false)
     }
+  }
+
+  const handleSaveSearch = async () => {
+    const body: SettingsUpdate = {
+      embedding_model: embeddingModel,
+      embedding_api_key: embeddingApiKey || KEY_PLACEHOLDER,
+      embedding_base_url: embeddingBaseUrl,
+      embedding_dimensions: embeddingDimensions,
+      // Phase 111.1 — pin the explicit providers (route by stored provider, D-06/D-09).
+      embedding_provider: embeddingProvider,
+      extraction_provider: extractionProvider,
+      extraction_model: extractionModel,
+      rerank_enabled: rerankEnabled,
+      rerank_provider: rerankProvider,
+      rerank_api_key: rerankApiKey || KEY_PLACEHOLDER,
+      rerank_model: rerankModel,
+      rerank_top_n: rerankTopN,
+      retrieval_top_k: retrievalTopK,
+      retrieval_match_threshold: retrievalThreshold,
+      hybrid_search_enabled: hybridEnabled,
+      hybrid_candidate_count: hybridCandidates,
+      vector_search_weight: vectorWeight,
+      keyword_search_weight: keywordWeight,
+      rrf_k: rrfK,
+    }
+
+    // Phase 111.1 D-02/D-03 — confirm-on-save gate. ONLY fire when the embedding
+    // model OR dimensions actually changed (a no-change save commits silently).
+    const modelChanged = !!s && embeddingModel !== s.embedding_model
+    const dimsChanged = !!s && embeddingDimensions !== s.embedding_dimensions
+    if (modelChanged || dimsChanged) {
+      setPendingSearchSave(body)
+      setReembedChunkCount(null)
+      setReembedModalOpen(true)
+      // Pull the LIVE chunk count for the gate's "how many chunks" fact (the
+      // current-model total — what will go stale + re-embed). Best-effort.
+      void getReembedProgress()
+        .then((p) => setReembedChunkCount(p.total))
+        .catch(() => setReembedChunkCount(null))
+      return
+    }
+
+    await commitSearchSave(body)
   }
 
   const handleSaveIntegrations = async () => {
@@ -706,6 +769,25 @@ export function SettingsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8">
+      {/* Phase 111.1 D-03 — destructive re-embed confirm gate (sketch 025). Fires
+          on a model/dim change BEFORE the PUT; only Confirm commits the save. */}
+      <ReembedConfirmModal
+        open={reembedModalOpen}
+        chunkCount={reembedChunkCount}
+        targetModel={embeddingModel}
+        targetDims={embeddingDimensions}
+        busy={savingSearch}
+        onCancel={() => {
+          setReembedModalOpen(false)
+          setPendingSearchSave(null)
+        }}
+        onConfirm={async () => {
+          const body = pendingSearchSave
+          setReembedModalOpen(false)
+          setPendingSearchSave(null)
+          if (body) await commitSearchSave(body)
+        }}
+      />
       <div className="max-w-3xl w-full mx-auto space-y-8">
 
         {/* Header — no global Save button */}
@@ -931,21 +1013,62 @@ export function SettingsPage() {
           {/* Tab 1: Search & Retrieval */}
           <TabsContent value="1">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
-              {/* Embedding SectionCard */}
-              <SectionCard title="Embedding" description="Model used to embed documents and queries for semantic search.">
-                <div className="bg-card/40 rounded-md px-3 py-2">
-                  <FieldRow label="Model">
-                    <TextInput value={embeddingModel} onChange={setEmbeddingModel} placeholder="text-embedding-3-small" />
-                  </FieldRow>
-                  <FieldRow label="Dimensions">
-                    <NumberInput value={embeddingDimensions} onChange={setEmbeddingDimensions} min={64} max={4096} />
-                  </FieldRow>
-                  <FieldRow label="Base URL (optional)">
-                    <TextInput value={embeddingBaseUrl} onChange={setEmbeddingBaseUrl} placeholder="Leave blank to use active provider" />
-                  </FieldRow>
-                  <FieldRow label="API Key (optional)">
-                    <ApiKeyInput value={embeddingApiKey} onChange={setEmbeddingApiKey} placeholder="Leave blank to use active provider key" />
-                  </FieldRow>
+              {/* Phase 111.1 — Embeddings & Extraction (sketches 024/026).
+                  ONE reusable ProviderPicker drives BOTH the embedding model and
+                  the extraction model (D-09); the always-on lock-icon endpoint
+                  footer makes where-it-runs unmissable (BUG-260616-01 legibility
+                  cure). The graceful-dip status card is the home for the re-embed
+                  job (D-04/D-05). */}
+              <SectionCard title="Embeddings & Extraction" description="Pick a model and pin where it runs. One picker, reused for both jobs — so a local model can never silently call the cloud.">
+                <div className="space-y-4">
+                  {/* Embedding model picker */}
+                  <ProviderPicker
+                    presets={EMBEDDING_PRESETS}
+                    showDimensions
+                    title="Embedding model"
+                    description="Turns your documents into search vectors. Changing this re-embeds your library."
+                    value={{
+                      provider: embeddingProvider,
+                      model: embeddingModel,
+                      base_url: embeddingBaseUrl,
+                      api_key: embeddingApiKey,
+                      dimensions: embeddingDimensions,
+                      threshold: retrievalThreshold,
+                    }}
+                    onChange={(next: ProviderPickerValue) => {
+                      setEmbeddingProvider(next.provider)
+                      setEmbeddingModel(next.model)
+                      setEmbeddingBaseUrl(next.base_url)
+                      setEmbeddingApiKey(next.api_key)
+                      setEmbeddingDimensions(next.dimensions)
+                      setRetrievalThreshold(next.threshold)
+                    }}
+                  />
+
+                  {/* Extraction model picker — SAME component (D-09 reuse) */}
+                  <ProviderPicker
+                    presets={EXTRACTION_PRESETS}
+                    reuseChip
+                    title="Metadata extraction model"
+                    description="Reads each document for title, summary, and custom fields. Pinning the endpoint here is what closes the local-model mis-route bug."
+                    value={{
+                      provider: extractionProvider,
+                      model: extractionModel,
+                      base_url: extractionBaseUrl,
+                      api_key: extractionApiKey,
+                      dimensions: 0,
+                      threshold: 0,
+                    }}
+                    onChange={(next: ProviderPickerValue) => {
+                      setExtractionProvider(next.provider)
+                      setExtractionModel(next.model)
+                      setExtractionBaseUrl(next.base_url)
+                      setExtractionApiKey(next.api_key)
+                    }}
+                  />
+
+                  {/* Graceful-dip re-embed status card (sketch 026) — the HOME */}
+                  <ReembedStatusCard id="reembed-status-card" />
                 </div>
               </SectionCard>
 

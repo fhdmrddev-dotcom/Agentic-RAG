@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 034 — Relationships Section</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+
+  /* ── App chrome (matches 028) ── */
+  .app { display: flex; height: calc(100vh - 52px); }
+  .nav-rail { width: 52px; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding-top: var(--space-4); flex-shrink: 0; }
+  .nav-rail .ni { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center;
+    color: var(--color-text-dim); font-size: 17px; cursor: pointer; }
+  .nav-rail .ni.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .main { display: grid; grid-template-columns: minmax(0,1fr) 460px; flex: 1; min-width: 0; }
+  .list-col { min-width: 0; overflow: auto; padding: var(--space-3) var(--space-3) var(--space-8); }
+  .page-head { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-4); }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-lg); margin: 0; font-weight: 700; }
+  .page-head .crumb { color: var(--color-text-dim); font-size: var(--text-xs); }
+  .doc-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .doc-table thead th { text-align: left; font-weight: 500; color: var(--color-text-dim); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+  .doc-row td { padding: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+  .doc-row { cursor: pointer; }
+  .doc-row:hover { background: var(--color-muted); }
+  .doc-row.selected { background: var(--color-primary-dim); }
+  .doc-row.selected td:first-child { box-shadow: inset 2px 0 0 var(--color-primary); }
+  .doc-name { font-weight: 500; display: flex; align-items: center; gap: var(--space-2); }
+  .link-badge { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted);
+    background: var(--color-accent); padding: 1px 7px; border-radius: var(--radius-full); }
+
+  /* ── Detail panel (027-A shell) ── */
+  .detail-col { border-left: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden auto; }
+  .detail-inner { padding: var(--space-4) var(--space-5) var(--space-12); }
+  .detail-head { display: flex; align-items: flex-start; gap: var(--space-3); padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border); }
+  .detail-head .fico { font-size: 22px; }
+  .detail-head .ttl { font-family: var(--font-headline); font-size: var(--text-md); font-weight: 700; line-height: 1.3; }
+  .detail-head .sub { font-size: var(--text-xs); color: var(--color-text-dim); font-family: var(--font-mono); margin-top: 2px; }
+  .detail-head .tools { margin-left: auto; display: flex; gap: 4px; }
+  .detail-head .ib { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 13px;
+    padding: 3px 7px; border-radius: var(--radius-sm); }
+  .detail-head .ib:hover { background: var(--color-accent); color: var(--color-text); }
+
+  /* ── Accordion section (matches 028) ── */
+  .sec { border-bottom: 1px solid var(--color-border); }
+  .sec-head { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-3) 0;
+    background: none; border: none; cursor: pointer; color: var(--color-text); font-size: var(--text-xs);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
+  .sec-head .chev { color: var(--color-text-dim); font-size: 10px; transition: transform var(--dur-fast); }
+  .sec.collapsed .chev { transform: rotate(-90deg); }
+  .sec.collapsed .sec-body { display: none; }
+  .sec-head .count { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted);
+    background: var(--color-accent); padding: 1px 7px; border-radius: var(--radius-full); }
+  .sec-head .soon { font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12);
+    padding: 2px 7px; border-radius: var(--radius-full); font-family: var(--font-mono); }
+  .sec-head .ml { margin-left: auto; }
+  .placeholder { color: var(--color-text-muted); font-size: var(--text-sm); padding: var(--space-3);
+    background: var(--color-bg); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
+  .sec-body { padding-bottom: var(--space-3); }
+
+  /* ── Relationships: shared ── */
+  /* meaningful copy uses --color-text-muted (AA ≥4.5:1 on the panel); only decorative glyphs stay --color-text-dim */
+  .rel-subhead { display: flex; align-items: center; gap: var(--space-2); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--color-text-muted); margin: var(--space-3) 0 var(--space-2); }
+  .rel-subhead .cnt { font-family: var(--font-mono); color: var(--color-text-muted); }
+  .rel-subhead .dir-note { margin-left: auto; text-transform: none; letter-spacing: 0; font-style: italic;
+    color: var(--color-text-muted); font-size: 10px; }
+
+  /* per-type dot — calm distinct hues */
+  .tdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .t-supersedes .tdot { background: var(--color-primary); }
+  .t-amends     .tdot { background: var(--color-accent-violet); }
+  .t-references .tdot { background: var(--color-text-dim); }
+  .t-attached_to .tdot { background: var(--color-warning); }
+
+  /* ── Variant A: chip-led rows ── */
+  .rel-row { display: flex; align-items: center; gap: var(--space-2); padding: 7px var(--space-2); border-radius: var(--radius-md);
+    transition: background var(--dur-fast); }
+  .rel-row:hover { background: var(--color-muted); }
+  .rel-row .dir { color: var(--color-text-dim); font-size: 12px; width: 12px; text-align: center; flex-shrink: 0; }
+  .rel-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 2px 9px;
+    border-radius: var(--radius-full); background: var(--color-accent); color: var(--color-text-muted); white-space: nowrap; flex-shrink: 0; }
+  .rel-file { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-text);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rel-file.link { cursor: pointer; }
+  .rel-file.link:hover { color: var(--color-primary); text-decoration: underline; }
+  .rel-x { margin-left: auto; background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 12px;
+    padding: 3px 6px; border-radius: var(--radius-sm); opacity: 0; flex-shrink: 0; transition: all var(--dur-fast); }
+  /* reveal on hover AND keyboard focus — destructive remove must be reachable without a mouse (WCAG 2.4.7) */
+  .rel-row:hover .rel-x, .rel-row:focus-within .rel-x, .rel-x:focus-visible { opacity: 1; }
+  .rel-x:hover, .rel-x:focus-visible { opacity: 1; background: var(--color-danger-dim); color: hsl(0 80% 80%); }
+  .rel-x:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+  .rel-row.masked .rel-file { color: var(--color-text-muted); font-style: italic; }
+  .rel-row.removing { opacity: 0.35; pointer-events: none; }
+
+  /* ── Variant B: sentence-led ── */
+  .s-subhead { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted);
+    margin: var(--space-3) 0 4px; }
+  .s-row { display: flex; align-items: baseline; gap: 8px; padding: 6px var(--space-2); border-radius: var(--radius-md);
+    font-size: var(--text-sm); transition: background var(--dur-fast); }
+  .s-row:hover { background: var(--color-muted); }
+  .s-row .s-arrow { color: var(--color-text-dim); font-size: 13px; flex-shrink: 0; }
+  .s-row .s-verb { color: var(--color-text-muted); flex-shrink: 0; }
+  .s-row .s-verb .tdot { margin-right: 5px; vertical-align: middle; }
+  .s-row .s-file { color: var(--color-text); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .s-row .s-file:hover { color: var(--color-primary); text-decoration: underline; }
+  .s-row.masked .s-file { color: var(--color-text-muted); font-style: italic; font-weight: 400; cursor: default; }
+  .s-row.masked .s-file:hover { color: var(--color-text-muted); text-decoration: none; }
+  .s-row .rel-x { margin-left: auto; opacity: 0; }
+  .s-row:hover .rel-x, .s-row:focus-within .rel-x { opacity: 0.7; }
+  .s-row.removing { opacity: 0.35; pointer-events: none; }
+
+  /* ── Variant C: compact dense ── */
+  .c-group { margin-top: var(--space-2); }
+  .c-subhead { display: flex; align-items: center; gap: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--color-text-muted); padding: var(--space-2) 0 4px; position: sticky; top: 0; background: var(--color-surface); }
+  .c-list { display: flex; flex-direction: column; }
+  .c-row { display: grid; grid-template-columns: 14px 92px 1fr 22px; align-items: center; gap: 8px; padding: 4px var(--space-2);
+    font-size: var(--text-sm); border-radius: var(--radius-sm); transition: background var(--dur-fast); }
+  .c-row:hover { background: var(--color-muted); }
+  .c-row .dir { color: var(--color-text-dim); font-size: 11px; text-align: center; }
+  .c-tag { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); display: inline-flex; align-items: center; gap: 5px; }
+  .c-row .c-file { color: var(--color-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .c-row .c-file:hover { color: var(--color-primary); }
+  .c-row.masked .c-file { color: var(--color-text-muted); font-style: italic; cursor: default; }
+  .c-row .rel-x { opacity: 0; }
+  .c-row:hover .rel-x, .c-row:focus-within .rel-x { opacity: 0.7; }
+  .c-scroll { max-height: 168px; overflow: auto; }
+  .c-row.removing { opacity: 0.35; pointer-events: none; }
+
+  /* ── Create affordance ── */
+  .add-link { width: 100%; text-align: left; padding: 8px 11px; margin-top: var(--space-3); border: 1px dashed var(--color-border);
+    background: transparent; color: var(--color-text-muted); font-size: var(--text-sm); border-radius: var(--radius-md); cursor: pointer;
+    display: flex; align-items: center; gap: 7px; transition: all var(--dur-fast); }
+  .add-link:hover { border-color: var(--color-primary); color: var(--color-text); border-style: solid; }
+  .add-link-pill { display: inline-flex; align-items: center; gap: 6px; margin-top: var(--space-2); padding: 5px 11px;
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); font-size: var(--text-sm);
+    border-radius: var(--radius-full); cursor: pointer; transition: all var(--dur-fast); }
+  .add-link-pill:hover { border-color: var(--color-primary); color: var(--color-text); }
+  .head-add { margin-left: auto; background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-sm); font-size: 11px; padding: 2px 9px; cursor: pointer; font-family: var(--font-sans); font-weight: 500; }
+
+  /* ── States ── */
+  .rel-empty { text-align: center; padding: var(--space-6) var(--space-4); color: var(--color-text-muted); }
+  .rel-empty .big { font-size: 26px; opacity: 0.5; margin-bottom: var(--space-2); }
+  .rel-empty .msg { font-size: var(--text-sm); margin-bottom: var(--space-3); }
+  .rel-empty .add-link { display: inline-flex; width: auto; }
+  .skel { height: 30px; border-radius: var(--radius-md); margin: 7px 0;
+    background: linear-gradient(90deg, var(--color-muted) 25%, var(--color-accent) 37%, var(--color-muted) 63%);
+    background-size: 400% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+  .skel.sub { height: 12px; width: 40%; margin: var(--space-3) 0 var(--space-2); }
+  .rel-error { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-3);
+    background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.3); border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: hsl(0 80% 80%); }
+  .rel-error button { margin-left: auto; background: none; border: 1px solid hsl(0 72% 51% / 0.4); color: hsl(0 80% 80%);
+    border-radius: var(--radius-sm); padding: 2px 9px; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+  .updating { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-dim);
+    font-family: var(--font-mono); margin: 4px 0; }
+  .updating .spin { display: inline-block; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); background: var(--color-surface-hi);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 9px 16px; font-size: var(--text-sm);
+    color: var(--color-text); box-shadow: var(--shadow-lg); z-index: 9990; display: flex; align-items: center; gap: 8px;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .toast .undo { color: var(--color-primary); cursor: pointer; font-weight: 600; }
+
+  /* ── Stub create dialog ── */
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9980; display: grid; place-items: center;
+    animation: fadeSlideUp var(--dur-fast) var(--ease-out); }
+  .dlg { width: 440px; max-width: calc(100vw - 32px); background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: var(--space-5); }
+  .dlg h3 { font-family: var(--font-headline); font-size: var(--text-md); margin: 0 0 4px; }
+  .dlg .dsub { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: var(--space-4); }
+  .dlg .dsub b { color: var(--color-text); font-weight: 600; }
+  .type-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-3); }
+  .type-pick { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--radius-full);
+    border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); font-size: var(--text-sm); cursor: pointer; }
+  .type-pick.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .dlg .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin-bottom: 5px; }
+  .ta-input { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 8px 11px; color: var(--color-text); font-size: var(--text-sm); font-family: var(--font-sans); outline: none; }
+  .ta-input:focus { border-color: var(--color-primary); box-shadow: var(--shadow-glow-primary); }
+  .ta-list { border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md);
+    max-height: 150px; overflow: auto; }
+  .ta-opt { padding: 7px 11px; font-size: var(--text-sm); cursor: pointer; display: flex; align-items: center; gap: 7px; }
+  .ta-opt:hover, .ta-opt.cur { background: var(--color-primary-dim); }
+  .preview-line { font-size: var(--text-xs); color: var(--color-text-muted); margin: var(--space-3) 0; font-style: italic; }
+  .preview-line b { color: var(--color-text); font-style: normal; }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: var(--space-4); }
+  .btn { font-size: var(--text-sm); padding: 6px 14px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--color-border);
+    background: var(--color-surface); color: var(--color-text-muted); }
+  .btn.primary { background: var(--color-primary); color: hsl(216 45% 6%); border-color: var(--color-primary); font-weight: 600; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .dnote { font-size: 10px; color: var(--color-accent-violet); margin-top: var(--space-3); font-family: var(--font-mono); }
+
+  /* ── State control strip ── */
+  .state-strip { display: flex; align-items: center; gap: 6px; padding: 8px var(--space-5); border-bottom: 1px solid var(--color-border-soft);
+    background: var(--color-bg-elev1); }
+  .state-strip .lab { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin-right: 4px; }
+  .sbtn { font-size: 11px; padding: 3px 9px; border-radius: var(--radius-full); border: 1px solid var(--color-border);
+    background: transparent; color: var(--color-text-muted); cursor: pointer; }
+  .sbtn.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  /* ── Build notes ── */
+  .notes { margin-top: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-bg); padding: var(--space-3) var(--space-4); }
+  .notes h4 { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin: 0 0 var(--space-2); cursor: pointer; }
+  .notes ul { margin: 0; padding-left: 18px; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; }
+  .notes .net { color: var(--color-accent-violet); font-weight: 600; }
+  .notes .ok { color: var(--color-success); font-weight: 600; }
+  .notes.collapsed .notes-body { display: none; }
+
+  /* touch / coarse-pointer (and the <768 bottom-sheet): no hover exists, so the destructive
+     remove must be permanently visible — never hover-gated on these surfaces */
+  @media (hover: none), (max-width: 820px) {
+    .rel-x, .c-row .rel-x { opacity: 0.7; }
+  }
+  @media (max-width: 820px) {
+    .main { grid-template-columns: 1fr; }
+    .list-col { display: none; }
+    .detail-col { border-left: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">034 · Relationships Section</span>
+  <button class="variant-tab active" onclick="show('a',event)">A · Chip-led grouped<span class="star">★</span>Selected</button>
+  <button class="variant-tab" onclick="show('b',event)">B · Sentence-led</button>
+  <button class="variant-tab" onclick="show('c',event)">C · Compact / dense</button>
+</div>
+
+<div id="variant-a" class="variant"></div>
+<div id="variant-b" class="variant" style="display:none"></div>
+<div id="variant-c" class="variant" style="display:none"></div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVp(440)">📱</button>
+  <button onclick="setVp(0)">🖥</button>
+</div>
+
+<script>
+// ───────────────────────── grounded data ─────────────────────────
+// Subject = the open document. Relationships come from the NET-NEW GET read seam
+// (D-117-7) — outgoing + incoming over the subject's full version-id set,
+// follow-to-latest, per-target readability re-check → mask unseeable (D-117-8).
+const SUBJECT = { icon:'📕', name:'Project Charter.pdf', type:'PDF', ver:'v2' };
+
+// 4 stored rel types (D-116) + their display labels. Incoming rows use the INVERSE
+// label drawn from the same vocabulary the backend defines (tool_dispatcher._INVERSE_LABEL).
+const OUT_LABEL = { supersedes:'Supersedes', amends:'Amends', references:'References', attached_to:'Attached to' };
+const IN_LABEL  = { supersedes:'Superseded by', amends:'Amended by', references:'Referenced by', attached_to:'Has attachment' };
+
+// Base relationship set for the populated state.
+function baseRel(){ return {
+  outgoing: [
+    { id:'o1', type:'references',  icon:'📊', name:'Risk Register.xlsx' },
+    { id:'o2', type:'references',  icon:'📄', name:'Stakeholder Map.docx' },
+    { id:'o3', type:'attached_to', icon:'📑', name:'Steering Committee Deck.pptx' },
+    { id:'o4', type:'references',  icon:null, name:null, masked:true }, // target not readable → masked
+  ],
+  incoming: [
+    { id:'i1', type:'amends',     icon:'📕', name:'Charter Amendment 1.pdf' },
+    { id:'i2', type:'references', icon:'📄', name:'Q3 Status Report.docx' },
+    { id:'i3', type:'references', icon:'📊', name:'Budget Plan.xlsx' },
+  ],
+}; }
+// Larger set to exercise variant C's density.
+function denseRel(){ const b = baseRel();
+  b.outgoing.push(
+    { id:'o5', type:'supersedes', icon:'📕', name:'Project Brief (draft).pdf' },
+    { id:'o6', type:'references', icon:'📄', name:'Comms Plan.docx' },
+    { id:'o7', type:'attached_to', icon:'🖼', name:'Org Chart.png' },
+  );
+  b.incoming.push(
+    { id:'i4', type:'references', icon:'📄', name:'Onboarding Guide.docx' },
+    { id:'i5', type:'references', icon:'📊', name:'KPI Dashboard.xlsx' },
+  );
+  return b;
+}
+
+// Candidates for the stub create picker (visible docs minus self/already-linked — D-117-4).
+const CANDIDATES = [
+  { icon:'📄', name:'Vendor Contract.docx' },
+  { icon:'📊', name:'Timeline.xlsx' },
+  { icon:'📑', name:'Kickoff Deck.pptx' },
+  { icon:'📕', name:'Scope Statement.pdf' },
+  { icon:'📄', name:'Meeting Notes — Apr.docx' },
+];
+
+const VARS = {
+  a: { mode:'chip',     label:'a' },
+  b: { mode:'sentence', label:'b' },
+  c: { mode:'compact',  label:'c' },
+};
+// per-variant runtime state: which data state, and a live copy of relationships
+const ST = {
+  a: { state:'populated', rel:baseRel() },
+  b: { state:'populated', rel:baseRel() },
+  c: { state:'populated', rel:denseRel() },
+};
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function relCount(rel){ return rel.outgoing.length + rel.incoming.length; }
+
+// ───────────────────────── rows by mode ─────────────────────────
+function chipRow(v, dir, r){
+  const lbl = dir==='out' ? OUT_LABEL[r.type] : IN_LABEL[r.type];
+  const arrow = dir==='out' ? '→' : '←';
+  const file = r.masked
+    ? `<span class="rel-file">🔒 linked document (no access)</span>`
+    : `<span class="rel-file link">${r.icon} ${esc(r.name)}</span>`;
+  return `<div class="rel-row t-${r.type} ${r.masked?'masked':''}" data-id="${r.id}">
+    <span class="dir">${arrow}</span>
+    <span class="rel-chip"><span class="tdot"></span>${lbl}</span>
+    ${file}
+    <button class="rel-x" aria-label="Remove link" title="Remove link" onclick="removeRel('${v}','${r.id}')">✕</button>
+  </div>`;
+}
+function sentenceRow(v, dir, r){
+  const lbl = dir==='out' ? OUT_LABEL[r.type] : IN_LABEL[r.type];
+  const arrow = dir==='out' ? '↑' : '↓';
+  const file = r.masked
+    ? `<span class="s-file">🔒 linked document (no access)</span>`
+    : `<span class="s-file">${r.icon} ${esc(r.name)}</span>`;
+  return `<div class="s-row t-${r.type} ${r.masked?'masked':''}" data-id="${r.id}">
+    <span class="s-arrow">${arrow}</span>
+    <span class="s-verb"><span class="tdot"></span>${lbl}</span>
+    ${file}
+    <button class="rel-x" aria-label="Remove link" title="Remove link" onclick="removeRel('${v}','${r.id}')">✕</button>
+  </div>`;
+}
+function compactRow(v, dir, r){
+  const lbl = dir==='out' ? OUT_LABEL[r.type] : IN_LABEL[r.type];
+  const arrow = dir==='out' ? '→' : '←';
+  const file = r.masked
+    ? `<span class="c-file masked">🔒 no access</span>`
+    : `<span class="c-file">${r.icon} ${esc(r.name)}</span>`;
+  return `<div class="c-row t-${r.type} ${r.masked?'masked':''}" data-id="${r.id}">
+    <span class="dir">${arrow}</span>
+    <span class="c-tag"><span class="tdot"></span>${lbl}</span>
+    ${file}
+    <button class="rel-x" aria-label="Remove link" title="Remove link" onclick="removeRel('${v}','${r.id}')">✕</button>
+  </div>`;
+}
+
+// ───────────────────────── section body per state ─────────────────────────
+function relBody(v){
+  const st = ST[v]; const mode = VARS[v].mode; const rel = st.rel;
+
+  if (st.state === 'loading'){
+    return `<div class="skel sub"></div><div class="skel"></div><div class="skel"></div>
+            <div class="skel sub" style="margin-top:18px"></div><div class="skel"></div>`;
+  }
+  if (st.state === 'error'){
+    return `<div class="rel-error" role="alert"><span>⚠</span><span>Couldn't load relationships. This is an error — not "no links."</span>
+            <button onclick="setState('${v}','populated')">Retry</button></div>`;
+  }
+  if (st.state === 'empty'){
+    return `<div class="rel-empty">
+      <div class="big">🔗</div>
+      <div class="msg">No relationships yet.<br><span class="text-dim" style="font-size:11px">Link this document to another to track how they relate.</span></div>
+      <button class="add-link" onclick="openCreate('${v}')">＋ Add link</button>
+    </div>`;
+  }
+
+  // populated
+  const out = rel.outgoing, inc = rel.incoming;
+  let html = '';
+  if (mode === 'chip'){
+    html += `<div class="rel-subhead">Outgoing <span class="cnt">${out.length}</span><span class="dir-note">this document → others</span></div>`;
+    html += out.map(r=>chipRow(v,'out',r)).join('') || `<div class="placeholder" style="margin:4px 0">No outgoing links.</div>`;
+    html += `<div class="rel-subhead">Incoming <span class="cnt">${inc.length}</span><span class="dir-note">others → this document</span></div>`;
+    html += inc.map(r=>chipRow(v,'in',r)).join('') || `<div class="placeholder" style="margin:4px 0">No incoming links.</div>`;
+    html += `<button class="add-link" onclick="openCreate('${v}')">＋ Add link</button>`;
+  } else if (mode === 'sentence'){
+    html += `<div class="s-subhead">Outgoing · this document…</div>`;
+    html += out.map(r=>sentenceRow(v,'out',r)).join('');
+    html += `<div class="s-subhead" style="margin-top:16px">Incoming · …this document</div>`;
+    html += inc.map(r=>sentenceRow(v,'in',r)).join('');
+    html += `<button class="add-link-pill" onclick="openCreate('${v}')">＋ Link this document to…</button>`;
+  } else { // compact
+    html += `<div class="c-group"><div class="c-subhead">→ Outgoing · ${out.length}</div>`;
+    html += `<div class="c-scroll"><div class="c-list">${out.map(r=>compactRow(v,'out',r)).join('')}</div></div></div>`;
+    html += `<div class="c-group"><div class="c-subhead">← Incoming · ${inc.length}</div>`;
+    html += `<div class="c-scroll"><div class="c-list">${inc.map(r=>compactRow(v,'in',r)).join('')}</div></div></div>`;
+  }
+  return html;
+}
+
+// ───────────────────────── panel ─────────────────────────
+function panel(v){
+  const st = ST[v]; const n = st.state==='populated' ? relCount(st.rel) : 0;
+  const headExtra = VARS[v].mode==='compact' && st.state==='populated'
+    ? `<button class="head-add ml" onclick="openCreate('${v}')">＋ Add</button>` : '';
+  const countChip = st.state==='populated' ? `<span class="count">${n}</span>` : '';
+  return `
+  <div class="state-strip">
+    <span class="lab">State</span>
+    ${['populated','empty','loading','error'].map(s=>`<button class="sbtn ${st.state===s?'on':''}" onclick="setState('${v}','${s}')">${s}</button>`).join('')}
+  </div>
+  <div class="detail-inner">
+    <div class="detail-head">
+      <span class="fico">${SUBJECT.icon}</span>
+      <div><div class="ttl">${SUBJECT.name}</div><div class="sub">${SUBJECT.type} · ${SUBJECT.ver} · 14 chunks</div></div>
+      <div class="tools"><button class="ib" aria-label="Build notes" title="Build notes" onclick="toggleNotes('${v}')">ⓘ</button><button class="ib" aria-label="Close document details" title="Close">✕</button></div>
+    </div>
+
+    <div class="sec collapsed" id="sec-meta-${v}">
+      <button class="sec-head" onclick="toggleSec('sec-meta-${v}')"><span class="chev">▾</span> Metadata <span class="count ml">10</span></button>
+      <div class="sec-body"><div class="placeholder">Per-field metadata + confidence (Phase 112).</div></div>
+    </div>
+
+    <div class="sec" id="sec-rel-${v}">
+      <button class="sec-head" onclick="toggleSec('sec-rel-${v}')">
+        <span class="chev">▾</span> Relationships ${countChip}${headExtra}
+      </button>
+      <div class="sec-body" id="rel-body-${v}">${relBody(v)}</div>
+    </div>
+
+    <div class="sec collapsed" id="sec-class-${v}">
+      <button class="sec-head" onclick="toggleSec('sec-class-${v}')"><span class="chev">▾</span> Classification <span class="soon ml">Phase 118</span></button>
+      <div class="sec-body"><div class="placeholder">Auto-classification suggestions — Phase 118.</div></div>
+    </div>
+
+    <div class="notes collapsed" id="notes-${v}">
+      <h4 onclick="this.parentElement.classList.toggle('collapsed')">ⓘ Build notes — what's real vs net-new ▾</h4>
+      <div class="notes-body"><ul>
+        <li><span class="ok">REAL today:</span> create + remove edges — <code>POST</code> / <code>DELETE /document-relationships</code> (Phase 116), user-scoped (migration 071), idempotent create, audit-logged.</li>
+        <li><span class="ok">REAL today:</span> the leak-safe read traversal (outgoing+incoming, follow-to-latest, per-target readability re-check, "no access" mask) — but only inside the AGENT tool <code>_handle_get_related_documents</code>.</li>
+        <li><span class="ok">REAL today:</span> the inverse-label vocabulary (<code>_INVERSE_LABEL</code>) the incoming chips reuse — the frontend mirrors it, never invents wording (D-117-6).</li>
+        <li><span class="net">NET-NEW (117):</span> a <code>GET</code> read endpoint for the panel — Phase 116 shipped NO REST read. <b>Extract</b> the read into <code>document_relationship_service</code> so the agent tool AND the route share ONE source of truth (D-117-7) — never fork the leak-safe read into the route.</li>
+        <li><span class="net">NET-NEW (117):</span> <code>api.ts</code> client fns + the Relationships <code>PanelSection</code> in <code>DocumentDetailPanel</code>.</li>
+        <li>Create is <b>outgoing-only</b>; remove works on <b>either direction</b> (D-117-1/2) — deliberate asymmetry, lock it against "fix to symmetry."</li>
+        <li>After create/remove → <b>re-fetch</b> (not optimistic, D-117-9): the masked "no access" row never leaks an id/title (D-117-8) and only the server can compute follow-to-latest + inverse labels. Remove is a hard, audited <code>DELETE</code> — <b>no undo</b> affordance (an "Undo" would imply optimistic reversibility the backend doesn't provide).</li>
+        <li><span class="net">A11y (SC#3 AA):</span> the per-row remove (✕) is hover-reveal for mouse only — it MUST stay keyboard-operable (<code>:focus-visible</code>) and <b>always visible on touch/coarse-pointer</b> (the &lt;768px bottom-sheet has no hover). Icon-only buttons carry <code>aria-label</code> (the shell pattern: <code>aria-label="Close document details"</code>); the destructive remove should announce <code>aria-label="Remove &lt;type&gt; link to &lt;filename&gt;"</code>. The accordion head reuses <code>PanelSection</code>'s real <code>&lt;button aria-expanded aria-controls&gt;</code>.</li>
+        <li><span class="net">A11y (SC#3 AA):</span> the masked "no access" string + all meaningful copy (group subheaders, exclusion note, empty/error body) use the <b>panel-scoped AA token</b> (<code>--panel-muted-foreground</code> ≥4.5:1), NEVER the global muted/dim 3.59–3.64:1 token. The transient <code>↻ updating</code> beat carries <code>role="status" aria-live="polite"</code> and the error block <code>role="alert"</code> (the 112 panel pattern).</li>
+        <li>Scaffolding only: the surrounding <b>Metadata (112)</b> + <b>Classification (118)</b> sections are sketch context to situate Relationships — they are NOT 117 work. The real <code>DocumentDetailPanel</code> ships NO inert stub for unbuilt features; 117 adds ONLY the Relationships <code>PanelSection</code>.</li>
+      </ul></div>
+    </div>
+  </div>`;
+}
+
+// ───────────────────────── render ─────────────────────────
+function render(){
+  for (const v of ['a','b','c']){
+    document.getElementById('variant-'+v).innerHTML = `<div class="app">
+      <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📄</div><div class="ni">🔀</div><div class="ni">🧩</div></div>
+      <div class="main">
+        <div class="list-col">
+          <div class="page-head"><h1>Documents</h1><span class="crumb">Project Meridian</span></div>
+          <table class="doc-table"><thead><tr><th>Name</th><th>Links</th></tr></thead><tbody>
+          ${docRows()}
+          </tbody></table>
+        </div>
+        <div class="detail-col">${panel(v)}</div>
+      </div></div>`;
+  }
+}
+function docRows(){
+  const rows = [
+    { icon:'📕', name:'Project Charter.pdf', links:7, sel:true },
+    { icon:'📊', name:'Risk Register.xlsx', links:2 },
+    { icon:'📄', name:'Stakeholder Map.docx', links:1 },
+    { icon:'📑', name:'Steering Committee Deck.pptx', links:1 },
+    { icon:'📕', name:'Charter Amendment 1.pdf', links:1 },
+  ];
+  return rows.map(r=>`<tr class="doc-row ${r.sel?'selected':''}">
+    <td><span class="doc-name">${r.icon} ${r.name}</span></td>
+    <td>${r.links?`<span class="link-badge">🔗 ${r.links}</span>`:'<span class="text-dim" style="font-size:11px">—</span>'}</td></tr>`).join('');
+}
+
+// ───────────────────────── interactions ─────────────────────────
+function setState(v, s){ ST[v].state = s; if (s==='populated' && relCount(ST[v].rel)===0) ST[v].rel = (v==='c'?denseRel():baseRel()); rerenderBody(v); }
+function rerenderBody(v){ const el = document.getElementById('rel-body-'+v); if (el) el.innerHTML = relBody(v);
+  // update count chip
+  const head = document.querySelector('#sec-rel-'+v+' .sec-head'); if(head){ render(); } }
+function toggleSec(id){ document.getElementById(id).classList.toggle('collapsed'); }
+function toggleNotes(v){ const n=document.getElementById('notes-'+v); n.classList.toggle('collapsed'); n.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+
+// remove with HONEST re-fetch posture (D-117-9): dim row → "↻ updating" → re-fetch → gone
+function removeRel(v, id){
+  const st = ST[v];
+  const row = document.querySelector('#variant-'+v+' [data-id="'+id+'"]');
+  if (row){ row.classList.add('removing'); }
+  // show an updating note inside the section
+  const body = document.getElementById('rel-body-'+v);
+  const note = document.createElement('div'); note.className='updating';
+  note.setAttribute('role','status'); note.setAttribute('aria-live','polite');
+  note.innerHTML='<span class="spin">↻</span> updating…';
+  if (row) row.after(note);
+  setTimeout(()=>{
+    st.rel.outgoing = st.rel.outgoing.filter(r=>r.id!==id);
+    st.rel.incoming = st.rel.incoming.filter(r=>r.id!==id);
+    render();
+    // honest re-fetch posture (D-117-9): NO undo — DELETE is a hard, audited mutation; the UI just re-fetches
+    showToast('Link removed — list re-fetched from server.');
+  }, 600);
+}
+
+let toastTimer=null;
+function showToast(msg, undo){
+  clearTimeout(toastTimer);
+  document.getElementById('toast-root').innerHTML =
+    `<div class="toast">✓ ${esc(msg)} ${undo?'<span class="undo" onclick="document.getElementById(\'toast-root\').innerHTML=\'\'">Undo</span>':''}</div>`;
+  toastTimer = setTimeout(()=>{ document.getElementById('toast-root').innerHTML=''; }, 3200);
+}
+
+// ── stub create dialog (the FULL picker is explored in sketch 035) ──
+let createCtx = { v:null, type:'references', target:null, q:'' };
+function openCreate(v){ createCtx = { v, type:'references', target:null, q:'' }; renderCreate(); }
+function closeCreate(){ document.getElementById('modal-root').innerHTML=''; }
+function pickType(t){ createCtx.type=t; renderCreate(); }
+function pickTarget(name, icon){ createCtx.target={name,icon}; createCtx.q=name; renderCreate(); }
+function onQ(val){ createCtx.q = val; createCtx.target = null; renderCreateList(); updatePreview(); }
+function renderCreate(){
+  const c = createCtx;
+  const types = ['supersedes','amends','references','attached_to'];
+  document.getElementById('modal-root').innerHTML = `
+    <div class="scrim" onclick="if(event.target===this)closeCreate()">
+      <div class="dlg">
+        <h3>Add a relationship</h3>
+        <div class="dsub">From <b>${SUBJECT.icon} ${SUBJECT.name}</b> — always an outgoing link (D-117-1).</div>
+        <div class="lbl">Relationship type</div>
+        <div class="type-row">
+          ${types.map(t=>`<button class="type-pick t-${t} ${c.type===t?'on':''}" onclick="pickType('${t}')"><span class="tdot"></span>${OUT_LABEL[t]}</button>`).join('')}
+        </div>
+        <div class="lbl">Target document — type to search your documents</div>
+        <input class="ta-input" id="ta" placeholder="Search documents…" value="${esc(c.q)}" oninput="onQ(this.value)" autocomplete="off" />
+        <div id="ta-list"></div>
+        <div class="preview-line" id="prev"></div>
+        <div class="dnote">↪ full searchable typeahead (self + already-linked excluded) is sketch 035</div>
+        <div class="dlg-foot">
+          <button class="btn" onclick="closeCreate()">Cancel</button>
+          <button class="btn primary" id="addbtn" ${c.target?'':'disabled'} onclick="confirmCreate()">Add link</button>
+        </div>
+      </div>
+    </div>`;
+  renderCreateList(); updatePreview();
+  const ta=document.getElementById('ta'); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+function renderCreateList(){
+  const c = createCtx; const q = c.q.trim().toLowerCase();
+  const matches = CANDIDATES.filter(x=> x.name.toLowerCase().includes(q));
+  const el = document.getElementById('ta-list'); if(!el) return;
+  if (c.target){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="ta-list">${matches.length
+    ? matches.map(x=>`<div class="ta-opt" onclick="pickTarget('${esc(x.name)}','${x.icon}')">${x.icon} ${esc(x.name)}</div>`).join('')
+    : '<div class="ta-opt" style="cursor:default;color:var(--color-text-muted)">No matching documents</div>'}</div>`;
+}
+function updatePreview(){
+  const c = createCtx; const el=document.getElementById('prev'); const btn=document.getElementById('addbtn'); if(!el) return;
+  if (c.target){ el.innerHTML = `This document <b>${OUT_LABEL[c.type].toLowerCase()}</b> → <b>${esc(c.target.name)}</b>`; if(btn) btn.disabled=false; }
+  else { el.innerHTML = `Pick a type and a target to preview the link.`; if(btn) btn.disabled=true; }
+}
+function confirmCreate(){
+  const c = createCtx; if(!c.target) return;
+  const st = ST[c.v];
+  st.rel.outgoing.push({ id:'new'+Date.now()%100000, type:c.type, icon:c.target.icon, name:c.target.name });
+  if (st.state!=='populated') st.state='populated';
+  closeCreate(); render();
+  showToast('Link added — list re-fetched from server.');
+}
+
+// ───────────────────────── shell ─────────────────────────
+function show(id,e){ document.querySelectorAll('.variant').forEach(x=>x.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block'; e.target.classList.add('active'); }
+function setVp(w){ document.querySelectorAll('.variant').forEach(v=>{ v.style.maxWidth=w?w+'px':''; v.style.margin=w?'0 auto':''; }); }
+
+render();
+</script>
+</body>
+</html>

@@ -16,10 +16,10 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.document import DocumentMoveRequest, DocumentResponse
+from app.models.document import DocumentMetadata, DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
-from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
+from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
 from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -69,6 +69,22 @@ class ReextractRequest(BaseModel):
     """
 
     engine: Literal["pymupdf", "legacy"]
+
+
+class MetadataUpdateRequest(BaseModel):
+    """PATCH /documents/{id}/metadata body schema (Phase 112 META-05, D-03).
+
+    Single-field edit (D-03 contract). `value` is polymorphic — a built-in field
+    is a string/date/list[str] and a custom field follows its def's type
+    (string/date/number/boolean/enum) — so we accept any JSON value and let the
+    VALIDATED `field` (allow-list checked in the route) constrain the shape
+    (RESEARCH Open Question 1). The route NEVER reads a client-supplied `source`:
+    there is deliberately no `source` field here — provenance is server-stamped.
+    """
+
+    field: str
+    value: object | None = None
+
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -1331,6 +1347,248 @@ async def move_document(
     return result.data[0]
 
 
+# The immutable built-in metadata keys. IN-01: single-sourced from DocumentMetadata
+# (under extra="allow", model_fields still returns ONLY the 7 declared built-ins, not
+# extras) so a future built-in addition can't drift this allow-list out of lockstep.
+# A PATCH `field` must be one of these OR an enabled custom field_key — and must
+# NEVER start with '_' (provenance-forgery block).
+_METADATA_BUILTINS = set(DocumentMetadata.model_fields)
+
+
+@router.patch("/{document_id}/metadata", response_model=DocumentResponse)
+async def update_document_metadata(
+    document_id: str,
+    body: MetadataUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 112 META-05 (D-03) — audited single-field metadata edit.
+
+    Persists one validated metadata field on a document the caller owns, hard-stamps
+    `_source[field]='user'` (the client may NEVER assert provenance), drops any stale
+    `_confidence[field]` (a human override has no model score), and writes a
+    `metadata.update` audit row. Owner-scoped on BOTH the SELECT and the UPDATE →
+    404 (never 403) on a non-owner miss (no existence leak), mirroring move_document.
+
+    Every `.execute()` is wrapped in `run_in_threadpool` (D-v2.5-01) — move_document's
+    raw `.execute()` predates that sweep and is deliberately NOT the threadpool template;
+    the reextract_document owner-SELECT (documents.py:1033) is.
+    """
+    # 1. Owner SELECT (404 on miss, no existence leak) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .eq("is_latest", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        # is_latest=False / no-row makes supabase-py raise on .maybe_single() rather than
+        # returning data=None — treat as 404 (matches reextract_document:1043-1049).
+        raise HTTPException(status_code=404, detail="Document not found")
+    # supabase-py .maybe_single().execute() on a no-row owner miss may return the whole
+    # response object as None (not an object with .data=None) — guard both shapes so a
+    # non-owner gets a clean 404, never an AttributeError 500 (no existence leak).
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Validate the field allow-list + reject any leading underscore (V5 input validation
+    #    + provenance-forgery block — a client must not write _source/_confidence directly).
+    field = body.field
+    if field.startswith("_"):
+        raise HTTPException(status_code=422, detail="Invalid metadata field")
+    enabled_custom = {
+        d["field_key"]
+        for d in await run_in_threadpool(
+            lambda: read_enabled_field_defs(supabase, current_user["id"])
+        )
+    }
+    if field not in _METADATA_BUILTINS and field not in enabled_custom:
+        raise HTTPException(status_code=422, detail="Unknown metadata field")
+
+    # 3. Merge into the existing metadata blob; hard-stamp _source='user'.
+    # WR-02: defensive-copy the fetched blob (+ the nested _source/_confidence dicts
+    # we mutate) so the prior SELECT result stays pristine — a future refactor that
+    # re-reads doc.data["metadata"] for an audit diff must see the PRIOR value, not
+    # the post-merge state. Behavior is unchanged; this is purely defensive.
+    meta = dict(doc.data.get("metadata") or {})
+    if isinstance(meta.get("_source"), dict):
+        meta["_source"] = dict(meta["_source"])
+    if isinstance(meta.get("_confidence"), dict):
+        meta["_confidence"] = dict(meta["_confidence"])
+    value = body.value
+    if field in ("document_type", "language") and isinstance(value, str):
+        # Mirror ingest_document:1457-1461 so user-edited values still match `@>` filters.
+        value = value.lower()
+    meta[field] = value
+    meta.setdefault("_source", {})[field] = "user"
+    # Phase 112 D-03: a user override carries NO model score — the chip renders neutral
+    # "Edited", never a fabricated number. Drop any stale _confidence entry for this field.
+    if isinstance(meta.get("_confidence"), dict):
+        meta["_confidence"].pop(field, None)
+
+    # 4. Owner-scoped UPDATE — threadpool-wrapped (D-v2.5-01).
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 5. Audit row (await inline; write_audit_entry swallows errors — the live round-trip
+    #    is the real verification). metadata.update is in VALID_ACTION_TYPES + live CHECK.
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type="metadata.update",
+        metadata={"document_id": document_id, "field": field},
+        supabase=supabase,
+    )
+    return result.data[0]
+
+
+@router.patch("/{document_id}/classification/accept", response_model=DocumentResponse)
+async def accept_classification(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 118 CLASS-03 — accept a classification suggestion (reversible move + audit).
+
+    Records the doc's PRIOR folder_id into the suggestion object (for Undo, D-118-6),
+    re-validates the suggested target folder is still readable (own+global; the FK is
+    ON DELETE SET NULL — Pitfall 5), moves the doc, marks status="accepted", and writes
+    a `classification.apply` audit row ONLY after the move succeeds (the 112/116 honesty
+    discipline — never optimistic). Owner-scoped on BOTH the SELECT and the UPDATE → 404
+    (never the forbidden status) on a non-owner / absent / no-active-suggestion miss (no
+    existence leak).
+
+    Undo needs NO endpoint — the frontend reverses via the EXISTING PATCH
+    /documents/{id}/move with the stamped prior_folder_id. Every `.execute()` is
+    threadpool-wrapped (D-v2.5-01 — this is an async handler; follow update_document_metadata,
+    not move_document's raw .execute()).
+    """
+    # 1. Owner SELECT (404 on miss, never the forbidden status) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("folder_id, metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Require an ACTIVE "suggested" suggestion with a target folder (else 404 — no
+    #    over-broad accept; never reveals whether the doc exists vs has no suggestion).
+    sugg = (doc.data.get("metadata") or {}).get("_classification") or {}
+    target = sugg.get("suggested_folder_id")
+    if not target or sugg.get("status") != "suggested":
+        raise HTTPException(status_code=404, detail="No active suggestion")
+
+    # 3. Re-validate the target folder is readable (own+global) — Pitfall 5 (clone
+    #    move_document:1325-1335). A deleted/unreadable folder → uniform 404.
+    from app.utils.db import coerce_uid  # noqa: PLC0415
+    caller_uid = coerce_uid(current_user["id"])  # AR-118-01: coerced owner-scoping gate
+    try:
+        folder = await run_in_threadpool(
+            lambda: supabase.table("folders")
+            .select("id")
+            .eq("id", str(target))
+            .or_(f"user_id.eq.{caller_uid},is_global.eq.true")
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if not folder or not getattr(folder, "data", None):
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # 4. Record the prior folder (Undo, D-118-6), mark accepted, ONE owner-scoped UPDATE
+    #    writing folder_id + the marked metadata (the move + the suggestion stamp together).
+    prior_folder = doc.data.get("folder_id")
+    meta = dict(doc.data.get("metadata") or {})
+    meta["_classification"] = {**sugg, "status": "accepted", "prior_folder_id": prior_folder}
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"folder_id": str(target), "metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 5. Audit ONLY after the move succeeds (never optimistic). classification.apply is
+    #    LIVE in VALID_ACTION_TYPES — write_audit_entry swallows errors so the live
+    #    round-trip is the verification.
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type="classification.apply",
+        metadata={
+            "document_id": document_id,
+            "rule_id": sugg.get("rule_id"),
+            "from_folder": prior_folder,
+            "to_folder": str(target),
+        },
+        supabase=supabase,
+    )
+    return result.data[0]
+
+
+@router.patch("/{document_id}/classification/dismiss", response_model=DocumentResponse)
+async def dismiss_classification(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 118 CLASS-03 — dismiss a classification suggestion (clear, no move, no audit).
+
+    Owner-scoped SELECT of the metadata → pop `_classification` → owner-scoped UPDATE of
+    the metadata. NO folder move, NO audit (dismiss is a non-action that clears a
+    suggestion; the rule itself is untouched). Owner-scoped on BOTH the SELECT and the
+    UPDATE → 404 (never the forbidden status) on a non-owner / absent miss.
+    Threadpool-wrapped (D-v2.5-01).
+    """
+    # 1. Owner SELECT (404 on miss, never the forbidden status) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Pop _classification → owner-scoped UPDATE of the metadata (no move, no audit).
+    meta = dict(doc.data.get("metadata") or {})
+    meta.pop("_classification", None)
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return result.data[0]
+
+
 def ingest_document(
     document_id: str,
     text: str,
@@ -1363,16 +1621,144 @@ def ingest_document(
         # status='processing' gates UI visibility; ingestion_step provides the label.
         supabase.table("documents").update({"ingestion_step": "extracting"}).eq("id", document_id).execute()
 
+        # Phase 111 (META-01/03/04) — read effective settings ONCE, BEFORE the
+        # metadata extract branch, so extraction_model / window_cap / enrichment_mode
+        # are in scope. load_app_settings() is sync/cache-only and already used at
+        # the embedding step below — this is the sync BackgroundTask, not an async
+        # handler, so D-v2.5-01 does NOT fire (it's hoisted, not newly introduced).
+        app_settings = load_app_settings()
+
         # Extract metadata FIRST so we can use it to enrich chunk embeddings.
         # This is best-effort — failures are logged but never block ingestion.
-        metadata = extract_metadata(text)
-        metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
-        # Normalize case-sensitive filter fields for consistent retrieval
+        #
+        # Phase 111 (D-111-2/8) — branch on metadata_enrichment_mode:
+        #   - 'enriched' (default; any non-'legacy' value fails safe to enriched):
+        #       cross-provider forced_emit through extract_metadata_enriched, with a
+        #       runtime create_model schema (built-ins + user custom fields), a
+        #       head+tail window sample (NOT content[:3000]), and a nested per-field
+        #       `_confidence` map attached AFTER the dump.
+        #   - 'legacy': the untouched OpenAI json_object extract_metadata path runs
+        #       byte-identical (the reversibility path).
+        # Three graceful-degradation layers are preserved: (1) extract_metadata_enriched's
+        # own except→None [Plan 02], (2) the call-site except below → emitted=None, and
+        # (3) the outer try/except backstop at the function bottom. A None metadata_dict
+        # is fine — the doc still reaches status=completed and flat `@>` filters still match.
+        mode = app_settings.metadata_enrichment_mode
+        if mode != "legacy":  # default-on 'enriched'; any non-'legacy' value fails safe to enriched
+            from app.config import get_model_capability  # noqa: PLC0415
+            from app.services.embedding_service import (  # noqa: PLC0415
+                attach_confidence,
+                build_metadata_model,
+                extract_metadata_enriched,
+                read_enabled_field_defs,
+                resolve_extraction_model,
+                sample_for_extraction,
+            )
+
+            # verify-work 111.1: the WHOLE enriched setup is inside the degrade try now.
+            # build_metadata_model() raises ValueError on an unknown/typo'd custom
+            # field_type (reachable only via a direct DB write — the CRUD API hard-validates
+            # field_type), and resolve/read/sample can also fail; previously those sat
+            # OUTSIDE the try so a metadata-config problem hard-FAILED the whole ingest
+            # (status=failed, no chunks). The "metadata failure never breaks ingestion"
+            # contract (D-111-8) requires ANY enriched failure to degrade to metadata=None.
+            metadata_dict = None
+            try:
+                model = resolve_extraction_model(app_settings.extraction_model)  # env gpt-4o fallback
+                # D-09 #1 (BUG-260616-01 / EMBED-01 data-egress cure): prefer the stored
+                # explicit `extraction_provider`. When the operator pinned a provider in
+                # Settings (e.g. `lmstudio`/`ollama`), trust it and SKIP name-inference
+                # entirely — a slashed local id (`google/gemma-3-4b`) can no longer be
+                # mis-inferred to `openrouter` and ship document text to the cloud.
+                # Name-inference stays ONLY as the last-resort legacy fallback for pre-111.1
+                # rows that never set `extraction_provider` (D-08 back-compat — byte-identical).
+                provider = (getattr(app_settings, "extraction_provider", "") or "").strip().lower() \
+                    or (get_model_capability(model) or {}).get("provider")
+                defs = read_enabled_field_defs(supabase, user_id)  # Plan-02 explicit-scoped, fail-closed read
+                DynModel = build_metadata_model(defs)
+                emit_tool = {
+                    "type": "function",
+                    "function": {
+                        "name": "emit_document_metadata",
+                        "description": (
+                            "Emit structured metadata for this document with a per-field "
+                            "0-1 confidence."
+                        ),
+                        "parameters": DynModel.model_json_schema(),
+                    },
+                }
+                sampled = sample_for_extraction(text, app_settings.extraction_window_cap)
+                result = asyncio.run(extract_metadata_enriched(
+                    sampled=sampled,
+                    model=model,
+                    provider=provider,
+                    schema_model=DynModel,
+                    emit_tool=emit_tool,
+                    user_settings=app_settings,
+                ))
+                emitted = result.get("emitted")
+                # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
+                # `confidence` field out of the dump and renames it to the nested
+                # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
+                # left the flat `confidence` key in the dump (the populated-dict default
+                # survives exclude_none), polluting the `metadata @>` containment filter.
+                metadata_dict = attach_confidence(emitted.model_dump(exclude_none=True)) if emitted else None
+            except Exception:  # noqa: BLE001 — degrade layer 2: ANY enriched failure → metadata=None; doc still completes (D-111-8)
+                log.warning("enriched metadata extraction failed; degrading to None", exc_info=True)
+                metadata_dict = None
+        else:
+            metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
+            metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+        # Normalize case-sensitive filter fields for consistent retrieval.
+        # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
+        # is NEVER touched here, and is NEVER promoted to a flat filter field.
         if metadata_dict:
             if metadata_dict.get("document_type"):
                 metadata_dict["document_type"] = metadata_dict["document_type"].lower()
             if metadata_dict.get("language"):
                 metadata_dict["language"] = metadata_dict["language"].lower()
+
+        # Phase 112 D-03 (META-05) — re-extract precedence merge guard.
+        # Preserve any field a human marked _source='user' (via PATCH /documents/{id}/metadata,
+        # Plan 01) across re-extraction, so a later extraction never silently destroys an edit.
+        #
+        # Pitfall 1 (single write site): this guard MUST live here at the SINGLE
+        # ingest_document metadata-write site — NOT in a re-extract wrapper — so ALL THREE
+        # re-extract entry points inherit it: /upload + /reingest (-> _upload_pipeline ->
+        # ingest_document) and /reextract (-> background_tasks.add_task(ingest_document)).
+        # A wrapper-placed guard would pass a /reextract-only test while still destroying
+        # edits on /upload + /reingest. The guard reads the PRIOR doc's _source map (there
+        # is no request-scoped `body` in this function's scope — Pitfall 1 is self-enforced).
+        #
+        # Pitfall 2 (degrade): enriched extraction can degrade to metadata_dict=None; we
+        # promote None -> {} BEFORE the user-field loop so a degrade-with-prior-user-fields
+        # yields {user fields + _source}, never None (a degrade must NOT wipe a human edit).
+        #
+        # sync .execute() — already inside the BackgroundTask thread (this function is a
+        # sync def), so D-v2.5-01 (no blocking I/O in async handlers) does NOT fire here.
+        prior = (
+            supabase.table("documents").select("metadata")
+            .eq("id", document_id).maybe_single().execute()
+        )
+        # WR-02: defensive-copy the fetched prior blob (+ the nested _source dict we
+        # read) so the SELECT result stays pristine and restored values don't share a
+        # mutable reference with the prior object. Behavior unchanged; purely defensive.
+        prior_meta = dict((getattr(prior, "data", None) or {}).get("metadata") or {})
+        user_fields = dict(prior_meta.get("_source") or {})  # {field: "user"}
+        if user_fields:
+            metadata_dict = metadata_dict or {}  # Pitfall 2: degrade None -> {} before the loop
+            preserved_source = metadata_dict.setdefault("_source", {})
+            for fld, src in user_fields.items():
+                if src != "user":
+                    continue
+                if fld in prior_meta:
+                    metadata_dict[fld] = prior_meta[fld]  # restore the human value
+                else:
+                    metadata_dict.pop(fld, None)          # human cleared it -> keep it cleared
+                preserved_source[fld] = "user"            # keep the marker
+                # a human override has no model score -> drop any fresh _confidence for it
+                if isinstance(metadata_dict.get("_confidence"), dict):
+                    metadata_dict["_confidence"].pop(fld, None)
 
         supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
@@ -1400,10 +1786,25 @@ def ingest_document(
 
         texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks
 
-        app_settings = load_app_settings()
+        # Phase 111 — app_settings was hoisted above the metadata extract branch; reuse it.
         supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
-        embeddings = embed_chunks(texts_to_embed, model=app_settings.embedding_model or None)
+        # Phase 111.1 EMBED-04 / D-13: thread user_settings=app_settings so the chunk
+        # path resolves the SAME get_embedding_client the query path uses
+        # (retrieval_service.py:42-44). Without this, a configured non-default embedder
+        # embedded chunks via env creds while queries used configured creds → two vector
+        # spaces → silent retrieval failure.
+        embeddings = embed_chunks(
+            texts_to_embed,
+            model=app_settings.embedding_model or None,
+            user_settings=app_settings,
+        )
 
+        # Phase 111.1 D-10: tag each chunk with the embedding model + dims it was
+        # produced under, so a half-finished re-embed never compares across vector
+        # spaces (match_document_chunks filters on p_embedding_model). Default mirrors
+        # the migration-073 backfill (text-embedding-3-small / 1536) for back-compat.
+        _chunk_embedding_model = app_settings.embedding_model or "text-embedding-3-small"
+        _chunk_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
         chunk_rows = [
             {
                 "document_id": document_id,
@@ -1411,6 +1812,8 @@ def ingest_document(
                 "content": chunk,        # raw text — clean for display and citations
                 "chunk_index": i,
                 "embedding": embedding,  # computed from context_header + chunk
+                "embedding_model": _chunk_embedding_model,           # D-10 per-chunk tag
+                "embedding_dimensions": _chunk_embedding_dimensions,  # D-10
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]
@@ -1464,6 +1867,51 @@ def ingest_document(
             )
 
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
+
+        # Phase 118 (CLASS-02 / D-118-2/3/4/8) — classification rule-eval pass.
+        # Runs immediately BEFORE the single persist UPDATE below (metadata_dict is final
+        # here — it is only READ for the chunk header above, never mutated). It writes ONE
+        # `_classification` SUGGESTION into metadata_dict; the existing :metadata write below
+        # carries it. It NEVER writes folder_id — the milestone anti-feature ("silent
+        # autonomous auto-filing") is structurally impossible here; the move happens ONLY on
+        # an explicit Accept (accept_classification).
+        #
+        # This is a sync def inside a BackgroundTask (NO request JWT — auth.uid() is NULL and
+        # the service-role client BYPASSES RLS). The SOLE owner-scoping gate is the in-app
+        # `.or_(user_id.eq.{uploader},is_global.eq.true)` predicate (Pitfall 3, D-118-8): an
+        # unscoped select would return ALL users' rules. A global rule is evaluated against
+        # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
+        if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
+            try:
+                from app.services import classification_matcher  # noqa: PLC0415
+                from app.utils.db import coerce_uid  # noqa: PLC0415
+                rules = (
+                    supabase.table("classification_rules").select("*")
+                    # AR-118-01: coerce the interpolated uploader id (service-role read,
+                    # RLS bypassed — this app-code predicate is the SOLE owner gate).
+                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_global.eq.true")  # D-118-8 own + global
+                    .eq("enabled", True)
+                    .order("is_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
+                    .execute()
+                ).data or []
+                # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
+                # sibling service-role own+global reads carry (read_enabled_field_defs,
+                # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
+                # a malformed/over-broad result can NEVER evaluate another user's rule
+                # against this uploader's metadata (the phase's highest-stakes leak site).
+                rules = [r for r in rules if r.get("is_global") or str(r.get("user_id")) == str(user_id)]
+                whitelist = _METADATA_BUILTINS | {
+                    d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
+                }
+                for rule in rules:  # first-match-wins (D-118-3): ONE object, never an array
+                    if classification_matcher.match_metadata(rule["match_expr"], metadata_dict, whitelist):
+                        metadata_dict["_classification"] = classification_matcher.build_suggestion(
+                            rule, supabase, user_id,
+                        )
+                        break
+            except Exception:  # noqa: BLE001 — classification NEVER blocks ingestion (mirror the metadata degrade)
+                log.warning("classification rule-eval failed; skipping suggestion", exc_info=True)
+
         supabase.table("documents").update({
             "status": "completed",
             # Phase 072.1 Gap 3 closure documentation — chunk_count is TEXT-chunks-only.

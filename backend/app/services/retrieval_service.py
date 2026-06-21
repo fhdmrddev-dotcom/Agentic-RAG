@@ -42,11 +42,20 @@ async def _vector_search(
     query_embedding = (
         await run_in_threadpool(embed_texts, [query], user_settings=user_settings)
     )[0]
+    # Phase 111.1 D-10: filter search to the CURRENTLY-configured embedding model so a
+    # half-finished re-embed never compares across vector spaces (Pitfall 2). Stale-model
+    # chunks are excluded — that exclusion is the graceful-dip recall reduction (D-04),
+    # NOT a cross-vector-space comparison. The migration-073 backfill tagged pre-existing
+    # chunks text-embedding-3-small, so default to that when no model is configured.
+    current_model = (getattr(user_settings, "embedding_model", "") or "text-embedding-3-small")
     params: dict = {
         "query_embedding": query_embedding,
         "match_user_id": user_id,
         "match_count": top_n,
         "match_threshold": match_threshold,
+        # p_embedding_model is the LAST, NULL-defaulted RPC param (migration 073); additive
+        # and defaulted, so the call stays valid even before the migration is applied (Plan 04).
+        "p_embedding_model": current_model,
     }
     if metadata_filter:
         params["metadata_filter"] = metadata_filter

@@ -209,6 +209,17 @@
   }
 }
 
+/* ─── Phase 117: relationship remove ✕ reachability (the fidelity audit's #1 a11y
+   fix). On fine pointers the ✕ reveals on row hover / row focus-within / own focus
+   (Tailwind utilities on the control). On COARSE pointers (touch — incl. the <768px
+   bottom-sheet, which has NO hover) it MUST be always visible, or the destructive
+   either-direction remove (incl. masked rows) is unreachable → WCAG 2.4.7 fail. ─── */
+@media (pointer: coarse) {
+  .rel-x-touch {
+    opacity: 1 !important;
+  }
+}
+
 /* ─── Animations ─── */
 @keyframes fadeSlideUp {
   from {

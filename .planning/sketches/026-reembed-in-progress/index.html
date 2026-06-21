@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 026 — Re-embed In Progress</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 56px; }
+  .stage { max-width: 760px; margin: 0 auto; padding: var(--space-8) var(--space-6) 140px; }
+  .page-head { margin-bottom: var(--space-6); }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0 0 var(--space-2); }
+  .page-head p { color: var(--color-text-muted); margin: 0; font-size: var(--text-sm); }
+
+  .state-cycler { display: flex; gap: 6px; margin-bottom: var(--space-6); flex-wrap: wrap; }
+  .state-cycler button {
+    background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted);
+    border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--text-xs); cursor: pointer;
+    font-family: var(--font-mono); transition: all var(--dur-fast);
+  }
+  .state-cycler button.active { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  .card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+  }
+
+  /* ─── Variant A: inline progress strip in settings ─── */
+  .reembed-strip {
+    border-radius: var(--radius-md); border: 1px solid var(--color-border);
+    overflow: hidden; background: var(--color-bg-elev1);
+  }
+  .rs-head {
+    display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4);
+  }
+  .rs-pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); flex-shrink: 0;
+    animation: pulseGlow 1.6s ease-in-out infinite; box-shadow: 0 0 8px var(--color-primary-glow); }
+  .rs-pulse.done { background: var(--color-success); animation: none; box-shadow: 0 0 8px hsl(142 71% 45% / 0.6); }
+  .rs-pulse.failed { background: var(--color-danger); animation: none; }
+  .rs-title { font-weight: 600; font-size: var(--text-sm); }
+  .rs-sub { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .rs-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text); }
+  .rs-bar-track { height: 4px; background: var(--color-primary-dim); position: relative; overflow: hidden; }
+  .rs-bar-fill { height: 100%; background: linear-gradient(90deg, var(--color-primary-strong), var(--color-accent-violet)); transition: width var(--dur-slow) var(--ease-out); }
+  .rs-bar-fill.done { background: var(--color-success); }
+  .rs-bar-fill.failed { background: var(--color-danger); }
+  .rs-foot {
+    display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);
+    font-size: var(--text-xs); color: var(--color-text-muted); border-top: 1px solid var(--color-border-soft);
+  }
+  .recall-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-full);
+    font-size: var(--text-xs); font-family: var(--font-mono);
+  }
+  .recall-chip.catching { background: var(--color-warning-dim); color: var(--color-warning); }
+  .recall-chip.full { background: var(--color-success-dim); color: var(--color-success); }
+  .rs-foot .spacer { margin-left: auto; }
+  .btn {
+    border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text);
+    border-radius: var(--radius-sm); padding: 6px 14px; font-size: var(--text-xs); font-weight: 600;
+    cursor: pointer; font-family: var(--font-sans); transition: all var(--dur-fast);
+  }
+  .btn:hover { border-color: var(--color-primary-glow); }
+  .btn.primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color: hsl(226 60% 8%); }
+  .btn.warn { background: var(--color-warning); border-color: var(--color-warning); color: hsl(38 40% 10%); }
+
+  /* ─── Variant B: app-wide banner ─── */
+  .app-banner {
+    display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5);
+    background: linear-gradient(90deg, var(--color-warning-dim), transparent);
+    border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+  .app-banner.done { background: linear-gradient(90deg, var(--color-success-dim), transparent); border-color: hsl(142 71% 45% / 0.3); }
+  .app-banner.failed { background: linear-gradient(90deg, var(--color-danger-dim), transparent); border-color: hsl(0 72% 51% / 0.3); }
+  .app-banner .bi { font-size: 18px; }
+  .app-banner .bmain b { color: var(--color-text); }
+  .app-banner .bmain span { color: var(--color-text-muted); font-size: var(--text-xs); }
+  .app-banner .bprog { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+  .mini-track { width: 120px; height: 4px; background: var(--color-warning-dim); border-radius: 2px; overflow: hidden; }
+  .mini-fill { height: 100%; background: var(--color-warning); transition: width var(--dur-slow); }
+  .browser-chrome {
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border); border-radius: var(--radius-md) var(--radius-md) 0 0;
+    padding: 8px 12px; display: flex; gap: 6px; align-items: center;
+  }
+  .browser-chrome .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .browser-chrome .url { margin-left: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .fake-app-body { background: var(--color-bg); border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md); padding: var(--space-4); }
+  .fake-line { height: 8px; background: var(--color-muted); border-radius: 4px; margin-bottom: 10px; }
+  .fake-line.w70 { width: 70%; } .fake-line.w50 { width: 50%; } .fake-line.w90 { width: 90%; }
+
+  /* ─── Variant C: status card with batches ─── */
+  .job-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+  .job-head { padding: var(--space-5); display: flex; align-items: flex-start; gap: var(--space-3); }
+  .job-head .ji {
+    width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center;
+    background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); font-size: 20px; flex-shrink: 0;
+  }
+  .job-head.done .ji { background: var(--color-success-dim); border-color: hsl(142 71% 45% / 0.4); }
+  .job-head.failed .ji { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / 0.4); }
+  .job-title { font-family: var(--font-headline); font-size: var(--text-md); margin: 0 0 3px; }
+  .job-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .job-state-pill {
+    margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 10px; border-radius: var(--radius-full); font-family: var(--font-mono);
+  }
+  .job-state-pill.running { background: var(--color-primary-dim); color: var(--color-primary); }
+  .job-state-pill.done { background: var(--color-success-dim); color: var(--color-success); }
+  .job-state-pill.failed { background: var(--color-danger-dim); color: var(--color-danger); }
+  .job-body { padding: 0 var(--space-5) var(--space-5); }
+  .batch-grid { display: flex; gap: 4px; flex-wrap: wrap; margin: var(--space-4) 0; }
+  .batch { width: 22px; height: 22px; border-radius: 5px; background: var(--color-muted); border: 1px solid var(--color-border); transition: all var(--dur-base); }
+  .batch.done { background: var(--color-success); border-color: var(--color-success); }
+  .batch.active { background: var(--color-primary); border-color: var(--color-primary); animation: pulseGlow 1.5s infinite; }
+  .batch.failed { background: var(--color-danger); border-color: var(--color-danger); }
+  .job-stats { display: flex; gap: var(--space-6); margin-bottom: var(--space-4); }
+  .job-stat .js-v { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700; }
+  .job-stat .js-k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); }
+  .job-note {
+    padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); font-size: var(--text-xs);
+    display: flex; gap: var(--space-2); align-items: flex-start; margin-bottom: var(--space-4);
+  }
+  .job-note.catching { background: var(--color-warning-dim); color: var(--color-text-muted); }
+  .job-note.catching b { color: var(--color-warning); }
+  .job-note.failed { background: var(--color-danger-dim); color: var(--color-text-muted); }
+  .job-note.failed b { color: var(--color-danger); }
+  .job-foot { display: flex; gap: var(--space-3); }
+
+  .pitch {
+    margin-top: var(--space-6); padding: var(--space-4); border-radius: var(--radius-md);
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border-soft);
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6;
+  }
+  .pitch b { color: var(--color-text); }
+
+  /* synthesis: slim search-pointer line (the whisper of B, where search happens) */
+  .search-pointer {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 7px var(--space-3); border-radius: var(--radius-sm);
+    background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.25);
+    font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 12px;
+  }
+  .search-pointer .sp-ic { color: var(--color-warning); }
+  .search-pointer a { color: var(--color-primary); text-decoration: none; margin-left: auto; font-weight: 600; }
+  .search-pointer a:hover { text-decoration: underline; }
+  .synth-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin: var(--space-6) 0 var(--space-3); }
+  .synth-section-label:first-of-type { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 026 · Re-embed In Progress</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Inline strip</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: App-wide banner</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Status card + batches</button>
+  <button class="variant-tab active" onclick="showVariant('synth', event)">Synthesis: C + search pointer <span class="star">★</span></button>
+</div>
+
+<!-- ───────── VARIANT A ───────── -->
+<div id="variant-a" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Re-embed running — inline in Settings</h1>
+      <p>The job lives where you started it. Honest about the recall dip; one-click re-kick if it stalls.</p>
+    </div>
+    <div class="state-cycler">
+      <button class="active" onclick="setA('running', event)">running</button>
+      <button onclick="setA('partial', event)">partial / failed</button>
+      <button onclick="setA('done', event)">complete</button>
+    </div>
+
+    <div class="card">
+      <div class="reembed-strip">
+        <div class="rs-head">
+          <span class="rs-pulse" id="a-pulse"></span>
+          <div>
+            <div class="rs-title" id="a-title">Re-embedding your library</div>
+            <div class="rs-sub" id="a-sub">text-embedding-3-large · 3072d · started 2 min ago</div>
+          </div>
+          <div class="rs-count" id="a-count">1,860 / 4,212</div>
+        </div>
+        <div class="rs-bar-track"><div class="rs-bar-fill" id="a-fill" style="width:44%"></div></div>
+        <div class="rs-foot">
+          <span class="recall-chip catching" id="a-recall">◐ Search catching up · reduced recall</span>
+          <span class="spacer"></span>
+          <span id="a-eta">~3 min left</span>
+          <button class="btn" id="a-action" style="display:none" onclick="alert('Re-embed re-kicked')">Re-embed now</button>
+        </div>
+      </div>
+    </div>
+    <div class="pitch"><b>Variant A — inline strip.</b> Minimal footprint, lives right under the model picker. Good for the operator who's actively in Settings, weaker at surfacing the dip to a user who's elsewhere in the app searching documents.</div>
+  </div>
+</div>
+
+<!-- ───────── VARIANT B ───────── -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Re-embed running — app-wide banner</h1>
+      <p>A slim banner rides the top of every page, so anyone searching during the dip sees <i>why</i> results look thin. Disappears on completion.</p>
+    </div>
+    <div class="state-cycler">
+      <button class="active" onclick="setB('running', event)">running</button>
+      <button onclick="setB('failed', event)">failed</button>
+      <button onclick="setB('done', event)">complete</button>
+    </div>
+
+    <div class="app-banner" id="b-banner">
+      <span class="bi" id="b-icon">◐</span>
+      <div class="bmain">
+        <b id="b-main">Search is catching up</b>
+        <span id="b-sub"> — re-embedding to text-embedding-3-large, results may be incomplete</span>
+      </div>
+      <div class="bprog" id="b-prog">
+        <div class="mini-track"><div class="mini-fill" id="b-mini" style="width:44%"></div></div>
+        <span style="font-family:var(--font-mono);font-size:var(--text-xs)" id="b-pct">44%</span>
+      </div>
+    </div>
+
+    <!-- show it in context of the app -->
+    <div style="margin-top: var(--space-5)">
+      <div class="browser-chrome">
+        <span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>
+        <span class="url">app/documents — searching "Q3 risk register"</span>
+      </div>
+      <div class="fake-app-body">
+        <div class="fake-line w90"></div>
+        <div class="fake-line w70"></div>
+        <div class="fake-line w50"></div>
+        <div style="font-size:var(--text-xs);color:var(--color-text-dim);margin-top:14px">3 results (some documents temporarily excluded while re-embedding)</div>
+      </div>
+    </div>
+    <div class="pitch"><b>Variant B — app-wide banner.</b> Maximum honesty: every searching user understands the dip in context. Slightly more intrusive; needs a tasteful slim height + auto-dismiss so it doesn't nag. Best matches the "search quality dips" contract being visible where search actually happens.</div>
+  </div>
+</div>
+
+<!-- ───────── VARIANT C ───────── -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Re-embed running — full status card</h1>
+      <p>The richest surface: per-batch progress, resumable/non-destructive state, and explicit re-kick. The home for a long-running, occasionally-failing job.</p>
+    </div>
+    <div class="state-cycler">
+      <button class="active" onclick="setC('running', event)">running</button>
+      <button onclick="setC('partial', event)">partial / stalled</button>
+      <button onclick="setC('done', event)">complete</button>
+    </div>
+
+    <div class="job-card">
+      <div class="job-head" id="c-head">
+        <div class="ji" id="c-ji">↻</div>
+        <div>
+          <div class="job-title" id="c-title">Re-embedding library</div>
+          <div class="job-meta" id="c-meta">→ text-embedding-3-large · 3072d · OpenAI · started 12:04</div>
+        </div>
+        <span class="job-state-pill running" id="c-pill">running</span>
+      </div>
+      <div class="job-body">
+        <div class="batch-grid" id="c-batches"></div>
+        <div class="job-stats">
+          <div class="job-stat"><div class="js-v" id="c-done">1,860</div><div class="js-k">re-embedded</div></div>
+          <div class="job-stat"><div class="js-v" id="c-total">4,212</div><div class="js-k">total chunks</div></div>
+          <div class="job-stat"><div class="js-v" id="c-eta">~3 min</div><div class="js-k">remaining</div></div>
+        </div>
+        <div class="job-note catching" id="c-note">
+          <span>◐</span>
+          <span><b>Search at reduced recall.</b> Chunks not yet re-embedded are filtered out of results, so search stays up and fully recovers as this completes. Old vectors are kept until each replacement is written — nothing is lost if this is interrupted.</span>
+        </div>
+        <div class="job-foot" id="c-foot">
+          <button class="btn" onclick="alert('Job paused')">Pause</button>
+        </div>
+      </div>
+    </div>
+    <div class="pitch"><b>Variant C — status card + batches.</b> Most trustworthy for the rare, deliberate admin act: you can see exactly how far it got, that it's non-destructive, and re-kick a stalled run. Heaviest surface; arguably overkill for a 6-minute job, ideal for large corpora. Pairs naturally with A or B as the slim everyday indicator that links here.</div>
+  </div>
+</div>
+
+<!-- ───────── SYNTHESIS: C card (home) + search pointer (whisper of B) ★ ───────── -->
+<div id="variant-synth" class="variant">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Re-embed running — C as home, with a whisper where search happens</h1>
+      <p>The rich status card (your pick, 026-C) stays the trustworthy <b>home in Settings</b>. A single slim <b>"search is catching up"</b> pointer appears only where people actually search — closing the honesty gap for someone who isn't in Settings — and links straight into the card.</p>
+    </div>
+
+    <div class="synth-section-label">① Where search happens — Documents page</div>
+    <div class="browser-chrome">
+      <span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>
+      <span class="url">app/documents — searching "Q3 risk register"</span>
+    </div>
+    <div class="fake-app-body">
+      <!-- the whisper: one slim line, links into the card -->
+      <div class="search-pointer">
+        <span class="sp-ic">◐</span>
+        <span>Search is catching up — some documents are temporarily excluded while re-embedding.</span>
+        <a href="#" onclick="document.getElementById('synth-card').scrollIntoView({behavior:'smooth'});return false;">View progress →</a>
+      </div>
+      <div class="fake-line w90"></div>
+      <div class="fake-line w70"></div>
+      <div class="fake-line w50"></div>
+      <div style="font-size:var(--text-xs);color:var(--color-text-dim);margin-top:14px">3 results (2 documents temporarily excluded)</div>
+    </div>
+
+    <div class="synth-section-label" id="synth-card">② The home — Settings · Embeddings</div>
+    <div class="job-card">
+      <div class="job-head">
+        <div class="ji">↻</div>
+        <div>
+          <div class="job-title">Re-embedding library</div>
+          <div class="job-meta">→ text-embedding-3-large · 3072d · OpenAI · started 12:04</div>
+        </div>
+        <span class="job-state-pill running">running</span>
+      </div>
+      <div class="job-body">
+        <div class="batch-grid" id="synth-batches"></div>
+        <div class="job-stats">
+          <div class="job-stat"><div class="js-v">1,860</div><div class="js-k">re-embedded</div></div>
+          <div class="job-stat"><div class="js-v">4,212</div><div class="js-k">total chunks</div></div>
+          <div class="job-stat"><div class="js-v">~3 min</div><div class="js-k">remaining</div></div>
+        </div>
+        <div class="job-note catching">
+          <span>◐</span>
+          <span><b>Search at reduced recall.</b> Chunks not yet re-embedded are filtered out of results, so search stays up and fully recovers as this completes. Old vectors are kept until each replacement is written — nothing is lost if this is interrupted.</span>
+        </div>
+        <div class="job-foot"><button class="btn" onclick="alert('Job paused')">Pause</button></div>
+      </div>
+    </div>
+
+    <div class="pitch"><b>Synthesis — C + search pointer.</b> One rich, honest home (C) instead of duplicating progress everywhere; one cheap slim line where the dip is actually felt (the whisper of B), which deep-links into the home. Avoids B's full app-wide banner nagging every page, while still telling the truth to a searcher who never opened Settings. The pointer auto-hides the moment the job completes.</div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>026</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  e.target.classList.add('active');
+}
+function cyc(e) { e.target.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active')); e.target.classList.add('active'); }
+
+// Variant A
+function setA(state, e) {
+  cyc(e);
+  const pulse=document.getElementById('a-pulse'), fill=document.getElementById('a-fill'),
+        title=document.getElementById('a-title'), sub=document.getElementById('a-sub'),
+        count=document.getElementById('a-count'), recall=document.getElementById('a-recall'),
+        eta=document.getElementById('a-eta'), action=document.getElementById('a-action');
+  pulse.className='rs-pulse'; fill.className='rs-bar-fill';
+  if (state==='running') {
+    fill.style.width='44%'; count.textContent='1,860 / 4,212';
+    title.textContent='Re-embedding your library'; sub.textContent='text-embedding-3-large · 3072d · started 2 min ago';
+    recall.className='recall-chip catching'; recall.textContent='◐ Search catching up · reduced recall';
+    eta.textContent='~3 min left'; action.style.display='none';
+  } else if (state==='partial') {
+    pulse.classList.add('failed'); fill.classList.add('failed'); fill.style.width='62%'; count.textContent='2,610 / 4,212';
+    title.textContent='Re-embed stopped — 1,602 chunks remain'; sub.textContent='Connection to embedder lost · resumable';
+    recall.className='recall-chip catching'; recall.textContent='◐ Still catching up · reduced recall';
+    eta.textContent='paused'; action.style.display='inline-block'; action.className='btn warn'; action.textContent='Re-embed now';
+  } else {
+    pulse.classList.add('done'); fill.classList.add('done'); fill.style.width='100%'; count.textContent='4,212 / 4,212';
+    title.textContent='Re-embed complete'; sub.textContent='text-embedding-3-large · 3072d · finished 12:10';
+    recall.className='recall-chip full'; recall.textContent='✓ Full recall restored';
+    eta.textContent='done'; action.style.display='none';
+  }
+}
+
+// Variant B
+function setB(state, e) {
+  cyc(e);
+  const b=document.getElementById('b-banner'), icon=document.getElementById('b-icon'),
+        main=document.getElementById('b-main'), sub=document.getElementById('b-sub'),
+        prog=document.getElementById('b-prog'), mini=document.getElementById('b-mini'), pct=document.getElementById('b-pct');
+  b.className='app-banner';
+  if (state==='running') {
+    icon.textContent='◐'; main.textContent='Search is catching up';
+    sub.textContent=' — re-embedding to text-embedding-3-large, results may be incomplete';
+    prog.style.display='flex'; mini.style.width='44%'; pct.textContent='44%';
+  } else if (state==='failed') {
+    b.classList.add('failed'); icon.textContent='⚠'; main.textContent='Re-embed stalled';
+    sub.textContent=' — 1,602 chunks not yet re-embedded · search still at reduced recall. Re-kick in Settings.';
+    prog.style.display='none';
+  } else {
+    b.classList.add('done'); icon.textContent='✓'; main.textContent='Search fully restored';
+    sub.textContent=' — every document re-embedded to text-embedding-3-large.';
+    prog.style.display='none';
+  }
+}
+
+// Variant C
+function renderBatches(doneN, activeN, failedN, total, gridId) {
+  const grid=document.getElementById(gridId || 'c-batches'); grid.innerHTML='';
+  for (let i=0;i<total;i++){
+    const d=document.createElement('div'); d.className='batch';
+    if (i<doneN) d.classList.add('done');
+    else if (failedN && i===doneN) d.classList.add('failed');
+    else if (!failedN && i===doneN) d.classList.add('active');
+    grid.appendChild(d);
+  }
+}
+function setC(state, e) {
+  cyc(e);
+  const head=document.getElementById('c-head'), ji=document.getElementById('c-ji'),
+        title=document.getElementById('c-title'), meta=document.getElementById('c-meta'),
+        pill=document.getElementById('c-pill'), done=document.getElementById('c-done'),
+        eta=document.getElementById('c-eta'), note=document.getElementById('c-note'), foot=document.getElementById('c-foot');
+  head.className='job-head'; pill.className='job-state-pill';
+  if (state==='running') {
+    ji.textContent='↻'; pill.classList.add('running'); pill.textContent='running';
+    title.textContent='Re-embedding library'; meta.textContent='→ text-embedding-3-large · 3072d · OpenAI · started 12:04';
+    done.textContent='1,860'; eta.textContent='~3 min';
+    renderBatches(18,1,0,42);
+    note.className='job-note catching';
+    note.innerHTML='<span>◐</span><span><b>Search at reduced recall.</b> Chunks not yet re-embedded are filtered out of results, so search stays up and fully recovers as this completes. Old vectors are kept until each replacement is written — nothing is lost if this is interrupted.</span>';
+    foot.innerHTML='<button class="btn" onclick="alert(\'Job paused\')">Pause</button>';
+  } else if (state==='partial') {
+    head.classList.add('failed'); ji.textContent='⚠'; pill.classList.add('failed'); pill.textContent='stalled';
+    title.textContent='Re-embed stalled'; meta.textContent='→ text-embedding-3-large · embedder timeout at 12:08 · resumable';
+    done.textContent='2,610'; eta.textContent='paused';
+    renderBatches(26,0,1,42);
+    note.className='job-note failed';
+    note.innerHTML='<span>⚠</span><span><b>Stopped with 1,602 chunks left.</b> Nothing was lost — old vectors are intact and search runs at reduced recall. Re-embed now picks up exactly where it stopped.</span>';
+    foot.innerHTML='<button class="btn primary" onclick="alert(\'Resuming…\')">Re-embed now</button> <button class="btn" onclick="alert(\'Reverted to previous model\')">Switch back</button>';
+  } else {
+    head.classList.add('done'); ji.textContent='✓'; pill.classList.add('done'); pill.textContent='complete';
+    title.textContent='Re-embed complete'; meta.textContent='→ text-embedding-3-large · 3072d · finished 12:10 · 6m 04s';
+    done.textContent='4,212'; eta.textContent='done';
+    renderBatches(42,0,0,42);
+    note.className='job-note catching';
+    note.innerHTML='<span>✓</span><span><b>Full recall restored.</b> Every chunk is now embedded with text-embedding-3-large. Search is back to full quality.</span>';
+    foot.innerHTML='';
+  }
+}
+renderBatches(18,1,0,42);
+renderBatches(18,1,0,42,'synth-batches');
+</script>
+</body>
+</html>

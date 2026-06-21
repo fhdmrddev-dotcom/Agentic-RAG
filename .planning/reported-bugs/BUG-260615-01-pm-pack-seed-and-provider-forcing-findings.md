@@ -9,7 +9,7 @@ affected_areas: [scripts/seed-pm-pack, backend/harness/forced-emit, provider-rou
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-082]
-re_open_trigger: null
+re_open_trigger: "Reviewed at Phase 111 discuss-phase (2026-06-15): finding (3) (DeepSeek/Gemini honest-fail FORCED structured emit) is directly relevant — 111 re-platforms metadata extraction onto forced_emit. Disposition: LEAVE OPEN; 111 does NOT own the provider-forcing fix (pairs with SEED-082). 111's SC#4 acceptance = pass-OR-documented per provider, with TIER-COERCE + graceful degradation as the safety net. Re-route the fix to a provider-feature-fit/eval phase when scoped."
 reproduces_on:
   branch: v2.5-dev
   commit: 6e2f383e

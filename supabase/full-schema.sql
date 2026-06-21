@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
+\restrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -114,10 +114,10 @@ $$;
 
 
 --
--- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[]); Type: FUNCTION; Schema: public; Owner: -
+-- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb, uuid[], text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
+CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 BEGIN
@@ -126,11 +126,12 @@ BEGIN
          1 - (dc.embedding <=> query_embedding) AS similarity
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id
+  WHERE dc.user_id = match_user_id          -- RLS scope (V4 — keep)
     AND 1 - (dc.embedding <=> query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+    AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
   ORDER BY dc.embedding <=> query_embedding
   LIMIT match_count;
 END;
@@ -220,6 +221,28 @@ $$;
 
 
 --
+-- Name: view_iso_to_date(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.view_iso_to_date(s text) RETURNS date
+    LANGUAGE plpgsql IMMUTABLE STRICT
+    AS $_$
+BEGIN
+  IF s !~ '^\d{4}-\d{2}-\d{2}$' THEN
+    RETURN NULL;  -- not ISO YYYY-MM-DD shape
+  END IF;
+  RETURN make_date(
+    substring(s FROM 1 FOR 4)::int,   -- year
+    substring(s FROM 6 FOR 2)::int,   -- month
+    substring(s FROM 9 FOR 2)::int    -- day
+  );
+EXCEPTION WHEN others THEN
+  RETURN NULL;  -- calendar-invalid (2026-13-99 / 2026-02-31) → NULL, never raises
+END;
+$_$;
+
+
+--
 -- Name: workflow_definitions_block_published_update(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -302,6 +325,14 @@ CREATE TABLE public.app_settings (
     sub_agent_config jsonb DEFAULT '{"max_output_tokens": 32768}'::jsonb,
     token_capture_enabled boolean DEFAULT true,
     template_ttl_hours integer DEFAULT 24,
+    document_management_enabled boolean DEFAULT true,
+    extraction_model text,
+    extraction_window_cap integer DEFAULT 32000,
+    metadata_enrichment_mode text DEFAULT 'enriched'::text,
+    embedding_provider text,
+    extraction_provider text,
+    confidence_bucket_high double precision DEFAULT 0.54,
+    confidence_bucket_medium double precision DEFAULT 0.38,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -321,6 +352,13 @@ COMMENT ON COLUMN public.app_settings.template_ttl_hours IS 'Phase 100 D-05. Hou
 
 
 --
+-- Name: COLUMN app_settings.document_management_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.document_management_enabled IS 'Phase 110 DMF-03. Master gate for net-new DM surfaces+tools (113-119). Default true => v3.0 behavior unchanged. Seam SEED-080 (v3.2) entitlement enforcement plugs into. NOT entangled with Phase 111 enrichment (D-110-2).';
+
+
+--
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -330,8 +368,32 @@ CREATE TABLE public.audit_log (
     action_type text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text])))
 );
+
+
+--
+-- Name: classification_rules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.classification_rules (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid,
+    name text NOT NULL,
+    match_expr jsonb NOT NULL,
+    suggest_folder_id uuid,
+    is_global boolean DEFAULT false NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN classification_rules.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.classification_rules.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
 
 
 --
@@ -361,7 +423,9 @@ CREATE TABLE public.document_chunks (
     chunk_index integer NOT NULL,
     embedding public.vector(1536),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    search_vector tsvector
+    search_vector tsvector,
+    embedding_model text,
+    embedding_dimensions integer
 );
 
 
@@ -382,6 +446,30 @@ CREATE TABLE public.document_images (
 
 
 --
+-- Name: document_relationships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_relationships (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid,
+    source_doc_id uuid NOT NULL,
+    target_doc_id uuid NOT NULL,
+    rel_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT document_relationships_rel_type_check CHECK ((rel_type = ANY (ARRAY['supersedes'::text, 'amends'::text, 'references'::text, 'attached_to'::text]))),
+    CONSTRAINT no_self_rel CHECK ((source_doc_id <> target_doc_id))
+);
+
+
+--
+-- Name: COLUMN document_relationships.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_relationships.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
 -- Name: document_tables; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -397,6 +485,29 @@ CREATE TABLE public.document_tables (
     bbox jsonb,
     extractor text
 );
+
+
+--
+-- Name: document_views; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_views (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid,
+    name text NOT NULL,
+    filter_expr jsonb DEFAULT '{}'::jsonb NOT NULL,
+    folder_scope uuid,
+    is_global boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN document_views.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_views.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
 
 
 --
@@ -423,6 +534,8 @@ CREATE TABLE public.documents (
     full_markdown text,
     ingestion_step text,
     extractor text,
+    document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
+    date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -510,6 +623,32 @@ ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
 --
 
 COMMENT ON COLUMN public.messages.tool_calls IS 'JSONB array. For role=system rows, first element may carry a "kind" discriminator: context_truncated | iteration_cap_dropped_tool_calls (Phase 075.4) | ask_user_prompt | ask_user_response (Phase 085).';
+
+
+--
+-- Name: metadata_field_definitions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.metadata_field_definitions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    org_id uuid,
+    field_key text NOT NULL,
+    field_type text DEFAULT 'string'::text NOT NULL,
+    description text,
+    is_global boolean DEFAULT false NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    options jsonb,
+    CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_global = true)))
+);
+
+
+--
+-- Name: COLUMN metadata_field_definitions.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.metadata_field_definitions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
 
 
 --
@@ -909,6 +1048,14 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: classification_rules classification_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.classification_rules
+    ADD CONSTRAINT classification_rules_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: code_executions code_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -933,11 +1080,27 @@ ALTER TABLE ONLY public.document_images
 
 
 --
+-- Name: document_relationships document_relationships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_relationships
+    ADD CONSTRAINT document_relationships_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: document_tables document_tables_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.document_tables
     ADD CONSTRAINT document_tables_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_views document_views_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_views
+    ADD CONSTRAINT document_views_pkey PRIMARY KEY (id);
 
 
 --
@@ -986,6 +1149,14 @@ ALTER TABLE ONLY public.message_feedback
 
 ALTER TABLE ONLY public.messages
     ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: metadata_field_definitions metadata_field_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.metadata_field_definitions
+    ADD CONSTRAINT metadata_field_definitions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1185,6 +1356,13 @@ CREATE INDEX document_images_document_idx ON public.document_images USING btree 
 
 
 --
+-- Name: document_relationships_idempotency_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX document_relationships_idempotency_idx ON public.document_relationships USING btree (user_id, source_doc_id, target_doc_id, rel_type);
+
+
+--
 -- Name: document_tables_document_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1255,6 +1433,76 @@ CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
 
 
 --
+-- Name: idx_classification_rules_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_classification_rules_org_id ON public.classification_rules USING btree (org_id);
+
+
+--
+-- Name: idx_classification_rules_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_classification_rules_user_id ON public.classification_rules USING btree (user_id);
+
+
+--
+-- Name: idx_document_relationships_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_relationships_org_id ON public.document_relationships USING btree (org_id);
+
+
+--
+-- Name: idx_document_relationships_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_relationships_source ON public.document_relationships USING btree (source_doc_id);
+
+
+--
+-- Name: idx_document_relationships_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_relationships_target ON public.document_relationships USING btree (target_doc_id);
+
+
+--
+-- Name: idx_document_relationships_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_relationships_user_id ON public.document_relationships USING btree (user_id);
+
+
+--
+-- Name: idx_document_views_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_views_org_id ON public.document_views USING btree (org_id);
+
+
+--
+-- Name: idx_document_views_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_views_user_id ON public.document_views USING btree (user_id);
+
+
+--
+-- Name: idx_documents_date_typed; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_date_typed ON public.documents USING btree (date_typed);
+
+
+--
+-- Name: idx_documents_document_type_norm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (document_type_norm);
+
+
+--
 -- Name: idx_harness_audit_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1266,6 +1514,20 @@ CREATE INDEX idx_harness_audit_run ON public.harness_audit USING btree (run_id) 
 --
 
 CREATE INDEX idx_harness_audit_user_created ON public.harness_audit USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_metadata_field_definitions_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_metadata_field_definitions_org_id ON public.metadata_field_definitions USING btree (org_id);
+
+
+--
+-- Name: idx_metadata_field_definitions_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_metadata_field_definitions_user_id ON public.metadata_field_definitions USING btree (user_id);
 
 
 --
@@ -1501,6 +1763,22 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: classification_rules classification_rules_suggest_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.classification_rules
+    ADD CONSTRAINT classification_rules_suggest_folder_id_fkey FOREIGN KEY (suggest_folder_id) REFERENCES public.folders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: classification_rules classification_rules_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.classification_rules
+    ADD CONSTRAINT classification_rules_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: code_executions code_executions_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1549,6 +1827,30 @@ ALTER TABLE ONLY public.document_images
 
 
 --
+-- Name: document_relationships document_relationships_source_doc_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_relationships
+    ADD CONSTRAINT document_relationships_source_doc_id_fkey FOREIGN KEY (source_doc_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: document_relationships document_relationships_target_doc_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_relationships
+    ADD CONSTRAINT document_relationships_target_doc_id_fkey FOREIGN KEY (target_doc_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: document_relationships document_relationships_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_relationships
+    ADD CONSTRAINT document_relationships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: document_tables document_tables_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1562,6 +1864,22 @@ ALTER TABLE ONLY public.document_tables
 
 ALTER TABLE ONLY public.document_tables
     ADD CONSTRAINT document_tables_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: document_views document_views_folder_scope_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_views
+    ADD CONSTRAINT document_views_folder_scope_fkey FOREIGN KEY (folder_scope) REFERENCES public.folders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: document_views document_views_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_views
+    ADD CONSTRAINT document_views_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1634,6 +1952,14 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.messages
     ADD CONSTRAINT messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: metadata_field_definitions metadata_field_definitions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.metadata_field_definitions
+    ADD CONSTRAINT metadata_field_definitions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1829,6 +2155,27 @@ ALTER TABLE ONLY public.workspace_files
 
 
 --
+-- Name: classification_rules Users can delete own classification_rules; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own classification_rules" ON public.classification_rules FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: document_relationships Users can delete own document_relationships; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: document_views Users can delete own document_views; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own document_views" ON public.document_views FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
 -- Name: folders Users can delete own folders; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1840,6 +2187,13 @@ CREATE POLICY "Users can delete own folders" ON public.folders FOR DELETE USING 
 --
 
 CREATE POLICY "Users can delete own memory" ON public.user_memory FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: metadata_field_definitions Users can delete own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metadata_field_definitions FOR DELETE USING ((auth.uid() = user_id));
 
 
 --
@@ -1899,6 +2253,27 @@ CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSER
 
 
 --
+-- Name: classification_rules Users can insert own classification_rules; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+
+
+--
+-- Name: document_relationships Users can insert own document_relationships; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
+-- Name: document_views Users can insert own document_views; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+
+
+--
 -- Name: code_executions Users can insert own executions; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -1931,6 +2306,13 @@ CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR I
 --
 
 CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
+-- Name: metadata_field_definitions Users can insert own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
 
 
 --
@@ -2025,6 +2407,27 @@ CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT USI
 
 
 --
+-- Name: classification_rules Users can update own classification_rules; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+
+
+--
+-- Name: document_relationships Users can update own document_relationships; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own document_relationships" ON public.document_relationships FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+
+
+--
+-- Name: document_views Users can update own document_views; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+
+
+--
 -- Name: folders Users can update own folders; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2036,6 +2439,13 @@ CREATE POLICY "Users can update own folders" ON public.folders FOR UPDATE USING 
 --
 
 CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: metadata_field_definitions Users can update own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
 
 
 --
@@ -2097,10 +2507,31 @@ CREATE POLICY "Users can view files on own or global skills" ON public.skill_fil
 
 
 --
+-- Name: classification_rules Users can view own and global classification_rules; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+
+
+--
+-- Name: document_views Users can view own and global document_views; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+
+
+--
 -- Name: folders Users can view own and global folders; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT USING (((auth.uid() = user_id) OR public.folder_is_globally_visible(id)));
+
+
+--
+-- Name: metadata_field_definitions Users can view own and global metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
 
 
 --
@@ -2115,6 +2546,13 @@ CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT
 --
 
 CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT USING (((auth.uid() = created_by) OR (is_global = true)));
+
+
+--
+-- Name: document_relationships Users can view own document_relationships; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own document_relationships" ON public.document_relationships FOR SELECT USING ((auth.uid() = user_id));
 
 
 --
@@ -2180,6 +2618,12 @@ CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT US
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: classification_rules; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.classification_rules ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: code_executions; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2198,10 +2642,22 @@ ALTER TABLE public.document_chunks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_images ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: document_relationships; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_relationships ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: document_tables; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.document_tables ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_views; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_views ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: documents; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2232,6 +2688,12 @@ ALTER TABLE public.message_feedback ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: metadata_field_definitions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.metadata_field_definitions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: model_capabilities_overrides; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2521,5 +2983,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Hxai5hYkTmiUGgGRDbe3kazNzgI4frQwk1sIobUAumsAKbR7tdfRi2zJT3WWadU
+\unrestrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 

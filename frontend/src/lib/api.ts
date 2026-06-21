@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1544,6 +1544,11 @@ export interface FullAppSettings {
   embedding_base_url: string
   embedding_dimensions: number
   embedding_has_api_key: boolean
+  // Phase 111.1 — the stored provider the picker reads back to show the current
+  // selection (routes by stored provider, never name-inference — D-06 / D-09).
+  embedding_provider: string
+  extraction_provider: string
+  extraction_model: string
   rerank_enabled: boolean
   rerank_provider: string
   rerank_model: string
@@ -1592,6 +1597,15 @@ export interface SettingsUpdate {
   embedding_api_key?: string
   embedding_base_url?: string
   embedding_dimensions?: number
+  // Phase 111.1 — explicit provider pinning (D-06 embedding / D-09 extraction).
+  // The picker stores the preset key so the backend routes by it. `extraction_model`
+  // travels with the picker default; the backend persists `extraction_provider`
+  // through the contract today (the model is stored via app_settings).
+  embedding_provider?: string
+  extraction_provider?: string
+  extraction_model?: string
+  confidence_bucket_high?: number
+  confidence_bucket_medium?: number
   rerank_enabled?: boolean
   rerank_provider?: string
   rerank_api_key?: string
@@ -1640,6 +1654,34 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     throw new Error("Failed to save settings")
   }
   return res.json() as Promise<FullAppSettings>
+}
+
+// Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
+// live from document_chunks on every fetch (the source of truth — reconcile-on-fetch,
+// D-v2.5-03); `status` is a cosmetic hint reconciled against the counts (counts win).
+export interface ReembedProgress {
+  status: "idle" | "running" | "partial" | "complete" | "failed"
+  total: number | null
+  re_embedded: number | null
+  remaining: number | null
+  model: string | null
+  updated_at: number | null
+}
+
+/** GET /settings/reembed-progress — reconcile-on-fetch progress for the status card. */
+export async function getReembedProgress(): Promise<ReembedProgress> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/reembed-progress`, { headers, cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to get re-embed progress")
+  return res.json() as Promise<ReembedProgress>
+}
+
+/** POST /settings/reembed — manual "Re-embed now" re-kick of a failed/partial run. */
+export async function kickReembed(): Promise<ReembedProgress> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/reembed`, { method: "POST", headers })
+  if (!res.ok) throw new Error("Failed to start re-embed")
+  return res.json() as Promise<ReembedProgress>
 }
 
 export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
@@ -1926,6 +1968,67 @@ export async function getRetrievalTrend(days = 30): Promise<RetrievalTrendPoint[
   return res.json() as Promise<RetrievalTrendPoint[]>
 }
 
+// ── Phase 119 (DGOV-01/02) — Document Governance Health ──────────────────────
+// Three read-only fetch helpers wrapping the Plan-01 `document_governance` router
+// (`backend/app/api/document_governance.py`). Each mirrors the knowledge-health
+// helpers above verbatim — getAuthHeaders() + throw-on-non-ok — and returns the
+// shared `{items, total, offset, limit}` PaginatedResponse shape the 3 stacked
+// Governance cards consume. Read-only / owner-scoped server-side; no write path.
+
+/** A broken-relationship row (D-119-3). `readable_doc_id` (aliased `document_id`)
+ *  is the OPENABLE end of a dangling edge — it MAY be null when both ends are
+ *  gone, so the row link-out must guard the click. The broken end can't be opened. */
+export interface GovBrokenItem {
+  relationship_id: string
+  rel_type: string
+  broken_doc_id: string
+  /** The openable end (the broken end's surviving counterpart). Null when both ends are gone. */
+  readable_doc_id: string | null
+  /** Alias of `readable_doc_id` — the doc the row navigates to. Null guards the link-out. */
+  document_id: string | null
+}
+
+/** An unclassified-document row (D-119-4) — a doc with a pending
+ *  `_classification.status == "suggested"`. */
+export interface GovUnclassifiedItem {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  suggested_folder_name?: string | null
+}
+
+/** A low-confidence-metadata row (D-119-5) — a doc with any extracted field whose
+ *  `_confidence[field] < 0.5`. `min_confidence` is the worst field's RAW score
+ *  (rendered honestly via the 112 ConfidenceChip, never fabricated). */
+export interface GovLowConfidenceItem {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  low_fields: Record<string, number>
+  min_confidence: number
+}
+
+export async function getGovBroken(offset = 0, limit = 20): Promise<PaginatedResponse<GovBrokenItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/broken-relationships?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load broken relationships")
+  return res.json() as Promise<PaginatedResponse<GovBrokenItem>>
+}
+
+export async function getGovUnclassified(offset = 0, limit = 20): Promise<PaginatedResponse<GovUnclassifiedItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/unclassified?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load unclassified documents")
+  return res.json() as Promise<PaginatedResponse<GovUnclassifiedItem>>
+}
+
+export async function getGovLowConfidence(offset = 0, limit = 20): Promise<PaginatedResponse<GovLowConfidenceItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/low-confidence?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load low-confidence metadata")
+  return res.json() as Promise<PaginatedResponse<GovLowConfidenceItem>>
+}
+
 export async function moveDocument(id: string, folderId: string | null): Promise<Document> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${id}/move`, {
@@ -1944,6 +2047,350 @@ export async function reingestDocument(id: string): Promise<Document> {
     headers,
   })
   if (!res.ok) throw new Error("Failed to reingest document")
+  return res.json() as Promise<Document>
+}
+
+/** Phase 112 (META-02) — manual single-field metadata edit. Clones the
+ *  `moveDocument` PATCH shape. The body is `{ field, value }` ONLY — the client
+ *  MUST NOT send `source`: the server hard-stamps provenance (`_source='user'`)
+ *  so the client can never assert it (T-112-03-02). Returns the updated Document;
+ *  the panel reconciles by calling `loadDocuments()` after a 200. */
+export async function updateDocumentMetadata(id: string, field: string, value: unknown): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/metadata`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ field, value }),
+  })
+  if (!res.ok) throw new Error("Failed to update metadata")
+  return res.json() as Promise<Document>
+}
+
+/** Phase 112 (META-02) — the caller's own + global metadata field definitions.
+ *  Thin consumer of the already-secured `GET /metadata-fields` (own-or-global
+ *  scoping enforced server-side, T-112-03-03). The panel renders the union of
+ *  built-in fields + enabled custom defs. */
+export async function listMetadataFields(): Promise<MetadataFieldDef[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/metadata-fields`, { headers })
+  if (!res.ok) throw new Error("Failed to load metadata fields")
+  return res.json() as Promise<MetadataFieldDef[]>
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 114 (VIEW-03 / UX-01) — saved-view ("virtual folder") CRUD + count.
+//
+// Thin consumers of the already-leak-safe document-views router (Plans 02/03):
+//   POST   /document-views                       create a named saved view
+//   GET    /document-views                       list own + global views
+//   DELETE /document-views/{id}                  delete an owned view
+//   GET    /document-views/{id}/resolve?count_only=true   → {total: N}
+//   GET    /document-views/{id}/resolve                    → {documents, total}
+//
+// The client ONLY assembles the `filter_expr` AST — ALL field-whitelist
+// validation + value binding happens server-side (T-114-05-01: the client is not
+// a trust boundary). Mirrors the `listMetadataFields` fetch-wrapper conventions.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /document-views — persist the current filter as a named saved view
+ *  (D-114-1: Save-as-view just persists what you're looking at). The server
+ *  hard-sets `is_global=false` (the body never supplies it). Returns the new
+ *  `SavedView`. */
+export async function createView(
+  name: string,
+  filter_expr: ViewFilter,
+  folder_scope?: string | null,
+): Promise<SavedView> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name,
+      filter_expr,
+      ...(folder_scope ? { folder_scope } : {}),
+    }),
+  })
+  if (!res.ok) throw new Error("Failed to save view")
+  return res.json() as Promise<SavedView>
+}
+
+/** PATCH /document-views/{id} — update an OWNED saved view in place (the
+ *  `ViewUpdate` body shape: every field optional, the backend applies only the
+ *  keys present via `exclude_none=True`). Used by the FilterBar's edit-on-save
+ *  path (D-114-3): after "Edit view" a Save PATCHes the SAME row instead of
+ *  POSTing a new one. Mirrors `createView`'s auth-header + fetch shape; the
+ *  backend re-runs whitelist validation when `filter_expr` is present and
+ *  returns the updated view. 404 on a cross-user / absent id (never 403). */
+export async function updateView(
+  id: string,
+  body: { name?: string; filter_expr?: ViewFilter; folder_scope?: string | null },
+): Promise<SavedView> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update view")
+  return res.json() as Promise<SavedView>
+}
+
+/** GET /document-views — the caller's own + global saved views (leak-safe
+ *  server-side, Phase 113). Selecting one loads its `filter_expr` back into the
+ *  filter bar (D-114-1). */
+export async function listViews(): Promise<SavedView[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views`, { headers })
+  if (!res.ok) throw new Error("Failed to list views")
+  return res.json() as Promise<SavedView[]>
+}
+
+/** DELETE /document-views/{id} — remove an owned view (204; 404 on a cross-user
+ *  miss, never 403 — D-113-4). Idempotent from the UI's perspective. */
+export async function deleteView(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete view")
+}
+
+/** GET /document-views/{id}/resolve — resolve a SAVED view. `count_only` returns
+ *  just `{total: N}` (the live builder count + per-view sidebar badges, D-114-15);
+ *  the full resolve returns `{documents, total}`. The returned `documents` are
+ *  plain rows (no response_model) so `_source`/`_confidence` survive (112 CR-01). */
+export async function resolveView(
+  id: string,
+  opts: { count_only?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number }> {
+  const headers = await getAuthHeaders()
+  const qs = opts.count_only ? "?count_only=true" : ""
+  const res = await fetch(`${API_BASE}/document-views/${id}/resolve${qs}`, { headers })
+  if (!res.ok) throw new Error("Failed to resolve view")
+  return res.json() as Promise<{ documents?: Document[]; total: number }>
+}
+
+/** POST /document-views/resolve — STATELESS ad-hoc resolve/count for an UNSAVED
+ *  filter (114 CR-01). Carries the `filter_expr` AST inline; the backend runs the
+ *  SAME caller-scoped own+global two-leg resolve as the saved-view route but writes
+ *  NO `document_views` row and NO audit entry — so it is safe to call on every
+ *  debounced keystroke. `count_only` returns `{total}`; otherwise `{documents,
+ *  total}` (plain rows so `_source`/`_confidence` survive, 112 CR-01).
+ *
+ *  This REPLACES the old `createView → resolve → deleteView` dance, which fired a
+ *  `view.create` governance-audit row per keystroke that was never cleaned up
+ *  (audit-log pollution) and double-round-tripped (the page + the bar each ran
+ *  their own transient cycle). */
+export async function resolveAdHoc(
+  filter_expr: ViewFilter,
+  opts: { count_only?: boolean } = {},
+): Promise<{ documents?: Document[]; total: number }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-views/resolve`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ filter_expr, count_only: opts.count_only ?? false }),
+  })
+  if (!res.ok) throw new Error("Failed to resolve filter")
+  return res.json() as Promise<{ documents?: Document[]; total: number }>
+}
+
+/** Live "N documents match" count for an AD-HOC (unsaved) filter (D-114-2).
+ *  Thin count-only wrapper over the stateless `resolveAdHoc` endpoint (114 CR-01) —
+ *  NO transient view, NO audit pollution. An empty filter (`conditions: []`) is "no
+ *  narrowing" and needs no round-trip — the caller short-circuits before calling. */
+export async function resolveFilterCount(filter_expr: ViewFilter): Promise<number> {
+  const { total } = await resolveAdHoc(filter_expr, { count_only: true })
+  return total
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 117 (REL-02 / UX-01) — document-relationships read + create + remove.
+//
+// Thin consumers of the leak-safe relationship router:
+//   GET    /document-relationships?document_id={id}   read outgoing + incoming
+//                                                      links (the net-new Plan 02
+//                                                      read seam) → RelatedDocumentsResponse
+//   POST   /document-relationships                     create an OUTGOING link
+//                                                      (visible-both gate server-side)
+//   DELETE /document-relationships/{id}                remove an owned link (204;
+//                                                      404-tolerant own-scoped delete)
+//
+// The client is NOT a trust boundary — the per-viewer readability re-check + the
+// visible-both create gate are enforced server-side. A masked row arrives with
+// `document_id: null` (D-117-8); the client never sees the hidden id/title. Mirrors
+// the `document-views` family fetch-wrapper conventions (getAuthHeaders + throw-on-
+// non-ok + the 404-tolerant DELETE).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /document-relationships?document_id= — a document's outgoing + incoming
+ *  typed links (the Plan 02 read seam). Returns the plain dict the panel renders
+ *  (subject + total + rows); a row's `document_id` is null for a masked "no access"
+ *  endpoint (D-117-8). 404 on an unreadable/unknown subject → throws (the section
+ *  renders its honest error state, distinct from empty — D-117-10). */
+export async function listRelationships(documentId: string): Promise<RelatedDocumentsResponse> {
+  const headers = await getAuthHeaders()
+  // encodeURIComponent the id (IN-02, folded into WR-01): doc ids are UUIDs today so
+  // this is safe in practice, but defensive URL construction keeps a non-UUID/whitespace
+  // value from corrupting the query (and pairs with the route's uniform-404 hardening).
+  const res = await fetch(
+    `${API_BASE}/document-relationships?document_id=${encodeURIComponent(documentId)}`,
+    { headers },
+  )
+  if (!res.ok) throw new Error("Failed to load relationships")
+  return res.json() as Promise<RelatedDocumentsResponse>
+}
+
+/** POST /document-relationships — create an OUTGOING link from the open document
+ *  (D-117-1: outgoing-only authoring). Body is `{ source_doc_id, target_doc_id,
+ *  rel_type }` EXACTLY (mirrors `RelationshipCreate`). The server runs the
+ *  visible-both gate + self-link guard; a non-ok (422 = unseeable endpoint /
+ *  self-link / forged type, uniform) throws. Idempotent server-side (D-116-6).
+ *  Returns the persisted `Relationship` (the POST 201 body).
+ *
+ *  Throws an `ApiError` carrying `res.status` (WR-03): a 422 is a PERMANENT
+ *  rejection (self-link / unseeable / forged type — uniform server-side, never
+ *  succeeds on retry), so the caller can render a non-retry-implying message and
+ *  reserve "try again" for network/5xx. */
+export async function createRelationship(
+  source_doc_id: string,
+  target_doc_id: string,
+  rel_type: RelType,
+): Promise<Relationship> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-relationships`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ source_doc_id, target_doc_id, rel_type }),
+  })
+  if (!res.ok) throw new ApiError("Failed to create link", res.status)
+  return res.json() as Promise<Relationship>
+}
+
+/** DELETE /document-relationships/{id} — remove an owned link (204; either
+ *  direction — D-117-2). Own-scoped server-side, so a cross-user/absent id is a
+ *  uniform 404 → treated as a no-op (404-tolerant, the `deleteView` pattern):
+ *  the link is gone either way, so a 404 is not an error from the UI's view. */
+export async function deleteRelationship(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-relationships/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to remove link")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 118 (CLASS-01 / CLASS-03) — classification-rule CRUD + accept/dismiss.
+//
+// Thin consumers of the leak-safe classification-rules router (Plans 02/03):
+//   GET    /classification-rules                          list own + global rules
+//   POST   /classification-rules                          create a rule (is_global server-owned)
+//   PATCH  /classification-rules/{id}                      update an owned rule (incl. the enabled toggle)
+//   DELETE /classification-rules/{id}                      delete an owned rule (204; 404-tolerant)
+//   PATCH  /documents/{id}/classification/accept           accept the suggestion (moves + stamps prior_folder_id)
+//   PATCH  /documents/{id}/classification/dismiss          dismiss the suggestion (clears _classification; no move)
+//
+// The client is NOT a trust boundary — the `match_expr` whitelist validation, the
+// `is_global` hard-set, the own+global leak-safe reads, and the accept-move folder
+// re-check are all enforced server-side. The builder's "would match N" live count
+// REUSES the existing `resolveAdHoc`/`resolveFilterCount` (a rule's `match_expr` is
+// the SAME `ViewFilter` AST) — NO new count fn, NO new backend endpoint. Undo reuses
+// the existing `moveDocument(id, prior_folder_id)` — reversible by construction
+// (D-118-6). Mirrors the `document-views` family fetch-wrapper conventions
+// (getAuthHeaders + throw-on-non-ok + the 404-tolerant DELETE).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /classification-rules — the caller's own + global classification rules
+ *  (leak-safe server-side, the `.or_()` own+global predicate). The Automation
+ *  sidebar group + the rules page render these. */
+export async function listRules(): Promise<ClassificationRule[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules`, { headers })
+  if (!res.ok) throw new Error("Failed to list rules")
+  return res.json() as Promise<ClassificationRule[]>
+}
+
+/** POST /classification-rules — create a named rule. The body is
+ *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_global`
+ *  (the server hard-sets it false; mirrors `createView`, T-118-04-01). The server
+ *  re-runs the `match_expr` whitelist + operand validation (the client is not a
+ *  trust boundary). Returns the new `ClassificationRule`. */
+export async function createRule(
+  name: string,
+  match_expr: ViewFilter,
+  suggest_folder_id: string | null,
+): Promise<ClassificationRule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name, match_expr, suggest_folder_id }),
+  })
+  if (!res.ok) throw new Error("Failed to create rule")
+  return res.json() as Promise<ClassificationRule>
+}
+
+/** PATCH /classification-rules/{id} — update an OWNED rule in place (the
+ *  `RuleUpdate` body: every field optional, the backend applies only the keys
+ *  present). The `enabled` toggle rides THIS path — no separate endpoint. The
+ *  backend re-runs whitelist validation when `match_expr` is present and returns
+ *  the updated rule. 404 on a cross-user / absent id (never 403). */
+export async function updateRule(
+  id: string,
+  body: { name?: string; match_expr?: ViewFilter; suggest_folder_id?: string | null; enabled?: boolean },
+): Promise<ClassificationRule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update rule")
+  return res.json() as Promise<ClassificationRule>
+}
+
+/** DELETE /classification-rules/{id} — remove an owned rule (204; 404 on a
+ *  cross-user miss, never 403). Idempotent from the UI's perspective (the
+ *  `deleteView` 404-tolerant pattern). */
+export async function deleteRule(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete rule")
+}
+
+/** PATCH /documents/{id}/classification/accept — accept the doc's active
+ *  classification suggestion. The server moves the doc to the suggested folder,
+ *  stamps `prior_folder_id` (the Undo target, D-118-6), flips the suggestion
+ *  `status` to `"accepted"`, and writes the `classification.apply` audit AFTER
+ *  the move succeeds. Returns the updated Document; the section reconciles by
+ *  re-fetching (not optimistic). Undo = `moveDocument(id, prior_folder_id)`. */
+export async function acceptClassification(docId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${docId}/classification/accept`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to accept classification")
+  return res.json() as Promise<Document>
+}
+
+/** PATCH /documents/{id}/classification/dismiss — dismiss the doc's active
+ *  classification suggestion. The server clears `_classification` from the doc's
+ *  metadata; NO move, NO audit. Returns the updated Document; the section
+ *  reconciles by re-fetching (not optimistic). */
+export async function dismissClassification(docId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${docId}/classification/dismiss`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to dismiss classification")
   return res.json() as Promise<Document>
 }
 

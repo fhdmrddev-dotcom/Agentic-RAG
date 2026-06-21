@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 022 — Workflow Run in Thread (re-architected)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 022 — Workflow Run in Thread  (RE-ARCHITECTED per 022-RUN-SURFACE-AUDIT.md)
+   Q: When a workflow runs in a thread, can you chat — AND how is the run
+      made meaningful + consistent with the app's panel/tool surface?
+
+   AUDIT FIX (PARTIAL-ALIGN → ALIGN):
+   • The PANEL owns the live 6-phase MEANINGFUL spine (mirrors the real
+     WorkspacePanel "Workflow" section + 008-D PhaseTimeline / PhaseCard).
+     The panel stays VISIBLE during the run.
+   • The CHAT run-frame is now a THIN bracket/receipt: a mode badge + the
+     015-C never-vanishes status strip that RESOLVES into the deliverable
+     receipt (009-C live-status→resolves; 007-C live-pointer/reload-resolved).
+     NO full embedded 6-row timeline in chat → kills the third-run-frame /
+     dual-surface bounce (sketch 004's warning).
+   • Meaningful step = human TITLE (NET-NEW wire: phase.name) + type·ordinal
+     + a RUNNING-phase-ONLY honest activity line (relaxes D-03 for the active
+     phase only — operator-approved) + a gate chip WHEN a validator exists.
+   • Composer A (locked-in-thread) is the WINNER. Variants now differ ONLY in
+     composer-during-a-run behavior over the SHARED meaningful run surface.
+
+   HONESTY: every NET-NEW wire field is flagged in-surface (★N). Real-now
+   fields (slug, phase_type live, status, the ask pause) are unmarked.
+   Concrete example (018–021): the published 'Vendor-risk portfolio review'.
+   ─────────────────────────────────────────────────────────────── */
+
+/* local sketch tokens — derived once so on-bright ink + soft tints aren't re-invented inline.
+   The base theme ships danger/warning -dim (.15) + -glow (.35) but no .4-alpha EDGE tint — the
+   recurring terminal/border tint — so derive it once here instead of open-coding hsl() literals. */
+:root {
+  --on-bright-ink: hsl(240 60% 8%);
+  --color-danger-edge: hsl(0 72% 51% / .4);
+  --color-warning-edge: hsl(38 92% 60% / .4);
+}
+
+body { padding-top: 52px; }
+
+/* ── App shell (nav rail | chat | panel) — mirrors ChatLayout grid ── */
+.shell { display: grid; grid-template-columns: 52px 1fr clamp(330px, 34%, 440px); height: calc(100vh - 52px); overflow: hidden; }
+.nav-rail { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-2); }
+.nav-rail .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); margin-bottom: var(--space-3); }
+.nav-rail .nav-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); cursor: pointer; position: relative; transition: all var(--dur-fast) var(--ease-out); }
+.nav-rail .nav-ico:hover { background: var(--color-accent); color: var(--color-text); }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+/* parallel-thread escape hatch (variant A) — a second thread with an unread dot */
+.nav-rail .nav-ico .thread-dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-bg-elev1); }
+.nav-rail .nav-ico.running-mark { color: var(--color-warning); }
+.nav-rail .nav-ico.running-mark::after { content: ''; position: absolute; bottom: 4px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 0 2px var(--color-bg-elev1); animation: pulseGlow 1.6s infinite; }
+/* collapse-to-rail affordance (panel) — the 52px stub */
+.panel-rail { width: 52px; background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: none; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-3); }
+.panel-rail .pr-ico { width: 34px; height: 34px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); cursor: pointer; position: relative; }
+.panel-rail .pr-ico:hover { background: var(--color-accent); color: var(--color-text); }
+.panel-rail .pr-ico.live { color: var(--color-warning); }
+.panel-rail .pr-badge { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: var(--radius-full); background: var(--color-warning); color: var(--on-bright-ink); font-size: 9px; font-weight: 700; font-family: var(--font-mono); display: grid; place-items: center; }
+
+/* ── Chat column ── */
+.chat { display: flex; flex-direction: column; background: var(--color-bg); overflow: hidden; }
+.chat-scroll { flex: 1; overflow-y: auto; padding: var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-4); }
+.chat-head { color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: var(--space-2); }
+.chat-head .mode-tag { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: var(--radius-full); }
+.chat-head .mode-tag.harness { color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); }
+.chat-head .mode-tag.deep { color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+
+.bubble-user { align-self: flex-end; max-width: 78%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); font-size: var(--text-sm); line-height: 1.5; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.answer { display: flex; gap: var(--space-3); animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+.answer .bot { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; }
+.answer .body { font-size: var(--text-sm); line-height: 1.6; }
+.answer .body .cite { font-family: var(--font-mono); font-size: 10px; color: var(--color-primary); background: var(--color-primary-dim); padding: 0 5px; border-radius: var(--radius-sm); }
+
+/* ── THE THIN CHAT RECEIPT (009-C live-status → resolves; 007-C live-pointer/reload-resolved) ──
+   This REPLACES 022's old embedded 6-row .run-frame timeline. It is a bracket:
+   a mode badge + the 015-C never-vanishes status strip, pointing AT the panel
+   while live, RESOLVING into a deliverable receipt at a true terminal. 3-sec read. */
+.receipt-bracket { border-radius: var(--radius-md); border: 1px solid var(--color-warning); background: var(--color-warning-dim); padding: var(--space-3) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); max-width: 94%; animation: fadeSlideUp var(--dur-slow) var(--ease-out); cursor: pointer; }
+.receipt-bracket.is-done { border-color: hsl(142 71% 45% / .55); background: var(--color-surface); border-left: 3px solid var(--color-success); }
+.receipt-bracket.is-failed { border-color: hsl(0 72% 51% / .5); background: var(--color-surface); border-left: 3px solid var(--color-danger); }
+.receipt-bracket.is-cancelled { border-color: hsl(38 92% 60% / .5); background: var(--color-surface); border-left: 3px solid var(--color-warning); }
+.receipt-bracket.is-paused { border-color: var(--color-warning); }
+.rb-line { display: flex; align-items: center; gap: var(--space-2); }
+.rb-line .mode-badge { font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: var(--radius-full); color: var(--color-warning); background: hsl(38 92% 60% / .18); border: 1px solid hsl(38 92% 60% / .35); flex: none; }
+.receipt-bracket.is-done .mode-badge { color: var(--color-success); background: var(--color-success-dim); border-color: hsl(142 71% 45% / .35); }
+.rb-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); color: var(--color-text); }
+.rb-open { margin-left: auto; font-size: var(--text-xs); color: var(--color-primary); white-space: nowrap; flex: none; }
+.rb-open:hover { text-decoration: underline; }
+
+/* the NEVER-VANISHES status strip (015-C) — elapsed from a stable start-ts, freezes only on a true terminal.
+   Carries ▶ name · status · phase i/N · <activity> as ONE honest line. */
+.status-strip { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: var(--text-xs); background: hsl(220 30% 11% / .85); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 4px; color: var(--color-text-muted); white-space: nowrap; max-width: 100%; overflow: hidden; }
+.status-strip .seg { padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.status-strip .seg.time { color: var(--color-text); flex: none; }
+.status-strip .seg.time::before { content: '⏱'; }
+.status-strip .divider { width: 1px; height: 12px; background: var(--color-border); flex: none; }
+.status-strip .seg.act { color: var(--color-warning); overflow: hidden; text-overflow: ellipsis; }
+.status-strip .seg.act .play { flex: none; }
+.status-strip .seg.act .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: dotBounce 1.4s ease-in-out infinite; flex: none; }
+.status-strip.paused { border-color: hsl(38 92% 60% / .4); }
+.status-strip.paused .seg.act { color: var(--color-warning); } .status-strip.paused .seg.act .dot { animation: none; }
+.status-strip.done { color: var(--color-success); border-color: hsl(142 71% 45% / .35); }
+.status-strip.done .seg.act { color: var(--color-success); } .status-strip.done .seg.act .dot { animation: none; }
+.status-strip.failed { color: var(--color-danger); border-color: hsl(0 72% 51% / .35); }
+.status-strip.failed .seg.act { color: var(--color-danger); }
+.status-strip.cancelled { color: var(--color-warning); border-color: hsl(38 92% 60% / .35); }
+.status-strip.cancelled .seg.act { color: var(--color-warning); }
+
+/* deliverable / FILES receipt (the resolved terminal — replaces the live strip) */
+.deliverable { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); }
+.deliverable:hover { border-color: var(--color-primary-glow); }
+.deliverable .file-ic { width: 34px; height: 34px; border-radius: var(--radius-sm); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); display: grid; place-items: center; font-size: 16px; flex: none; }
+.deliverable .d-main { flex: 1; min-width: 0; }
+.deliverable .d-name { font-weight: 600; font-size: var(--text-sm); }
+.deliverable .d-meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.deliverable .d-open { font-size: var(--text-xs); color: var(--color-primary); border: 1px solid var(--color-primary-glow); background: var(--color-primary-dim); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; flex: none; }
+.deliverable .d-open:hover { background: var(--color-primary-glow); }
+
+/* ── the ask_user PAUSE card (006-C scoped question, lives in the transcript) ── */
+.ask { border: 1px solid var(--color-warning); background: var(--color-warning-dim); border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+.ask .qlbl { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--color-warning); font-family: var(--font-mono); display: flex; align-items: center; gap: 6px; }
+.ask .qlbl .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.4s ease-in-out infinite; }
+.ask .qlbl .clock { margin-left: auto; color: var(--color-text-dim); }
+.ask .qtext { font-size: var(--text-base); color: var(--color-text); line-height: 1.5; }
+.ask .qctx { font-size: var(--text-xs); color: var(--color-text-muted); }
+.ask .opts { display: flex; flex-direction: column; gap: 6px; }
+.ask .opt { text-align: left; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 12px; font-size: var(--text-sm); color: var(--color-text); cursor: pointer; transition: all var(--dur-fast); }
+.ask .opt:hover { border-color: var(--color-warning); background: var(--color-warning-dim); }
+.ask .opt.sel { border-color: var(--color-warning); background: var(--color-warning); color: var(--on-bright-ink); font-weight: 600; }
+.ask .opt .o-glyph { margin-right: 6px; }
+.ask.answered { border-color: var(--color-success); background: var(--color-success-dim); }
+.ask.answered .qlbl { color: var(--color-success); }
+.ask.answered .qlbl .pip { background: var(--color-success); animation: none; }
+.answered-row { font-size: var(--text-sm); color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+.answered-row .you { color: var(--color-success); font-weight: 600; }
+
+/* ── composer dock ── */
+.composer-dock { border-top: 1px solid var(--color-border); background: var(--color-bg-elev1); padding: var(--space-3) var(--space-4) var(--space-4); }
+
+/* locked composer = status chip + Cancel (011-A) */
+.runchip { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-2); border-radius: var(--radius-md); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / .35); font-size: var(--text-sm); }
+.runchip .rc-ico { color: var(--color-warning); animation: brandPulse 1.5s infinite; }
+.runchip .rc-name { color: var(--color-text); font-weight: 500; }
+.runchip .rc-phase { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.runchip .spacer { flex: 1; }
+.runchip .cancel { font-size: var(--text-xs); color: var(--color-danger); cursor: pointer; padding: 4px 9px; border-radius: var(--radius-sm); border: 1px solid hsl(0 72% 51% / .35); transition: all var(--dur-fast); }
+.runchip .cancel:hover { background: var(--color-danger-dim); }
+.runchip.paused { background: var(--color-warning-dim); border-color: var(--color-warning); }
+
+/* scoped-reply composer (during a pause, the composer accepts ONLY the answer) */
+.scoped-wrap { border: 1px solid var(--color-warning); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-3); }
+.scoped-wrap .scope-label { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--color-warning); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.scoped-wrap .scope-row { display: flex; gap: var(--space-2); }
+.scoped-wrap .scope-row input { flex: 1; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 11px; color: var(--color-text); font-size: var(--text-sm); font-family: var(--font-sans); }
+.scoped-wrap .scope-row input:focus { outline: none; border-color: var(--color-warning); }
+.scoped-wrap .scope-row .send { background: var(--color-warning); color: var(--on-bright-ink); border: none; border-radius: var(--radius-sm); padding: 8px 14px; font-weight: 700; font-size: var(--text-sm); cursor: pointer; }
+.scoped-wrap .scope-mini { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.scoped-wrap .scope-mini button { font-size: var(--text-xs); padding: 4px 10px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-bg-elev1); color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast); }
+.scoped-wrap .scope-mini button:hover { border-color: var(--color-warning); color: var(--color-text); }
+.scoped-wrap .scope-mini button.proceed { color: var(--color-success); border-color: hsl(142 71% 45% / .4); }
+.scoped-wrap .scope-mini button.abort { color: var(--color-danger); border-color: hsl(0 72% 51% / .4); }
+
+/* normal (Deep) composer — resting + after */
+.ta-wrap { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-3); transition: border-color var(--dur-fast); }
+.ta-wrap.focus { border-color: var(--color-primary-glow); }
+.ta-wrap.disabled { opacity: .55; }
+.ta { width: 100%; background: transparent; border: none; outline: none; color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: none; min-height: 22px; }
+.ta::placeholder { color: var(--color-text-dim); }
+.pill-row { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 5px var(--space-3); border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-bg-elev1); color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast); }
+.pill:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+.pill.disabled { opacity: .4; cursor: not-allowed; }
+.pill .ic { font-family: var(--font-mono); opacity: .8; }
+.pill .grp { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); }
+.pill-row .spacer { flex: 1; }
+.send-btn { width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--color-primary); color: var(--on-bright-ink); border: none; display: grid; place-items: center; cursor: pointer; font-size: 15px; transition: all var(--dur-fast); }
+.send-btn:hover { box-shadow: var(--shadow-glow-primary); }
+.send-btn.disabled { background: var(--color-muted); color: var(--color-text-dim); cursor: not-allowed; box-shadow: none; }
+
+/* escape-hatch hint (variant A) */
+.escape-hint { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--color-text-dim); margin-top: var(--space-2); padding: 6px var(--space-2); }
+.escape-hint .eh-ic { color: var(--color-primary); }
+.escape-hint b { color: var(--color-text-muted); }
+.escape-hint .eh-link { color: var(--color-primary); cursor: pointer; text-decoration: underline; text-decoration-style: dotted; }
+
+/* live-alongside composer (variant B) */
+.alongside-caveat { display: flex; align-items: flex-start; gap: 7px; font-size: var(--text-xs); color: var(--color-warning); margin-top: var(--space-2); padding: 7px var(--space-3); border-radius: var(--radius-sm); background: var(--color-warning-dim); border: 1px dashed hsl(38 92% 60% / .4); line-height: 1.45; }
+.alongside-caveat .ac-ic { color: var(--color-warning); flex: none; }
+
+/* ── REJECTED full-screen run view (variant C) ── */
+.runview { grid-column: 2 / 4; display: flex; flex-direction: column; background: var(--color-bg); overflow: hidden; }
+.runview-top { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); background: hsl(220 30% 8% / .96); }
+.runview-top .back { font-size: var(--text-xs); color: var(--color-text-muted); cursor: pointer; padding: 5px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.runview-top .back:hover { background: var(--color-accent); color: var(--color-text); }
+.runview-top .rv-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.runview-top .rv-sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+.rejected-banner { display: flex; align-items: center; gap: 8px; padding: 8px var(--space-6); background: var(--color-danger-dim); border-bottom: 1px solid hsl(0 72% 51% / .4); font-size: var(--text-xs); color: var(--color-danger); font-family: var(--font-mono); }
+.rejected-banner b { color: var(--color-danger); }
+.runview-body { flex: 1; overflow-y: auto; padding: var(--space-6); display: grid; grid-template-columns: 1fr clamp(260px, 32%, 360px); gap: var(--space-6); align-items: start; }
+.runview-main { min-width: 0; }
+.runview-side { position: sticky; top: 0; }
+.ci-panel { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-4); margin-bottom: var(--space-4); }
+.ci-panel .cip-h { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .07em; color: var(--color-text-dim); margin-bottom: var(--space-3); }
+.tradeoff-card { border: 1px dashed hsl(0 72% 51% / .4); background: var(--color-danger-dim); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-xs); color: var(--color-danger); line-height: 1.55; }
+.tradeoff-card .tc-h { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-danger); margin-bottom: 6px; }
+.tradeoff-card ul { margin: 0; padding-left: 16px; }
+.tradeoff-card li { margin-bottom: 4px; }
+
+/* ── PANEL (right rail) — owns the MEANINGFUL spine ── */
+.panel { background: hsl(220 40% 8%); border-left: 1px solid hsl(220 25% 24%); display: flex; flex-direction: column; overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.panel-head .ph-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: pulseGlow 1.6s infinite; }
+.panel-head .head-tag { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-warning); }
+.panel-head .head-tag.done { color: var(--color-success); }
+.panel-head .collapse-btn { color: var(--color-text-dim); cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: var(--radius-sm); }
+.panel-head .collapse-btn:hover { background: var(--color-accent); color: var(--color-text); }
+.panel-body { flex: 1; overflow-y: auto; padding: var(--space-4); }
+
+/* the WorkspacePanel section accordion (Workflow / Files) — 004-B stacked accordion */
+.panel-sec { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: hsl(220 30% 7% / .5); margin-bottom: var(--space-3); overflow: hidden; }
+.panel-sec > .ps-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); cursor: pointer; }
+.panel-sec > .ps-head:hover { background: var(--color-surface-hi); }
+.panel-sec .ps-h { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--color-text-dim); font-family: var(--font-mono); }
+.panel-sec .ps-count { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.panel-sec .ps-body { padding: var(--space-3); border-top: 1px solid var(--color-border-soft); }
+
+/* run banner inside the Workflow section (008-D D7) — mode + meta + honest phase ordinal, never a % */
+.run-banner { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+.run-banner .wf-name { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.run-banner .wf-meta { font-size: var(--text-xs); color: var(--color-text-dim); }
+.run-banner .count-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: var(--space-2); }
+.run-banner .chip { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border-radius: var(--radius-full); background: var(--color-muted); color: var(--color-text-muted); border: 1px solid var(--color-border-soft); }
+.run-banner .chip.primary { color: var(--color-warning); background: var(--color-warning-dim); border-color: hsl(38 92% 60% / .35); }
+
+/* ── the 008-D phase spine — cards on a connector, status-colored ── */
+.tlD { list-style: none; margin: 0; padding: 0; }
+.tlD > li { position: relative; padding-left: 30px; padding-bottom: 12px; }
+.tlD > li:last-child { padding-bottom: 0; }
+.tlD > li::before { content: ''; position: absolute; left: 10px; transform: translateX(-1px); top: 22px; bottom: -14px; width: 2px; z-index: 0; background: var(--color-border); }
+.tlD > li:last-child::before { display: none; }
+.tlD > li.s-done::before { background: var(--color-success); }
+.tlD > li.s-fail::before { background: var(--color-danger); }
+.tlD > li.s-pause::before { background: var(--color-warning); }
+.tlD > li.s-run::before { background: linear-gradient(var(--color-warning) 35%, var(--color-border)); }
+.tlD > li.s-lock::before { background: transparent; border-left: 2px dashed var(--color-text-dim); width: 0; }
+/* node "station": opaque circle masks the spine where it passes (matches panel bg) */
+.nodeD { position: absolute; left: 0; top: 5px; width: 20px; height: 20px; z-index: 2; display: grid; place-items: center; border-radius: 50%; background: hsl(220 40% 8%); }
+.st-ico { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 11px; font-weight: 700; font-family: var(--font-mono); }
+.st-done { background: var(--color-success-dim); color: var(--color-success); border: 1.5px solid var(--color-success); }
+.st-run { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); animation: pulseGlow 1.4s infinite; }
+.st-lock { background: transparent; color: var(--color-text-dim); border: 1.5px dashed var(--color-text-dim); }
+.st-fail { background: var(--color-danger-dim); color: var(--color-danger); border: 1.5px solid var(--color-danger); }
+.st-pause { background: var(--color-warning-dim); color: var(--color-warning); border: 1.5px solid var(--color-warning); }
+
+/* the PhaseCard — calm at rest (title + type·ordinal + status), comprehensive on the active step */
+.pcard { border-radius: var(--radius-md); border: 1px solid transparent; padding: 6px 9px; transition: all var(--dur-fast); }
+.pcard.run { background: var(--color-warning-dim); border-color: hsl(38 92% 60% / .35); }
+.pcard.pause { background: var(--color-warning-dim); border: 1px solid var(--color-warning); }
+.pcard.fail { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / .4); }
+.pcard.lock { opacity: .72; }
+/* LINE 1 — the human title (NET-NEW phase.name) + status pill */
+.pc-l1 { display: flex; align-items: center; gap: var(--space-2); }
+.pc-glyph { font-size: 13px; width: 16px; text-align: center; flex: none; }
+.pc-title { font-weight: 600; font-size: var(--text-sm); color: var(--color-text); }
+.pcard.lock .pc-title, .pcard.lock .pc-glyph { color: var(--color-text-dim); font-weight: 500; }
+.statuspill { margin-left: auto; flex: none; font-size: 9.5px; font-weight: 600; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 4px; }
+.sp-done { color: var(--color-success); background: var(--color-success-dim); }
+.sp-run { color: var(--color-warning); background: var(--color-warning-dim); }
+.sp-lock { color: var(--color-text-dim); background: var(--color-muted); }
+.sp-fail { color: var(--color-danger); background: var(--color-danger-dim); }
+.sp-pause { color: var(--color-warning); background: var(--color-warning-dim); }
+/* LINE 2 — Phase i of N · {PHASE_TYPE_LABEL}  (always) */
+.pc-l2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; padding-left: 24px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.pc-l2 .ord { color: var(--color-text-muted); }
+/* LINE 3 — ONE honest activity line (RUNNING phase ONLY) */
+.pc-l3 { display: flex; align-items: center; gap: 6px; margin-top: 5px; padding-left: 24px; font-size: var(--text-xs); color: var(--color-warning); }
+.pc-l3 .act-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.4s infinite; flex: none; }
+.pc-l3 .act-text { color: var(--color-text); }
+.pc-l3 .act-text b { color: var(--color-warning); font-weight: 600; }
+/* GATE chip — only when the phase carries a PhaseSpec.validator */
+.gate-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; margin-left: 24px; font-family: var(--font-mono); font-size: 9px; color: var(--color-accent-violet); border: 1px solid hsl(258 90% 66% / .4); padding: 1px 6px; border-radius: var(--radius-sm); background: hsl(258 90% 66% / .08); }
+/* slug demoted to secondary (real-now field, calm) */
+.pc-slug { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); }
+
+/* sub-results expander (fan-out depth stays OUT of the spine — SIMPLICITY GUARD) */
+.subexp { margin-top: 6px; margin-left: 24px; }
+.subexp summary { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); cursor: pointer; list-style: none; }
+.subexp summary::-webkit-details-marker { display: none; }
+.subexp summary::before { content: '▸ '; color: var(--color-text-dim); }
+.subexp[open] summary::before { content: '▾ '; }
+.subexp .subrows { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; padding-left: 2px; border-left: 1px solid var(--color-border-soft); }
+.subrow { display: flex; align-items: center; gap: var(--space-2); padding: 4px var(--space-2); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 11px; }
+.subrow .sa-name { flex: 1; color: var(--color-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subrow .sa-stats { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); flex: none; }
+.subrow.run { background: var(--color-warning-dim); }
+
+/* fail-reason block (RC-4: failed-as-failed with a reason) */
+.fail-reason { margin-top: 6px; margin-left: 24px; padding: var(--space-2) var(--space-3); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / .4); border-radius: var(--radius-sm); font-size: 11px; color: hsl(0 80% 78%); line-height: 1.45; }
+.fail-reason b { color: var(--color-danger); }
+
+/* files section rows */
+.files-row { display: flex; align-items: center; gap: var(--space-2); padding: 6px 9px; font-size: var(--text-xs); font-family: var(--font-mono); color: var(--color-text-muted); border-radius: var(--radius-sm); }
+.files-row:hover { background: var(--color-accent); color: var(--color-text); }
+.files-row.fresh { color: var(--color-success); background: var(--color-success-dim); }
+
+/* ── HONESTY: the NET-NEW wire legend (always visible in panel, collapsible) ── */
+.honesty-box { margin-top: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-md); background: hsl(220 30% 7% / .4); }
+.honesty-box summary { padding: var(--space-2) var(--space-3); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); cursor: pointer; list-style: none; }
+.honesty-box summary::-webkit-details-marker { display: none; }
+.honesty-box summary::before { content: '▸ '; }
+.honesty-box[open] summary::before { content: '▾ '; }
+.honesty-box .hb-body { padding: 0 var(--space-3) var(--space-3); font-size: 11px; line-height: 1.6; color: var(--color-text-dim); }
+.honesty-box .hb-body .real { color: var(--color-success); font-weight: 600; }
+.honesty-box .hb-body .netnew { color: var(--color-warning); font-weight: 600; }
+.honesty-box .hb-body code { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); }
+.honesty-box .hb-body .bug { color: var(--color-accent-violet); font-weight: 600; }
+
+/* NET-NEW flag pill (inline, marks a fabricated/proposed-wire field everywhere it appears) */
+.nn { font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: var(--color-warning); background: hsl(38 92% 60% / .14); border: 1px solid hsl(38 92% 60% / .3); border-radius: var(--radius-sm); padding: 0 4px; letter-spacing: .03em; vertical-align: 1px; cursor: help; }
+/* the 'why' tier is reachable without hover — focusable for keyboard/touch, with a visible ring */
+.nn:focus-visible, .gate-chip:focus-visible, .pc-l2 [tabindex]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; border-radius: var(--radius-sm); }
+
+.callout { font-size: 11px; color: var(--color-text-dim); padding: var(--space-3) 0 0; margin-top: var(--space-3); border-top: 1px dashed var(--color-border-soft); line-height: 1.5; }
+.callout b { color: var(--color-primary); }
+.callout .honest { color: var(--color-warning); font-weight: 600; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* toolbar lifecycle cycler */
+.lc-cycler { display: flex; gap: 3px; flex-wrap: wrap; }
+.lc-cycler button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+/* keep floating toolbar clear of the composer */
+.sketch-toolbar { bottom: auto; top: 60px; max-width: 96vw; flex-wrap: wrap; }
+.variant-tab.rejected { color: var(--color-danger); }
+.variant-tab.rejected.active { background: var(--color-danger-dim); color: var(--color-danger); border-color: hsl(0 72% 51% / .4); }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 022 · Workflow Run in Thread · panel owns the spine</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Locked-in-thread ★ Selected</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Chat-alongside</button>
+  <button class="variant-tab rejected" data-v="C" onclick="setVariant('C')">C · Dedicated run view (rejected)</button>
+</nav>
+
+<div class="shell" id="shell">
+  <div class="nav-rail" id="navRail"></div>
+  <div id="centerCol"><!-- chat OR (rejected) runview --></div>
+  <div class="panel" id="panelCol">
+    <div class="panel-head">
+      <span class="pulse-dot" id="panelDot"></span>
+      <span class="ph-title">Workspace</span>
+      <span class="head-tag" id="panelHeadTag"></span>
+      <span class="collapse-btn" title="Collapse to rail (⌘.)" onclick="toggleRail()">⟩</span>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+  <div class="panel-rail" id="panelRail" onclick="toggleRail()">
+    <div class="pr-ico live" title="Workflow running — click to expand">◆<span class="pr-badge" id="railBadge">2/6</span></div>
+    <div class="pr-ico" title="Files">▤</div>
+  </div>
+</div>
+
+<div role="status" aria-live="polite" class="sr-only" id="announcer"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">lifecycle</span>
+  <div class="lc-cycler" id="lcCycler">
+    <button data-s="before" onclick="setStage('before')">1 · Before (Deep)</button>
+    <button data-s="launching" onclick="setStage('launching')">2 · Launch</button>
+    <button data-s="running" class="on" onclick="setStage('running')">3 · Running</button>
+    <button data-s="paused" onclick="setStage('paused')">4 · Pause (ask)</button>
+    <button data-s="resolve" onclick="setStage('resolve')">5 · Resolve</button>
+    <button data-s="after" onclick="setStage('after')">6 · After (Deep)</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <span style="opacity:.6">resolve as</span>
+  <div class="lc-cycler" id="resolveKind">
+    <button data-r="completed" class="on" onclick="setResolveKind('completed')">✓ completed</button>
+    <button data-r="failed" onclick="setResolveKind('failed')">✕ failed-honestly</button>
+    <button data-r="cancelled" onclick="setResolveKind('cancelled')">⏹ cancelled</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <span style="opacity:.5" title="The panel owns the meaningful 6-phase spine for ALL three variants. The variant tabs change ONLY the composer-during-a-run behavior (stages 2–4). Before / Resolve / After render the same Deep chat for all three — sameness by design.">variants differ only in composer-during-a-run (stages 2–4)</span>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   Concrete example (018–021): the published
+   'Vendor-risk portfolio review' workflow, run in a thread.
+   Domain-agnostic framing — finance/legal/PM are example CONTENT.
+
+   Each phase carries:
+   • slug         — REAL today (the machine ID on the wire / DB).
+   • name         — NET-NEW wire field (phase.name): the human title.
+   • typeKey/label— phase_type: REAL live on phase_started; NET-NEW for reload
+                    persistence (durable phase_type → no "Step" collapse).
+   • gate         — from PhaseSpec.validators (authored data, when present).
+   • activity()   — the RUNNING-phase-only honest line; sourced from REAL
+                    tool_call args / sub_agent_start.description, un-suppressed
+                    for the ACTIVE phase only (relaxes D-03, operator-approved).
+   ───────────────────────────────────────────────────────────── */
+const WF = {
+  name: 'Vendor-risk portfolio review',
+  kb: 'Procurement KB · 14 vendor dossiers (1,204 chunks)',
+  kickoff: 'Run the quarterly vendor-risk portfolio review and draft the committee brief.',
+  tier: 'Strict',
+  // 6 phases — load → search → per-vendor → draft → committee confirm → fill template
+  // The 5 mapped types (programmatic⚙ / llm_single✎ / llm_agent🤖 / llm_batch_agents⛓ /
+  // llm_human_input☺) mirror PhaseCard.tsx:41-47 byte-for-byte. llm_emit is a REAL backend
+  // enum (harness.py LlmEmitPhaseConfig, the 6th discriminated member) but it is NOT in the
+  // shipped PHASE_TYPE_LABEL map (5 keys) — today it falls through to UNKNOWN → label 'Step',
+  // glyph '•'. So the 'Deliverable' / ◆ label below is a PROPOSED 6th map entry (net-new
+  // frontend surface), flagged ★NET-NEW in the spine, not an existing byte-for-byte reuse.
+  phases: [
+    { slug:'load_portfolio', name:'Load the vendor portfolio',          glyph:'⚙', typeKey:'programmatic',     label:'Server step',     gate:null,
+      activity:'Loading 14 vendor dossiers from the Procurement KB' },
+    { slug:'research',       name:'Gather evidence from the vendor KB',  glyph:'🤖', typeKey:'llm_agent',        label:'AI agent step',   gate:'freshness ≤ 90d',
+      activity:'Searching <b>Procurement KB</b> for "Q3 breach thresholds"' },
+    { slug:'score_vendors',  name:'Score each vendor on risk',          glyph:'⛓', typeKey:'llm_batch_agents', label:'Parallel agents', gate:null,
+      activity:'<b>14 agents</b> scoring vendors in parallel' },
+    { slug:'draft',          name:'Draft the committee brief',          glyph:'✎', typeKey:'llm_single',       label:'AI write step',   gate:'cited · structure',
+      activity:'Writing the committee brief from the scored evidence' },
+    { slug:'confirm',        name:'Confirm escalations with you',       glyph:'☺', typeKey:'llm_human_input',  label:'Needs you',       gate:null,
+      activity:'Waiting for your answer' },
+    { slug:'emit',           name:'Fill the committee template',        glyph:'◆', typeKey:'llm_emit',         label:'Deliverable',     gate:'cited · structure', labelNew:true,
+      activity:'Filling <b>committee_brief.docx</b> — every figure cited' },
+  ],
+};
+const ASK = {
+  prompt: 'Two vendors (Northwind Logistics, Helix Cloud) breached their risk threshold this quarter. Escalate both to the committee brief, or only the higher-severity one?',
+  ctx: 'Phase 5 of 6 · Confirm escalations with you · llm_human_input · this answer is the only input the run will accept right now.',
+  options: [
+    { glyph:'⚑', label:'Escalate both (recommended by the scoring phase)' },
+    { glyph:'▴', label:'Only Helix Cloud (higher severity)' },
+  ],
+};
+
+/* per-stage phase status map (keyed by slug) */
+function phaseStatus(stage){
+  const S = {}; WF.phases.forEach(p => S[p.slug]='lock');
+  if (stage==='launching') return {...S, load_portfolio:'run'};
+  if (stage==='running')   return {...S, load_portfolio:'done', research:'done', score_vendors:'run'};
+  if (stage==='paused')    return {...S, load_portfolio:'done', research:'done', score_vendors:'done', draft:'done', confirm:'pause'};
+  if (stage==='resolve' || stage==='after'){
+    const done = {load_portfolio:'done',research:'done',score_vendors:'done',draft:'done',confirm:'done'};
+    if (RESOLVE_KIND==='failed')    return {...done, emit:'fail'};   // emit GATE failed honestly
+    if (RESOLVE_KIND==='cancelled') return {...done, emit:'fail'};   // aborted in flight, never finished
+    return {...done, emit:'done'};
+  }
+  return S;
+}
+const SICO = { done:['st-done','✓'], run:['st-run','●'], lock:['st-lock','○'], fail:['st-fail','✕'], pause:['st-pause','⏸'] };
+const SPILL = { done:['sp-done','Complete'], run:['sp-run','Running'], lock:['sp-lock','Locked'], fail:['sp-fail','Failed'], pause:['sp-pause','Needs you'] };
+function stIco(s){ const [c,g]=SICO[s]||SICO.lock; return `<span class="st-ico ${c}" aria-hidden="true">${g}</span>`; }
+function statusPill(s){ const [c,l]=SPILL[s]||SPILL.lock; return `<span class="statuspill ${c}">${l}</span>`; }
+
+/* honest phase ordinal "i of N" for the active row */
+function activeOrdinal(stage){
+  const ps = phaseStatus(stage);
+  const i = WF.phases.findIndex(p => ps[p.slug]==='run' || ps[p.slug]==='pause' || ps[p.slug]==='fail');
+  return (i<0 ? WF.phases.length : i+1);
+}
+
+let CUR_V='A', CUR_STAGE='running', PICKED=null, ANSWER_SENT=false, RAIL=false;
+// RESOLVE is a three-way terminal: 'completed' | 'failed' | 'cancelled' (run honesty)
+let RESOLVE_KIND='completed';
+
+/* ════════════════════════════════════════════════════════════════
+   THE NEVER-VANISHES STATUS STRIP (015-C) — one honest line.
+   ▶ name · status · phase i/N · <activity-of-the-running-phase>
+   Resolves to a frozen terminal line; elapsed freezes only on a true terminal.
+   ════════════════════════════════════════════════════════════════ */
+function statusStrip(stage){
+  const N = WF.phases.length;
+  if (stage==='paused')
+    return `<span class="status-strip paused"><span class="seg time">02:41</span><span class="divider"></span><span class="seg act"><span class="dot"></span>paused · phase 5/${N} · waiting on you</span></span>`;
+  if (stage==='resolve' || stage==='after'){
+    if (RESOLVE_KIND==='failed')
+      return `<span class="status-strip failed"><span class="seg time">04:12</span><span class="divider"></span><span class="seg act">✕ failed · phase 6/${N} · deliverable gate</span></span>`;
+    if (RESOLVE_KIND==='cancelled')
+      return `<span class="status-strip cancelled"><span class="seg time">03:30</span><span class="divider"></span><span class="seg act">⏹ cancelled · phase 6/${N} · by you</span></span>`;
+    return `<span class="status-strip done"><span class="seg time">03:58</span><span class="divider"></span><span class="seg act">✓ completed · ${N}/${N} phases</span></span>`;
+  }
+  if (stage==='launching')
+    return `<span class="status-strip"><span class="seg time">00:01</span><span class="divider"></span><span class="seg act"><span class="dot"></span>starting · phase 1/${N} · loading portfolio</span></span>`;
+  // running — the activity comes from the RUNNING phase's real activity line (plain text, no markup in the strip)
+  return `<span class="status-strip"><span class="seg time">01:18</span><span class="divider"></span><span class="seg act"><span class="dot"></span>phase 3/${N} · 14 agents scoring vendors</span></span>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   THE THIN CHAT RECEIPT (009-C / 007-C) — replaces the old in-chat timeline.
+   Live  → ▶ mode badge + name + status strip, pointing at the panel ("Open ▸").
+   Done  → resolves into a deliverable receipt (or honest failure/cancel receipt).
+   NEVER a full embedded 6-row spine. 3-second read.
+   ════════════════════════════════════════════════════════════════ */
+function chatReceipt(stage){
+  const terminal = (stage==='resolve'||stage==='after');
+  const broke = terminal && RESOLVE_KIND!=='completed';
+  const cls = stage==='paused' ? 'is-paused'
+    : (terminal && RESOLVE_KIND==='cancelled') ? 'is-cancelled'
+    : broke ? 'is-failed'
+    : terminal ? 'is-done'
+    : '';
+  const badge = (terminal && RESOLVE_KIND==='completed') ? 'Harness · done' : `Harness · ${WF.tier}`;
+  // LIVE / PAUSED: the bracket = badge + name + the status strip + a panel pointer.
+  if (!terminal){
+    const liveText = stage==='paused'
+      ? `<span class="rb-open" onclick="flashPanel()">Answer in panel ▸</span>`
+      : `<span class="rb-open" onclick="flashPanel()">Open spine in panel ▸</span>`;
+    // 006-C dual-surface: the question card + scoped reply live in the panel/composer, but the
+    // transcript must still POINT home on pause so the chat never goes silent about a waiting run.
+    const footer = stage==='paused'
+      ? `<div style="font-size:11px;color:var(--color-warning)">⏸ The run needs you — answer in the <b style="color:var(--color-primary)">Workspace panel ▸</b> or the scoped composer below. This chat stays a thin receipt pointing home.</div>`
+      : `<div style="font-size:11px;color:var(--color-text-dim)">The live 6-phase spine + each step's meaning lives in the <b style="color:var(--color-primary)">Workspace panel →</b> — this chat keeps a thin receipt so your eyes have one live home.</div>`;
+    return `<div class="receipt-bracket ${cls}" onclick="flashPanel()">
+      <div class="rb-line">
+        <span class="mode-badge">${badge}</span>
+        <span class="rb-name">▶ ${WF.name}</span>
+        ${liveText}
+      </div>
+      ${statusStrip(stage)}
+      ${footer}
+    </div>`;
+  }
+  // TERMINAL: the strip RESOLVES into the deliverable receipt.
+  let resolved = '';
+  if (RESOLVE_KIND==='completed'){
+    resolved = `<div class="deliverable">
+      <span class="file-ic">◆</span>
+      <div class="d-main">
+        <div class="d-name">committee_brief.docx</div>
+        <div class="d-meta">14 vendors · every figure cited · saved to FILES</div>
+      </div>
+      <button class="d-open" onclick="flashPanel()">Open in FILES ▸</button>
+    </div>`;
+  } else if (RESOLVE_KIND==='failed'){
+    resolved = `<div class="deliverable" style="border-color:var(--color-danger-edge);background:var(--color-danger-dim)">
+      <span class="file-ic" style="background:var(--color-danger-dim);border-color:var(--color-danger-edge);color:var(--color-danger)">✕</span>
+      <div class="d-main">
+        <div class="d-name" style="color:var(--color-danger)">No deliverable produced — run failed honestly</div>
+        <div class="d-meta">phase 6/6 (Fill the committee template) · the cited-output gate found uncited figures → the .docx was NOT written. Nothing partial saved.</div>
+      </div>
+    </div>`;
+  } else {
+    resolved = `<div class="deliverable">
+      <span class="file-ic" style="background:var(--color-warning-dim);border-color:var(--color-warning-edge);color:var(--color-warning)">⏹</span>
+      <div class="d-main">
+        <div class="d-name">Run cancelled — no deliverable produced</div>
+        <div class="d-meta">you cancelled during phase 6/6 · partial work discarded · the thread is back to normal Deep chat.</div>
+      </div>
+    </div>`;
+  }
+  return `<div class="receipt-bracket ${cls}" onclick="flashPanel()">
+    <div class="rb-line">
+      <span class="mode-badge">${badge}</span>
+      <span class="rb-name">${WF.name}</span>
+      <span class="rb-open" onclick="flashPanel()">Full spine in panel ▸</span>
+    </div>
+    ${statusStrip(stage)}
+    ${resolved}
+  </div>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   THE PANEL — owns the MEANINGFUL 6-phase spine (008-D / PhaseTimeline+PhaseCard).
+   Calm at rest (title + type·ordinal + status); comprehensive on the ACTIVE step
+   (adds the one honest activity line). Gate chip only when a validator exists.
+   ════════════════════════════════════════════════════════════════ */
+function nnTag(reason){ return `<span class="nn" tabindex="0" title="${reason}">NET-NEW</span>`; }
+
+function phaseCardLi(p, idx, stage){
+  const ps = phaseStatus(stage);
+  const st = ps[p.slug];
+  const N = WF.phases.length;
+  const cardCls = st==='run'?'run':st==='pause'?'pause':st==='fail'?'fail':st==='lock'?'lock':'';
+  const isRunning = (st==='run');
+  const isPaused = (st==='pause');
+
+  // LINE 3 — RUNNING (or paused-on-human-input) phase ONLY: one honest activity line.
+  let l3 = '';
+  if (isRunning || isPaused){
+    l3 = `<div class="pc-l3"><span class="act-dot"></span><span class="act-text">${p.activity}</span></div>`;
+  }
+
+  // GATE chip — only when the phase actually carries a PhaseSpec.validator.
+  const gate = p.gate ? `<span class="gate-chip" tabindex="0" title="A PhaseSpec.validator that runs THIS phase — honest authored data, not a fabricated count. See the always-open Honesty legend below for the real-now vs net-new map.">⛨ ${p.gate}</span>` : '';
+
+  // sub-results expander — fan-out depth stays OUT of the spine (simplicity guard).
+  let subexp = '';
+  if (p.typeKey==='llm_batch_agents' && (st==='run'||st==='done')){
+    const rows = [
+      ['Northwind Logistics','done','2.1s · 5t · 14src'],
+      ['Helix Cloud',        st==='run'?'run':'done', st==='run'?'1.4s · 4t · 11src':'1.9s · 4t · 12src'],
+      ['Atlas Components',   st==='run'?'run':'done', '1.2s · 3t · 9src'],
+      ['+ 11 more vendors',  st==='run'?'run':'done', st==='run'?'scoring…':'done'],
+    ];
+    subexp = `<details class="subexp"><summary>Sub-results · ${st==='run'?'3 of 14 scored':'14 of 14 scored'}</summary>
+      <div class="subrows">${rows.map(([n,s,st2])=>`<div class="subrow ${s==='run'?'run':''}">${stIco(s)}<span class="sa-name">${n}</span><span class="sa-stats">${st2}</span></div>`).join('')}</div>
+    </details>`;
+  }
+
+  // fail-reason block (RC-4) on the failed emit phase.
+  let failBlock = '';
+  if (st==='fail'){
+    failBlock = RESOLVE_KIND==='cancelled'
+      ? `<div class="fail-reason"><b>Cancelled in flight.</b> You aborted while this phase was running — the deliverable was never produced. Nothing partial saved.</div>`
+      : `<div class="fail-reason"><b>Cited-output gate failed.</b> Three figures in the Helix Cloud row had no supporting chunk in the KB, so the <code>.docx was NOT written</code> (citation_policy = strict → honest fail). Add the SOC-2 source or set the policy to <b>flag</b>, then re-run.</div>`;
+  }
+
+  return `<li class="s-${st}">
+    <span class="nodeD">${stIco(st)}</span>
+    <div class="pcard ${cardCls}">
+      <div class="pc-l1">
+        <span class="pc-glyph">${p.glyph}</span>
+        <span class="pc-title">${p.name}</span> ${nnTag('phase.name — the human title. Not on the wire today; a natural Phase-103 NL-authoring output.')}
+        ${statusPill(st)}
+      </div>
+      <div class="pc-l2">
+        <span class="ord">Phase ${idx+1} of ${N}</span> · <span tabindex="0" title="phase_type — REAL live on phase_started; NET-NEW only for reload persistence (durable phase_type stops the 'Step' collapse).">${p.label}</span>${p.labelNew?' '+nnTag('llm_emit has NO entry in the shipped PHASE_TYPE_LABEL map (5 keys) — it renders as \'Step\'/• today. \'Deliverable\'/◆ is a PROPOSED 6th map entry, not a byte-for-byte reuse. The enum IS real (harness.py LlmEmitPhaseConfig).'):''}
+        · <span class="pc-slug">${p.slug}</span>
+      </div>
+      ${l3}${(isRunning||isPaused)?nnTag('running-phase activity line — relaxes D-03 for the ACTIVE phase only. Sourced from REAL tool_call args / sub_agent_start.description; un-suppressed for the active phase.'):''}
+      ${gate}
+      ${subexp}
+      ${failBlock}
+    </div>
+  </li>`;
+}
+
+function panelSpine(stage){
+  const N = WF.phases.length;
+  const i = activeOrdinal(stage);
+  const terminal = (stage==='resolve'||stage==='after');
+  const broke = terminal && RESOLVE_KIND!=='completed';
+  // honest "doing now" + count chips, never a %.
+  let bannerLine = '';
+  const chips = [];
+  chips.push(`<span class="chip primary">Phase ${terminal? N+'/'+N : i+'/'+N}</span>`);
+  chips.push(`<span class="chip">14 vendors</span>`);
+  // D-03: an end-of-run source TOTAL is only honest at a true terminal — mid-run the wire
+  // can't back "31 sources" yet, so the spine stays quiet about it while live.
+  if (terminal && !broke) chips.push(`<span class="chip">31 sources</span>`);
+  chips.push(`<span class="chip">Tier: ${WF.tier}</span>`);
+
+  // inject the ask card right after the spine on pause.
+  const askBlock = (stage==='paused') ? askCard() : '';
+
+  return `<div class="panel-sec">
+    <div class="ps-head"><span class="ps-h">Workflow</span><span class="ps-count">${terminal?(broke?'ended':'done'):'live'} · ${WF.phases.length} phases</span></div>
+    <div class="ps-body">
+      <div class="run-banner">
+        <div class="wf-name">${WF.name}</div>
+        <div class="wf-meta">${WF.kb}</div>
+        <div class="count-strip">${chips.join('')}</div>
+      </div>
+      <ol class="tlD" aria-label="Workflow phases">${WF.phases.map((p,idx)=>phaseCardLi(p,idx,stage)).join('')}</ol>
+      ${askBlock}
+    </div>
+  </div>`;
+}
+
+/* the FILES section (005-A drill-in lives here; the deliverable lands here) */
+function panelFiles(stage){
+  const terminal = (stage==='resolve'||stage==='after');
+  if (terminal){
+    if (RESOLVE_KIND!=='completed')
+      return `<div class="panel-sec"><div class="ps-head"><span class="ps-h">Files</span><span class="ps-count">2</span></div>
+        <div class="ps-body">
+          <div class="files-row">▤ vendor_scores.csv</div>
+          <div class="files-row">▤ portfolio_2024Q3.json</div>
+          <div class="files-row" style="color:var(--color-text-dim)">— no committee_brief.docx (${RESOLVE_KIND==='failed'?'gate failed':'cancelled'})</div>
+        </div></div>`;
+    return `<div class="panel-sec"><div class="ps-head"><span class="ps-h">Files</span><span class="ps-count">3</span></div>
+      <div class="ps-body">
+        <div class="files-row fresh">◆ committee_brief.docx <span style="margin-left:auto">new</span></div>
+        <div class="files-row">▤ vendor_scores.csv</div>
+        <div class="files-row">▤ portfolio_2024Q3.json</div>
+      </div></div>`;
+  }
+  if (stage==='running'||stage==='paused')
+    return `<div class="panel-sec"><div class="ps-head"><span class="ps-h">Files</span><span class="ps-count">1</span></div>
+      <div class="ps-body"><div class="files-row">▤ vendor_scores.csv <span style="margin-left:auto">writing…</span></div></div></div>`;
+  return '';
+}
+
+/* the honesty legend — REAL-NOW vs NET-NEW-WIRE, always available in the panel */
+function honestyBox(){
+  return `<details class="honesty-box">
+    <summary>Honesty · real-now vs net-new wire</summary>
+    <div class="hb-body">
+      <div style="margin-bottom:8px"><span class="real">REAL today</span> — already on the wire / DB: phase <code>slug</code>, <code>phase_type</code> (live on <code>phase_started</code>), per-phase <code>status</code>, the <code>llm_human_input</code> ask pause, the <code>PhaseSpec.validators</code> behind each gate chip.</div>
+      <div style="margin-bottom:8px"><span class="netnew">NET-NEW wire surface</span> — flagged <span class="nn">NET-NEW</span> in the spine:
+        <div style="margin-top:4px">• <code>phase.name</code> — the human title (a natural Phase-103 NL-authoring output).</div>
+        <div>• persisted <code>phase_type</code> — so a reload doesn't collapse every row to "Step".</div>
+        <div>• <code>llm_emit</code> TYPE-LABEL — the enum is real (<code>harness.py LlmEmitPhaseConfig</code>) but it has NO entry in the shipped <code>PHASE_TYPE_LABEL</code> (5 keys) → renders as "Step"/• today. "Deliverable"/◆ is a proposed 6th map entry.</div>
+        <div>• the running-phase <b>activity line</b> — relaxes D-03 for the ACTIVE phase only (operator-approved); built from REAL tool_call args / sub_agent_start.description.</div>
+      </div>
+      <div style="margin-bottom:4px"><span class="bug">3 routed bug/wire fixes</span> — make the CURRENT surface meaningful with <b>no new UI</b>:</div>
+      <div>• <code>BUG-260609-04</code> — phase-0 reconcile overwrite (real slug clobbered by <code>phase-${'{i}'}</code>).</div>
+      <div>• <code>BUG-260609-02</code> — Sub-task description loss on nav (reconcile <code>tasksByThread</code> durably).</div>
+      <div>• <code>BUG-260610-01</code> — dup-avatar / timer-reset (separate render-only workstream).</div>
+    </div>
+  </details>`;
+}
+
+/* ── the ask_user pause card (006-C, lives in the panel spine + a thin chat pointer) ── */
+function askCard(){
+  if (ANSWER_SENT){
+    return `<div class="ask answered" style="margin-top:var(--space-3)">
+      <div class="qlbl"><span class="pip"></span>Answered · run resumed</div>
+      <div class="qtext">${ASK.prompt}</div>
+      <div class="answered-row"><span class="you">You:</span> ${PICKED || ASK.options[0].label}</div>
+    </div>`;
+  }
+  return `<div class="ask" style="margin-top:var(--space-3)">
+    <div class="qlbl"><span class="pip"></span>The run needs you<span class="clock">⏲ 4:48 left</span></div>
+    <div class="qtext">${ASK.prompt}</div>
+    <div class="qctx">${ASK.ctx}</div>
+    <div class="opts">${ASK.options.map((o,i)=>`<button class="opt ${PICKED===o.label?'sel':''}" onclick="pick(${i})"><span class="o-glyph">${o.glyph}</span>${o.label}</button>`).join('')}</div>
+  </div>`;
+}
+function pick(i){ PICKED = ASK.options[i].label; render(); }
+function sendScoped(){ ANSWER_SENT=true; RESOLVE_KIND='completed'; CUR_STAGE='resolve'; if(!PICKED) PICKED=ASK.options[0].label; syncCycler(); render(); announce('Answer sent — run resumed and completed.'); }
+function proceed(label){ PICKED=label; sendScoped(); }
+
+/* ── transcript before the run / after the run (normal Deep chat) ── */
+function transcriptBefore(){
+  return `
+    <div class="bubble-user">Can you pull up our procurement KB? I want to look at vendor risk before the committee meets.</div>
+    <div class="answer"><div class="bot"></div><div class="body">Sure — your <b>Procurement KB</b> has 14 vendor dossiers indexed. Want a quick ad-hoc look, or should I run your published <b>Vendor-risk portfolio review</b> workflow to produce the committee brief?</div></div>`;
+}
+function transcriptLaunching(){
+  return `
+    <div class="bubble-user">Run the Vendor-risk portfolio review workflow.</div>
+    <div class="answer"><div class="bot"></div><div class="body">Starting <b>Vendor-risk portfolio review</b> on the Procurement KB. This is a Strict workflow — it runs locked until it finishes or asks you something. The live phase spine is in the <b>Workspace panel →</b>; I'll keep a thin receipt here.</div></div>`;
+}
+function transcriptAfter(){
+  if (RESOLVE_KIND!=='completed'){
+    const why = RESOLVE_KIND==='failed'
+      ? 'The run <b>failed honestly</b> — the cited-output gate found uncited figures, so the committee brief was NOT written. Nothing partial saved.'
+      : 'The run was <b>cancelled</b> — no committee brief was produced and partial work was discarded.';
+    return `
+      <div class="bubble-user">${WF.kickoff}</div>
+      <div class="answer"><div class="bot"></div><div class="body">${why} The thread is back to normal chat.</div></div>
+      ${chatReceipt('after')}
+      <div class="bubble-user">${RESOLVE_KIND==='failed'?'Which figures were uncited?':'Can we re-run it?'}</div>
+      <div class="answer"><div class="bot"></div><div class="body">${RESOLVE_KIND==='failed'
+        ? 'Three figures in the Helix Cloud row had no supporting chunk in the KB. Add the SOC-2 source or loosen the deliverable\'s <b>citation_policy</b> to <b>flag</b>, then re-run — a fresh run re-checks the gate.'
+        : 'Yes — just say "run the Vendor-risk portfolio review" again and it starts a fresh run on the current KB.'}</div></div>`;
+  }
+  return `
+    <div class="bubble-user">${WF.kickoff}</div>
+    <div class="answer"><div class="bot"></div><div class="body">The run finished — committee brief produced (receipt below). The thread is back to normal chat; ask me anything about it.</div></div>
+    ${chatReceipt('after')}
+    <div class="bubble-user">Summarize the top 3 risks from the brief.</div>
+    <div class="answer"><div class="bot"></div><div class="body">From <span class="cite">committee_brief.docx</span>: <b>1.</b> Northwind Logistics — SLA breach + concentration risk <span class="cite">p.3</span>; <b>2.</b> Helix Cloud — unresolved SOC-2 finding <span class="cite">p.5</span>; <b>3.</b> Atlas Components — single-source dependency <span class="cite">p.7</span>.</div></div>
+    <div class="bubble-user">Tweak this to add a mitigation column to the brief.</div>
+    <div class="answer"><div class="bot"></div><div class="body">That changes the deliverable's template, so it forks a <b>new version</b> of the workflow. I've opened <b>Vendor-risk portfolio review v2</b> in the builder with a "Mitigation" column added to the committee template — review and re-publish when ready. <span class="text-dim">(v1 stays immutable in your Workflows page.)</span></div></div>`;
+}
+
+/* ── composer dock per variant + stage ── */
+function composerHTML(){
+  const stage = CUR_STAGE, v = CUR_V;
+  if (stage==='before' || stage==='after' || stage==='resolve'){
+    const seed = stage==='before' ? 'Run the Vendor-risk portfolio review workflow' : '';
+    const placeholder = stage==='resolve'
+      ? (RESOLVE_KIND==='completed'
+          ? 'Run complete — ask a follow-up, tweak the deliverable, or re-run with different input…'
+          : RESOLVE_KIND==='failed'
+            ? 'Run failed honestly — no deliverable. Ask what blocked it, fix coverage, or re-run…'
+            : 'Run cancelled — no deliverable. Re-run, or just keep chatting…')
+      : 'Message…  (Deep is the resting default — just type)';
+    return `<div class="ta-wrap focus"><textarea class="ta" rows="1" placeholder="${placeholder}">${seed}</textarea>${pills(false)}</div>`;
+  }
+  if (stage==='launching' || stage==='running'){
+    if (v==='A' || v==='C') return lockedComposer(stage);
+    return alongsideComposer(stage); // B
+  }
+  if (stage==='paused'){
+    if (v==='A' || v==='C') return scopedComposer();
+    return alongsideComposer('paused'); // B keeps the free composer, scoped card lives in the panel
+  }
+  return '';
+}
+
+/* the simplified 2-pill Deep composer (D-092-UX) */
+function pills(disabled){
+  const d = disabled?'disabled':'';
+  const onclick = disabled ? '' : 'onclick="sendDeep(this)"';
+  return `<div class="pill-row">
+    <span class="pill ${d}" title="Provider folded into Model"><span class="ic">⌘</span><span class="grp">openai/</span>gpt-5.4 ▾</span>
+    <span class="pill ${d}" title="How the agent thinks"><span class="ic">⊙</span>General ▾</span>
+    <span class="spacer"></span>
+    <button class="send-btn ${d}" ${disabled?'disabled':''} ${onclick} aria-label="Send message">↑</button>
+  </div>`;
+}
+function sendDeep(btn){
+  const wrap = btn.closest('.ta-wrap');
+  const ta = wrap ? wrap.querySelector('.ta') : null;
+  const text = ta ? ta.value.trim() : '';
+  const scroll = document.getElementById('chatScroll');
+  if (!scroll) return;
+  if (!text){ btn.animate([{transform:'scale(1)'},{transform:'scale(.86)'},{transform:'scale(1)'}],{duration:220}); if (ta) ta.focus(); return; }
+  if (ta) ta.value='';
+  const u=document.createElement('div'); u.className='bubble-user'; u.textContent=text;
+  const a=document.createElement('div'); a.className='answer';
+  a.innerHTML='<div class="bot"></div><div class="body">Got it — this is a normal Deep reply in the resting thread (sketch stub).</div>';
+  scroll.appendChild(u); scroll.appendChild(a);
+  scroll.scrollTop = scroll.scrollHeight;
+  announce('Message sent — Deep replied in the thread.');
+}
+
+/* A/C locked composer — status chip + Cancel; can't type a new message (011-A) */
+function lockedComposer(stage){
+  const phase = stage==='launching' ? 'phase 1/6 · Load the vendor portfolio' : 'phase 3/6 · Score each vendor';
+  const escape = (CUR_V==='A') ? `<div class="escape-hint">
+      <span class="eh-ic">⎇</span>
+      <span>You're not blocked — <b>open a new thread</b> to chat freely while this runs.
+      <span class="eh-link" onclick="flashThread()">New thread ▸</span></span>
+    </div>` : '';
+  return `<div class="runchip">
+      <span class="rc-ico">◆</span>
+      <span class="rc-name">${WF.name}</span>
+      <span class="rc-phase">${phase} · spine is live in the panel →</span>
+      <span class="spacer"></span>
+      <span class="cancel" onclick="cancelRun()">⏹ Cancel</span>
+    </div>
+    <div class="ta-wrap disabled"><textarea class="ta" rows="1" placeholder="Workflow running — the composer is locked. Cancel to type, or chat in another thread." disabled></textarea>${pills(true)}</div>
+    ${escape}`;
+}
+
+/* A/C scoped-reply composer — accepts ONLY the answer to the pause (006-C dual-surface) */
+function scopedComposer(){
+  return `<div class="runchip paused">
+      <span class="rc-ico" style="animation:none">⏸</span>
+      <span class="rc-name">${WF.name}</span>
+      <span class="rc-phase">phase 5/6 · paused — needs your call (card in panel)</span>
+      <span class="spacer"></span>
+      <span class="cancel" onclick="cancelRun()">⏹ Abort run</span>
+    </div>
+    <div class="scoped-wrap">
+      <div class="scope-label"><span>⏸</span> Scoped reply — this answers the run's question, not a new chat</div>
+      <div class="scope-row">
+        <input id="scopedInput" placeholder="Type your answer (e.g. 'escalate both')…" value="${PICKED?escapeAttr(PICKED):''}" oninput="PICKED=this.value||null">
+        <button class="send" onclick="sendScoped()">Send</button>
+      </div>
+      <div class="scope-mini">
+        <button class="proceed" onclick="proceed('Escalate both (recommended by the scoring phase)')">⚑ Escalate both</button>
+        <button onclick="proceed('Only Helix Cloud (higher severity)')">▴ Only Helix Cloud</button>
+        <button class="abort" onclick="cancelRun()">✕ Abort</button>
+      </div>
+    </div>`;
+}
+
+/* B alongside composer — STAYS LIVE for free chat while the workflow streams (documented alternative) */
+function alongsideComposer(stage){
+  const paused = stage==='paused';
+  const chip = `<div class="runchip">
+      <span class="rc-ico">◆</span>
+      <span class="rc-name">${WF.name} · ${paused?'paused (answer the card in the panel)':'running'}</span>
+      <span class="rc-phase">${paused?'phase 5/6 · needs you':'phase 3/6 · spine in panel'}</span>
+      <span class="spacer"></span>
+      <span class="cancel" onclick="cancelRun()">⏹ Cancel run</span>
+    </div>`;
+  const placeholder = paused
+    ? "Answer the run's question in the panel card. Typing here chats — it does NOT resolve the pause…"
+    : 'Chat freely — this composer stays live while the workflow runs…';
+  const caveat = paused
+    ? `<b>Two inputs, one precedence:</b> the scoped question card in the panel is the ONLY input that resumes the run — a free-chat send here is a normal message and will <b>NOT</b> be taken as the pause answer. With two live affordances open, that ambiguity is exactly the silent-send-drop the parallel-stream race warns about. We surface it — we don't hide it.`
+    : `<b>Tangle risk:</b> your free chat and the workflow both write THIS thread. Two live streams can interleave or silently drop a send (the documented parallel-stream race). We surface it — we don't hide it.`;
+  return chip + `<div class="ta-wrap focus"><textarea class="ta" rows="1" placeholder="${placeholder}"></textarea>${pills(false)}</div>
+    <div class="alongside-caveat">
+      <span class="ac-ic">⚠</span>
+      <span>${caveat}</span>
+    </div>`;
+}
+
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+
+/* ── center column render (chat vs the REJECTED dedicated run view) ── */
+function renderCenter(){
+  const center = document.getElementById('centerCol');
+  // Variant C (REJECTED): a dedicated full-screen run view that HIDES the panel.
+  if (CUR_V==='C' && (CUR_STAGE==='launching'||CUR_STAGE==='running'||CUR_STAGE==='paused'||CUR_STAGE==='resolve')){
+    center.className = 'runview';
+    center.innerHTML = runViewHTML();
+    document.getElementById('panelCol').style.display='none';
+    document.getElementById('panelRail').style.display='none';
+    return;
+  }
+  // restore the panel/rail for A/B and for C's resting/after stages
+  document.getElementById('panelCol').style.display = RAIL ? 'none' : 'flex';
+  document.getElementById('panelRail').style.display = RAIL ? 'flex' : 'none';
+  center.className = 'chat';
+  let scroll = '';
+  if (CUR_STAGE==='before') scroll = transcriptBefore();
+  else if (CUR_STAGE==='launching') scroll = transcriptLaunching() + chatReceipt('launching');
+  else if (CUR_STAGE==='after') scroll = transcriptAfter();
+  else {
+    // running / paused / resolve — kickoff + the THIN chat receipt (panel owns the spine)
+    scroll = `<div class="bubble-user">${WF.kickoff}</div>` + chatReceipt(CUR_STAGE);
+    // Variant B's THESIS: a free user chat message actually interleaved INTO the thread mid-run.
+    if (CUR_V==='B' && (CUR_STAGE==='running'||CUR_STAGE==='paused')){
+      scroll += `
+        <div class="bubble-user">While this runs — what's Northwind's current SLA in our KB?</div>
+        <div class="answer"><div class="bot"></div><div class="body">Northwind Logistics' contracted SLA is <b>99.5% uptime</b> <span class="cite">northwind_msa.pdf p.4</span> — they breached it twice this quarter. <span style="color:var(--color-warning)">(Heads up: this reply landed in the SAME thread the workflow is writing — that's the interleave the caveat warns about.)</span></div></div>`;
+    }
+    if (CUR_STAGE==='resolve'){
+      const ack = RESOLVE_KIND==='completed'
+        ? 'Done — committee brief produced and saved to FILES. Ask me anything about it, or tweak it into a new version.'
+        : RESOLVE_KIND==='failed'
+          ? 'The run <b>failed honestly</b> — the cited-output gate found uncited figures, so the .docx was NOT written (nothing partial saved). Fix the source coverage and re-run, or open the spine to see which figures were uncited.'
+          : 'Run <b>cancelled</b> — no deliverable was produced and partial work was discarded. The thread is back to normal Deep chat.';
+      scroll += `<div class="answer"><div class="bot"></div><div class="body">${ack}</div></div>`;
+    }
+  }
+  const modeTag = (CUR_STAGE==='before'||CUR_STAGE==='after'||CUR_STAGE==='resolve')
+    ? `<span class="mode-tag deep">Deep</span>` : `<span class="mode-tag harness">Harness · running</span>`;
+  center.innerHTML = `
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-head">Thread · Q3 vendor review ${modeTag}</div>
+      ${scroll}
+    </div>
+    <div class="composer-dock">${composerHTML()}</div>`;
+  const cs = document.getElementById('chatScroll'); if (cs) cs.scrollTop = cs.scrollHeight;
+}
+
+/* REJECTED full-screen run view (variant C) — kept to show its trade-off card */
+function runViewHTML(){
+  const terminal = (CUR_STAGE==='resolve');
+  const rvSub = CUR_STAGE==='launching'
+    ? 'Opening run view… you LEFT the thread — the run executes on a SEPARATE full-screen view, and the workspace panel is HIDDEN'
+    : terminal
+      ? 'Run finished on the separate view — ready to hand back to the thread'
+      : `${WF.kb} · run executes on a SEPARATE full-screen view, away from chat AND the panel`;
+  const bridge = terminal ? (() => {
+    const ok = RESOLVE_KIND==='completed';
+    const label = ok ? 'Run finished — committee brief produced'
+      : RESOLVE_KIND==='failed' ? 'Run failed honestly — no deliverable produced'
+      : 'Run cancelled — no deliverable produced';
+    const sub = ok ? 'The deliverable + FILES seam live back in the thread + panel. Return to pick up the conversation, summarize, or tweak → new version.'
+      : RESOLVE_KIND==='failed' ? 'The cited-output gate found uncited figures, so the .docx was NOT written. Return to the thread to see the failure receipt and re-run.'
+      : 'Partial work was discarded. Return to the thread — it is back to normal Deep chat.';
+    const tone = ok ? 'var(--color-success)' : RESOLVE_KIND==='failed' ? 'var(--color-danger)' : 'var(--color-warning)';
+    return `<div class="ci-panel" style="border-color:${tone};text-align:center">
+        <div style="font-size:22px;margin-bottom:6px;color:${tone}">${ok?'✓':RESOLVE_KIND==='failed'?'✕':'⏹'}</div>
+        <div style="font-family:var(--font-headline);font-weight:600;font-size:var(--text-md);color:var(--color-text)">${label}</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-dim);line-height:1.5;margin:8px 0 14px">${sub}</div>
+        <button class="d-open" onclick="setStage('after')" style="padding:8px 16px">Return to thread ▸</button>
+      </div>`;
+  })() : '';
+  // The spine here is the SAME PhaseCard vocabulary — but duplicated on a surface that hides the panel.
+  const spine = `<ol class="tlD" aria-label="Workflow phases">${WF.phases.map((p,idx)=>phaseCardLi(p,idx,CUR_STAGE)).join('')}</ol>`;
+  const ask = (CUR_STAGE==='paused') ? `<div class="ci-panel">${askCard()}${scopedComposer()}</div>` : '';
+  return `
+    <div class="rejected-banner">⛔ <b>REJECTED exploration.</b> A dedicated full-screen run view — kept only to document why it loses. See the trade-off card →</div>
+    <div class="runview-top">
+      <span class="back" onclick="setStage('after')">‹ Back to thread</span>
+      <div style="flex:1">
+        <div class="rv-title">${WF.name}</div>
+        <div class="rv-sub">${rvSub}</div>
+      </div>
+      ${statusStrip(CUR_STAGE)}
+    </div>
+    <div class="runview-body scrollbar-thin">
+      <div class="runview-main">
+        ${spine}
+        ${ask}
+        ${bridge}
+      </div>
+      <div class="runview-side">
+        <div class="ci-panel">
+          <div class="cip-h">Run summary</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.7">
+            <div>Phase <b style="color:var(--color-text)">${terminal?'6/6':CUR_STAGE==='paused'?'5/6':CUR_STAGE==='launching'?'1/6':'3/6'}</b></div>
+            <div>14 vendors · ${CUR_STAGE==='launching'?'0':'31'} sources</div>
+            <div>Tier: <b style="color:var(--color-text)">${WF.tier}</b> · gates active</div>
+          </div>
+        </div>
+        <div class="tradeoff-card">
+          <div class="tc-h">⛔ why this is rejected</div>
+          <ul>
+            <li><b>Hides the panel</b> — the workspace panel (Files / Versions / the spine itself) is gone here; the app's one execution surface is thrown away.</li>
+            <li><b>Loses conversational follow-up</b> — no "summarize the top 3" or "tweak → new version" inline; the run stops being an episode in the thread.</li>
+            <li><b>Duplicates plumbing</b> — re-creates the run/stream/lock/resume the harness already ships, on a surface you abandon the moment the run ends.</li>
+            <li><b>Dual-surface bounce</b> — exactly the "eyes bounce, nothing is clearly the live thing" failure sketch 004 warns about: now the run view AND the panel both want to be home.</li>
+          </ul>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── nav rail (escape-hatch parallel thread shown in A) ── */
+function navRail(){
+  const running = (CUR_STAGE==='launching'||CUR_STAGE==='running'||CUR_STAGE==='paused');
+  const secondThread = (CUR_V==='A' && running)
+    ? `<div class="nav-ico" title="A second thread — chat freely here while the run continues" onclick="flashThread()">💬<span class="thread-dot"></span></div>`
+    : '';
+  return `
+    <div class="logo"></div>
+    <div class="nav-ico active ${running?'running-mark':''}" title="${running?'This thread — workflow running':'Chat'}">💬</div>
+    ${secondThread}
+    <div class="nav-ico" title="Workflows page (launch from here)">⚙</div>
+    <div class="nav-ico" title="Documents">▤</div>`;
+}
+
+/* ── panel body (the spine + files + honesty legend), and head/rail state ── */
+function renderPanel(){
+  const stage = CUR_STAGE;
+  const running = (stage==='launching'||stage==='running'||stage==='paused');
+  const terminal = (stage==='resolve'||stage==='after');
+  document.getElementById('panelDot').style.display = running ? 'block' : 'none';
+  const headTag = document.getElementById('panelHeadTag');
+  headTag.className = 'head-tag' + (terminal && RESOLVE_KIND==='completed' ? ' done' : '');
+  headTag.textContent = running ? 'harness · live' : terminal ? (RESOLVE_KIND==='completed'?'harness · done':'harness · ended') : '';
+
+  let body = '';
+  if (stage==='before'){
+    // resting — no workflow; calm empty-state (the common case, 004-B short-circuit)
+    body = `<div class="panel-note" style="font-size:12px;color:var(--color-text-dim);line-height:1.6">
+      <b style="color:var(--color-primary)">Before — resting Deep chat.</b> No workflow running, so the panel is quiet (Todos / Files / Versions appear only when there's something to show). Launch a workflow and the live <b>meaningful phase spine</b> lands here — never inside the chat.</div>`;
+  } else {
+    body = panelSpine(stage) + panelFiles(stage);
+  }
+  body += honestyBox();
+  body += caveatNote();
+  document.getElementById('panelBody').innerHTML = body;
+
+  // rail badge
+  const ord = activeOrdinal(stage);
+  document.getElementById('railBadge').textContent = `${terminal?'6':ord}/${WF.phases.length}`;
+  announce(running ? `Workflow running — phase ${ord} of ${WF.phases.length} in the workspace panel.` : '');
+}
+
+function caveatNote(){
+  let caveat = '';
+  if (CUR_V==='A') caveat = `<div class="callout"><b>Composer A (★ Selected):</b> the run owns the composer — locked + Cancel during the run; only the scoped pause reply gets in; unlocks to normal Deep chat after. You're <span class="honest">never truly blocked</span> — open a parallel thread to chat freely.</div>`;
+  if (CUR_V==='B') caveat = `<div class="callout"><b>Composer B (documented alternative):</b> the composer stays live next to the stream — but two live streams writing one thread risks the <span class="honest">tangle / silent send-drop</span> (the documented parallel-stream race). Surfaced in the composer, not hidden.</div>`;
+  if (CUR_V==='C') caveat = `<div class="callout"><b>Composer C (REJECTED):</b> the dedicated full-screen run view <span class="honest">hides this panel</span>, loses conversational follow-up, and duplicates the run plumbing the harness already ships.</div>`;
+  return caveat;
+}
+
+function render(){
+  document.getElementById('navRail').innerHTML = navRail();
+  renderCenter();
+  if (!(CUR_V==='C' && (CUR_STAGE==='launching'||CUR_STAGE==='running'||CUR_STAGE==='paused'||CUR_STAGE==='resolve'))){
+    renderPanel();
+  }
+}
+function stripTags(h){ const d=document.createElement('div'); d.innerHTML=h; return d.textContent; }
+let lastAnnounce='';
+function announce(msg){ if(msg!==lastAnnounce){ document.getElementById('announcer').textContent=msg; lastAnnounce=msg; } }
+
+function setVariant(v){
+  CUR_V=v; PICKED=null; ANSWER_SENT=false; RAIL=false;
+  if (CUR_STAGE==='resolve') ANSWER_SENT=true;
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v));
+  render();
+}
+function setStage(s){
+  CUR_STAGE=s;
+  if (s!=='resolve' && s!=='after') RESOLVE_KIND='completed';
+  if (s==='paused'){ ANSWER_SENT=false; PICKED=null; }
+  if (s==='resolve'||s==='after') ANSWER_SENT=true;
+  syncCycler();
+  render();
+}
+function toggleRail(){ RAIL=!RAIL; render(); }
+function syncCycler(){
+  document.querySelectorAll('#lcCycler button').forEach(b=>b.classList.toggle('on',b.dataset.s===CUR_STAGE));
+  document.querySelectorAll('#resolveKind button').forEach(b=>b.classList.toggle('on',b.dataset.r===RESOLVE_KIND));
+}
+function setResolveKind(k){
+  RESOLVE_KIND=k;
+  // a resolve-kind preview can only make sense at a terminal — if we're mid-run, jump to resolve.
+  // Flash the lifecycle 'Resolve' button so the cause→effect of the stage teleport is VISIBLE, not just announced.
+  const jumped = (CUR_STAGE!=='resolve' && CUR_STAGE!=='after');
+  if (jumped) CUR_STAGE='resolve';
+  ANSWER_SENT=true;
+  syncCycler(); render();
+  if (jumped){
+    const rb = document.querySelector('#lcCycler button[data-s="resolve"]');
+    if (rb) rb.animate([{boxShadow:'0 0 0 2px var(--color-primary)'},{boxShadow:'0 0 0 0 transparent'}],{duration:900});
+  }
+  announce(k==='completed'?'Resolve: completed — deliverable produced.'
+    : k==='failed'?'Resolve: failed honestly — no deliverable, the cited-output gate blocked it.'
+    : 'Resolve: cancelled — no deliverable produced.');
+}
+
+function cancelRun(){
+  ANSWER_SENT=false; PICKED=null; RESOLVE_KIND='cancelled'; CUR_STAGE='resolve';
+  syncCycler(); render();
+  announce('Run cancelled — no deliverable produced. Once you dismiss this, the thread returns to normal Deep chat.');
+}
+function flashThread(){ const n=document.querySelectorAll('.nav-ico'); const t=n[2]||n[1];
+  if(t) t.animate([{boxShadow:'0 0 0 2px var(--color-primary)'},{boxShadow:'0 0 0 0 transparent'}],{duration:900}); }
+function flashPanel(){
+  const p=document.getElementById('panelCol');
+  if(p && p.style.display!=='none'){ p.animate([{boxShadow:'inset 0 0 0 2px var(--color-primary)'},{boxShadow:'inset 0 0 0 0 transparent'}],{duration:900}); return; }
+  // panel collapsed → flash the rail to point home
+  const r=document.getElementById('panelRail');
+  if(r && r.style.display!=='none'){ r.animate([{boxShadow:'inset 0 0 0 2px var(--color-primary)'},{boxShadow:'inset 0 0 0 0 transparent'}],{duration:900}); }
+}
+
+/* keyboard: ⌘. / Ctrl+. toggles the panel rail (mirrors the app) */
+document.addEventListener('keydown', (e)=>{ if((e.metaKey||e.ctrlKey) && e.key==='.'){ e.preventDefault(); toggleRail(); } });
+
+syncCycler();
+render();
+</script>
+</body>
+</html>

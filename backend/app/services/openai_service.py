@@ -95,6 +95,152 @@ QUERY_DOCUMENTS_TOOL = {
     },
 }
 
+# Phase 115 (VIEW-07) — the one new agent tool: list ALL documents matching a saved
+# view or exact metadata criteria (complete, deterministic, newest-first; NO semantic
+# ranking, NO query string). Cross-provider-safe shape (RESEARCH §Pattern 1, D-115-13):
+# two FLAT optional fields `view` XOR `filter` + optional `limit`, the either/or
+# invariant stated in PROSE (never anyOf/oneOf — Gemini function-calling rejects them),
+# the nested `filter` mirroring render_template's nested-object-with-required precedent
+# (production-proven across the native-7), and the condition `op` enum matching
+# ViewCondition.op (models/document_view.py:42-64) EXACTLY so the parsed object validates
+# against ViewFilter.model_validate(...) without translation.
+QUERY_DOCUMENTS_BY_VIEW_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "query_documents_by_view",  # final name — D-115-12
+        "description": (
+            "List ALL documents matching a saved view or exact metadata criteria — "
+            "complete, deterministic, newest-first, NO semantic ranking and NO search "
+            "query string. Use this for 'show me all X', 'how many X', 'list my "
+            "contracts', 'open my Invoices view', 'which docs expire within 90 days'. "
+            "This is NOT search_documents (which needs a natural-language query and "
+            "returns ranked top-K passages) and NOT query_documents (free SQL). "
+            "Provide EXACTLY ONE of: `view` (a saved view name) OR `filter` (inline "
+            "metadata conditions). Provide NEITHER to discover what saved views and "
+            "filterable fields exist (a catalog is returned — then call again with a "
+            "concrete choice). Never provide both."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "view": {
+                    "type": "string",
+                    "description": (
+                        "Name of a saved view to run (e.g. 'Invoices', 'Expiring "
+                        "Contracts'). Case-insensitive. Omit to use `filter` or to "
+                        "request the catalog."
+                    ),
+                },
+                "filter": {
+                    "type": "object",
+                    "description": (
+                        "An inline metadata filter (use INSTEAD of `view`). A flat "
+                        "AND-list of conditions; every condition matches exactly."
+                    ),
+                    "properties": {
+                        "op": {"type": "string", "enum": ["and"]},
+                        "conditions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "field": {
+                                        "type": "string",
+                                        "description": "A filterable field (call with no args to see the catalog of fields).",
+                                    },
+                                    "op": {
+                                        "type": "string",
+                                        "enum": [
+                                            "eq", "gte", "lte", "one_of", "contains",
+                                            "is_empty", "within_next", "older_than",
+                                            "before", "after", "between",
+                                        ],
+                                    },
+                                    "value": {"type": ["string", "number", "boolean", "null"]},
+                                    "value2": {
+                                        "type": ["string", "number", "null"],
+                                        "description": "Upper bound for 'between'.",
+                                    },
+                                    "values": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Membership list for 'one_of'.",
+                                    },
+                                    "unit": {
+                                        "type": "string",
+                                        "enum": ["days", "weeks", "months"],
+                                        "description": "Span unit for within_next/older_than.",
+                                    },
+                                },
+                                "required": ["field", "op"],
+                            },
+                        },
+                    },
+                    "required": ["op", "conditions"],
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max rows to return (default 20, hard cap 50). The TRUE total is always reported.",
+                },
+            },
+            # No top-level required → catalog mode (neither field) is reachable.
+        },
+    },
+}
+
+
+# Phase 116 (REL-04) — get_related_documents: traverse the human-curated relationship
+# graph (D-116-8). SIMPLER than QUERY_DOCUMENTS_BY_VIEW_TOOL by design: two flat scalar-
+# string fields, NO anyOf/oneOf, NO multi-type `type` arrays. The a5b0b917 discipline —
+# avoiding anyOf/oneOf is NECESSARY-NOT-SUFFICIENT for Gemini; a multi-type `type:[...]`
+# array ALSO 400s google-genai (Phase 115 live UAT). The "provide exactly one" either/or
+# lives in PROSE, never in the schema shape; the handler resolves whichever one is given.
+GET_RELATED_DOCUMENTS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_related_documents",
+        "description": (
+            "List the typed relationships a document has with OTHER documents — the "
+            "human-curated links, NOT semantic similarity. Returns BOTH directions: "
+            "OUTGOING edges (this document supersedes / amends / references / is "
+            "attached_to another) AND INCOMING edges, surfaced with the inverse label "
+            "(superseded_by / amended_by / referenced_by / has_attachment). Use this for "
+            "'what does this document supersede', 'which documents reference this one', "
+            "'show me the related / linked / attached documents', 'what amends this "
+            "contract', 'is there a newer version linked here'. This is NOT "
+            "search_documents (semantic) and NOT query_documents_by_view (metadata). "
+            "Identify the subject document by `document_id` (preferred) OR its exact "
+            "`filename`. Provide EXACTLY ONE of the two — never both. A linked document "
+            "you cannot access is shown as 'linked document (no access)' so you learn a "
+            "relationship exists without seeing its contents."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "string",
+                    "description": (
+                        "The id of the subject document whose relationships you want "
+                        "(preferred — unambiguous). Omit if you only have the filename."
+                    ),
+                },
+                "filename": {
+                    "type": "string",
+                    "description": (
+                        "The EXACT filename of the subject document (use INSTEAD of "
+                        "`document_id` when you do not have the id). Case-insensitive "
+                        "exact match — not a partial/substring search."
+                    ),
+                },
+            },
+            # No top-level `required` — the either/or is prose-only (a hard XOR in the
+            # schema would push a Gemini-unsafe shape). The handler returns a calm
+            # 'provide exactly one' result when neither is given.
+        },
+    },
+}
+
+
 LS_TOOL = {
     "type": "function",
     "function": {
@@ -873,13 +1019,23 @@ EXPLORER_SYSTEM_PROMPT = (
 def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict]:
     """Return the active tool list based on per-user effective settings."""
     effective = user_settings if user_settings is not None else None
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, QUERY_DOCUMENTS_BY_VIEW_TOOL,
+             GET_RELATED_DOCUMENTS_TOOL,
+             LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
              # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
              WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
+    # Phase 116 (REL-04) — D-116-10 / SC#1: get_related_documents is Deep-visible here
+    # AND registered in tool_dispatcher._TOOL_REGISTRY (the dual-wiring contract — a
+    # registry entry the model never SEES is dead; the Phase-101 render_template
+    # half-wired bug, guarded by the 115 precedent). MUST be in BOTH.
+    # Phase 115 (VIEW-07) — D-115-8: Deep-visible so the model actually SEES it (SC#1).
+    # The inverse of render_template (registered in _TOOL_REGISTRY but NOT advertised here —
+    # harness-only); this tool MUST be in BOTH. apply_tool_budget only trims on the HARNESS
+    # path (Google max_tools:16); Deep stays byte-identical with this tool present.
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
     if web_enabled:
@@ -1447,7 +1603,14 @@ def create_adaptive_streaming_chat(
 
             # OpenRouter quality strategy enhancements
             if user_settings and getattr(user_settings, "openrouter_tool_strategy", "quality") == "quality":
-                if effective_model.startswith("openrouter/") or "/" in effective_model:
+                # D-09 #3 (BUG-260616-01): gate on the RESOLVED provider, not the model
+                # string. The old `"/" in effective_model` slash-gate fired for EVERY
+                # `org/model` id — which is exactly how every LM Studio/Ollama model is
+                # named (`google/gemma-4-e4b`) — appending `:exacto` + a `response-healing`
+                # plugin that 500s the local server. `provider` is resolved upstream
+                # (active_provider or settings.llm_provider) so OpenRouter still gets the
+                # quality strategy while local providers are left untouched.
+                if provider == "openrouter":
                     # Append :exacto for quality routing if not already present
                     if ":exacto" not in effective_model:
                         kwargs["model"] = f"{effective_model}:exacto"

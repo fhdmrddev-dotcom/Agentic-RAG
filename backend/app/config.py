@@ -13,6 +13,7 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "google": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "",  # resolved dynamically from ollama_base_url
+    "lmstudio": "",  # resolved dynamically from lmstudio_base_url (Phase 111 D-111-7)
     "deepseek": "https://api.deepseek.com/v1",
     "moonshot": "https://api.moonshot.ai/v1",
     "minimax": "https://api.minimax.io/v1",        # INTERNATIONAL host — matches int'l key (D-089 docs curation 2026-05-30; api.minimax.chat is the China host, rejects int'l keys w/ 401)
@@ -348,6 +349,15 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
 #
 # All patterns are anchored at ``^`` with bounded character classes to keep
 # ``re.search`` linear in the input length — T-075.3-02-01 ReDoS mitigation.
+#
+# D-09 #1 / BUG-260616-01 (data-egress) — NAME-INFERENCE IS LAST-RESORT ONLY.
+# The `^word/word → openrouter` rule below cannot disambiguate a slashed id that
+# legitimately lives behind OpenRouter, a local LM Studio, OR a local Ollama
+# (`google/gemma-3-4b` is valid on all three). A name therefore CANNOT identify
+# the endpoint. Any caller that has an explicit stored `(provider, model)` pair
+# (e.g. `app_settings.extraction_provider`) MUST prefer it and skip this inference
+# entirely — see `backend/app/api/documents.py` extraction routing. Inference here
+# stays purely as the legacy fallback for rows that never pinned a provider.
 _INFERENCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^gpt-", re.IGNORECASE), "openai"),
     (re.compile(r"^o[1-9](-|$)", re.IGNORECASE), "openai"),
@@ -689,6 +699,9 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     openrouter_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
+    # Phase 111 D-111-7 — LM Studio first-class provider (local OpenAI-compatible
+    # server). Its URL ALREADY includes /v1, unlike ollama which appends it.
+    lmstudio_base_url: str = "http://localhost:1234/v1"
 
     # Direct provider keys (Phase 076.1 — curated OpenAI-compatible providers)
     deepseek_api_key: str = ""
@@ -737,6 +750,7 @@ class Settings(BaseSettings):
             "google": self.google_api_key,
             "openrouter": self.openrouter_api_key,
             "ollama": "ollama",  # Ollama doesn't require a real key
+            "lmstudio": "lm-studio",  # LM Studio doesn't require a real key (Phase 111 D-111-7)
             "deepseek": self.deepseek_api_key,
             "moonshot": self.moonshot_api_key,
             "minimax": self.minimax_api_key,
@@ -749,6 +763,9 @@ class Settings(BaseSettings):
 
         if provider == "ollama":
             self.llm_base_url = f"{self.ollama_base_url.rstrip('/')}/v1"
+        elif provider == "lmstudio":
+            # LM Studio's URL ALREADY includes /v1 — NO append (unlike ollama).
+            self.llm_base_url = self.lmstudio_base_url.rstrip("/")
         else:
             self.llm_base_url = _PROVIDER_BASE_URLS[provider]
 

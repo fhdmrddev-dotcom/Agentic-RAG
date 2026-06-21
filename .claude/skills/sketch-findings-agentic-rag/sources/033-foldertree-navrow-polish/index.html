@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 033 — Folder Tree + NavRow Polish</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+  .stage { display: flex; gap: var(--space-6); padding: var(--space-6); align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 280px; max-width: 320px; }
+  .col h3 { font-family: var(--font-headline); font-size: var(--text-md); margin: 0 0 4px; }
+  .col .cap { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: var(--space-3); min-height: 32px; }
+  .col.bad h3 { color: var(--color-warning); }
+  .col.good h3 { color: var(--color-success); }
+  .side { border: 1px solid var(--color-border); background: var(--color-bg-elev1); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-2); }
+
+  .grp-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-2); margin: var(--space-3) 0 var(--space-2); }
+  .grp-head:first-of-type { margin-top: 0; }
+  .grp-head .t { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim); }
+  .grp-head .add { width: 24px; height: 24px; border-radius: var(--radius-sm); display: grid; place-items: center; background: none; border: none; color: var(--color-text-dim); cursor: pointer; }
+  .grp-head .add:hover { background: var(--color-accent); color: var(--color-text); }
+
+  .navsearch { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--space-2); padding: 5px 8px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .navsearch input { flex: 1; background: none; border: none; outline: none; color: var(--color-text); font-size: var(--text-sm); font-family: inherit; }
+  .navsearch .i { color: var(--color-text-dim); font-size: 12px; }
+
+  /* ─── Shared NavRow primitive (the fix) ─── */
+  .nr { position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); transition: background var(--dur-fast); }
+  .nr:hover, .nr:focus-within { background: var(--color-accent); color: var(--color-text); }
+  .nr.active { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; box-shadow: inset 2px 0 0 var(--color-primary); }
+  .nr .chev { width: 12px; flex-shrink: 0; color: var(--color-text-dim); font-size: 10px; cursor: pointer; transition: transform var(--dur-fast); display: inline-flex; }
+  .nr .chev.open { transform: rotate(90deg); }
+  .nr .chev.leaf { visibility: hidden; }
+  .nr .ico { width: 16px; text-align: center; flex-shrink: 0; }
+  .nr .ico.folder { color: hsl(38 92% 60% / 0.75); }
+  .nr.active .ico.folder { color: var(--color-primary); }
+  .nr .ico.view { color: var(--color-primary); }
+  .nr .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nr .gpill { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); background: var(--color-muted); padding: 1px 6px; border-radius: var(--radius-full); flex-shrink: 0; cursor: help; }
+  .nr .cnt { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); flex-shrink: 0; min-width: 18px; text-align: right; }
+  .nr .menu { flex-shrink: 0; display: flex; gap: 1px; opacity: 0.25; transition: opacity var(--dur-fast); }
+  .nr:hover .menu, .nr:focus-within .menu { opacity: 1; }
+  .nr .menu button { width: 24px; height: 24px; border-radius: var(--radius-sm); border: none; background: none; color: var(--color-text-dim); cursor: pointer; font-size: 12px; }
+  .nr .menu button:hover, .nr .menu button:focus { background: var(--color-surface); color: var(--color-text); outline: 1px solid var(--color-primary-glow); }
+  /* single soft indent guide instead of hand-drawn branch lines */
+  .nr-wrap.indented { border-left: 1px solid var(--color-border-soft); margin-left: 14px; }
+
+  /* depth-cap (variant C) */
+  .more-levels { font-size: var(--text-xs); color: var(--color-primary); padding: 4px 8px 4px 30px; cursor: pointer; }
+  .more-levels:hover { text-decoration: underline; }
+  .crumb-line { font-size: 10px; color: var(--color-text-dim); padding: 2px 8px 6px 30px; font-family: var(--font-mono); }
+
+  /* ════════ BEFORE — today's tree (variant B) ════════ */
+  .old-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .old-row:hover { background: var(--color-accent); color: var(--color-text); }
+  .old-row . chev { }
+  .old-row .ico { width: 16px; text-align: center; color: hsl(38 92% 60% / 0.75); flex-shrink: 0; }
+  .old-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .old-row .gpill { font-size: 9px; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); background: var(--color-muted); padding: 1px 6px; border-radius: var(--radius-full); }
+  .old-row .menu { margin-left: auto; display: flex; gap: 1px; opacity: 0; transition: opacity var(--dur-fast); }
+  .old-row:hover .menu { opacity: 1; }
+  .old-row .menu button { width: 22px; height: 22px; border: none; background: none; color: var(--color-text-dim); cursor: pointer; font-size: 11px; }
+  .guide-v { position: absolute; top: 0; bottom: 0; border-left: 1px solid hsl(220 20% 16% / 0.55); }
+  .guide-h { position: absolute; top: 50%; width: 10px; border-top: 1px solid hsl(220 20% 16% / 0.55); }
+  .flaw { color: var(--color-warning); font-size: 10px; }
+
+  .legend { padding: 0 var(--space-6) var(--space-12); max-width: 760px; }
+  .legend h4 { font-family: var(--font-headline); font-size: var(--text-sm); margin: var(--space-4) 0 var(--space-2); }
+  .legend ul { margin: 0; padding-left: 18px; color: var(--color-text-muted); font-size: var(--text-sm); }
+  .legend li { margin-bottom: 4px; }
+  .legend .x { color: var(--color-warning); } .legend .ok { color: var(--color-success); }
+
+  .tip { position: fixed; z-index: 9999; background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text); font-size: var(--text-xs); padding: 5px 9px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md); pointer-events: none; opacity: 0; transition: opacity var(--dur-fast); }
+  .tip.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">033 · Folder Tree + NavRow Polish</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Unified NavRow (after) <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Today (before)</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Deep-nesting: indent cap</button>
+</div>
+
+<!-- ══════════ VARIANT A — polished, unified ══════════ -->
+<div id="va" class="variant">
+  <div class="stage">
+    <div class="col good">
+      <h3>One row, two peers</h3>
+      <div class="cap">Folders and Views are built from the <b>same row</b> — both show a count, both have a reachable menu. The only differences: the icon (folder vs funnel) and which actions appear.</div>
+      <div class="side">
+        <div class="navsearch"><span class="i">⌕</span><input placeholder="Filter folders &amp; views…" oninput="filterNav('a',this.value)"></div>
+        <div class="grp-head"><span class="t">Folders</span><button class="add" title="New folder">＋</button></div>
+        <div id="a-folders"></div>
+        <div class="grp-head"><span class="t">Views</span><button class="add" title="New view">＋</button></div>
+        <div id="a-views"></div>
+      </div>
+    </div>
+    <div class="legend col">
+      <h4>What changed</h4>
+      <ul>
+        <li><span class="ok">✓</span> <b>Every row shows a count</b> — folders too, not just Views. No more guessing how much is in a folder.</li>
+        <li><span class="ok">✓</span> <b>Views are flat</b> — a saved filter never nests, so it never inherits the tree's indentation.</li>
+        <li><span class="ok">✓</span> <b>One soft indent guide</b> replaces the hand-drawn branch lines that read as noise.</li>
+        <li><span class="ok">✓</span> <b>The “G” has a tooltip</b> — hover it: “Global — shared with everyone.” Same labeled pill on global Views.</li>
+        <li><span class="ok">✓</span> <b>Actions are always faintly visible</b> and keyboard-reachable — not hidden until hover.</li>
+        <li><span class="ok">✓</span> <b>A small filter box</b> appears once you have many folders/views.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT B — today (before) ══════════ -->
+<div id="vb" class="variant" style="display:none">
+  <div class="stage">
+    <div class="col bad">
+      <h3>Today's tree</h3>
+      <div class="cap">The current <code style="font-family:var(--font-mono)">FolderNode</code> — what “not good” looks like. Hover a row to find the tiny action buttons.</div>
+      <div class="side">
+        <div class="grp-head"><span class="t">Folders</span><button class="add" title="New folder">＋</button></div>
+        <div id="b-folders"></div>
+      </div>
+    </div>
+    <div class="legend col">
+      <h4>The problems (verified in code)</h4>
+      <ul>
+        <li><span class="x">✗</span> <b>No count on subfolders</b> — only “Root” shows one; you can't tell what's inside.</li>
+        <li><span class="x">✗</span> <b>Unbounded nesting</b> — 16px per level with no cap; deep folders truncate the name to nothing.</li>
+        <li><span class="x">✗</span> <b>Dense hand-drawn guide lines</b> — two 1px branch lines per child read as visual noise.</li>
+        <li><span class="x">✗</span> <b>Tiny hover-only actions</b> — ~24px, invisible until hover, unreachable by touch/keyboard.</li>
+        <li><span class="x">✗</span> <b>Opaque “G” pill</b> — a bare letter with no explanation.</li>
+        <li><span class="x">✗</span> <b>Adding a “Views” group as-is</b> would clone every one of these flaws and look inconsistent beside Folders.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT C — deep-nesting strategy ══════════ -->
+<div id="vc" class="variant" style="display:none">
+  <div class="stage">
+    <div class="col good">
+      <h3>Capped indent + path</h3>
+      <div class="cap">Beyond ~3 levels, stop indenting and show the remaining path inline, so a deep folder never crushes its own name. Selecting a deep folder still shows a breadcrumb above the list.</div>
+      <div class="side">
+        <div class="navsearch"><span class="i">⌕</span><input placeholder="Filter folders &amp; views…"></div>
+        <div class="grp-head"><span class="t">Folders</span><button class="add">＋</button></div>
+        <div id="c-folders"></div>
+        <div class="grp-head"><span class="t">Views</span><button class="add">＋</button></div>
+        <div id="c-views"></div>
+      </div>
+    </div>
+    <div class="legend col">
+      <h4>The over-nesting answer</h4>
+      <ul>
+        <li><span class="ok">✓</span> Indent caps at level 3; deeper folders align there with a small path prefix (e.g. <code style="font-family:var(--font-mono)">…/Q1/</code>).</li>
+        <li><span class="ok">✓</span> The existing breadcrumb carries deep location, so the tree stays shallow and scannable.</li>
+        <li><span class="ok">✓</span> Everything else is the same unified NavRow from variant A.</li>
+        <li>Trade-off: a tiny bit less literal hierarchy on screen, in exchange for never truncating names.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="vp(420)">📱</button><button onclick="vp(0)">🖥</button>
+</div>
+
+<script>
+const FOLDERS = [
+  {id:'mer',parent:null,name:'Project Meridian',count:5},
+  {id:'sr',parent:'mer',name:'Status Reports',count:3},
+  {id:'y26',parent:'sr',name:'2026',count:3},
+  {id:'q1',parent:'y26',name:'Q1',count:2},
+  {id:'dr',parent:'q1',name:'Drafts',count:1},
+  {id:'fin',parent:null,name:'Finance',count:18},
+  {id:'inv',parent:'fin',name:'Invoices',count:12},
+  {id:'con',parent:'fin',name:'Contracts',count:4},
+  {id:'comp',parent:null,name:'Compliance',count:6,global:true},
+];
+const VIEWS = [
+  {id:'v1',name:'Invoices',count:47},
+  {id:'v2',name:'Expiring ≤ 90 days',count:6},
+  {id:'v3',name:'Status: Amber',count:3},
+  {id:'v4',name:'Compliance',count:12,global:true},
+];
+function childrenOf(pid){ return FOLDERS.filter(f=>f.parent===pid); }
+let expanded = new Set(['mer','sr','y26','q1','fin']); // deep chain open so nesting shows
+let active = {a:'inv', c:'inv'};
+
+// ── Shared NavRow (variant A + C) ──
+function navRow(scope, f, depth, capped){
+  const kids = childrenOf(f.id);
+  const isOpen = expanded.has(f.id);
+  const act = active[scope]===f.id ? 'active' : '';
+  const chev = kids.length ? `<span class="chev ${isOpen?'open':''}" onclick="event.stopPropagation();toggle('${scope}','${f.id}')">▸</span>` : `<span class="chev leaf">▸</span>`;
+  const g = f.global ? `<span class="gpill" data-tip="Global — shared with everyone" onmouseenter="tip(event)" onmouseleave="untip()">G</span>` : '';
+  return `<div class="nr ${act}" tabindex="0" onclick="select('${scope}','${f.id}')">${chev}<span class="ico folder">📁</span><span class="nm">${f.name}</span>${g}<span class="cnt">${f.count}</span><span class="menu"><button title="New subfolder">＋</button><button title="More">⋯</button></span></div>`;
+}
+function viewRow(scope, v){
+  const g = v.global ? `<span class="gpill" data-tip="Global — shared with everyone" onmouseenter="tip(event)" onmouseleave="untip()">G</span>` : '';
+  return `<div class="nr" tabindex="0"><span class="chev leaf">▸</span><span class="ico view">⛛</span><span class="nm">${v.name}</span>${g}<span class="cnt">${v.count}</span><span class="menu"><button title="Edit filter">✎</button><button title="More">⋯</button></span></div>`;
+}
+function renderTree(scope, capped){
+  const CAP = 3;
+  function walk(pid, depth){
+    return childrenOf(pid).map(f=>{
+      const over = capped && depth > CAP;
+      const dShown = capped ? Math.min(depth, CAP) : depth;
+      const wrap = dShown>0 ? `<div class="nr-wrap indented" style="margin-left:${dShown*12}px">` : `<div class="nr-wrap">`;
+      let inner = navRow(scope, f, dShown, capped);
+      if(over){
+        // show path prefix instead of further indent
+        const path = pathTo(f).slice(-2,-1).map(p=>p.name).join('/');
+        inner = inner.replace('<span class="nm">', `<span class="nm"><span style="color:var(--color-text-dim);font-family:var(--font-mono);font-size:10px">…/${path}/</span>`);
+      }
+      let childHtml = '';
+      if(expanded.has(f.id)) childHtml = walk(f.id, depth+1);
+      return wrap + inner + childHtml + `</div>`;
+    }).join('');
+  }
+  return walk(null, 0);
+}
+function pathTo(f){ const out=[]; let cur=f; while(cur){ out.unshift(cur); cur=FOLDERS.find(x=>x.id===cur.parent); } return out; }
+
+// ── BEFORE renderer (variant B) — approximates today's FolderNode ──
+function renderOld(){
+  function walk(pid, depth){
+    return childrenOf(pid).map(f=>{
+      const kids = childrenOf(f.id);
+      const isOpen = expanded.has(f.id);
+      const guides = depth>0 ? `<div class="guide-v" style="left:${(depth-1)*16+16}px"></div><div class="guide-h" style="left:${(depth-1)*16+16}px"></div>` : '';
+      const g = f.global ? `<span class="gpill">G</span>` : '';
+      const chev = kids.length ? `<span style="width:14px;color:var(--color-text-dim);font-size:10px;cursor:pointer" onclick="event.stopPropagation();toggle('b','${f.id}')">${isOpen?'▾':'▸'}</span>` : `<span style="width:14px"></span>`;
+      // NOTE: deliberately NO count on children (the flaw)
+      const row = `<div style="position:relative;padding-left:${depth*16+4}px">${guides}<div class="old-row">${chev}<span class="ico">📁</span><span class="nm">${f.name}</span>${g}<span class="menu"><button>＋</button><button>⋯</button></span></div></div>`;
+      return row + (isOpen ? walk(f.id, depth+1) : '');
+    }).join('');
+  }
+  // Root with the ONLY count, like today
+  const root = `<div class="old-row"><span style="width:14px"></span><span class="ico">📁</span><span class="nm">Root</span><span class="cnt" style="margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)">36</span></div>`;
+  document.getElementById('b-folders').innerHTML = root + walk(null,0);
+}
+
+function renderAll(){
+  document.getElementById('a-folders').innerHTML = renderTree('a', false);
+  document.getElementById('a-views').innerHTML = VIEWS.map(v=>viewRow('a',v)).join('');
+  document.getElementById('c-folders').innerHTML = renderTree('c', true);
+  document.getElementById('c-views').innerHTML = VIEWS.map(v=>viewRow('c',v)).join('');
+  renderOld();
+}
+function toggle(scope,id){ expanded.has(id)?expanded.delete(id):expanded.add(id); renderAll(); }
+function select(scope,id){ active[scope]=id; renderAll(); }
+function filterNav(scope,q){ /* visual only */ q=q.toLowerCase(); document.querySelectorAll(`#${scope}-folders .nr, #${scope}-views .nr`).forEach(r=>{ const nm=r.querySelector('.nm').textContent.toLowerCase(); r.style.display = nm.includes(q)?'':'none'; }); }
+
+// G-pill tooltip
+function tip(e){ const t=document.getElementById('tip'); t.textContent=e.target.dataset.tip; t.classList.add('show'); const r=e.target.getBoundingClientRect(); t.style.left=r.left+'px'; t.style.top=(r.bottom+6)+'px'; }
+function untip(){ document.getElementById('tip').classList.remove('show'); }
+
+function vp(w){ document.querySelectorAll('.col').forEach(c=>{ if(w){ c.style.maxWidth=Math.min(w-40,320)+'px'; } else c.style.maxWidth='320px'; }); }
+function showVariant(id,e){ document.querySelectorAll('.variant').forEach(v=>v.style.display='none'); document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); document.getElementById('v'+id).style.display='block'; e.target.closest('.variant-tab').classList.add('active'); }
+
+renderAll();
+</script>
+</body>
+</html>

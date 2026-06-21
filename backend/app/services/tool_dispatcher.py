@@ -34,6 +34,23 @@ from app.services.audit_service import write_audit_entry
 from app.services.sandbox_service import sandbox_manager, harvest_output_files
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
+# Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
+# resolve core IN-PROCESS (no FastAPI self-call). ``ViewFilter`` + the two view/field
+# services are cycle-safe at module level (they import only pydantic/dependencies/db).
+# ``resolve_filter`` / ``ResolveError`` / ``_build_field_meta`` live in
+# ``document_view_resolver``, which transitively imports ``harness.scope`` →
+# ``task_service`` → back to THIS module — a real import cycle if pulled at module load.
+# They are bound LAZILY via ``_ensure_resolver()`` into THESE module globals (sentinels
+# below) so (a) the cycle is broken and (b) the unit-test ``monkeypatch.setattr(td,
+# "resolve_filter", ...)`` still targets the exact name the handler calls (patch-where-used:
+# a non-None monkeypatched value is preserved, never re-imported).
+from app.models.document_view import ViewFilter
+from app.services import document_view_service, metadata_field_service
+# Phase 116 (REL-04) — get_related_documents reuses the SAME shared resolver
+# (_resolve_readable_latest) IN-PROCESS for leak-safe per-viewer masking. The
+# relationship service imports only pydantic/dependencies/db/folder_utils → cycle-safe
+# at module level (unlike document_view_resolver, which transitively pulls harness).
+from app.services import document_relationship_service
 from app.services.workspace_service import (
     write_file as ws_write_file,
     read_file as ws_read_file,
@@ -123,6 +140,40 @@ class ToolResult:
     citations: list[dict] = field(default_factory=list)  # New citation objects
     similarity_score: float | None = None  # Avg similarity to accumulate
     sub_agent_record: dict | None = None  # Sub-agent metadata (analyze_document)
+
+
+# ---------------------------------------------------------------------------
+# Phase 115 (VIEW-07) — lazy resolver binding (cycle-break + monkeypatch-friendly)
+# ---------------------------------------------------------------------------
+# Sentinels: bound on first use by _ensure_resolver(). Declared at module scope so a
+# test can `monkeypatch.setattr(td, "resolve_filter", spy)` and the handler picks up the
+# spy (a non-None value is NEVER overwritten by the lazy import — patch-where-used).
+resolve_filter = None  # type: ignore[assignment]
+ResolveError = None  # type: ignore[assignment]
+_build_field_meta = None  # type: ignore[assignment]
+
+
+def _ensure_resolver() -> None:
+    """Bind the document_view_resolver symbols into THIS module's globals on first use.
+
+    Deferred (not a top-level import) to break the cycle:
+    tool_dispatcher → document_view_resolver → harness.scope → harness/__init__ →
+    phase_types → task_service → tool_dispatcher. Only assigns a global that is still the
+    ``None`` sentinel, so a test's monkeypatched ``resolve_filter`` survives untouched.
+    """
+    g = globals()
+    if g.get("resolve_filter") is None or g.get("ResolveError") is None or g.get("_build_field_meta") is None:
+        from app.services.document_view_resolver import (
+            ResolveError as _RE,
+            _build_field_meta as _bfm,
+            resolve_filter as _rf,
+        )
+        if g.get("resolve_filter") is None:
+            g["resolve_filter"] = _rf
+        if g.get("ResolveError") is None:
+            g["ResolveError"] = _RE
+        if g.get("_build_field_meta") is None:
+            g["_build_field_meta"] = _bfm
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +302,269 @@ async def _handle_query_documents(args: dict, ctx: ToolContext) -> ToolResult:
         folder_ids=ctx.folder_subtree_ids,
     )
     return ToolResult(result=tool_result)
+
+
+async def _handle_query_documents_by_view(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 115 (VIEW-07) — the conversational mouth of the 113/114 virtual-folders work.
+
+    Three modes off a single flat, polymorphic arg set (``view`` XOR ``filter`` + an
+    optional ``limit`` — D-115 / RESEARCH §"State of the Art": NO anyOf/oneOf, the only
+    cross-provider-safe shape for function-calling):
+
+      * CATALOG  — neither ``view`` nor ``filter`` (or an UNKNOWN ``view`` name): return
+        the caller's saved views + the filterable fields. The ``filterable_fields`` list
+        is IDENTICAL to the whitelist the compiler validates against (``_build_field_meta``
+        — no drift). No resolve, so NO audit.
+      * SAVED-VIEW — a ``view`` NAME → own-or-global ``get_view_by_name`` (the model never
+        sees a UUID) → resolve. An unknown name falls through to CATALOG (D-115-6 — never a
+        distinguishable 403/existence leak).
+      * INLINE-FILTER — a ``filter`` object → ``ViewFilter.model_validate`` → resolve. A
+        malformed shape (Pydantic ``ValidationError``) is mapped to a calm tool-result.
+
+    Honesty is load-bearing: the TRUE total comes from ``resolve_filter(count_only=True)``
+    (NEVER ``len(shown_rows)`` — the silent-undercount trap); a truncation note + a
+    ``truncated`` flag are emitted when ``total > shown``; rows + ``source_refs`` are the
+    CALLER's only (VIEW-06 — ``resolve_filter`` caller-scopes own+global). A VIEW listing
+    has no chunk passage, so the citable channel is ``source_refs`` only (citations=[],
+    D-115-4); ``source_refs`` is ALSO embedded in the JSON ``result`` the model reads so it
+    can cite by id+filename.
+
+    Errors NEVER escape into the agent loop (T-115-02-05): a ``ResolveError`` (bad field) or
+    a Pydantic ``ValidationError`` (malformed inline filter) becomes a calm ``ToolResult``
+    JSON string that points the model back at the catalog. Pitfall 4: ``ctx.folder_subtree_ids``
+    is NEVER threaded into ``resolve_filter`` — the view owns its own ``folder_scope``.
+
+    D-115-10: every concrete resolve fires the EXISTING ``search.query`` audit tagged
+    ``via:"view"``/``via:"filter"`` (no new audit enum, no migration); fire-and-forget so a
+    write failure never breaks the answer.
+    """
+    from pydantic import ValidationError
+
+    _ensure_resolver()  # bind resolve_filter / ResolveError / _build_field_meta (cycle-break)
+
+    view_name = (args.get("view") or "").strip()
+    inline = args.get("filter")
+    caller = ctx.current_user["id"]
+
+    async def _catalog() -> ToolResult:
+        # CATALOG — saved views + the filterable-field whitelist. The whitelist is the
+        # SAME source the compiler validates against (_build_field_meta) so the catalog
+        # advertises exactly what resolve accepts (no drift). Counts are omitted (lazy —
+        # RESEARCH §A3: a catalog call should be cheap, not N resolves).
+        # WR-03: catalog is the FIRST path the model is told to call; a transient DB error in
+        # list_views/_build_field_meta must stay a calm ToolResult, never raise into the loop
+        # (T-115-02-05 — the same contract the resolve path already honors).
+        try:
+            views = await document_view_service.list_views(caller, supabase=ctx.supabase)
+            whitelist, _ = await _build_field_meta(caller, ctx.supabase)
+        except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
+            return ToolResult(result=json.dumps({
+                "status": "catalog_unavailable",
+                "message": f"could not load saved views / fields right now: {e}",
+                "hint": "try again, or call with a concrete `view` name or `filter`",
+            }))
+        return ToolResult(result=json.dumps({
+            "mode": "catalog",
+            "views": [{"name": v["name"]} for v in views],
+            "filterable_fields": sorted(whitelist),
+            "hint": "Call again with `view` (a name above) or `filter` (using a field above).",
+        }))
+
+    if not view_name and inline is None:
+        return await _catalog()
+
+    # ---- resolve the filter_expr: saved view by name, or inline ----
+    if view_name:
+        view = await document_view_service.get_view_by_name(
+            view_name, caller, supabase=ctx.supabase
+        )
+        if view is None:
+            return await _catalog()  # unknown view → catalog, NEVER an existence leak (D-115-6)
+        try:
+            flt = ViewFilter.model_validate(
+                view.get("filter_expr") or {"op": "and", "conditions": []}
+            )
+        except (ValidationError, ValueError) as e:
+            # A stored view row whose filter_expr no longer parses (e.g. a future-shape
+            # drift) — calm string, never a raise into the loop.
+            return ToolResult(result=json.dumps({
+                "status": "invalid_filter",
+                "message": f"saved view {view['name']!r} could not be parsed: {e}",
+                "hint": "call with no arguments to see your saved views and filterable fields",
+            }))
+        folder_scope = view.get("folder_scope")
+        via_meta = {"via": "view", "view_id": view["id"], "view_name": view["name"]}
+    else:
+        try:
+            flt = ViewFilter.model_validate(inline)
+        except (ValidationError, ValueError) as e:
+            return ToolResult(result=json.dumps({
+                "status": "invalid_filter",
+                "message": f"the filter shape is invalid: {e}",
+                "hint": "call with no arguments to see filterable fields",
+            }))
+        folder_scope = None
+        via_meta = {"via": "filter", "filter": inline}
+
+    # WR-01: a non-numeric `limit` (e.g. {"limit": "twenty"}) must NOT raise into the agent
+    # loop — _normalize_optional_int coerces or returns None (→ default 20). T-115-02-05 contract.
+    _norm_limit = _normalize_optional_int(args.get("limit"))
+    limit = max(1, min(_norm_limit if _norm_limit is not None else 20, 50))  # default 20, hard cap 50 (D-115-3)
+
+    try:
+        total = (await resolve_filter(
+            caller=caller, flt=flt, folder_scope=folder_scope,
+            count_only=True, supabase=ctx.supabase,
+        ))["total"]
+        full = await resolve_filter(
+            caller=caller, flt=flt, folder_scope=folder_scope,
+            count_only=False, supabase=ctx.supabase,
+        )
+    except ResolveError as e:  # the extracted core raises this, NOT HTTPException
+        return ToolResult(result=json.dumps({
+            "status": "invalid_filter",
+            "message": e.detail,
+            "hint": "call with no arguments to see filterable fields",
+        }))
+
+    rows = (full.get("documents") or [])[:limit]
+    compact = [{
+        "document_id": d["id"],
+        "filename": d["filename"],
+        "document_type": (d.get("metadata") or {}).get("document_type"),
+        "date": (d.get("metadata") or {}).get("date"),
+        "author": (d.get("metadata") or {}).get("author"),
+    } for d in rows]
+    source_refs = [{"document_id": d["id"], "filename": d["filename"]} for d in rows]
+
+    # D-115-10: reuse the existing search.query audit (no new enum, no migration), tagged
+    # via:"view"/"filter". Fire-and-forget — a write failure never breaks the answer.
+    # getattr-guard: a duck-typed test/duck ctx may omit `spawn`; a missing hook must not
+    # turn a clean answer into an exception (the answer is the point).
+    _spawn = getattr(ctx, "spawn", None)
+    if callable(_spawn):
+        try:
+            _spawn(write_audit_entry(
+                user_id=caller,
+                action_type="search.query",
+                metadata={**via_meta, "document_ids": [d["id"] for d in rows]},
+                supabase=ctx.supabase,
+            ))
+        except Exception:  # noqa: BLE001 — audit is best-effort; never block the answer
+            logger.exception("query_documents_by_view audit spawn failed for caller=%s", caller)
+
+    shown = len(compact)
+    note = (
+        f"{total} match; {shown} newest shown." if total > shown
+        else f"{total} match."
+    )
+    return ToolResult(
+        result=json.dumps({
+            "mode": "results",
+            "total": total,
+            "shown": shown,
+            "truncated": total > shown,
+            "note": note,
+            "documents": compact,
+            "source_refs": source_refs,  # citable channel, also embedded so the model can cite
+        }),
+        source_refs=source_refs,
+    )
+
+
+async def _handle_get_related_documents(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 116 (REL-04) — traverse the human-curated relationship graph (D-116-8).
+
+    The leak-safe read tool over the directional ``document_relationships`` edges. Clone
+    of ``_handle_query_documents_by_view``'s contract: compact rows + ``source_refs``,
+    every failure path a calm ``ToolResult`` JSON string (NEVER a raise into the agent
+    loop — the 115 WR-01/WR-03 lesson; ``agent_loop.py`` catches ValueError as a backstop
+    but this handler must not depend on it).
+
+    Phase 117 (D-117-7): the leak-safe outgoing+incoming TRAVERSAL was extracted into the
+    SHARED, FastAPI-free ``document_relationship_service.get_related_documents`` so the new
+    GET route (Plan 02) and this agent tool call ONE source of truth — there is no fork
+    that could drift and re-open the SC#1 leak (the 115 ``resolve_filter`` precedent). This
+    handler is now a THIN caller: parse the subject identifier, delegate the traversal,
+    then package the shared dict into the calm ``ToolResult`` (the ``mode``/``note`` framing
+    + ``source_refs`` the agent expects — byte-identical to before the extraction, plus the
+    additive per-row ``relationship_id`` the shared fn now carries, which the agent ignores).
+
+    Flow:
+      1. Parse the subject identifier (``document_id`` preferred; else exact ``filename``).
+         Neither arg → a calm "no_subject" string.
+      2. Delegate the leak-safe traversal to the shared fn (subject resolve via
+         ``_resolve_readable_latest``, edge queries over the full version-id set, per-edge
+         other-endpoint readability re-check → masked unseeable endpoints). A ``None`` return
+         (unreadable/unknown subject) → the calm "not_found" string. Any unexpected
+         exception → the calm "unavailable" string (the handler never raises into the loop).
+      3. Package the shared dict into the ``ToolResult`` JSON: re-add the agent-facing
+         ``mode`` + ``note`` framing around the shared ``subject``/``total``/``documents``/
+         ``source_refs``.
+
+    Read-audit policy (RESEARCH OQ1 / A2, Claude's discretion): NO read audit — D-116-12
+    mandates an audit only for create/remove, no SC requires a read receipt, and adding
+    one would need a new enum value. A read is a pure traversal of the caller's own graph.
+    Pitfall: ``ctx.folder_subtree_ids`` is NEVER threaded — relationships are whole-KB,
+    own-scoped, and the per-endpoint readability re-check (inside the shared fn) is the SOLE
+    access gate.
+    """
+    caller = ctx.current_user["id"]
+    doc_id = (args.get("document_id") or "").strip()
+    filename = (args.get("filename") or "").strip()
+
+    # ── 1. parse the subject identifier (calm string when neither arg given) ─────
+    if not doc_id and not filename:
+        return ToolResult(result=json.dumps({
+            "status": "no_subject",
+            "message": "Provide exactly one of `document_id` or `filename` to identify the document.",
+            "hint": "Pass the subject document's id (preferred) or its exact filename.",
+        }))
+
+    # ── 2. delegate the leak-safe traversal to the SHARED fn (D-117-7 — one core) ──
+    try:
+        result = await document_relationship_service.get_related_documents(
+            caller,
+            document_id=doc_id or None,
+            filename=filename or None,
+            supabase=ctx.supabase,
+        )
+    except Exception as e:  # noqa: BLE001 — calm-string contract; never raise into the loop
+        logger.exception("get_related_documents traversal failed for caller=%s", caller)
+        return ToolResult(result=json.dumps({
+            "status": "unavailable",
+            "message": f"could not load this document's relationships right now: {e}",
+            "hint": "try again, or identify the document a different way (id vs filename)",
+        }))
+
+    # A None return = an unreadable/unknown subject (no leak) → the calm "not_found" string.
+    if result is None:
+        which = f"document_id {doc_id!r}" if doc_id else f"filename {filename!r}"
+        return ToolResult(result=json.dumps({
+            "status": "not_found",
+            "message": f"No document you can access matches {which}.",
+            "hint": "Check the id/filename, or use search_documents / query_documents_by_view to find it first.",
+        }))
+
+    # ── 3. package the shared dict into the agent-facing ToolResult (mode + note framing) ──
+    subject = result["subject"]
+    total = result["total"]
+    source_refs = result["source_refs"]
+    note = (
+        f"{total} related document(s) for {subject['filename']!r}." if total
+        else f"No relationships found for {subject['filename']!r}."
+    )
+    return ToolResult(
+        result=json.dumps({
+            "mode": "relationships",
+            "subject": subject,
+            "total": total,
+            "note": note,
+            "documents": result["documents"],
+            "source_refs": source_refs,  # seeable endpoints only; also embedded so the model can cite
+        }),
+        source_refs=source_refs,
+    )
 
 
 async def _handle_web_search(args: dict, ctx: ToolContext) -> ToolResult:
@@ -2379,6 +2693,10 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "ask_user": _handle_ask_user,
     # Phase 101 (TMPL-02 / TMPL-03) — template fill (G-5: handler + one line; threads.py untouched)
     "render_template": _handle_render_template,
+    # Phase 115 (VIEW-07) — registry + get_tools BOTH (the inverse of render_template); threads.py untouched (G-5)
+    "query_documents_by_view": _handle_query_documents_by_view,
+    # Phase 116 (REL-04) — registry + get_tools BOTH (SC#1 dual-wiring); G-5: handler + one line, threads.py untouched
+    "get_related_documents": _handle_get_related_documents,
 }
 
 

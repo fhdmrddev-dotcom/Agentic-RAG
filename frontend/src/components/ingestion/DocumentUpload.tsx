@@ -58,56 +58,65 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         ? "Uploading…"
         : null
 
+  // The button always reads just "Upload" (folder context lives in the breadcrumb /
+  // header), so a long folder name can never widen it. The full target is kept in
+  // the button's aria-label + title for accessibility and hover.
+  const targetLabel = folderName ? `Upload to ${folderName}` : "Upload to Root"
+
   return (
-    <div className="space-y-2">
-      <div
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <button
+        type="button"
         onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => !uploading && !disabled && inputRef.current?.click()}
-        className={cn(
-          "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors",
+        disabled={disabled || uploading}
+        aria-label={disabled ? "Read-only folder" : targetLabel}
+        title={
           disabled
-            ? "pointer-events-none opacity-60 cursor-not-allowed border-muted-foreground/20"
-            : cn(
-                "cursor-pointer",
-                dragging ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary/50",
-              ),
-          uploading && "pointer-events-none opacity-60",
+            ? "Only the folder owner can upload files here"
+            : `${targetLabel} · drop files here or click to browse`
+        }
+        className={cn(
+          // Compact upload control in the header band's right corner — a real
+          // designed button, but the whole control is still a drop target (drag a
+          // file onto it) and opens the file picker on click. (Was a big p-10
+          // dropzone that pushed the file list below the fold.)
+          "inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
+          disabled
+            ? "cursor-not-allowed border-dashed border-muted-foreground/25 text-muted-foreground/60"
+            : dragging
+              ? "cursor-copy border-primary bg-primary/10 text-primary"
+              : "cursor-pointer border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent",
+          uploading && "cursor-default opacity-70",
         )}
       >
         {disabled ? (
           <>
-            <Lock className="h-8 w-8 text-muted-foreground/50" />
-            <div className="text-center">
-              <p className="text-sm font-medium text-muted-foreground">Read-only folder</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Only the folder owner can upload files here</p>
-            </div>
+            <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>Read-only</span>
+          </>
+        ) : uploading ? (
+          <>
+            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="truncate">{statusLabel ?? "Uploading…"}</span>
           </>
         ) : (
           <>
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <div className="text-center">
-              <p className="text-sm font-medium">
-                {folderName ? `Upload to ${folderName}` : "Upload to Root"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Drop files here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx, .pptx, .xlsx, .csv, .epub · Multiple files allowed</p>
-            </div>
-            {uploading && (
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
-              </div>
-            )}
+            <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {/* Always just "Upload" — folder context lives in the breadcrumb/header,
+                so a long folder name can never widen the button (full target is in
+                the button's aria-label + title). */}
+            <span>Upload</span>
           </>
         )}
-      </div>
+      </button>
 
       {result && !uploading && (
-        <div className="space-y-1">
+        <div className="text-right">
           {(result.uploaded > 0 || result.duplicates > 0) && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {[
                 result.uploaded > 0 && `${result.uploaded} uploaded`,
                 result.duplicates > 0 && `${result.duplicates} already up to date`,
@@ -117,7 +126,7 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
             </p>
           )}
           {result.errors.map((err, i) => (
-            <p key={i} className="text-sm text-destructive">{err}</p>
+            <p key={i} className="text-xs text-destructive">{err}</p>
           ))}
         </div>
       )}

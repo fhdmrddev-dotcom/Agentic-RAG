@@ -1,5 +1,7 @@
 # PRD-Reset Meta-Phase — Summary & Signoff Brief
 
+> ℹ️ **Superseded sequencing — see `.planning/PRDs/SEQUENCE.md` (authoritative, 2026-06-15).** The six-milestone table in §E.1 reflects the ORIGINAL 2026-05-10 plan (v3.0 Skill Studio first). The project pivoted (v2.7–2.9 = Workspace / Harness / Workflow Studio) and on 2026-06-15 the roadmap was re-sequenced: Document Management = v3.0, Skill Studio re-scoped → v3.1, and the rest shifted down one slot. The cross-PRD consistency analysis below stays useful, but its version slots are stale.
+
 **Date:** 2026-05-10
 **Author:** Plan 09 consistency-pass agent
 **Inputs:** 6 PRDs (v2.6, v3.0, v3.1, v3.2, v3.3, v3.4) + DECISIONS.md (D-PRD-01..11) + MIGRATION-RESERVATIONS.md + PRD-TEMPLATE.md + synthesis + meta-phase PLAN.md

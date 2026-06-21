@@ -133,6 +133,9 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
+    document_management_enabled: bool = True
+
     # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
@@ -148,6 +151,20 @@ class UserEffectiveSettings(BaseModel):
     extraction_image_engine_docx: str = "zip_xpath"
     extraction_equation_engine: str = "none"
     extraction_per_call_hints_enabled: bool = True
+
+    # Phase 111 META-03 — configurable metadata extraction (migration 072).
+    # app_settings-only (env_attr=None below); deliberately NOT in SettingsUpdate
+    # (DB-only, no UI — D-111-2; mirrors extraction_* / harness_judge_model).
+    extraction_model: str = ""              # unset => settings.llm_model (gpt-4o env default)
+    extraction_window_cap: int = 32000      # head+tail sampler cap
+    metadata_enrichment_mode: str = "enriched"  # enriched | legacy
+
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
+    embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
+    extraction_provider: str = ""           # D-09 #1 explicit extraction provider (short-circuits name-inference)
+    confidence_bucket_high: float = 0.54    # D-12 portable confidence bucket (was hardcoded 0.54)
+    confidence_bucket_medium: float = 0.38  # D-12 portable confidence bucket (was hardcoded 0.38)
 
     # Context & Sub-agent
     context_window_max_tokens: int
@@ -472,6 +489,10 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         sandbox_enabled=_val_bool(row, "sandbox_enabled", "sandbox_enabled", True),
 
+        # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
+        document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
+
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
 
@@ -487,6 +508,19 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         extraction_image_engine_docx=str(_val(row, "extraction_image_engine_docx", None, "zip_xpath")),
         extraction_equation_engine=str(_val(row, "extraction_equation_engine", None, "none")),
         extraction_per_call_hints_enabled=_val_bool(row, "extraction_per_call_hints_enabled", None, True),
+
+        # Phase 111 META-03 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
+        extraction_model=str(_val(row, "extraction_model", None, "")),
+        extraction_window_cap=int(_val(row, "extraction_window_cap", None, 32000)),
+        metadata_enrichment_mode=str(_val(row, "metadata_enrichment_mode", None, "enriched")),
+
+        # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
+        # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
+        embedding_provider=str(_val(row, "embedding_provider", None, "")),
+        extraction_provider=str(_val(row, "extraction_provider", None, "")),
+        confidence_bucket_high=float(_val(row, "confidence_bucket_high", None, 0.54)),
+        confidence_bucket_medium=float(_val(row, "confidence_bucket_medium", None, 0.38)),
 
         context_window_max_tokens=int(_val(row, "context_window_max_tokens", "context_window_max_tokens", 0)),
         sub_agent_max_output_tokens=int(_val(row, "sub_agent_max_output_tokens", "sub_agent_max_output_tokens", 8192)),
@@ -566,6 +600,20 @@ def tool_args_progress_emit_boundary_bytes() -> int:
     if value is None or value <= 0:
         return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
     return int(value)
+
+
+def document_management_enabled() -> bool:
+    """Phase 110 DMF-03 — master DM capability gate. Defensive: True on any read failure
+    (a settings-read failure must NOT hide DM surfaces — default-on, D-110-2).
+
+    Note the polarity flip vs tool_args_progress_emit_boundary_bytes(): that helper
+    falls back to a fixed VALUE; this one MUST fall back to True (default-ON). F8 trap:
+    returning False here would silently hide DM despite the default-on guarantee.
+    """
+    try:
+        return load_app_settings().document_management_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-on on cold cache / DB read failure
+        return True
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 029 — Filter Builder Bar</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+
+  /* ─── App chrome (shared with 027) ─── */
+  .app { display: flex; height: calc(100vh - 52px); }
+  .nav-rail { width: 52px; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding-top: var(--space-4); flex-shrink: 0; }
+  .nav-rail .ni { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--color-text-dim); font-size: 17px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .nav-rail .ni.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .nav-rail .ni:hover:not(.active) { background: var(--color-accent); color: var(--color-text); }
+
+  /* ─── Compact left sidebar (Folders + Views) to show the save destination ─── */
+  .side { width: 210px; flex-shrink: 0; border-right: 1px solid var(--color-border); background: var(--color-bg-elev1); padding: var(--space-4) var(--space-2); overflow: auto; }
+  .side .grp-h { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim); padding: 0 var(--space-2); margin: var(--space-3) 0 var(--space-2); }
+  .side-row { display: flex; align-items: center; gap: var(--space-2); padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); transition: background var(--dur-fast); }
+  .side-row:hover { background: var(--color-accent); color: var(--color-text); }
+  .side-row.active { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; }
+  .side-row .ico { width: 16px; text-align: center; flex-shrink: 0; }
+  .side-row .ico.folder { color: hsl(38 92% 60% / 0.75); }
+  .side-row .ico.view { color: var(--color-primary); }
+  .side-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-row .cnt { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .side-row .gpill { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); background: var(--color-muted); padding: 1px 6px; border-radius: var(--radius-full); }
+  .side-row.fresh { animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+
+  /* ─── Main column ─── */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .page-head { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-5) var(--space-6) var(--space-3); }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0; font-weight: 700; }
+  .page-head .crumb { color: var(--color-text-dim); font-size: var(--text-sm); }
+  .list-scroll { overflow: auto; padding: 0 var(--space-6) var(--space-6); }
+
+  /* ─── Document list (shared with 027) ─── */
+  .doc-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .doc-table thead th { text-align: left; font-weight: 500; color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; background: var(--color-bg); }
+  .doc-row td { padding: var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+  .doc-row { transition: background var(--dur-fast) var(--ease-out); }
+  .doc-row:hover { background: var(--color-muted); }
+  .doc-name { font-weight: 500; color: var(--color-text); display: flex; align-items: center; gap: var(--space-2); }
+  .doc-ico { font-size: 14px; }
+  .pill { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: 10px; padding: 1px 7px; border-radius: var(--radius-full); background: var(--color-primary-dim); color: var(--color-primary); }
+  .empty-list { text-align: center; color: var(--color-text-dim); padding: var(--space-12) var(--space-4); }
+  .empty-list .big { font-size: 26px; margin-bottom: var(--space-2); }
+
+  /* ─── Shared condition primitives ─── */
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 4px 6px 4px 10px; font-size: var(--text-sm); white-space: nowrap; transition: border-color var(--dur-fast); }
+  .chip:hover { border-color: var(--color-primary-glow); }
+  .chip .ck { color: var(--color-text-dim); font-size: var(--text-xs); }
+  .chip .cf { color: var(--color-text); font-weight: 500; }
+  .chip .co { color: var(--color-primary); font-size: var(--text-xs); }
+  .chip .cv { color: var(--color-text); }
+  .chip .rm { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 13px; padding: 0 2px; border-radius: var(--radius-sm); line-height: 1; }
+  .chip .rm:hover { color: var(--color-danger); background: var(--color-danger-dim); }
+  .add-cond { display: inline-flex; align-items: center; gap: 5px; background: transparent; border: 1px dashed var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 5px 12px; font-size: var(--text-sm); cursor: pointer; font-family: inherit; transition: all var(--dur-fast); }
+  .add-cond:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .count-live { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text); white-space: nowrap; }
+  .count-live b { color: var(--color-primary); }
+  .count-live.zero b { color: var(--color-warning); }
+  .save-view-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--color-primary); color: hsl(216 45% 6%); border: none; border-radius: var(--radius-md); padding: 6px 14px; font-size: var(--text-sm); font-weight: 600; cursor: pointer; font-family: inherit; transition: filter var(--dur-fast); }
+  .save-view-btn:hover { filter: brightness(1.08); }
+  .save-view-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .clear-btn { background: none; border: none; color: var(--color-text-dim); font-size: var(--text-xs); cursor: pointer; text-decoration: underline; }
+  .clear-btn:hover { color: var(--color-text); }
+
+  /* condition editor popover */
+  .pop { position: absolute; z-index: 300; background: var(--color-surface-hi); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: var(--space-3); width: 280px; animation: fadeSlideUp var(--dur-fast) var(--ease-out); }
+  .pop label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); margin: var(--space-2) 0 4px; }
+  .pop select, .pop input { width: 100%; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 8px; font-family: var(--font-sans); font-size: var(--text-sm); outline: none; }
+  .pop select:focus, .pop input:focus { border-color: var(--color-primary); }
+  .pop .reldate { display: flex; gap: 6px; }
+  .pop .reldate input { width: 64px; }
+  .pop .preview { margin-top: var(--space-2); font-size: var(--text-xs); color: var(--color-success); font-family: var(--font-mono); }
+  .pop .note { margin-top: 4px; font-size: 10px; color: var(--color-text-dim); }
+  .pop .pop-actions { display: flex; gap: 6px; margin-top: var(--space-3); }
+  .pop .pa { flex: 1; font-size: var(--text-sm); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+  .pop .pa.primary { background: var(--color-primary); color: hsl(216 45% 6%); border-color: var(--color-primary); font-weight: 600; }
+
+  /* name-the-view inline */
+  .name-pop input { width: 180px; }
+
+  /* ════════ VARIANT A — Chip bar (single strip) ════════ */
+  #va .filterbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1); position: relative; }
+  #va .filterbar .lead { font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px; }
+  #va .filterbar .spacer { flex: 1; }
+  #va .filterbar .right { display: flex; align-items: center; gap: var(--space-3); }
+
+  /* ════════ VARIANT B — Stacked rows panel ════════ */
+  #vb .fb-toggle { margin: var(--space-3) var(--space-6) 0; display: inline-flex; align-items: center; gap: 8px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 7px 14px; color: var(--color-text); cursor: pointer; font-size: var(--text-sm); font-family: inherit; }
+  #vb .fb-toggle:hover { border-color: var(--color-primary-glow); }
+  #vb .fb-toggle .badge { font-family: var(--font-mono); font-size: 10px; background: var(--color-primary-dim); color: var(--color-primary); padding: 1px 7px; border-radius: var(--radius-full); }
+  #vb .panel { margin: var(--space-3) var(--space-6) 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+  #vb .panel.hidden { display: none; }
+  #vb .crow { display: grid; grid-template-columns: 22px 150px 150px 1fr 32px; gap: var(--space-2); align-items: center; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+  #vb .crow .conj { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); text-align: center; }
+  #vb .crow select, #vb .crow input { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 8px; font-family: var(--font-sans); font-size: var(--text-sm); outline: none; }
+  #vb .crow select:focus, #vb .crow input:focus { border-color: var(--color-primary); }
+  #vb .crow .val-wrap { display: flex; gap: 6px; }
+  #vb .crow .val-wrap input.num { width: 60px; }
+  #vb .crow .del { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 15px; }
+  #vb .crow .del:hover { color: var(--color-danger); }
+  #vb .panel-foot { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); background: var(--color-bg-elev1); }
+  #vb .preview-line { font-size: var(--text-xs); color: var(--color-success); font-family: var(--font-mono); padding: 0 var(--space-6); margin-top: 6px; min-height: 16px; }
+
+  /* ════════ VARIANT C — Sentence grammar (sticky) ════════ */
+  #vc .gram { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); background: hsl(220 40% 5% / 0.92); backdrop-filter: blur(12px); }
+  #vc .gram .kw { color: var(--color-text-dim); font-size: var(--text-sm); }
+  #vc .gram .tok { display: inline-flex; align-items: center; gap: 6px; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); color: var(--color-text); border-radius: var(--radius-sm); padding: 3px 8px; font-size: var(--text-sm); cursor: pointer; }
+  #vc .gram .tok .f { color: var(--color-primary); font-weight: 500; }
+  #vc .gram .tok .o { font-size: var(--text-xs); color: var(--color-text-muted); }
+  #vc .gram .tok .rm { background: none; border: none; color: var(--color-text-dim); cursor: pointer; padding: 0; font-size: 12px; }
+  #vc .gram .tok .rm:hover { color: var(--color-danger); }
+  #vc .gram .add { color: var(--color-primary); cursor: pointer; font-size: var(--text-sm); border: none; background: none; font-family: inherit; }
+  #vc .gram .tail { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+
+  .toast { position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); background: var(--color-success); color: hsl(216 45% 6%); font-weight: 600; font-size: var(--text-sm); padding: 8px 18px; border-radius: var(--radius-full); box-shadow: var(--shadow-lg); z-index: 9998; opacity: 0; pointer-events: none; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">029 · Filter Builder Bar</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Chip bar (one strip) <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Stacked rows panel</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Sentence grammar</button>
+</div>
+
+<!-- ══════════ VARIANT A ══════════ -->
+<div id="va" class="variant">
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📄</div><div class="ni">🔀</div><div class="ni">🧩</div><div class="ni" style="margin-top:auto;margin-bottom:16px">⚙️</div></div>
+    <div class="side">
+      <div class="grp-h">Folders</div>
+      <div class="side-row"><span class="ico folder">📁</span><span class="nm">Root</span><span class="cnt">36</span></div>
+      <div class="side-row"><span class="ico folder">📁</span><span class="nm">Project Meridian</span><span class="cnt">5</span></div>
+      <div class="grp-h">Views</div>
+      <div id="va-views"></div>
+    </div>
+    <div class="main">
+      <div class="page-head"><h1>Documents</h1><span class="crumb">All conditions must match</span></div>
+      <div class="filterbar" id="va-bar"></div>
+      <div class="list-scroll"><table class="doc-table"><thead><tr><th>Name</th><th>Type</th><th>Date</th><th>Author</th></tr></thead><tbody id="va-rows"></tbody></table><div id="va-empty"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT B ══════════ -->
+<div id="vb" class="variant" style="display:none">
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📄</div><div class="ni">🔀</div><div class="ni">🧩</div><div class="ni" style="margin-top:auto;margin-bottom:16px">⚙️</div></div>
+    <div class="side">
+      <div class="grp-h">Folders</div>
+      <div class="side-row"><span class="ico folder">📁</span><span class="nm">Root</span><span class="cnt">36</span></div>
+      <div class="grp-h">Views</div>
+      <div id="vb-views"></div>
+    </div>
+    <div class="main">
+      <div class="page-head"><h1>Documents</h1><span class="crumb">Filter your documents</span></div>
+      <button class="fb-toggle" id="vb-toggle" onclick="vbToggle()">⛛ Filter <span class="badge" id="vb-badge">2</span></button>
+      <div class="panel" id="vb-panel">
+        <div id="vb-rows"></div>
+        <div style="padding:var(--space-2) var(--space-4)"><button class="add-cond" onclick="addCond()">＋ Add condition</button></div>
+        <div class="panel-foot">
+          <span class="count-live" id="vb-count"></span>
+          <span class="spacer" style="flex:1"></span>
+          <button class="clear-btn" onclick="clearConds()">Clear all</button>
+          <button class="save-view-btn" id="vb-save" onclick="startSave('vb')">＋ Save as view</button>
+        </div>
+      </div>
+      <div class="preview-line" id="vb-preview"></div>
+      <div class="list-scroll" style="margin-top:var(--space-3)"><table class="doc-table"><thead><tr><th>Name</th><th>Type</th><th>Date</th><th>Author</th></tr></thead><tbody id="vb-rows-doc"></tbody></table><div id="vb-empty"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT C ══════════ -->
+<div id="vc" class="variant" style="display:none">
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📄</div><div class="ni">🔀</div><div class="ni">🧩</div><div class="ni" style="margin-top:auto;margin-bottom:16px">⚙️</div></div>
+    <div class="side">
+      <div class="grp-h">Folders</div>
+      <div class="side-row"><span class="ico folder">📁</span><span class="nm">Root</span><span class="cnt">36</span></div>
+      <div class="grp-h">Views</div>
+      <div id="vc-views"></div>
+    </div>
+    <div class="main">
+      <div class="gram" id="vc-gram"></div>
+      <div class="list-scroll"><table class="doc-table"><thead><tr><th>Name</th><th>Type</th><th>Date</th><th>Author</th></tr></thead><tbody id="vc-rows"></tbody></table><div id="vc-empty"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ View saved</div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="setVp(430)">📱</button><button onclick="setVp(900)">▭</button><button onclick="setVp(0)">🖥</button>
+</div>
+
+<script>
+// ───────── Synthetic corpus (deterministic) ─────────
+const TODAY = new Date('2026-06-19T00:00:00');
+function addDays(b,n){ const d=new Date(b); d.setDate(d.getDate()+n); return d; }
+function iso(d){ return d.toISOString().slice(0,10); }
+function fmt(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+const ICONS = {invoice:'🧾',contract:'📜','status report':'📘',charter:'📕','risk register':'📊','task log':'📗',policy:'📄',memo:'✉️'};
+
+function buildCorpus(){
+  const TYPES=['invoice','contract','status report','charter','risk register','task log','policy','memo'];
+  const AUTH=['A. Okafor','J. Smith','M. Chen',null,'PMO','R. Díaz','S. Patel'];
+  const LANG=['English','English','English','German','French'];
+  let seed=7; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+  const docs=[]; const ctr={};
+  for(let i=0;i<36;i++){
+    const t=TYPES[Math.floor(rnd()*TYPES.length)];
+    ctr[t]=(ctr[t]||0)+1;
+    const off=Math.floor(rnd()*600)-450; // -450 .. +150 days
+    // store type with mixed case to demonstrate case-INSENSITIVE matching (D-114-10)
+    const storedType = rnd()<0.45 ? cap(t) : t;
+    let nm;
+    if(t==='invoice') nm=`Invoice INV-2026-${String(100+i).padStart(4,'0')}.pdf`;
+    else if(t==='contract') nm=`Contract — ${['Acme','Vendor Z','Northwind','Globex'][ctr[t]%4]}.pdf`;
+    else if(t==='status report') nm=`Week ${ctr[t]+4} Status Notes.docx`;
+    else if(t==='charter') nm=`Project Charter.pdf`;
+    else if(t==='risk register') nm=`Risk Register ${ctr[t]}.xlsx`;
+    else if(t==='task log') nm=`Sprint & Task Log ${ctr[t]}.md`;
+    else if(t==='policy') nm=`Policy — ${['Travel','Security','Data Retention'][ctr[t]%3]}.pdf`;
+    else nm=`Memo ${String(ctr[t]).padStart(2,'0')}.docx`;
+    docs.push({ id:i, name:nm, type:storedType, date:iso(addDays(TODAY,off)), author:AUTH[Math.floor(rnd()*AUTH.length)], lang:LANG[Math.floor(rnd()*LANG.length)] });
+  }
+  return docs;
+}
+const CORPUS = buildCorpus();
+
+// ───────── Field + operator vocabulary ─────────
+const FIELDS = {
+  document_type: { label:'Document type', type:'string', prop:'type' },
+  date:          { label:'Date',          type:'date',   prop:'date' },
+  author:        { label:'Author',        type:'string', prop:'author' },
+  language:      { label:'Language',       type:'string', prop:'lang' },
+  title:         { label:'Title',          type:'string', prop:'name' },
+};
+const OPS = {
+  string: [['is','is'],['is_not','is not'],['contains','contains'],['one_of','one of'],['is_empty','is empty']],
+  date:   [['within_next','within next…'],['older_than','older than…'],['before','before'],['after','after'],['between','between'],['is_empty','is empty']],
+};
+function opLabel(field, op){ const t=FIELDS[field].type; const m=(OPS[t]||OPS.string).find(o=>o[0]===op); return m?m[1].replace('…',''):op; }
+
+// ───────── Evaluation (case-insensitive — D-114-10) ─────────
+const ci = s => String(s==null?'':s).toLowerCase().trim();
+function evalCond(doc, c){
+  const v = doc[FIELDS[c.field].prop];
+  switch(c.op){
+    case 'is': return ci(v)===ci(c.value);
+    case 'is_not': return ci(v)!==ci(c.value);
+    case 'contains': return ci(v).includes(ci(c.value));
+    case 'one_of': return ci(c.value).split(',').map(s=>s.trim()).filter(Boolean).includes(ci(v));
+    case 'is_empty': return v==null || String(v).trim()==='';
+    case 'within_next': { const d=new Date(doc.date); return d>=TODAY && d<=addDays(TODAY, +c.n||0); }
+    case 'older_than': { const d=new Date(doc.date); return d < addDays(TODAY, -(+c.n||0)); }
+    case 'before': return c.value ? new Date(doc.date) < new Date(c.value) : true;
+    case 'after': return c.value ? new Date(doc.date) > new Date(c.value) : true;
+    case 'between': return (c.value&&c.value2) ? (new Date(doc.date)>=new Date(c.value) && new Date(doc.date)<=new Date(c.value2)) : true;
+    default: return true;
+  }
+}
+function matches(){ return CORPUS.filter(d => CONDS.every(c=>evalCond(d,c))); }
+
+// human-readable value for a condition chip
+function valText(c){
+  if(c.op==='within_next') return `${c.n} days`;
+  if(c.op==='older_than') return `${c.n} days`;
+  if(c.op==='between') return `${c.value||'…'} – ${c.value2||'…'}`;
+  if(c.op==='is_empty') return '';
+  return c.value || '…';
+}
+// resolved absolute window for a relative-date condition (the "recomputed live" honesty)
+function windowText(c){
+  if(c.op==='within_next') return `→ ${fmt(TODAY)} – ${fmt(addDays(TODAY,+c.n||0))}  ·  overdue not included`;
+  if(c.op==='older_than') return `→ before ${fmt(addDays(TODAY,-(+c.n||0)))}`;
+  return '';
+}
+
+// ───────── State ─────────
+let CONDS = [
+  { field:'document_type', op:'is', value:'invoice' },
+  { field:'date', op:'within_next', n:90 },
+];
+let SAVED = [ {name:'Active Contracts', n:11, glob:false}, {name:'Compliance', n:6, glob:true} ];
+
+// ───────── Renderers ─────────
+function renderAll(){
+  const m = matches();
+  // Variant A — chip bar
+  const bar = document.getElementById('va-bar');
+  bar.innerHTML = `<span class="lead">Where</span>` +
+    CONDS.map((c,i)=>condChip(c,i)).join('') +
+    `<button class="add-cond" onclick="openEditor('va', -1, event)">＋ condition</button>` +
+    `<span class="spacer"></span>` +
+    `<span class="right"><span class="count-live ${m.length?'':'zero'}"><b>${m.length}</b> match</span>` +
+    `<button class="clear-btn" onclick="clearConds()">Clear</button>` +
+    `<button class="save-view-btn" ${CONDS.length?'':'disabled'} onclick="startSave('va')">＋ Save as view</button></span>`;
+  rows('va-rows','va-empty', m);
+  views('va-views');
+
+  // Variant B — stacked rows
+  document.getElementById('vb-badge').textContent = CONDS.length;
+  const rowsHtml = CONDS.map((c,i)=>bRow(c,i)).join('');
+  document.getElementById('vb-rows').innerHTML = rowsHtml || `<div style="padding:var(--space-4);color:var(--color-text-dim);font-size:var(--text-sm)">No conditions — showing all 36 documents.</div>`;
+  document.getElementById('vb-count').innerHTML = `<span class="count-live ${m.length?'':'zero'}"><b>${m.length}</b> documents match</span>`;
+  document.getElementById('vb-save').disabled = !CONDS.length;
+  const rel = CONDS.find(c=>c.op==='within_next'||c.op==='older_than');
+  document.getElementById('vb-preview').textContent = rel ? windowText(rel) : '';
+  rows('vb-rows-doc','vb-empty', m);
+  views('vb-views');
+
+  // Variant C — sentence grammar
+  const g = document.getElementById('vc-gram');
+  g.innerHTML = `<span class="kw">Documents where</span>` +
+    CONDS.map((c,i)=>`<span class="tok" onclick="openEditor('vc',${i},event)"><span class="f">${FIELDS[c.field].label}</span><span class="o">${opLabel(c.field,c.op)}</span>${valText(c)?`<span>${valText(c)}</span>`:''}<button class="rm" onclick="event.stopPropagation();removeCond(${i})">✕</button></span>` + (i<CONDS.length-1?`<span class="kw">and</span>`:'')).join('') +
+    `<button class="add" onclick="openEditor('vc',-1,event)">＋ add</button>` +
+    `<span class="tail"><span class="count-live ${m.length?'':'zero'}"><b>${m.length}</b> match</span><button class="save-view-btn" ${CONDS.length?'':'disabled'} onclick="startSave('vc')">＋ Save as view</button></span>`;
+  rows('vc-rows','vc-empty', m);
+  views('vc-views');
+}
+
+function condChip(c,i){
+  return `<span class="chip"><span class="cf">${FIELDS[c.field].label}</span><span class="co" onclick="openEditor('va',${i},event)" style="cursor:pointer">${opLabel(c.field,c.op)}</span>${valText(c)?`<span class="cv" onclick="openEditor('va',${i},event)" style="cursor:pointer">${valText(c)}</span>`:''}<button class="rm" onclick="removeCond(${i})">✕</button></span>`;
+}
+function bRow(c,i){
+  const t = FIELDS[c.field].type;
+  const ops = (OPS[t]||OPS.string);
+  let valControl='';
+  if(c.op==='within_next'||c.op==='older_than') valControl=`<div class="val-wrap"><input class="num" type="number" value="${c.n}" onchange="setN(${i},this.value)"><select onchange="setUnit(${i},this.value)"><option>days</option><option>weeks</option><option>months</option></select></div>`;
+  else if(c.op==='between') valControl=`<div class="val-wrap"><input type="date" value="${c.value||''}" onchange="setVal(${i},this.value)"><input type="date" value="${c.value2||''}" onchange="setVal2(${i},this.value)"></div>`;
+  else if(c.op==='before'||c.op==='after') valControl=`<input type="date" value="${c.value||''}" onchange="setVal(${i},this.value)">`;
+  else if(c.op==='is_empty') valControl=`<span style="color:var(--color-text-dim);font-size:var(--text-xs);font-style:italic">no value needed</span>`;
+  else valControl=`<input type="text" value="${c.value||''}" placeholder="value…" onchange="setVal(${i},this.value)">`;
+  return `<div class="crow"><span class="conj">${i===0?'where':'and'}</span>` +
+    `<select onchange="setField(${i},this.value)">${Object.keys(FIELDS).map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${FIELDS[f].label}</option>`).join('')}</select>` +
+    `<select onchange="setOp(${i},this.value)">${ops.map(o=>`<option value="${o[0]}" ${o[0]===c.op?'selected':''}>${o[1]}</option>`).join('')}</select>` +
+    `${valControl}<button class="del" onclick="removeCond(${i})">✕</button></div>`;
+}
+function rows(tbodyId, emptyId, m){
+  const tb=document.getElementById(tbodyId), em=document.getElementById(emptyId);
+  if(!m.length){ tb.innerHTML=''; em.innerHTML=`<div class="empty-list"><div class="big">🔍</div>No documents match.<div style="font-size:var(--text-xs);margin-top:6px">Try removing or loosening a condition.</div></div>`; return; }
+  em.innerHTML='';
+  tb.innerHTML = m.slice(0,14).map(d=>`<tr class="doc-row"><td><span class="doc-name"><span class="doc-ico">${ICONS[d.type.toLowerCase()]||'📄'}</span>${d.name}</span></td><td><span class="pill">${d.type}</span></td><td class="text-muted">${fmt(new Date(d.date))}</td><td class="text-muted">${d.author||'—'}</td></tr>`).join('') + (m.length>14?`<tr><td colspan="4" class="text-dim" style="font-size:var(--text-xs);padding:var(--space-3)">…and ${m.length-14} more</td></tr>`:'');
+}
+function views(id){
+  document.getElementById(id).innerHTML = SAVED.map(v=>`<div class="side-row ${v.fresh?'fresh':''}"><span class="ico view">⛛</span><span class="nm">${v.name}</span>${v.glob?'<span class="gpill">G</span>':''}<span class="cnt">${v.n}</span></div>`).join('') || `<div style="padding:6px 8px;color:var(--color-text-dim);font-size:var(--text-xs);font-style:italic">No saved views yet</div>`;
+}
+
+// ───────── Condition editor popover ─────────
+let editAt=-1, editScope='va';
+function openEditor(scope, i, e){
+  e.stopPropagation();
+  closePop();
+  editScope=scope;
+  if(i===-1){ CONDS.push({field:'document_type',op:'is',value:''}); i=CONDS.length-1; renderAll(); }
+  editAt=i;
+  const c=CONDS[i];
+  const pop=document.createElement('div'); pop.className='pop'; pop.id='editpop';
+  pop.innerHTML = popInner(c);
+  document.body.appendChild(pop);
+  const r=e.target.getBoundingClientRect();
+  pop.style.top = Math.min(r.bottom+6, window.innerHeight-300)+'px';
+  pop.style.left = Math.min(r.left, window.innerWidth-300)+'px';
+  bindPop();
+}
+function popInner(c){
+  const t=FIELDS[c.field].type; const ops=(OPS[t]||OPS.string);
+  let valC='';
+  if(c.op==='within_next'||c.op==='older_than') valC=`<label>Value</label><div class="reldate"><input id="p-n" type="number" value="${c.n||30}"><select id="p-unit"><option>days</option><option>weeks</option><option>months</option></select></div><div class="preview" id="p-prev"></div>${c.op==='within_next'?'<div class="note">Counts from today forward and updates automatically. Already-overdue items aren’t included.</div>':'<div class="note">Older than this many days from today, updated automatically.</div>'}`;
+  else if(c.op==='between') valC=`<label>Between</label><input id="p-v" type="date" value="${c.value||''}"><input id="p-v2" type="date" value="${c.value2||''}" style="margin-top:6px">`;
+  else if(c.op==='before'||c.op==='after') valC=`<label>Date</label><input id="p-v" type="date" value="${c.value||''}">`;
+  else if(c.op==='is_empty') valC=`<div class="note" style="margin-top:10px">Matches documents where this field is blank.</div>`;
+  else if(c.op==='one_of') valC=`<label>Any of (comma-separated)</label><input id="p-v" type="text" value="${c.value||''}" placeholder="invoice, contract, memo">`;
+  else valC=`<label>Value</label><input id="p-v" type="text" value="${c.value||''}" placeholder="value…">`;
+  return `<label>Field</label><select id="p-field">${Object.keys(FIELDS).map(f=>`<option value="${f}" ${f===c.field?'selected':''}>${FIELDS[f].label}</option>`).join('')}</select>`+
+    `<label>Operator</label><select id="p-op">${ops.map(o=>`<option value="${o[0]}" ${o[0]===c.op?'selected':''}>${o[1]}</option>`).join('')}</select>`+
+    valC+
+    `<div class="pop-actions"><button class="pa" onclick="closePop()">Done</button></div>`;
+}
+function bindPop(){
+  const c=CONDS[editAt];
+  const fld=document.getElementById('p-field'), op=document.getElementById('p-op');
+  fld.onchange=()=>{ c.field=fld.value; const t=FIELDS[c.field].type; const ops=(OPS[t]||OPS.string); if(!ops.find(o=>o[0]===c.op)) c.op=ops[0][0]; refreshPop(); };
+  op.onchange=()=>{ c.op=op.value; if((c.op==='within_next'||c.op==='older_than')&&!c.n) c.n=30; refreshPop(); };
+  const n=document.getElementById('p-n'); if(n){ n.oninput=()=>{ c.n=+n.value; updPrev(); renderAll(); }; }
+  const v=document.getElementById('p-v'); if(v){ v.oninput=()=>{ c.value=v.value; renderAll(); }; }
+  const v2=document.getElementById('p-v2'); if(v2){ v2.oninput=()=>{ c.value2=v2.value; renderAll(); }; }
+  updPrev();
+}
+function updPrev(){ const p=document.getElementById('p-prev'); if(p) p.textContent=windowText(CONDS[editAt]); }
+function refreshPop(){ document.getElementById('editpop').innerHTML=popInner(CONDS[editAt]); bindPop(); renderAll(); }
+function closePop(){ const p=document.getElementById('editpop'); if(p) p.remove(); editAt=-1; renderAll(); }
+document.addEventListener('click', e=>{ const p=document.getElementById('editpop'); if(p && !p.contains(e.target) && !e.target.closest('.chip,.tok,.add-cond,.add,.co,.cv')) closePop(); });
+
+// ───────── Mutators ─────────
+function setField(i,f){ CONDS[i].field=f; const t=FIELDS[f].type; const ops=(OPS[t]||OPS.string); if(!ops.find(o=>o[0]===CONDS[i].op)) CONDS[i].op=ops[0][0]; renderAll(); }
+function setOp(i,o){ CONDS[i].op=o; if((o==='within_next'||o==='older_than')&&!CONDS[i].n) CONDS[i].n=30; renderAll(); }
+function setVal(i,v){ CONDS[i].value=v; renderAll(); }
+function setVal2(i,v){ CONDS[i].value2=v; renderAll(); }
+function setN(i,v){ CONDS[i].n=+v; renderAll(); }
+function setUnit(i,u){ CONDS[i].unit=u; renderAll(); }
+function removeCond(i){ CONDS.splice(i,1); renderAll(); }
+function clearConds(){ CONDS=[]; renderAll(); }
+function addCond(){ CONDS.push({field:'document_type',op:'is',value:''}); renderAll(); }
+function vbToggle(){ document.getElementById('vb-panel').classList.toggle('hidden'); }
+
+// ───────── Save-as-view ─────────
+function startSave(scope){
+  closePop();
+  const pop=document.createElement('div'); pop.className='pop name-pop'; pop.id='editpop';
+  const m=matches().length;
+  pop.innerHTML=`<label>Name this view</label><input id="p-name" type="text" placeholder="e.g. Recent Invoices" value=""><div class="note" style="margin-top:6px">Saves these ${CONDS.length} filter${CONDS.length>1?'s':''} as a view you can reopen anytime.</div><div class="pop-actions"><button class="pa" onclick="closePop()">Cancel</button><button class="pa primary" onclick="commitSave()">Save view</button></div>`;
+  document.body.appendChild(pop);
+  const btn=document.querySelector(`#${scope==='va'?'va-bar':scope==='vb'?'vb-panel':'vc-gram'} .save-view-btn`);
+  const r=(btn||document.body).getBoundingClientRect();
+  pop.style.top=(r.bottom+6)+'px'; pop.style.left=Math.min(r.left, window.innerWidth-300)+'px';
+  setTimeout(()=>document.getElementById('p-name').focus(),0);
+  document.getElementById('p-name').addEventListener('keydown',e=>{ if(e.key==='Enter') commitSave(); });
+}
+function commitSave(){
+  const nm=document.getElementById('p-name').value.trim()||'Untitled view';
+  SAVED.push({name:nm, n:matches().length, fresh:true});
+  closePop();
+  toast(`✓ View “${nm}” saved to sidebar`);
+  setTimeout(()=>{ SAVED.forEach(v=>v.fresh=false); renderAll(); }, 1200);
+}
+
+// ───────── Misc ─────────
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+function setVp(w){ document.querySelectorAll('.variant').forEach(v=>{ v.style.maxWidth=w?w+'px':''; v.style.margin=w?'0 auto':''; v.style.borderInline=w?'1px solid var(--color-border)':''; }); }
+function showVariant(id,e){ document.querySelectorAll('.variant').forEach(v=>v.style.display='none'); document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); document.getElementById('v'+id).style.display='block'; e.target.closest('.variant-tab').classList.add('active'); }
+
+renderAll();
+</script>
+</body>
+</html>

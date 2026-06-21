@@ -12,6 +12,7 @@ from app.models.user_settings import (
     resolve_sub_agent_model,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.reembed_service import start_reembed
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -38,6 +39,10 @@ class FullSettingsResponse(BaseModel):
     embedding_base_url: str
     embedding_dimensions: int
     embedding_has_api_key: bool
+    # Phase 111.1 — the stored provider the picker reads to show the current selection.
+    embedding_provider: str
+    extraction_provider: str
+    extraction_model: str
     # Reranking
     rerank_enabled: bool
     rerank_provider: str
@@ -92,6 +97,12 @@ class SettingsUpdate(BaseModel):
     embedding_api_key: str | None = None   # "***" = keep; "" = clear; real = save
     embedding_base_url: str | None = None
     embedding_dimensions: int | None = None
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    embedding_provider: str | None = None      # D-06 explicit embedding provider
+    extraction_provider: str | None = None     # D-09 #1 explicit extraction provider
+    extraction_model: str | None = None         # the operator's selected extraction model (was silently dropped — verify-work 111.1)
+    confidence_bucket_high: float | None = None    # D-12 portable confidence bucket
+    confidence_bucket_medium: float | None = None  # D-12 portable confidence bucket
     # Reranking
     rerank_enabled: bool | None = None
     rerank_provider: str | None = None
@@ -142,6 +153,10 @@ async def _build_response(s=None) -> FullSettingsResponse:
         embedding_base_url=s.embedding_base_url,
         embedding_dimensions=s.embedding_dimensions,
         embedding_has_api_key=bool(s.embedding_api_key),
+        # Phase 111.1 — surface the stored provider so the picker can read it back.
+        embedding_provider=s.embedding_provider,
+        extraction_provider=s.extraction_provider,
+        extraction_model=s.extraction_model,
         rerank_enabled=s.rerank_enabled,
         rerank_provider=s.rerank_provider,
         rerank_model=s.rerank_model,
@@ -177,6 +192,30 @@ async def _build_response(s=None) -> FullSettingsResponse:
             if m and m not in MODEL_CAPABILITIES
         },
     )
+
+
+def _validate_confidence_buckets(high: float | None, medium: float | None) -> None:
+    """Phase 111.1 V5 — clamp/coherence guard for the confidence buckets (D-12).
+
+    Each bucket, when supplied, must be inside [0.0, 1.0]; when BOTH are supplied
+    they must keep a coherent order (medium <= high). An incoherent pair is a
+    tampering vector (T-111.1-01-01) — reject with a 422 rather than silently
+    storing thresholds that make every result grade 'low'/'high' nonsensically.
+    """
+    for name, val in (("confidence_bucket_high", high), ("confidence_bucket_medium", medium)):
+        if val is not None and not (0.0 <= val <= 1.0):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{name} must be within [0.0, 1.0] (got {val}).",
+            )
+    if high is not None and medium is not None and medium > high:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"confidence_bucket_medium ({medium}) must be <= confidence_bucket_high "
+                f"({high}) — incoherent bucket order."
+            ),
+        )
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -224,6 +263,21 @@ async def update_settings(
         updates["embedding_base_url"] = body.embedding_base_url
     if body.embedding_dimensions is not None:
         updates["embedding_dimensions"] = body.embedding_dimensions
+
+    # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
+    # V5: validate the confidence buckets BEFORE building updates so an incoherent
+    # pair (medium > high) or an out-of-range value is rejected with a 422.
+    _validate_confidence_buckets(body.confidence_bucket_high, body.confidence_bucket_medium)
+    if body.embedding_provider is not None:
+        updates["embedding_provider"] = body.embedding_provider
+    if body.extraction_provider is not None:
+        updates["extraction_provider"] = body.extraction_provider
+    if body.extraction_model is not None:
+        updates["extraction_model"] = body.extraction_model
+    if body.confidence_bucket_high is not None:
+        updates["confidence_bucket_high"] = body.confidence_bucket_high
+    if body.confidence_bucket_medium is not None:
+        updates["confidence_bucket_medium"] = body.confidence_bucket_medium
 
     if body.rerank_enabled is not None:
         updates["rerank_enabled"] = body.rerank_enabled
@@ -284,6 +338,12 @@ async def update_settings(
                 detail=f"Model '{body.sub_agent_model}' is not available for provider '{pending_provider}'.",
             )
 
+    # Phase 111.1 EMBED-05 — snapshot the PREVIOUS embedding model/dims BEFORE the write,
+    # so we can detect a real change after save and kick the re-embed job (D-04/D-05).
+    prev_settings = await load_app_settings_async()
+    prev_model = prev_settings.embedding_model
+    prev_dims = prev_settings.embedding_dimensions
+
     await save_app_settings(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
@@ -293,7 +353,73 @@ async def update_settings(
         metadata={"new_settings": sanitized},
         supabase=supabase,
     )
+
+    # Phase 111.1 EMBED-05 — kick the re-embed job on a CONFIRMED model/dim change.
+    # The D-03 confirm gate is the FRONTEND modal (Plan 06) — the backend kicks on the
+    # already-confirmed save, so we never add a second backend confirmation. A change in
+    # the embedding MODEL or DIMENSIONS makes the existing chunks stale (their vectors
+    # live in a different space), so the job re-embeds them from preserved content
+    # (graceful-dip recall in the meantime via the D-10 stale-model filter). The handler
+    # returns fast; the job runs in the BackgroundTask thread (same pattern as
+    # documents.py:497). dims_changed gates the destructive resize_embedding_column.
+    new_settings = await load_app_settings_async()
+    model_changed = new_settings.embedding_model != prev_model
+    dims_changed = new_settings.embedding_dimensions != prev_dims
+    if model_changed or dims_changed:
+        background_tasks.add_task(
+            start_reembed,
+            supabase,
+            current_user["id"],
+            new_settings,
+            dims_changed,
+        )
+
     return await _build_response()
+
+
+# Phase 111.1 EMBED-05 — re-embed progress + manual re-kick surfaces.
+
+class ReembedProgressResponse(BaseModel):
+    status: str            # idle | running | partial | complete | failed
+    total: int | None
+    re_embedded: int | None
+    remaining: int | None
+    model: str | None = None
+    updated_at: float | None = None
+
+
+@router.get("/reembed-progress", response_model=ReembedProgressResponse)
+async def get_reembed_progress(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Reconcile-on-fetch progress for the Settings re-embed status card (D-v2.5-03).
+
+    Counts are derived live from document_chunks (the source of truth); the status hint
+    is reconciled against them (counts win — T-111.1-05-05). RLS-scoped to the caller.
+    """
+    from app.services.reembed_service import reembed_progress
+
+    s = await load_app_settings_async()
+    return await reembed_progress(supabase, current_user["id"], s)
+
+
+@router.post("/reembed", response_model=ReembedProgressResponse)
+async def rekick_reembed(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Manual "Re-embed now" re-kick for a failed/partial run (D-05). Re-runs against the
+    same stale predicate, so it resumes from wherever the last run stopped. dims_changed
+    is False here — a manual re-kick re-embeds the still-stale chunks, never re-resizes
+    (a dims change always flows through the settings save kickoff above)."""
+    from app.services.reembed_service import reembed_progress, start_reembed
+
+    s = await load_app_settings_async()
+    background_tasks.add_task(start_reembed, supabase, current_user["id"], s, False)
+    # Return the CURRENT (pre-run) progress snapshot so the card can show "running".
+    return await reembed_progress(supabase, current_user["id"], s)
 
 
 @router.get("/providers")

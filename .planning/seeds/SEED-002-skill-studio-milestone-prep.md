@@ -1,6 +1,6 @@
 ---
 id: SEED-002
-status: dormant
+status: queued (v3.1 — re-scoped)
 planted: 2026-05-02
 planted_during: v2.5 (Phase 059 complete — SSE Architecture Refactor)
 trigger_when: planning a milestone scoped to "Skills" / "Skill Studio" / "Eval" / v3.0 / v3.1 — or any milestone that extends the existing skills system, agent tools, or sub-agent service
@@ -8,6 +8,8 @@ scope: Large
 ---
 
 # SEED-002: Skill Studio Milestone Preparation
+
+> **Update 2026-06-15 — re-sequenced to v3.1 + re-scoped.** Per `.planning/PRDs/SEQUENCE.md`: Skill Studio was largely superseded by the v2.7–2.9 pivot (multi-agent orchestration shipped v2.8; the output-quality judge, NL authoring, and skill versioning/immutability shipped v2.9). It is now **slotted at v3.1** (the next milestone after v3.0 Document Management) and **re-scoped from "skill-only eval studio" → "Workflow + Skill Eval Studio"**: an eval/regression harness reusing the Phase 102 judge + golden-run, evaluating *workflows and their composed skills*, not skills alone. The test-infra-debt and catalog-injection notes below are mostly closed (Phase 065 repaired skills tests; v2.9 added skill snapshotting), so re-author against the live codebase when v3.1 starts. **Trigger:** next-up after v3.0 *unless a paying customer makes the GTM track (Operator UX → Multi-tenancy) jump the queue.* The PRD brief is `.planning/PRDs/v3.1-skill-studio-eval.md`.
 
 ## Why This Matters
 

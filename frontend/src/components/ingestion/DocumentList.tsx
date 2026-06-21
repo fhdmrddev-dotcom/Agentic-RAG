@@ -8,12 +8,20 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw } from "lucide-react"
+import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw, FolderInput, Check, X } from "lucide-react"
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
-import { fetchDocumentVersions, restoreDocumentVersion, reingestDocument } from "@/lib/api"
+import {
+  fetchDocumentVersions,
+  restoreDocumentVersion,
+  reingestDocument,
+  acceptClassification,
+  dismissClassification,
+} from "@/lib/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFileIcon } from "@/lib/fileIcons"
-import type { Document, DocumentMetadata } from "@/types"
+import { cn } from "@/lib/utils"
+import { MoveToFolderDialog } from "@/components/health/MoveToFolderDialog"
+import type { Document } from "@/types"
 
 interface Props {
   documents: Document[]
@@ -21,6 +29,11 @@ interface Props {
   onRefresh: () => void
   folderId?: string | null
   currentUserId: string
+  /** Phase 112 (D-01): open the document detail panel. Inline metadata expand is
+   *  retired — the filename cell click opens the push/split panel instead. */
+  onSelect?: (id: string) => void
+  /** The currently open document (drives the selected-row affordance). */
+  selectedDocId?: string | null
 }
 
 function formatBytes(bytes: number): string {
@@ -29,70 +42,16 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function MetadataPanel({ metadata }: { metadata: DocumentMetadata }) {
-  return (
-    <div className="px-4 py-3 bg-muted/30 border-t text-xs space-y-1.5">
-      {metadata.title && (
-        <div>
-          <span className="font-medium text-muted-foreground">Title: </span>
-          {metadata.title}
-        </div>
-      )}
-      {metadata.author && (
-        <div>
-          <span className="font-medium text-muted-foreground">Author: </span>
-          {metadata.author}
-        </div>
-      )}
-      {metadata.date && (
-        <div>
-          <span className="font-medium text-muted-foreground">Date: </span>
-          {metadata.date}
-        </div>
-      )}
-      {metadata.document_type && (
-        <div>
-          <span className="font-medium text-muted-foreground">Type: </span>
-          {metadata.document_type}
-        </div>
-      )}
-      {metadata.language && (
-        <div>
-          <span className="font-medium text-muted-foreground">Language: </span>
-          {metadata.language}
-        </div>
-      )}
-      {metadata.topics && metadata.topics.length > 0 && (
-        <div className="flex flex-wrap gap-1 items-center">
-          <span className="font-medium text-muted-foreground">Topics: </span>
-          {metadata.topics.map((t) => (
-            <span
-              key={t}
-              className="rounded-full bg-primary/10 text-primary px-2 py-0.5"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-      {metadata.summary && (
-        <div>
-          <span className="font-medium text-muted-foreground">Summary: </span>
-          {metadata.summary}
-        </div>
-      )}
-    </div>
-  )
-}
+// Phase 112 Plan 04 (D-01): the inline `MetadataPanel` was RETIRED here — metadata
+// now lives in the one honest surface (DocumentDetailPanel, opened by a row click).
+// Version-history inline-expand stays (VersionHistoryPanel below).
 
 function VersionHistoryPanel({
   documentId,
-  currentVersionNumber,
   onRestored,
   currentUserId,
 }: {
   documentId: string
-  currentVersionNumber: number
   onRestored: () => void
   currentUserId: string
 }) {
@@ -226,13 +185,83 @@ function VersionHistoryPanel({
   )
 }
 
-export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId }: Props) {
+/**
+ * Phase 118 Plan 05 Task 2 — the compact one-glance classification chip (sketch 036-A:
+ * `→ folder ✓ ✕`). Renders ONLY when the doc carries a "suggested" `_classification`
+ * (reads the existing `doc.metadata` — zero new fetch). The full provenance card lives
+ * in the DocumentDetailPanel's Classification section (Task 1); this is one-glance only.
+ *
+ * ✓ accepts (move + audit), ✕ dismisses — both re-fetch via onRefresh on a 200
+ * (re-fetch-not-optimistic; the suggestion clears/flips server-side, the re-fetch
+ * shows truth). a11y: ✓/✕ carry aria-label and are coarse-pointer always-on (the
+ * .rel-x-touch utility — the action must be reachable on touch with no hover).
+ */
+function ClassificationRowChip({ doc, onRefresh }: { doc: Document; onRefresh: () => void }) {
+  const sugg = doc.metadata?._classification
+  const [busy, setBusy] = useState(false)
+  if (!sugg || sugg.status !== "suggested") return null
+
+  const folderName = sugg.suggested_folder_name ?? "(deleted folder)"
+
+  async function run(fn: () => Promise<unknown>) {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fn()
+      // Re-fetch the authoritative list (re-fetch-not-optimistic) — the suggestion
+      // clears/flips server-side; the re-fetch drops the chip.
+      onRefresh()
+    } catch {
+      // Leave the chip in place — the user can retry. The panel section carries the
+      // honest failure beat; the row chip stays quiet to avoid table-row churn.
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      // The chip's controls are NOT the filename-open affordance — stop row clicks.
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--warning)/0.15)] px-2 py-0.5 text-[11px] font-semibold text-[hsl(var(--warning))] whitespace-nowrap">
+        <span aria-hidden="true" className="opacity-70">→</span>
+        {folderName}
+      </span>
+      <button
+        type="button"
+        onClick={() => void run(() => acceptClassification(doc.id))}
+        disabled={busy}
+        aria-label={`Accept suggestion and move ${doc.filename} to ${folderName}`}
+        className="rel-x-touch grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[hsl(var(--panel-status-done)/0.15)] hover:text-[hsl(var(--panel-status-done))] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => void run(() => dismissClassification(doc.id))}
+        disabled={busy}
+        aria-label={`Dismiss classification suggestion for ${doc.filename}`}
+        className="rel-x-touch grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[hsl(0_80%_60%/0.15)] hover:text-[hsl(0_80%_70%)] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  )
+}
+
+export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId, onSelect, selectedDocId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
   const [reingestingId, setReingestingId] = useState<string | null>(null)
+  // Phase 114 (D-114-14): the Move-to-folder document-row action. A single dialog
+  // keyed to the active row's document — reuses the existing MoveToFolderDialog +
+  // PATCH /documents/{id}/move (zero net-new backend). No drag-drop is built.
+  const [moveTarget, setMoveTarget] = useState<Document | null>(null)
 
   // BUG-260516-03: surface the reingest action that previously only existed
   // on the Library Health page. Same /documents/{id}/reingest endpoint
@@ -303,11 +332,10 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
     )
   }
 
-  const hasMetadata = (doc: Document) =>
-    doc.status === "completed" && doc.metadata != null
-
+  // Phase 112 Plan 04 (D-01): the chevron now toggles VERSION HISTORY ONLY —
+  // metadata moved to the click-to-open DocumentDetailPanel (no longer drives expand).
   const hasVersions = (doc: Document) => (doc.version_number ?? 1) > 1
-  const isExpandable = (doc: Document) => hasMetadata(doc) || hasVersions(doc)
+  const isExpandable = (doc: Document) => hasVersions(doc)
 
   return (
     <>
@@ -328,14 +356,18 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
             {filtered.map((doc) => (
               <Fragment key={doc.id}>
                 <tr
-                  className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+                  data-selected={selectedDocId === doc.id || undefined}
+                  className={cn(
+                    "border-b last:border-0 hover:bg-muted/20 transition-colors",
+                    selectedDocId === doc.id && "bg-primary/5",
+                  )}
                 >
                   <td className="px-2 py-3">
                     {isExpandable(doc) && (
                       <button
                         onClick={() => toggle(doc.id)}
                         className="text-muted-foreground hover:text-foreground"
-                        aria-label={expanded.has(doc.id) ? "Collapse details" : "Expand details"}
+                        aria-label={expanded.has(doc.id) ? "Collapse version history" : "Expand version history"}
                       >
                         {expanded.has(doc.id)
                           ? <ChevronDown className="h-3.5 w-3.5" />
@@ -343,25 +375,37 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                       </button>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-medium max-w-xs truncate">
-                    <span className="flex items-center gap-1.5 flex-wrap">
-                      {doc.filename}
-                      {(doc.version_number ?? 1) > 1 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          v{doc.version_number}
-                        </span>
-                      )}
-                      {(doc.table_count ?? 0) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          {doc.table_count} tables
-                        </span>
-                      )}
-                      {(doc.image_count ?? 0) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          {doc.image_count} imgs
-                        </span>
-                      )}
-                    </span>
+                  <td className="px-4 py-3 font-medium max-w-xs">
+                    {/* Phase 112 (D-01): the filename cell opens the detail panel.
+                        Distinct from the chevron (version-history toggle) per RESEARCH Q4. */}
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => onSelect?.(doc.id)}
+                        aria-pressed={selectedDocId === doc.id}
+                        className="flex items-center gap-1.5 flex-wrap text-left truncate hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
+                      >
+                        {doc.filename}
+                        {(doc.version_number ?? 1) > 1 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            v{doc.version_number}
+                          </span>
+                        )}
+                        {(doc.table_count ?? 0) > 0 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            {doc.table_count} tables
+                          </span>
+                        )}
+                        {(doc.image_count ?? 0) > 0 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            {doc.image_count} imgs
+                          </span>
+                        )}
+                      </button>
+                      {/* Phase 118 (CLASS-03): one-glance suggestion chip — only when a
+                          "suggested" _classification is present on this doc. */}
+                      <ClassificationRowChip doc={doc} onRefresh={onRefresh} />
+                    </div>
                   </td>
                   <td className="px-4 py-3">{getFileIcon(doc.filename)}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
@@ -394,6 +438,19 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setMoveTarget(doc)}
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                          >
+                            <FolderInput className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Move to folder</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setDeleteTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                           >
@@ -405,19 +462,11 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     </div>
                   </td>
                 </tr>
-                {hasMetadata(doc) && expanded.has(doc.id) && (
-                  <tr>
-                    <td colSpan={7} className="p-0">
-                      <MetadataPanel metadata={doc.metadata!} />
-                    </td>
-                  </tr>
-                )}
                 {hasVersions(doc) && expanded.has(doc.id) && (
                   <tr>
                     <td colSpan={7} className="p-0">
                       <VersionHistoryPanel
                         documentId={doc.id}
-                        currentVersionNumber={doc.version_number ?? 1}
                         onRestored={onRefresh}
                         currentUserId={currentUserId}
                       />
@@ -528,6 +577,22 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Phase 114 (D-114-14): Move-to-folder — reuses the existing dialog +
+          PATCH /documents/{id}/move. onMoved refreshes the list so the moved doc
+          drops out of the current folder view. */}
+      {moveTarget && (
+        <MoveToFolderDialog
+          open={moveTarget !== null}
+          documentId={moveTarget.id}
+          documentName={moveTarget.filename}
+          onClose={() => setMoveTarget(null)}
+          onMoved={() => {
+            setMoveTarget(null)
+            onRefresh()
+          }}
+        />
+      )}
     </>
   )
 }

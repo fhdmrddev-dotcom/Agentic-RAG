@@ -8,6 +8,8 @@ import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
+import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
+import { GovernancePage } from "@/pages/GovernancePage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -278,7 +280,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
       ) : (
         <main className="flex-1 overflow-hidden">
           {activeView === "documents" ? (
-            <IngestionPage />
+            <IngestionPage onNavigate={onNavigate} />
           ) : activeView === "skills" ? (
             <SkillsPage onTryInChat={handleTryInChat} />
           ) : activeView === "settings" ? (
@@ -290,6 +292,19 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             // Builder + the publish gauntlet as intra-view state (three-homes, no
             // router); onLaunch = doRun (the existing-kickoff launcher).
             <WorkflowsPage folders={folders} onLaunch={doRun} />
+          ) : activeView === "classification-rules" ? (
+            // Phase 118 gap-closure (CLASS-01 reachability): the rules-authoring
+            // page mounts here as a top-level home (the Plan-04 ActiveView seam +
+            // sketch 037-A), additive BEFORE the trailing KnowledgeHealthPage else.
+            // Self-fetches via listRules() — no props; three-homes, no router.
+            <ClassificationRulesPage />
+          ) : activeView === "governance" ? (
+            // Phase 119 (DGOV-01/02): the Governance top-level home mounts here as
+            // a peer to Library Health (the D-119-2 navigation triad — App.tsx
+            // union + this branch + the nav-items entry, all owned in-phase so the
+            // surface is reachable; the Phase 118 built-but-unreachable lesson).
+            // Self-fetches the 3 governance signals — no props; three-homes, no router.
+            <GovernancePage />
           ) : (
             <KnowledgeHealthPage />
           )}
