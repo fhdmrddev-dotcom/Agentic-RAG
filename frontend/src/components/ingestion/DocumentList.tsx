@@ -8,9 +8,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw, FolderInput } from "lucide-react"
+import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw, FolderInput, Check, X } from "lucide-react"
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
-import { fetchDocumentVersions, restoreDocumentVersion, reingestDocument } from "@/lib/api"
+import {
+  fetchDocumentVersions,
+  restoreDocumentVersion,
+  reingestDocument,
+  acceptClassification,
+  dismissClassification,
+} from "@/lib/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFileIcon } from "@/lib/fileIcons"
 import { cn } from "@/lib/utils"
@@ -179,6 +185,72 @@ function VersionHistoryPanel({
   )
 }
 
+/**
+ * Phase 118 Plan 05 Task 2 — the compact one-glance classification chip (sketch 036-A:
+ * `→ folder ✓ ✕`). Renders ONLY when the doc carries a "suggested" `_classification`
+ * (reads the existing `doc.metadata` — zero new fetch). The full provenance card lives
+ * in the DocumentDetailPanel's Classification section (Task 1); this is one-glance only.
+ *
+ * ✓ accepts (move + audit), ✕ dismisses — both re-fetch via onRefresh on a 200
+ * (re-fetch-not-optimistic; the suggestion clears/flips server-side, the re-fetch
+ * shows truth). a11y: ✓/✕ carry aria-label and are coarse-pointer always-on (the
+ * .rel-x-touch utility — the action must be reachable on touch with no hover).
+ */
+function ClassificationRowChip({ doc, onRefresh }: { doc: Document; onRefresh: () => void }) {
+  const sugg = doc.metadata?._classification
+  const [busy, setBusy] = useState(false)
+  if (!sugg || sugg.status !== "suggested") return null
+
+  const folderName = sugg.suggested_folder_name ?? "(deleted folder)"
+
+  async function run(fn: () => Promise<unknown>) {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fn()
+      // Re-fetch the authoritative list (re-fetch-not-optimistic) — the suggestion
+      // clears/flips server-side; the re-fetch drops the chip.
+      onRefresh()
+    } catch {
+      // Leave the chip in place — the user can retry. The panel section carries the
+      // honest failure beat; the row chip stays quiet to avoid table-row churn.
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      // The chip's controls are NOT the filename-open affordance — stop row clicks.
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--warning)/0.15)] px-2 py-0.5 text-[11px] font-semibold text-[hsl(var(--warning))] whitespace-nowrap">
+        <span aria-hidden="true" className="opacity-70">→</span>
+        {folderName}
+      </span>
+      <button
+        type="button"
+        onClick={() => void run(() => acceptClassification(doc.id))}
+        disabled={busy}
+        aria-label={`Accept suggestion and move ${doc.filename} to ${folderName}`}
+        className="rel-x-touch grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[hsl(var(--panel-status-done)/0.15)] hover:text-[hsl(var(--panel-status-done))] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => void run(() => dismissClassification(doc.id))}
+        disabled={busy}
+        aria-label={`Dismiss classification suggestion for ${doc.filename}`}
+        className="rel-x-touch grid h-6 w-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[hsl(0_80%_60%/0.15)] hover:text-[hsl(0_80%_70%)] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  )
+}
+
 export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId, onSelect, selectedDocId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
@@ -303,32 +375,37 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                       </button>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-medium max-w-xs truncate">
+                  <td className="px-4 py-3 font-medium max-w-xs">
                     {/* Phase 112 (D-01): the filename cell opens the detail panel.
                         Distinct from the chevron (version-history toggle) per RESEARCH Q4. */}
-                    <button
-                      type="button"
-                      onClick={() => onSelect?.(doc.id)}
-                      aria-pressed={selectedDocId === doc.id}
-                      className="flex items-center gap-1.5 flex-wrap text-left hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
-                    >
-                      {doc.filename}
-                      {(doc.version_number ?? 1) > 1 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          v{doc.version_number}
-                        </span>
-                      )}
-                      {(doc.table_count ?? 0) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          {doc.table_count} tables
-                        </span>
-                      )}
-                      {(doc.image_count ?? 0) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
-                          {doc.image_count} imgs
-                        </span>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => onSelect?.(doc.id)}
+                        aria-pressed={selectedDocId === doc.id}
+                        className="flex items-center gap-1.5 flex-wrap text-left truncate hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
+                      >
+                        {doc.filename}
+                        {(doc.version_number ?? 1) > 1 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            v{doc.version_number}
+                          </span>
+                        )}
+                        {(doc.table_count ?? 0) > 0 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            {doc.table_count} tables
+                          </span>
+                        )}
+                        {(doc.image_count ?? 0) > 0 && (
+                          <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                            {doc.image_count} imgs
+                          </span>
+                        )}
+                      </button>
+                      {/* Phase 118 (CLASS-03): one-glance suggestion chip — only when a
+                          "suggested" _classification is present on this doc. */}
+                      <ClassificationRowChip doc={doc} onRefresh={onRefresh} />
+                    </div>
                   </td>
                   <td className="px-4 py-3">{getFileIcon(doc.filename)}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
