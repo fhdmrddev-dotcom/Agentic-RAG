@@ -69,7 +69,7 @@
 
 ### Cross-cutting UX (UX)
 
-- [ ] **UX-01**: All new DM UI matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA — reusing existing primitives (`ConfidenceChip`, `MoveToFolderDialog` document-picker, `FolderNode` inline-edit, `HealthPanel` cards) and the state-based `ActiveView` navigation (no react-router).
+- [x] **UX-01**: All new DM UI matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA — reusing existing primitives (`ConfidenceChip`, `MoveToFolderDialog` document-picker, `FolderNode` inline-edit, `HealthPanel` cards) and the state-based `ActiveView` navigation (no react-router).
 - [ ] **UX-02**: The three highest-risk net-new surfaces — the **document detail panel** (metadata + confidence + inline edit + relationships + classification), the **view/filter builder**, and the **relationship panel** — are sketched and operator-approved before implementation (G-2 sketch-before-plan).
 
 ## Deferred (Future) — v3.0.x / later
@@ -127,7 +127,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | CLASS-03 | Phase 118 — Auto-Classification | Complete |
 | DGOV-01 | Phase 119 — Document Governance Health | Pending |
 | DGOV-02 | Phase 119 — Document Governance Health | Pending |
-| UX-01 | Cross-cutting (Phases 112, 114, 117, 118, 119) | Pending |
+| UX-01 | Cross-cutting (Phases 112, 114, 117, 118, 119) | Complete |
 | UX-02 | Cross-cutting G-2 sketch (Phases 112, 114, 117) | Pending |
 
 **Coverage:**

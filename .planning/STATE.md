@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T03:18:43.357Z"
+last_updated: "2026-06-21T03:30:07.330Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 44
-  completed_plans: 42
+  completed_plans: 43
   percent: 82
 ---
 
@@ -27,6 +27,8 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 ## Current Position
 
 Phase: 118 (auto-classification) — EXECUTING
+
+**118-05 (Wave 3, CLASS-03/UX-01 — on-doc classification UI) — EXECUTED 2026-06-21** (2 TDD tasks / 2 commits — `af39cf8e` ClassificationSection + 3rd PanelSection mount, `c03f4c7f` DocumentList row chip; SUMMARY `118-05-SUMMARY.md`): the honest on-doc accept/dismiss surface for upload-time suggestions, built INSIDE the existing Phase-112 `DocumentDetailPanel` (the 117 RelationshipsSection precedent — NOT a new surface), honoring the LOCKED G-2 sketch 036-A (Winner A: on the doc — row chip + panel card). **`ClassificationSection.tsx`** (net-new) — matched-rule **provenance** card (`rule_name` + frozen `condition_summary` + `→ {suggested_folder_name}`), NEVER a confidence % (the 028/036 honesty principle); the **suggested** state reads instantly as *not moved yet* (file still where uploaded), the **accepted** state renders the `🛡 classification.apply · audit logged` receipt + a reversible **Undo / move back** (reuses the existing `moveDocument(docId, prior_folder_id ?? null)` — D-118-6, no new endpoint), the **no-match** state is a calm dashed empty (NOT `role=alert`). **KEY adaptation [Rule 3]:** the section has **NO independent GET** (no `getClassification` endpoint exists — Plan 04 added only accept/dismiss + rule CRUD), so it re-derives the suggestion off the `doc.metadata._classification` prop and reconciles via `onChanged=onReconcile` (the parent `loadDocuments` re-fetch) on a 200 — re-fetch-NOT-optimistic enforced by the onChanged-on-200 path, not a local `load(true)` (exactly the PATTERNS props shape `suggestion={doc.metadata?._classification}` / `onChanged={onReconcile}`). Mounted as the **3rd `<PanelSection title="Classification">`** after Relationships with a `classCount` count-lift (1 only while `status==='suggested'`, else 0; reset on `doc.id`) mirroring `relTotal`. **`DocumentList.tsx`** — `ClassificationRowChip` (`→ {folder} ✓ ✕`) renders **only** for a `status==='suggested'` doc (reads existing `doc.metadata` — zero new fetch); `✓`→`acceptClassification`, `✕`→`dismissClassification`, both reconcile via the existing `onRefresh`; placed in the filename cell (outside the filename-open button, `stopPropagation` so ✓/✕ never trigger panel-open). **a11y:** all controls `aria-label`'d; row chip controls coarse-pointer always-on via the shared `.rel-x-touch`; panel-AA tokens. **2 deviations [both Rule 3]:** (1) the `onChanged` re-fetch path replaces the literal `load(true)` (no GET to re-run); (2) wrapped the net-new `DocumentList.test.tsx` render in `TooltipProvider` (the component's existing radix Tooltip throws bare — test-harness only). **Plan-owned tests GREEN:** `vitest run ClassificationSection DocumentList DocumentDetailPanel` → **4 files / 31 tests passed** (ClassificationSection 13 + DocumentList 7 + DocumentDetailPanel.a11y 7 + panel mount). `tsc --noEmit` **EXIT 0**. All acceptance greps pass (no confidence-% render; `ClassificationSection` mounted; `_classification` + `status !== "suggested"` gate + 2 chip aria-labels). **Net-new failures = 0** — only the 3 test files import the 3 changed components (the 2 new plan tests + the existing panel a11y test), all GREEN; purely additive, no existing symbol modified. `threads.py` byte-untouched (G-5; `git diff a7986c2b HEAD` = 0). No new package, no migration, no deletions. SUMMARY: `118-05-SUMMARY.md` (Self-Check: PASSED). CLASS-03 + UX-01 marked complete. **Deferred to verify-phase:** G-4 lived-experience UI UAT (live accept→move→audit→receipt + Undo round-trip; mobile coarse-pointer reach). NEXT = Plan 06 (rules page — AutomationGroup + RuleBuilderPanel + ClassificationRulesPage; shares the Plan-04 client family).
 
 **118-04 (Wave 1, CLASS-01/03 — frontend interface seam) — EXECUTED 2026-06-21** (2 tasks / 2 commits — `4751480d` types, `48567973` client + ActiveView union; SUMMARY `118-04-SUMMARY.md`): the leak-safe, convention-matching frontend contract Plans 05 (on-doc) + 06 (rules-page) build against — interface-first so the two UI plans receive the types/client directly. **`types/index.ts`** (+66): `ClassificationRule` (a `SavedView` clone — `filter_expr`→`match_expr` reusing the SAME `ViewFilter` AST, + `suggest_folder_id: string | null`/`enabled: boolean`; `is_global` server-owned); `ClassificationSuggestion` mirroring the D-118-5 `_classification` object EXACTLY (`{rule_id, rule_name, condition_summary, suggested_folder_id, suggested_folder_name: string | null, status: "suggested" | "accepted", prior_folder_id?: string | null}` — `suggested_folder_name` nullable per Pitfall 5, `prior_folder_id` optional since stamped at ACCEPT only, D-118-6); `_classification?: ClassificationSuggestion` added to `DocumentMetadata` the SAME way `_source`/`_confidence` are typed so `doc.metadata?._classification` type-checks for the row chip + panel. **`api.ts`** (+114, adjacent to the relationships family, cloning `getAuthHeaders`+throw-on-non-ok+404-tolerant DELETE): `listRules`/`createRule(name, match_expr, suggest_folder_id)`/`updateRule(id, body)`/`deleteRule(id)` — **`createRule`'s POST body OMITS `is_global`** (server hard-sets it, mirrors `createView`, T-118-04-01); `acceptClassification(docId)`/`dismissClassification(docId)` PATCH the new `/documents/{id}/classification/{accept,dismiss}` endpoints; **NO new "would match N" count fn** (the builder reuses the EXISTING `resolveAdHoc`/`resolveFilterCount`) and **NO new Undo fn** (reuses the EXISTING `moveDocument(id, prior_folder_id)`). **`App.tsx:9`** `ActiveView` union extended with `"classification-rules"`. **0 deviations** — executed exactly as written. `npx tsc --noEmit` **EXIT 0** (run after each task); all acceptance greps pass (createRule no `is_global` via `sed`-scoped grep; no new count fn; both `classification/accept`+`classification/dismiss` present; union extended). **Net-new failures = 0** — purely additive (new exported types/fns + one union member, zero existing symbols modified); api client suites `src/lib/api.test.ts` + `src/__tests__/lib/api.test.ts` ran **48/48 passed** live. `threads.py` byte-untouched (G-5; `git diff a7986c2b HEAD` = 0). No new package, no new migration, no file deletions. SUMMARY: `118-04-SUMMARY.md` (Self-Check: PASSED). CLASS-01/CLASS-03 client seam in place. NEXT (per wave order) = Plans 02/03 (backend rule CRUD + matcher + ingest splice + accept/dismiss endpoints) then Plans 05/06 (the UI that consumes this seam).
 
@@ -71,7 +73,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-21
@@ -570,6 +572,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 |-------|------|----------|-------|
 | Phase 118 P02 | ~30 min | 2 tasks | 3 files |
 | Phase 118 P03 | 12min | 2 tasks | 5 files |
+| Phase 118 P05 | 10min | 2 tasks | 5 files |
 
 ## Decisions
 
