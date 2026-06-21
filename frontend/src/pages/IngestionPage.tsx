@@ -421,13 +421,22 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
             <div
               className={cn(
                 "flex flex-col overflow-y-auto space-y-4 min-w-0",
-                // Column-shedding (D-114-17, net-new): when the panel is open hide
-                // the Type/Size/Chunks columns (3rd–5th cells of the list table —
-                // fixed order chevron·Filename·Type·Size·Chunks·Status·Actions),
-                // keeping Filename + Status + Actions. Scoped to the list table via
-                // an arbitrary descendant variant so no shared CSS file is touched.
-                panelOpen &&
+                // Column-shedding (D-114-17, net-new): hide the Type/Size/Chunks
+                // columns (3rd–5th cells of the list table — fixed order
+                // chevron·Filename·Type·Size·Chunks·Status·Actions), keeping
+                // Filename + Status + Actions. Applied (a) when the detail panel is
+                // open beside the list and (b) on mobile (<768px), where the full
+                // 7-column table would otherwise force a horizontal scroll. Scoped to
+                // the list table via an arbitrary descendant variant so no shared CSS
+                // file is touched.
+                (panelOpen || isMobile) &&
                   "[&_table_th:nth-child(n+3):nth-child(-n+5)]:hidden [&_table_td:nth-child(n+3):nth-child(-n+5)]:hidden",
+                // On mobile the Filename column must be allowed to break a long
+                // unbreakable name (e.g. "Fahed_Mrad_Defense_Presentation") instead of
+                // forcing the table wider — otherwise shedding alone wouldn't remove
+                // the horizontal scroll.
+                isMobile &&
+                  "[&_table_td:nth-child(2)_button]:whitespace-normal [&_table_td:nth-child(2)_button]:[overflow-wrap:anywhere]",
               )}
             >
               {/* Mobile-only folder access — opens the tree as a bottom-sheet. */}
