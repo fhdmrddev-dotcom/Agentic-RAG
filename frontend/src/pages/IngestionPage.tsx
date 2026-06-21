@@ -420,7 +420,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                 Filename + Status + Actions (D-114-17, column-shedding net-new). */}
             <div
               className={cn(
-                "flex flex-col overflow-y-auto space-y-6 min-w-0",
+                "flex flex-col overflow-y-auto space-y-4 min-w-0",
                 // Column-shedding (D-114-17, net-new): when the panel is open hide
                 // the Type/Size/Chunks columns (3rd–5th cells of the list table —
                 // fixed order chevron·Filename·Type·Size·Chunks·Status·Actions),
@@ -442,6 +442,62 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                   {selectedFolderName ?? "Root"}
                 </span>
               </button>
+
+              {/* Folder / view header band — title + count on the LEFT; the upload
+                  control fills the otherwise-empty top-right corner (best use of the
+                  wide header row — previously a separate full-width upload block sat
+                  below an empty corner). Upload is folder-scoped → omitted while a
+                  saved view is the active surface (a view is a filter, not a target). */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  {selectedViewId === null && selectedFolderId === null && (
+                    <>
+                      <h2 className="text-lg font-semibold leading-tight">Root</h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Documents not assigned to a folder · {rootDocumentCount}{" "}
+                        {rootDocumentCount === 1 ? "document" : "documents"}
+                      </p>
+                    </>
+                  )}
+                  {selectedViewId === null && selectedFolderId !== null && (
+                    <>
+                      <FolderBreadcrumb
+                        folders={folders}
+                        selectedFolderId={selectedFolderId}
+                        onSelectFolder={handleSelectFolder}
+                      />
+                      {selectedFolder && (
+                        <FolderDetail
+                          folder={selectedFolder}
+                          documents={folderDocuments}
+                          subfolderCount={subfolderCount}
+                        />
+                      )}
+                    </>
+                  )}
+                  {selectedViewId !== null && (
+                    <>
+                      <h2 className="text-lg font-semibold leading-tight">
+                        {views.find((v) => v.id === selectedViewId)?.name ?? "View"}
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Documents matching this saved filter.
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {selectedViewId === null && (
+                  <DocumentUpload
+                    onUpload={upload}
+                    uploading={uploading}
+                    uploadingCount={uploadingCount}
+                    folderId={selectedFolderId}
+                    folderName={selectedFolderName}
+                    disabled={!canUploadToFolder}
+                  />
+                )}
+              </div>
 
               {/* Phase 114: the inline filter/view builder (D-114-1). Ad-hoc
                   filtering and a loaded saved view are the SAME surface. When the
@@ -481,52 +537,6 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                     matchCount={matchCount}
                   />
                 </div>
-              )}
-
-              {selectedViewId === null && selectedFolderId === null && (
-                <div>
-                  <h2 className="text-lg font-semibold">Root</h2>
-                  <p className="text-sm text-muted-foreground">Documents not assigned to a folder</p>
-                </div>
-              )}
-              {selectedViewId === null && selectedFolderId !== null && (
-                <>
-                  <FolderBreadcrumb
-                    folders={folders}
-                    selectedFolderId={selectedFolderId}
-                    onSelectFolder={handleSelectFolder}
-                  />
-                  {selectedFolder && (
-                    <FolderDetail
-                      folder={selectedFolder}
-                      documents={folderDocuments}
-                      subfolderCount={subfolderCount}
-                    />
-                  )}
-                </>
-              )}
-              {selectedViewId !== null && (
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    {views.find((v) => v.id === selectedViewId)?.name ?? "View"}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Documents matching this saved filter.
-                  </p>
-                </div>
-              )}
-
-              {/* Upload is folder-scoped — hidden while a view is the active
-                  surface (a view is a saved filter, not an upload target). */}
-              {selectedViewId === null && (
-                <DocumentUpload
-                  onUpload={upload}
-                  uploading={uploading}
-                  uploadingCount={uploadingCount}
-                  folderId={selectedFolderId}
-                  folderName={selectedFolderName}
-                  disabled={!canUploadToFolder}
-                />
               )}
 
               <DocumentList

@@ -59,58 +59,55 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         : null
 
   return (
-    <div className="space-y-2">
-      <div
+    <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <button
+        type="button"
         onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onClick={() => !uploading && !disabled && inputRef.current?.click()}
-        className={cn(
-          // Compact single-row drop bar. (Was a tall p-10 dropzone that pushed the
-          // file list below the fold — especially on short viewports.) Drag-drop AND
-          // click-to-browse both still work on the whole bar.
-          "flex items-center gap-3 rounded-xl border border-dashed px-4 py-3 transition-colors",
+        disabled={disabled || uploading}
+        title={
           disabled
-            ? "pointer-events-none opacity-60 cursor-not-allowed border-muted-foreground/20"
-            : cn(
-                "cursor-pointer",
-                dragging ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary/50",
-              ),
-          uploading && "pointer-events-none opacity-60",
+            ? "Only the folder owner can upload files here"
+            : "Drop files here or click to browse · .txt .md .pdf .docx .pptx .xlsx .csv .epub"
+        }
+        className={cn(
+          // Compact upload control in the header band's right corner — a real
+          // designed button, but the whole control is still a drop target (drag a
+          // file onto it) and opens the file picker on click. (Was a big p-10
+          // dropzone that pushed the file list below the fold.)
+          "inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
+          disabled
+            ? "cursor-not-allowed border-dashed border-muted-foreground/25 text-muted-foreground/60"
+            : dragging
+              ? "cursor-copy border-primary bg-primary/10 text-primary"
+              : "cursor-pointer border-border bg-card text-foreground hover:border-primary/50 hover:bg-accent",
+          uploading && "cursor-default opacity-70",
         )}
       >
         {disabled ? (
           <>
-            <Lock className="h-5 w-5 text-muted-foreground/50 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-muted-foreground leading-tight">Read-only folder</p>
-              <p className="text-xs text-muted-foreground truncate leading-tight">Only the folder owner can upload files here</p>
-            </div>
+            <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>Read-only</span>
           </>
         ) : uploading ? (
           <>
-            <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="text-sm font-medium">{statusLabel ?? "Uploading…"}</span>
+            <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span>{statusLabel ?? "Uploading…"}</span>
           </>
         ) : (
           <>
-            <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium leading-tight">
-                {folderName ? `Upload to ${folderName}` : "Upload to Root"}
-              </p>
-              <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
-                Drop files here or click to browse · .txt .md .pdf .docx .pptx .xlsx .csv .epub
-              </p>
-            </div>
+            <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{folderName ? `Upload to ${folderName}` : "Upload to Root"}</span>
           </>
         )}
-      </div>
+      </button>
 
       {result && !uploading && (
-        <div className="space-y-1">
+        <div className="text-right">
           {(result.uploaded > 0 || result.duplicates > 0) && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {[
                 result.uploaded > 0 && `${result.uploaded} uploaded`,
                 result.duplicates > 0 && `${result.duplicates} already up to date`,
@@ -120,7 +117,7 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
             </p>
           )}
           {result.errors.map((err, i) => (
-            <p key={i} className="text-sm text-destructive">{err}</p>
+            <p key={i} className="text-xs text-destructive">{err}</p>
           ))}
         </div>
       )}
