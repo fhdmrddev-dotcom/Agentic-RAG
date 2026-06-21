@@ -198,7 +198,10 @@ export function GovernancePage() {
             const filename = doc?.filename ?? "Linked document"
             return (
               <GovernanceRow
-                key={item.relationship_id}
+                // WR-01: a single edge can contribute TWO broken items (both ends
+                // dangling) that share one relationship_id — combine it with the
+                // broken end id so the React key is unique per item.
+                key={`${item.relationship_id}:${item.broken_doc_id}`}
                 docId={openId}
                 filename={filename}
                 chip={
