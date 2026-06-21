@@ -9,9 +9,6 @@ interface Props {
   folderId?: string | null
   folderName?: string | null
   disabled?: boolean
-  /** Icon + short "Upload" label only (used when the detail panel is open and the
-   *  header column is narrow) so a long folder name can't blow up the button. */
-  compact?: boolean
 }
 
 interface BatchResult {
@@ -20,7 +17,7 @@ interface BatchResult {
   errors: string[]
 }
 
-export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folderId, folderName, disabled = false, compact = false }: Props) {
+export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folderId, folderName, disabled = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [result, setResult] = useState<BatchResult | null>(null)
@@ -61,9 +58,9 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         ? "Uploading…"
         : null
 
-  // The full target label always reads "Upload to <folder>" (or Root). In compact
-  // mode only the short word "Upload" is shown (folder context lives in the
-  // breadcrumb) so a long folder name can never widen the button.
+  // The button always reads just "Upload" (folder context lives in the breadcrumb /
+  // header), so a long folder name can never widen it. The full target is kept in
+  // the button's aria-label + title for accessibility and hover.
   const targetLabel = folderName ? `Upload to ${folderName}` : "Upload to Root"
 
   return (
@@ -85,9 +82,8 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
           // Compact upload control in the header band's right corner — a real
           // designed button, but the whole control is still a drop target (drag a
           // file onto it) and opens the file picker on click. (Was a big p-10
-          // dropzone that pushed the file list below the fold.) max-width + truncate
-          // so a long folder name can never blow the button out of the header row.
-          "inline-flex max-w-[20rem] items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
+          // dropzone that pushed the file list below the fold.)
+          "inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors",
           disabled
             ? "cursor-not-allowed border-dashed border-muted-foreground/25 text-muted-foreground/60"
             : dragging
@@ -109,9 +105,10 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         ) : (
           <>
             <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {/* compact: just "Upload" (folder context is in the breadcrumb). full:
-                "Upload to <folder>", truncated so long names never overflow. */}
-            <span className="truncate">{compact ? "Upload" : targetLabel}</span>
+            {/* Always just "Upload" — folder context lives in the breadcrumb/header,
+                so a long folder name can never widen the button (full target is in
+                the button's aria-label + title). */}
+            <span>Upload</span>
           </>
         )}
       </button>

@@ -135,14 +135,15 @@ describe("IngestionPage", () => {
     // bottom-sheet trigger (IngestionPage). jsdom ignores the responsive
     // hide, so both sit in the DOM; assert the Folders surface is present.
     expect(screen.getAllByText("Folders").length).toBeGreaterThanOrEqual(1)
-    // Upload component with "Upload to Root" (default — no folder selected)
-    expect(screen.getByText("Upload to Root")).toBeInTheDocument()
+    // Upload control — visible label is "Upload"; the folder target ("Upload to
+    // Root" by default) is the button's accessible name (aria-label).
+    expect(screen.getByRole("button", { name: "Upload to Root" })).toBeInTheDocument()
   })
 
-  it("DocumentUpload shows 'Upload to Root' when no folder selected", async () => {
+  it("DocumentUpload targets Root (accessible name) when no folder selected", async () => {
     const { IngestionPage } = await import("@/pages/IngestionPage")
     renderPage(<IngestionPage />)
-    expect(screen.getByText("Upload to Root")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Upload to Root" })).toBeInTheDocument()
   })
 
   it("DocumentList shows only root documents when Root is selected (default)", async () => {

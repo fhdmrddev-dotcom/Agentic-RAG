@@ -495,9 +495,6 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
                     folderId={selectedFolderId}
                     folderName={selectedFolderName}
                     disabled={!canUploadToFolder}
-                    // Panel open → narrow header column → icon + short "Upload" only,
-                    // so a long folder name can't overflow into the breadcrumb.
-                    compact={panelOpen}
                   />
                 )}
               </div>
