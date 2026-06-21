@@ -32,6 +32,14 @@ import type { ActiveView } from "@/App"
 // push/split grid to a single full-width column so the list never gets crushed.
 const MOBILE_BREAKPOINT = 768
 
+// Above this width the page is roomy enough to show the Folders+Views sidebar AND
+// the 430px detail panel AND a usable (column-shed) list at the same time — so the
+// panel-open auto-collapse to a rail is NOT applied. That collapse (D-114-17, sketch
+// 032-A) was designed for the ≤~1440px "4-column crunch"; on a wide screen it only
+// hides the folders for no benefit. Below this width the rail behavior still earns
+// its keep (the list would otherwise be crushed beside the panel).
+const WIDE_BREAKPOINT = 1536
+
 // Phase 114 (D-114-17): the sidebar→rail collapse is user-pinnable + session-
 // persisted (mirrors the workspace-panel collapse-to-rail precedent). The pin
 // records the user's MANUAL intent so auto-collapse on panel-open doesn't yo-yo.
@@ -50,6 +58,19 @@ function useIsMobile(): boolean {
   return isMobile
 }
 
+function useIsWide(): boolean {
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= WIDE_BREAKPOINT,
+  )
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth >= WIDE_BREAKPOINT)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+  return isWide
+}
+
 export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
@@ -66,6 +87,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   // Phase 112 (D-01): the open document for the right-side push/split detail panel.
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
   const isMobile = useIsMobile()
+  const isWide = useIsWide()
   // Mobile only: the folder tree lives in a bottom-sheet (desktop shows it inline).
   const [folderSheetOpen, setFolderSheetOpen] = useState(false)
 
@@ -119,7 +141,10 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
   // The sidebar collapses to a rail when the detail panel is open UNLESS the user
   // pinned it expanded. Mobile never rails (the sidebar is a bottom-sheet there).
   const panelOpen = !isMobile && selectedDoc !== null
-  const sidebarRail = panelOpen && !sidebarPinnedExpanded
+  // On a wide screen there's room for the sidebar AND the panel, so keep the folders
+  // visible when the panel opens (the rail only earns its keep at the ≤~1440px crunch
+  // — sketch 032-A / D-114-17). Below WIDE_BREAKPOINT the rail behavior is unchanged.
+  const sidebarRail = panelOpen && !sidebarPinnedExpanded && !isWide
   // The filter bar collapses to a summary chip when the panel is open (D-114-17).
   const [filterChipExpanded, setFilterChipExpanded] = useState(false)
   const filterActive = filter.conditions.length > 0
@@ -352,8 +377,10 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
             ) : (
               <>
                 {/* When the panel is open but pinned-expanded, offer a collapse
-                    affordance so the user can reclaim the list width on demand. */}
-                {panelOpen && (
+                    affordance so the user can reclaim the list width on demand.
+                    Not offered on wide screens — there the sidebar always stays
+                    expanded (the rail isn't used), so a collapse control would no-op. */}
+                {panelOpen && !isWide && (
                   <div className="flex justify-end mb-1">
                     <Tooltip>
                       <TooltipTrigger asChild>

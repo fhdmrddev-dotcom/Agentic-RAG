@@ -66,7 +66,10 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         onDrop={onDrop}
         onClick={() => !uploading && !disabled && inputRef.current?.click()}
         className={cn(
-          "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors",
+          // Compact single-row drop bar. (Was a tall p-10 dropzone that pushed the
+          // file list below the fold — especially on short viewports.) Drag-drop AND
+          // click-to-browse both still work on the whole bar.
+          "flex items-center gap-3 rounded-xl border border-dashed px-4 py-3 transition-colors",
           disabled
             ? "pointer-events-none opacity-60 cursor-not-allowed border-muted-foreground/20"
             : cn(
@@ -78,28 +81,28 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
       >
         {disabled ? (
           <>
-            <Lock className="h-8 w-8 text-muted-foreground/50" />
-            <div className="text-center">
-              <p className="text-sm font-medium text-muted-foreground">Read-only folder</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Only the folder owner can upload files here</p>
+            <Lock className="h-5 w-5 text-muted-foreground/50 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground leading-tight">Read-only folder</p>
+              <p className="text-xs text-muted-foreground truncate leading-tight">Only the folder owner can upload files here</p>
             </div>
+          </>
+        ) : uploading ? (
+          <>
+            <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="text-sm font-medium">{statusLabel ?? "Uploading…"}</span>
           </>
         ) : (
           <>
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <div className="text-center">
-              <p className="text-sm font-medium">
+            <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium leading-tight">
                 {folderName ? `Upload to ${folderName}` : "Upload to Root"}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Drop files here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx, .pptx, .xlsx, .csv, .epub · Multiple files allowed</p>
+              <p className="text-xs text-muted-foreground truncate leading-tight mt-0.5">
+                Drop files here or click to browse · .txt .md .pdf .docx .pptx .xlsx .csv .epub
+              </p>
             </div>
-            {uploading && (
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
-              </div>
-            )}
           </>
         )}
       </div>
