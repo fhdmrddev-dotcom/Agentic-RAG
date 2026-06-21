@@ -9,14 +9,21 @@
 ## v3.0 Requirements
 
 ### Foundations (DMF) — shared substrate, landed once
+
 - [x] **DMF-01
+
 **: New document-management actions (view created, relationship added/removed, classification applied, metadata edited) are recorded in the immutable audit log. *(closes the closed-CHECK-enum silent-reject trap; verify live, not with mocks)*
+
 - [x] **DMF-02
+
 **: All DM data (views, relationships, classification rules, custom-field definitions) is owner-private or intentionally global-shared with no cross-user leakage, and every new table carries a nullable `org_id` so the future multi-tenancy rewrite (v3.3) re-keys cleanly.
+
 - [x] **DMF-03
+
 **: The v3.0 DM capability is gated behind a single feature flag (`app_settings`, default **on**) that cleanly enables/disables the new DM surfaces (views, relationships, classification, governance) + tools, and the metadata-enrichment change is backward-compatible / reversible. The flag is the seam a future entitlement/tier system plugs into (SEED-080, enforced at v3.2 Operator UX) — no entitlement *enforcement* is built in v3.0.
 
 ### Metadata Enrichment (META) — built first; unblocks classification
+
 - [ ] **META-01**: User can define custom metadata fields (beyond the built-in title/author/date/type/topics/language/summary) that the system extracts on ingest.
 - [x] **META-02**: User can see a per-field confidence score for each extracted metadata value.
 - [ ] **META-03**: Metadata extraction uses the user-selected (or an admin-configured) model — not the hardwired `gpt-4o`.
@@ -24,6 +31,7 @@
 - [x] **META-05**: User can manually edit/override an extracted metadata value, audit-logged.
 
 ### Configurable / Multi-Provider Embeddings (EMBED) — retires the OpenAI embedding SPOF (SEED-048)
+
 - [ ] **EMBED-01**: Admin can select the embedding provider (OpenAI / Google / local Ollama / local LM Studio / other OpenAI-compatible `/v1/embeddings`) from Settings — embeddings are no longer effectively OpenAI-only.
 - [ ] **EMBED-02**: Selecting a local provider auto-fills its base_url (Ollama `http://localhost:11434/v1`, LM Studio `http://localhost:1234/v1`) and relaxes the API key to a dummy value.
 - [ ] **EMBED-03**: The existing embedding model / dimensions / base_url / key remain as advanced overrides, with a provider→default-model→default-dimensions auto-fill map.
@@ -32,6 +40,7 @@
 - [ ] **EMBED-06**: A destructive-change confirmation names the re-embed (and its cost) before any embedding model/dimension change commits.
 
 ### Metadata-Driven Views / "Virtual Folders" (VIEW)
+
 - [x] **VIEW-01**: User can save a metadata filter as a named view that appears in the sidebar like a folder.
 - [x] **VIEW-02**: A view's contents are live; one document can appear in multiple views with no duplication.
 - [x] **VIEW-03**: View filters support equals / one-of / contains / is-empty / numeric & date comparisons, including relative dates ("expiring within N days").
@@ -41,25 +50,30 @@
 - [x] **VIEW-07**: The agent can run a saved view / metadata query as a tool to answer questions in chat.
 
 ### Document Relationships (REL)
+
 - [x] **REL-01**: User can create a typed link between two documents (supersedes / amends / references / attached-to).
 - [x] **REL-02**: User can see a document's relationships in a panel on its detail view.
 - [x] **REL-03**: User can remove a relationship.
 - [x] **REL-04**: The agent can retrieve a document's related documents via a `get_related_documents` tool.
 
 ### Auto-Classification (CLASS)
-- [ ] **CLASS-01**: User can define classification rules (metadata condition → suggested folder/tag).
+
+- [x] **CLASS-01**: User can define classification rules (metadata condition → suggested folder/tag).
 - [ ] **CLASS-02**: On upload, matching rules produce a routing/classification suggestion — never a silent auto-move.
 - [ ] **CLASS-03**: User can accept or dismiss a classification suggestion.
 
 ### Document Governance Health (DGOV) — light, built last
+
 - [ ] **DGOV-01**: User can see a light governance view surfacing document-structure health: broken/dangling relationships, unclassified documents, and low-confidence metadata.
 - [ ] **DGOV-02**: Each governance signal links to the action that fixes it (open document, re-extract, classify).
 
 ### Cross-cutting UX (UX)
+
 - [ ] **UX-01**: All new DM UI matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA — reusing existing primitives (`ConfidenceChip`, `MoveToFolderDialog` document-picker, `FolderNode` inline-edit, `HealthPanel` cards) and the state-based `ActiveView` navigation (no react-router).
 - [ ] **UX-02**: The three highest-risk net-new surfaces — the **document detail panel** (metadata + confidence + inline edit + relationships + classification), the **view/filter builder**, and the **relationship panel** — are sketched and operator-approved before implementation (G-2 sketch-before-plan).
 
 ## Deferred (Future) — v3.0.x / later
+
 - View **grouping levels** (metadata → nested pseudo-folder tree) and **OR / nested boolean** in view filters — ship flat-list + AND first.
 - **Full** governance dashboard (start as a few counters + lists).
 - Auto-relate / auto-classify **workflow-produced deliverables** (composes SEED-069).
@@ -67,6 +81,7 @@
 - Extraction-model **registry self-service UI** beyond a simple picker (full SEED-040 registry stays broader).
 
 ## Out of Scope
+
 | Feature | Reason |
 |---------|--------|
 | DM Tier B — retention/lifecycle policies, check-in/check-out locking, approval workflows | Higher complexity + far more valuable once orgs/roles exist → **v3.5** (Automations + DM Tier B brief) |
@@ -107,7 +122,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | REL-03 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-02 | Phase 117 — Document Relationships (Panel UI) | Complete |
-| CLASS-01 | Phase 118 — Auto-Classification | Pending |
+| CLASS-01 | Phase 118 — Auto-Classification | Complete |
 | CLASS-02 | Phase 118 — Auto-Classification | Pending |
 | CLASS-03 | Phase 118 — Auto-Classification | Pending |
 | DGOV-01 | Phase 119 — Document Governance Health | Pending |
@@ -116,6 +131,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | UX-02 | Cross-cutting G-2 sketch (Phases 112, 114, 117) | Pending |
 
 **Coverage:**
+
 - v3.0 requirements: 24 functional total (DMF 3, META 5, VIEW 7, REL 4, CLASS 3, DGOV 2) + UX 2 cross-cutting
 - Mapped to phases: **24 / 24 functional ✓** (each to exactly one phase, no orphans, no duplicates); UX-01/UX-02 attached as cross-cutting acceptance to the UI/sketch phases
 - Unmapped: **0**

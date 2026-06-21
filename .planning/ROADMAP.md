@@ -228,10 +228,12 @@
   3. The panel matches the Deep Midnight / Aether design system, is mobile-responsive, and meets WCAG 2.1 AA (UX-01 cross-cutting acceptance).
 
 **Plans**: 4 plans (4 waves — backend foundation before consuming frontend)
+
 - [x] 117-01-PLAN.md (Wave 1) — extract the leak-safe read into shared `get_related_documents` (D-117-7) + refactor the agent handler (behavior-preserving, 116 suite stays green) + carry `relationship_id` through (A6) + 3 Wave-0 backend test scaffolds
 - [x] 117-02-PLAN.md (Wave 2) — thin authenticated `GET /document-relationships?document_id=` route (no fork, no audit, uniform 404) + LIVE two-user ROUTE leak proof on :54322 + no-fork grep guard GREEN
 - [x] 117-03-PLAN.md (Wave 3) — frontend types (RelationshipRow nullable masked id) + 3 api.ts client fns (list/create/delete, 404-tolerant)
 - [x] 117-04-PLAN.md (Wave 4) — `RelationshipsSection` (grouped Outgoing/Incoming, inverse labels, masked rows, honest states, re-fetch-not-optimistic, reachable remove) + `CreateLinkDialog` (MoveToFolderDialog shell, type-first bespoke typeahead combobox, per-type exclusion) mounted in `DocumentDetailPanel` + 3 frontend Wave-0 tests
+
 **UI hint**: yes
 **G-2**: /gsd:sketch (operator-approved mockup of the **relationship panel**) — SATISFIED (sketches 034 + 035, winner A, operator-approved 2026-06-20, audit-hardened `wf_1ec2afac-687`; `references/document-relationships-panel.md`). (UX-02 cross-cutting acceptance.)
 
@@ -250,7 +252,7 @@
 **Plans**: 6 plans
 
   - [x] 118-01-PLAN.md — Backend primitives: rule Pydantic models + the net-new pure in-Python `classification_matcher` (AST→bool, reuses ViewFilter + validators) + 8 Wave-0 test scaffolds (CLASS-01/02)
-  - [ ] 118-02-PLAN.md — `/classification-rules` CRUD service + router + main.py mount (is_global hard-false, own+global 404-not-403, match_expr validation, `classification.rule.create` audit) (CLASS-01)
+  - [x] 118-02-PLAN.md — `/classification-rules` CRUD service + router + main.py mount (is_global hard-false, own+global 404-not-403, match_expr validation, `classification.rule.create` audit) (CLASS-01)
   - [ ] 118-03-PLAN.md — `documents.py` edits: ingest rule-eval splice (user-scoped, first-match-wins suggestion, never silent move) + reversible accept/dismiss endpoints (`classification.apply` audit-after-move) (CLASS-02/03)
   - [x] 118-04-PLAN.md — Frontend interface seam: types (ClassificationRule/Suggestion + `_classification`) + api client (rule CRUD + accept/dismiss; createRule omits is_global) + ActiveView union (CLASS-01/03)
   - [ ] 118-05-PLAN.md — On-doc surfaces: `ClassificationSection` (3rd PanelSection — provenance, no %, reversible accept/dismiss/Undo) + `DocumentList` row chip (sketch 036-A) (CLASS-03/UX-01)
@@ -285,7 +287,7 @@
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
-| 118. Auto-Classification | 2/6 | In Progress|  |
+| 118. Auto-Classification | 3/6 | In Progress|  |
 | 119. Document Governance Health | 0/? | Not started | - |
 
 ---

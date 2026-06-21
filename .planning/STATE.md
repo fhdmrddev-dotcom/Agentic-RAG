@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T02:49:40.160Z"
+last_updated: "2026-06-21T03:01:55.521Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 82
 ---
 
@@ -71,7 +71,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-21
@@ -563,3 +563,14 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
 **Planned Phase:** 112 (metadata-enrichment-document-detail-panel-manual-edit) — 4 plans — 2026-06-17T20:46:10.826Z
+
+## Performance Metrics
+
+| Phase | Plan | Duration | Notes |
+|-------|------|----------|-------|
+| Phase 118 P02 | ~30 min | 2 tasks | 3 files |
+
+## Decisions
+
+- [Phase ?]: 118-02: classification-rules routes return RuleResponse(**row) so live CRUD tests can call coroutines directly (read .is_global/.id/.enabled); service imported as a module to avoid create_rule shadowing
+- [Phase ?]: 118-02: removed 5 stale xfail markers in test_118_rule_crud.py so the CRUD tests are genuinely GREEN (xpass would silently mask a future regression)
