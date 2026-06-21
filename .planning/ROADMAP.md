@@ -273,7 +273,7 @@
 
 **Plans**: 2 plans (2 waves; backend router -> frontend page + nav triad)
 
-  - [ ] 119-01-PLAN.md (Wave 1) -- Backend document_governance.py router (3 owner-scoped paginated signal routes: broken-relationships via _resolve_readable_latest-None / unclassified via _classification.status=="suggested" / low-confidence via Python-scan of _confidence<0.5) + main.py mount + 6 Wave-0 test scaffolds incl. the two-user live leak harness (DGOV-01)
+  - [x] 119-01-PLAN.md (Wave 1) -- Backend document_governance.py router (3 owner-scoped paginated signal routes: broken-relationships via _resolve_readable_latest-None / unclassified via _classification.status=="suggested" / low-confidence via Python-scan of _confidence<0.5) + main.py mount + 6 Wave-0 test scaffolds incl. the two-user live leak harness (DGOV-01)
   - [ ] 119-02-PLAN.md (Wave 2) -- Frontend GovernancePage (counter header + 3 stacked positive-empty-state cards + initializedTabsRef no-loop guard + own DocumentDetailPanel link-out) + link-out-only GovernanceRow + the D-119-2 navigation triad (App.tsx union + nav-items entry + ChatLayout branch -- all three in one plan) + Vitest reachability/no-loop/link-out (DGOV-01/DGOV-02/UX-01)
 
 **UI hint**: yes
@@ -292,7 +292,7 @@
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
 | 118. Auto-Classification | 6/6 | Complete    | 2026-06-21 |
-| 119. Document Governance Health | 0/? | Not started | - |
+| 119. Document Governance Health | 1/2 | In Progress|  |
 
 ---
 

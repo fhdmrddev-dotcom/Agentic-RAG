@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T11:25:07.856Z"
-last_activity: 2026-06-21 -- Phase 119 planning complete
+last_updated: "2026-06-21T14:39:16.668Z"
+last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 44
+  completed_plans: 45
   percent: 91
 ---
 
@@ -22,11 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 119 — document governance health
+**Current focus:** Phase 119 — document-governance-health
 
 ## Current Position
 
-Phase: 119
+Phase: 119 (document-governance-health) — EXECUTING
 
 **118-06 (Wave 3, CLASS-01/UX-01 — classification rules page: builder + Automation sidebar) — EXECUTED 2026-06-21** (2 TDD tasks / 2 commits — `56d07c5c` RuleBuilderPanel, `dc7ce84f` AutomationGroup + ClassificationRulesPage; SUMMARY `118-06-SUMMARY.md`): the rules-authoring surface of the LOCKED G-2 sketch 037-A (Winner A — rules list + right-side push/split builder). **`RuleBuilderPanel.tsx`** (net-new) — the builder in the 027/112/117 push/split shell (`minmax(0,1fr) <panel>`, no-router state-switch): a **chip-strip condition** reusing the 029/114 `ConditionPopover`/`ViewCondition` grammar verbatim (`field op value` + `＋condition`, flat AND) → a **📁 folder-only action** (a labeled `<select>` over own+global folders — the **🏷 tag radio DROPPED per D-118-1**, the only `tag` strings are the drop comments) → a **scope segmented** native-radio control (👤 Only me / 🌐 Global G, default Only me, AA) → a **live "would match N of M" preview** via the EXISTING `resolveAdHoc({count_only:true})` (a rule's `match_expr` is the SAME `ViewFilter` AST — **no new count fn, no new endpoint**, amber at zero) + the verbatim forward-only honesty line *"existing docs aren't moved — rules suggest on new uploads only"* (D-118-2). **Save** → `createRule(name, match_expr, suggest_folder_id)` with a body that **OMITS `is_global`** (server hard-sets it; the scope toggle is an authoring affordance not a create-body flag — T-118-06-01; the test asserts `createRule.mock.calls[0].toHaveLength(3)`) / `updateRule` when editing. **`AutomationGroup.tsx`** (net-new) — clones `ViewsGroup`: an uppercase "Automation" group header (peer to Folders + Views), each rule row built from the **SHARED `NavRow`** (never a FolderNode clone) with a `Zap` icon (green enabled / dim disabled = the 037-A dot), the tooltip-labeled `G` global pill (only for `is_global`), a **live `role="switch"` toggle** PATCHing `updateRule(id,{enabled})`, and Edit / Delete kebab (delete → inline confirm → `deleteRule`); the `condition (mono) → 📁 action` summary is a **static frozen render** under the row (the per-rule "would match N" is owned by the builder, not the row — D-118-2; so NO lazy `fetchCount`); honest empty state. **`ClassificationRulesPage.tsx`** (net-new, 201 lines) — the dedicated page (`App.tsx` `ActiveView` `"classification-rules"` from Plan 04 routes here): lists rules via `listRules()` in the `AutomationGroup`, opens `RuleBuilderPanel` in the right-side push/split panel (`430px`, no router; state-switch) on New rule / Edit, **honest states** loading (`role=status`) ≠ error (`role=alert` + Try again) ≠ calm empty, **re-fetch-not-optimistic** reconcile (`listRules`); folders + custom fields load alongside (degrade to empty, never a page error); single full-width column < 768px. **2 deviations [Rule 1 + Rule 3, BOTH test-harness only]:** (1) the toggle test regex matched the wrong accessible name — the enabled rule's toggle reads "Disable rule {name}", not "Enable…"; corrected the regex (component label is the intended action-relative a11y wording); (2) the Radix `DropdownMenu` kebab does not open under `fireEvent.click` in jsdom (pointer-capture + scrollIntoView APIs jsdom lacks) → added the standard Radix-+-jsdom shim + drove the menu with `@testing-library/user-event`, mirrored verbatim from the shipped `ViewsGroup.test.tsx`. **Plan-owned tests GREEN:** `vitest run RuleBuilderPanel AutomationGroup ClassificationRulesPage` → **3 files / 19 tests passed** (RuleBuilderPanel 7 + AutomationGroup 6 + ClassificationRulesPage 6). `tsc --noEmit` **EXIT 0**. All acceptance greps pass (no tag-radio; `resolveAdHoc` reuse; honesty line; createRule omits is_global; `NavRow` shared; `updateRule` live toggle; `RuleBuilderPanel` mounted; "Automation" header; 201 ≥ 50 min_lines). **Net-new failures = 0 (by construction)** — all 6 files net-new; **no existing source file imports any of the 3 new components** (`grep -rln` outside their own test files = empty → zero existing symbols modified); sibling-dir regression `vitest run NavRow ViewsGroup FilterBar DocumentList ClassificationSection` → **6 files / 59 passed**. `threads.py` byte-untouched (G-5; `git diff a7986c2b HEAD` = 0). No new package, no migration, no deletions. SUMMARY: `118-06-SUMMARY.md` (Self-Check: PASSED). CLASS-01 + UX-01 confirmed complete. **Scope note (not a deviation):** mounting `ClassificationRulesPage` into `ChatLayout` + a sidebar Automation launcher is a follow-on wiring step (`ChatLayout.tsx`/`IngestionPage.tsx` not in this plan's files). **Deferred to verify-phase:** G-4 lived-experience UI UAT (builder live count, toggle, edit/delete round-trip, mobile). **NEXT = /gsd:verify-work 118** (all 6 plans executed; SC#1-4 must-haves + SC#10 cross-provider upload-path UAT).
 
@@ -75,10 +75,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: Not started
+Plan: 2 of 2
 Status: Ready to execute
-Resume file: .planning/phases/119-document-governance-health/119-CONTEXT.md
-Last activity: 2026-06-21 -- Phase 119 planning complete
+Resume file: None
+Last activity: 2026-06-21
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
@@ -575,6 +575,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 118 P02 | ~30 min | 2 tasks | 3 files |
 | Phase 118 P03 | 12min | 2 tasks | 5 files |
 | Phase 118 P05 | 10min | 2 tasks | 5 files |
+| Phase 119 P01 | 11min | 2 tasks | 8 files |
 
 ## Decisions
 
@@ -582,3 +583,6 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 118-02: removed 5 stale xfail markers in test_118_rule_crud.py so the CRUD tests are genuinely GREEN (xpass would silently mask a future regression)
 - [Phase ?]: Phase 118-03: classification rule-eval spliced into ingest_document before the single persist write — own+global leak-safe read (no auth.uid in the BG task, D-118-8), first-match-wins ONE _classification suggestion, NEVER a folder move (CLASS-02)
 - [Phase 118]: Phase 118-03: accept/dismiss endpoints — accept records prior_folder_id, re-validates the target folder, moves, audits classification.apply AFTER the move; dismiss clears; Undo reuses the existing move endpoint (CLASS-03 reversible)
+- [Phase 119]: Phase 119-01: A1 LIVE — document_relationships FKs are ON DELETE CASCADE; a full endpoint delete cascades the edge away, so the only broken state is an orphaned old-version edge (lineage has no current is_latest). Broken predicate anchors on _latest_exists_anywhere, not the resolver None (which degrades to a stale old row).
+- [Phase 119]: Phase 119-01: A3 PINNED LIVE — PostgREST deep-jsonb path for the _-leading key is the DOTTED form metadata->_classification->>status (quoted-arrow form returns nothing).
+- [Phase 119]: Phase 119-01: masking != deletion (D-119-3) — an alive-but-unreadable target is masked, NOT broken; the existence probe is content-free (count only), no cross-user leak; DMF-03 non-gate confirmed (A8).
