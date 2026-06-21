@@ -118,6 +118,12 @@ None for this plan. **Plan 03 (BLOCKING operator task)** applies migration 076 t
 - `messages.origin` is the substrate Phase 130 (COLL-02 template_input resolver run-scope) and any future context-isolation work can build on.
 - No blockers introduced. `api/threads.py` and `supabase/full-schema.sql` untouched (G-5 / Plan-03 ownership respected).
 
+## Self-Check: PASSED
+
+- Files verified present: `supabase/migrations/076_messages_origin.sql`, `backend/tests/test_120_origin_filter.py`, `.planning/phases/120-collision-fix-context-isolation/120-02-SUMMARY.md`.
+- Commits verified in git log: `0b6241ab` (Task 1), `cf451131` (Task 2 RED), `ad959761` (Task 2 GREEN), `2c6c8c51` (SUMMARY).
+- Protected files confirmed untouched across all commits: `backend/app/api/threads.py`, `supabase/full-schema.sql`.
+
 ---
 *Phase: 120-collision-fix-context-isolation*
 *Completed: 2026-06-22*

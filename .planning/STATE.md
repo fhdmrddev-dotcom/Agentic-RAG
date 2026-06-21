@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-21T21:56:17.463Z"
-last_activity: 2026-06-21 -- Phase 120 Plan 01 (COLL-01) executed — run-scoped harvest
+last_updated: "2026-06-22T00:00:00.000Z"
+last_activity: 2026-06-22 -- Phase 120 Plan 02 (CTX-01) executed — messages.origin + asymmetric history filter
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 120 (collision-fix-context-isolation) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 120 (Plan 01 COLL-01 complete — run-scoped sandbox harvest)
-Last activity: 2026-06-21 -- Phase 120 Plan 01 (COLL-01) executed; SUMMARY written, next = Plan 02 (CTX-01)
+Plan: 3 of 3
+Status: Plan 02 (CTX-01) complete — migration 076 authored (NOT applied), origin tagged at every harness write site, asymmetric history filter live. Next = Plan 03 (BLOCKING operator: apply migration 076 + regenerate full-schema.sql + live-DB integration test).
+Last activity: 2026-06-22 -- Phase 120 Plan 02 (CTX-01) executed; SUMMARY written
 
 ### Quick Tasks Completed
 
@@ -221,6 +221,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 119 P01 | 11min | 2 tasks | 8 files |
 | Phase 119 P02 | 7min | 3 tasks | 7 files |
 | Phase 120 P01 | ~4min | 2 tasks (TDD) | 3 files |
+| Phase 120 P02 | ~25min | 2 tasks (1 TDD) | 8 files |
 
 ## Decisions
 
@@ -235,6 +236,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 119]: Phase 119-02: GovernanceRow is link-out-only (D-119-6) — clones only HealthDocumentRow chrome, imports no document-mutation helper; the whole row is a keyboard-operable button → DocumentDetailPanel. A5 lighter reuse: top-10 rows + honest backend total (no PaginationControls); D-119-9 initializedTabsRef no-refetch-loop guard carried verbatim into the 3-stacked-card page (Refresh clears it). Frontend-only, no migration/package/write path; threads.py untouched.
 - [Phase 120]: Phase 120-01 (COLL-01): Option 2 lazy seed in the execute_code handler (tool_dispatcher.py) chosen over Option 1 (eager seed in agent_loop.py) — keeps the G-5 hot file agent_loop.py untouched (it does not import sandbox_manager), the session already exists at :868, and the SAME handler serves Deep + Harness so one seed site covers both. Guard via ctx._output_baseline_seeded (per-RUN not per-cell); run_in_threadpool-wrapped (D-v2.5-01).
 - [Phase 120]: Phase 120-01 (COLL-01): snapshot_output_baseline SEEDS the existing SHA-256 hash-dedup baseline (no new filename heuristic — explicitly disproven by COLL-03-EVIDENCE §Refinement 1: the live 2 files shared ONE execution_id). D-120-02 honored — the helper never clears/deletes /sandbox/output/, is fully try/except-wrapped (empty/failure → {} = legacy behavior), and only stops RE-EMITTING pre-existing files. No schema/package change (stdlib hashlib/os/tempfile).
+- [Phase 120]: Phase 120-02 (CTX-01): migration 076 AUTHORED only (NOT applied — Plan 03 applies + regenerates full-schema.sql); `messages.origin text NOT NULL DEFAULT 'deep'` + CHECK, no new RLS policy (inherits thread-owner policy, precedent 050). The DEFAULT 'deep' is load-bearing — fills legacy rows so the Deep neq() filter avoids the NULL three-valued-logic drop (Pitfall 1).
+- [Phase 120]: Phase 120-02 (CTX-01): asymmetric origin filter extracted to module-level pure helper `_apply_origin_filter(history_q, agent_mode)` — Deep/Explorer neq('origin','harness') (replays deep + legacy), Harness eq('origin','harness') (strict, A1 defense-in-depth per D-120-06). A SINGLE shared WHERE clause (no per-provider fork); origin kept OUT of .select() projection (Pitfall 4) so _reconstruct_history is unchanged and pure-Deep threads return today's exact set (SC#4 byte-identical). Owner/thread .eq scope never relaxed (V4).
+- [Phase 120]: Phase 120-02 (CTX-01): every enumerated HARNESS insert site tags origin='harness' (db/runs.py shared helper kwarg, harness_engine success/failure persists + raw expiry INSERT positional $4 (never f-stringed, T-120-06) + disposition prompt, phase_types llm_human_input prompt); api/runs.py ask_user_response is mode-aware (default 'deep', 'harness' ONLY on the confirmed workflow_runs-fallback branch, A2 safe-direction). api/threads.py:1020 user row UNTOUCHED (G-5); full-schema.sql NOT touched.
 
 ## Operator Next Steps
 
