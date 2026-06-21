@@ -152,7 +152,6 @@ def _good_expr() -> dict:
     return {"op": "and", "conditions": [{"field": "document_type", "op": "eq", "value": "invoice"}]}
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the /classification-rules router")
 @pytest.mark.asyncio
 async def test_create_hard_sets_is_global_false(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
@@ -166,7 +165,6 @@ async def test_create_hard_sets_is_global_false(pg_pool, two_users):
     assert created.is_global is False
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the /classification-rules router")
 @pytest.mark.asyncio
 async def test_create_writes_rule_create_audit(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
@@ -186,7 +184,6 @@ async def test_create_writes_rule_create_audit(pg_pool, two_users):
     assert created.id is not None
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the /classification-rules router")
 @pytest.mark.asyncio
 async def test_validate_fields_rejects_underscore_prefix_422(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
@@ -204,7 +201,6 @@ async def test_validate_fields_rejects_underscore_prefix_422(pg_pool, two_users)
     assert ei.value.status_code == 422
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the /classification-rules router")
 @pytest.mark.asyncio
 async def test_cross_user_update_404_not_403(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
@@ -226,7 +222,6 @@ async def test_cross_user_update_404_not_403(pg_pool, two_users):
     assert ei.value.status_code == 404, "cross-user update must 404, never 403 (no existence leak)"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 02 ships the /classification-rules router")
 @pytest.mark.asyncio
 async def test_enable_toggle_rides_update(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
