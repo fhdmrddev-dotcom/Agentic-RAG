@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Document Management — ✅ SHIPPED 2026-06-21
-status: Awaiting next milestone
-last_updated: "2026-06-21T16:56:42.626Z"
-last_activity: 2026-06-21 — Milestone v3.0 completed and archived
+milestone: v3.1
+milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
+status: planning
+last_updated: "2026-06-21T19:47:29.739Z"
+last_activity: 2026-06-21
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 46
-  completed_plans: 46
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.0 Document Management miles
 
 ## Current Position
 
-Phase: Milestone v3.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-21 — Milestone v3.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-21 — Milestone v3.1 started
 
 ### Quick Tasks Completed
 
