@@ -8,6 +8,7 @@ import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
+import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -290,6 +291,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             // Builder + the publish gauntlet as intra-view state (three-homes, no
             // router); onLaunch = doRun (the existing-kickoff launcher).
             <WorkflowsPage folders={folders} onLaunch={doRun} />
+          ) : activeView === "classification-rules" ? (
+            // Phase 118 gap-closure (CLASS-01 reachability): the rules-authoring
+            // page mounts here as a top-level home (the Plan-04 ActiveView seam +
+            // sketch 037-A), additive BEFORE the trailing KnowledgeHealthPage else.
+            // Self-fetches via listRules() — no props; three-homes, no router.
+            <ClassificationRulesPage />
           ) : (
             <KnowledgeHealthPage />
           )}

@@ -12,7 +12,7 @@
  * is a `useState<ActiveView>` switch (App.tsx). The Workflows icon is a
  * DISTINCT non-gear lucide glyph (`Workflow`, NOT `Settings`) per REQ-7.
  */
-import { MessageSquare, FileText, Activity, Zap, Settings, Workflow } from "lucide-react"
+import { MessageSquare, FileText, Activity, Zap, Settings, Workflow, Wand2 } from "lucide-react"
 import type { ActiveView } from "@/App"
 
 export interface NavItem {
@@ -25,6 +25,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { view: "chat", icon: MessageSquare, label: "Chat" },
   { view: "workflows", icon: Workflow, label: "Workflows" },
   { view: "documents", icon: FileText, label: "Documents" },
+  // Phase 118 gap-closure (CLASS-01 reachability): the classification-rules
+  // top-level home (sketch 037-A "Automation"). Distinct non-reused glyph
+  // (Wand2 — automation), placed adjacent to Documents as a doc-automation home.
+  { view: "classification-rules", icon: Wand2, label: "Classification" },
   { view: "library-health", icon: Activity, label: "Library Health" },
   { view: "skills", icon: Zap, label: "Skills" },
   { view: "settings", icon: Settings, label: "Settings" },
