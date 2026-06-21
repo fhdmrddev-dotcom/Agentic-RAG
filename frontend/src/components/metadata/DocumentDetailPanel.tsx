@@ -29,6 +29,7 @@ import { X, ShieldCheck } from "lucide-react"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "@/components/panel/PanelSection"
 import { RelationshipsSection } from "@/components/relationships/RelationshipsSection"
+import { ClassificationSection } from "@/components/classification/ClassificationSection"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
@@ -136,6 +137,9 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // The Relationships section owns its own fetch; it lifts its loaded total up so the
   // PanelSection can show a count badge (null = not yet loaded → no badge).
   const [relTotal, setRelTotal] = useState<number | null>(null)
+  // The Classification section reads metadata._classification (no own fetch); it lifts
+  // its pending-suggestion count up (1 when a "suggested" exists, else 0).
+  const [classCount, setClassCount] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -161,10 +165,12 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
     closeButtonRef.current?.focus()
   }, [])
 
-  // Reset the relationships count when the open document changes so a stale badge
-  // never shows during the new doc's fetch (the section re-fetches on docId change).
+  // Reset the relationships + classification counts when the open document changes so
+  // a stale badge never shows during the new doc's fetch (each section re-derives on
+  // docId change).
   useEffect(() => {
     setRelTotal(null)
+    setClassCount(null)
   }, [doc.id])
 
   useEffect(
@@ -249,6 +255,21 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
             docId={doc.id}
             filename={doc.filename}
             onTotalChange={setRelTotal}
+          />
+        </PanelSection>
+
+        {/* Classification (Phase 118 CLASS-03/UX-01) — reads the on-upload suggestion
+            off metadata._classification (no own fetch); accept/dismiss/Undo re-fetch
+            via onReconcile (not optimistic). Lifts the pending count for the badge. */}
+        <PanelSection
+          title="Classification"
+          count={classCount ?? undefined}
+        >
+          <ClassificationSection
+            docId={doc.id}
+            suggestion={doc.metadata?._classification}
+            onChanged={onReconcile}
+            onTotalChange={setClassCount}
           />
         </PanelSection>
       </div>
