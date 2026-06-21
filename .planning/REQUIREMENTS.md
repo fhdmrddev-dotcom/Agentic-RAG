@@ -78,31 +78,44 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| COLL-01 | TBD | Pending |
-| CTX-01 | TBD | Pending |
-| IA-01 | TBD | Pending |
-| MP-01 | TBD | Pending |
-| MP-02 | TBD | Pending |
-| MP-03 | TBD | Pending |
-| TDP-01 | TBD | Pending |
-| TRIG-01 | TBD | Pending |
-| TRIG-03 | TBD | Pending |
-| CTX-03 | TBD | Pending |
-| WUX-01 | TBD | Pending |
-| WUX-02 | TBD | Pending |
-| SI-02 (STRETCH) | TBD | Pending |
-| TRIG-02 (STRETCH) | TBD | Pending |
-| WUX-03 (STRETCH) | TBD | Pending |
-| TDP-02 (STRETCH) | TBD | Pending |
-| MP-04 (STRETCH) | TBD | Pending |
-| COLL-02 (STRETCH) | TBD | Pending |
+| COLL-01 | Phase 120 | Pending |
+| CTX-01 | Phase 120 | Pending |
+| IA-01 | Phase 121 | Pending |
+| MP-01 | Phase 122 | Pending |
+| MP-02 | Phase 122 | Pending |
+| MP-03 | Phase 122 | Pending |
+| TDP-01 | Phase 122 | Pending |
+| TRIG-01 | Phase 123 | Pending |
+| TRIG-03 | Phase 123 | Pending |
+| CTX-03 | Phase 123 | Pending |
+| WUX-01 | Phase 124 | Pending |
+| WUX-02 | Phase 124 | Pending |
+| SI-02 (STRETCH) | Phase 125 | Pending (gated) |
+| TRIG-02 (STRETCH) | Phase 126 | Pending (gated) |
+| WUX-03 (STRETCH) | Phase 127 | Pending (gated) |
+| TDP-02 (STRETCH) | Phase 128 | Pending (gated) |
+| MP-04 (STRETCH) | Phase 129 | Pending (gated) |
+| COLL-02 (STRETCH) | Phase 130 | Pending (gated) |
 
 **Coverage:**
-- v1 (CORE) requirements: 12 total
-- STRETCH requirements: 6 (gated, in-roadmap)
-- Mapped to phases: 0 (filled by roadmapper)
-- Unmapped: 18 ⚠️ (until roadmap created)
+- v1 (CORE) requirements: 12 total — **12 mapped** (Phases 120-124)
+- STRETCH requirements: 6 (gated, in-roadmap) — **6 mapped** (Phases 125-130)
+- Mapped to phases: **18 / 18** ✓
+- Unmapped: **0** ✓
+
+**Phase map (CORE 120-124 · STRETCH 125-130):**
+- Phase 120 — Collision Fix + Context Isolation: COLL-01, CTX-01
+- Phase 121 — One Front Door for Workflows (IA): IA-01
+- Phase 122 — Cross-Provider Trust & Honesty Parity: MP-01, MP-02, MP-03, TDP-01
+- Phase 123 — Skill Triggering Quality: TRIG-01, TRIG-03, CTX-03
+- Phase 124 — Workflow Studio UX — Soul + Strict↔Loose: WUX-01, WUX-02
+- Phase 125 (STRETCH) — Self-Improve Proposer (description-only): SI-02
+- Phase 126 (STRETCH) — Smart-Dispatch Relevance Pre-Filter: TRIG-02
+- Phase 127 (STRETCH) — Gauntlet Pip-Strip + Quiet Idle Cards: WUX-03
+- Phase 128 (STRETCH) — Live Description Before tool_start: TDP-02
+- Phase 129 (STRETCH) — MiniMax/OpenRouter Arg Repair: MP-04
+- Phase 130 (STRETCH) — template_input Resolver Run-Scope: COLL-02
 
 ---
 *Requirements defined: 2026-06-21*
-*Last updated: 2026-06-21 after milestone v3.1 initial definition*
+*Last updated: 2026-06-21 after roadmap creation (18/18 requirements mapped — CORE 120-124, STRETCH 125-130)*

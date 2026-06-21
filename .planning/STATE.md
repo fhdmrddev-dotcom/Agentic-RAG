@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: planning
-last_updated: "2026-06-21T19:47:29.739Z"
+last_updated: "2026-06-21T20:30:00.000Z"
 last_activity: 2026-06-21
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,21 +15,21 @@ progress:
 
 # Project State
 
-> **Scope note:** **v3.0 Document Management SHIPPED + archived 2026-06-21 (last phase 119); no milestone is active — next is v3.1 Workflow + Skill Eval Studio (`/gsd:new-milestone`).** Scope was SEED-005 Tier A (metadata enrichment → metadata-driven views/"virtual folders" → document relationships → auto-classification → governance health) delivered as a first-class product surface; full close-out in `.planning/milestones/` + `MILESTONES.md` + `RETROSPECTIVE.md`. It was chosen over resuming Skill Studio (the original v3.0 PRD), which the v2.7–2.9 pivot largely superseded; Skill Studio deferred → v3.1, re-scoped as a Workflow+Skill Eval Studio. The v3.x PRD roadmap was re-sequenced 2026-06-15 — authoritative map: `.planning/PRDs/SEQUENCE.md`. The prior milestone (v2.9 Workflow Studio) shipped + archived 2026-06-15; its detail is in `.planning/milestones/` + `MILESTONES.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards. **Everything below the Current Position block is v2.9-and-earlier accumulated context, retained per the milestone-transition convention.**
+> **Scope note:** **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers STARTED 2026-06-21 (Option A — scope LOCKED + operator-approved).** Roadmap created: CORE Phases 120-124 + STRETCH Phases 125-130 (gated behind CORE). Numbering continues from v3.0's last phase (119). Scope source: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`; operator pressures: `.planning/research/v3.1-skills-eval/OPERATOR-INPUTS.md`. **v3.0 Document Management SHIPPED + archived 2026-06-21** (last phase 119; SEED-005 Tier A — metadata enrichment → metadata-driven views/"virtual folders" → document relationships → auto-classification → governance health; full close-out in `.planning/milestones/` + `MILESTONES.md` + `RETROSPECTIVE.md`). The v3.x PRD roadmap was re-sequenced 2026-06-15 — authoritative map: `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards. **Everything below the "Roadmap shape (v3.1...)" block is v3.0-and-earlier accumulated context, retained per the milestone-transition convention.**
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-21 — v3.0 Document Management milestone COMPLETE + archived)
+See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Planning next milestone — v3.1 Workflow + Skill Eval Studio (run `/gsd:new-milestone`)
+**Current focus:** v3.1 Phase 120 (Collision Fix + Context Isolation) — roadmap created, planning. Next action: `/gsd:discuss-phase 120` (or `/gsd:plan-phase 120`).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 120 — Collision Fix + Context Isolation (first phase, CORE)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-21 — Milestone v3.1 started
+Status: Planning (roadmap created 2026-06-21; phase not yet discussed/planned)
+Last activity: 2026-06-21 — v3.1 roadmap created (CORE 120-124 + STRETCH 125-130; 18/18 requirements mapped)
 
 ### Quick Tasks Completed
 
@@ -96,7 +96,40 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 
 **v2.9 STRETCH phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01)** remain backlog carry-forwards (next-milestone candidates).
 
-**Open `surface: Agentic-RAG` reports (roll forward, not folded into any v3.0 phase):** the carried v2.9 run-honesty / provider-polish reports (BUG-260609-02/-04, BUG-260610-01, BUG-260615-01, `general-chat-intermittent-silent-send-drop`, `minimax-m3-invalid-tool-args-400`, `setting-up-agent-hides-model-activity`) — carried into the next milestone's UAT blast radius (noted in RETROSPECTIVE).
+**Open `surface: Agentic-RAG` reports (roll forward into the v3.1 UAT blast radius):** the carried v2.9 run-honesty / provider-polish reports (BUG-260609-02/-04, BUG-260610-01, BUG-260615-01, `general-chat-intermittent-silent-send-drop`, `minimax-m3-invalid-tool-args-400`, `setting-up-agent-hides-model-activity`). **v3.1 routing note:** `minimax-m3-invalid-tool-args-400` is the re-open trigger for STRETCH Phase 129 (MP-04 MiniMax arg repair); `setting-up-agent-hides-model-activity` + `non-anthropic-generic-code-task-descriptions` are addressed by Phase 122 (TDP-01 task-label parity) + STRETCH Phase 128 (TDP-02). Cross-check these at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.1, created 2026-06-21)
+
+**CORE (committed) — Phases 120-124:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 120 | Collision Fix + Context Isolation | COLL-01, CTX-01 | 4 | G-5 (`threads.py`/`agent_loop.py`); SC#10 |
+| 121 | One Front Door for Workflows (IA) | IA-01 | 3 | G-2 sketch; UI hint; SC#10 |
+| 122 | Cross-Provider Trust & Honesty Parity | MP-01, MP-02, MP-03, TDP-01 | 5 | G-5 (gateway/adapter); SC#10 (eval axis, MP-03) |
+| 123 | Skill Triggering Quality | TRIG-01, TRIG-03, CTX-03 | 5 | G-5 (`context_window.py`/`agent_loop.py` trim); SC#10 |
+| 124 | Workflow Studio UX — Soul + Strict↔Loose | WUX-01, WUX-02 | 4 | G-2 sketch (both); UI hint; G-5 (`PhaseTimeline.tsx`/`PhaseCard.tsx`) |
+
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent) — Phases 125-130:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 125 | Self-Improve Proposer (description-only) | SI-02 | 3 | 122 + 123 |
+| 126 | Smart-Dispatch Relevance Pre-Filter | TRIG-02 | 3 | 123 |
+| 127 | Gauntlet Pip-Strip + Quiet Idle Cards | WUX-03 | 2 | 124 (G-2 sketch; UI hint) |
+| 128 | Live Description Before tool_start | TDP-02 | 2 | 122 |
+| 129 | MiniMax/OpenRouter Arg Repair | MP-04 | 2 | 122 |
+| 130 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 |
+
+- **Coverage:** 18/18 requirements mapped (12 CORE + 6 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Sequencing rationale:** COLL-01 (confirmed LIVE bug, Mechanism A) sequenced EARLIEST (Phase 120), paired with CTX-01 (same collision/context-isolation fix). MP-03 (per-provider scoreboard) lands in the SAME phase as MP-01/MP-02 (122) so the scoreboard substrate gates any MP-02 tier flip. TRIG-01 (headline skill-quality deliverable) gets its own phase (123) with TRIG-03 + CTX-03 as adjacent skill-triggering items. WUX-01/WUX-02 (G-2 sketch-gated UX re-skin) cluster in 124; IA-01 (also G-2/frontend) lands first in 121 as the "one front door" prerequisite the WUX re-skin builds on.
+- **SC#10 (cross-provider mandate, EVAL axis per MP-03):** flagged on every phase touching streaming / agent loop / provider routing / UI state — 120, 121, 122, 123, 124 (+ dependent STRETCH 125, 126, 128, 129).
+- **UI hint:** 121, 124 (CORE) + 125, 127 (STRETCH).
+- **G-2 sketch-gated:** 121 (IA-01), 124 (WUX-01/02) + 127 (WUX-03). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **G-5 hot files (audit at discuss-phase):** `backend/app/api/threads.py` (firing → extraction due; 120/121 thread/composer surface — do NOT grow it), `context_window.py`/`agent_loop.py` trim path (CTX-01 `_reconstruct_history` origin filter, CTX-03 trim-pin), `PhaseTimeline.tsx`/`PhaseCard.tsx` (shared with the live harness — re-run replay tests in 124/127), the gateway/adapter boundary (122/128/129).
+- **Red line:** never fork the shared path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime.
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.1 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Scope source: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
@@ -201,4 +234,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- v3.1 roadmap created (CORE 120-124 + STRETCH 125-130). Next: `/gsd:discuss-phase 120` (Collision Fix + Context Isolation) — cross-check `.planning/reported-bugs/*.md` (`status: open` + `surface: Agentic-RAG`) per the discuss-phase mandate. G-2 sketch fires on 121/124 before spec/discuss.

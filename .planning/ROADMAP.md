@@ -14,9 +14,197 @@
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
-- 📋 **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — NEXT. Workflow↔skill collision fix (sandbox-harvest run-scope, root-caused live) + cross-provider trust/honesty (force→coerce retry ladder, task-label parity) + Skill **Trigger Tuner** + Workflow Studio UX (soul card + strict↔loose) + bounded human-in-loop self-improve (STRETCH). Decided scope: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
+- 📋 **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — IN PROGRESS. CORE Phases 120-124 + STRETCH Phases 125-130. Workflow↔skill collision fix (sandbox-harvest run-scope, root-caused live) + cross-provider trust/honesty (force→coerce retry ladder, per-provider eval scoreboard, task-label parity) + Skill **Trigger Tuner** + Workflow Studio UX (soul card + strict↔loose) + bounded human-in-loop self-improve (STRETCH). Decided scope: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
 - 📋 **v3.2 Skill Eval Studio (full) + Self-Improving** — the net-new eval+versioning backend (`skill_versions` + eval harness + grader/comparator/analyzer + review viewer + skill publish gate; the v3.1-PRD spine, not yet built). Brief: `PRDs/v3.1-skill-studio-eval.md`.
 - 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
+
+---
+
+## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
+
+**Started:** 2026-06-21 (Option A — scope LOCKED + operator-approved). Numbering continues from v3.0's last phase (119) → **CORE Phases 120-124**, then **STRETCH Phases 125-130** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent).
+
+**Goal:** Make the agent's skills + workflows trustworthy, legible, and reliably triggered across *all* providers — fix the live workflow↔skill collision (a confirmed, root-caused bug), lift cross-provider honesty to OpenAI-parity, add a Skill Trigger Tuner, and re-skin the Workflow Studio so each workflow's "soul" is obvious with a strict↔loose authoring/running split.
+
+**Red line (every phase):** never fork the shared Deep/agent-loop/provider path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime.
+
+**Scope source:** `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md` (LOCKED). Operator pressures: `.planning/research/v3.1-skills-eval/OPERATOR-INPUTS.md`.
+
+### Phase Table (CORE)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 120 | Collision Fix + Context Isolation | A skill saving one file in a workflow-touched thread emits exactly that file, and Deep/Harness stop replaying each other's history | COLL-01, CTX-01 | 4 | G-5 (`threads.py` firing → extraction due, `agent_loop.py` `_reconstruct_history`); SC#10 |
+| 121 | One Front Door for Workflows (IA) | Workflows launch from a single front door; the chat composer drops to 2-pill General/Explorer while the lock/409/reconcile is preserved | IA-01 | 3 | G-2 sketch-gated; UI hint; SC#10 |
+| 122 | Cross-Provider Trust & Honesty Parity | Cross-provider emission is recovered-or-honest, doc-verified per provider, measured on a per-provider scoreboard, and task labels are concrete on every provider | MP-01, MP-02, MP-03, TDP-01 | 5 | G-5 (gateway/adapter boundary, `agent_loop.py`); SC#10 (cross-provider = EVAL axis, MP-03) |
+| 123 | Skill Triggering Quality | A skill author can tune a description against a held-out benchmark, weak descriptions are flagged at save, and loaded skills don't fall out of context mid-session | TRIG-01, TRIG-03, CTX-03 | 5 | G-5 (`context_window.py`/`agent_loop.py` trim path for CTX-03); SC#10 (TRIG-01 cross-provider) |
+| 124 | Workflow Studio UX — Soul + Strict↔Loose | A user sees a workflow's "soul" at a glance in 3 sizes and meets a clear strict↔loose split ("Describe & run" vs "Author & govern") | WUX-01, WUX-02 | 4 | G-2 sketch-gated (both); UI hint; G-5 (`PhaseTimeline.tsx`/`PhaseCard.tsx`) |
+
+### Phase Table (STRETCH — gated behind CORE)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 125 | Self-Improve Proposer (description-only) | A bounded, human-in-the-loop description-only proposer drafts a description diff → human approves → new immutable version; never auto-publishes | SI-02 (STRETCH) | 3 | SC#10 (judge-as-gate cross-provider); depends on 122 + 123 |
+| 126 | Smart-Dispatch Relevance Pre-Filter | Only plausibly-relevant skills are surfaced to the model and the catalog stays within a token budget | TRIG-02 (STRETCH) | 3 | G-5 (catalog injection path); SC#10; depends on 123 |
+| 127 | Gauntlet Pip-Strip + Quiet Idle Cards | The publish gauntlet renders as a pip-strip + worded verdict with raw-on-demand; idle PhaseCards stay quiet | WUX-03 (STRETCH) | 2 | G-2 sketch-gated; UI hint; G-5 (`PhaseCard.tsx`); depends on 124 |
+| 128 | Live Description Before tool_start | A tool's `description` streams live before `tool_start` (the preparing-window honesty improvement) | TDP-02 (STRETCH) | 2 | SC#10; depends on 122 |
+| 129 | MiniMax/OpenRouter Arg Repair | MiniMax malformed-args boundary repair + OpenRouter `require_parameters` for broader provider robustness | MP-04 (STRETCH) | 2 | G-5 (gateway/adapter boundary); SC#10; depends on 122 |
+| 130 | template_input Resolver Run-Scope | The `template_input` resolver is run-scoped too — defense-in-depth for the `render_template` path alongside COLL-01 | COLL-02 (STRETCH) | 2 | depends on 120 |
+
+### Phase Checklist
+
+- [ ] **Phase 120: Collision Fix + Context Isolation** — run-scope the sandbox harvest baseline (kills the live 2-files bug) + tag `messages.origin` so Deep/Harness stop replaying each other (COLL-01, CTX-01)
+- [ ] **Phase 121: One Front Door for Workflows (IA)** — remove the composer Harness pill → 2-pill General/Explorer, keep the lock/409/reconcile (IA-01)
+- [ ] **Phase 122: Cross-Provider Trust & Honesty Parity** — force→coerce retry ladder, doc-verified `emit_tier`, per-provider scoreboard, OpenAI-parity task labels (MP-01, MP-02, MP-03, TDP-01)
+- [ ] **Phase 123: Skill Triggering Quality** — Skill Trigger Tuner, save-time description lint, pin loaded skills out of trim (TRIG-01, TRIG-03, CTX-03)
+- [ ] **Phase 124: Workflow Studio UX — Soul + Strict↔Loose** — soul in 3 sizes + strict↔loose disclosure (WUX-01, WUX-02)
+- [ ] **Phase 125 (STRETCH): Self-Improve Proposer (description-only)** — bounded human-in-the-loop description proposer (SI-02)
+- [ ] **Phase 126 (STRETCH): Smart-Dispatch Relevance Pre-Filter** — relevance pre-filter + catalog token budget (TRIG-02)
+- [ ] **Phase 127 (STRETCH): Gauntlet Pip-Strip + Quiet Idle Cards** — pip-strip + worded verdict, quiet idle cards (WUX-03)
+- [ ] **Phase 128 (STRETCH): Live Description Before tool_start** — stream description in the preparing window (TDP-02)
+- [ ] **Phase 129 (STRETCH): MiniMax/OpenRouter Arg Repair** — MiniMax arg repair + OpenRouter `require_parameters` (MP-04)
+- [ ] **Phase 130 (STRETCH): template_input Resolver Run-Scope** — run-scope the render_template resolver (COLL-02)
+
+### Phase Details
+
+#### Phase 120: Collision Fix + Context Isolation
+**Goal**: A skill that runs in a thread that previously ran a workflow emits only its own output, and a subsequent Deep turn never replays the workflow's history — the live, root-caused collision (Mechanism A) is closed at the harvest baseline and the history-reconstruction filter.
+**Depends on**: Nothing (first phase; sequenced EARLY because COLL-01 is a confirmed live bug)
+**Requirements**: COLL-01, CTX-01
+**Success Criteria** (what must be TRUE):
+  1. A skill `execute_code` that saves exactly one file in a thread that previously ran a workflow emits exactly that one file — the prior workflow's leftover `/sandbox/output/` artifact is never re-emitted (the confirmed 2-files bug is gone).
+  2. The sandbox-output harvest is run-scoped to its own run's baseline, so any file present before the run starts is excluded from that run's emitted outputs.
+  3. When Deep chat and a workflow share a thread, a Deep turn's history reconstruction replays only `messages.origin = deep` rows, and a workflow phase replays only its `harness` rows — workflow context never bleeds into a subsequent Deep turn.
+  4. The collision fix holds across providers, multi-tool prompts, parallel threads, and long (≥50-message) histories — Deep Mode stays byte-identical on the native-7 (no shared-path fork; SC#10).
+**Plans**: TBD
+
+#### Phase 121: One Front Door for Workflows (IA)
+**Goal**: A user launches workflows from a single, obvious front door (the Workflows page); the chat composer is simplified to a 2-pill General/Explorer control with the Harness pill and in-chat workflow selector removed, while the existing Harness↔Deep lock / 409 / reconcile behavior is preserved exactly.
+**Depends on**: Phase 120 (context isolation is the actual collision fix; IA-01 is the clarity win that rides on top — and they touch overlapping thread/composer surfaces)
+**Requirements**: IA-01
+**Success Criteria** (what must be TRUE):
+  1. The chat composer shows exactly two mode pills (General / Explorer) — the Harness pill and the in-chat workflow selector are gone, and the only place to launch a workflow is the Workflows page.
+  2. Launching a workflow still works as an explicit "launch-in-context" action (the capability is not removed), and a launched workflow's thread still toggles into Harness mode and Continues correctly.
+  3. The server-side Harness↔Deep lock still returns a 409 on an illegal switch, and the lock/reconcile behavior is unchanged from before the composer change.
+  4. Behavior holds across providers and parallel threads with no Deep-mode regression (SC#10).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 122: Cross-Provider Trust & Honesty Parity
+**Goal**: Structured emission is recovered-or-honest on every provider, each provider uses the emission path it actually supports (doc-verified, not guessed), cross-provider reliability is measured on a per-provider scoreboard that gates any tier change, and task/step labels are concrete on every provider (OpenAI-parity) — all at the gateway/adapter boundary, never the shared path.
+**Depends on**: Phase 120 (lands after the collision fix so the cross-provider blast radius is clean)
+**Requirements**: MP-01, MP-02, MP-03, TDP-01
+**Success Criteria** (what must be TRUE):
+  1. A model that silently fails a forced structured emit (e.g. the default model's no-metadata 400) is recovered by a force→coerce retry ladder in `forced_emit`, so a typed-artifact phase produces its emission instead of a silent empty result.
+  2. Each provider's forcing/strict behavior is honest and doc-verified — an explicit `emit_tier` field replaces guesswork, the inert DeepSeek function-level `strict` is dropped, and GLM forcing is kept (intentional, live-verified).
+  3. The eval treats provider as a first-class axis with a per-provider scoreboard (trigger / force / recovery / honest-fail), pass-OR-documented, and any `emit_tier` change is gated on that scoreboard (no silent tier flip).
+  4. Task/todo/workflow-step labels are concrete on every provider (OpenAI-parity), not the bare tool name — an ungated prompt nudge fills `execute_code.description` and a deterministic frontend summarizer floor backstops providers that don't, without regressing providers that already do.
+  5. The 4-axis SC#10 scoreboard (cross-provider × multi-tool × parallel-thread × long-message) passes as an EVAL axis (per MP-03), and Deep Mode stays byte-identical (no shared-path fork).
+**Plans**: TBD
+
+#### Phase 123: Skill Triggering Quality
+**Goal**: A skill author can measurably tune a skill's trigger description, the system flags weak trigger descriptions before a skill is saved, and a loaded skill's instructions stay available for the rest of the session instead of silently falling out of context.
+**Depends on**: Phase 122 (the Trigger Tuner measures cross-provider on production model-ids; it reuses the per-provider scoreboard substrate landed in 122)
+**Requirements**: TRIG-01, TRIG-03, CTX-03
+**Success Criteria** (what must be TRUE):
+  1. A skill author can run a description against a held-out should-trigger / should-not-trigger benchmark (Skill Trigger Tuner) and pick the winning description by held-out score, measured cross-provider on production model-ids.
+  2. The Trigger Tuner reports a concrete trigger/should-not score per candidate description so the author can see one description beat another, not just a pass/fail.
+  3. At `save_skill` (and in the skill-creator loop) a description-quality lint flags a weak or ambiguous trigger description before the skill is saved.
+  4. A skill loaded mid-conversation stays in context for the rest of the session — its instructions are pinned out of the rolling trim window and don't silently disappear after the window rolls.
+  5. Trigger measurement and the pinned-instruction behavior hold across providers and long histories (SC#10) with no shared-path fork on the trim path.
+**Plans**: TBD
+
+#### Phase 124: Workflow Studio UX — Soul + Strict↔Loose
+**Goal**: A user immediately sees the "soul" of a workflow (its purpose, what it needs, its phase spine, its tier, its output) in three consistent sizes, and meets a clear strict↔loose disclosure that offers two doors ("Describe & run" vs "Author & govern") without removing any control — accuracy and governance preserved, complexity demoted one click.
+**Depends on**: Phase 121 (the Workflows page is now the single front door; the soul re-skin builds on that consolidated surface)
+**Requirements**: WUX-01, WUX-02
+**Success Criteria** (what must be TRUE):
+  1. A user sees a workflow's "soul" at a glance in three sizes (library card / run header / publish summary): its purpose (`business_requirement`), what it needs, a glyph-dot phase spine (no type ribbons/index noise), one tier chip, and its output line.
+  2. The library card / run header / publish summary all show the same soul object consistently — a user recognizes a workflow by the same essence in all three places.
+  3. Authoring and running expose a strict↔loose disclosure keyed off `deriveTier` — two clear doors ("Describe & run" vs "Author & govern") — where nothing is removed and advanced controls are demoted exactly one click.
+  4. The strict↔loose split preserves accuracy and control — a power user can still reach every advanced control, and a loose user can describe-and-run without meeting governance complexity (sketch-approved mockup is the acceptance bar).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 125 (STRETCH): Self-Improve Proposer (description-only)
+**Goal**: A bounded, human-in-the-loop, description-only self-improvement proposer: eval surfaces a weak description → proposes a description diff → DRAFT → human approves → a new immutable version; it never auto-publishes, uses held-out selection, and uses the Phase-102 judge as a gate.
+**Depends on**: Phase 122 + Phase 123 (reuses the cross-provider scoreboard, the Trigger Tuner's held-out selection, and the judge gate); gated behind CORE completion
+**Requirements**: SI-02 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. The proposer can take an eval signal on a weak description and produce a proposed description diff as a DRAFT — it never edits a live skill description and never auto-publishes.
+  2. A human reviews the proposed diff and, on approval, the proposal becomes a new immutable version; on rejection nothing changes.
+  3. A proposed description is selected by held-out score and must clear the Phase-102 judge gate before it can be presented as a recommendation.
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 126 (STRETCH): Smart-Dispatch Relevance Pre-Filter
+**Goal**: Only plausibly-relevant skills are surfaced to the model and the skill catalog stays within a token budget, so the model isn't flooded with irrelevant skills and the catalog doesn't blow the context budget.
+**Depends on**: Phase 123 (builds on the skill-triggering work); gated behind CORE completion
+**Requirements**: TRIG-02 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. For a given user turn, only skills that pass a relevance pre-filter are surfaced to the model — clearly-irrelevant skills are not injected.
+  2. The injected skill catalog stays within a defined token budget even as the user's skill count grows.
+  3. The pre-filter never starves a genuinely-relevant skill (a should-trigger skill still reaches the model), verified cross-provider (SC#10).
+**Plans**: TBD
+
+#### Phase 127 (STRETCH): Gauntlet Pip-Strip + Quiet Idle Cards
+**Goal**: The publish gauntlet reads at a glance as a pip-strip + worded verdict with raw detail on demand, and idle PhaseCards stay visually quiet instead of competing for attention.
+**Depends on**: Phase 124 (rides on the Workflow Studio UX re-skin); gated behind CORE completion
+**Requirements**: WUX-03 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. The publish gauntlet renders as a pip-strip + a worded verdict, with the raw gauntlet detail available on demand (not shown by default).
+  2. An idle PhaseCard stays quiet (no noisy animation/placeholder) and only animates when its phase is actually active (sketch-approved mockup is the acceptance bar).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 128 (STRETCH): Live Description Before tool_start
+**Goal**: A tool's `description` streams live during the preparing window, before `tool_start`, so the user sees an honest "about to do X" label instead of a silent gap.
+**Depends on**: Phase 122 (extends the task-label parity work); gated behind CORE completion
+**Requirements**: TDP-02 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. A tool's `description` appears in the preparing window before the `tool_start` event fires, so the user sees what the agent is about to do during the prep gap.
+  2. The live-description behavior holds across providers with no Deep-mode regression and no shared-path fork (SC#10).
+**Plans**: TBD
+
+#### Phase 129 (STRETCH): MiniMax/OpenRouter Arg Repair
+**Goal**: Broader provider robustness — MiniMax malformed tool-args are repaired at the adapter boundary, and OpenRouter requests set `require_parameters` so a wider set of routed providers honor the tool schema.
+**Depends on**: Phase 122 (extends the cross-provider trust cluster at the gateway/adapter boundary); gated behind CORE completion
+**Requirements**: MP-04 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. A MiniMax malformed-args response is repaired at the adapter boundary so the tool call still dispatches instead of failing (closes the `minimax-m3-invalid-tool-args-400` class).
+  2. OpenRouter requests carry `require_parameters`, and the change improves tool-schema honoring without regressing other providers (SC#10), with provider handling staying at the adapter boundary (no shared-path fork).
+**Plans**: TBD
+
+#### Phase 130 (STRETCH): template_input Resolver Run-Scope
+**Goal**: Defense-in-depth for the collision — the `template_input` resolver is run-scoped too, so the `render_template` path can't re-introduce a cross-run leak alongside the COLL-01 harvest fix.
+**Depends on**: Phase 120 (pairs with COLL-01 on the same collision/harvest surface); gated behind CORE completion
+**Requirements**: COLL-02 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. The `template_input` resolver only resolves inputs scoped to the current run — a prior run's template inputs in the shared workspace are never picked up by a later run's `render_template`.
+  2. The render_template path produces the same output it did before for in-scope inputs (no regression on the happy path).
+**Plans**: TBD
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 120. Collision Fix + Context Isolation | 0/? | Not started | - |
+| 121. One Front Door for Workflows (IA) | 0/? | Not started | - |
+| 122. Cross-Provider Trust & Honesty Parity | 0/? | Not started | - |
+| 123. Skill Triggering Quality | 0/? | Not started | - |
+| 124. Workflow Studio UX — Soul + Strict↔Loose | 0/? | Not started | - |
+| 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
+| 126 (STRETCH). Smart-Dispatch Relevance Pre-Filter | 0/? | Gated (behind CORE) | - |
+| 127 (STRETCH). Gauntlet Pip-Strip + Quiet Idle Cards | 0/? | Gated (behind CORE) | - |
+| 128 (STRETCH). Live Description Before tool_start | 0/? | Gated (behind CORE) | - |
+| 129 (STRETCH). MiniMax/OpenRouter Arg Repair | 0/? | Gated (behind CORE) | - |
+| 130 (STRETCH). template_input Resolver Run-Scope | 0/? | Gated (behind CORE) | - |
+
+**Guardrails firing (v3.1):**
+- **G-2 sketch-first** on Phase 121 (IA-01), Phase 124 (WUX-01/02), Phase 127 (WUX-03) — all live UI / "feels like" surfaces. `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`. `sketch-findings-agentic-rag` already names the workflow run surface, the Workflows page, the phase timeline, and the composer.
+- **G-5 hot files:** `backend/app/api/threads.py` (firing → extraction due — do NOT grow it; 120/121 touch its thread/composer surface), `context_window.py`/`agent_loop.py` trim path (CTX-01 origin filter in `_reconstruct_history`, CTX-03 trim-pin), `PhaseTimeline.tsx`/`PhaseCard.tsx` (shared with the live harness — re-run replay tests in 124/127), the gateway/adapter boundary (122/128/129).
+- **SC#10 cross-provider** is an EVAL axis here (MP-03), not just manual UAT — flagged on every phase touching streaming / agent loop / provider routing / UI state (120, 121, 122, 123, 124, and the dependent STRETCH phases).
+- **Red line:** never fork the shared path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime.
 
 ---
 
@@ -26,7 +214,7 @@ Full detail archived → **`.planning/milestones/v3.0-ROADMAP.md`** · requireme
 
 11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, shipped + validated — **every phase passed verify-work + secure-phase + validate-phase** (live cross-provider UAT on the agent-tool / upload-path phases; no formal milestone audit). Turned the product's incidental document handling into a first-class, metadata-driven surface (M-Files Tier A): user-defined custom metadata with per-field confidence + audited manual override, configurable multi-provider embeddings (retires the OpenAI SPOF), metadata-driven "virtual folders" (a closed-registry filter-AST → parameterized-jsonb compiler + a no-DSL builder + an agent tool), typed document relationships (a leak-safe share-don't-fork core + panel + agent tool), suggest-then-confirm auto-classification, and a light governance-health view. 24/24 functional requirements delivered; `threads.py` untouched all milestone (G-5); near-zero new deps.
 
-**Next:** v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (`/gsd:new-milestone`; decided scope in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`).
+**Next:** v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (active above; decided scope in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`).
 
 ---
 
@@ -175,4 +363,4 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 ---
 
-*Milestones v1.0–v2.9 shipped and archived under `.planning/milestones/`. **Active milestone: v3.0 Document Management** (started 2026-06-15 — Phases 110-119; SEED-005 Tier A). Re-sequenced PRD roadmap + the deferral of Skill Studio → v3.1: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*
+*Milestones v1.0–v3.0 shipped and archived under `.planning/milestones/`. **Active milestone: v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** (started 2026-06-21 — CORE Phases 120-124 + STRETCH Phases 125-130; scope locked in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`). Re-sequenced PRD roadmap: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*
