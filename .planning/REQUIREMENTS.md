@@ -59,8 +59,8 @@
 ### Auto-Classification (CLASS)
 
 - [x] **CLASS-01**: User can define classification rules (metadata condition → suggested folder/tag).
-- [ ] **CLASS-02**: On upload, matching rules produce a routing/classification suggestion — never a silent auto-move.
-- [ ] **CLASS-03**: User can accept or dismiss a classification suggestion.
+- [x] **CLASS-02**: On upload, matching rules produce a routing/classification suggestion — never a silent auto-move.
+- [x] **CLASS-03**: User can accept or dismiss a classification suggestion.
 
 ### Document Governance Health (DGOV) — light, built last
 
@@ -123,8 +123,8 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | REL-04 | Phase 116 — Document Relationships (Backend + Agent Tool) | Complete |
 | REL-02 | Phase 117 — Document Relationships (Panel UI) | Complete |
 | CLASS-01 | Phase 118 — Auto-Classification | Complete |
-| CLASS-02 | Phase 118 — Auto-Classification | Pending |
-| CLASS-03 | Phase 118 — Auto-Classification | Pending |
+| CLASS-02 | Phase 118 — Auto-Classification | Complete |
+| CLASS-03 | Phase 118 — Auto-Classification | Complete |
 | DGOV-01 | Phase 119 — Document Governance Health | Pending |
 | DGOV-02 | Phase 119 — Document Governance Health | Pending |
 | UX-01 | Cross-cutting (Phases 112, 114, 117, 118, 119) | Pending |

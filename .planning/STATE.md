@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T03:01:55.521Z"
+last_updated: "2026-06-21T03:18:43.357Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 44
-  completed_plans: 41
+  completed_plans: 42
   percent: 82
 ---
 
@@ -71,7 +71,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-21
@@ -569,8 +569,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase | Plan | Duration | Notes |
 |-------|------|----------|-------|
 | Phase 118 P02 | ~30 min | 2 tasks | 3 files |
+| Phase 118 P03 | 12min | 2 tasks | 5 files |
 
 ## Decisions
 
 - [Phase ?]: 118-02: classification-rules routes return RuleResponse(**row) so live CRUD tests can call coroutines directly (read .is_global/.id/.enabled); service imported as a module to avoid create_rule shadowing
 - [Phase ?]: 118-02: removed 5 stale xfail markers in test_118_rule_crud.py so the CRUD tests are genuinely GREEN (xpass would silently mask a future regression)
+- [Phase ?]: Phase 118-03: classification rule-eval spliced into ingest_document before the single persist write — own+global leak-safe read (no auth.uid in the BG task, D-118-8), first-match-wins ONE _classification suggestion, NEVER a folder move (CLASS-02)
+- [Phase 118]: Phase 118-03: accept/dismiss endpoints — accept records prior_folder_id, re-validates the target folder, moves, audits classification.apply AFTER the move; dismiss clears; Undo reuses the existing move endpoint (CLASS-03 reversible)
