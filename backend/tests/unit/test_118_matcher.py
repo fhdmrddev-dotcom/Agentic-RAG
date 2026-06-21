@@ -258,7 +258,7 @@ def test_build_suggestion_shape_no_confidence():
         def table(self, _name):
             return _Q({"id": "folder-abc", "name": "Invoices"})
 
-    sugg = classification_matcher.build_suggestion(rule, _SB(), "user-1")
+    sugg = classification_matcher.build_suggestion(rule, _SB(), "11111111-1111-1111-1111-111111111111")
 
     assert set(sugg.keys()) == {
         "rule_id",
@@ -293,6 +293,6 @@ def test_build_suggestion_deleted_folder_resolves_none():
         def table(self, _name):
             raise AssertionError("no folder lookup when suggest_folder_id is None")
 
-    sugg = classification_matcher.build_suggestion(rule, _SB(), "user-1")
+    sugg = classification_matcher.build_suggestion(rule, _SB(), "11111111-1111-1111-1111-111111111111")
     assert sugg["suggested_folder_id"] is None
     assert sugg["suggested_folder_name"] is None

@@ -45,6 +45,7 @@ from datetime import date, timedelta
 
 from app.models.document_view import ViewCondition, ViewFilter
 from app.services import view_filter_compiler
+from app.utils.db import coerce_uid
 
 # Fields stored lowercase at every write path (mirror NORMALIZED_LOWER_FIELDS in the
 # compiler — document_type/language) — the eq/one_of value is lowercased on BOTH sides.
@@ -266,7 +267,7 @@ def _resolve_folder_name(folder_id, supabase, user_id) -> str | None:
             supabase.table("folders")
             .select("id,name")
             .eq("id", str(folder_id))
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{coerce_uid(user_id)},is_global.eq.true")  # AR-118-01: coerced
             .maybe_single()
             .execute()
         )

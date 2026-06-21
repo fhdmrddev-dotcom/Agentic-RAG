@@ -1497,12 +1497,14 @@ async def accept_classification(
 
     # 3. Re-validate the target folder is readable (own+global) — Pitfall 5 (clone
     #    move_document:1325-1335). A deleted/unreadable folder → uniform 404.
+    from app.utils.db import coerce_uid  # noqa: PLC0415
+    caller_uid = coerce_uid(current_user["id"])  # AR-118-01: coerced owner-scoping gate
     try:
         folder = await run_in_threadpool(
             lambda: supabase.table("folders")
             .select("id")
             .eq("id", str(target))
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .or_(f"user_id.eq.{caller_uid},is_global.eq.true")
             .maybe_single()
             .execute()
         )
@@ -1882,13 +1884,22 @@ def ingest_document(
         if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
             try:
                 from app.services import classification_matcher  # noqa: PLC0415
+                from app.utils.db import coerce_uid  # noqa: PLC0415
                 rules = (
                     supabase.table("classification_rules").select("*")
-                    .or_(f"user_id.eq.{user_id},is_global.eq.true")  # D-118-8 own + global
+                    # AR-118-01: coerce the interpolated uploader id (service-role read,
+                    # RLS bypassed — this app-code predicate is the SOLE owner gate).
+                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_global.eq.true")  # D-118-8 own + global
                     .eq("enabled", True)
                     .order("is_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
                     .execute()
                 ).data or []
+                # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
+                # sibling service-role own+global reads carry (read_enabled_field_defs,
+                # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
+                # a malformed/over-broad result can NEVER evaluate another user's rule
+                # against this uploader's metadata (the phase's highest-stakes leak site).
+                rules = [r for r in rules if r.get("is_global") or str(r.get("user_id")) == str(user_id)]
                 whitelist = _METADATA_BUILTINS | {
                     d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
                 }

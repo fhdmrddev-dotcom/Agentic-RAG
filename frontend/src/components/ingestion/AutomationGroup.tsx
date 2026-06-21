@@ -94,14 +94,19 @@ export function AutomationGroup({
 }: AutomationGroupProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  // AR-118-05: a per-row error so a failed mutation is VISIBLE (was console-only —
+  // a silently-failing toggle reads as "broken", not "not allowed").
+  const [actionError, setActionError] = useState<{ id: string; msg: string } | null>(null)
 
   const handleToggle = async (rule: ClassificationRule) => {
     setTogglingId(rule.id)
+    setActionError(null)
     try {
       const updated = await updateRule(rule.id, { enabled: !rule.enabled })
       onToggled(updated)
     } catch (err) {
       console.error("Could not toggle rule:", err)
+      setActionError({ id: rule.id, msg: "Couldn’t update that rule — please try again." })
     } finally {
       setTogglingId(null)
     }
@@ -109,11 +114,13 @@ export function AutomationGroup({
 
   const handleConfirmDelete = async (id: string) => {
     setDeletingId(null)
+    setActionError(null)
     try {
       await deleteRule(id)
       onDeleted(id)
     } catch (err) {
       console.error("Could not delete rule:", err)
+      setActionError({ id, msg: "Couldn’t delete that rule — please try again." })
     }
   }
 
@@ -137,6 +144,11 @@ export function AutomationGroup({
       ) : (
         rules.map((rule) => {
           const isDeleting = deletingId === rule.id
+          // AR-118-05: globals are admin/service-role-seeded and own-scoped on the
+          // server, so a non-owned global rule can't be toggled/edited/deleted from
+          // here (the mutation would 404). Gate the affordances rather than letting
+          // them fail silently. (A user's own rule is always is_global=false.)
+          const owned = !rule.is_global
           const folderName = rule.suggest_folder_id
             ? folderNames[rule.suggest_folder_id] ?? "a folder"
             : "no folder"
@@ -154,14 +166,19 @@ export function AutomationGroup({
                       type="button"
                       role="switch"
                       aria-checked={rule.enabled}
-                      aria-label={`${rule.enabled ? "Disable" : "Enable"} rule ${rule.name}`}
-                      disabled={togglingId === rule.id}
+                      aria-label={
+                        owned
+                          ? `${rule.enabled ? "Disable" : "Enable"} rule ${rule.name}`
+                          : `${rule.name} is a global rule — read only`
+                      }
+                      title={owned ? undefined : "Global rule — read only"}
+                      disabled={togglingId === rule.id || !owned}
                       onClick={(e) => {
                         e.stopPropagation()
                         void handleToggle(rule)
                       }}
                       className={cn(
-                        "relative h-4 w-7 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                        "relative h-4 w-7 shrink-0 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
                         "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                         rule.enabled ? "bg-emerald-500/70" : "bg-muted",
                       )}
@@ -181,8 +198,12 @@ export function AutomationGroup({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0"
-                          aria-label={`Actions for ${rule.name}`}
+                          className="h-6 w-6 p-0 disabled:cursor-not-allowed"
+                          aria-label={
+                            owned ? `Actions for ${rule.name}` : `${rule.name} — global rule, read only`
+                          }
+                          title={owned ? undefined : "Global rule — read only"}
+                          disabled={!owned}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-3 w-3" />
@@ -224,6 +245,13 @@ export function AutomationGroup({
                   {folderName}
                 </span>
               </div>
+
+              {/* AR-118-05: a visible mutation error (was console-only). */}
+              {actionError?.id === rule.id && (
+                <p role="alert" className="ml-8 mb-1 px-2 text-[11px] text-destructive">
+                  {actionError.msg}
+                </p>
+              )}
 
               {/* Inline delete confirmation (mirrors the ViewsGroup idiom). */}
               {isDeleting && (

@@ -36,12 +36,10 @@ Every function takes an optional ``supabase`` client (defaults to the singleton
 inject a real local client built from backend/.env.
 """
 
-from uuid import UUID
-
 from supabase import Client
 
 from app.dependencies import get_supabase
-from app.utils.db import aexec
+from app.utils.db import aexec, coerce_uid
 
 _TABLE = "classification_rules"
 
@@ -50,18 +48,10 @@ def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
 
 
-def _uid(user_id) -> str:
-    """Coerce ``user_id`` to a canonical UUID string before it is interpolated into
-    a PostgREST ``.or_()`` filter grammar (the WR-02 hardening).
-
-    ``user_id`` is the JWT-subject UUID from ``get_current_user`` and is not
-    attacker-influenced today, but ``get_supabase()`` is the SERVICE-ROLE client
-    (RLS bypassed) — these app-level predicates are the SOLE owner-scoping gate.
-    Wrapping it in ``UUID(...)`` makes the one unparameterized runtime-value-into-
-    DSL spot safe by construction: any value that is not a well-formed UUID raises
-    ``ValueError`` instead of breaking out of the ``user_id.eq.<...>`` term.
-    """
-    return str(UUID(str(user_id)))
+# The UUID-coercion that makes the one runtime-value-into-`.or_()`-DSL spot safe by
+# construction (the WR-02 hardening) now lives in app.utils.db; kept as a local alias
+# so the call sites read unchanged (AR-118-01 hoist).
+_uid = coerce_uid
 
 
 async def create_rule(

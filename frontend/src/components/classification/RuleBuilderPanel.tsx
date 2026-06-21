@@ -346,12 +346,18 @@ export function RuleBuilderPanel({
             />
             <span aria-hidden="true">👤</span> Only me
           </label>
+          {/* AR-118-04: "Global" is disabled — there is no client path to create a
+              global rule (the server hard-sets is_global=false on create; globals are
+              admin/service-role-seeded). Showing it live but non-functional was a
+              "never silent" honesty defect, so it's disabled with an explanation
+              rather than silently ignored. */}
           <label
+            title="Global rules are seeded by an administrator"
             className={cn(
-              "inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+              "inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
               scope === "global"
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-primary/10 text-primary/70 font-medium"
+                : "text-muted-foreground/50",
             )}
           >
             <input
@@ -360,6 +366,7 @@ export function RuleBuilderPanel({
               aria-label="Global"
               className="sr-only"
               checked={scope === "global"}
+              disabled
               onChange={() => setScope("global")}
             />
             <span aria-hidden="true">🌐</span> Global
@@ -368,6 +375,9 @@ export function RuleBuilderPanel({
             </span>
           </label>
         </div>
+        <p className="text-[11px] text-muted-foreground/70">
+          Global rules are seeded by an administrator.
+        </p>
       </fieldset>
 
       {/* Live "would match N of M" preview + the forward-only honesty line. */}

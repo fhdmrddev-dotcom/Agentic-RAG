@@ -95,6 +95,10 @@ describe("RuleBuilderPanel", () => {
     // Default selection = Only me.
     expect(onlyMe).toBeChecked()
     expect(global).not.toBeChecked()
+    // AR-118-04: "Global" is disabled — there's no client path to create a global
+    // rule, so it's shown-but-non-functional rather than silently ignored.
+    expect(global).toBeDisabled()
+    expect(onlyMe).toBeEnabled()
   })
 
   it("editing the condition triggers a 'would match N of M' preview via resolveAdHoc(count_only)", async () => {
