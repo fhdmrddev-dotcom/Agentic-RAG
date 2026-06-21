@@ -249,7 +249,7 @@
 
 **Plans**: 6 plans
 
-  - [ ] 118-01-PLAN.md — Backend primitives: rule Pydantic models + the net-new pure in-Python `classification_matcher` (AST→bool, reuses ViewFilter + validators) + 8 Wave-0 test scaffolds (CLASS-01/02)
+  - [x] 118-01-PLAN.md — Backend primitives: rule Pydantic models + the net-new pure in-Python `classification_matcher` (AST→bool, reuses ViewFilter + validators) + 8 Wave-0 test scaffolds (CLASS-01/02)
   - [ ] 118-02-PLAN.md — `/classification-rules` CRUD service + router + main.py mount (is_global hard-false, own+global 404-not-403, match_expr validation, `classification.rule.create` audit) (CLASS-01)
   - [ ] 118-03-PLAN.md — `documents.py` edits: ingest rule-eval splice (user-scoped, first-match-wins suggestion, never silent move) + reversible accept/dismiss endpoints (`classification.apply` audit-after-move) (CLASS-02/03)
   - [ ] 118-04-PLAN.md — Frontend interface seam: types (ClassificationRule/Suggestion + `_classification`) + api client (rule CRUD + accept/dismiss; createRule omits is_global) + ActiveView union (CLASS-01/03)
@@ -285,7 +285,7 @@
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
-| 118. Auto-Classification | 0/6 | Planned | - |
+| 118. Auto-Classification | 1/6 | In Progress|  |
 | 119. Document Governance Health | 0/? | Not started | - |
 
 ---

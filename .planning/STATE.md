@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T00:21:28.905Z"
-last_activity: 2026-06-21 -- Phase 118 planning complete
+last_updated: "2026-06-21T02:43:34.501Z"
+last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 44
-  completed_plans: 38
+  completed_plans: 39
   percent: 82
 ---
 
@@ -22,11 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 118 — Auto-Classification (next; G-2 sketch fires)
+**Current focus:** Phase 118 — auto-classification
 
 ## Current Position
 
-Phase: 117 (document-relationships-panel-ui) — ✅ **COMPLETE 2026-06-21 — ALL THREE GATES CLEAR.** NEXT = `/gsd:discuss-phase 118` (Auto-Classification; G-2 sketch fires — live suggestion UI).
+Phase: 118 (auto-classification) — EXECUTING
 
 **117 close-out (2026-06-21):** code-review (0C/4W/5I; WR-01..04 FIXED `e7032acf`/`1741c41d`/`b1a4188c`/`3ef7c509` — GET malformed `document_id`→uniform 404 not 500 + POST resolves→422 + `encodeURIComponent` + WR-01 malformed-id regression test; WR-02 transient "couldn't remove" alert; WR-03 non-retry 422 message via `ApiError` status; WR-04 `aria-controls` only when listbox present; review marked resolved `099d1204`) → **verify-work 6/6** (`117-UAT.md`, Claude-driven Chrome DevTools MCP + psycopg2 DB truth: automated suite re-green; grouped/masked render with DOM leak-check clean; type-first typeahead create with per-type re-derived exclusion + APG keyboard + DB-confirmed re-fetch; either-direction+masked remove with DB truth; **mobile bottom-sheet with the coarse-pointer ✕ always-on proven live** — the audit #1 a11y fix; **live two-user leak proof** — B over a global-shared subject A linked sees total 0 / zero trace because edges are own-scoped, A sees the real row; all seeded UAT data cleaned up) → **secure-phase 18/18 threats_open 0** (`117-SECURITY.md` @ `132d8661`; 12 mitigate verified in source + live tests + 6 accept AR-117-01..06; orchestrator HAND-VERIFIED the leak-safe mask path `document_relationship_service.py:399-435` non-vacuous — owner-scoped edge queries + per-caller readability re-check → `document_id:None`+mask, the D-102 "static would false-green" discipline; corrected auditor frontmatter overcount 20→18) → **validate-phase NYQUIST-COMPLIANT** (`117-VALIDATION.md` @ `7dd29e96`; State A reconcile of the plan-time draft to executed reality — 13/13 SC rows COVERED, backend 13 [route_leak 6 + get_read 4 + no_fork 3] + frontend 32 [RelationshipsSection 11 + a11y 6 + CreateLinkDialog 8 + DocumentDetailPanel.a11y 7] all GREEN, 0 gaps, no auditor spawn; manual-only lived-experience rows completed in UAT). REL-02 delivered end-to-end. Frontend + thin GET route; `threads.py` untouched (G-5); no new migration, no new package. **NEXT = Phase 118 (Auto-Classification — `/gsd:discuss-phase 118`; G-2 sketch fires).**
 
@@ -67,10 +67,10 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 4 of 4
+Plan: 2 of 6
 Status: Ready to execute
-Resume file: .planning/phases/118-auto-classification/118-CONTEXT.md
-Last activity: 2026-06-21 -- Phase 118 planning complete
+Resume file: None
+Last activity: 2026-06-21
 
 **Phase 111 (Metadata Enrichment — Extraction Backend) — ALL 5 PLANS EXECUTED (5/5), FULLY CLOSED (verify + secure + validate):**
 
