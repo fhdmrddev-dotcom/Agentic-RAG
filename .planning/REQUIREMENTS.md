@@ -65,7 +65,7 @@
 ### Document Governance Health (DGOV) — light, built last
 
 - [x] **DGOV-01**: User can see a light governance view surfacing document-structure health: broken/dangling relationships, unclassified documents, and low-confidence metadata.
-- [ ] **DGOV-02**: Each governance signal links to the action that fixes it (open document, re-extract, classify).
+- [x] **DGOV-02**: Each governance signal links to the action that fixes it (open document, re-extract, classify).
 
 ### Cross-cutting UX (UX)
 
@@ -126,7 +126,7 @@ Build order is dependency-driven; phases 110-119 of milestone v3.0 (continuing p
 | CLASS-02 | Phase 118 — Auto-Classification | Complete |
 | CLASS-03 | Phase 118 — Auto-Classification | Complete |
 | DGOV-01 | Phase 119 — Document Governance Health | Complete |
-| DGOV-02 | Phase 119 — Document Governance Health | Pending |
+| DGOV-02 | Phase 119 — Document Governance Health | Complete |
 | UX-01 | Cross-cutting (Phases 112, 114, 117, 118, 119) | Complete |
 | UX-02 | Cross-cutting G-2 sketch (Phases 112, 114, 117) | Pending |
 
