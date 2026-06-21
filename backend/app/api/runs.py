@@ -518,6 +518,14 @@ async def submit_ask_user_response(
     )
     row = row_resp.data if row_resp is not None else None
 
+    # CTX-01 (T-120-04 / A2): the ask_user_response row's origin. The Step-1 SELECT
+    # above resolves a Deep ``runs`` row → 'deep' (default). The harness workflow_runs
+    # fallback below synthesizes ``row`` → 'harness'. Mis-tagging a workflow reply
+    # 'deep' is the SAFE direction (it only re-shows in a later Deep turn); mis-tagging
+    # a Deep reply 'harness' would DROP it from Deep replay — so default 'deep' and set
+    # 'harness' ONLY on the confirmed-workflow branch.
+    _origin = "deep"
+
     if not row:
         # ── F10 (093 / D-07 / D-08): harness ask_user workflow_run-id fallback ──
         # A harness ``llm_human_input`` prompt's durable row carries
@@ -565,6 +573,8 @@ async def submit_ask_user_response(
                     "thread_id": wf_self["thread_id"],
                     "status": None,
                 }
+                # CTX-01 (A2): confirmed workflow_run reply → tag 'harness'.
+                _origin = "harness"
 
     if not row:
         raise HTTPException(
@@ -582,6 +592,8 @@ async def submit_ask_user_response(
                 "user_id": current_user["id"],
                 "role": "system",
                 "content": body.response_text,
+                # CTX-01 (A2): 'harness' only on the confirmed-workflow branch, else 'deep'.
+                "origin": _origin,
                 "tool_calls": [{
                     "kind": "ask_user_response",
                     "tool_call_id": body.tool_call_id,

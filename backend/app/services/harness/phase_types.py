@@ -632,6 +632,8 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
                         "user_id": current_user.get("id"),
                         "role": "system",
                         "content": prompt,
+                        # CTX-01 (T-120-04): llm_human_input ask_user prompt — workflow row.
+                        "origin": "harness",
                         "tool_calls": [
                             {
                                 "kind": "ask_user_prompt",
