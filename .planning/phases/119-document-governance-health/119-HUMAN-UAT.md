@@ -36,9 +36,23 @@ result: [pending]
 
 total: 5
 passed: 0
-issues: 0
+issues: 1
 pending: 5
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+### BUG-260620 — Low-confidence card surfaced docs whose detail panel showed every field ≥ 0.90 — RESOLVED
+found: 2026-06-21 (operator manual UAT)
+status: resolved
+fix: commit 573dfd50
+The Low-confidence metadata card surfaced docs that, when opened, showed all metadata
+confidences high. Root cause: `_fetch_low_confidence` counted EVERY numeric `_confidence`
+key `< 0.5`, including fields the extractor left BLANK (`date`/`author` = `None` carried a
+0.1/0.2 score). The detail panel correctly hides empty fields (`resolveFieldState.empty`), so
+the governance signal was dishonest. Fixed by aligning the backend scan with the panel's
+`isLow` predicate: skip `_`-prefixed keys, skip fields whose value is empty (missing metadata
+≠ low-confidence metadata), and skip user-confirmed fields (`_source[field] == "user"`).
+Verified live: the previously-flagged doc set dropped 4 → 0; full 119 backend suite 27 passed
+(incl. new empty-field / user-confirmed exclusion regressions + the non-vacuous leak proof).
