@@ -21,7 +21,8 @@
   "model_profile": "quality",
   "commit_docs": true,
   "git": {
-    "branching_strategy": "none"
+    "branching_strategy": "none",
+    "base_branch": "master"
   },
   "hooks": {
     "context_warnings": true
