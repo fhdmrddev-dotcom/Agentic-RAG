@@ -6,7 +6,7 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()

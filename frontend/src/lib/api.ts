@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -2219,6 +2219,118 @@ export async function deleteRelationship(id: string): Promise<void> {
     headers,
   })
   if (!res.ok && res.status !== 404) throw new Error("Failed to remove link")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 118 (CLASS-01 / CLASS-03) — classification-rule CRUD + accept/dismiss.
+//
+// Thin consumers of the leak-safe classification-rules router (Plans 02/03):
+//   GET    /classification-rules                          list own + global rules
+//   POST   /classification-rules                          create a rule (is_global server-owned)
+//   PATCH  /classification-rules/{id}                      update an owned rule (incl. the enabled toggle)
+//   DELETE /classification-rules/{id}                      delete an owned rule (204; 404-tolerant)
+//   PATCH  /documents/{id}/classification/accept           accept the suggestion (moves + stamps prior_folder_id)
+//   PATCH  /documents/{id}/classification/dismiss          dismiss the suggestion (clears _classification; no move)
+//
+// The client is NOT a trust boundary — the `match_expr` whitelist validation, the
+// `is_global` hard-set, the own+global leak-safe reads, and the accept-move folder
+// re-check are all enforced server-side. The builder's "would match N" live count
+// REUSES the existing `resolveAdHoc`/`resolveFilterCount` (a rule's `match_expr` is
+// the SAME `ViewFilter` AST) — NO new count fn, NO new backend endpoint. Undo reuses
+// the existing `moveDocument(id, prior_folder_id)` — reversible by construction
+// (D-118-6). Mirrors the `document-views` family fetch-wrapper conventions
+// (getAuthHeaders + throw-on-non-ok + the 404-tolerant DELETE).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /classification-rules — the caller's own + global classification rules
+ *  (leak-safe server-side, the `.or_()` own+global predicate). The Automation
+ *  sidebar group + the rules page render these. */
+export async function listRules(): Promise<ClassificationRule[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules`, { headers })
+  if (!res.ok) throw new Error("Failed to list rules")
+  return res.json() as Promise<ClassificationRule[]>
+}
+
+/** POST /classification-rules — create a named rule. The body is
+ *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_global`
+ *  (the server hard-sets it false; mirrors `createView`, T-118-04-01). The server
+ *  re-runs the `match_expr` whitelist + operand validation (the client is not a
+ *  trust boundary). Returns the new `ClassificationRule`. */
+export async function createRule(
+  name: string,
+  match_expr: ViewFilter,
+  suggest_folder_id: string | null,
+): Promise<ClassificationRule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name, match_expr, suggest_folder_id }),
+  })
+  if (!res.ok) throw new Error("Failed to create rule")
+  return res.json() as Promise<ClassificationRule>
+}
+
+/** PATCH /classification-rules/{id} — update an OWNED rule in place (the
+ *  `RuleUpdate` body: every field optional, the backend applies only the keys
+ *  present). The `enabled` toggle rides THIS path — no separate endpoint. The
+ *  backend re-runs whitelist validation when `match_expr` is present and returns
+ *  the updated rule. 404 on a cross-user / absent id (never 403). */
+export async function updateRule(
+  id: string,
+  body: { name?: string; match_expr?: ViewFilter; suggest_folder_id?: string | null; enabled?: boolean },
+): Promise<ClassificationRule> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update rule")
+  return res.json() as Promise<ClassificationRule>
+}
+
+/** DELETE /classification-rules/{id} — remove an owned rule (204; 404 on a
+ *  cross-user miss, never 403). Idempotent from the UI's perspective (the
+ *  `deleteView` 404-tolerant pattern). */
+export async function deleteRule(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/classification-rules/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete rule")
+}
+
+/** PATCH /documents/{id}/classification/accept — accept the doc's active
+ *  classification suggestion. The server moves the doc to the suggested folder,
+ *  stamps `prior_folder_id` (the Undo target, D-118-6), flips the suggestion
+ *  `status` to `"accepted"`, and writes the `classification.apply` audit AFTER
+ *  the move succeeds. Returns the updated Document; the section reconciles by
+ *  re-fetching (not optimistic). Undo = `moveDocument(id, prior_folder_id)`. */
+export async function acceptClassification(docId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${docId}/classification/accept`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to accept classification")
+  return res.json() as Promise<Document>
+}
+
+/** PATCH /documents/{id}/classification/dismiss — dismiss the doc's active
+ *  classification suggestion. The server clears `_classification` from the doc's
+ *  metadata; NO move, NO audit. Returns the updated Document; the section
+ *  reconciles by re-fetching (not optimistic). */
+export async function dismissClassification(docId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${docId}/classification/dismiss`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to dismiss classification")
+  return res.json() as Promise<Document>
 }
 
 // -- Feedback API functions ---------------------------------------------------
