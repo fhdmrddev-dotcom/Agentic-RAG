@@ -151,13 +151,14 @@ async def _seed_user(pool, label):
 
 
 async def _seed_doc(pool, user_id, *, title, folder_id=None, metadata=None,
-                    is_latest=True, version=1):
+                    is_latest=True, version=1, filename=None):
     doc_id = uuid4()
+    fname = filename or f"{title}-{doc_id}.txt"
     await pool.execute(
         "INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, "
         "status, metadata, created_at, is_latest, version_number, folder_id) "
         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10, $11)",
-        doc_id, user_id, f"{title}-{doc_id}.txt",
+        doc_id, user_id, fname,
         f"{user_id}/{doc_id}.txt", 100, "text/plain", "completed",
         metadata if metadata is not None else {"title": title}, is_latest, version, folder_id,
     )
@@ -198,12 +199,18 @@ def _low_conf_meta(title, *, score=0.4):
 async def two_users_with_signals(pg_pool):
     """Seed each user a NON-VACUOUS true positive per signal (own-scoped):
 
-      A: broken edge (target hard-deleted) · suggested doc · low-conf doc (0.4 field)
-      B: broken edge (target hard-deleted) · suggested doc · low-conf doc (0.4 field)
+      A: broken edge (orphaned old-version target) · suggested doc · low-conf doc (0.4 field)
+      B: broken edge (orphaned old-version target) · suggested doc · low-conf doc (0.4 field)
 
     Every doc/edge is owned by its user. A's lists must NEVER contain any of B's ids and
     vice-versa, AND each user's lists are non-empty (own positives) so empty-everywhere
     cannot false-green.
+
+    BROKEN seed reflects the A1 live finding: ``document_relationships`` FKs are ON DELETE
+    CASCADE, so hard-deleting an endpoint takes its edge with it — the ONLY dangling state is an
+    edge keyed on a now-orphaned OLD version whose lineage has no ``is_latest=True`` row. We seed
+    v1 (is_latest=False) + v2 (is_latest=True) of a target, link the edge to v1, then delete v2 →
+    the v1 row + the edge survive, but the lineage has no current latest → broken.
     """
     for tbl in ("documents", "document_relationships"):
         if not await _table_exists(pg_pool, tbl):
@@ -213,12 +220,21 @@ async def two_users_with_signals(pg_pool):
     for label in ("a", "b"):
         uid = await _seed_user(pg_pool, label)
 
-        # --- BROKEN signal: an edge whose TARGET is hard-deleted (no readable latest). ---
+        # --- BROKEN signal: an edge keyed on an orphaned OLD version (no current latest). ---
         src = await _seed_doc(pg_pool, uid, title=f"{label}-broken-src", folder_id=None)
-        dead_target = await _seed_doc(pg_pool, uid, title=f"{label}-broken-target", folder_id=None)
-        rel = await _seed_relationship(pg_pool, uid, src, dead_target, "references")
-        # Hard-delete the target so the resolver yields None for it (= broken).
-        await pg_pool.execute("DELETE FROM documents WHERE id = $1", dead_target)
+        tgt_fname = f"{label}-broken-target-{uuid4()}.txt"
+        tgt_v1 = await _seed_doc(
+            pg_pool, uid, title=f"{label}-broken-tgt-v1",
+            folder_id=None, filename=tgt_fname, is_latest=False, version=1,
+        )
+        tgt_v2 = await _seed_doc(
+            pg_pool, uid, title=f"{label}-broken-tgt-v2",
+            folder_id=None, filename=tgt_fname, is_latest=True, version=2,
+        )
+        rel = await _seed_relationship(pg_pool, uid, src, tgt_v1, "references")
+        # Delete the current latest (v2) → its edges cascade, but our edge keyed on v1 survives;
+        # the lineage now has NO is_latest=True row → genuinely broken (not masked).
+        await pg_pool.execute("DELETE FROM documents WHERE id = $1", tgt_v2)
 
         # --- UNCLASSIFIED signal: a doc with status:'suggested'. ---
         unclass = await _seed_doc(
@@ -236,7 +252,7 @@ async def two_users_with_signals(pg_pool):
             "uid": str(uid),
             "broken_src": str(src),
             "broken_rel": str(rel),
-            "dead_target": str(dead_target),
+            "dead_target": str(tgt_v1),  # the orphaned old-version row the edge dangles to
             "unclassified": str(unclass),
             "lowconf": str(lowc),
         }

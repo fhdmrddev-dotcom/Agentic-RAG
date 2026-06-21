@@ -402,7 +402,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -423,6 +423,7 @@ app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metad
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
 app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
+app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

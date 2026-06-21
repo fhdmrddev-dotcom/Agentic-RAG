@@ -138,13 +138,15 @@ async def _seed_user(pool, label):
     return user_id
 
 
-async def _seed_doc(pool, user_id, *, title, folder_id=None, is_latest=True, version=1):
+async def _seed_doc(pool, user_id, *, title, folder_id=None, is_latest=True, version=1,
+                    filename=None):
     doc_id = uuid4()
+    fname = filename or f"{title}-{doc_id}.txt"
     await pool.execute(
         "INSERT INTO documents (id, user_id, filename, file_path, file_size, mime_type, "
         "status, metadata, created_at, is_latest, version_number, folder_id) "
         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9, $10, $11)",
-        doc_id, user_id, f"{title}-{doc_id}.txt",
+        doc_id, user_id, fname,
         f"{user_id}/{doc_id}.txt", 100, "text/plain", "completed",
         {"title": title}, is_latest, version, folder_id,
     )
@@ -193,14 +195,13 @@ async def _cleanup(pg_pool, uid):
 
 
 @pytest.mark.asyncio
-async def test_hard_deleted_target_surfaces_as_broken_or_edge_cascaded(pg_pool):
-    """A1 LIVE PIN: seed an edge, hard-DELETE the target, observe the real semantics.
+async def test_a1_hard_delete_cascades_edge_away_no_dangle(pg_pool):
+    """A1 LIVE PIN (1/2): a FULL hard-delete of an endpoint CASCADES the edge away.
 
-    Either (a) a FK ON DELETE CASCADE removed the edge → no broken row (and no orphan), OR
-    (b) the edge survives the target deletion → the broken card surfaces it. Both are
-    acceptable behaviors; this test PINS which one is live (documented in the assertion
-    message) so the broken card is sized against reality. What is NOT acceptable: a 500, or
-    the deleted target's id leaking as a "readable" end.
+    ``document_relationships.{source,target}_doc_id`` are ON DELETE CASCADE (pinned live), so
+    deleting the exact doc the edge points to removes the edge with it — there is NOTHING
+    dangling and NO broken row. This is why the broken signal can ONLY arise from an orphaned
+    OLD-version reference (test 2/2), never from a clean hard-delete.
     """
     if not await _table_exists(pg_pool, "document_relationships"):
         pytest.skip("document_relationships table absent")
@@ -212,10 +213,14 @@ async def test_hard_deleted_target_surfaces_as_broken_or_edge_cascaded(pg_pool):
         target = await _seed_doc(pg_pool, uid, title="broken-target", folder_id=None)
         rel = await _seed_relationship(pg_pool, uid, src, target, "references")
 
-        # Does the edge survive a hard target delete, or did a FK CASCADE remove it?
         await pg_pool.execute("DELETE FROM documents WHERE id = $1", target)
         edge_still_exists = await pg_pool.fetchval(
             "SELECT EXISTS (SELECT 1 FROM public.document_relationships WHERE id = $1)", rel
+        )
+        # A1 pinned: the FK CASCADE removed the edge.
+        assert edge_still_exists is False, (
+            "A1 LIVE: document_relationships FKs are ON DELETE CASCADE — a hard-deleted "
+            "endpoint must take its edge with it"
         )
 
         client, teardown = _route_client(str(uid), sb)
@@ -225,25 +230,51 @@ async def test_hard_deleted_target_surfaces_as_broken_or_edge_cascaded(pg_pool):
             teardown()
 
         assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
-        body = resp.json()
-        blob = json.dumps(body)
-        # The deleted target id must never be surfaced as a readable/openable end.
-        assert str(target) not in blob, (
-            "the fully-deleted target id must never surface as an openable end"
-        )
+        blob = json.dumps(resp.json())
+        assert str(rel) not in blob, "the CASCADE-removed edge must not appear as broken"
+        assert str(target) not in blob, "the deleted target id must never surface as an openable end"
+    finally:
+        await _cleanup(pg_pool, uid)
 
-        if edge_still_exists:
-            # A1 observed: edge survives target deletion → the broken card MUST surface it.
-            assert body.get("total", 0) >= 1, (
-                "A1 LIVE: edge survives target hard-delete → broken card must report it; "
-                f"got {body}"
-            )
-            assert str(rel) in blob, "the surviving dangling edge must appear on the broken card"
-        else:
-            # A1 observed: a FK CASCADE removed the edge → nothing dangling, no broken row.
-            assert str(rel) not in blob, (
-                "A1 LIVE: target hard-delete CASCADE-removed the edge → no broken row expected"
-            )
+
+@pytest.mark.asyncio
+async def test_a1_orphaned_old_version_edge_surfaces_as_broken(pg_pool):
+    """A1 LIVE PIN (2/2): an edge keyed on an orphaned OLD version (no current latest) IS broken.
+
+    Seed v1 (is_latest=False) + v2 (is_latest=True) sharing a filename; link the edge to v1; then
+    delete v2 (the current latest). The CASCADE removes only edges keyed on v2; our edge keyed on
+    v1 survives, but the lineage now has NO is_latest=True row → ``_resolve_readable_latest``
+    yields None AND ``_latest_exists_anywhere`` is False → genuinely broken. This is the ONLY
+    dangling state the schema permits, so it is what the broken card actually reports.
+    """
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    sb = _supabase_or_skip()
+    uid = await _seed_user(pg_pool, "orphan")
+    try:
+        src = await _seed_doc(pg_pool, uid, title="orphan-src", folder_id=None)
+        fname = f"orphan-target-{uuid4()}.txt"
+        v1 = await _seed_doc(pg_pool, uid, title="orphan-v1", filename=fname, is_latest=False, version=1)
+        v2 = await _seed_doc(pg_pool, uid, title="orphan-v2", filename=fname, is_latest=True, version=2)
+        rel = await _seed_relationship(pg_pool, uid, src, v1, "references")
+        await pg_pool.execute("DELETE FROM documents WHERE id = $1", v2)
+
+        edge_survives = await pg_pool.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM public.document_relationships WHERE id = $1)", rel
+        )
+        assert edge_survives, "the edge keyed on the surviving v1 row must NOT cascade"
+
+        client, teardown = _route_client(str(uid), sb)
+        try:
+            resp = client.get("/document-governance/broken-relationships")
+        finally:
+            teardown()
+
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
+        body = resp.json()
+        assert body.get("total", 0) >= 1, f"the orphaned-old-version edge must surface as broken; got {body}"
+        assert str(rel) in json.dumps(body), "the dangling edge id must appear on the broken card"
     finally:
         await _cleanup(pg_pool, uid)
 
