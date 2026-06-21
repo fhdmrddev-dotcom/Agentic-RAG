@@ -1968,6 +1968,67 @@ export async function getRetrievalTrend(days = 30): Promise<RetrievalTrendPoint[
   return res.json() as Promise<RetrievalTrendPoint[]>
 }
 
+// ── Phase 119 (DGOV-01/02) — Document Governance Health ──────────────────────
+// Three read-only fetch helpers wrapping the Plan-01 `document_governance` router
+// (`backend/app/api/document_governance.py`). Each mirrors the knowledge-health
+// helpers above verbatim — getAuthHeaders() + throw-on-non-ok — and returns the
+// shared `{items, total, offset, limit}` PaginatedResponse shape the 3 stacked
+// Governance cards consume. Read-only / owner-scoped server-side; no write path.
+
+/** A broken-relationship row (D-119-3). `readable_doc_id` (aliased `document_id`)
+ *  is the OPENABLE end of a dangling edge — it MAY be null when both ends are
+ *  gone, so the row link-out must guard the click. The broken end can't be opened. */
+export interface GovBrokenItem {
+  relationship_id: string
+  rel_type: string
+  broken_doc_id: string
+  /** The openable end (the broken end's surviving counterpart). Null when both ends are gone. */
+  readable_doc_id: string | null
+  /** Alias of `readable_doc_id` — the doc the row navigates to. Null guards the link-out. */
+  document_id: string | null
+}
+
+/** An unclassified-document row (D-119-4) — a doc with a pending
+ *  `_classification.status == "suggested"`. */
+export interface GovUnclassifiedItem {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  suggested_folder_name?: string | null
+}
+
+/** A low-confidence-metadata row (D-119-5) — a doc with any extracted field whose
+ *  `_confidence[field] < 0.5`. `min_confidence` is the worst field's RAW score
+ *  (rendered honestly via the 112 ConfidenceChip, never fabricated). */
+export interface GovLowConfidenceItem {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  low_fields: Record<string, number>
+  min_confidence: number
+}
+
+export async function getGovBroken(offset = 0, limit = 20): Promise<PaginatedResponse<GovBrokenItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/broken-relationships?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load broken relationships")
+  return res.json() as Promise<PaginatedResponse<GovBrokenItem>>
+}
+
+export async function getGovUnclassified(offset = 0, limit = 20): Promise<PaginatedResponse<GovUnclassifiedItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/unclassified?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load unclassified documents")
+  return res.json() as Promise<PaginatedResponse<GovUnclassifiedItem>>
+}
+
+export async function getGovLowConfidence(offset = 0, limit = 20): Promise<PaginatedResponse<GovLowConfidenceItem>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/document-governance/low-confidence?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load low-confidence metadata")
+  return res.json() as Promise<PaginatedResponse<GovLowConfidenceItem>>
+}
+
 export async function moveDocument(id: string, folderId: string | null): Promise<Document> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/documents/${id}/move`, {
