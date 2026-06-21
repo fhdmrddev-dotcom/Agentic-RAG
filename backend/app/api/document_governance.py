@@ -151,17 +151,24 @@ async def _fetch_broken_relationships(
 
     broken: list[dict] = []
     # Cache resolver + existence verdicts within this request — a doc appears on many edges.
-    readable: dict[str, bool] = {}
+    readable_latest_id: dict[str, str | None] = {}
     latest_alive: dict[str, bool] = {}
 
-    async def _is_readable(doc_id: str) -> bool:
-        # "Readable" here means the caller can OPEN this end (for the link-out target). Note the
-        # resolver degrades to a stale old row when no current latest exists, so it is NOT a
-        # broken oracle on its own — `_is_broken` anchors on `_latest_exists_anywhere` instead.
-        if doc_id not in readable:
+    async def _readable_latest_id(doc_id: str) -> str | None:
+        # The openable end for the link-out: the RESOLVED LATEST id, NOT the raw edge
+        # endpoint id (WR-02). The endpoint may itself be an old (is_latest=False) version —
+        # surfacing that raw id makes `listDocuments()` (is_latest-only) return nothing, so the
+        # frontend resolves it to undefined and the row is a silent dead click. `_resolve_readable_latest`
+        # is already owner-scoped (its returned row is own-latest ∪ global-latest); we capture
+        # THAT row's id so the link-out targets a row the doc list actually returns. The resolver
+        # degrades to a stale old row when no current latest exists, so we only carry it when the
+        # resolved row is itself is_latest — otherwise the end has no openable target (None).
+        if doc_id not in readable_latest_id:
             row = await _resolve_readable_latest(doc_id, user_id, supabase=supabase)
-            readable[doc_id] = row is not None and bool(row.get("is_latest"))
-        return readable[doc_id]
+            readable_latest_id[doc_id] = (
+                row["id"] if (row is not None and bool(row.get("is_latest"))) else None
+            )
+        return readable_latest_id[doc_id]
 
     async def _is_broken(doc_id: str) -> bool:
         # Broken = NO current `is_latest=True` row exists for this lineage ANYWHERE (the
@@ -179,19 +186,22 @@ async def _fetch_broken_relationships(
         tgt_broken = await _is_broken(tgt) if tgt else False
 
         # An edge is dangling when EITHER endpoint was fully deleted. Surface the broken end +
-        # the readable end (so the row can link out to the openable document, if any).
+        # the readable end's RESOLVED LATEST id (WR-02), so the row links out to a doc that
+        # `listDocuments()` (is_latest-only) actually returns — None if that end has no current
+        # readable latest (both ends gone, or the surviving end is itself an old version).
         broken_ends = []
         if src_broken:
-            broken_ends.append((src, tgt if (tgt and await _is_readable(tgt)) else None))
+            broken_ends.append((src, (await _readable_latest_id(tgt)) if tgt else None))
         if tgt_broken:
-            broken_ends.append((tgt, src if (src and await _is_readable(src)) else None))
+            broken_ends.append((tgt, (await _readable_latest_id(src)) if src else None))
 
         for broken_doc_id, readable_doc_id in broken_ends:
             broken.append({
                 "relationship_id": edge.get("id"),
                 "rel_type": edge.get("rel_type"),
                 "broken_doc_id": broken_doc_id,
-                # readable_doc_id is the openable end (may be None if BOTH ends are gone).
+                # readable_doc_id is the RESOLVED LATEST id of the openable end (WR-02) —
+                # None if both ends are gone OR the surviving end has no current readable latest.
                 "readable_doc_id": readable_doc_id,
                 "document_id": readable_doc_id,  # the link-out target the row opens
             })

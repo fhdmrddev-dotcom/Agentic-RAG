@@ -306,6 +306,66 @@ async def test_resolvable_target_is_not_broken(pg_pool):
         await _cleanup(pg_pool, uid)
 
 
+@pytest.mark.asyncio
+async def test_readable_end_surfaces_resolved_latest_id_not_raw_endpoint(pg_pool):
+    """WR-02 — the readable end of a broken edge surfaces its RESOLVED LATEST id, not the raw
+    (possibly old-version) endpoint id.
+
+    The broken signal arises from orphaned OLD-version references, so the SURVIVING (readable)
+    end of such an edge can ALSO be keyed on an old version that has been re-uploaded. Seed:
+
+      * READABLE lineage: rd_v1 (is_latest=False) + rd_v2 (is_latest=True), same filename.
+      * DEAD lineage: dt_v1 (is_latest=False) + dt_v2 (is_latest=True), same filename.
+
+    Link the edge rd_v1 -> dt_v1 (BOTH ends keyed on old versions), then delete dt_v2 so the
+    target's lineage has no current latest -> the target end is broken. The source (rd_v1) end
+    is readable but its raw id is is_latest=False; `listDocuments()` is is_latest-only, so a raw
+    rd_v1 id would be a dead click. The fix must surface rd_v2 (the resolved latest), NOT rd_v1.
+    """
+    if not await _table_exists(pg_pool, "document_relationships"):
+        pytest.skip("document_relationships table absent")
+
+    sb = _supabase_or_skip()
+    uid = await _seed_user(pg_pool, "resolve")
+    try:
+        rd_fname = f"readable-old-{uuid4()}.txt"
+        rd_v1 = await _seed_doc(pg_pool, uid, title="rd-v1", filename=rd_fname, is_latest=False, version=1)
+        rd_v2 = await _seed_doc(pg_pool, uid, title="rd-v2", filename=rd_fname, is_latest=True, version=2)
+
+        dt_fname = f"dead-old-{uuid4()}.txt"
+        dt_v1 = await _seed_doc(pg_pool, uid, title="dt-v1", filename=dt_fname, is_latest=False, version=1)
+        dt_v2 = await _seed_doc(pg_pool, uid, title="dt-v2", filename=dt_fname, is_latest=True, version=2)
+
+        # Edge keyed on BOTH old versions; deleting dt_v2 leaves the target lineage with no latest.
+        rel = await _seed_relationship(pg_pool, uid, rd_v1, dt_v1, "references")
+        await pg_pool.execute("DELETE FROM documents WHERE id = $1", dt_v2)
+
+        client, teardown = _route_client(str(uid), sb)
+        try:
+            resp = client.get("/document-governance/broken-relationships")
+        finally:
+            teardown()
+
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.text}"
+        body = resp.json()
+        # Find the item for this edge whose broken end is the dead target.
+        item = next(
+            (it for it in body["items"]
+             if it.get("relationship_id") == str(rel) and it.get("broken_doc_id") == str(dt_v1)),
+            None,
+        )
+        assert item is not None, f"the orphaned-old-version edge must surface as broken; got {body}"
+        # WR-02: the readable end is the RESOLVED LATEST id (rd_v2) — the openable doc
+        # `listDocuments()` actually returns — NOT the raw old-version endpoint id (rd_v1).
+        assert item["readable_doc_id"] == str(rd_v2), (
+            f"readable_doc_id must be the resolved latest id {rd_v2}, not the raw old endpoint {rd_v1}; got {item}"
+        )
+        assert item["document_id"] == str(rd_v2), "document_id mirrors the resolved latest readable_doc_id"
+        assert item["readable_doc_id"] != str(rd_v1), "the raw old-version endpoint id must NOT be surfaced (dead click)"
+    finally:
+        await _cleanup(pg_pool, uid)
+
+
 @pytest_asyncio.fixture
 async def masked_target(pg_pool):
     """B owns an edge to a doc only A can read (present-but-masked, not deleted)."""
