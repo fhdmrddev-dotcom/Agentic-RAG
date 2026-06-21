@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Document Management — 🔨 ACTIVE
 status: executing
-last_updated: "2026-06-21T02:43:34.501Z"
+last_updated: "2026-06-21T02:49:40.160Z"
 last_activity: 2026-06-21
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 44
-  completed_plans: 39
+  completed_plans: 40
   percent: 82
 ---
 
@@ -27,6 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-15 — v3.0 Document Management miles
 ## Current Position
 
 Phase: 118 (auto-classification) — EXECUTING
+
+**118-04 (Wave 1, CLASS-01/03 — frontend interface seam) — EXECUTED 2026-06-21** (2 tasks / 2 commits — `4751480d` types, `48567973` client + ActiveView union; SUMMARY `118-04-SUMMARY.md`): the leak-safe, convention-matching frontend contract Plans 05 (on-doc) + 06 (rules-page) build against — interface-first so the two UI plans receive the types/client directly. **`types/index.ts`** (+66): `ClassificationRule` (a `SavedView` clone — `filter_expr`→`match_expr` reusing the SAME `ViewFilter` AST, + `suggest_folder_id: string | null`/`enabled: boolean`; `is_global` server-owned); `ClassificationSuggestion` mirroring the D-118-5 `_classification` object EXACTLY (`{rule_id, rule_name, condition_summary, suggested_folder_id, suggested_folder_name: string | null, status: "suggested" | "accepted", prior_folder_id?: string | null}` — `suggested_folder_name` nullable per Pitfall 5, `prior_folder_id` optional since stamped at ACCEPT only, D-118-6); `_classification?: ClassificationSuggestion` added to `DocumentMetadata` the SAME way `_source`/`_confidence` are typed so `doc.metadata?._classification` type-checks for the row chip + panel. **`api.ts`** (+114, adjacent to the relationships family, cloning `getAuthHeaders`+throw-on-non-ok+404-tolerant DELETE): `listRules`/`createRule(name, match_expr, suggest_folder_id)`/`updateRule(id, body)`/`deleteRule(id)` — **`createRule`'s POST body OMITS `is_global`** (server hard-sets it, mirrors `createView`, T-118-04-01); `acceptClassification(docId)`/`dismissClassification(docId)` PATCH the new `/documents/{id}/classification/{accept,dismiss}` endpoints; **NO new "would match N" count fn** (the builder reuses the EXISTING `resolveAdHoc`/`resolveFilterCount`) and **NO new Undo fn** (reuses the EXISTING `moveDocument(id, prior_folder_id)`). **`App.tsx:9`** `ActiveView` union extended with `"classification-rules"`. **0 deviations** — executed exactly as written. `npx tsc --noEmit` **EXIT 0** (run after each task); all acceptance greps pass (createRule no `is_global` via `sed`-scoped grep; no new count fn; both `classification/accept`+`classification/dismiss` present; union extended). **Net-new failures = 0** — purely additive (new exported types/fns + one union member, zero existing symbols modified); api client suites `src/lib/api.test.ts` + `src/__tests__/lib/api.test.ts` ran **48/48 passed** live. `threads.py` byte-untouched (G-5; `git diff a7986c2b HEAD` = 0). No new package, no new migration, no file deletions. SUMMARY: `118-04-SUMMARY.md` (Self-Check: PASSED). CLASS-01/CLASS-03 client seam in place. NEXT (per wave order) = Plans 02/03 (backend rule CRUD + matcher + ingest splice + accept/dismiss endpoints) then Plans 05/06 (the UI that consumes this seam).
+
+---
 
 **117 close-out (2026-06-21):** code-review (0C/4W/5I; WR-01..04 FIXED `e7032acf`/`1741c41d`/`b1a4188c`/`3ef7c509` — GET malformed `document_id`→uniform 404 not 500 + POST resolves→422 + `encodeURIComponent` + WR-01 malformed-id regression test; WR-02 transient "couldn't remove" alert; WR-03 non-retry 422 message via `ApiError` status; WR-04 `aria-controls` only when listbox present; review marked resolved `099d1204`) → **verify-work 6/6** (`117-UAT.md`, Claude-driven Chrome DevTools MCP + psycopg2 DB truth: automated suite re-green; grouped/masked render with DOM leak-check clean; type-first typeahead create with per-type re-derived exclusion + APG keyboard + DB-confirmed re-fetch; either-direction+masked remove with DB truth; **mobile bottom-sheet with the coarse-pointer ✕ always-on proven live** — the audit #1 a11y fix; **live two-user leak proof** — B over a global-shared subject A linked sees total 0 / zero trace because edges are own-scoped, A sees the real row; all seeded UAT data cleaned up) → **secure-phase 18/18 threats_open 0** (`117-SECURITY.md` @ `132d8661`; 12 mitigate verified in source + live tests + 6 accept AR-117-01..06; orchestrator HAND-VERIFIED the leak-safe mask path `document_relationship_service.py:399-435` non-vacuous — owner-scoped edge queries + per-caller readability re-check → `document_id:None`+mask, the D-102 "static would false-green" discipline; corrected auditor frontmatter overcount 20→18) → **validate-phase NYQUIST-COMPLIANT** (`117-VALIDATION.md` @ `7dd29e96`; State A reconcile of the plan-time draft to executed reality — 13/13 SC rows COVERED, backend 13 [route_leak 6 + get_read 4 + no_fork 3] + frontend 32 [RelationshipsSection 11 + a11y 6 + CreateLinkDialog 8 + DocumentDetailPanel.a11y 7] all GREEN, 0 gaps, no auditor spawn; manual-only lived-experience rows completed in UAT). REL-02 delivered end-to-end. Frontend + thin GET route; `threads.py` untouched (G-5); no new migration, no new package. **NEXT = Phase 118 (Auto-Classification — `/gsd:discuss-phase 118`; G-2 sketch fires).**
 
@@ -67,7 +71,7 @@ _Prior (112, closed 2026-06-18 — ALL THREE GATES CLEAR):_ **Phase: 112 — Met
 ---
 
 _Prior (111.1, closed 2026-06-17 — all 3 gates clear):_ Phase: 111.1 — Configurable / Multi-Provider Embeddings (incl. local Ollama/LM Studio) — **✅ EXECUTED + verify-phase PASSED 2026-06-17 (6/6 plans; 9/10 must-haves, all 6 EMBED reqs SATISFIED; 4 manual items → 111.1-HUMAN-UAT.md) — ✅ ALL THREE GATES CLEAR 2026-06-17: verify-work 5/5 (incl. post-restart cold-start smoke, DB-verified) + secure verified (threats_open 0) + validate nyquist-compliant; NEXT = Phase 112 (sketches 027/028 done)** — **v3.0 Document Management** (EMBED-01..06)
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Resume file: None
 Last activity: 2026-06-21
