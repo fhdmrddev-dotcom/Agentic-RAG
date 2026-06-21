@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: planning
-last_updated: "2026-06-21T20:30:00.000Z"
-last_activity: 2026-06-21
+last_updated: "2026-06-21T20:54:41.567Z"
+last_activity: 2026-06-21 — v3.1 roadmap created (CORE 120-124 + STRETCH 125-130; 18/18 requirements mapped)
 progress:
   total_phases: 5
   completed_phases: 0
