@@ -256,7 +256,7 @@
   - [x] 118-03-PLAN.md — `documents.py` edits: ingest rule-eval splice (user-scoped, first-match-wins suggestion, never silent move) + reversible accept/dismiss endpoints (`classification.apply` audit-after-move) (CLASS-02/03)
   - [x] 118-04-PLAN.md — Frontend interface seam: types (ClassificationRule/Suggestion + `_classification`) + api client (rule CRUD + accept/dismiss; createRule omits is_global) + ActiveView union (CLASS-01/03)
   - [x] 118-05-PLAN.md — On-doc surfaces: `ClassificationSection` (3rd PanelSection — provenance, no %, reversible accept/dismiss/Undo) + `DocumentList` row chip (sketch 036-A) (CLASS-03/UX-01)
-  - [ ] 118-06-PLAN.md — Rules surface: `ClassificationRulesPage` + push/split `RuleBuilderPanel` (chip strip → folder-only action → scope → live resolveAdHoc preview + honesty line) + `AutomationGroup` sidebar (sketch 037-A) (CLASS-01/UX-01)
+  - [x] 118-06-PLAN.md — Rules surface: `ClassificationRulesPage` + push/split `RuleBuilderPanel` (chip strip → folder-only action → scope → live resolveAdHoc preview + honesty line) + `AutomationGroup` sidebar (sketch 037-A) (CLASS-01/UX-01)
 
 **UI hint**: yes
 
@@ -287,7 +287,7 @@
 | 115. Virtual Folders — Agent Tool | 3/3 | Complete    | 2026-06-20 |
 | 116. Document Relationships — Backend + Agent Tool | 5/5 | Complete    | 2026-06-20 |
 | 117. Document Relationships — Panel UI | 4/4 | Complete   | 2026-06-20 |
-| 118. Auto-Classification | 5/6 | In Progress|  |
+| 118. Auto-Classification | 6/6 | Complete   | 2026-06-21 |
 | 119. Document Governance Health | 0/? | Not started | - |
 
 ---
