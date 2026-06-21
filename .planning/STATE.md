@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-21T21:44:51.839Z"
-last_activity: 2026-06-21 -- Phase 120 planning complete
+last_updated: "2026-06-21T21:56:17.463Z"
+last_activity: 2026-06-21 -- Phase 120 Plan 01 (COLL-01) executed — run-scoped harvest
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v3.1 Phase 120 (Collision Fix + Context Isolation) — roadmap created, planning. Next action: `/gsd:discuss-phase 120` (or `/gsd:plan-phase 120`).
+**Current focus:** Phase 120 — collision-fix-context-isolation
 
 ## Current Position
 
-Phase: 120 — Collision Fix + Context Isolation (first phase, CORE)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-06-21 -- Phase 120 planning complete
+Phase: 120 (collision-fix-context-isolation) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 120 (Plan 01 COLL-01 complete — run-scoped sandbox harvest)
+Last activity: 2026-06-21 -- Phase 120 Plan 01 (COLL-01) executed; SUMMARY written, next = Plan 02 (CTX-01)
 
 ### Quick Tasks Completed
 
@@ -220,6 +220,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 118 P05 | 10min | 2 tasks | 5 files |
 | Phase 119 P01 | 11min | 2 tasks | 8 files |
 | Phase 119 P02 | 7min | 3 tasks | 7 files |
+| Phase 120 P01 | ~4min | 2 tasks (TDD) | 3 files |
 
 ## Decisions
 
@@ -232,6 +233,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 119]: Phase 119-01: masking != deletion (D-119-3) — an alive-but-unreadable target is masked, NOT broken; the existence probe is content-free (count only), no cross-user leak; DMF-03 non-gate confirmed (A8).
 - [Phase 119]: Phase 119-02: D-119-2 navigation triad owned in ONE plan (App.tsx ActiveView union + nav-items ShieldCheck entry + ChatLayout governance branch) — clicking Governance renders GovernancePage, not KnowledgeHealthPage; the Phase 118 built-but-unreachable lesson applied.
 - [Phase 119]: Phase 119-02: GovernanceRow is link-out-only (D-119-6) — clones only HealthDocumentRow chrome, imports no document-mutation helper; the whole row is a keyboard-operable button → DocumentDetailPanel. A5 lighter reuse: top-10 rows + honest backend total (no PaginationControls); D-119-9 initializedTabsRef no-refetch-loop guard carried verbatim into the 3-stacked-card page (Refresh clears it). Frontend-only, no migration/package/write path; threads.py untouched.
+- [Phase 120]: Phase 120-01 (COLL-01): Option 2 lazy seed in the execute_code handler (tool_dispatcher.py) chosen over Option 1 (eager seed in agent_loop.py) — keeps the G-5 hot file agent_loop.py untouched (it does not import sandbox_manager), the session already exists at :868, and the SAME handler serves Deep + Harness so one seed site covers both. Guard via ctx._output_baseline_seeded (per-RUN not per-cell); run_in_threadpool-wrapped (D-v2.5-01).
+- [Phase 120]: Phase 120-01 (COLL-01): snapshot_output_baseline SEEDS the existing SHA-256 hash-dedup baseline (no new filename heuristic — explicitly disproven by COLL-03-EVIDENCE §Refinement 1: the live 2 files shared ONE execution_id). D-120-02 honored — the helper never clears/deletes /sandbox/output/, is fully try/except-wrapped (empty/failure → {} = legacy behavior), and only stops RE-EMITTING pre-existing files. No schema/package change (stdlib hashlib/os/tempfile).
 
 ## Operator Next Steps
 
