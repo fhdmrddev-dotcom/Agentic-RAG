@@ -9,6 +9,7 @@ import { SkillsPage } from "@/pages/SkillsPage"
 import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
+import { GovernancePage } from "@/pages/GovernancePage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -297,6 +298,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             // sketch 037-A), additive BEFORE the trailing KnowledgeHealthPage else.
             // Self-fetches via listRules() — no props; three-homes, no router.
             <ClassificationRulesPage />
+          ) : activeView === "governance" ? (
+            // Phase 119 (DGOV-01/02): the Governance top-level home mounts here as
+            // a peer to Library Health (the D-119-2 navigation triad — App.tsx
+            // union + this branch + the nav-items entry, all owned in-phase so the
+            // surface is reachable; the Phase 118 built-but-unreachable lesson).
+            // Self-fetches the 3 governance signals — no props; three-homes, no router.
+            <GovernancePage />
           ) : (
             <KnowledgeHealthPage />
           )}
