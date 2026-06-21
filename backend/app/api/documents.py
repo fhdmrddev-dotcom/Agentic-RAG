@@ -1452,6 +1452,141 @@ async def update_document_metadata(
     return result.data[0]
 
 
+@router.patch("/{document_id}/classification/accept", response_model=DocumentResponse)
+async def accept_classification(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 118 CLASS-03 — accept a classification suggestion (reversible move + audit).
+
+    Records the doc's PRIOR folder_id into the suggestion object (for Undo, D-118-6),
+    re-validates the suggested target folder is still readable (own+global; the FK is
+    ON DELETE SET NULL — Pitfall 5), moves the doc, marks status="accepted", and writes
+    a `classification.apply` audit row ONLY after the move succeeds (the 112/116 honesty
+    discipline — never optimistic). Owner-scoped on BOTH the SELECT and the UPDATE → 404
+    (never the forbidden status) on a non-owner / absent / no-active-suggestion miss (no
+    existence leak).
+
+    Undo needs NO endpoint — the frontend reverses via the EXISTING PATCH
+    /documents/{id}/move with the stamped prior_folder_id. Every `.execute()` is
+    threadpool-wrapped (D-v2.5-01 — this is an async handler; follow update_document_metadata,
+    not move_document's raw .execute()).
+    """
+    # 1. Owner SELECT (404 on miss, never the forbidden status) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("folder_id, metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Require an ACTIVE "suggested" suggestion with a target folder (else 404 — no
+    #    over-broad accept; never reveals whether the doc exists vs has no suggestion).
+    sugg = (doc.data.get("metadata") or {}).get("_classification") or {}
+    target = sugg.get("suggested_folder_id")
+    if not target or sugg.get("status") != "suggested":
+        raise HTTPException(status_code=404, detail="No active suggestion")
+
+    # 3. Re-validate the target folder is readable (own+global) — Pitfall 5 (clone
+    #    move_document:1325-1335). A deleted/unreadable folder → uniform 404.
+    try:
+        folder = await run_in_threadpool(
+            lambda: supabase.table("folders")
+            .select("id")
+            .eq("id", str(target))
+            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if not folder or not getattr(folder, "data", None):
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # 4. Record the prior folder (Undo, D-118-6), mark accepted, ONE owner-scoped UPDATE
+    #    writing folder_id + the marked metadata (the move + the suggestion stamp together).
+    prior_folder = doc.data.get("folder_id")
+    meta = dict(doc.data.get("metadata") or {})
+    meta["_classification"] = {**sugg, "status": "accepted", "prior_folder_id": prior_folder}
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"folder_id": str(target), "metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 5. Audit ONLY after the move succeeds (never optimistic). classification.apply is
+    #    LIVE in VALID_ACTION_TYPES — write_audit_entry swallows errors so the live
+    #    round-trip is the verification.
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type="classification.apply",
+        metadata={
+            "document_id": document_id,
+            "rule_id": sugg.get("rule_id"),
+            "from_folder": prior_folder,
+            "to_folder": str(target),
+        },
+        supabase=supabase,
+    )
+    return result.data[0]
+
+
+@router.patch("/{document_id}/classification/dismiss", response_model=DocumentResponse)
+async def dismiss_classification(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 118 CLASS-03 — dismiss a classification suggestion (clear, no move, no audit).
+
+    Owner-scoped SELECT of the metadata → pop `_classification` → owner-scoped UPDATE of
+    the metadata. NO folder move, NO audit (dismiss is a non-action that clears a
+    suggestion; the rule itself is untouched). Owner-scoped on BOTH the SELECT and the
+    UPDATE → 404 (never the forbidden status) on a non-owner / absent miss.
+    Threadpool-wrapped (D-v2.5-01).
+    """
+    # 1. Owner SELECT (404 on miss, never the forbidden status) — threadpool-wrapped (D-v2.5-01).
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("metadata")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not doc or not getattr(doc, "data", None):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Pop _classification → owner-scoped UPDATE of the metadata (no move, no audit).
+    meta = dict(doc.data.get("metadata") or {})
+    meta.pop("_classification", None)
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .update({"metadata": meta})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return result.data[0]
+
+
 def ingest_document(
     document_id: str,
     text: str,

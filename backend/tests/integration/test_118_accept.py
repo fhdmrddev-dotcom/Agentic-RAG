@@ -171,7 +171,6 @@ async def doc_with_suggestion(pg_pool):
                 pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships accept_classification")
 @pytest.mark.asyncio
 async def test_accept_moves_and_stamps_prior_folder(pg_pool, doc_with_suggestion):
     """Accept moves to the suggested folder, marks accepted, stamps prior_folder_id (Undo)."""
@@ -188,7 +187,6 @@ async def test_accept_moves_and_stamps_prior_folder(pg_pool, doc_with_suggestion
     assert sugg.get("prior_folder_id") == ctx["src_folder"], "prior folder stamped for Undo"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships accept_classification")
 @pytest.mark.asyncio
 async def test_accept_writes_classification_apply_audit(pg_pool, doc_with_suggestion):
     """The classification.apply audit lands ONLY after the move succeeds (never optimistic)."""
@@ -206,7 +204,6 @@ async def test_accept_writes_classification_apply_audit(pg_pool, doc_with_sugges
     assert audit is not None, "classification.apply audit row must land after the accept move"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships accept_classification")
 @pytest.mark.asyncio
 async def test_accept_unreadable_folder_404(pg_pool, doc_with_suggestion):
     """A suggested folder that was deleted (FK SET NULL / unreadable) → uniform 404 (Pitfall 5)."""
@@ -224,7 +221,6 @@ async def test_accept_unreadable_folder_404(pg_pool, doc_with_suggestion):
     assert ei.value.status_code == 404
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships accept_classification")
 @pytest.mark.asyncio
 async def test_accept_cross_user_404_not_403(pg_pool, doc_with_suggestion):
     """User B accepting User A's doc → 404, NEVER 403 (no existence leak)."""

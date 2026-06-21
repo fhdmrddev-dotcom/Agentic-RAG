@@ -170,7 +170,6 @@ async def doc_with_suggestion(pg_pool):
                 pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships dismiss_classification")
 @pytest.mark.asyncio
 async def test_dismiss_clears_classification_no_move(pg_pool, doc_with_suggestion):
     """Dismiss pops _classification and does NOT change folder_id (no move)."""
@@ -185,7 +184,6 @@ async def test_dismiss_clears_classification_no_move(pg_pool, doc_with_suggestio
     assert str(row["folder_id"]) == ctx["folder_id"], "dismiss must NOT move the document"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships dismiss_classification")
 @pytest.mark.asyncio
 async def test_dismiss_writes_no_audit(pg_pool, doc_with_suggestion):
     """Dismiss writes NO audit row (it is a non-action — clears a suggestion)."""
@@ -202,7 +200,6 @@ async def test_dismiss_writes_no_audit(pg_pool, doc_with_suggestion):
     assert audit["n"] == 0, "dismiss must write NO classification audit row"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships dismiss_classification")
 @pytest.mark.asyncio
 async def test_dismiss_cross_user_404_not_403(pg_pool, doc_with_suggestion):
     """User B dismissing User A's doc → 404, NEVER 403."""
@@ -218,7 +215,6 @@ async def test_dismiss_cross_user_404_not_403(pg_pool, doc_with_suggestion):
     assert ei.value.status_code == 404
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 ships dismiss_classification + accept stamps prior_folder_id")
 @pytest.mark.asyncio
 async def test_undo_reuses_existing_move_via_prior_folder_id(pg_pool, doc_with_suggestion):
     """Undo is NOT a new endpoint — accept stamps prior_folder_id; the frontend reverses via
