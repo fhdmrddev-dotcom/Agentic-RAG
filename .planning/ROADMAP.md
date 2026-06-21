@@ -14,8 +14,9 @@
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
-- 📋 **v3.1 Workflow + Skill Eval Studio** — re-scoped "Skill Studio" (eval/regression over the Phase 102 judge + golden-run, for workflows + composed skills). Next after v3.0 *unless a paying customer flips priority to the GTM track*. Brief: `PRDs/v3.1-skill-studio-eval.md`
-- 📋 **v3.2 Operator UX** → **v3.3 Multi-tenancy** → **v3.4 Open Platform (API/MCP)** → **v3.5 Automations** — the enterprise-GTM track. **Authoritative version map: `PRDs/SEQUENCE.md`.** (All re-sequenced 2026-06-15; briefs predate the v2.7–2.9 pivot and re-author at milestone start.)
+- 📋 **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — NEXT. Workflow↔skill collision fix (sandbox-harvest run-scope, root-caused live) + cross-provider trust/honesty (force→coerce retry ladder, task-label parity) + Skill **Trigger Tuner** + Workflow Studio UX (soul card + strict↔loose) + bounded human-in-loop self-improve (STRETCH). Decided scope: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
+- 📋 **v3.2 Skill Eval Studio (full) + Self-Improving** — the net-new eval+versioning backend (`skill_versions` + eval harness + grader/comparator/analyzer + review viewer + skill publish gate; the v3.1-PRD spine, not yet built). Brief: `PRDs/v3.1-skill-studio-eval.md`.
+- 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
 
 ---
 
@@ -25,7 +26,7 @@ Full detail archived → **`.planning/milestones/v3.0-ROADMAP.md`** · requireme
 
 11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, shipped + validated — **every phase passed verify-work + secure-phase + validate-phase** (live cross-provider UAT on the agent-tool / upload-path phases; no formal milestone audit). Turned the product's incidental document handling into a first-class, metadata-driven surface (M-Files Tier A): user-defined custom metadata with per-field confidence + audited manual override, configurable multi-provider embeddings (retires the OpenAI SPOF), metadata-driven "virtual folders" (a closed-registry filter-AST → parameterized-jsonb compiler + a no-DSL builder + an agent tool), typed document relationships (a leak-safe share-don't-fork core + panel + agent tool), suggest-then-confirm auto-classification, and a light governance-health view. 24/24 functional requirements delivered; `threads.py` untouched all milestone (G-5); near-zero new deps.
 
-**Next:** v3.1 Workflow + Skill Eval Studio (`/gsd:new-milestone`).
+**Next:** v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (`/gsd:new-milestone`; decided scope in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`).
 
 ---
 
