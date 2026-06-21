@@ -78,7 +78,10 @@
   2. The sandbox-output harvest is run-scoped to its own run's baseline, so any file present before the run starts is excluded from that run's emitted outputs.
   3. When Deep chat and a workflow share a thread, a Deep turn's history reconstruction replays only `messages.origin = deep` rows, and a workflow phase replays only its `harness` rows — workflow context never bleeds into a subsequent Deep turn.
   4. The collision fix holds across providers, multi-tool prompts, parallel threads, and long (≥50-message) histories — Deep Mode stays byte-identical on the native-7 (no shared-path fork; SC#10).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 120-01-PLAN.md — COLL-01: run-scope the sandbox-output harvest (snapshot+hash baseline seed) + headline live-repro regression test
+- [ ] 120-02-PLAN.md — CTX-01: author migration 076 (messages.origin) + tag every harness insert site + asymmetric origin filter at agent_loop.py:1024
+- [ ] 120-03-PLAN.md — [BLOCKING] apply migration 076 to live DB (SQL-editor paste) + regenerate full-schema.sql + live-DB integration test
 
 #### Phase 121: One Front Door for Workflows (IA)
 **Goal**: A user launches workflows from a single, obvious front door (the Workflows page); the chat composer is simplified to a 2-pill General/Explorer control with the Harness pill and in-chat workflow selector removed, while the existing Harness↔Deep lock / 409 / reconcile behavior is preserved exactly.
@@ -201,7 +204,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 120. Collision Fix + Context Isolation | 0/? | Not started | - |
+| 120. Collision Fix + Context Isolation | 0/3 | Planned | - |
 | 121. One Front Door for Workflows (IA) | 0/? | Not started | - |
 | 122. Cross-Provider Trust & Honesty Parity | 0/? | Not started | - |
 | 123. Skill Triggering Quality | 0/? | Not started | - |
