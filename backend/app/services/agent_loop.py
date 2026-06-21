@@ -720,6 +720,31 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
 # (``test_chunk_handler_provider_aware.py``) imports it from the new home.
 
 
+def _apply_origin_filter(history_q, agent_mode: str):
+    """CTX-01 (D-120-06): apply the ASYMMETRIC, provider-agnostic origin filter.
+
+    A row-level WHERE pre-filter on ``messages.origin`` that isolates Deep and Harness
+    history go-forward in a SHARED thread:
+
+      - Deep / Explorer (``agent_mode != "harness"``): ``neq('origin','harness')`` —
+        replays deep + legacy rows (migration 076 fills legacy NULLs to 'deep' so the
+        ``neq`` keeps them; the three-valued-logic trap is avoided), but NEVER a
+        workflow row.
+      - Harness (``agent_mode == "harness"``): ``eq('origin','harness')`` — strict,
+        defense-in-depth (A1: the harness does not reconstruct via ``messages`` today;
+        this is the one place ``agent_mode`` is evaluated against the history read).
+
+    This is ADDITIVE: it only NARROWS within the already-owner/thread-scoped query — it
+    never relaxes ``.eq('thread_id')`` / ``.eq('user_id')`` (V4). It is a SINGLE shared
+    clause (no per-provider fork): the same filtered set feeds every provider, so a
+    pure-Deep thread returns today's exact set — Deep Mode byte-identical (SC#4). The
+    builder is mutated/returned in place (supabase-py chains return the same builder).
+    """
+    if agent_mode != "harness":
+        return history_q.neq("origin", "harness")
+    return history_q.eq("origin", "harness")
+
+
 def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
     """
     Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
@@ -1020,14 +1045,19 @@ async def run_agent_loop(
         # so the scope note is not injected with a confusing "/" root path.
         scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
-    # Load full message history (includes just-inserted user message)
-    history_resp = await aexec(
+    # Load full message history (includes just-inserted user message).
+    # CTX-01 (D-120-06): build the query, then apply the ASYMMETRIC origin pre-filter
+    # so a Deep turn never replays a workflow's rows (and vice-versa). origin is a pure
+    # WHERE clause — kept OUT of the .select() projection (Pitfall 4) and ADDITIVE on
+    # top of the owner/thread scope (.eq thread_id + .eq user_id are never relaxed, V4).
+    _history_q = (
         supabase.table("messages")
         .select("role, content, tool_calls, reasoning_content")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
-        .order("created_at")
     )
+    _history_q = _apply_origin_filter(_history_q, body.agent_mode)
+    history_resp = await aexec(_history_q.order("created_at"))
 
     # Select system prompt, tools, and iteration limit based on agent mode
     if body.agent_mode == "explorer":
