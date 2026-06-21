@@ -193,6 +193,49 @@ describe("GovernancePage", () => {
     expect(scope.queryByRole("button", { name: /move/i })).not.toBeInTheDocument()
   })
 
+  it("WR-03: clicking a row whose doc isn't in the loaded list shows an honest 'couldn't open' message (no silent dead click)", async () => {
+    const user = userEventReal.setup()
+    // A low-conf row points at a doc id that listDocuments does NOT return (beyond the
+    // ~1000-row cap, or filtered out) — so selectedDoc resolves to null.
+    getGovLowConfidence.mockResolvedValue({
+      items: [{ document_id: "doc-beyond-cap", filename: "uncapped-report.pdf", folder_id: null, low_fields: { title: 0.3 }, min_confidence: 0.3 }],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    })
+    listDocuments.mockResolvedValue([docA]) // docA is the ONLY loaded doc; doc-beyond-cap is absent
+    renderPage()
+
+    const row = await screen.findByRole("button", { name: /open uncapped-report\.pdf/i })
+    await user.click(row)
+
+    // The honest fallback appears instead of the panel (a silent no-op would render nothing).
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(/couldn't open this document/i)).toBeInTheDocument()
+    // It is NOT the detail panel: the panel would render the filename a second time.
+    expect(screen.getAllByText("uncapped-report.pdf").length).toBe(1)
+  })
+
+  it("WR-03: a failed document-list load surfaces a reason on click (transient /documents error)", async () => {
+    const user = userEventReal.setup()
+    getGovUnclassified.mockResolvedValue({
+      items: [{ document_id: "doc-a", filename: "quarterly-report.pdf", folder_id: null, suggested_folder_name: "Reports" }],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    })
+    // The doc-list fetch fails entirely — every click is otherwise an invisible dead click.
+    listDocuments.mockRejectedValue(new Error("network"))
+    renderPage()
+
+    const row = await screen.findByRole("button", { name: /open quarterly-report\.pdf/i })
+    await user.click(row)
+
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(/couldn't open this document/i)).toBeInTheDocument()
+    expect(within(alert).getByText(/document list failed to load/i)).toBeInTheDocument()
+  })
+
   it("Refresh re-fires the 3 fetches (the init-ref clears, D-119-9)", async () => {
     const user = userEventReal.setup()
     renderPage()

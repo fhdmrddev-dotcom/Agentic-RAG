@@ -97,16 +97,30 @@ export function GovernancePage() {
   // caller's docs (listDocuments) and resolve the clicked id to its Document.
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null)
+  // WR-03: track whether the doc-list load itself failed, so a transient /documents
+  // error surfaces an honest reason rather than an invisible dead click.
+  const [docsLoadFailed, setDocsLoadFailed] = useState(false)
   const selectedDoc = useMemo(
     () => (selectedDocId === null ? null : documents.find((d) => d.id === selectedDocId) ?? null),
     [selectedDocId, documents],
   )
+  // WR-03: a row was clicked but its full Document is not in the (capped / failed-to-load)
+  // list, so the detail panel can't open. Show an honest message instead of a silent no-op —
+  // the >1000-doc Supabase default cap (vs the 2000-row low-conf scan) can surface a row
+  // whose id isn't in `documents`. No new fetch route (the plan chose listDocuments, A5/A7).
+  const selectedUnresolvable = selectedDocId !== null && selectedDoc === null
 
   const loadDocuments = useCallback(() => {
+    setDocsLoadFailed(false)
     listDocuments()
-      .then(setDocuments)
+      .then((docs) => {
+        setDocuments(docs)
+        setDocsLoadFailed(false)
+      })
       .catch(() => {
-        /* degrade: the cards still render + count; a click just can't resolve a Document */
+        // WR-03: degrade visibly — the cards still render + count, but record the failure
+        // so a click that can't resolve a Document explains why instead of doing nothing.
+        setDocsLoadFailed(true)
       })
   }, [])
 
@@ -252,7 +266,7 @@ export function GovernancePage() {
   }
 
   return (
-    <div className="h-full overflow-hidden grid" style={{ gridTemplateColumns: selectedDoc ? "minmax(0,1fr) 430px" : "minmax(0,1fr)" }}>
+    <div className="h-full overflow-hidden grid" style={{ gridTemplateColumns: selectedDoc || selectedUnresolvable ? "minmax(0,1fr) 430px" : "minmax(0,1fr)" }}>
       <div className="h-full overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-5">
           {/* Counter header — distinct from "Library Health" (D-119-1). */}
@@ -302,6 +316,27 @@ export function GovernancePage() {
           onClose={() => setSelectedDocId(null)}
           onReconcile={handleRefresh}
         />
+      )}
+
+      {/* WR-03: a row was clicked but its full Document isn't resolvable from the
+          (capped / failed-to-load) doc list, so the panel can't open. Surface an honest
+          reason instead of a silent dead click. No new fetch route (the plan chose
+          listDocuments — A5/A7); this is graceful frontend degradation. */}
+      {selectedUnresolvable && (
+        <div
+          role="alert"
+          className="h-full overflow-y-auto border-l border-border/40 bg-card/50 p-6 flex flex-col items-center justify-center gap-3 text-center"
+        >
+          <p className="text-sm text-destructive">Couldn&apos;t open this document.</p>
+          <p className="text-xs text-muted-foreground max-w-[28ch]">
+            {docsLoadFailed
+              ? "The document list failed to load. Refresh and try again."
+              : "It isn't in the loaded document list (your library may exceed the load limit)."}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setSelectedDocId(null)}>
+            Dismiss
+          </Button>
+        </div>
       )}
     </div>
   )
