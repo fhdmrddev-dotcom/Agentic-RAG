@@ -120,7 +120,6 @@ async def user_with_rule_and_folder(pg_pool):
                 pass
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 splices the ingest rule-eval pass")
 @pytest.mark.asyncio
 async def test_matching_rule_writes_classification_not_move(pg_pool, user_with_rule_and_folder):
     """A matching enabled rule writes metadata._classification (status=suggested), NEVER a move."""
@@ -168,7 +167,6 @@ async def test_matching_rule_writes_classification_not_move(pg_pool, user_with_r
     assert "condition_summary" in suggestion and suggestion["condition_summary"]
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 splices the ingest rule-eval pass")
 @pytest.mark.asyncio
 async def test_classification_never_blocks_ingest_on_error(pg_pool, user_with_rule_and_folder):
     """A matcher/read error degrades to NO suggestion — ingest never raises (mirror metadata degrade)."""

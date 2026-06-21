@@ -199,7 +199,6 @@ def _read_rules_for_uploader(sb, uploader_uid: str) -> list[dict]:
     ).data or []
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 splices the ingest rule-eval pass")
 @pytest.mark.asyncio
 async def test_b_private_rule_never_evaluates_against_a_upload(pg_pool, two_users_with_rules):
     """B's PRIVATE rule must NOT be in A's own+global read set (never evaluates on A's upload)."""
@@ -218,7 +217,6 @@ async def test_b_private_rule_never_evaluates_against_a_upload(pg_pool, two_user
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 03 splices the ingest rule-eval pass")
 @pytest.mark.asyncio
 async def test_global_rule_visible_but_evaluates_b_own_metadata(pg_pool, two_users_with_rules):
     """A's GLOBAL rule IS in B's read set, but evaluates against B's OWN upload only (D-118-8)."""
