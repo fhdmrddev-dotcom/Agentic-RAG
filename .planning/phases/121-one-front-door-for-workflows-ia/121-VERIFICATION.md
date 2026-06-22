@@ -1,9 +1,10 @@
 ---
 phase: 121-one-front-door-for-workflows-ia
 verified: 2026-06-22T23:35:00Z
-status: human_needed
-score: 7/9 must-haves verified (2 manual UAT axes not automatable)
+status: passed
+score: 9/9 must-haves verified (the 2 manual SC#10 axes resolved via live UAT — 121-HUMAN-UAT.md 4/4 PASS, 0 Phase-121 defects)
 overrides_applied: 0
+human_verification_resolved: 2026-06-23 — all 4 axes driven live via Chrome DevTools MCP; see 121-HUMAN-UAT.md (status: passed, commit bc85809a)
 human_verification:
   - test: "Cross-provider workflow launch + Harness lock: on OpenAI, Anthropic, Google, OpenRouter (one representative model each), launch a published workflow from the Workflows page, confirm the thread switches to Harness mode, the 2-pill composer shows the locked placeholder ('Workflow running — Cancel to switch back'), the Stop button is reachable, and Deep chat works normally after the run completes."
     expected: "Each provider: launch succeeds, thread goes Harness, composer shows running placeholder + Stop reachable, Deep unblocked post-run."
@@ -23,8 +24,8 @@ human_verification:
 
 **Phase Goal:** A user launches workflows from a single, obvious front door (the Workflows page); the chat composer is simplified to a 2-pill General/Explorer control with the Harness pill and in-chat workflow selector removed, while the existing Harness↔Deep lock / 409 / reconcile behavior is preserved exactly.
 **Verified:** 2026-06-22T23:35:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed (the 4 human-verification axes were driven live and passed 4/4 — 121-HUMAN-UAT.md, 2026-06-23)
+**Re-verification:** No — initial verification; human_needed axes resolved by live SC#10 UAT
 
 ---
 
@@ -41,10 +42,10 @@ human_verification:
 | 5 | 409 lock banner preserved: `workflow-lock-error-banner` testid + no Retry for 409 | ✓ VERIFIED | ChatArea.tsx L469-474: `data-testid={reconcileError instanceof ApiError && reconcileError.status === 409 ? "workflow-lock-error-banner" : "reconcile-error-banner"}`. `ChatAreaBanner.test.tsx` test b (byte-unchanged) asserts the 409 banner testid + no Retry. GREEN. |
 | 6 | Workflows-page launch path (ChatLayout.doRun → createThread + postMessage({workflowDefinitionId}) + onNavigate("chat")) is untouched | ✓ VERIFIED | `ChatLayoutLaunch.test.tsx` drives the full WorkflowsPage Run → doRun flow and asserts `createThread("Vendor-risk review")` + `postMessage("thread-new", "review Acme Corp", { workflowDefinitionId: "pub-1" })` + `onNavigate("chat")`. GREEN. |
 | 7 | No backend file and no migration touched — frontend-only change (D-06/G-5) | ✓ VERIFIED | `git diff --stat 131584b6^ HEAD -- 'backend/**' 'supabase/migrations/**'` returns empty. All 4 phase commits modify only `frontend/src/components/chat/` and `frontend/src/components/layout/__tests__/`. |
-| 8 | Cross-provider launch → Harness lock + SC#10 4-axis coverage (SC#4 manual axes) | ? UNCERTAIN (human_needed) | Automated oracles cover SC#1/SC#2/SC#3. SC#10 4-axis (cross-provider, multi-tool, parallel-thread, long-message) requires live provider streaming. Per 121-VALIDATION.md these are declared manual-only. |
+| 8 | Cross-provider launch → Harness lock + SC#10 4-axis coverage (SC#4 manual axes) | ✓ VERIFIED (live UAT) | Automated oracles cover SC#1/SC#2/SC#3. The SC#10 4-axis (cross-provider, multi-tool, parallel-thread, long-message) was driven LIVE via Chrome DevTools MCP — **4/4 PASS, 0 Phase-121 defects** (121-HUMAN-UAT.md, status: passed, commit bc85809a). Observed pre-existing render/reconcile artifacts (dup-bubble BUG-260610-01, pre-lock + lock-release reconcile lag) are disjoint from the Phase-121 changed files and routed to Phase 124 per D-07 — not regressions. |
 | 9 | No chat-side workflow pointer or empty-state nudge added (D-04) | ✓ VERIFIED | ChatArea.tsx welcome-state renders the Sparkles icon + "How can I help you?" + folder scope selector. No workflow link or nudge added. MessageInput.tsx has no workflow-related render path. `Workflow`/`Sparkles` lucide icons removed from MessageInput imports (only remaining references are the `workflowLocked` placeholder strings, correct). |
 
-**Score:** 7/9 truths verified (2 are manual-only per VALIDATION.md — not gaps, not failures)
+**Score:** 9/9 truths verified (the 2 manual-only axes were driven live and passed 4/4 — see 121-HUMAN-UAT.md)
 
 ---
 
@@ -114,6 +115,8 @@ The 27 pre-existing unrelated Vitest failures (across `streamsProvider.test.tsx`
 
 ### Human Verification Required
 
+> **RESOLVED 2026-06-23 — all 4 axes driven live via Chrome DevTools MCP, 4/4 PASS, 0 Phase-121 defects.** Full evidence in `121-HUMAN-UAT.md` (status: passed, commit `bc85809a`). The four items below were the manual SC#10 gates; each is now confirmed passing on the running app. Retained here for the record.
+
 #### 1. Cross-Provider Workflow Launch + Harness Lock
 
 **Test:** Launch a published workflow from the Workflows page on each of OpenAI, Anthropic, Google, and OpenRouter (one representative model each). After launch, confirm the thread shows the 2-pill composer in locked state ("Workflow running — Cancel to switch back" placeholder + disabled textarea), the Stop button is reachable, and after the run completes the composer returns to normal Deep mode.
@@ -142,9 +145,10 @@ The 27 pre-existing unrelated Vitest failures (across `streamsProvider.test.tsx`
 
 ### Gaps Summary
 
-No gaps. The automated oracles are fully GREEN (11/11 tests across 3 files). All removal seams are clean. The PRESERVE LIST is intact. No backend or migration files touched. The 4 human verification items are SC#10 manual axes declared in 121-VALIDATION.md — they are not failures or gaps, they are expected manual UAT gates.
+No gaps. The automated oracles are fully GREEN (11/11 tests across 3 files). All removal seams are clean. The PRESERVE LIST is intact. No backend or migration files touched. The 4 human verification items (SC#10 manual axes declared in 121-VALIDATION.md) were driven live via Chrome DevTools MCP on 2026-06-23 and passed **4/4 with 0 Phase-121 defects** (121-HUMAN-UAT.md). Phase 121 has **zero open functional gaps**.
 
 ---
 
 _Verified: 2026-06-22T23:35:00Z_
 _Verifier: Claude (gsd-verifier)_
+_Human-verification resolved: 2026-06-23 (verify-work — live SC#10 UAT 4/4 PASS; status human_needed → passed)_
