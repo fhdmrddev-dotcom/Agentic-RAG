@@ -107,7 +107,11 @@
   3. The eval treats provider as a first-class axis with a per-provider scoreboard (trigger / force / recovery / honest-fail), pass-OR-documented, and any `emit_tier` change is gated on that scoreboard (no silent tier flip).
   4. Task/todo/workflow-step labels are concrete on every provider (OpenAI-parity), not the bare tool name — an ungated prompt nudge fills `execute_code.description` and a deterministic frontend summarizer floor backstops providers that don't, without regressing providers that already do.
   5. The 4-axis SC#10 scoreboard (cross-provider × multi-tool × parallel-thread × long-message) passes as an EVAL axis (per MP-03), and Deep Mode stays byte-identical (no shared-path fork).
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 122-01-PLAN.md — MP-02: explicit emit_tier field + 55-row registry migration (14/2/34/5) + remove the provider=="openai" gate + inert DeepSeek strict
+- [ ] 122-02-PLAN.md — MP-01: the ordered force_strict→non-strict→coerce→fail rung ladder inside forced_emit (reads emit_tier) + emit_rung telemetry
+- [ ] 122-03-PLAN.md — MP-03: --forced-emit scoreboard matrix (EASY+HARD × native-7, 4 axes PASS/FAIL/DOCUMENTED) + dated artifact + README grep ritual
+- [ ] 122-04-PLAN.md — TDP-01: ungated execute_code.description SYSTEM_PROMPT nudge + verified frontend label floor
 
 #### Phase 123: Skill Triggering Quality
 **Goal**: A skill author can measurably tune a skill's trigger description, the system flags weak trigger descriptions before a skill is saved, and a loaded skill's instructions stay available for the rest of the session instead of silently falling out of context.
@@ -208,7 +212,7 @@
 |-------|----------------|--------|-----------|
 | 120. Collision Fix + Context Isolation | 3/3 | Complete | 2026-06-22 |
 | 121. One Front Door for Workflows (IA) | 2/2 | Complete | 2026-06-23 |
-| 122. Cross-Provider Trust & Honesty Parity | 0/? | Not started | - |
+| 122. Cross-Provider Trust & Honesty Parity | 0/4 | Planned | - |
 | 123. Skill Triggering Quality | 0/? | Not started | - |
 | 124. Workflow Studio UX — Soul + Strict↔Loose | 0/? | Not started | - |
 | 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
