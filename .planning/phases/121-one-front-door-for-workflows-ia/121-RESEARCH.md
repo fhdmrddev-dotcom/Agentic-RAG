@@ -346,14 +346,16 @@ The executor must prove these are **byte-unchanged in behavior** after the remov
 
 **This table is empty:** Every factual claim in this research was verified by reading the live source files (`MessageInput.tsx`, `ChatArea.tsx`, `ChatLayout.tsx`, `WorkflowsPage.tsx`, `RunCard.tsx`, `RunStatusStrip.tsx`, `ActiveRunsTray.tsx`, `StreamsProvider.tsx`, `api.ts`, `MessageItem.tsx`, the test files) plus project-wide grep. No claim rests on training data or unverified inference. No user confirmation is needed before planning **except** the two Open Questions below, which are genuine design forks (not unverified facts).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **OQ-1 [D-01 follow-up] — Cancel for a locked-but-NOT-streaming thread.**
+> Both OQs are dispositioned below — neither is a blocking uncertainty; recorded for plan-time / UAT traceability.
+
+1. **OQ-1 [D-01 follow-up] — Cancel for a locked-but-NOT-streaming thread.** — **RESOLVED:** kept as a VALIDATION.md manual UAT observation row; plans add NO new composer chip (D-01). If UAT shows real pain, the D-01-compliant fix is to the run receipt/status strip, not the composer.
    - What we know: While streaming, `composer-stop` is the reachable Cancel. While locked-but-not-streaming (cap_paused with ended producer stream, or a reload of an idle locked run), `isStreaming` may be false → no visible Stop; only the disabled placeholder shows.
    - What's unclear: Is this a real operator-visible pain after the pill is gone? Does the existing Continue card (for cap_paused) cover the only realistic stuck state?
    - Recommendation: **Do not pre-build a fix.** Add a SC#10/G-4 UAT row to observe this state. If pain is real, the D-01-compliant fix is to the run receipt/status strip (surface a Cancel when locked), NOT a new composer chip. Surface to the operator at plan-time as a scoped decision.
 
-2. **OQ-2 — Panel-open on launch (the `requestOpenPanel()` in `handleSend`).**
+2. **OQ-2 — Panel-open on launch (the `requestOpenPanel()` in `handleSend`).** — **RESOLVED:** out-of-scope for IA-01. Plan 01 confirmed `doRun` does NOT call `requestOpenPanel` and the panel rail is always present (the spine stays reachable). Any auto-open is a small additive in `doRun`/ChatLayout for a later phase, NOT a composer change this phase.
    - What we know: `ChatArea.handleSend` (L333-340) calls `requestOpenPanel()` on the harness branch (when `kickoffWorkflowId` is set) so the workspace panel auto-opens to the phase timeline. This branch reads the removed `selectedWorkflowId` and becomes dead. The page-launch path (`doRun`) does NOT call `requestOpenPanel`.
    - What's unclear: After removal, does launching from the Workflows page still auto-open the panel to the phase spine (sketch 022-A: "the panel owns the live spine")? The in-chat kickoff used to trigger it; `doRun` may not.
    - Recommendation: Verify whether `doRun` / ChatLayout already opens the panel on harness navigation (the panel rail is always present per panel-shell.md D4, so the spine is reachable regardless). If the auto-open is desired UX and `doRun` lacks it, that is a small additive in `doRun` / ChatLayout — NOT a composer change. Flag for the planner to confirm scope (likely out-of-scope for IA-01, but worth a one-line check so launch-into-Harness doesn't feel degraded vs. the old picker path).
