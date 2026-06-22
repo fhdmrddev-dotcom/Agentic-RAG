@@ -66,7 +66,7 @@ vi.mock("@/lib/supabase", () => ({
 import { ChatArea } from "../ChatArea"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
-import { ApiError } from "@/lib/api"
+import { ApiError, getThreadWorkflow } from "@/lib/api"
 import type { Thread } from "@/types"
 
 const THREAD: Thread = {
@@ -100,6 +100,9 @@ beforeEach(() => {
     failedSendDrafts: new Map<string, string>(),
     loadingThreads: new Set<string>(),
     subscriptionsByThread: new Map<string, Set<string>>(),
+    // Phase 121: reset the per-thread workflow lock so a locked reconcile from
+    // one test never bleeds into the next (the lock map is not mock-cleared).
+    workflowLockByThread: new Map(),
   })
 })
 
@@ -173,5 +176,58 @@ describe("099-08 refusal banner", () => {
     await waitFor(() =>
       expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false),
     )
+  })
+})
+
+/**
+ * Phase 121 (IA-01 / SC#3 reconcile) — server truth, not a pill.
+ *
+ * The in-chat Deep/Harness pill is gone (Plan 01), so "is this thread locked?"
+ * comes from the SOURCE OF TRUTH — the mount-time GET /threads/{id}/workflow
+ * reconcile (CLAUDE.md: Realtime is a hint, reconcile on (re)connect). This pins
+ * the surviving server-driven lock: a `locked:true` reconcile disables the
+ * composer (running placeholder) on mount; the default `locked`-less / `deep`
+ * reconcile leaves it enabled. The owner-scoped per-thread lock (never global)
+ * is what keeps a background run on another thread from locking THIS composer.
+ */
+describe("121 reconcile-lock — getThreadWorkflow drives the per-thread composer disable (SC#3)", () => {
+  const LOCKED_PLACEHOLDER = "Workflow running — Cancel to switch back"
+
+  it("locked:true reconcile disables the composer with the running placeholder on mount", async () => {
+    // Override the default deep/unlocked reconcile for this case only: a real,
+    // non-stale run with an active anchor → the mount reconcile sets the lock.
+    // (mockResolvedValue, not …Once — the mount effect can re-fire and a single
+    //  Once value would let a follow-up undefined resolve clear the lock again.)
+    vi.mocked(getThreadWorkflow).mockResolvedValue({
+      locked: true,
+      lock_is_stale: false,
+      active_workflow_run_id: "run-1",
+      cap_paused: false,
+      continues_remaining: 0,
+    } as Awaited<ReturnType<typeof getThreadWorkflow>>)
+
+    renderChatArea()
+
+    // After the reconcile resolves, the composer swaps to the running placeholder
+    // and the textarea is disabled — a Deep message cannot be sent during a run.
+    const textarea = await screen.findByPlaceholderText(LOCKED_PLACEHOLDER)
+    await waitFor(() => expect(textarea).toBeDisabled())
+  })
+
+  it("the default (deep / locked:false) reconcile leaves the composer enabled", async () => {
+    // Explicit deep/unlocked reconcile (set here, not relied on from the cleared
+    // factory default) → the mount reconcile clears any lock on this thread.
+    vi.mocked(getThreadWorkflow).mockResolvedValue({
+      mode: "deep",
+      locked: false,
+      active_workflow_run_id: null,
+    } as Awaited<ReturnType<typeof getThreadWorkflow>>)
+
+    renderChatArea()
+
+    const textarea = await screen.findByPlaceholderText("Ask anything…")
+    expect(textarea).not.toBeDisabled()
+    // The locked composer is NOT shown when the server says the thread is unlocked.
+    expect(screen.queryByPlaceholderText(LOCKED_PLACEHOLDER)).not.toBeInTheDocument()
   })
 })

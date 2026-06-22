@@ -1,76 +1,116 @@
 /**
- * Phase 094 Plan 05 Task 1 (D-02) — the DISPLAYED mode label reads SERVER TRUTH.
+ * Phase 121 (IA-01) — the 2-pill composer + the surviving Cancel + the
+ * workflow-locked preserve.
  *
- * The bug (finding #5): the composer's Deep/Harness pill rendered the local
- * `workflowMode` launch-toggle useState, which goes stale before the mount-time
- * `getThreadWorkflow` reconcile — so a running Harness workflow could show as
- * "Deep". The fix points the DISPLAYED label at a new `displayedMode` prop the
- * parent derives from `workflowLocked` (the server-truth lock reconciled from
- * `active_workflow_run_id`), while the launch toggle + kickoff staging keep
- * reading `workflowMode` (the user's intent for the NEXT kickoff).
+ * Plan 01 removed the in-chat Deep/Harness mode toggle (`workflow-mode-selector`)
+ * and the in-chat workflow picker (`workflow-picker`) — the "one front door for
+ * workflows" is now the Workflows page (D-04), not a composer pill. The composer
+ * is therefore a 2-pill surface: the Model pill and the General/Explorer
+ * `agent-mode-selector`. The Deep/Harness label that finding #5 worried about no
+ * longer exists (it died by construction), so the old three tests in this file —
+ * which asserted the removed pill's label — are obsolete and are replaced here.
  *
- * This file unit-tests MessageInput's pill in isolation: when the displayed mode
- * is "harness" (server truth) the badge MUST read "Harness" regardless of the
- * local `workflowMode` toggle; when "deep" it reads "Deep".
+ * What this file pins post-removal (MessageInput rendered IN ISOLATION):
+ *  - SC#1: exactly 2 pills — `workflow-mode-selector` is GONE, `workflow-picker`
+ *    is GONE, `agent-mode-selector` STAYS, and the Model pill renders.
+ *  - Cancel-reachability (D-01): the post-removal Cancel is the existing
+ *    `composer-stop` Stop button. With `disabled` (streaming) it renders and a
+ *    click calls `onStop` — no new composer chrome was added.
+ *  - SC#3 preserve: with `workflowLocked` the textarea is disabled and shows the
+ *    "Workflow running — Cancel to switch back" placeholder, and Send is gated.
  */
-import { describe, it, expect, afterEach } from "vitest"
-import { render, screen, cleanup, within } from "@testing-library/react"
+import { describe, it, expect, afterEach, vi } from "vitest"
+import { render, screen, cleanup, fireEvent } from "@testing-library/react"
 import { MessageInput } from "../MessageInput"
 
 afterEach(() => cleanup())
 
-/** The Deep/Harness toggle button — keyed off its stable data-testid. */
-function modePill(): HTMLElement {
-  return screen.getByTestId("workflow-mode-selector")
-}
+/** A single-provider/single-model render still surfaces the Model pill as a
+ *  static label (the selector dropdown only appears with >1 option). Either
+ *  shape satisfies "Model pill present". */
+const MODEL_PROPS = {
+  providers: [{ id: "openai", name: "OpenAI", models: ["gpt-test"], is_active: true }],
+  selectedProvider: "openai",
+  models: ["gpt-test"],
+  selectedModel: "gpt-test",
+} as const
 
-describe("MessageInput mode label (D-02 — server truth, finding #5)", () => {
-  it("reads 'Harness' when displayedMode is harness even if the local workflowMode toggle is 'deep'", () => {
+describe("MessageInput — Phase 121 2-pill composer (SC#1)", () => {
+  it("renders exactly the 2 surviving pills: the removed mode toggle + picker are GONE, agent-mode + Model stay", () => {
     render(
       <MessageInput
         onSend={() => {}}
         disabled={false}
-        // Server truth: a workflow is running → harness. The local toggle is
-        // stale at "deep" (the finding-#5 condition).
-        displayedMode="harness"
-        workflowMode="deep"
+        onAgentModeChange={() => {}}
+        {...MODEL_PROPS}
+      />,
+    )
+    // The two removed controls no longer render (the "one front door" removal).
+    expect(screen.queryByTestId("workflow-mode-selector")).toBeNull()
+    expect(screen.queryByTestId("workflow-picker")).toBeNull()
+    // The General/Explorer pill survives (gated on its own onAgentModeChange).
+    expect(screen.getByTestId("agent-mode-selector")).toBeInTheDocument()
+    // The Model pill renders (single-model → the static "gpt-test" label).
+    expect(screen.getByText("gpt-test")).toBeInTheDocument()
+  })
+})
+
+describe("MessageInput — Cancel-reachability survives the removal (D-01)", () => {
+  it("with disabled/streaming, composer-stop renders and clicking it calls onStop", () => {
+    const onStop = vi.fn()
+    render(
+      <MessageInput
+        onSend={() => {}}
+        onStop={onStop}
+        disabled
+        onAgentModeChange={() => {}}
+        {...MODEL_PROPS}
+      />,
+    )
+    // The post-removal Cancel is the existing right-side Stop button — no new chrome.
+    const stop = screen.getByTestId("composer-stop")
+    expect(stop).toBeInTheDocument()
+    fireEvent.click(stop)
+    expect(onStop).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("MessageInput — workflow-locked preserve (SC#3)", () => {
+  it("with workflowLocked the textarea is disabled, shows the running placeholder, and Send is gated", () => {
+    const onSend = vi.fn()
+    render(
+      <MessageInput
+        onSend={onSend}
+        disabled={false}
         workflowLocked
-        onWorkflowModeChange={() => {}}
         onAgentModeChange={() => {}}
+        {...MODEL_PROPS}
       />,
     )
-    // Server truth wins — the displayed badge reads "Harness", NOT "Deep".
-    expect(within(modePill()).getByText("Harness")).toBeInTheDocument()
-    expect(within(modePill()).queryByText("Deep")).not.toBeInTheDocument()
+    // The locked thread swaps the placeholder to the running copy …
+    const textarea = screen.getByPlaceholderText("Workflow running — Cancel to switch back")
+    // … and disables the textarea so a Deep message cannot be typed during a run.
+    expect(textarea).toBeDisabled()
+    // The default "Ask anything…" composer is NOT shown while locked.
+    expect(screen.queryByPlaceholderText("Ask anything…")).toBeNull()
+    // Send is gated: typing + Enter never reaches onSend while locked.
+    fireEvent.change(textarea, { target: { value: "should not send" } })
+    fireEvent.keyDown(textarea, { key: "Enter" })
+    expect(onSend).not.toHaveBeenCalled()
   })
 
-  it("reads 'Deep' when displayedMode is deep (no active run)", () => {
+  it("when NOT locked the textarea is enabled with the default placeholder", () => {
     render(
       <MessageInput
         onSend={() => {}}
         disabled={false}
-        displayedMode="deep"
-        workflowMode="deep"
         workflowLocked={false}
-        onWorkflowModeChange={() => {}}
         onAgentModeChange={() => {}}
+        {...MODEL_PROPS}
       />,
     )
-    expect(within(modePill()).getByText("Deep")).toBeInTheDocument()
-    expect(within(modePill()).queryByText("Harness")).not.toBeInTheDocument()
-  })
-
-  it("falls back to workflowMode for the displayed label when displayedMode is absent (back-compat)", () => {
-    render(
-      <MessageInput
-        onSend={() => {}}
-        disabled={false}
-        // No displayedMode prop → the label defaults to the workflowMode toggle.
-        workflowMode="harness"
-        onWorkflowModeChange={() => {}}
-        onAgentModeChange={() => {}}
-      />,
-    )
-    expect(within(modePill()).getByText("Harness")).toBeInTheDocument()
+    const textarea = screen.getByPlaceholderText("Ask anything…")
+    expect(textarea).not.toBeDisabled()
+    expect(screen.queryByPlaceholderText("Workflow running — Cancel to switch back")).toBeNull()
   })
 })
