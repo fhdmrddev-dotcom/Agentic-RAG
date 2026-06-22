@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
-status: ready_to_plan
-last_updated: 2026-06-22T21:05:24.065Z
-last_activity: 2026-06-22
+status: planning
+last_updated: "2026-06-23"
+last_activity: 2026-06-23
+stopped_at: Phase 122 context gathered (122-CONTEXT.md committed fe14e008) — ready to plan Phase 122
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 5
   completed_plans: 5
   percent: 40
-stopped_at: Phase 121 complete (2/2) — ready to discuss Phase 122
 ---
 
 # Project State
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 Phase: 122
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-22
+Status: Ready to plan (context gathered 2026-06-23 — 122-CONTEXT.md committed fe14e008)
+Last activity: 2026-06-23
 
 ### Quick Tasks Completed
 
@@ -251,4 +251,5 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Operator Next Steps
 
-- v3.1 roadmap created (CORE 120-124 + STRETCH 125-130). Next: `/gsd:discuss-phase 120` (Collision Fix + Context Isolation) — cross-check `.planning/reported-bugs/*.md` (`status: open` + `surface: Agentic-RAG`) per the discuss-phase mandate. G-2 sketch fires on 121/124 before spec/discuss.
+- **Phase 122 context gathered 2026-06-23** (`122-CONTEXT.md` @ `fe14e008`). 8 decisions locked (D-122-01..08): force→coerce ladder in `forced_emit` (all consumers, 4 rungs strict→non-strict→coerce→fail, runtime-only never mutates registry); single `emit_tier` enum (force_strict|force|coerce, unverified→coerce); extend `eval_cross_provider.py` → dated `.planning/eval/` scoreboard + manual operator gate, DOCUMENTED=known-limitation row; targeted TDP-01 (ungated `execute_code.description` nudge + verify `inferLabel` floor). Reported-bugs: BUG-260615-01 + BUG-260528-03 **folded into 122**; BUG-260607-02 left open (→128), BUG-260607-03 deferred (→129), BUG-260616-01 stays in 111.1 (adjacent gateway seam). **Next: `/clear` then `/gsd:plan-phase 122`.** G-5 fires on the gateway/adapter boundary (`forced_emit`/`openai_service`/`config.py`) + `agent_loop.py` SYSTEM_PROMPT — keep provider differences at the boundary, Deep byte-identical.
+- _Prior:_ v3.1 roadmap created (CORE 120-124 + STRETCH 125-131); Phases 120 + 121 COMPLETE (all gates clear). G-2 sketch fires on 124 before spec/discuss (122 is backend/gateway — no sketch gate).
