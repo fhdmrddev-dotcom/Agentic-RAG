@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
+\restrict qmYXYDEUiCdgn80hpwV44SzBL53bW6eJBkyPXDzw0qDSYUcGaxFNrYPx2zh0Pvi
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -612,6 +612,8 @@ CREATE TABLE public.messages (
     confidence_avg_similarity double precision,
     confidence_disclaimer text,
     reasoning_content text,
+    origin text DEFAULT 'deep'::text NOT NULL,
+    CONSTRAINT messages_origin_check CHECK ((origin = ANY (ARRAY['deep'::text, 'harness'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
 
@@ -2983,5 +2985,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
+\unrestrict qmYXYDEUiCdgn80hpwV44SzBL53bW6eJBkyPXDzw0qDSYUcGaxFNrYPx2zh0Pvi
 
