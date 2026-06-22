@@ -1,10 +1,11 @@
 ---
 phase: 120-collision-fix-context-isolation
-verified: 2026-06-22T00:00:00Z
-status: human_needed
-score: 3/4 must-haves verified (SC#4/SC#10 live cross-provider axis is manual)
+verified: 2026-06-22T14:45:00Z
+status: verified
+score: 4/4 must-haves verified (SC#10 live cross-provider 4-axis UAT PASSED 2026-06-22 — see 120-HUMAN-UAT.md)
 overrides_applied: 0
 re_verification: false
+human_verification_resolved: "2026-06-22 — both items PASSED via Claude-driven live UAT (Chrome MCP + browser-JWT chat endpoint + real Docker sandbox + Supabase :54322). SC#10 4/4 axes green across OpenAI/Anthropic/Google/OpenRouter; live 2-files bug reproduced (workflow leftover excluded, exactly one Deep file emitted). Recorded in 120-HUMAN-UAT.md."
 human_verification:
   - test: "SC#10 4-axis live UAT: cross-provider (OpenAI / Anthropic / Google / OpenRouter) x multi-tool x parallel-thread x >=50-message history"
     expected: "On each provider: run a workflow render then a Deep skill execute_code in the same thread — exactly one file is emitted and the Deep history contains no harness-origin rows. Multi-tool: post-workflow Deep turn using search_documents + execute_code emits only the new file. Parallel-thread: Thread A (workflow) streaming while Thread B accepts a new Deep prompt — no cross-thread baseline or origin bleed. Long-message: post-workflow thread with >=50 mixed deep+harness rows — Deep replays only deep+legacy rows and the new skill file emits cleanly. Deep Mode proven byte-identical on the native-7."
