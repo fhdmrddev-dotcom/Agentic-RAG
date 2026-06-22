@@ -15,14 +15,11 @@ import {
 import {
   getProviders,
   getThreadWorkflow,
-  listPublishedWorkflows,
   ApiError,
-  type PublishedWorkflow,
 } from "@/lib/api"
 import type { Folder, Message, Thread } from "@/types"
 import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
 import { toolLabel } from "@/lib/toolMeta"
-import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
 
 interface Provider {
   id: string
@@ -63,13 +60,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
-  // Phase 092 (MODE-01 — D-01/D-02): Deep/Harness toggle + published-workflow
-  // picker state. workflowMode toggles the composer between the Deep agent loop
-  // (General/Explorer) and the Harness picker; selectedWorkflowId is the staged
-  // kickoff id sent as workflow_definition_id on the next send.
-  const [workflowMode, setWorkflowMode] = useState<"deep" | "harness">("deep")
-  const [publishedWorkflows, setPublishedWorkflows] = useState<PublishedWorkflow[]>([])
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
   // (BUG-260523-01 close), MessageList streaming prop, and reconcile/
@@ -140,10 +130,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   useEffect(() => {
     setAgentMode("default")
     setScopeFolderId(null)
-    // Phase 092: reset the picker on thread switch — the mount reconcile below
-    // re-derives the true Harness/Deep state from GET /threads/{id}/workflow.
-    setWorkflowMode("deep")
-    setSelectedWorkflowId(null)
   }, [thread?.id])
 
   useEffect(() => {
@@ -160,13 +146,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           setSelectedModel(preferred)
         }
       })
-      .catch(console.error)
-  }, [])
-
-  // Phase 092 (D-01): load the published-workflow picker feed once on mount.
-  useEffect(() => {
-    listPublishedWorkflows()
-      .then(setPublishedWorkflows)
       .catch(console.error)
   }, [])
 
@@ -325,19 +304,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       // dropped — the empty-until-end-of-run user-observable failure.
       setViewingThread(activeThread.id)
     }
-    // Phase 092 (D-02): a Harness send carries the picked workflow id as the
-    // kickoff field; a Deep send omits it (byte-identical). Stage-then-clear so
-    // a workflow only starts once per pick.
-    const kickoffWorkflowId =
-      workflowMode === "harness" && selectedWorkflowId ? selectedWorkflowId : undefined
-    if (kickoffWorkflowId) {
-      // Phase 094 (PANEL-08): entering Harness Mode auto-opens the workspace
-      // panel to the phase timeline (the ChatLayout expand seam is already
-      // subscribed via subscribeOpenPanel). Fire ONLY on the harness branch —
-      // a Deep send must NOT force the panel open. Scoped to the panel-open
-      // seam so Plan 05's mode-label edit on this file layers cleanly.
-      requestOpenPanel()
-    }
     await sendMessage(
       activeThread.id,
       content,
@@ -345,15 +311,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onTitleUpdate,
       agentMode,
       selectedProvider || undefined,
-      kickoffWorkflowId,
     )
-    if (kickoffWorkflowId) {
-      // The workflow is now running; clear the staged pick so the next send is
-      // a normal turn (the lock — derived from the mount/SSE reconcile — keeps
-      // the picker disabled while the run is live).
-      setSelectedWorkflowId(null)
-    }
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, workflowMode, selectedWorkflowId])
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -406,18 +365,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         }
         onClearPrefill?.()
       }}
-      workflowMode={workflowMode}
-      onWorkflowModeChange={setWorkflowMode}
-      // Phase 094 (D-02 — server truth): the DISPLAYED mode badge derives from
-      // workflowLocked (reconciled from active_workflow_run_id at :161-167),
-      // never the stale launch-toggle useState. A running Harness workflow shows
-      // "Harness" regardless of what the local toggle was set to — kills
-      // finding #5. The launch toggle (workflowMode) still drives the dropdown
-      // selection + the :307 kickoff staging, unchanged.
-      displayedMode={workflowLocked ? "harness" : "deep"}
-      publishedWorkflows={publishedWorkflows}
-      selectedWorkflowId={selectedWorkflowId}
-      onWorkflowSelect={setSelectedWorkflowId}
       workflowLocked={workflowLocked}
     />
   )
