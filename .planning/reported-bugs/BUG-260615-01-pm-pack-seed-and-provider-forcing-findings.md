@@ -4,12 +4,12 @@ title: PM-pack seed idempotency defects + DeepSeek/Gemini forced-emit reliabilit
 reported: 2026-06-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [scripts/seed-pm-pack, backend/harness/forced-emit, provider-routing, model-registry]
-folded_into: null
+folded_into: "122"
 verified_closed_by: null
 related_seeds: [SEED-082]
-re_open_trigger: "Reviewed at Phase 111 discuss-phase (2026-06-15): finding (3) (DeepSeek/Gemini honest-fail FORCED structured emit) is directly relevant — 111 re-platforms metadata extraction onto forced_emit. Disposition: LEAVE OPEN; 111 does NOT own the provider-forcing fix (pairs with SEED-082). 111's SC#4 acceptance = pass-OR-documented per provider, with TIER-COERCE + graceful degradation as the safety net. Re-route the fix to a provider-feature-fit/eval phase when scoped."
+re_open_trigger: "FOLDED into Phase 122 (2026-06-23, /gsd:discuss-phase): finding (3) — the TIER-FORCE 400 → null-without-non-strict-retry defect — is the LIVE EVIDENCE for MP-01 (the force→non-strict→coerce ladder in forced_emit, D-122-01/02) + MP-02 (explicit doc-verified emit_tier, D-122-04). Verify-close 122 only when the ladder recovers the schema-specific 400s and the default-config metadata extraction no longer silently emits null. Findings (1)/(2)/(4) are seed-pm-pack idempotency + model-registry curation — NOT owned by 122; leave those tracked here. Prior (Phase 111 discuss, 2026-06-15): LEFT OPEN; 111's SC#4 = pass-OR-documented per provider + graceful degradation; re-route the forcing fix to a provider-feature-fit/eval phase — now done (122)."
 reproduces_on:
   branch: v2.5-dev
   commit: 6e2f383e
@@ -72,3 +72,36 @@ direction — surface at the next provider/eval phase. (1)/(2) are a small `seed
 - **(3) OPEN** — DeepSeek/Gemini forced-emit reliability (provider-tuning; pairs with SEED-082).
 - **(4) OPEN** — model-list curation (the scoreboard harness IDs were fixed to `gpt-4o`/`MiniMax-M2.7`).
 - The BLOCKING double-gate over-rejection (not in this report's scope) is FIXED (commit `6a607169`).
+
+## Phase 111 live UAT extension (2026-06-16) — sharpens finding (3)
+
+Phase 111's SC#4 4-axis cross-provider UAT (Claude-driven: minted-JWT API uploads + psycopg2 :54322
++ backend log-sink provider-endpoint verification) re-exercised forced structured emit on a DIFFERENT
+schema — the dynamic `emit_document_metadata` tool (7 optional `anyOf[..,null]` built-ins + a custom
+field + a `confidence` `dict[str,float]` → `{type:object, additionalProperties:{type:number}}`). New
+evidence that refines (3):
+
+- **gpt-4o AND glm-4.6 ALSO 400 on THIS schema** — not just DeepSeek/Gemini. In the 104 deliverable
+  context these three produced clean output; on the 111 metadata schema OpenAI gpt-4o, DeepSeek
+  deepseek-v4-pro, and Z.ai glm-4.6 ALL return `400 Bad Request` on the TIER-FORCE chat-completion
+  (`logs/backend.60452.log` lines 117/179/220). So the failing set is **schema-specific**, not a fixed
+  provider list — the metadata schema's optional-heavy + `additionalProperties` confidence object trips
+  the OpenAI-schema-validation family (OpenAI/DeepSeek/Z.ai) where the 104 deliverable schema did not.
+- **Root cause localized:** a direct repro proved OpenAI ACCEPTS the raw `emit_document_metadata`
+  schema in NON-strict mode (`OK tool_calls=True`, both builtins-only and with-custom-field). Yet the
+  live `forced_emit` TIER-FORCE 400s despite the caller passing `strict=False` (plumbed at
+  `forced_emit.py:248/292`), and then degrades straight to null **without a non-strict COERCE retry**.
+  ⇒ the defect is in the shared forced_emit/gateway TIER-FORCE strict handling (and missing non-strict
+  fallback), not in the per-call `strict` flag and not in Phase 111's schema construction.
+- **Impact bumped:** because metadata extraction defaults to gpt-4o (`resolve_extraction_model` env
+  fallback), the **default config silently extracts no metadata** until this is fixed — higher
+  real-world impact than the 104 framing suggested. Anthropic claude-sonnet-4-6, Moonshot kimi-k2.6,
+  MiniMax MiniMax-M2.7, and OpenRouter deepseek/deepseek-chat all returned full confidence-scored
+  metadata (incl. the live custom `contract_value` field), so the dynamic-schema + confidence path
+  itself is proven cross-provider.
+- Google gemini-2.5-flash failed here on a **429 quota** (transient), a separate cause from the 400s.
+
+Disposition unchanged: still OPEN, still pairs with SEED-082, still NOT owned by Phase 111 (111's SC#4
+acceptance = pass-OR-documented-per-provider + graceful degradation, which HELD — every doc completed,
+none stuck). Route the forced_emit strict-400 + non-strict-retry fix to the provider-feature-fit / eval
+phase. Evidence: Phase 111 `111-HUMAN-UAT.md` Test 1 + `scripts/_uat111/results.json`.
