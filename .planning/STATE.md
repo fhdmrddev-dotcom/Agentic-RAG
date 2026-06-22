@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-22T18:49:47.539Z"
-last_activity: 2026-06-22 -- Phase 121 planning complete
+last_updated: "2026-06-22T19:04:37.631Z"
+last_activity: 2026-06-22
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 20
 ---
 
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 120 — collision-fix-context-isolation
+**Current focus:** Phase 121 — one-front-door-for-workflows-ia
 
 ## Current Position
 
-Phase: 120 (collision-fix-context-isolation) — EXECUTED (all 3 plans complete, ready for verification)
-Plan: 3 of 3 (complete)
+Phase: 121 (one-front-door-for-workflows-ia) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-22 -- Phase 121 planning complete
+Last activity: 2026-06-22
 
 ### Quick Tasks Completed
 
@@ -223,6 +223,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 120 P01 | ~4min | 2 tasks (TDD) | 3 files |
 | Phase 120 P02 | ~25min | 2 tasks (1 TDD) | 8 files |
 | Phase 120 P03 | ~10min | 3 tasks | 2 files |
+| Phase 121 P01 | 6min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -242,6 +243,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 120]: Phase 120-02 (CTX-01): every enumerated HARNESS insert site tags origin='harness' (db/runs.py shared helper kwarg, harness_engine success/failure persists + raw expiry INSERT positional $4 (never f-stringed, T-120-06) + disposition prompt, phase_types llm_human_input prompt); api/runs.py ask_user_response is mode-aware (default 'deep', 'harness' ONLY on the confirmed workflow_runs-fallback branch, A2 safe-direction). api/threads.py:1020 user row UNTOUCHED (G-5); full-schema.sql NOT touched.
 - [Phase 120]: Phase 120-03 (CTX-01): migration 076 APPLIED to the live DB (:54322) via psycopg2-direct (NOT db push/reset) — messages.origin NOT NULL DEFAULT 'deep'::text + messages_origin_check CHECK (origin IN ('deep','harness')) confirmed live; 658 legacy rows backfilled to 'deep', zero NULL (the load-bearing NULL-trap guard closed). full-schema.sql regenerated via scripts/regenerate-full-schema.sh (no --reset) — contains origin column at lines 615-616. Full Phase 120 test set green 21/21 (3 integration + 4 collision-regression + 14 origin-filter); the two prior PGRST204 test_093 failures (test_deep_runs_id_path_still_200, test_ask_user_answer_resolves_via_workflow_run_fallback) RESOLVED by the apply. The 3 test_sandbox_service TestHarvestOutputFiles failures are PRE-EXISTING (Phase 075.4 hash-keyed signature pivot, deferred-items.md), 0 net-new.
 - [Phase 120]: Phase 120-03 (CTX-01) Rule 1 fix: the live-DB origin CHECK probe (test_120_migration.py) omitted the NOT NULL user_id column, so the INSERT failed on user_id BEFORE the origin CHECK was reached — a VACUOUS probe. Reuse the throwaway auth.users id for FK + NOT NULL so the CHECK genuinely accepts deep/harness and rejects 'other'. Lesson: live-DB constraint probes must satisfy every NOT NULL sibling column or the target CHECK is never evaluated (commit 035295a1).
+- [Phase ?]: Phase 121-01 (IA-01): removed the Deep/Harness composer toggle + in-chat workflow picker → 2-pill composer (Model + General/Explorer); composer-stop is the post-removal Cancel (D-01, no new chrome); kickoffWorkflowId staging deleted as dead code but postMessage/doRun launch route untouched (SC#2/D-02); workflowLocked gating + mount reconcile + 409 banner preserved byte-identical (SC#3); tsc clean, no backend/migration (D-06/G-5).
 
 ## Operator Next Steps
 

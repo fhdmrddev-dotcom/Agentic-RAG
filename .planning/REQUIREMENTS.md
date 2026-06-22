@@ -14,7 +14,7 @@ Each maps to exactly one roadmap phase.
 
 - [x] **COLL-01**: A skill that saves one file in a thread that previously ran a workflow emits exactly that one file — the sandbox-output harvest is run-scoped to its own run's baseline, so a prior workflow's leftover `/sandbox/output/` artifacts are never re-emitted (the confirmed live 2-files bug, Mechanism A).
 - [x] **CTX-01**: When Deep chat and a workflow share a thread, each mode's history reconstruction replays only its own messages — `messages.origin` (`deep` | `harness`) is recorded and filtered in `_reconstruct_history`, so workflow context never bleeds into a subsequent Deep turn.
-- [ ] **IA-01**: A user launches workflows from one front door (the Workflows page) — the chat composer's Harness pill + in-chat workflow selector are removed, leaving a 2-pill General/Explorer composer, while the Harness↔Deep lock / 409 / reconcile behavior is preserved. (G-2 sketch-gated.)
+- [x] **IA-01**: A user launches workflows from one front door (the Workflows page) — the chat composer's Harness pill + in-chat workflow selector are removed, leaving a 2-pill General/Explorer composer, while the Harness↔Deep lock / 409 / reconcile behavior is preserved. (G-2 sketch-gated.)
 
 ### Cross-Provider Trust & Honesty
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | COLL-01 | Phase 120 | Complete |
 | CTX-01 | Phase 120 | Complete |
-| IA-01 | Phase 121 | Pending |
+| IA-01 | Phase 121 | Complete |
 | MP-01 | Phase 122 | Pending |
 | MP-02 | Phase 122 | Pending |
 | MP-03 | Phase 122 | Pending |

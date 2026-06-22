@@ -102,6 +102,11 @@ None - no external service configuration required. Frontend-only code change; a 
 - **No blockers.** `npx tsc --noEmit` passes; RunCard no-regression tests GREEN; removed symbols now appear ONLY in `ChatAreaMode.test.tsx` (the Plan 02 rewrite target), confirming the 3-file blast radius collapsed to the expected single test file.
 - SC#10 4-axis cross-provider live UAT is authored under `121-VALIDATION.md` (not plan tasks) and stays a verify-phase gate.
 
+## Self-Check: PASSED
+
+- Files verified present: `121-01-SUMMARY.md`, `MessageInput.tsx`, `ChatArea.tsx`.
+- Commits verified in git log: `131584b6` (Task 1), `6f8276de` (Task 2), `900744e1` (SUMMARY).
+
 ---
 *Phase: 121-one-front-door-for-workflows-ia*
 *Completed: 2026-06-22*
