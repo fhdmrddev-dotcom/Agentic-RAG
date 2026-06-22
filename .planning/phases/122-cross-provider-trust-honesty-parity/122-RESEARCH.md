@@ -426,7 +426,7 @@ emit_tier: Literal["force_strict", "force", "coerce"]  # Phase 122 D-122-04 — 
 
 **If this table is non-empty:** these claims need confirmation — A4 (OpenAI strict guarantee source) and A1 (which rung actually recovers) are the load-bearing ones the live scoreboard + an explicit OpenAI force_strict test settle.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`emit_tier` as a literal field vs a derived view, and the two old bools' fate.**
    - What we know: D-122-04 locks the *intent* (one explicit declared value, no provider-name special-case); 55 rows carry the old bools; 4 `forced_emit` consumers + `openai_service.py` read the tier.
