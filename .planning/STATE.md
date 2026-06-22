@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
-status: executing
-last_updated: "2026-06-22T00:00:00.000Z"
-last_activity: 2026-06-22 -- Phase 120 Plan 02 (CTX-01) executed — messages.origin + asymmetric history filter
+status: verifying
+last_updated: "2026-06-22T03:12:29.579Z"
+last_activity: 2026-06-22 -- Phase 120 Plan 03 (CTX-01) executed — migration 076 applied live + full-schema regenerated; ALL Phase 120 plans complete (ready for verification)
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 20
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 ## Current Position
 
-Phase: 120 (collision-fix-context-isolation) — EXECUTING
-Plan: 3 of 3
-Status: Plan 02 (CTX-01) complete — migration 076 authored (NOT applied), origin tagged at every harness write site, asymmetric history filter live. Next = Plan 03 (BLOCKING operator: apply migration 076 + regenerate full-schema.sql + live-DB integration test).
-Last activity: 2026-06-22 -- Phase 120 Plan 02 (CTX-01) executed; SUMMARY written
+Phase: 120 (collision-fix-context-isolation) — EXECUTED (all 3 plans complete, ready for verification)
+Plan: 3 of 3 (complete)
+Status: Plan 03 (CTX-01) complete — migration 076 APPLIED to the live DB (:54322), messages.origin NOT NULL DEFAULT 'deep' + CHECK live, 658 legacy rows backfilled (zero NULL), full-schema.sql regenerated. Full Phase 120 test set green (21/21); the two prior PGRST204 test_093 failures resolved. Next = /gsd:verify-work 120 + the SC#10 4-axis cross-provider live UAT (VALIDATION.md).
+Last activity: 2026-06-22 -- Phase 120 Plan 03 (CTX-01) executed; SUMMARY written; ALL Phase 120 plans complete
 
 ### Quick Tasks Completed
 
@@ -222,6 +222,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 119 P02 | 7min | 3 tasks | 7 files |
 | Phase 120 P01 | ~4min | 2 tasks (TDD) | 3 files |
 | Phase 120 P02 | ~25min | 2 tasks (1 TDD) | 8 files |
+| Phase 120 P03 | ~10min | 3 tasks | 2 files |
 
 ## Decisions
 
@@ -239,6 +240,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 120]: Phase 120-02 (CTX-01): migration 076 AUTHORED only (NOT applied — Plan 03 applies + regenerates full-schema.sql); `messages.origin text NOT NULL DEFAULT 'deep'` + CHECK, no new RLS policy (inherits thread-owner policy, precedent 050). The DEFAULT 'deep' is load-bearing — fills legacy rows so the Deep neq() filter avoids the NULL three-valued-logic drop (Pitfall 1).
 - [Phase 120]: Phase 120-02 (CTX-01): asymmetric origin filter extracted to module-level pure helper `_apply_origin_filter(history_q, agent_mode)` — Deep/Explorer neq('origin','harness') (replays deep + legacy), Harness eq('origin','harness') (strict, A1 defense-in-depth per D-120-06). A SINGLE shared WHERE clause (no per-provider fork); origin kept OUT of .select() projection (Pitfall 4) so _reconstruct_history is unchanged and pure-Deep threads return today's exact set (SC#4 byte-identical). Owner/thread .eq scope never relaxed (V4).
 - [Phase 120]: Phase 120-02 (CTX-01): every enumerated HARNESS insert site tags origin='harness' (db/runs.py shared helper kwarg, harness_engine success/failure persists + raw expiry INSERT positional $4 (never f-stringed, T-120-06) + disposition prompt, phase_types llm_human_input prompt); api/runs.py ask_user_response is mode-aware (default 'deep', 'harness' ONLY on the confirmed workflow_runs-fallback branch, A2 safe-direction). api/threads.py:1020 user row UNTOUCHED (G-5); full-schema.sql NOT touched.
+- [Phase 120]: Phase 120-03 (CTX-01): migration 076 APPLIED to the live DB (:54322) via psycopg2-direct (NOT db push/reset) — messages.origin NOT NULL DEFAULT 'deep'::text + messages_origin_check CHECK (origin IN ('deep','harness')) confirmed live; 658 legacy rows backfilled to 'deep', zero NULL (the load-bearing NULL-trap guard closed). full-schema.sql regenerated via scripts/regenerate-full-schema.sh (no --reset) — contains origin column at lines 615-616. Full Phase 120 test set green 21/21 (3 integration + 4 collision-regression + 14 origin-filter); the two prior PGRST204 test_093 failures (test_deep_runs_id_path_still_200, test_ask_user_answer_resolves_via_workflow_run_fallback) RESOLVED by the apply. The 3 test_sandbox_service TestHarvestOutputFiles failures are PRE-EXISTING (Phase 075.4 hash-keyed signature pivot, deferred-items.md), 0 net-new.
+- [Phase 120]: Phase 120-03 (CTX-01) Rule 1 fix: the live-DB origin CHECK probe (test_120_migration.py) omitted the NOT NULL user_id column, so the INSERT failed on user_id BEFORE the origin CHECK was reached — a VACUOUS probe. Reuse the throwaway auth.users id for FK + NOT NULL so the CHECK genuinely accepts deep/harness and rejects 'other'. Lesson: live-DB constraint probes must satisfy every NOT NULL sibling column or the target CHECK is never evaluated (commit 035295a1).
 
 ## Operator Next Steps
 
