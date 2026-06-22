@@ -92,7 +92,9 @@
   2. Launching a workflow still works as an explicit "launch-in-context" action (the capability is not removed), and a launched workflow's thread still toggles into Harness mode and Continues correctly.
   3. The server-side Harness↔Deep lock still returns a 409 on an illegal switch, and the lock/reconcile behavior is unchanged from before the composer change.
   4. Behavior holds across providers and parallel threads with no Deep-mode regression (SC#10).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 121-01-PLAN.md — remove the Deep/Harness toggle + in-chat workflow picker (2-pill composer); preserve lock/409/reconcile + composer-stop Cancel (SC#1/SC#3)
+- [ ] 121-02-PLAN.md — rewrite ChatAreaMode + extend ChatAreaBanner + new ChatLayout launch test (SC#1/SC#2/SC#3 oracles)
 **UI hint**: yes
 
 #### Phase 122: Cross-Provider Trust & Honesty Parity
@@ -205,7 +207,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 120. Collision Fix + Context Isolation | 0/3 | Planned | - |
-| 121. One Front Door for Workflows (IA) | 0/? | Not started | - |
+| 121. One Front Door for Workflows (IA) | 0/2 | Planned | - |
 | 122. Cross-Provider Trust & Honesty Parity | 0/? | Not started | - |
 | 123. Skill Triggering Quality | 0/? | Not started | - |
 | 124. Workflow Studio UX — Soul + Strict↔Loose | 0/? | Not started | - |
