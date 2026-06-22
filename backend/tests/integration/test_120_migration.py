@@ -196,19 +196,25 @@ async def test_check_accepts_valid_rejects_other(pg_pool):
             )
 
             # 'deep' and 'harness' are ACCEPTED.
+            # NOTE: public.messages.user_id is NOT NULL — it must be supplied or
+            # the INSERT fails on the user_id constraint BEFORE the origin CHECK
+            # is ever evaluated (which would make this an empty probe). Reuse the
+            # throwaway auth.users id created above for FK + NOT NULL.
             for ok_value in ("deep", "harness"):
                 await conn.execute(
-                    "INSERT INTO public.messages (thread_id, role, content, origin) "
-                    "VALUES ($1, $2, $3, $4)",
-                    tid, "user", "probe", ok_value,
+                    "INSERT INTO public.messages "
+                    "(thread_id, user_id, role, content, origin) "
+                    "VALUES ($1, $2, $3, $4, $5)",
+                    tid, uid, "user", "probe", ok_value,
                 )
 
             # Any out-of-domain value is REJECTED by messages_origin_check.
             with pytest.raises(asyncpg.exceptions.CheckViolationError):
                 await conn.execute(
-                    "INSERT INTO public.messages (thread_id, role, content, origin) "
-                    "VALUES ($1, $2, $3, $4)",
-                    tid, "user", "probe", "other",
+                    "INSERT INTO public.messages "
+                    "(thread_id, user_id, role, content, origin) "
+                    "VALUES ($1, $2, $3, $4, $5)",
+                    tid, uid, "user", "probe", "other",
                 )
         finally:
             await tx.rollback()  # never mutate the live corpus
