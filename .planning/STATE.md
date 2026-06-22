@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
-status: verifying
-last_updated: "2026-06-22T19:21:55.171Z"
+status: ready_to_plan
+last_updated: 2026-06-22T21:05:24.065Z
 last_activity: 2026-06-22
 progress:
   total_phases: 5
@@ -11,6 +11,7 @@ progress:
   total_plans: 5
   completed_plans: 5
   percent: 40
+stopped_at: Phase 121 complete (2/2) — ready to discuss Phase 122
 ---
 
 # Project State
@@ -22,13 +23,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 121 — one-front-door-for-workflows-ia
+**Current focus:** Phase 122 — cross provider trust & honesty parity
 
 ## Current Position
 
-Phase: 121 (one-front-door-for-workflows-ia) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 122
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-06-22
 
 ### Quick Tasks Completed
@@ -244,8 +245,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 120]: Phase 120-02 (CTX-01): every enumerated HARNESS insert site tags origin='harness' (db/runs.py shared helper kwarg, harness_engine success/failure persists + raw expiry INSERT positional $4 (never f-stringed, T-120-06) + disposition prompt, phase_types llm_human_input prompt); api/runs.py ask_user_response is mode-aware (default 'deep', 'harness' ONLY on the confirmed workflow_runs-fallback branch, A2 safe-direction). api/threads.py:1020 user row UNTOUCHED (G-5); full-schema.sql NOT touched.
 - [Phase 120]: Phase 120-03 (CTX-01): migration 076 APPLIED to the live DB (:54322) via psycopg2-direct (NOT db push/reset) — messages.origin NOT NULL DEFAULT 'deep'::text + messages_origin_check CHECK (origin IN ('deep','harness')) confirmed live; 658 legacy rows backfilled to 'deep', zero NULL (the load-bearing NULL-trap guard closed). full-schema.sql regenerated via scripts/regenerate-full-schema.sh (no --reset) — contains origin column at lines 615-616. Full Phase 120 test set green 21/21 (3 integration + 4 collision-regression + 14 origin-filter); the two prior PGRST204 test_093 failures (test_deep_runs_id_path_still_200, test_ask_user_answer_resolves_via_workflow_run_fallback) RESOLVED by the apply. The 3 test_sandbox_service TestHarvestOutputFiles failures are PRE-EXISTING (Phase 075.4 hash-keyed signature pivot, deferred-items.md), 0 net-new.
 - [Phase 120]: Phase 120-03 (CTX-01) Rule 1 fix: the live-DB origin CHECK probe (test_120_migration.py) omitted the NOT NULL user_id column, so the INSERT failed on user_id BEFORE the origin CHECK was reached — a VACUOUS probe. Reuse the throwaway auth.users id for FK + NOT NULL so the CHECK genuinely accepts deep/harness and rejects 'other'. Lesson: live-DB constraint probes must satisfy every NOT NULL sibling column or the target CHECK is never evaluated (commit 035295a1).
-- [Phase ?]: Phase 121-01 (IA-01): removed the Deep/Harness composer toggle + in-chat workflow picker → 2-pill composer (Model + General/Explorer); composer-stop is the post-removal Cancel (D-01, no new chrome); kickoffWorkflowId staging deleted as dead code but postMessage/doRun launch route untouched (SC#2/D-02); workflowLocked gating + mount reconcile + 409 banner preserved byte-identical (SC#3); tsc clean, no backend/migration (D-06/G-5).
-- [Phase ?]: Phase 121-02 (IA-01): SC oracles bound as isolated test-only assertions — SC#1 2-pill (workflow-mode-selector + workflow-picker null, agent-mode + Model present), Cancel-reachability D-01 (composer-stop click → onStop), SC#3 (workflowLocked disable + 'Workflow running — Cancel to switch back' placeholder; getThreadWorkflow locked:true mount-reconcile disables; 409 test b byte-unchanged), SC#2 (ChatLayout doRun → createThread + postMessage{workflowDefinitionId} + onNavigate('chat')); RunCard tests untouched + GREEN
+- [Phase 121]: Phase 121-01 (IA-01): removed the Deep/Harness composer toggle + in-chat workflow picker → 2-pill composer (Model + General/Explorer); composer-stop is the post-removal Cancel (D-01, no new chrome); kickoffWorkflowId staging deleted as dead code but postMessage/doRun launch route untouched (SC#2/D-02); workflowLocked gating + mount reconcile + 409 banner preserved byte-identical (SC#3); tsc clean, no backend/migration (D-06/G-5).
+- [Phase 121]: Phase 121-02 (IA-01): SC oracles bound as isolated test-only assertions — SC#1 2-pill (workflow-mode-selector + workflow-picker null, agent-mode + Model present), Cancel-reachability D-01 (composer-stop click → onStop), SC#3 (workflowLocked disable + 'Workflow running — Cancel to switch back' placeholder; getThreadWorkflow locked:true mount-reconcile disables; 409 test b byte-unchanged), SC#2 (ChatLayout doRun → createThread + postMessage{workflowDefinitionId} + onNavigate('chat')); RunCard tests untouched + GREEN
 - [Phase ?]: Phase 121-02 (IA-01): reset workflowLockByThread in ChatAreaBanner beforeEach (Rule 1 test-isolation — the lock map is not mock-cleared so a locked reconcile bled into the next test); reconcile-lock mocks use mockResolvedValue not …Once because the mount reconcile effect can re-fire
 
 ## Operator Next Steps
