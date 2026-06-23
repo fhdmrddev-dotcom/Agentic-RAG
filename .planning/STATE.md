@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T18:17:14.486Z"
+last_updated: "2026-06-23T18:31:59.672Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 60
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123 (skill-triggering-quality) — EXECUTING
-Plan: 5 of 6
-Status: Ready to execute
+Plan: 6 of 6
+Status: Plan 05 complete (Trigger Tuner UI + reachability triad, 14/14 vitest, tsc clean) — ready to execute Plan 06
 Last activity: 2026-06-23
 
 ### Quick Tasks Completed
@@ -233,6 +233,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
 | Phase 123 P03 | 12min | 2 tasks | 6 files |
 | Phase 123 P04 | 8min | 2 tasks | 3 files |
+| Phase 123 P05 | ~10min | 3 tasks (2 TDD) | 11 files |
 
 ## Decisions
 
@@ -273,6 +274,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123-03 (TRIG-01): pure scoring = deterministic 60/40 split + 3-repeat aggregate + pick_winner BY HELD-OUT (never train); every cell carries BOTH fires/no_false (042-A). configured_targets = presence-only probe, OpenRouter distinct from native deepseek/zhipu, N=1 clean baseline, local first-class. auto_seed does no I/O; fetch_owner_scoped_siblings carries the .or_(user_id.eq,is_global.eq.true) leak gate. ZERO migration/package.
 - [Phase ?]: Phase 123-04 (TRIG-01): net-new owner-scoped skill_tuner.py router (start/stream/results) over the Phase-061+ run-buffer; service-role + .or_(own,global) sole leak gate, 404 on cross-user; tuner_progress/tuner_provider_done/tuner_complete vocab never overloads chat events.
 - [Phase ?]: Phase 123-04 (TRIG-01): background run bounded on every axis (MAX_CASES=40/MAX_TARGETS=8/MAX_ITERATIONS<=5 + per-call get_per_call_timeout + one job per skill via _INFLIGHT_SKILLS->409); calls ONLY Plan-03 forced_emit service fns (D-14 red line); cases+scoreboard ephemeral at tuner_result:{run_id} run-buffer key, no DB schema change.
+- [Phase 123]: Phase 123-05 (TRIG-01): Trigger Tuner React surface + the reachability triad in ONE plan (App ActiveView 'skill-tuner' + tunerSkillId + onTuneSkill, ChatLayout skill-tuner mount branch, SkillsPage 'Tune triggers' entry action on the selected skill) — the Phase-118 built-but-unreachable lesson; SkillTunerPage is a focused full-surface entered WITH a skillId (GovernancePage/publish-gauntlet ActiveView no-router precedent).
+- [Phase 123]: Phase 123-05 (TRIG-01): ProviderScoreboard (no-analog, 042-A) derives its N columns PURELY from the server-returned cells — a provider the org doesn't run is simply absent so it never renders (a score you can't act on is fabricated); N=1 is the clean baseline (no degraded affordance), OpenRouter≠native zhipu/z-ai, EVERY cell shows BOTH fires (recall) + no-false (the false-fire rail), never a hidden aggregate (T-123-05-01).
+- [Phase 123]: Phase 123-05 (TRIG-01): author-confirm-not-auto-apply (042-A/D-03) — CandidateCard's Use→reveal-diff is NOT the write; updateSkill (PATCH /skills, re-lints) fires ONLY on explicit confirm. LiveRunCard: queued≠running (no fake percent, 043-A) + never-vanishing elapsed timer derived from a stable start-ts (the 095 lesson, frozen on terminal) + reconcile-on-return (terminal 'done' re-reads GET results, SSE tuner_complete a best-effort hint per D-v2.5-03). CaseEditor 60/40 split bar mirrors backend split_held_out. ZERO package/migration; chat subscribeToRun untouched (purpose-built streamTunerRun tuner_* reader). 14/14 vitest, tsc clean.
 
 ## Operator Next Steps
 
