@@ -461,6 +461,17 @@ export interface Document {
   image_count?: number
 }
 
+/** Phase 123-06 (TRIG-03) — one save-time description-lint warning, mirroring the
+ *  backend `skill_lint.lint_description()` `{code, message}` shape (Plan 01).
+ *  `code` is the specific reason (`name_echo` / `no_trigger_verb` / `too_short` /
+ *  `too_long` / `generic` / `duplicate` / `empty`); `message` is the human reason
+ *  string the inline warning renders verbatim. The lint is WARN-NEVER-BLOCK (D-09):
+ *  the save already succeeded — these are advisory. */
+export interface SkillLintWarning {
+  code: string
+  message: string
+}
+
 export interface Skill {
   id: string
   user_id: string
@@ -471,6 +482,14 @@ export interface Skill {
   is_global: boolean
   created_at: string
   updated_at: string
+  /** Phase 123-06 (TRIG-03) — the optional save-time lint warnings the
+   *  POST/PATCH /skills response carries (`SkillResponse.lint_warnings`, Plan 01).
+   *  Advisory only — the save already succeeded (warn-never-block, D-09). Empty/
+   *  absent => healthy (silent-when-healthy). The shared `SkillForm` holds the
+   *  returned warnings in local state after a save resolves and renders them
+   *  inline under the Description textarea (sketch 044-A), each with a one-click
+   *  "Tune this" handoff into the Trigger Tuner. */
+  lint_warnings?: SkillLintWarning[]
 }
 
 export interface SkillCreate {

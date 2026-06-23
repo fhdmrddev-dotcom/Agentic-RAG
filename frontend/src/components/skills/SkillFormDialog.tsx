@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Paperclip, FileText, Trash2, Loader2 } from "lucide-react"
+import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { listSkillFiles, uploadSkillFile, deleteSkillFile } from "@/lib/api"
-import type { Skill, SkillCreate, SkillUpdate, SkillFile } from "@/types"
+import type { Skill, SkillCreate, SkillUpdate, SkillFile, SkillLintWarning } from "@/types"
 
 // ---------------------------------------------------------------------------
 // SkillForm — shared inner form component used by both SkillFormDialog and SkillDetailPanel
@@ -33,6 +33,13 @@ interface SkillFormProps {
   onAttach: (e: React.ChangeEvent<HTMLInputElement>) => void
   onDeleteFile: (fileId: string) => void
   fileInputRef: React.RefObject<HTMLInputElement>
+  /** Phase 123-06 (TRIG-03 / sketch 044-A): the save-time lint warnings returned
+   *  by the last save (POST/PATCH /skills `lint_warnings`). Rendered inline under
+   *  the Description textarea — warn-never-block (D-09), silent when empty/absent. */
+  lintWarnings?: SkillLintWarning[]
+  /** Fires the one-click "Tune this" handoff into the Trigger Tuner for this skill
+   *  (D-12). Undefined while creating a brand-new skill (no id to tune yet). */
+  onTuneThis?: () => void
 }
 
 function SkillForm({
@@ -51,6 +58,8 @@ function SkillForm({
   onAttach,
   onDeleteFile,
   fileInputRef,
+  lintWarnings,
+  onTuneThis,
 }: SkillFormProps) {
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -68,13 +77,54 @@ function SkillForm({
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Description</label>
+        <label className="text-sm font-medium text-foreground">
+          Description{" "}
+          <span className="text-xs text-muted-foreground font-normal">
+            · drives when the agent loads this skill
+          </span>
+        </label>
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="One sentence describing what this skill does"
           rows={2}
         />
+
+        {/* Phase 123-06 (TRIG-03 / sketch 044-A): inline weak-description lint.
+            Mounted DIRECTLY under the Description textarea (variant A — closest to
+            the thing it's about) in the SHARED SkillForm, so it covers BOTH the
+            modal SkillFormDialog and the 3-pane SkillDetailPanel from one place.
+            Warn-NEVER-block (D-09): the save already succeeded; this is advisory.
+            Renders nothing when warnings are empty/absent (silent-when-healthy). */}
+        {lintWarnings && lintWarnings.length > 0 && (
+          <div
+            role="status"
+            className="mt-1 flex items-start gap-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" aria-hidden="true" />
+            <div className="flex-1 min-w-0 text-xs leading-relaxed">
+              <p className="font-semibold text-amber-400">
+                Weak trigger description — the agent may not fire this skill.
+              </p>
+              <ul className="mt-1 list-disc pl-4 text-muted-foreground space-y-0.5">
+                {lintWarnings.map((w) => (
+                  <li key={w.code}>{w.message}</li>
+                ))}
+              </ul>
+            </div>
+            {onTuneThis && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={onTuneThis}
+                className="shrink-0 gap-1.5 bg-amber-500 text-amber-950 hover:bg-amber-400 border-none h-7 px-2.5 text-xs font-semibold"
+              >
+                <Target className="h-3.5 w-3.5" />
+                Tune this
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Instructions */}
@@ -155,11 +205,18 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   skill?: Skill | null
-  onSave: (body: SkillCreate | SkillUpdate) => Promise<void>
+  /** Resolves to the saved Skill so the form can surface its `lint_warnings`
+   *  (POST/PATCH /skills, Plan 01). `void` for callers that don't return it
+   *  (the warning simply won't render). */
+  onSave: (body: SkillCreate | SkillUpdate) => Promise<Skill | void>
   currentUserId?: string
+  /** Phase 123-06 (TRIG-03 / D-12): the verified Plan-05 navigator that opens the
+   *  Trigger Tuner for a skill. The inline lint's "Tune this" button reuses THIS
+   *  exact seam (App → ChatLayout → "skill-tuner" view), never a parallel path. */
+  onTuneSkill?: (skillId: string) => void
 }
 
-export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUserId }: Props) {
+export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUserId, onTuneSkill }: Props) {
   const isEdit = !!skill
   const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
 
@@ -171,6 +228,9 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
   const [files, setFiles] = useState<SkillFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [fileError, setFileError] = useState<string | null>(null)
+  // Phase 123-06: the lint warnings from the last save (advisory; warn-never-block).
+  const [lintWarnings, setLintWarnings] = useState<SkillLintWarning[]>([])
+  const [savedSkillId, setSavedSkillId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset fields whenever dialog opens/closes or skill changes
@@ -183,6 +243,8 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
       setSaving(false)
       setFiles([])
       setFileError(null)
+      setLintWarnings([])
+      setSavedSkillId(skill?.id ?? null)
       if (skill) {
         listSkillFiles(skill.id)
           .then(setFiles)
@@ -225,8 +287,14 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
       const body = isEdit
         ? ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillUpdate)
         : ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillCreate)
-      await onSave(body)
-      onOpenChange(false)
+      // The save ALWAYS proceeds — the lint is advisory (D-09). Capture the
+      // returned skill's lint_warnings; if any fired, KEEP the dialog open so the
+      // inline warning + "Tune this" are visible. Healthy save → close as before.
+      const saved = await onSave(body)
+      const warnings = (saved && "lint_warnings" in saved && saved.lint_warnings) || []
+      if (saved?.id) setSavedSkillId(saved.id)
+      setLintWarnings(warnings)
+      if (warnings.length === 0) onOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save skill.")
     } finally {
@@ -258,6 +326,12 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
             onAttach={handleFileUpload}
             onDeleteFile={handleDeleteFile}
             fileInputRef={fileInputRef}
+            lintWarnings={lintWarnings}
+            onTuneThis={
+              onTuneSkill && savedSkillId
+                ? () => onTuneSkill(savedSkillId)
+                : undefined
+            }
           />
         </div>
 
@@ -283,12 +357,16 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
 
 interface SkillDetailPanelProps {
   skill: Skill | null
-  onSave: (body: SkillCreate | SkillUpdate) => Promise<void>
+  onSave: (body: SkillCreate | SkillUpdate) => Promise<Skill | void>
   onDiscard: () => void
   currentUserId?: string
+  /** Phase 123-06 (TRIG-03 / D-12): the verified Plan-05 navigator (reused, not
+   *  forked) that opens the Trigger Tuner for a skill. The inline lint's "Tune
+   *  this" button fires it with the saved skill's id. */
+  onTuneSkill?: (skillId: string) => void
 }
 
-export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: SkillDetailPanelProps) {
+export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTuneSkill }: SkillDetailPanelProps) {
   const isEdit = !!skill
   const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
 
@@ -300,6 +378,9 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: Sk
   const [files, setFiles] = useState<SkillFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [fileError, setFileError] = useState<string | null>(null)
+  // Phase 123-06: lint warnings from the last save (advisory; warn-never-block).
+  const [lintWarnings, setLintWarnings] = useState<SkillLintWarning[]>([])
+  const [savedSkillId, setSavedSkillId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset when selected skill changes
@@ -311,6 +392,8 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: Sk
     setSaving(false)
     setFiles([])
     setFileError(null)
+    setLintWarnings([])
+    setSavedSkillId(skill?.id ?? null)
     if (skill) {
       listSkillFiles(skill.id)
         .then(setFiles)
@@ -352,7 +435,11 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: Sk
       const body = isEdit
         ? ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillUpdate)
         : ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillCreate)
-      await onSave(body)
+      // The save ALWAYS proceeds (D-09). The panel already stays open after a save,
+      // so we just capture the returned lint_warnings to render inline.
+      const saved = await onSave(body)
+      if (saved?.id) setSavedSkillId(saved.id)
+      setLintWarnings((saved && "lint_warnings" in saved && saved.lint_warnings) || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save skill.")
     } finally {
@@ -390,6 +477,12 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: Sk
           onAttach={handleFileUpload}
           onDeleteFile={handleDeleteFile}
           fileInputRef={fileInputRef}
+          lintWarnings={lintWarnings}
+          onTuneThis={
+            onTuneSkill && savedSkillId
+              ? () => onTuneSkill(savedSkillId)
+              : undefined
+          }
         />
       </div>
 

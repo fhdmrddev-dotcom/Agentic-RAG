@@ -27,14 +27,16 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<{ text: string; isError: boolean } | null>(null)
 
-  const handleSave = async (body: SkillCreate | SkillUpdate) => {
+  const handleSave = async (body: SkillCreate | SkillUpdate): Promise<Skill> => {
     if (selectedSkill) {
-      await updateSkill(selectedSkill.id, body as SkillUpdate)
-      // Panel stays open after edit — user sees updated state
-    } else {
-      await createSkill(body as SkillCreate)
-      setIsCreatingNew(false) // close after new skill created
+      // Panel stays open after edit — user sees updated state + any lint warnings.
+      // Return the saved skill so SkillDetailPanel can surface its lint_warnings
+      // (Phase 123-06 / TRIG-03 — the inline never-block warning + "Tune this").
+      return updateSkill(selectedSkill.id, body as SkillUpdate)
     }
+    const created = await createSkill(body as SkillCreate)
+    setIsCreatingNew(false) // close after new skill created
+    return created
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +179,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
                 onSave={handleSave}
                 onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
                 currentUserId={user?.id}
+                onTuneSkill={onTuneSkill}
               />
             </div>
           </div>
