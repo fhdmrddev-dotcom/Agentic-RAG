@@ -357,8 +357,9 @@ The 7 load-bearing findings were re-verified by 7 independent adversarial verifi
 
 Re-verified green on `develop` with the real venv: 78 backend tests across the touched files + shared-path regression files; 8 frontend tests; `tsc --noEmit` clean.
 
+**WR-03 — FIXED after live UAT (`af73f75d`).** Promoted from backlog when the operator hit it live: a tuner run hard-failed at ~62s with `redis_timeout` (the shared SSE consumer's socket-read deadline during the long builder phase), even though the bounded job kept computing server-side. `SkillTunerPage` now treats transient transport terminals (`redis_timeout` / `consumer_timeout`) as non-fatal — reconcile via `getTunerResults`, else reconnect the stream from the buffer (bounded by MAX_RECONNECTS). Mirrors the chat path + D-v2.5-03. Proven live: a run survived past 120s, reconnected through the logged `redis_timeout`, and kept scoring providers (network: stream 200 → results 404 → stream 200). +2 regression tests. Frontend-only; shared chat consumer untouched.
+
 **Accepted as non-blocking backlog (not fixed in-phase):**
-- **WR-03** — long tuner runs falsely flagged failed by the shared 610s `consumer_timeout`; frontend should reconcile via `getTunerResults` on a `consumer_timeout` terminal. (UX robustness; run keeps computing server-side.)
 - **WR-05** — `CaseEditor` advertises client auto-seed it never performs; dead `seeded`/`sibling`/`held` provenance values; run-config shows "0 cases" while the server auto-seeds. (Honesty/clarity; the backend DOES seed correctly.)
 - **WR-08** — transient Redis read during results-poll maps to a 503 the frontend silently swallows; should distinguish 404 (poll again) from 503 (retry/surface).
 - **IN-01** (`Optional` renders harmless `str|null` anyOf — google adapter sanitizes; soften docstring), **IN-02** (placeholder local model ids in the Settings picker), **IN-03** (pinned groups reordered to front — atomic pairs intact, low risk), **IN-04** (`_started_score` is a timestamp — rename nit).
