@@ -1341,6 +1341,10 @@ def _forced_emit_schemas() -> dict[str, dict]:
         notes: dict | None = Field(default=None)
 
     easy_tool = {
+        "type": "function",  # REQUIRED by the openai-compat tools API — without it
+        # openai/deepseek/moonshot/zhipu/minimax 400 ("missing tools[0].type"); native
+        # anthropic/google adapters read .function directly and tolerate its absence.
+        # Mirrors the production tool-registry shape (122 live-UAT fix).
         "function": {
             "name": "emit_easy",
             "description": "Emit the structured easy field-map.",
@@ -1356,6 +1360,7 @@ def _forced_emit_schemas() -> dict[str, dict]:
         }
     }
     hard_tool = {
+        "type": "function",  # REQUIRED by the openai-compat tools API (see easy_tool).
         "function": {
             "name": "emit_hard",
             "description": "Emit the structured hard field-map (optional-heavy).",
@@ -1390,6 +1395,17 @@ def _forced_emit_schemas() -> dict[str, dict]:
 _FORCED_EMIT_PROMPT = (
     "Produce a one-line title and a short summary describing a quarterly status "
     "report. Emit the structured field-map via the tool."
+)
+
+# A NON-EMPTY system prompt is REQUIRED: the anthropic adapter stamps cache_control on
+# the system block, and an EMPTY system text block 400s ("cache_control cannot be set
+# for empty text blocks") — the forced rung raises and the ladder masks it by descending
+# to coerce, understating anthropic's true forced-emit capability. Real forced_emit
+# consumers (judge / llm_emit / metadata extraction) all pass a real system prompt, so
+# this mirrors production (122 live-UAT fix).
+_FORCED_EMIT_SYSTEM = (
+    "You are a precise data-extraction assistant. Use the provided tool to emit the "
+    "structured field-map exactly per the schema."
 )
 
 
@@ -1553,7 +1569,7 @@ async def _drive_forced_emit_cell(
             emitter=spec["emitter"],
             tools=spec["tools"],
             user_settings=user_settings,
-            system_prompt="",
+            system_prompt=_FORCED_EMIT_SYSTEM,
             schema_model=spec["schema_model"],
         )
     except Exception as e:  # noqa: BLE001 — an unexpected raise is an honest provider_error cell

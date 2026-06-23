@@ -230,3 +230,35 @@ def test_undocumented_fail_fails_the_gate():
     # trigger=FAIL (provider_error, never reached) and NOT documented -> fails.
     assert cell["axes"]["trigger"] == "FAIL"
     assert ecp._cell_gate_ok(cell) is False
+
+
+# ── 5. live-input shape guards (122 live-UAT regression) ───────────────────────
+# The structure tests above mock the forced_emit RESULT, so they never exercised the
+# real tool fixtures / system prompt against a provider — exactly the blind spot
+# code-review WR-04 named. The 122 live operator run found TWO input defects the mocks
+# hid: the EASY/HARD tool defs omitted the openai-compat-required ``type: "function"``
+# wrapper (→ openai/deepseek/moonshot/zhipu/minimax 400 "missing tools[0].type", read
+# as a cross-provider emission failure), and an EMPTY ``system_prompt`` 400'd anthropic's
+# forced rung ("cache_control cannot be set for empty text blocks"), masking its true
+# forced-emit capability behind a coerce descent. These guards pin both input shapes.
+
+
+def test_forced_emit_tools_carry_type_function():
+    """Every tool in _forced_emit_schemas() MUST carry ``type: "function"`` — the
+    openai-compat tools API rejects a bare ``{"function": {...}}`` with a 400
+    ("missing tools[0].type"), which masquerades as a cross-provider emission failure."""
+    schemas = ecp._forced_emit_schemas()
+    assert set(schemas) >= {"easy", "hard"}
+    for difficulty, spec in schemas.items():
+        for tool in spec["tools"]:
+            assert tool.get("type") == "function", (
+                f"{difficulty} tool missing type=function (openai-compat 400 trap)"
+            )
+            assert tool["function"]["name"] == spec["emitter"]
+
+
+def test_forced_emit_system_prompt_is_non_empty():
+    """The forced shot MUST send a non-empty system prompt — an empty system text block
+    400s anthropic's forced rung (cache_control on empty block), masking its true
+    forced-emit capability behind a coerce descent."""
+    assert ecp._FORCED_EMIT_SYSTEM.strip(), "forced-emit system prompt must be non-empty"
