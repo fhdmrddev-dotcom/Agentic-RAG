@@ -36,6 +36,16 @@ def _tc(id: str, name: str, args: str) -> dict:
     return {"id": id, "type": "function", "function": {"name": name, "arguments": args}}
 
 
+def _skill_tool(tool_call_id: str, skill_name: str, content: str) -> dict:
+    """A tool-result message tagged as a pinned load_skill result (CTX-03)."""
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "content": content,
+        "_pinned_skill": skill_name,
+    }
+
+
 # ---------------------------------------------------------------------------
 # estimate_tokens
 # ---------------------------------------------------------------------------
@@ -507,3 +517,169 @@ def test_trim_protected_overrun_preserves_last_message():
     result = trim_messages_to_fit(messages, max_tokens=20, reserve_recent=6)
     # The last message must survive (hard floor)
     assert last_msg in result, "Last protected message must never be trimmed"
+
+
+# ---------------------------------------------------------------------------
+# trim_messages_to_fit — CTX-03 pinned load_skill protected class (Plan 123-02)
+# ---------------------------------------------------------------------------
+
+def _has_parent_tool_calls(result: list[dict], tool_call_id: str) -> bool:
+    """True if some assistant+tool_calls message in result owns tool_call_id."""
+    return any(
+        m.get("role") == "assistant"
+        and any(tc.get("id") == tool_call_id for tc in (m.get("tool_calls") or []))
+        for m in result
+    )
+
+
+def test_pin_load_skill_survives_trim():
+    """A load_skill group near the FRONT survives even when older non-skill turns
+    are trimmed out (CTX-03 — a loaded skill stays available for the session)."""
+    system_msg = _sys("System.")
+    messages = [system_msg]
+    # The load_skill group lives near the front (would normally be trimmed first)
+    messages.append(_assistant_tc([_tc("call_skill", "load_skill", '{"skill_name": "pptx-builder"}')]))
+    messages.append(_skill_tool("call_skill", "pptx-builder", "SKILL INSTRUCTIONS: build pptx. " * 10))
+    # Many filler non-skill turns that blow the budget
+    for i in range(20):
+        messages.append(_user(f"Filler question {i} " * 20))
+        messages.append(_assistant(f"Filler reply {i} " * 20))
+
+    result = trim_messages_to_fit(messages, max_tokens=400, reserve_recent=4)
+
+    # The pinned skill tool-result is STILL present
+    skill_tool = next(
+        (m for m in result if m.get("role") == "tool" and m.get("_pinned_skill") == "pptx-builder"),
+        None,
+    )
+    assert skill_tool is not None, "Pinned load_skill tool-result must survive the trim"
+    # Older non-skill filler turns are gone
+    assert not any("Filler question 0 " in (m.get("content") or "") for m in result), (
+        "Oldest non-skill turns should have been trimmed"
+    )
+
+
+def test_pin_keeps_atomic_pair():
+    """The pinned group keeps BOTH its assistant+tool_calls parent AND its
+    tool-result — no orphaned tool message (Pitfall 2 / D-14 atomic invariant)."""
+    system_msg = _sys("System.")
+    messages = [system_msg]
+    messages.append(_assistant_tc([_tc("call_skill", "load_skill", '{"skill_name": "docx-builder"}')]))
+    messages.append(_skill_tool("call_skill", "docx-builder", "SKILL INSTRUCTIONS " * 20))
+    for i in range(20):
+        messages.append(_user(f"Filler {i} " * 20))
+        messages.append(_assistant(f"Reply {i} " * 20))
+
+    result = trim_messages_to_fit(messages, max_tokens=400, reserve_recent=4)
+
+    # The pinned tool-result is present AND its parent assistant+tool_calls is too
+    skill_tool = next(
+        (m for m in result if m.get("role") == "tool" and m.get("_pinned_skill") == "docx-builder"),
+        None,
+    )
+    assert skill_tool is not None
+    assert _has_parent_tool_calls(result, "call_skill"), (
+        "Pinned tool-result must keep its assistant+tool_calls parent (no orphan)"
+    )
+    # No orphaned tool messages anywhere in the output
+    for msg in result:
+        if msg.get("role") == "tool":
+            assert _has_parent_tool_calls(result, msg.get("tool_call_id")), (
+                f"Orphaned tool result: {msg.get('tool_call_id')}"
+            )
+
+
+def test_pin_dedupe_same_skill():
+    """The same skill loaded twice → exactly ONE pinned copy survives (the LATEST);
+    the older one is demoted to the trimmable pool (D-13 de-dupe)."""
+    system_msg = _sys("System.")
+    messages = [system_msg]
+    # First (older) load of the same skill
+    messages.append(_assistant_tc([_tc("call_a", "load_skill", '{"skill_name": "pptx-builder"}')]))
+    messages.append(_skill_tool("call_a", "pptx-builder", "OLD instructions " * 20))
+    # Filler
+    for i in range(6):
+        messages.append(_user(f"Filler {i} " * 20))
+        messages.append(_assistant(f"Reply {i} " * 20))
+    # Second (newer) load of the SAME skill
+    messages.append(_assistant_tc([_tc("call_b", "load_skill", '{"skill_name": "pptx-builder"}')]))
+    messages.append(_skill_tool("call_b", "pptx-builder", "NEW instructions " * 20))
+    # More filler to force trimming
+    for i in range(10):
+        messages.append(_user(f"Late {i} " * 20))
+        messages.append(_assistant(f"LateReply {i} " * 20))
+
+    result = trim_messages_to_fit(messages, max_tokens=500, reserve_recent=4)
+
+    pinned_tool_ids = [
+        m.get("tool_call_id")
+        for m in result
+        if m.get("role") == "tool"
+        and m.get("_pinned_skill") == "pptx-builder"
+        and _has_parent_tool_calls(result, m.get("tool_call_id"))
+    ]
+    # Exactly ONE pinned copy survives, and it is the LATEST (call_b)
+    assert pinned_tool_ids == ["call_b"], (
+        f"Expected only the latest pinned copy (call_b); got {pinned_tool_ids}"
+    )
+
+
+def test_pin_budget_evicts_lru_with_marker():
+    """Pinned groups whose summed token estimate exceeds PIN_BUDGET_FRACTION*max_tokens
+    → the least-recently-loaded pinned group is evicted AND _TRIM_MARKER appears."""
+    from app.services.context_window import PIN_BUDGET_FRACTION
+
+    system_msg = _sys("System.")
+    max_tokens = 600
+    pin_budget = int(PIN_BUDGET_FRACTION * max_tokens)
+    # Build two big pinned skill groups; together they should exceed pin_budget.
+    # Each tool-result content is sized so a single one already approaches the budget.
+    big = "X" * (pin_budget * 4)  # chars/4 → ~pin_budget tokens per result
+    messages = [system_msg]
+    # Older pinned skill (least-recently-loaded — should be evicted)
+    messages.append(_assistant_tc([_tc("call_old", "load_skill", '{"skill_name": "skill-old"}')]))
+    messages.append(_skill_tool("call_old", "skill-old", big))
+    # Newer pinned skill (should be kept)
+    messages.append(_assistant_tc([_tc("call_new", "load_skill", '{"skill_name": "skill-new"}')]))
+    messages.append(_skill_tool("call_new", "skill-new", big))
+    # A couple of recent protected turns
+    messages.append(_user("recent question"))
+    messages.append(_assistant("recent reply"))
+
+    result = trim_messages_to_fit(messages, max_tokens=max_tokens, reserve_recent=2)
+
+    kept_skills = {
+        m.get("_pinned_skill")
+        for m in result
+        if m.get("role") == "tool" and m.get("_pinned_skill")
+        and _has_parent_tool_calls(result, m.get("tool_call_id"))
+    }
+    # The newer skill is kept; the older (LRU) one was evicted
+    assert "skill-new" in kept_skills, "Newest pinned skill must survive the budget cap"
+    assert "skill-old" not in kept_skills, "Least-recently-loaded pinned skill must be evicted over budget"
+    # Eviction is never silent — the honest trim marker is present
+    assert any(_TRIM_MARKER in (m.get("content") or "") for m in result), (
+        "Pin eviction must insert the honest _TRIM_MARKER"
+    )
+
+
+def test_pin_never_starves_recent():
+    """With pins at the budget cap, the reserve_recent tail is STILL fully preserved
+    (T-123-02-01 — pinning never starves the recent-message budget)."""
+    system_msg = _sys("System.")
+    max_tokens = 500
+    big = "Y" * (max_tokens * 4)  # one oversized pinned result
+    messages = [system_msg]
+    messages.append(_assistant_tc([_tc("call_skill", "load_skill", '{"skill_name": "huge-skill"}')]))
+    messages.append(_skill_tool("call_skill", "huge-skill", big))
+    # Recent protected tail
+    recent_user = _user("recent question")
+    recent_assistant = _assistant("recent reply")
+    messages.append(recent_user)
+    messages.append(recent_assistant)
+
+    result = trim_messages_to_fit(messages, max_tokens=max_tokens, reserve_recent=2)
+
+    # The recent tail is fully preserved even though the pin overflowed the budget
+    assert recent_user in result, "reserve_recent tail must never be starved by a pin"
+    assert recent_assistant in result, "reserve_recent tail must never be starved by a pin"
