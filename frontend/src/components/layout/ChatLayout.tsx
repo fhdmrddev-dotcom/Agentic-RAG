@@ -10,6 +10,7 @@ import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { GovernancePage } from "@/pages/GovernancePage"
+import { SkillTunerPage } from "@/pages/SkillTunerPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -33,9 +34,16 @@ interface Props {
   onNavigate: (view: ActiveView) => void
   prefillMessage: string | null
   onSetPrefillMessage: (msg: string | null) => void
+  // Phase 123-05 (TRIG-01 / sketch 041-A): the selected skill for the focused
+  // Trigger Tuner surface + the navigator that opens it. Both come from App
+  // (the per-view selection state) so the reachability triad — the ActiveView
+  // union member, this mount branch, and the SkillsPage entry action — is owned
+  // in-phase (the Phase-118 built-but-unreachable lesson).
+  tunerSkillId: string | null
+  onTuneSkill: (skillId: string) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage, tunerSkillId, onTuneSkill }: Props) {
   const {
     threads,
     selectedThread,
@@ -282,7 +290,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
           {activeView === "documents" ? (
             <IngestionPage onNavigate={onNavigate} />
           ) : activeView === "skills" ? (
-            <SkillsPage onTryInChat={handleTryInChat} />
+            <SkillsPage onTryInChat={handleTryInChat} onTuneSkill={onTuneSkill} />
           ) : activeView === "settings" ? (
             <SettingsPage />
           ) : activeView === "workflows" ? (
@@ -305,6 +313,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             // surface is reachable; the Phase 118 built-but-unreachable lesson).
             // Self-fetches the 3 governance signals — no props; three-homes, no router.
             <GovernancePage />
+          ) : activeView === "skill-tuner" ? (
+            // Phase 123-05 (TRIG-01 / sketch 041-A): the Trigger Tuner focused
+            // full-surface mounts here (additive branch BEFORE the trailing
+            // KnowledgeHealthPage else — mirrors the governance branch above). It
+            // is entered WITH a skillId via the SkillsPage "Tune triggers" action
+            // (onTuneSkill → App's tunerSkillId setter + onNavigate); "‹ Skills"
+            // returns. The reachability triad (App union + this mount + the entry
+            // action) is owned in-phase (the Phase-118 built-but-unreachable lesson).
+            <SkillTunerPage skillId={tunerSkillId} onBack={() => onNavigate("skills")} />
           ) : (
             <KnowledgeHealthPage />
           )}

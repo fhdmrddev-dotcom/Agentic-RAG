@@ -2623,3 +2623,203 @@ export async function publishWorkflow(
   if (res.status === 409) return { kind: "already_published" }
   throw new Error(`Failed to publish workflow (status ${res.status})`)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 123-05 (TRIG-01) — Skill Trigger Tuner client calls.
+//
+// Mirror the Plan-04 router contract (backend/app/api/skill_tuner.py):
+//   POST   /skills/{id}/tuner/runs           → kick off a BOUNDED background run, get a run_id
+//   GET    /skills/{id}/tuner/runs/{run}/stream  → live tuner_* SSE progress
+//   GET    /skills/{id}/tuner/runs/{run}     → the held-out scoreboard once complete
+//
+// The per-provider cell shape (`{ provider, model, axes: { fires, no_false }, score }`)
+// is the ProviderScoreboard render input (042-A — BOTH sub-scores present, never a
+// hidden aggregate). The scoreboard is N-column = the org's configured targets; the
+// candidate set is held-out-scored and the author picks the winner by held-out (D-03).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A benchmark target column = a provider + its representative model (043-A run config). */
+export interface TunerTarget {
+  provider: string
+  model: string
+}
+
+/** One (client-held) benchmark case: a user prompt + whether the skill SHOULD fire on it
+ *  (the should-NOT cases are the false-fire rail). Cases are ephemeral / never persisted. */
+export interface TunerCase {
+  prompt: string
+  should_fire: boolean
+}
+
+/** A single per-provider scoreboard cell. BOTH sub-scores are always present (042-A — the
+ *  false-fire rail is never a hidden aggregate): `fires` = should-trigger recall, `no_false`
+ *  = should-NOT precision. `score` is the server-computed combined cell score. */
+export interface TunerCell {
+  provider: string
+  model: string
+  axes: { fires: number; no_false: number }
+  score: number
+}
+
+/** One scored candidate description: its held-out score + the per-provider cells. */
+export interface TunerCandidate {
+  index: number
+  description: string
+  cells: TunerCell[]
+  held_out_score: number
+  is_baseline: boolean
+}
+
+/** The held-out scoreboard returned by GET results (and carried on tuner_complete). */
+export interface TunerScoreboard {
+  skill_id: string
+  candidates: TunerCandidate[]
+  winner_index: number | null
+  winner_description: string | null
+}
+
+/** The POST /runs response (run kicked off; reconcile via /stream + /results). */
+export interface StartTunerRunResponse {
+  run_id: string
+  skill_id: string
+  targets: TunerTarget[]
+  case_count: number
+  n: number
+}
+
+export interface StartTunerRunBody {
+  cases?: TunerCase[]
+  targets?: TunerTarget[]
+  n?: number
+}
+
+/** Kick off a bounded background tuning run; the response carries the run_id to
+ *  stream + reconcile (D-06 non-blocking). 409 means a run is already in flight. */
+export async function startTunerRun(
+  skillId: string,
+  body: StartTunerRunBody = {},
+): Promise<StartTunerRunResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (res.status === 409) {
+    throw new ApiError("A tuning run is already in progress for this skill.", 409)
+  }
+  if (!res.ok) throw new ApiError("Failed to start the tuning run. Please try again.", res.status)
+  return (await res.json()) as StartTunerRunResponse
+}
+
+/** Read the held-out scoreboard once the run completes. A 404 means the run is
+ *  still in progress (or its ephemeral buffer expired) — the caller polls or relies
+ *  on the tuner_complete SSE event. Throws ApiError(404) so the caller can branch. */
+export async function getTunerResults(
+  skillId: string,
+  runId: string,
+): Promise<TunerScoreboard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/${runId}`, { headers })
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 404 ? "Tuner run not complete or result expired." : "Failed to load tuner results.",
+      res.status,
+    )
+  }
+  return (await res.json()) as TunerScoreboard
+}
+
+/** Tuner-specific SSE events (the Plan-04 vocab — NEVER chat event types). The
+ *  terminal `done` / `error` sentinel breaks the consumer (mirrors the shared
+ *  replay_tail_consumer contract). */
+export interface TunerStreamCallbacks {
+  /** tuner_progress — stage-carrying progress (building_candidates / candidate_scored …). */
+  onProgress?: (data: Record<string, unknown>) => void
+  /** tuner_provider_done — one provider cell finished for a candidate. */
+  onProviderDone?: (data: { candidate_index: number; provider: string; model: string; cell: TunerCell }) => void
+  /** tuner_complete — the full scoreboard (non-terminal progress carrying the result). */
+  onComplete?: (scoreboard: TunerScoreboard) => void
+  /** the terminal sentinel — 'done' on success, 'error' (with reason) on failure. */
+  onTerminal: (status: "done" | "error", reason?: string) => void
+}
+
+/** Open GET /skills/{id}/tuner/runs/{run}/stream and dispatch tuner_* events.
+ *
+ *  A focused, purpose-built SSE reader (not the chat subscribeToRun) — it speaks ONLY
+ *  the tuner vocab + the done/error terminal. Bearer auth attaches via getAuthHeaders +
+ *  fetch (the native EventSource can't send headers — same rationale as subscribeToRun).
+ *  `since` is "0" (full replay is idempotent; React reconciles duplicate progress as a
+ *  no-op). The caller passes an AbortSignal to cancel (leave-and-reconcile-on-return). */
+export async function streamTunerRun(
+  skillId: string,
+  runId: string,
+  callbacks: TunerStreamCallbacks,
+  since = "0",
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const url = `${API_BASE}/skills/${skillId}/tuner/runs/${runId}/stream?since=${encodeURIComponent(since)}`
+  const res = await fetch(url, { headers, signal })
+
+  if (res.status === 404) {
+    callbacks.onTerminal("error", "run_not_found")
+    return
+  }
+  if (res.status === 503) {
+    callbacks.onTerminal("error", "streaming_unavailable")
+    return
+  }
+  if (!res.ok) throw new Error(`Failed to open tuner stream (status ${res.status})`)
+  if (!res.body) throw new Error("No response body on tuner stream")
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  while (true) {
+    let done: boolean, value: Uint8Array | undefined
+    try {
+      ;({ done, value } = await reader.read())
+    } catch {
+      // AbortError (caller-initiated cancel via signal) — silent return. The run
+      // keeps computing server-side; the author reconciles on return.
+      return
+    }
+    if (done) {
+      // Reader closed without an explicit terminal — defensive done so the UI
+      // reconciles via GET results rather than hanging.
+      callbacks.onTerminal("done")
+      return
+    }
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split("\n")
+    buffer = lines.pop() ?? ""
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue
+      const raw = line.slice(5).trim()
+      if (!raw) continue
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        continue
+      }
+      const t = parsed.type as string
+      if (t === "tuner_progress") callbacks.onProgress?.(parsed)
+      else if (t === "tuner_provider_done")
+        callbacks.onProviderDone?.(
+          parsed as unknown as { candidate_index: number; provider: string; model: string; cell: TunerCell },
+        )
+      else if (t === "tuner_complete")
+        callbacks.onComplete?.(parsed.scoreboard as TunerScoreboard)
+      else if (t === "done") {
+        callbacks.onTerminal("done")
+        return
+      } else if (t === "error") {
+        callbacks.onTerminal("error", (parsed.error ?? parsed.message) as string | undefined)
+        return
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { Plus, Zap, Upload, Loader2 } from "lucide-react"
+import { Plus, Zap, Upload, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSkills } from "@/hooks/useSkills"
 import { useAuth } from "@/hooks/useAuth"
@@ -11,9 +11,14 @@ import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
 interface Props {
   onTryInChat?: (skillName: string) => void
+  // Phase 123-05 (TRIG-01 / sketch 041-A): opens the focused Trigger Tuner
+  // surface for a skill (entered WITH a skillId). Threaded from ChatLayout to
+  // App's tunerSkillId setter + onNavigate('skill-tuner') — the reachability
+  // entry action that makes the Tuner reachable in-phase.
+  onTuneSkill?: (skillId: string) => void
 }
 
-export function SkillsPage({ onTryInChat }: Props) {
+export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
   const { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal } = useSkills()
   const { user } = useAuth()
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
@@ -147,12 +152,34 @@ export function SkillsPage({ onTryInChat }: Props) {
         aria-live="polite"
       >
         {selectedSkill || isCreatingNew ? (
-          <SkillDetailPanel
-            skill={selectedSkill}
-            onSave={handleSave}
-            onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
-            currentUserId={user?.id}
-          />
+          <div className="flex flex-col h-full">
+            {/* Phase 123-05 (TRIG-01 / sketch 041-A): the "Tune triggers" entry
+                action — opens the focused Trigger Tuner for THIS skill (only on a
+                saved skill, never while creating). This is the reachability entry
+                point: onTuneSkill(id) → App's tunerSkillId setter +
+                onNavigate('skill-tuner'). */}
+            {selectedSkill && onTuneSkill && (
+              <div className="px-6 pt-4 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2"
+                  onClick={() => onTuneSkill(selectedSkill.id)}
+                >
+                  <Target className="h-4 w-4" />
+                  Tune triggers
+                </Button>
+              </div>
+            )}
+            <div className="flex-1 min-h-0">
+              <SkillDetailPanel
+                skill={selectedSkill}
+                onSave={handleSave}
+                onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
+                currentUserId={user?.id}
+              />
+            </div>
+          </div>
         ) : (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
