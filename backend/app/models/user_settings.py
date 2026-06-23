@@ -159,6 +159,14 @@ class UserEffectiveSettings(BaseModel):
     extraction_window_cap: int = 32000      # head+tail sampler cap
     metadata_enrichment_mode: str = "enriched"  # enriched | legacy
 
+    # Phase 123 (D-08 / TRIG-01) — the skill-builder model for the Trigger Tuner.
+    # app_settings-only (env_attr=None readback below; CLAUDE.md "env vars are for
+    # secrets/infra only" — a model id is a VALUE). Empty => resolve_skill_builder_model()
+    # picks a strong registry default. Selectable across the full provider list incl.
+    # local; no paid-provider SPOF (D-08); decoupled from the benchmark targets. The
+    # Settings UI (Plan 06) reads/writes this field.
+    skill_builder_model: str = ""
+
     # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
     # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
     embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
@@ -514,6 +522,11 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         extraction_model=str(_val(row, "extraction_model", None, "")),
         extraction_window_cap=int(_val(row, "extraction_window_cap", None, 32000)),
         metadata_enrichment_mode=str(_val(row, "metadata_enrichment_mode", None, "enriched")),
+
+        # Phase 123 (D-08 / TRIG-01) — env_attr=None: app_settings-only, no env
+        # fallback (a model id is a VALUE, not a secret). Missing/None => "" =>
+        # resolve_skill_builder_model() picks a strong registry default.
+        skill_builder_model=str(_val(row, "skill_builder_model", None, "")),
 
         # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.

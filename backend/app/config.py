@@ -1003,6 +1003,16 @@ class Settings(BaseSettings):
     # Settings-not-env (a model id is a VALUE, not a secret). None = a registry default resolved by resolve_authoring_model().
     harness_authoring_model: str | None = None
 
+    # Phase 123 (D-08 / TRIG-01) — the skill-builder model (writes candidate skill
+    # descriptions + auto-seeds the benchmark cases for the Trigger Tuner).
+    # Settings-not-env (a model id is a VALUE, not a secret). None = a registry default
+    # resolved by resolve_skill_builder_model(). Selectable across the FULL provider list
+    # incl. local/self-hosted (Ollama / LM Studio / openai-compat / DeepSeek-on-own-infra),
+    # so there is NO paid-provider single-point-of-failure (111.1 posture). DECOUPLED from
+    # the benchmark targets — the builder WRITES candidates, the configured targets MEASURE
+    # firing. Never hardcode a single paid provider as the only path (D-08 anti-pattern).
+    skill_builder_model: str | None = None
+
     # Phase 102 (WR-04 / T-102-09-03 / QUAL-01) — the publish-level wall budget. The
     # synchronous publish endpoint drives a FULL golden run on the request thread; without
     # a deadline a wedged run holds the request indefinitely (a DoS / hours-long hold). The
