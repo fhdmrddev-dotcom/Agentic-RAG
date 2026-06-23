@@ -32,14 +32,21 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  // WR-04: the write can fail (PATCH /skills rejects, network drop). Surface it
+  // inline instead of swallowing the rejection — the strip stays open so the
+  // author can retry, and they're told why nothing was saved.
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleConfirm = async () => {
     if (saving) return
     setSaving(true)
+    setSaveError(null)
     try {
       await onConfirm(candidate)
       setDone(true)
       setConfirming(false)
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Couldn't save the description. Please try again.")
     } finally {
       setSaving(false)
     }
@@ -103,6 +110,11 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
           <p className="text-[11px] text-muted-foreground">
             The skill begins firing on this description immediately. Nothing is applied until you confirm.
           </p>
+          {saveError && (
+            <p role="alert" data-testid="candidate-save-error" className="text-xs text-destructive font-mono">
+              {saveError}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={saving}>
               Cancel

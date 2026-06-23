@@ -155,4 +155,26 @@ describe("CandidateCard — held-out score + author-confirm, no auto-apply (042-
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onConfirm).toHaveBeenCalledWith(candidate)
   })
+
+  it("WR-04: a failed save surfaces an inline error and keeps the diff strip open (never silent)", async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockRejectedValue(new Error("Failed to update skill. Please try again."))
+    render(
+      <CandidateCard
+        candidate={makeCandidate()}
+        isWinner={true}
+        currentDescription="Fires on SQL."
+        onConfirm={onConfirm}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /use/i }))
+    await user.click(within(screen.getByTestId("candidate-diff-confirm")).getByRole("button", { name: /confirm|save/i }))
+
+    // The rejection is caught and surfaced — not swallowed.
+    const err = await screen.findByTestId("candidate-save-error")
+    expect(err.textContent).toMatch(/failed to update skill/i)
+    // The strip stays open (the write failed) and "Saved" never renders.
+    expect(screen.getByTestId("candidate-diff-confirm")).toBeTruthy()
+    expect(screen.queryByText(/now drives firing/i)).toBeNull()
+  })
 })
