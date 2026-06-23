@@ -138,10 +138,20 @@ def _patch_gateway(monkeypatch):
         return iter(state["events"]), cm
 
     monkeypatch.setattr(fe, "open_stream", _fake_open_stream)
-    # The tier is registry-driven; force a deterministic TIER-FORCE for the happy path
-    # unless a test overrides it.
+    # Phase 122 (MP-01): the tier is registry-driven via ``emit_tier``; force a
+    # deterministic force_strict tier for the happy path (first rung = strict_force)
+    # unless a test overrides it. ``forced_emission``/``strict_json_schema`` are kept
+    # for the Phase-103 strict tests that still read the cap shape — but ``emit_tier``
+    # is now what the ladder resolves on (the old bools are deprecated-unread, 122-01).
     monkeypatch.setattr(
-        fe, "get_model_capability", lambda model: {"forced_emission": True, "provider": "openai"}
+        fe,
+        "get_model_capability",
+        lambda model: {
+            "forced_emission": True,
+            "strict_json_schema": True,
+            "emit_tier": "force_strict",
+            "provider": "openai",
+        },
     )
     return state
 
@@ -170,6 +180,9 @@ async def test_forced_emit_happy_path_tool_call(_patch_gateway):
     assert res["recovered_from_narration"] is False
     assert res["truncated"] is False
     assert res["failure"] is None
+    # Phase 122 (MP-01): the success dict names the winning rung. A force_strict-tier
+    # model that commits the tool call on the FIRST shot wins on the strict_force rung.
+    assert res["emit_rung"] == "strict_force"
     # The forced shot named the tool — NOT tool_choice='auto' (Pitfall 5 / D-01).
     assert _patch_gateway["request"].force_tool_name == "render_template"
 
@@ -210,7 +223,9 @@ async def test_forced_emit_coerce_tier_no_force(_patch_gateway, monkeypatch):
     Even so, a committed tool call still validates (best-effort)."""
     import app.services.forced_emit as fe
 
-    monkeypatch.setattr(fe, "get_model_capability", lambda model: {"provider": "moonshot"})
+    monkeypatch.setattr(
+        fe, "get_model_capability", lambda model: {"emit_tier": "coerce", "provider": "moonshot"}
+    )
     _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
     res = await _run(model="kimi-k2.5")
     assert res["forced"] is False  # TIER-COERCE — never wrongly forces
@@ -219,6 +234,8 @@ async def test_forced_emit_coerce_tier_no_force(_patch_gateway, monkeypatch):
     assert _patch_gateway["request"].tool_choice == "auto"
     # A committed tool call still validates on the coerce path.
     assert res["emitted"] is not None
+    # Phase 122 (MP-01): the only rung a coerce-tier model runs is "coerce".
+    assert res["emit_rung"] == "coerce"
 
 
 def test_forced_emit_never_calls_open_loop():
@@ -249,9 +266,14 @@ async def test_forced_emit_open_stream_raise_provider_error(monkeypatch):
 
     monkeypatch.setattr(fe, "open_stream", _boom)
     monkeypatch.setattr(
-        fe, "get_model_capability", lambda model: {"forced_emission": True, "provider": "deepseek"}
+        fe,
+        "get_model_capability",
+        lambda model: {"forced_emission": True, "emit_tier": "force", "provider": "deepseek"},
     )
     res = await _run(model="deepseek-v4")
+    # Phase 122 (MP-01): a force-tier model whose EVERY rung (non_strict_force, coerce)
+    # raises exhausts the ladder and lands on the honest provider_error floor — never
+    # a silent escape.
     assert res["emitted"] is None
     assert res["failure"] == "provider_error"
 
