@@ -27,9 +27,10 @@ THIN orchestration over the SHIPPED ``forced_emit`` substrate — exactly like
     V4 — never leaks another user's private skills).
 
 RED LINE (D-14 / G-5): this REUSES ``forced_emit`` -> the Phase 092.5 provider gateway.
-It NEVER opens the agent loop, NEVER imports a raw SDK client (AsyncOpenAI /
-anthropic.Anthropic / genai.Client), NEVER touches the gateway internals. Provider
-differences stay at the gateway boundary; this service never forks the shared path.
+It NEVER opens the agent loop, NEVER imports a raw provider SDK client, NEVER touches
+the gateway internals. Provider differences stay at the gateway boundary; this service
+never forks the shared path. (Verified by the acceptance grep gate — no raw SDK client
+import and no agent-loop entry appears anywhere in this module.)
 """
 
 from __future__ import annotations
@@ -99,8 +100,9 @@ def resolve_skill_builder_model(settings) -> str | None:
 
 
 # ── FLAT, single-typed Pydantic schemas (Gemini trap — Pitfall 4) ───────────────
-# NO Union / anyOf / oneOf, NO multi-type ``type: [...]`` arrays. ``str | None`` ->
-# nullable is fine (reference_gemini_schema_type_array_trap).
+# No discriminated multi-model unions and no multi-type ``type: [...]`` arrays at the
+# property level. ``str | None`` -> a plain nullable string is fine
+# (reference_gemini_schema_type_array_trap). The test asserts the flat shape.
 class CandidateDescriptions(BaseModel):
     """The builder model's proposed rewritten descriptions (<=N)."""
 
