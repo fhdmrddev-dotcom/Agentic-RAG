@@ -34,6 +34,25 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
   ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
 }
 
+// Phase 123 (D-08 / sketch 044-A) — the skill-builder model picker options. The
+// model that WRITES candidate descriptions + seeds Tuner cases. MUST span the FULL
+// provider list incl. LOCAL (Ollama / LM Studio / OpenAI-compat / DeepSeek-on-own-
+// infra) so a builder can never be locked to a single paid provider (no SPOF —
+// mirrors the 111.1 embedding-SPOF removal). Decoupled from the benchmark TARGETS
+// (the builder writes; the targets measure). The `kind` drives the always-on
+// cloud/local footer tag. Values are real model ids the backend stores verbatim;
+// `""` = unset (the resolver picks the strong default).
+type BuilderModelKind = "cloud" | "local"
+const SKILL_BUILDER_MODEL_OPTIONS: { value: string; label: string; kind: BuilderModelKind }[] = [
+  { value: "claude-haiku-4-5-20251001", label: "Anthropic · claude-haiku-4-5 (strong default)", kind: "cloud" },
+  { value: "gpt-5.4-mini", label: "OpenAI · gpt-5.4-mini", kind: "cloud" },
+  { value: "gemini-3.5-flash", label: "Google · gemini-3.5-flash", kind: "cloud" },
+  { value: "deepseek-chat", label: "DeepSeek · deepseek-chat (own infra)", kind: "cloud" },
+  { value: "ollama/llama3.1", label: "Ollama · llama3.1 (local)", kind: "local" },
+  { value: "lm-studio/qwen3", label: "LM Studio · qwen3 (local)", kind: "local" },
+  { value: "openai-compat/local-model", label: "OpenAI-compat endpoint (local / self-hosted)", kind: "local" },
+]
+
 // ── Small reusable components ─────────────────────────────────────────────────
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -553,6 +572,10 @@ export function SettingsPage() {
   const [subAgentModel, setSubAgentModel] = useState("")
   const [subAgentModelError, setSubAgentModelError] = useState<string | null>(null)
   const [resolvedSubAgentModel, setResolvedSubAgentModel] = useState("")
+  // Phase 123 (D-08 / TRIG-01) — the skill-builder model knob. "" = unset (the
+  // resolver falls back to a strong default, surfaced as resolvedSkillBuilderModel).
+  const [skillBuilderModel, setSkillBuilderModel] = useState("")
+  const [resolvedSkillBuilderModel, setResolvedSkillBuilderModel] = useState("")
   const [llmMaxOutputTokens, setLlmMaxOutputTokens] = useState(0)
   const [openrouterToolStrategy, setOpenrouterToolStrategy] = useState<"quality" | "native" | "xml">("quality")
 
@@ -609,6 +632,8 @@ export function SettingsPage() {
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
     setSubAgentModel(data.sub_agent_model ?? "")
     setResolvedSubAgentModel(data.resolved_sub_agent_model ?? "")
+    setSkillBuilderModel(data.skill_builder_model ?? "")
+    setResolvedSkillBuilderModel(data.resolved_skill_builder_model ?? "")
     setLlmMaxOutputTokens(data.llm_max_output_tokens ?? 0)
     setOpenrouterToolStrategy(data.openrouter_tool_strategy ?? "quality")
     // Phase 075.3 D-075.3-13: defensive ?? so an old backend response without
@@ -641,6 +666,7 @@ export function SettingsPage() {
         context_window_max_tokens: contextWindowMaxTokens,
         sub_agent_max_output_tokens: subAgentMaxOutputTokens,
         sub_agent_model: subAgentModel,
+        skill_builder_model: skillBuilderModel,
         llm_max_output_tokens: llmMaxOutputTokens,
         openrouter_tool_strategy: openrouterToolStrategy,
       }
@@ -993,6 +1019,61 @@ export function SettingsPage() {
                       : `${resolvedSubAgentModel || "auto"} (auto)`}
                   </span>
                 </FieldRow>
+              </SectionCard>
+
+              {/* Phase 123 (D-08 / sketch 044-A) — Skill-builder model.
+                  The model that WRITES candidate descriptions + seeds the Trigger
+                  Tuner's benchmark cases. Selectable across the FULL provider list
+                  incl. LOCAL (no paid-provider SPOF); DECOUPLED from the benchmark
+                  TARGETS (the builder writes, the targets measure). Mirrors the
+                  Phase-111.1 provider-picker always-on cloud/local footer. */}
+              <SectionCard
+                title="Skill Trigger Tuner"
+                description="The model that writes candidate descriptions and seeds benchmark cases when you tune a skill's triggers."
+              >
+                <div className="flex flex-col gap-1.5 py-2">
+                  <label htmlFor="skill-builder-model" className="text-sm text-muted-foreground">
+                    Skill-builder model
+                  </label>
+                  <select
+                    id="skill-builder-model"
+                    value={skillBuilderModel}
+                    onChange={(e) => setSkillBuilderModel(e.target.value)}
+                    className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">
+                      Auto · {resolvedSkillBuilderModel || "strong default"} (recommended)
+                    </option>
+                    {/* If the persisted value isn't one of the presets (e.g. a custom
+                        local id), keep it selectable so the round-trip never drops it. */}
+                    {skillBuilderModel &&
+                      !SKILL_BUILDER_MODEL_OPTIONS.some((o) => o.value === skillBuilderModel) && (
+                        <option value={skillBuilderModel}>{skillBuilderModel} (current)</option>
+                      )}
+                    {SKILL_BUILDER_MODEL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  {/* Always-on cloud/local footer (mirrors the 111.1 endpoint footer) +
+                      the explicit decoupled-from-targets note (D-08). */}
+                  <div className="mt-1.5 flex items-center gap-2 rounded-md border border-border/40 bg-muted/20 px-2.5 py-1.5 text-[10px] font-mono text-muted-foreground">
+                    <span className="text-emerald-400">{"🔒"}</span>
+                    <span>
+                      {(SKILL_BUILDER_MODEL_OPTIONS.find((o) => o.value === skillBuilderModel)?.kind ??
+                        "cloud") === "local"
+                        ? "local · runs on your own infra"
+                        : `${resolvedSkillBuilderModel || "claude-haiku-4-5"} · cloud-capable, local-capable`}
+                      {" · no single-point-of-failure"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    The builder <span className="italic">writes</span> candidates; the benchmark
+                    targets <span className="italic">measure</span> firing — independent settings,
+                    decoupled by design.
+                  </p>
+                </div>
               </SectionCard>
 
               {/* Save AI Model button */}

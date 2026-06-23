@@ -1569,6 +1569,13 @@ export interface FullAppSettings {
   sub_agent_max_output_tokens: number
   sub_agent_model: string
   resolved_sub_agent_model: string
+  // Phase 123 (D-08 / TRIG-01) — the skill-builder model knob (the model that
+  // WRITES candidate descriptions + seeds Tuner cases). `skill_builder_model` is
+  // the raw setting ("" => unset); `resolved_skill_builder_model` is the strong
+  // default the resolver picks when unset (null only if no forceable default
+  // exists — the honest-None floor). Decoupled from the benchmark targets.
+  skill_builder_model: string
+  resolved_skill_builder_model: string | null
   llm_max_output_tokens: number
   openrouter_tool_strategy: "quality" | "native" | "xml"
   // Phase 075.3 D-075.3-13: registry-known model_ids — frontend uses this set
@@ -1624,6 +1631,8 @@ export interface SettingsUpdate {
   context_window_max_tokens?: number
   sub_agent_max_output_tokens?: number
   sub_agent_model?: string
+  // Phase 123 (D-08) — the skill-builder model id (any provider incl. local; no SPOF).
+  skill_builder_model?: string
   llm_max_output_tokens?: number
   openrouter_tool_strategy?: "quality" | "native" | "xml"
 }

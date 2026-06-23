@@ -13,6 +13,7 @@ from app.models.user_settings import (
 )
 from app.services.audit_service import write_audit_entry
 from app.services.reembed_service import start_reembed
+from app.services.skill_tuner_service import resolve_skill_builder_model
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -68,6 +69,14 @@ class FullSettingsResponse(BaseModel):
     sub_agent_max_output_tokens: int
     sub_agent_model: str
     resolved_sub_agent_model: str
+    # Phase 123 (D-08 / TRIG-01) — the skill-builder model for the Trigger Tuner.
+    # The raw setting ("" => unset) + the RESOLVED label (resolve_skill_builder_model:
+    # explicit -> strong forced_emission default -> None). A model id is a VALUE not a
+    # secret -> surfaced through the settings contract (CLAUDE.md). The Settings UI
+    # (Plan 06) reads `skill_builder_model` to show the current selection and the
+    # resolved label as the strong default when unset.
+    skill_builder_model: str
+    resolved_skill_builder_model: str | None
     # Phase 075.3 D-075.3-13: registry-known model_ids (frontend uses this set
     # to decide whether to render the "unverified" badge inline next to each
     # model in the main LLM dropdown + selected-label).
@@ -127,6 +136,11 @@ class SettingsUpdate(BaseModel):
     context_window_max_tokens: int | None = None
     sub_agent_max_output_tokens: int | None = Field(default=None, ge=4096, le=65536)
     sub_agent_model: str | None = None
+    # Phase 123 (D-08 / TRIG-01) — the skill-builder model id. A VALUE not a secret;
+    # selectable across the FULL provider list incl. local (no paid-provider SPOF).
+    # "" = unset (the resolver falls back to a strong default); decoupled from the
+    # benchmark targets (the builder WRITES candidates, the targets MEASURE firing).
+    skill_builder_model: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -177,6 +191,9 @@ async def _build_response(s=None) -> FullSettingsResponse:
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,
         resolved_sub_agent_model=resolve_sub_agent_model(s),
+        # Phase 123 (D-08) — the raw knob + the resolved label (strong default when unset).
+        skill_builder_model=s.skill_builder_model,
+        resolved_skill_builder_model=resolve_skill_builder_model(s),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).
         verified_models=sorted(MODEL_CAPABILITIES.keys()),
@@ -320,6 +337,12 @@ async def update_settings(
         updates["sub_agent_max_output_tokens"] = body.sub_agent_max_output_tokens
     if body.sub_agent_model is not None:
         updates["sub_agent_model"] = body.sub_agent_model
+    # Phase 123 (D-08) — the skill-builder model knob. A free-form model id (any
+    # provider incl. local); the resolver provides the strong default + honest-None
+    # floor, so no provider-list validation here (decoupled from the benchmark
+    # targets, no SPOF). "" persists as unset.
+    if body.skill_builder_model is not None:
+        updates["skill_builder_model"] = body.skill_builder_model
 
     # MDL-01: Validate sub_agent_model against active provider's model list
     if body.sub_agent_model:
