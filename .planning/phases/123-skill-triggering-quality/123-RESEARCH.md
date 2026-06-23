@@ -479,29 +479,31 @@ def resolve_skill_builder_model(settings) -> str | None:
 | A6 | The D-01 relaxed wording is sufficient as a false-fire guard *with* the should-NOT benchmark; the per-skill `auto_trigger` kill-switch is NOT built unless SC#10 surfaces a regression. | D-01 / Deferred | If SC#10 shows false-firing the contingency must be added; CONTEXT marks it as a planner-includable contingency. **Decide at plan time whether to pre-build the flag or treat it as a fast-follow.** |
 | A7 | Builder-model strong default = `claude-haiku-4-5-20251001` (sketch 044-A names `claude-haiku-4-5`), falling back to `gpt-5.4-mini`. | D-08 / Code Examples | A paid default; D-08 requires it be *selectable* incl. local, and the resolve function must not SPOF. The default firing only when configured. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Classification fidelity vs. cost (the core TRIG-01 mechanics question).**
+> All five resolved into the plans (2026-06-23): Q1 → Plan 123-03 (scoped `forced_emit` classification mirroring the post-D-01 catalog-note shared constant) + the SC#10 live spot-check in VALIDATION.md; Q2 → Plan 123-03 (sibling paraphrases + generic off-topic auto-seed, author edits); Q3 → Plan 123-04 (new `skill_tuner.py` router); Q4 → Plan 123-04 (tuner-specific SSE event set on the run-buffer transport); Q5 → Plan 123-03/04 (ephemeral/client-held cases, persist only the winning description via PATCH — no new table). Operator surfaces A1 (classification fidelity) and A2 (case persistence) are documented contingencies, not blockers.
+
+1. **Classification fidelity vs. cost (the core TRIG-01 mechanics question).** — **RESOLVED → Plan 123-03 + VALIDATION.md SC#10 spot-check (A1).**
    - What we know: driving the full agent loop per (case × target × 3) is multi-hour and entangles the whole tool surface; a scoped `forced_emit` classification ("given this catalog + policy + user turn, would you call load_skill, and for which skill?") is what makes the run multi-minute.
    - What's unclear: how faithfully a forced yes/no classification reproduces the *real* tool_choice=auto firing decision per provider (a model asked to classify may behave differently than the same model deciding to emit a tool call in a live turn).
    - Recommendation: use the scoped classification BUT (a) build its context from the exact live catalog assembly + the post-D-01 catalog-note wording (shared constant), and (b) include at least one live full-agent-loop spot-check per provider in the SC#10 UAT to validate the classifier tracks reality. Surface to the operator as A1.
 
-2. **Should-NOT case auto-seed realism (the false-fire rail quality).**
+2. **Should-NOT case auto-seed realism (the false-fire rail quality).** — **RESOLVED → Plan 123-03 (sibling paraphrases + generic off-topic, author-in-the-loop).**
    - What we know: D-04 seeds should-NOT from sibling catalog skills (leak-safe owner-scoped) + generic off-topic prompts. Sibling skills are the realistic false-fire bait.
    - What's unclear: whether sibling descriptions alone produce hard enough negatives (two skills with overlapping domains are the real risk).
    - Recommendation: seed should-NOT from (a) sibling skills' *paraphrased* trigger prompts (not just their descriptions) + (b) a small fixed generic off-topic set. The author edits/adds (043-A). Good enough to start; the author is in the loop.
 
-3. **Where the tuner-run routes live.**
+3. **Where the tuner-run routes live.** — **RESOLVED → Plan 123-04 (new `skill_tuner.py` router under `/skills/{id}/tuner/...`).**
    - What we know: `skills.py` already hosts skill CRUD; the run is a background job over Redis + SSE.
    - What's unclear: fold start/status/results into `skills.py` (`/skills/{id}/tuner/runs`) vs. a new `skill_tuner.py` router.
    - Recommendation: a new `skill_tuner.py` router mounted under `/skills/{id}/tuner/...` keeps `skills.py` lean (it's not a G-5 file but stays small). Planner's call (Claude's discretion per CONTEXT).
 
-4. **SSE event shape for the tuner job vs. the chat run-buffer.**
+4. **SSE event shape for the tuner job vs. the chat run-buffer.** — **RESOLVED → Plan 123-04 (run-buffer transport + tuner-specific event set `tuner_progress`/`tuner_provider_done`/`tuner_complete`).**
    - What we know: the chat loop emits typed SSE events over `run:{run_id}`; the Tuner's per-provider live progress (043-A) needs per-lane progress + a stable-start-ts elapsed timer (095 never-vanishes lesson).
    - What's unclear: reuse the exact chat event vocabulary or a tuner-specific event set on the same stream.
    - Recommendation: reuse the run-buffer *transport* (`run:{tuner_run_id}` stream + `runs_by_thread`/`runs:active` for cleanup) with a small tuner-specific event set (`tuner_progress`, `tuner_provider_done`, `tuner_complete`). Don't overload chat event types.
 
-5. **Case persistence (no DB vs. minimal table).**
+5. **Case persistence (no DB vs. minimal table).** — **RESOLVED → Plan 123-03/04 (ephemeral/client-held cases; persist only the winning description via PATCH; no new table — A2).**
    - What we know: SI-01's eval/versioning tables are explicitly deferred to v3.2.
    - What's unclear: whether benchmark cases must survive a page reload / second session.
    - Recommendation: keep cases ephemeral/client-held for this phase (auto-seed is fast; the author edits per session); persist ONLY the winning description via PATCH. If the operator wants persistence, that's the smallest possible additive table — but it edges toward SI-01's deferred scope. Surface as A2.
