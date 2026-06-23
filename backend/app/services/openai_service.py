@@ -1485,6 +1485,21 @@ def create_adaptive_streaming_chat(
     
     provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
 
+    # Phase 123 (WR-06): strip internal ``_``-prefixed markers from each message
+    # before they reach ``client.chat.completions.create``. ``_reconstruct_history``
+    # stamps ``_pinned_skill`` on load_skill tool-result messages (agent_loop.py) and
+    # ``trim_messages_to_fit`` preserves it (it is the de-dupe key in context_window).
+    # The Anthropic/Google adapters rebuild messages so the marker is dropped there,
+    # but the OpenAI-compat path (OpenAI + OpenRouter + Ollama + DeepSeek) funnels the
+    # list straight to the SDK, and OpenAI / several compat providers 400 on unknown
+    # top-level message properties. This shallow per-message comprehension is safely
+    # DOWNSTREAM of the upstream trim (the pin ORDERING is already baked into the list;
+    # only the now-redundant marker is removed). ``content`` is referenced by-reference,
+    # NOT deep-copied — it can be large.
+    messages = [
+        {k: v for k, v in m.items() if not k.startswith("_")} for m in messages
+    ]
+
     kwargs: dict = {
         "model": effective_model,
         "messages": messages,
