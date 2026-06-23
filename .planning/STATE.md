@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T18:02:57.669Z"
+last_updated: "2026-06-23T18:17:14.486Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 60
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123 (skill-triggering-quality) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -232,6 +232,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
 | Phase 123 P03 | 12min | 2 tasks | 6 files |
+| Phase 123 P04 | 8min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -270,6 +271,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123-03 (TRIG-01): resolve_skill_builder_model (D-08) mirrors resolve_authoring_model — explicit setting (local id verbatim) -> first forced_emission default -> honest None; no paid-provider SPOF, decoupled from benchmark targets; surfaced on config.py Settings + UserEffectiveSettings.
 - [Phase ?]: Phase 123-03 (TRIG-01): skill_tuner_service is thin orchestration over forced_emit (no agent-loop/raw-SDK fork, D-14); build_candidates/classify_fires use FLAT single-typed schemas + non-empty system_prompt; classify_fires embeds the shared LOAD_SKILL_POLICY (Pitfall 1 fidelity); honest-fail -> [] / would_load=False.
 - [Phase ?]: Phase 123-03 (TRIG-01): pure scoring = deterministic 60/40 split + 3-repeat aggregate + pick_winner BY HELD-OUT (never train); every cell carries BOTH fires/no_false (042-A). configured_targets = presence-only probe, OpenRouter distinct from native deepseek/zhipu, N=1 clean baseline, local first-class. auto_seed does no I/O; fetch_owner_scoped_siblings carries the .or_(user_id.eq,is_global.eq.true) leak gate. ZERO migration/package.
+- [Phase ?]: Phase 123-04 (TRIG-01): net-new owner-scoped skill_tuner.py router (start/stream/results) over the Phase-061+ run-buffer; service-role + .or_(own,global) sole leak gate, 404 on cross-user; tuner_progress/tuner_provider_done/tuner_complete vocab never overloads chat events.
+- [Phase ?]: Phase 123-04 (TRIG-01): background run bounded on every axis (MAX_CASES=40/MAX_TARGETS=8/MAX_ITERATIONS<=5 + per-call get_per_call_timeout + one job per skill via _INFLIGHT_SKILLS->409); calls ONLY Plan-03 forced_emit service fns (D-14 red line); cases+scoreboard ephemeral at tuner_result:{run_id} run-buffer key, no DB schema change.
 
 ## Operator Next Steps
 

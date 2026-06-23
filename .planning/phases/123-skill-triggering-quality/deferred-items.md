@@ -59,3 +59,27 @@ hash-keyed `TestHarvestOutputFiles` pivot already in STATE.md deferred-items),
 `test_skill_tuner_service.py`) are 27/27 GREEN, and the skill/config-adjacent suites
 (`test_skill_lint.py`, `test_111_extraction_model_resolve.py`, `test_103_nl_generate.py`,
 `test_111_dynamic_model.py`) are 33/33 GREEN. Net-new failures vs base: **0**.
+
+## 123-04 — live-infra integration test requires the local Supabase/Redis stack
+
+**Discovered:** Plan 123-04 regression check (2026-06-23).
+
+`test_062_stream_replay.py::test_replay_then_tail_to_terminal` fails with an
+`asyncpg.exceptions.ForeignKeyViolationError` on inserting a `runs` row whose
+`thread_id` is not present in the live `threads` table. The test drives the FULL
+`POST /threads/{id}/messages` → `GET /runs/{id}/stream` flow against a REAL Redis
+(`localhost:6379`) + a REAL asyncpg pool, so it needs the local Supabase stack running
+with the `threads` row pre-seeded (a live-infra/UAT-class test, not a unit-mockable one).
+
+**Verified not caused by this plan:** Plan 04 only ADDS `backend/app/api/skill_tuner.py`
+(which imports the module-level `replay_tail_consumer` from `runs.py`) + registers it in
+`main.py`. The import resolved cleanly (the new module + the whole app load with no infra),
+and the `runs.py` SSE consumer is unmodified. The 31 other integration/unit tests in the
+same run (including `test_062_cross_user_404.py` and the three Plan-03 service suites) pass.
+
+**Disposition:** Not fixed here (scope boundary — requires live local infra to pass; not a
+code defect). This plan's `test_skill_tuner_routes.py` is 6/6 GREEN using a mocked service +
+an in-memory fake Redis (no live infra), and the Plan-03 service suites are 27/27 GREEN.
+Net-new failures vs base: **0**. (SC#10 cross-provider live UAT — the D-01 firing-policy
+fidelity + no-false-fire rail — remains the MANDATORY dev gate authored in `123-VALIDATION.md`,
+exercised at phase verification with the local stack up.)
