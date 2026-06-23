@@ -272,7 +272,19 @@ async def _run_tuner_job(
         for cand_idx, candidate_desc in enumerate(bounded_candidates):
             catalog_lines = f"- **{skill_name}**: {candidate_desc}"
             # Per-provider cells for this candidate (held-out split applied per axis).
-            train_cases, held_out_cases = skill_tuner_service.split_held_out(cases)
+            # Phase 123 (WR-02): split PER CLASS so the held-out partition is NOT vacuous on
+            # one axis. ``cases`` is built class-sorted ([should_fire...] + [should_not...]),
+            # and ``split_held_out`` takes a deterministic head-60% / tail-40% cut with NO
+            # shuffle — so the held-out tail skewed ~100% toward should-NOT, making the
+            # should-fire (recall) axis empty -> ``_score_axis`` returns a vacuous 1.0 and the
+            # winner pick ran on a degenerate signal. Splitting each class independently and
+            # concatenating the held-out halves guarantees BOTH rails appear in held-out
+            # whenever the source has both classes. ``split_held_out`` itself stays generic.
+            _fire = [c for c in cases if c.get("should_fire")]
+            _nofire = [c for c in cases if not c.get("should_fire")]
+            _, _ho_f = skill_tuner_service.split_held_out(_fire)
+            _, _ho_n = skill_tuner_service.split_held_out(_nofire)
+            held_out_cases = _ho_f + _ho_n
             per_target_cells: list[dict] = []
             for target in targets:
                 provider = target.get("provider", "unknown")

@@ -39,6 +39,38 @@ def test_split_held_out_guarantees_a_held_out_case():
     assert train == [] and held == [], "empty input -> empty partitions, no crash"
 
 
+# ── per-class held-out split (WR-02 — recall axis must not be vacuous) ─────────
+def test_per_class_held_out_carries_both_rails():
+    """Phase 123 (WR-02): cases are assembled class-sorted ([should_fire...] +
+    [should_not...]). A SINGLE deterministic 60/40 cut put ~100% should-NOT in the
+    held-out tail, leaving the should-fire (recall) axis empty -> a vacuous 1.0. The
+    job's per-class split (mirrored here) must leave BOTH classes represented in
+    held-out whenever the source has both."""
+    from app.services.skill_tuner_service import split_held_out
+
+    # Class-sorted exactly as start_tuner_run builds ``cases``.
+    cases = (
+        [{"prompt": f"fire-{i}", "should_fire": True} for i in range(5)]
+        + [{"prompt": f"nofire-{i}", "should_fire": False} for i in range(5)]
+    )
+
+    # ── the OLD single-cut behaviour (what WR-02 flagged) ──
+    _, old_held = split_held_out(cases)
+    assert not any(c["should_fire"] for c in old_held), (
+        "single ordered cut leaves the held-out tail all should-NOT (the vacuous-recall bug)"
+    )
+
+    # ── the FIXED per-class split (mirrors skill_tuner._run_tuner_job) ──
+    fire = [c for c in cases if c.get("should_fire")]
+    nofire = [c for c in cases if not c.get("should_fire")]
+    _, ho_f = split_held_out(fire)
+    _, ho_n = split_held_out(nofire)
+    held_out = ho_f + ho_n
+
+    assert any(c["should_fire"] for c in held_out), "held-out must carry should_fire cases"
+    assert any(not c["should_fire"] for c in held_out), "held-out must carry should_not cases"
+
+
 # ── 3-repeat aggregation ──────────────────────────────────────────────────────
 def test_aggregate_repeats_averages():
     from app.services.skill_tuner_service import aggregate_repeats
