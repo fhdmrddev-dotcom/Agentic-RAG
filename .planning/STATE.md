@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T17:07:11.920Z"
-last_activity: 2026-06-23 -- Phase 123 planning complete
+last_updated: "2026-06-23T17:28:09.471Z"
+last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 9
+  completed_plans: 10
   percent: 60
 ---
 
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 123 — skill triggering quality
+**Current focus:** Phase 123 — skill-triggering-quality
 
 ## Current Position
 
-Phase: 123
-Plan: Not started
+Phase: 123 (skill-triggering-quality) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-06-23 -- Phase 123 planning complete
+Last activity: 2026-06-23
 
 ### Quick Tasks Completed
 
@@ -229,6 +229,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P04 | 5min | 2 tasks | 4 files |
 | Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
+| Phase 123 P01 | 9min | 2 tasks | 8 files |
 
 ## Decisions
 
@@ -260,6 +261,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 122]: 122-02 (MP-01): emit_rung telemetry added to the success dict + identifier-only logger.info; the ladder NEVER mutates the registry (D-122-03, runtime auto-demotion rejected). The Phase-103 strict override is preserved by DEMOTING strict_force→non_strict_force when strict=False; honest-fail floor returns emit_rung=None + the last rung's failure reason. 111.1 :251-291 injection block untouched (Pitfall 5).
 - [Phase ?]: Phase 122-03 (MP-03): --forced-emit matrix is a DIRECT-CALL harness (imports forced_emit, drives it per provider x EASY/HARD schema) NOT body.model — body.model does not steer harness phases (Pitfall 6); no bearer/DB/agent-run (never writes), localhost gate in main() suffices, T-122-03-03 SQL surface N/A
 - [Phase ?]: Phase 122-03 (MP-03): HARD schema (optional-heavy + additionalProperties confidence object) is the strict-rung trip-wire (Pitfall 1) making the recovery axis non-vacuous; recovery=PASS on any ladder win, force=PASS only on the declared TOP rung, trigger=FAIL on provider_error but honest_fail still PASS; DOCUMENTED clears the gate (D-122-07); the operator grep-before-tier-flip ritual is the MP-03 gate (NOT CI, D-122-06)
+- [Phase ?]: Phase 123-01 (TRIG-03/D-01): LOAD_SKILL_POLICY lives in skill_lint.py (not agent_loop.py) so the Plan 03 Tuner classifier imports ONE source of truth — Pitfall 1 fidelity guard. agent_loop catalog note relaxed to fire load_skill on description match, reconciled with LOAD_SKILL_TOOL; owner-scoped catalog query preserved byte-for-byte.
+- [Phase ?]: Phase 123-01 (TRIG-03): lint_description is pure/never-raises/warn-never-block (D-09); wired into POST+PATCH /skills + agent save_skill via the existing owner-scoped .or_() sibling fetch (excludes edited skill on PATCH, degrades to [] on read failure). openai_service NOT modified — already D-01-aligned. ZERO migration/package. 11 test_threads_skills failures verified pre-existing.
 
 ## Operator Next Steps
 
