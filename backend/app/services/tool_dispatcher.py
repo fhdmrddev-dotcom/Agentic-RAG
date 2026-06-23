@@ -34,6 +34,7 @@ from app.services.audit_service import write_audit_entry
 from app.services.sandbox_service import sandbox_manager, harvest_output_files, snapshot_output_baseline
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
+from app.services.skill_lint import lint_description
 # Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
 # resolve core IN-PROCESS (no FastAPI self-call). ``ViewFilter`` + the two view/field
 # services are cycle-safe at module level (they import only pydantic/dependencies/db).
@@ -718,6 +719,26 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         .limit(1)
     )
     existing = existing_resp.data[0] if existing_resp.data else None
+
+    # TRIG-03 (D-09/D-10/Pitfall 6): lint the description, owner-scoped, NEVER block.
+    # The save always proceeds; warnings ride along as a non-fatal note so the agent
+    # can mention them. A read failure degrades to an empty sibling list.
+    lint_warnings: list[dict] = []
+    try:
+        siblings_resp = await aexec(
+            ctx.supabase.table("skills")
+            .select("id, description")
+            .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        )
+        siblings = [
+            r.get("description", "")
+            for r in (siblings_resp.data or [])
+            if not existing or str(r.get("id")) != str(existing["id"])
+        ]
+        lint_warnings = lint_description(name, description, siblings)
+    except Exception:
+        lint_warnings = []
+
     if existing:
         row = existing
         await aexec(
@@ -726,7 +747,9 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
                 "instructions": instructions,
             }).eq("id", row["id"]).eq("user_id", ctx.current_user["id"])
         )
-        return ToolResult(result=json.dumps({"status": "updated", "name": name}))
+        return ToolResult(result=json.dumps(
+            {"status": "updated", "name": name, "lint_warnings": lint_warnings}
+        ))
     else:
         await aexec(
             ctx.supabase.table("skills").insert({
@@ -736,7 +759,9 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
                 "instructions": instructions,
             })
         )
-        return ToolResult(result=json.dumps({"status": "created", "name": name}))
+        return ToolResult(result=json.dumps(
+            {"status": "created", "name": name, "lint_warnings": lint_warnings}
+        ))
 
 
 def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:

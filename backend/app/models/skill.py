@@ -27,6 +27,9 @@ class SkillResponse(BaseModel):
     is_global: bool
     created_at: datetime
     updated_at: datetime
+    # TRIG-03 (D-09): non-blocking save-time description lint warnings.
+    # Always populated by create/update; None on rows that did not run the lint.
+    lint_warnings: list[dict] | None = None
 
 
 class SkillFileResponse(BaseModel):

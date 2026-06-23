@@ -74,6 +74,10 @@ from app.services.context_window import (
     estimate_messages_tokens,
     resolve_context_budget,
 )
+# Phase 123-01 (D-01): the relaxed "## Available Skills" catalog-note policy lives
+# in skill_lint as the single source of truth, so this runtime note and the Plan 03
+# Tuner classifier measure the SAME production policy (Pitfall 1 fidelity guard).
+from app.services.skill_lint import LOAD_SKILL_POLICY
 
 if TYPE_CHECKING:
     import asyncpg
@@ -1099,11 +1103,11 @@ async def run_agent_loop(
             catalog_lines = "\n".join(
                 f"- **{s['name']}**: {s['description']}" for s in enabled_skills
             )
+            # D-01: relaxed, description-driven load_skill firing — reconciled with
+            # LOAD_SKILL_TOOL.description via the shared LOAD_SKILL_POLICY constant.
             catalog_note = (
                 f"\n\n## Available Skills\n"
-                f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
-                f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
-                f"description similarity — wait for an explicit request:\n{catalog_lines}"
+                f"The following skills are available. {LOAD_SKILL_POLICY}\n{catalog_lines}"
             )
             active_system_prompt = active_system_prompt + catalog_note
 

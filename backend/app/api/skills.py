@@ -17,6 +17,7 @@ from app.models.skill import (
     SkillResponse,
     SkillUpdate,
 )
+from app.services.skill_lint import lint_description
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -102,6 +103,33 @@ def _upload_skill_files(
         }).execute()
 
 
+def _sibling_descriptions(
+    supabase: Client, user_id: str, exclude_skill_id: str | None = None
+) -> list[str]:
+    """Owner-scoped (own + global) sibling descriptions for the lint duplicate check.
+
+    Uses the SAME owner-scoped ``.or_(user_id.eq, is_global.eq.true)`` filter as
+    ``list_skills`` — never another user's private skills (T-123-01-02). On PATCH the
+    edited skill is excluded so a skill never flags itself as a duplicate. Never raises:
+    a read failure degrades to an empty sibling list (the lint stays advisory).
+    """
+    try:
+        result = (
+            supabase.table("skills")
+            .select("id, description")
+            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .execute()
+        )
+        rows = result.data or []
+        return [
+            r.get("description", "")
+            for r in rows
+            if str(r.get("id")) != str(exclude_skill_id)
+        ]
+    except Exception:
+        return []
+
+
 @router.get("", response_model=list[SkillResponse])
 async def list_skills(
     current_user: dict = Depends(get_current_user),
@@ -131,6 +159,11 @@ async def create_skill(
     supabase: Client = Depends(get_supabase),
 ):
     """Create a new skill owned by the current user."""
+    # TRIG-03 (D-09/D-10): lint the description PRE-persist against owner-scoped
+    # siblings (own + global), attach warnings to the response, but ALWAYS save.
+    siblings = _sibling_descriptions(supabase, current_user["id"])
+    warnings = lint_description(body.name, body.description, siblings)
+
     result = (
         supabase.table("skills")
         .insert({
@@ -142,7 +175,9 @@ async def create_skill(
         })
         .execute()
     )
-    return result.data[0]
+    row = dict(result.data[0])
+    row["lint_warnings"] = warnings
+    return row
 
 
 @router.post("/import", status_code=status.HTTP_201_CREATED)
@@ -280,7 +315,16 @@ async def update_skill(
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="Skill not found")
-    return result.data[0]
+
+    # TRIG-03 (D-09): re-lint the resulting skill (this PATCH is also the D-03
+    # author-confirm winner write). Excludes the edited skill from the duplicate
+    # check; warnings are attached but the update has already succeeded.
+    row = dict(result.data[0])
+    siblings = _sibling_descriptions(supabase, current_user["id"], exclude_skill_id=skill_id)
+    row["lint_warnings"] = lint_description(
+        row.get("name", ""), row.get("description", ""), siblings
+    )
+    return row
 
 
 @router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
