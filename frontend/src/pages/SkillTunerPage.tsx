@@ -38,6 +38,7 @@ import {
   type TunerTarget,
   type TunerScoreboard,
   type TunerCandidate,
+  type TunerStreamCallbacks,
 } from "@/lib/api"
 import type { Skill } from "@/types"
 
@@ -78,6 +79,11 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   const [lanes, setLanes] = useState<ProviderLane[]>([])
   const [scoreboard, setScoreboard] = useState<TunerScoreboard | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // A transient SSE transport timeout (redis_timeout / consumer_timeout) is NOT a
+  // run failure — the bounded job keeps computing server-side. We reconnect the
+  // stream from the buffer rather than surfacing a hard failure; this counter
+  // bounds the reconnect loop so a genuinely dead run can't spin forever.
+  const reconnectsRef = useRef(0)
 
   // Cancel any in-flight stream on unmount / skill switch (leave-and-reconcile).
   useEffect(() => {
@@ -105,53 +111,89 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
 
       const controller = new AbortController()
       abortRef.current = controller
-      void streamTunerRun(
-        skillId,
-        started.run_id,
-        {
-          onProviderDone: ({ provider, model, cell }) => {
+      reconnectsRef.current = 0
+      // A long builder/scoring stretch emits no stream events, so the shared SSE
+      // consumer's socket read can hit its deadline and yield a transient
+      // redis_timeout / consumer_timeout. That is NOT a run failure (the bounded
+      // job keeps computing server-side), so we reconcile via the authoritative
+      // GET results and, if it isn't done yet, reconnect the stream from the buffer
+      // (idempotent replay) — bounded by MAX_RECONNECTS. Only a genuine error
+      // (run_not_found / streaming_unavailable) or exhausting reconnects fails the UI.
+      const MAX_RECONNECTS = 20
+      const TRANSIENT_TERMINALS = new Set(["redis_timeout", "consumer_timeout"])
+      const runIdForStream = started.run_id
+
+      const callbacks: TunerStreamCallbacks = {
+        onProviderDone: ({ provider, model, cell }) => {
+          setLanes((prev) =>
+            prev.map((l) =>
+              l.provider === provider && l.model === model
+                ? { ...l, status: "done" as const, score: cell.score }
+                : l,
+            ),
+          )
+        },
+        onProgress: (data) => {
+          // A provider whose first cell starts flips queued→running (no fake %).
+          const prov = data.provider as string | undefined
+          const mdl = data.model as string | undefined
+          if (prov) {
             setLanes((prev) =>
               prev.map((l) =>
-                l.provider === provider && l.model === model
-                  ? { ...l, status: "done" as const, score: cell.score }
+                l.provider === prov && (!mdl || l.model === mdl) && l.status === "queued"
+                  ? { ...l, status: "running" as const }
                   : l,
               ),
             )
-          },
-          onProgress: (data) => {
-            // A provider whose first cell starts flips queued→running (no fake %).
-            const prov = data.provider as string | undefined
-            const mdl = data.model as string | undefined
-            if (prov) {
-              setLanes((prev) =>
-                prev.map((l) =>
-                  l.provider === prov && (!mdl || l.model === mdl) && l.status === "queued"
-                    ? { ...l, status: "running" as const }
-                    : l,
-                ),
-              )
-            }
-          },
-          onComplete: (sb) => setScoreboard(sb),
-          onTerminal: (status, reason) => {
-            if (status === "error") {
-              setRunPhase("error")
-              setRunError(reason ?? "The tuning run failed.")
-              return
-            }
-            setRunPhase("done")
-            // Reconcile the final scoreboard from the authoritative GET results
-            // (the SSE tuner_complete is a best-effort hint — D-v2.5-03).
-            getTunerResults(skillId, started.run_id)
-              .then(setScoreboard)
-              .catch(() => {
-                /* keep the SSE-carried scoreboard if results read fails */
-              })
-          },
+          }
         },
-        "0",
-        controller.signal,
-      )
+        onComplete: (sb) => setScoreboard(sb),
+        onTerminal: (status, reason) => {
+          if (controller.signal.aborted) return
+
+          // Transient transport timeout → reconcile, then reconnect if still running.
+          if (status === "error" && reason && TRANSIENT_TERMINALS.has(reason)) {
+            getTunerResults(skillId, runIdForStream)
+              .then((sb) => {
+                setScoreboard(sb)
+                setRunPhase("done")
+              })
+              .catch(() => {
+                if (controller.signal.aborted) return
+                if (reconnectsRef.current < MAX_RECONNECTS) {
+                  reconnectsRef.current += 1
+                  // Replay from the start of the buffer — re-applying already-seen
+                  // events is idempotent (setLanes / setScoreboard just re-set).
+                  void streamTunerRun(skillId, runIdForStream, callbacks, "0", controller.signal)
+                } else {
+                  setRunPhase("error")
+                  setRunError(
+                    "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
+                  )
+                }
+              })
+            return
+          }
+
+          // A genuine error terminal (run_not_found / streaming_unavailable / etc.).
+          if (status === "error") {
+            setRunPhase("error")
+            setRunError(reason ?? "The tuning run failed.")
+            return
+          }
+
+          setRunPhase("done")
+          // Reconcile the final scoreboard from the authoritative GET results
+          // (the SSE tuner_complete is a best-effort hint — D-v2.5-03).
+          getTunerResults(skillId, runIdForStream)
+            .then(setScoreboard)
+            .catch(() => {
+              /* keep the SSE-carried scoreboard if results read fails */
+            })
+        },
+      }
+
+      void streamTunerRun(skillId, runIdForStream, callbacks, "0", controller.signal)
     } catch (err) {
       setRunPhase("error")
       setRunError(

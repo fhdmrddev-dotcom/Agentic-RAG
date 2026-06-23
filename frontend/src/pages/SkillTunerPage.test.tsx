@@ -141,6 +141,50 @@ describe("SkillTunerPage — page-level author-confirm, no auto-apply (T-123-05-
   })
 })
 
+describe("SkillTunerPage — a transient SSE timeout is NOT a run failure (reconnect/reconcile)", () => {
+  it("a redis_timeout terminal reconciles to the finished scoreboard, never a hard failure", async () => {
+    const user = userEvent.setup()
+    // The SSE socket times out, but the bounded job already finished server-side.
+    streamTunerRun.mockImplementation(async (_s: unknown, _r: unknown, callbacks: any) => {
+      callbacks.onTerminal("error", "redis_timeout")
+    })
+    getTunerResults.mockResolvedValue(SCOREBOARD) // authoritative results ARE ready
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    await user.click(screen.getByRole("button", { name: /run tuning/i }))
+
+    // Reconciled to done — candidates render and NO failure copy appears.
+    const cards = await screen.findAllByTestId("candidate-card")
+    expect(cards.length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText(/the tuning run failed/i)).toBeNull()
+    expect(screen.queryByText(/lost the live connection/i)).toBeNull()
+  })
+
+  it("a redis_timeout while still running reconnects the stream instead of failing", async () => {
+    const user = userEvent.setup()
+    let call = 0
+    streamTunerRun.mockImplementation(async (_s: unknown, _r: unknown, callbacks: any) => {
+      call += 1
+      if (call === 1) callbacks.onTerminal("error", "consumer_timeout")
+      else {
+        callbacks.onComplete?.(SCOREBOARD)
+        callbacks.onTerminal("done")
+      }
+    })
+    // First reconcile: still running (404 → reject) → reconnect; final reconcile: ready.
+    getTunerResults.mockRejectedValueOnce(new Error("not ready")).mockResolvedValue(SCOREBOARD)
+
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    await user.click(screen.getByRole("button", { name: /run tuning/i }))
+
+    // The stream was reconnected (called a second time) and ended in success.
+    await waitFor(() => expect(streamTunerRun).toHaveBeenCalledTimes(2))
+    await screen.findAllByTestId("candidate-card")
+    expect(screen.queryByText(/the tuning run failed/i)).toBeNull()
+  })
+})
+
 describe("LiveRunCard — queued ≠ running, stable never-vanishing timer (T-123-05-03)", () => {
   const lanes: ProviderLane[] = [
     { provider: "openai", model: "gpt-5.4-mini", status: "running" },
