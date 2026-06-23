@@ -363,3 +363,96 @@ def test_force_default_safe_on_registry_miss():
     # forced_emission → .get(..., False) is the SAFE coerce default.
     cap = get_model_capability("totally-made-up-model-xyz")
     assert cap.get("forced_emission", False) is False
+
+
+# ── Phase 122 (MP-02 / D-122-04) — the provider-name gate is REMOVED ──────────
+# The forcing branch (openai_service.py:1534-1581) used to (a) set a function-level
+# ``strict`` flag (INERT for DeepSeek) and (b) gate the json_schema response_format
+# behind ``and provider == "openai"`` — a name check. Post-122 the gate is
+# TIER-DRIVEN: ``strict_response_format`` is set by the caller ONLY for
+# emit_tier=="force_strict" shots (OpenAI-only by MEASUREMENT, not name), so the
+# json_schema response_format is built whenever ``strict_response_format`` is true,
+# with no provider-name special-case.
+
+
+def test_no_provider_gate(monkeypatch):
+    """A force_strict-tier shot whose provider-NAME context is NOT 'openai' still
+    requests the json_schema response_format — the gate is tier-driven (the caller
+    set strict_response_format=True), not name-driven. This proves the
+    ``and provider == "openai"`` check is gone (the load-bearing MP-02 removal)."""
+    # active_provider deliberately NOT "openai" — pre-122 this would have suppressed
+    # the response_format entirely. Post-122 strict_response_format alone drives it.
+    us = SimpleNamespace(active_provider="not-openai", llm_model="some-strict-model", openrouter_tool_strategy="quality")
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "fill"}],
+        model="some-strict-model",
+        user_settings=us,
+        tools_override=[{"function": {"name": "render_template", "parameters": {"type": "object", "properties": {}}}}],
+        force_tool_name="render_template",
+        strict_response_format=True,
+    )
+    rf = kwargs.get("response_format")
+    assert rf is not None, "json_schema response_format must be built regardless of provider name"
+    assert rf["type"] == "json_schema"
+    assert rf["json_schema"]["name"] == "render_template"
+    assert rf["json_schema"]["strict"] is True
+    # The named tool_choice is still sent (forcing works regardless).
+    assert kwargs["tool_choice"]["function"]["name"] == "render_template"
+
+
+def test_deepseek_force(monkeypatch):
+    """A deepseek force-tier shot (force_tool_name set, strict_response_format NOT set
+    — emit_tier=force never requests strict) carries NO function-level ``strict`` flag
+    on the forced tool def AND no json_schema response_format. The inert DeepSeek
+    strict block is removed (Pitfall 3)."""
+    from app.config import MODEL_CAPABILITIES
+
+    # The registry rows for deepseek must be emit_tier=force (substrate from Task 1).
+    assert MODEL_CAPABILITIES["deepseek-v4-pro"]["emit_tier"] == "force"
+    assert MODEL_CAPABILITIES["deepseek-v4-flash"]["emit_tier"] == "force"
+
+    us = SimpleNamespace(active_provider="deepseek", llm_model="deepseek-v4-pro", openrouter_tool_strategy="quality")
+    forced_tool = {"function": {"name": "render_template", "parameters": {"type": "object", "properties": {}}}}
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "fill"}],
+        model="deepseek-v4-pro",
+        user_settings=us,
+        tools_override=[forced_tool],
+        force_tool_name="render_template",
+        # emit_tier=force => the caller does NOT set strict_response_format.
+        strict_response_format=False,
+    )
+    # No json_schema response_format on a force-tier (non-strict) shot.
+    assert kwargs.get("response_format") is None
+    # No function-level "strict" flag on the forced tool def (the inert block is gone).
+    sent_tools = kwargs.get("tools") or []
+    for _t in sent_tools:
+        _fn = _t.get("function") if isinstance(_t, dict) else None
+        if _fn and _fn.get("name") == "render_template":
+            assert "strict" not in _fn, "force-tier deepseek must NOT carry a function-level strict flag"
+    # Forcing still happens.
+    assert kwargs["tool_choice"]["function"]["name"] == "render_template"
+
+
+def test_openai_force_strict_preserved(monkeypatch):
+    """A4 (load-bearing): an OpenAI force_strict shot STILL requests the json_schema
+    response_format after removing the function-level strict block. OpenAI's guarantee
+    comes from the response_format json_schema, NOT the (now-removed) function flag —
+    so removing the function-level strict loop does NOT weaken OpenAI."""
+    us = SimpleNamespace(active_provider="openai", llm_model="gpt-5.4", openrouter_tool_strategy="quality")
+    kwargs = _capture_openai_kwargs(
+        monkeypatch,
+        messages=[{"role": "user", "content": "fill"}],
+        model="gpt-5.4",
+        user_settings=us,
+        tools_override=[{"function": {"name": "render_template", "parameters": {"type": "object", "properties": {}}}}],
+        force_tool_name="render_template",
+        strict_response_format=True,
+    )
+    rf = kwargs.get("response_format")
+    assert rf is not None, "A4 — OpenAI force_strict must still emit the json_schema response_format"
+    assert rf["type"] == "json_schema"
+    assert rf["json_schema"]["strict"] is True
+    assert rf["json_schema"]["name"] == "render_template"
