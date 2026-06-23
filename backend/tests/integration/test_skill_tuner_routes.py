@@ -63,11 +63,25 @@ class _FakeRedis:
         return 1
 
     async def set(self, key, value, *a, **k):
+        # Honor the SET NX semantic the tuner in-flight guard relies on (WR-01): when
+        # ``nx=True`` the write succeeds ONLY if the key is absent, returning a truthy value;
+        # if the key already exists it returns None (the losing POST -> 409). ``ex`` (TTL) is
+        # accepted and ignored by the fake.
+        if k.get("nx") and key in self.kv:
+            return None
         self.kv[key] = value
         return True
 
     async def get(self, key):
         return self.kv.get(key)
+
+    async def delete(self, *keys):
+        n = 0
+        for key in keys:
+            if key in self.kv:
+                del self.kv[key]
+                n += 1
+        return n
 
     async def expire(self, key, ttl):
         return True
@@ -350,12 +364,18 @@ async def test_start_caps_targets_no_unbounded_fanout():
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_duplicate_concurrent_run_returns_409():
-    """A second start for a skill already in-flight → 409 (one job per skill — T-123-04-02)."""
+    """A second start for a skill already in-flight → 409 (one job per skill — T-123-04-02).
+
+    Phase 123 (WR-01): the gate is the cross-worker Redis ``SET NX`` claim, NOT the
+    per-process ``_INFLIGHT_SKILLS`` set — so this test pre-sets the Redis claim key
+    (``tuner_inflight:{skill_id}``) to simulate a run already in-flight in ANOTHER worker.
+    The losing POST's ``SET NX`` then returns None -> 409."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
                  "user_id": OWNER["id"], "is_global": False}
     fake_redis = _FakeRedis()
-    # Pre-mark the skill in-flight (simulating an active run).
-    skill_tuner._INFLIGHT_SKILLS.add(SKILL_ID)
+    # Pre-set the cross-worker in-flight claim (an active run owns it). The per-process set is
+    # deliberately NOT seeded — proving the Redis claim is the real gate (defeats WORKER_COUNT=2).
+    fake_redis.kv[skill_tuner._inflight_key(SKILL_ID)] = "existing-run-id"
 
     app.dependency_overrides[get_supabase] = lambda: _supabase_returning_skill([skill_row])
     app.dependency_overrides[get_current_user] = lambda: OWNER

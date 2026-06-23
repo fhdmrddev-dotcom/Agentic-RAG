@@ -82,9 +82,23 @@ TERMINAL_ERROR = "error"
 _TUNER_BUFFER_TTL_S = 600
 
 # In-flight guard: exactly ONE tuner job per skill (no duplicate concurrent runs — T-123-04-02).
-# Per-process set (single-worker-per-skill is sufficient; the run-buffer is process-local for
-# the background task we spawn here). Keyed by skill_id.
+# Phase 123 (WR-01): the CORRECTNESS gate is now an ATOMIC Redis ``SET NX`` claim
+# (``tuner_inflight:{skill_id}``) so the bound holds (a) across the two near-simultaneous POSTs
+# that previously both passed a check-then-add separated by awaits (TOCTOU), and (b) across the
+# multi-worker uvicorn default (``WORKER_COUNT=2`` — a per-process set is invisible to the other
+# worker). ``_INFLIGHT_SKILLS`` is kept ONLY as a same-process fast-path hint; it is NOT the
+# gate. Keyed by skill_id.
 _INFLIGHT_SKILLS: set[str] = set()
+
+# TTL on the Redis claim — generously above the longest bounded run so a crashed/killed worker
+# that never reaches the ``finally`` cleanup can't wedge a skill forever, yet a real in-flight
+# run is never evicted mid-flight. Worst-case bounded run is
+# MAX_ITERATIONS×MAX_TARGETS×held-out×DEFAULT_REPEATS provider calls — 1800s clears it.
+_INFLIGHT_TTL_S = 1800
+
+
+def _inflight_key(skill_id: str) -> str:
+    return f"tuner_inflight:{skill_id}"
 
 
 # ── Request body ────────────────────────────────────────────────────────────────
@@ -380,13 +394,16 @@ async def _run_tuner_job(
         logger.exception("tuner job crashed for run %s", run_id)
         await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="tuner_job_failed")
     finally:
-        # Cleanup: drop the in-flight guard + the active-run sorted-set entries.
-        _INFLIGHT_SKILLS.discard(skill_id)
+        # Cleanup: release the in-flight guard + the active-run sorted-set entries.
+        _INFLIGHT_SKILLS.discard(skill_id)  # same-process fast-path hint
         try:
+            # Phase 123 (WR-01): release the cross-worker Redis claim so the NEXT run for
+            # this skill can start (the SET NX above is the gate).
+            await redis.delete(_inflight_key(skill_id))
             await redis.zrem("runs:active", str(run_id))
             await redis.zrem(f"runs_by_thread:tuner:{skill_id}", str(run_id))
         except Exception:
-            logger.exception("tuner job ZREM cleanup failed for run %s", run_id)
+            logger.exception("tuner job cleanup (DEL/ZREM) failed for run %s", run_id)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -407,69 +424,93 @@ async def start_tuner_run(
     """
     skill = await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
 
-    # ONE job per skill (T-123-04-02 — no duplicate concurrent runs / fan-out).
-    if skill_id in _INFLIGHT_SKILLS:
+    run_id = uuid4()
+
+    # ONE job per skill (T-123-04-02 — no duplicate concurrent runs / fan-out). Phase 123
+    # (WR-01): the gate is an ATOMIC Redis ``SET NX`` claim — a single check-and-set with NO
+    # intervening await — so two near-simultaneous POSTs can't both pass (the old
+    # check-then-add TOCTOU), and the claim is visible across uvicorn workers
+    # (``WORKER_COUNT=2`` defeats a per-process set). The losing POST raises the existing 409.
+    # NOTE: NEVER swallow this in a broad except — a Redis failure here must surface, not
+    # silently disable the DoS bound.
+    claimed = await redis.set(
+        _inflight_key(skill_id), str(run_id), nx=True, ex=_INFLIGHT_TTL_S
+    )
+    if not claimed:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A tuning run is already in progress for this skill",
         )
+    _INFLIGHT_SKILLS.add(skill_id)  # same-process fast-path hint (NOT the gate)
 
-    # Resolve + BOUND the targets (default to the configured N-column set; cap at MAX_TARGETS).
-    if body.targets:
-        targets = [{"provider": t.provider, "model": t.model} for t in body.targets]
-    else:
-        # Phase 123 (CR-01): derive the default target set from the DB-effective settings
-        # (provider keys saved through the Settings UI live in app_settings, surfaced via
-        # UserEffectiveSettings.providers), NOT the env-level ``settings`` singleton whose
-        # flat ``{provider}_api_key`` attrs are empty for UI-configured installs. The
-        # duck-typed ``configured_targets`` handles the .providers-list shape.
-        from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
-
-        eff = await load_app_settings_async()
-        targets = skill_tuner_service.configured_targets(eff)
-    targets = targets[:MAX_TARGETS]
-
-    # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).
-    if body.cases:
-        cases = [{"prompt": c.prompt, "should_fire": c.should_fire} for c in body.cases]
-    else:
-        siblings = await run_in_threadpool(
-            skill_tuner_service.fetch_owner_scoped_siblings,
-            supabase, current_user["id"], skill_id,
-        )
-        seeded = skill_tuner_service.auto_seed_cases(skill, siblings)
-        cases = (
-            [{"prompt": p, "should_fire": True} for p in seeded.get("should_fire", [])]
-            + [{"prompt": p, "should_fire": False} for p in seeded.get("should_not", [])]
-        )
-    cases = cases[:MAX_CASES]
-
-    n = max(1, min(int(body.n or skill_tuner_service.DEFAULT_CANDIDATE_COUNT), MAX_ITERATIONS))
-
-    run_id = uuid4()
-    _started_score = time_mod.time()
-    # Run-buffer ZADD start (Phase-061+ transport). A tuner run isn't anchored to a chat
-    # thread, so the per-skill sorted set carries it (NOT runs_by_thread:{chat_thread}).
+    # From here on the claim is HELD: if anything fails before the background job is spawned
+    # (it owns the release in its ``finally``), release the claim so a transient error can't
+    # wedge the skill for the full TTL. Once the task is created, ownership transfers to it.
     try:
-        await redis.zadd(f"runs_by_thread:tuner:{skill_id}", {str(run_id): _started_score})
-        await redis.zadd("runs:active", {str(run_id): _started_score})
-    except Exception:
-        logger.exception("tuner ZADD failed for run %s; continuing", run_id)
+        # Resolve + BOUND the targets (default to the configured N-column set; cap at MAX_TARGETS).
+        if body.targets:
+            targets = [{"provider": t.provider, "model": t.model} for t in body.targets]
+        else:
+            # Phase 123 (CR-01): derive the default target set from the DB-effective settings
+            # (provider keys saved through the Settings UI live in app_settings, surfaced via
+            # UserEffectiveSettings.providers), NOT the env-level ``settings`` singleton whose
+            # flat ``{provider}_api_key`` attrs are empty for UI-configured installs. The
+            # duck-typed ``configured_targets`` handles the .providers-list shape.
+            from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
 
-    # Mark in-flight + spawn the bounded background task (non-blocking — D-06).
-    _INFLIGHT_SKILLS.add(skill_id)
-    asyncio.create_task(
-        _run_tuner_job(
-            redis=redis,
-            run_id=run_id,
-            skill_id=skill_id,
-            skill=skill,
-            cases=cases,
-            targets=targets,
-            n=n,
-            user_id=current_user["id"],
+            eff = await load_app_settings_async()
+            targets = skill_tuner_service.configured_targets(eff)
+        targets = targets[:MAX_TARGETS]
+
+        # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).
+        if body.cases:
+            cases = [{"prompt": c.prompt, "should_fire": c.should_fire} for c in body.cases]
+        else:
+            siblings = await run_in_threadpool(
+                skill_tuner_service.fetch_owner_scoped_siblings,
+                supabase, current_user["id"], skill_id,
+            )
+            seeded = skill_tuner_service.auto_seed_cases(skill, siblings)
+            cases = (
+                [{"prompt": p, "should_fire": True} for p in seeded.get("should_fire", [])]
+                + [{"prompt": p, "should_fire": False} for p in seeded.get("should_not", [])]
+            )
+        cases = cases[:MAX_CASES]
+
+        n = max(1, min(int(body.n or skill_tuner_service.DEFAULT_CANDIDATE_COUNT), MAX_ITERATIONS))
+
+        _started_score = time_mod.time()
+        # Run-buffer ZADD start (Phase-061+ transport). A tuner run isn't anchored to a chat
+        # thread, so the per-skill sorted set carries it (NOT runs_by_thread:{chat_thread}).
+        try:
+            await redis.zadd(f"runs_by_thread:tuner:{skill_id}", {str(run_id): _started_score})
+            await redis.zadd("runs:active", {str(run_id): _started_score})
+        except Exception:
+            logger.exception("tuner ZADD failed for run %s; continuing", run_id)
+
+        # Spawn the bounded background task (non-blocking — D-06). The in-flight claim was
+        # taken atomically (SET NX) above; the job's ``finally`` releases it.
+        asyncio.create_task(
+            _run_tuner_job(
+                redis=redis,
+                run_id=run_id,
+                skill_id=skill_id,
+                skill=skill,
+                cases=cases,
+                targets=targets,
+                n=n,
+                user_id=current_user["id"],
+            )
         )
-    )
+    except Exception:
+        # Job never spawned — release the claim NOW (its owner-on-finally never starts) so a
+        # transient resolution error doesn't wedge the skill for the full TTL.
+        _INFLIGHT_SKILLS.discard(skill_id)
+        try:
+            await redis.delete(_inflight_key(skill_id))
+        except Exception:
+            logger.exception("tuner inflight-claim release failed after spawn error (skill %s)", skill_id)
+        raise
 
     return {
         "run_id": str(run_id),
