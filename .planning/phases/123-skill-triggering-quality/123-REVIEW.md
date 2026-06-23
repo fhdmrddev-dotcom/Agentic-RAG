@@ -41,7 +41,8 @@ findings:
   warning: 8
   info: 4
   total: 14
-status: issues_found
+status: resolved
+resolution: All 2 Critical + 5 of 8 Warning findings were adversarially re-verified (7/7 confirmed real, 1 reviewer-fix corrected) and fixed in commits c5b2757a/d7328212/e64ffc0c/14f25439/d1910de6/aae0ef0e/fd80cf21. Remaining 3 Warnings (WR-03/WR-05/WR-08) + 4 Info accepted as non-blocking backlog. See Resolution Log at end.
 ---
 
 # Phase 123: Code Review Report
@@ -340,6 +341,33 @@ reads like a tuning score. Minor readability nit on a brand-new module.
 
 ---
 
+## Resolution Log (2026-06-24)
+
+The 7 load-bearing findings were re-verified by 7 independent adversarial verifiers (each tasked to *refute* the claim) before any fix. Result: **6 confirmed, 1 partial (defect real, reviewer's proposed fix was wrong), 0 refuted.** The adversarial pass corrected CR-01 (the review's "pass `eff` into `configured_targets`" fix would have produced empty scoreboards — `UserEffectiveSettings` keys live in `.providers`, not flat attrs) and escalated WR-06 to top priority (confirmed it hits the **shared chat path**, not just the tuner). Each fix is a single atomic commit with tests run on the canonical `develop` tree under the project venv/node_modules.
+
+| ID | Severity | Verdict | Fix commit | Tests |
+|----|----------|---------|-----------|-------|
+| WR-06 | (shared-path regression) | confirmed | `c5b2757a` | strip `_`-keys before OpenAI-compat call + new `test_openai_service_message_sanitize.py` (3) + `test_context_window.py` (36) |
+| CR-02 | Critical | confirmed | `d7328212` | OpenRouter → concrete `deepseek/deepseek-chat` representative; `test_skill_tuner_service.py` |
+| CR-01 | Critical | partial (fix corrected) | `e64ffc0c` | DB-effective builder model + duck-typed target derivation from `eff.providers`; service+routes tests |
+| WR-02 | Warning | confirmed | `14f25439` | per-class held-out split; `test_skill_tuner_scoring.py` |
+| WR-01 | Warning | confirmed | `d1910de6` | Redis `SET NX EX 1800` one-job guard; `test_skill_tuner_routes.py` |
+| WR-07 | Warning | confirmed | `aae0ef0e` | reject empty/whitespace name on POST+PATCH; `test_skills_lint.py` |
+| WR-04 | Warning | confirmed | `fd80cf21` | inline save-error in `CandidateCard`; `ProviderScoreboard.test.tsx` |
+
+Re-verified green on `develop` with the real venv: 78 backend tests across the touched files + shared-path regression files; 8 frontend tests; `tsc --noEmit` clean.
+
+**Accepted as non-blocking backlog (not fixed in-phase):**
+- **WR-03** — long tuner runs falsely flagged failed by the shared 610s `consumer_timeout`; frontend should reconcile via `getTunerResults` on a `consumer_timeout` terminal. (UX robustness; run keeps computing server-side.)
+- **WR-05** — `CaseEditor` advertises client auto-seed it never performs; dead `seeded`/`sibling`/`held` provenance values; run-config shows "0 cases" while the server auto-seeds. (Honesty/clarity; the backend DOES seed correctly.)
+- **WR-08** — transient Redis read during results-poll maps to a 503 the frontend silently swallows; should distinguish 404 (poll again) from 503 (retry/surface).
+- **IN-01** (`Optional` renders harmless `str|null` anyOf — google adapter sanitizes; soften docstring), **IN-02** (placeholder local model ids in the Settings picker), **IN-03** (pinned groups reordered to front — atomic pairs intact, low risk), **IN-04** (`_started_score` is a timestamp — rename nit).
+
+These map to observability/UX polish, not correctness or security boundaries; suitable for a follow-up phase or `/gsd:code-review 123 --fix`.
+
+---
+
 _Reviewed: 2026-06-23T20:36:54Z_
 _Reviewer: Claude (gsd-code-reviewer)_
+_Resolution: 2026-06-24 (orchestrator + 7 adversarial verifiers)_
 _Depth: standard_
