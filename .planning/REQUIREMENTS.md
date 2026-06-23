@@ -25,7 +25,7 @@ Each maps to exactly one roadmap phase.
 
 ### Skill Triggering Quality
 
-- [ ] **TRIG-01**: A skill author can tune a skill's description against a held-out should-trigger / should-not-trigger benchmark (Skill Trigger Tuner) and pick the winning description by held-out score, measured cross-provider on production model-ids.
+- [x] **TRIG-01**: A skill author can tune a skill's description against a held-out should-trigger / should-not-trigger benchmark (Skill Trigger Tuner) and pick the winning description by held-out score, measured cross-provider on production model-ids.
 - [x] **TRIG-03**: At `save_skill` (and in the skill-creator loop) a description-quality lint flags weak/ambiguous trigger descriptions before the skill is saved, so new skills start with descriptions that actually fire.
 - [x] **CTX-03**: A loaded skill's instructions stay available for the rest of the session — they are pinned out of the rolling trim window so a skill doesn't silently fall out of context mid-conversation.
 

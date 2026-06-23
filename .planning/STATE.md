@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T17:44:28.987Z"
+last_updated: "2026-06-23T18:02:57.669Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 12
   percent: 60
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123 (skill-triggering-quality) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -231,6 +231,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
+| Phase 123 P03 | 12min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -266,6 +267,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123-01 (TRIG-03): lint_description is pure/never-raises/warn-never-block (D-09); wired into POST+PATCH /skills + agent save_skill via the existing owner-scoped .or_() sibling fetch (excludes edited skill on PATCH, degrades to [] on read failure). openai_service NOT modified — already D-01-aligned. ZERO migration/package. 11 test_threads_skills failures verified pre-existing.
 - [Phase 123]: 123-02 (CTX-03): trim_messages_to_fit gains a THIRD protected class — pinned load_skill groups (_extract_pinned_skill_groups) kept like the protected tail, de-duped to latest per skill, capped at PIN_BUDGET_FRACTION=1/3 of max_tokens, LRU-evict lowest-index over budget + honest _TRIM_MARKER; no-pins fast path = byte-identical pre-CTX-03 (G-5). Single trim path, no fork (D-14 RED LINE).
 - [Phase 123]: 123-02 (CTX-03): _reconstruct_history tags load_skill tool-results with _pinned_skill IN CODE (gated on tc.get('name')=='load_skill', skill name from args with tool_call_id fallback) — never sniffs the result JSON (D-13), never hoists to system prompt. _atomic_groups mirrors _remove_oldest_atomic so a pinned group keeps its assistant+tool_calls parent (Pitfall 2).
+- [Phase ?]: Phase 123-03 (TRIG-01): resolve_skill_builder_model (D-08) mirrors resolve_authoring_model — explicit setting (local id verbatim) -> first forced_emission default -> honest None; no paid-provider SPOF, decoupled from benchmark targets; surfaced on config.py Settings + UserEffectiveSettings.
+- [Phase ?]: Phase 123-03 (TRIG-01): skill_tuner_service is thin orchestration over forced_emit (no agent-loop/raw-SDK fork, D-14); build_candidates/classify_fires use FLAT single-typed schemas + non-empty system_prompt; classify_fires embeds the shared LOAD_SKILL_POLICY (Pitfall 1 fidelity); honest-fail -> [] / would_load=False.
+- [Phase ?]: Phase 123-03 (TRIG-01): pure scoring = deterministic 60/40 split + 3-repeat aggregate + pick_winner BY HELD-OUT (never train); every cell carries BOTH fires/no_false (042-A). configured_targets = presence-only probe, OpenRouter distinct from native deepseek/zhipu, N=1 clean baseline, local first-class. auto_seed does no I/O; fetch_owner_scoped_siblings carries the .or_(user_id.eq,is_global.eq.true) leak gate. ZERO migration/package.
 
 ## Operator Next Steps
 
