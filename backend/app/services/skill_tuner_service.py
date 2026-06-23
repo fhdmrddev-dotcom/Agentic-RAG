@@ -383,7 +383,15 @@ _REPRESENTATIVE_MODEL: dict[str, str] = {
     "openai": "gpt-5.4-mini",
     "anthropic": "claude-haiku-4-5-20251001",
     "google": "gemini-3.5-flash",
-    "openrouter": "",  # gateway — user's selected/routed model
+    # Phase 123 (CR-02): OpenRouter is a DISTINCT first-class target (gateway), so it
+    # needs a CONCRETE representative model — an empty string made the job's
+    # ``if not model: continue`` skip the lane entirely (no cell, frontend lane stuck
+    # "queued" forever, OpenRouter-only installs scored ZERO columns). ``deepseek/deepseek-chat``
+    # is an openrouter-provider registry row with ``forced_emission: True`` / ``emit_tier: "force"``
+    # (config.py) — i.e. it can actually be forced to emit the TriggerDecision, unlike the
+    # ``moonshotai/kimi-*`` coerce rows. This mirrors the one-representative-per-provider
+    # pattern used for every other column.
+    "openrouter": "deepseek/deepseek-chat",
     "deepseek": "deepseek-v4-flash",
     "moonshot": "kimi-k2.6",
     "minimax": "MiniMax-M2.7-highspeed",

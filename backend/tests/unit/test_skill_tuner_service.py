@@ -191,6 +191,14 @@ def test_n_column_configured_only():
     assert len({"openrouter", "deepseek", "zhipu"} & providers) == 3, (
         "OpenRouter must be a distinct entry from native deepseek/zhipu"
     )
+    # Phase 123 (CR-02): the OpenRouter target must carry a CONCRETE (non-empty)
+    # representative model — an empty model makes the job's ``if not model: continue``
+    # skip the lane entirely, so an OpenRouter-only install scores zero columns and the
+    # frontend lane stays "queued" forever.
+    or_target = next(t for t in targets if t["provider"] == "openrouter")
+    assert or_target["model"].strip(), (
+        "OpenRouter must have a concrete representative model so it is scored"
+    )
 
 
 def test_n_equals_one_is_a_valid_clean_baseline():
