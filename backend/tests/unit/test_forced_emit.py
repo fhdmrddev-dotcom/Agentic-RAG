@@ -406,3 +406,140 @@ async def test_forced_emit_default_still_emitfieldmap(_patch_gateway):
     )
     assert res2["emitted"] is None
     assert res2["failure"] == "model_failed_to_emit"
+
+
+# ── Phase 122 (MP-01 / D-122-02) — the ladder rung-descent + tier-scoping tests ──
+# These are the NON-VACUOUS recovery tests (the static-false-green trap from Phase
+# 102/104): a HARD-schema strict-400 → non-strict-400 → coerce-success descent must be
+# genuinely EXERCISED, not just the happy path. ``_fake_open_stream`` is sequenced
+# per-rung (raise / return) so the winning rung is the one the ladder ACTUALLY reached.
+
+
+def _sequence_gateway(state, monkeypatch, behaviours):
+    """Drive ``open_stream`` with a per-CALL behaviour list (one entry per rung the
+    ladder attempts). Each behaviour is either an Exception class/instance (the rung
+    raises — a provider 400) or a synthetic event list (the rung returns that stream).
+    Records every ``GatewayRequest`` the ladder built into ``state["requests"]`` so a
+    test can assert which rungs were attempted (tier-scoping)."""
+    import app.services.forced_emit as fe
+
+    state["requests"] = []
+    calls = {"i": 0}
+
+    async def _fake_open_stream(provider, request):
+        from app.services.provider_gateway import CallingMode
+
+        state["requests"].append(request)
+        state["request"] = request
+        state["provider"] = provider
+        idx = calls["i"]
+        calls["i"] += 1
+        behaviour = behaviours[idx] if idx < len(behaviours) else behaviours[-1]
+        if isinstance(behaviour, type) and issubclass(behaviour, BaseException):
+            raise behaviour("synthetic provider 400")
+        if isinstance(behaviour, BaseException):
+            raise behaviour
+        cm = state["calling_mode"] or CallingMode.NATIVE
+        return iter(behaviour), cm
+
+    monkeypatch.setattr(fe, "open_stream", _fake_open_stream)
+    return state
+
+
+def _patch_tier(monkeypatch, emit_tier, provider="openai"):
+    import app.services.forced_emit as fe
+
+    monkeypatch.setattr(
+        fe, "get_model_capability", lambda model: {"emit_tier": emit_tier, "provider": provider}
+    )
+
+
+async def test_ladder_descent_strict_to_coerce(_patch_gateway, monkeypatch):
+    """force_strict: strict_force RAISES (400) → non_strict_force RAISES (400) →
+    coerce SUCCEEDS. Reproduces the Pitfall-2 HARD-schema descent — the coerce rung is
+    the real safety net. Asserts ``emit_rung == "coerce"`` and a real emission (the
+    recovery rung is GENUINELY exercised, not a happy-path masquerade)."""
+    _patch_tier(monkeypatch, "force_strict")
+    _sequence_gateway(
+        _patch_gateway,
+        monkeypatch,
+        [RuntimeError, RuntimeError, _tool_call_stream("render_template", _VALID_FM)],
+    )
+    res = await _run()
+    assert res["emitted"] is not None
+    assert res["emitted"].scalars[0].value == "Meridian"
+    assert res["emit_rung"] == "coerce"
+    assert res["failure"] is None
+    # All three rungs were attempted (the ladder DESCENDED twice).
+    assert len(_patch_gateway["requests"]) == 3
+    # The first rung was strict (strict_schema=True); the coerce rung was tool_choice=auto.
+    assert _patch_gateway["requests"][0].strict_schema is True
+    assert _patch_gateway["requests"][2].force_tool_name is None
+    assert _patch_gateway["requests"][2].tool_choice == "auto"
+
+
+async def test_ladder_descent_non_strict_recovery(_patch_gateway, monkeypatch):
+    """force_strict: strict_force RAISES (400) → non_strict_force SUCCEEDS. The strict
+    rung went dark; the non-strict rung recovered (not the coerce rung). Asserts
+    ``emit_rung == "non_strict_force"`` — the proven-missing rung BUG-260615-01 needed."""
+    _patch_tier(monkeypatch, "force_strict")
+    _sequence_gateway(
+        _patch_gateway,
+        monkeypatch,
+        [RuntimeError, _tool_call_stream("render_template", _VALID_FM)],
+    )
+    res = await _run()
+    assert res["emitted"] is not None
+    assert res["emit_rung"] == "non_strict_force"
+    assert res["failure"] is None
+    # Exactly two rungs attempted: strict (dark) then non-strict (won) — coerce never run.
+    assert len(_patch_gateway["requests"]) == 2
+    assert _patch_gateway["requests"][0].strict_schema is True   # strict rung
+    assert _patch_gateway["requests"][1].strict_schema is False  # non-strict rung
+    assert _patch_gateway["requests"][1].force_tool_name == "render_template"
+
+
+async def test_ladder_tier_scoped_coerce_never_runs_strict(_patch_gateway, monkeypatch):
+    """tier_scoped: a coerce-tier model NEVER runs the strict or non-strict-force rung
+    (it would 400 every Kimi). Even if the FIRST call raises, the ONLY rung attempted is
+    coerce — no request ever carries strict_schema=True, and force_tool_name stays None."""
+    _patch_tier(monkeypatch, "coerce", provider="moonshot")
+    # Even if the (single) coerce rung's first attempt is a clean success, prove the
+    # ladder attempted ONLY coerce — never a strict/non-strict rung.
+    _sequence_gateway(
+        _patch_gateway,
+        monkeypatch,
+        [_tool_call_stream("render_template", _VALID_FM)],
+    )
+    res = await _run(model="kimi-k2.6")
+    assert res["emit_rung"] == "coerce"
+    assert res["forced"] is False
+    # Exactly ONE rung attempted (coerce only) — the strict + non_strict_force rungs SKIPPED.
+    assert len(_patch_gateway["requests"]) == 1
+    # No request EVER carried strict_schema=True, and none forced a named tool.
+    for req in _patch_gateway["requests"]:
+        assert req.strict_schema is not True, "a coerce-tier model must NEVER send strict_schema=True"
+        assert req.force_tool_name is None, "a coerce-tier model must NEVER force a named tool"
+    assert _patch_gateway["requests"][0].tool_choice == "auto"
+
+
+async def test_emit_tier_default_registry_miss_is_coerce(_patch_gateway, monkeypatch):
+    """emit_tier_default: a registry miss (get_model_capability returns {}) resolves to
+    ``coerce`` (default-SAFE, D-122-05). The rung list is [coerce] only — the strict and
+    non-strict-force rungs are NEVER attempted, even on a force-shaped emitter."""
+    import app.services.forced_emit as fe
+
+    monkeypatch.setattr(fe, "get_model_capability", lambda model: {})
+    _sequence_gateway(
+        _patch_gateway,
+        monkeypatch,
+        [_tool_call_stream("render_template", _VALID_FM)],
+    )
+    res = await _run(model="some-unverified-model")
+    assert res["tier"] == "coerce"
+    assert res["emit_rung"] == "coerce"
+    assert res["forced"] is False
+    # Only the coerce rung ran (default-SAFE never wrongly forces/strict-forces).
+    assert len(_patch_gateway["requests"]) == 1
+    assert _patch_gateway["requests"][0].strict_schema is not True
+    assert _patch_gateway["requests"][0].force_tool_name is None
