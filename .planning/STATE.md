@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T17:28:09.471Z"
+last_updated: "2026-06-23T17:44:28.987Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 11
   percent: 60
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123 (skill-triggering-quality) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -230,6 +230,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
+| Phase 123 P02 | 7min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -263,6 +264,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 122-03 (MP-03): HARD schema (optional-heavy + additionalProperties confidence object) is the strict-rung trip-wire (Pitfall 1) making the recovery axis non-vacuous; recovery=PASS on any ladder win, force=PASS only on the declared TOP rung, trigger=FAIL on provider_error but honest_fail still PASS; DOCUMENTED clears the gate (D-122-07); the operator grep-before-tier-flip ritual is the MP-03 gate (NOT CI, D-122-06)
 - [Phase ?]: Phase 123-01 (TRIG-03/D-01): LOAD_SKILL_POLICY lives in skill_lint.py (not agent_loop.py) so the Plan 03 Tuner classifier imports ONE source of truth — Pitfall 1 fidelity guard. agent_loop catalog note relaxed to fire load_skill on description match, reconciled with LOAD_SKILL_TOOL; owner-scoped catalog query preserved byte-for-byte.
 - [Phase ?]: Phase 123-01 (TRIG-03): lint_description is pure/never-raises/warn-never-block (D-09); wired into POST+PATCH /skills + agent save_skill via the existing owner-scoped .or_() sibling fetch (excludes edited skill on PATCH, degrades to [] on read failure). openai_service NOT modified — already D-01-aligned. ZERO migration/package. 11 test_threads_skills failures verified pre-existing.
+- [Phase 123]: 123-02 (CTX-03): trim_messages_to_fit gains a THIRD protected class — pinned load_skill groups (_extract_pinned_skill_groups) kept like the protected tail, de-duped to latest per skill, capped at PIN_BUDGET_FRACTION=1/3 of max_tokens, LRU-evict lowest-index over budget + honest _TRIM_MARKER; no-pins fast path = byte-identical pre-CTX-03 (G-5). Single trim path, no fork (D-14 RED LINE).
+- [Phase 123]: 123-02 (CTX-03): _reconstruct_history tags load_skill tool-results with _pinned_skill IN CODE (gated on tc.get('name')=='load_skill', skill name from args with tool_call_id fallback) — never sniffs the result JSON (D-13), never hoists to system prompt. _atomic_groups mirrors _remove_oldest_atomic so a pinned group keeps its assistant+tool_calls parent (Pitfall 2).
 
 ## Operator Next Steps
 
