@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 042 — Tuner: Scoreboard & Candidates</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { padding-top: 52px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 26px 28px 80px; }
+  .vhead { margin-bottom: 18px; }
+  .vhead h2 { font-family: var(--font-headline); font-weight:700; font-size: var(--text-xl); margin:0; }
+  .vhead p { color: var(--color-text-muted); font-size: var(--text-sm); margin:6px 0 0; max-width: 760px; line-height:1.55; }
+
+  .callout { border-left:3px solid var(--color-primary); background:var(--color-primary-dim); padding:11px 14px; border-radius:0 var(--radius-md) var(--radius-md) 0; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.55; margin-bottom:20px; }
+  .callout b { color: var(--color-primary); }
+
+  .s-label { font-size: var(--text-xs); text-transform: uppercase; letter-spacing:0.07em; color:var(--color-text-dim); font-weight:600; margin-bottom:11px; display:flex; align-items:center; gap:8px; }
+  .count { background: var(--color-muted); color: var(--color-text-muted); border-radius: var(--radius-full); padding:1px 8px; font-size:10px; letter-spacing:0; }
+
+  .btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight:500; border-radius: var(--radius-md); padding:8px 14px; cursor:pointer; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); display:inline-flex; align-items:center; gap:7px; transition: all var(--dur-fast) var(--ease-out); }
+  .btn:hover { background: var(--color-accent); }
+  .btn.primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color:#fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background:transparent; border-color:transparent; color:var(--color-text-muted); }
+  .btn.sm { padding:5px 10px; font-size: var(--text-xs); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* provider tokens */
+  .prov-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+  .prov-dot.openai{background:#10a37f}.prov-dot.anthropic{background:#d97757}.prov-dot.google{background:#4285f4}.prov-dot.openrouter{background:var(--color-accent-violet)}
+  .prov-model { font-family: var(--font-mono); font-size:10px; color: var(--color-text-dim); }
+  .mono { font-family: var(--font-mono); }
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); line-height:1.55; }
+
+  .score { font-family: var(--font-mono); font-weight:600; }
+  .good{color:var(--color-success)} .mid{color:var(--color-warning)} .bad{color:var(--color-danger)}
+  .bg-good{background:var(--color-success)} .bg-mid{background:var(--color-warning)} .bg-bad{background:var(--color-danger)}
+
+  /* ── VARIANT A — candidate cards w/ per-provider grid ───────── */
+  .desc-now { border:1px solid var(--color-border); background:var(--color-bg-elev1); border-radius:var(--radius-md); padding:13px 15px; margin-bottom:22px; }
+  .desc-now .tag { font-size:10px; font-family:var(--font-mono); color:var(--color-text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+  .desc-now .txt { font-size: var(--text-sm); margin-top:6px; line-height:1.55; }
+
+  .candgrid { display:flex; flex-direction:column; gap:14px; }
+  .candcard { border:1px solid var(--color-border); background:var(--color-surface); border-radius:var(--radius-lg); padding:16px 18px; transition:all var(--dur-fast) var(--ease-out); }
+  .candcard:hover { border-color: var(--color-primary-glow); }
+  .candcard.win { border-color: var(--color-success); box-shadow:0 0 0 1px var(--color-success-dim); }
+  .candcard.cur { border-style:dashed; opacity:0.92; }
+  .cc-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .cc-label { font-weight:600; font-size: var(--text-sm); }
+  .tag-win{font-size:10px;background:var(--color-success);color:#04140a;padding:3px 9px;border-radius:var(--radius-full);font-weight:700}
+  .tag-cur{font-size:10px;background:var(--color-muted);color:var(--color-text-muted);padding:3px 9px;border-radius:var(--radius-full)}
+  .cc-held { margin-left:auto; text-align:right; }
+  .cc-held .v { font-size: var(--text-xl); font-family:var(--font-mono); font-weight:700; }
+  .cc-held .l { font-size:10px; color:var(--color-text-dim); text-transform:uppercase; letter-spacing:0.05em; }
+  .cc-text { font-size: var(--text-sm); color: var(--color-text-muted); line-height:1.55; margin-bottom:14px; }
+  .cc-text b { color: var(--color-text); font-weight:500; }
+
+  .pgrid { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+  .pcell { border:1px solid var(--color-border-soft); border-radius:var(--radius-md); padding:9px 10px; background:var(--color-bg-elev1); }
+  .pcell .ph { display:flex; align-items:center; gap:6px; font-size: var(--text-xs); margin-bottom:7px; }
+  .pcell .nums { display:flex; align-items:baseline; gap:6px; }
+  .pcell .nums .big { font-family:var(--font-mono); font-weight:600; font-size: var(--text-md); }
+  .pcell .split { font-size:10px; color:var(--color-text-dim); margin-top:5px; font-family:var(--font-mono); }
+  .pbar { height:4px; border-radius:2px; background:var(--color-muted); margin-top:7px; overflow:hidden; }
+  .pbar > i { display:block; height:100%; }
+
+  .cc-actions { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid var(--color-border-soft); }
+
+  /* confirm strip */
+  .confirm { margin-top:18px; border:1px solid var(--color-primary-glow); background:var(--color-primary-dim); border-radius:var(--radius-lg); padding:16px 18px; display:none; }
+  .confirm.show { display:block; animation: fadeSlideUp 0.3s var(--ease-out); }
+  .confirm h4 { margin:0 0 8px; font-family:var(--font-headline); font-size:var(--text-md); }
+  .confirm .diff { font-size: var(--text-sm); line-height:1.7; margin:10px 0; }
+  .confirm .diff .old { color: var(--color-danger); text-decoration: line-through; opacity:0.8; }
+  .confirm .diff .new { color: var(--color-success); }
+
+  /* ── VARIANT B — leaderboard ─────────────────────────────────── */
+  .lb { display:flex; flex-direction:column; gap:8px; }
+  .lb-row { display:grid; grid-template-columns: 28px 1fr 90px 200px 70px; gap:14px; align-items:center; border:1px solid var(--color-border); border-radius:var(--radius-md); padding:12px 14px; background:var(--color-surface); transition:all var(--dur-fast) var(--ease-out); }
+  .lb-row.head { background:transparent; border:none; padding:0 14px 2px; color:var(--color-text-dim); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.05em; }
+  .lb-row.win { border-color: var(--color-success); background:var(--color-success-dim); }
+  .lb-row.cur { border-style:dashed; }
+  .lb-rank { font-family:var(--font-mono); color:var(--color-text-dim); text-align:center; }
+  .lb-row.win .lb-rank { color: var(--color-success); }
+  .lb-text { font-size: var(--text-sm); line-height:1.45; }
+  .lb-held { font-family:var(--font-mono); font-weight:700; font-size: var(--text-lg); }
+  .perprov { display:flex; gap:5px; }
+  .pp { flex:1; height:26px; border-radius:4px; background:var(--color-muted); position:relative; display:grid; place-items:center; }
+  .pp .ppv { font-family:var(--font-mono); font-size:9px; color:var(--color-text); z-index:1; }
+  .pp .ppfill { position:absolute; left:0; bottom:0; width:100%; border-radius:4px; opacity:0.35; }
+
+  /* ── VARIANT C — diff-against-current focus ──────────────────── */
+  .focus { display:grid; grid-template-columns: 280px 1fr; gap:22px; align-items:start; }
+  @media(max-width:900px){ .focus{ grid-template-columns:1fr; } }
+  .candlist { display:flex; flex-direction:column; gap:8px; }
+  .candmini { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:11px 13px; cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+  .candmini:hover { border-color:var(--color-primary-glow); }
+  .candmini.active { border-color: var(--color-primary); background: var(--color-primary-dim); }
+  .candmini.win { border-left:3px solid var(--color-success); }
+  .candmini .cm-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+  .candmini .cm-label { font-size: var(--text-xs); font-weight:600; }
+  .candmini .cm-text { font-size: var(--text-xs); color: var(--color-text-dim); line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .focuspane { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:20px; }
+  .fp-text { font-size: var(--text-base); line-height:1.6; padding:14px; background:var(--color-bg-elev1); border-radius:var(--radius-md); margin-bottom:18px; }
+  .fp-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .deltarow { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--color-border-soft); }
+  .deltarow:last-child { border:none; }
+  .delta-up { color: var(--color-success); font-family:var(--font-mono); font-size: var(--text-xs); }
+  .delta-down { color: var(--color-danger); font-family:var(--font-mono); font-size: var(--text-xs); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
+  <span class="label">042 · Scoreboard + candidates</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Candidate cards + grid ★</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Leaderboard rows</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Diff-against-current</button>
+</div>
+
+<!-- Cross-cutting: provider-set adaptivity band (always visible across all 3 tabs) -->
+<div style="max-width:1120px;margin:0 auto;padding:18px 28px 0;">
+  <div style="border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-bg-elev1);padding:16px 18px;">
+    <div style="font-size:var(--text-xs);text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-dim);font-weight:600;margin-bottom:5px;">The scoreboard renders YOUR configured targets — not a fixed four</div>
+    <p style="font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.55;margin:0 0 14px;max-width:860px;">
+      Same candidate ("Build or update a project risk register…"), three different orgs. A provider you don't run
+      <b style="color:var(--color-text)">never appears</b> — showing a score you can't act on would be a fabricated measurement.
+      <b style="color:var(--color-text)">Single-provider isn't a degraded mode — it's the clean baseline;</b> the multi-column grid is the elaboration.
+      OpenRouter is one gateway; native DeepSeek / GLM / Kimi / MiniMax are their own first-class targets.</p>
+    <div style="display:grid;grid-template-columns:1.7fr 1fr 1.1fr;gap:14px;align-items:stretch;">
+      <!-- multi-provider org -->
+      <div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:12px;background:var(--color-surface);">
+        <div style="font-size:var(--text-xs);font-weight:600;margin-bottom:10px;">Multi-provider org <span class="note">· 4 targets</span></div>
+        <div style="display:flex;gap:6px;">
+          <div style="flex:1;border:1px solid var(--color-border-soft);border-radius:7px;padding:7px 8px;background:var(--color-bg-elev1)"><div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:4px"><span class="prov-dot openai"></span>OpenAI</div><div class="mono good" style="font-weight:600;font-size:13px">.96</div></div>
+          <div style="flex:1;border:1px solid var(--color-border-soft);border-radius:7px;padding:7px 8px;background:var(--color-bg-elev1)"><div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:4px"><span class="prov-dot anthropic"></span>Anthr</div><div class="mono good" style="font-weight:600;font-size:13px">1.0</div></div>
+          <div style="flex:1;border:1px solid var(--color-border-soft);border-radius:7px;padding:7px 8px;background:var(--color-bg-elev1)"><div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:4px"><span class="prov-dot google"></span>Goog</div><div class="mono mid" style="font-weight:600;font-size:13px">.82</div></div>
+          <div style="flex:1;border:1px solid var(--color-border-soft);border-radius:7px;padding:7px 8px;background:var(--color-bg-elev1)"><div style="display:flex;align-items:center;gap:5px;font-size:10px;margin-bottom:4px"><span class="prov-dot openrouter"></span>OR</div><div class="mono good" style="font-weight:600;font-size:13px">.95</div></div>
+        </div>
+        <div class="note" style="margin-top:8px">held-out aggregate <span class="good mono">0.94</span> · the cross-provider case</div>
+      </div>
+      <!-- single provider org -->
+      <div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:12px;background:var(--color-surface);">
+        <div style="font-size:var(--text-xs);font-weight:600;margin-bottom:10px;">Anthropic-only org <span class="note">· 1 target</span></div>
+        <div style="border:1px solid var(--color-border-soft);border-radius:7px;padding:10px 11px;background:var(--color-bg-elev1)">
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px"><span class="prov-dot anthropic"></span>Anthropic <span class="prov-model">claude-haiku-4-5</span></div>
+          <div class="mono good" style="font-weight:700;font-size:22px">1.00</div>
+          <div class="note" style="margin-top:3px">fires 6/6 · no-false 5/5 · held-out</div>
+        </div>
+        <div class="note" style="margin-top:8px">no cross-provider grid — just "tune for Claude"</div>
+      </div>
+      <!-- self-hosted org -->
+      <div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:12px;background:var(--color-surface);">
+        <div style="font-size:var(--text-xs);font-weight:600;margin-bottom:10px;">Self-hosted org <span class="note">· 1 target, own infra</span></div>
+        <div style="border:1px solid var(--color-border-soft);border-radius:7px;padding:10px 11px;background:var(--color-bg-elev1)">
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:6px"><span style="width:8px;height:8px;border-radius:50%;background:#4d6bfe;display:inline-block"></span>DeepSeek <span class="prov-model">self-hosted · your endpoint</span></div>
+          <div class="mono good" style="font-weight:700;font-size:22px">0.88</div>
+          <div class="note" style="margin-top:3px">fires 6/6 · no-false 4/5 · held-out</div>
+        </div>
+        <div class="note" style="margin-top:8px">builder model can be self-hosted too → fully air-gapped</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT A ===================== -->
+<div id="variant-a" class="variant">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>One tuning iteration · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>The heart of the loop: each candidate description carries its <b>held-out score</b> and a
+        per-provider breakdown across the 4 production models. You pick the winner <b>by held-out score</b>,
+        then explicitly confirm — nothing is auto-applied.</p>
+    </div>
+
+    <div class="callout">
+      <b>Two honest sub-scores per cell.</b> "fires" = should-trigger recall · "no-false" = should-NOT
+      precision (the false-fire rail for the new description-driven policy). A description that fires on
+      everything would score high on "fires" and <b>fail "no-false"</b> — both must be good. Held-out =
+      the 40% of cases never used to pick the candidate.
+    </div>
+
+    <div class="desc-now">
+      <span class="tag">current · live · drives load_skill firing</span>
+      <div class="txt">"Risk register." &nbsp;<span class="mono note">held-out 0.54 — fires inconsistently, false-fires on generic risk questions</span></div>
+    </div>
+
+    <div class="s-label">Candidate rewrites <span class="count">generated by claude-haiku-4-5 · ≤ 4</span></div>
+    <div class="candgrid">
+      <!-- winner -->
+      <div class="candcard win">
+        <div class="cc-top">
+          <span class="tag-win">★ best held-out</span>
+          <span class="cc-label">Candidate A</span>
+          <div class="cc-held"><div class="v good">0.94</div><div class="l">held-out</div></div>
+        </div>
+        <div class="cc-text">"<b>Build or update a project risk register</b> — risks, likelihood, impact, and mitigation — as a tracked spreadsheet from the knowledge base."</div>
+        <div class="pgrid">
+          <div class="pcell"><div class="ph"><span class="prov-dot openai"></span>OpenAI</div><div class="nums"><span class="big good">0.96</span></div><div class="split">fires 6/6 · no-false 5/5</div><div class="pbar"><i class="bg-good" style="width:96%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot anthropic"></span>Anthropic</div><div class="nums"><span class="big good">1.00</span></div><div class="split">fires 6/6 · no-false 5/5</div><div class="pbar"><i class="bg-good" style="width:100%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot google"></span>Google</div><div class="nums"><span class="big mid">0.82</span></div><div class="split">fires 5/6 · no-false 5/5</div><div class="pbar"><i class="bg-mid" style="width:82%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot openrouter"></span>OpenRouter</div><div class="nums"><span class="big good">0.95</span></div><div class="split">fires 6/6 · no-false 4/5</div><div class="pbar"><i class="bg-good" style="width:95%"></i></div></div>
+        </div>
+        <div class="cc-actions">
+          <button class="btn primary" onclick="openConfirm()">Use this → confirm &amp; save</button>
+          <span class="note">Author-confirmed · writes via <span class="mono">PATCH /skills</span> · re-lints on save</span>
+        </div>
+      </div>
+
+      <!-- candidate B -->
+      <div class="candcard">
+        <div class="cc-top"><span class="tag-cur">Candidate B</span><div class="cc-held"><div class="v mid">0.78</div><div class="l">held-out</div></div></div>
+        <div class="cc-text">"Create a risk register spreadsheet listing project risks and their mitigations."</div>
+        <div class="pgrid">
+          <div class="pcell"><div class="ph"><span class="prov-dot openai"></span>OpenAI</div><div class="nums"><span class="big good">0.88</span></div><div class="split">fires 5/6 · no-false 5/5</div><div class="pbar"><i class="bg-good" style="width:88%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot anthropic"></span>Anthropic</div><div class="nums"><span class="big mid">0.80</span></div><div class="split">fires 5/6 · no-false 4/5</div><div class="pbar"><i class="bg-mid" style="width:80%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot google"></span>Google</div><div class="nums"><span class="big bad">0.60</span></div><div class="split">fires 4/6 · no-false 4/5</div><div class="pbar"><i class="bg-bad" style="width:60%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot openrouter"></span>OpenRouter</div><div class="nums"><span class="big mid">0.84</span></div><div class="split">fires 5/6 · no-false 5/5</div><div class="pbar"><i class="bg-mid" style="width:84%"></i></div></div>
+        </div>
+        <div class="cc-actions"><button class="btn">Use this</button><span class="note">Lower held-out — weaker on Google, one false-fire on Anthropic</span></div>
+      </div>
+
+      <!-- current baseline -->
+      <div class="candcard cur">
+        <div class="cc-top"><span class="tag-cur">Current (baseline)</span><div class="cc-held"><div class="v bad">0.54</div><div class="l">held-out</div></div></div>
+        <div class="cc-text">"Risk register."</div>
+        <div class="pgrid">
+          <div class="pcell"><div class="ph"><span class="prov-dot openai"></span>OpenAI</div><div class="nums"><span class="big mid">0.67</span></div><div class="split">fires 3/6 · no-false 5/5</div><div class="pbar"><i class="bg-mid" style="width:67%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot anthropic"></span>Anthropic</div><div class="nums"><span class="big bad">0.50</span></div><div class="split">fires 2/6 · no-false 5/5</div><div class="pbar"><i class="bg-bad" style="width:50%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot google"></span>Google</div><div class="nums"><span class="big bad">0.33</span></div><div class="split">fires 1/6 · no-false 5/5</div><div class="pbar"><i class="bg-bad" style="width:33%"></i></div></div>
+          <div class="pcell"><div class="ph"><span class="prov-dot openrouter"></span>OpenRouter</div><div class="nums"><span class="big mid">0.67</span></div><div class="split">fires 3/6 · no-false 5/5</div><div class="pbar"><i class="bg-mid" style="width:67%"></i></div></div>
+        </div>
+        <div class="cc-actions"><span class="note">Never false-fires (it barely fires at all) — the new policy makes this a problem.</span></div>
+      </div>
+    </div>
+
+    <!-- confirm -->
+    <div class="confirm" id="confirm-a">
+      <h4>🛡 Confirm description change</h4>
+      <div class="diff">
+        <span class="old">"Risk register."</span><br>
+        <span class="new">"Build or update a project risk register — risks, likelihood, impact, and mitigation — as a tracked spreadsheet from the knowledge base."</span>
+      </div>
+      <p class="note">Held-out 0.54 → <b class="good">0.94</b> across 4 providers. This writes the live description
+        via <span class="mono">PATCH /skills/{id}</span> and runs the save-time lint. The skill starts firing on
+        matching requests immediately.</p>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn primary" onclick="document.getElementById('confirm-a').classList.remove('show')">Confirm &amp; save</button>
+        <button class="btn ghost" onclick="document.getElementById('confirm-a').classList.remove('show')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT B ===================== -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>Candidate leaderboard · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>Every candidate + the current baseline in one ranked table, sorted by held-out score. The
+        per-provider strip is a compact 4-cell sparkline — dense, scannable, comparison-first.</p>
+    </div>
+    <div class="callout"><b>Trade vs A.</b> You see all candidates ranked at a glance, but each per-provider
+      cell shrinks to a single number — the fires-vs-no-false split is one tap away, not always visible.</div>
+
+    <div class="lb">
+      <div class="lb-row head"><span>#</span><span>description</span><span>held-out</span><span>per-provider (held-out)</span><span></span></div>
+      <div class="lb-row win">
+        <span class="lb-rank">1</span>
+        <span class="lb-text">"Build or update a project risk register — risks, likelihood, impact, mitigation — as a tracked spreadsheet…" <span class="tag-win">★ best</span></span>
+        <span class="lb-held good">0.94</span>
+        <span class="perprov">
+          <span class="pp"><span class="ppfill bg-good" style="height:96%"></span><span class="ppv">.96</span></span>
+          <span class="pp"><span class="ppfill bg-good" style="height:100%"></span><span class="ppv">1.0</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:82%"></span><span class="ppv">.82</span></span>
+          <span class="pp"><span class="ppfill bg-good" style="height:95%"></span><span class="ppv">.95</span></span>
+        </span>
+        <button class="btn primary sm">Use</button>
+      </div>
+      <div class="lb-row">
+        <span class="lb-rank">2</span>
+        <span class="lb-text">"Create a risk register spreadsheet listing project risks and their mitigations."</span>
+        <span class="lb-held mid">0.78</span>
+        <span class="perprov">
+          <span class="pp"><span class="ppfill bg-good" style="height:88%"></span><span class="ppv">.88</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:80%"></span><span class="ppv">.80</span></span>
+          <span class="pp"><span class="ppfill bg-bad" style="height:60%"></span><span class="ppv">.60</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:84%"></span><span class="ppv">.84</span></span>
+        </span>
+        <button class="btn sm">Use</button>
+      </div>
+      <div class="lb-row">
+        <span class="lb-rank">3</span>
+        <span class="lb-text">"Track and update project risks with likelihood and impact scores."</span>
+        <span class="lb-held mid">0.71</span>
+        <span class="perprov">
+          <span class="pp"><span class="ppfill bg-mid" style="height:75%"></span><span class="ppv">.75</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:78%"></span><span class="ppv">.78</span></span>
+          <span class="pp"><span class="ppfill bg-bad" style="height:55%"></span><span class="ppv">.55</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:76%"></span><span class="ppv">.76</span></span>
+        </span>
+        <button class="btn sm">Use</button>
+      </div>
+      <div class="lb-row cur">
+        <span class="lb-rank">4</span>
+        <span class="lb-text">"Risk register." <span class="tag-cur">current</span></span>
+        <span class="lb-held bad">0.54</span>
+        <span class="perprov">
+          <span class="pp"><span class="ppfill bg-mid" style="height:67%"></span><span class="ppv">.67</span></span>
+          <span class="pp"><span class="ppfill bg-bad" style="height:50%"></span><span class="ppv">.50</span></span>
+          <span class="pp"><span class="ppfill bg-bad" style="height:33%"></span><span class="ppv">.33</span></span>
+          <span class="pp"><span class="ppfill bg-mid" style="height:67%"></span><span class="ppv">.67</span></span>
+        </span>
+        <span class="note" style="text-align:center">live</span>
+      </div>
+    </div>
+    <p class="note" style="margin-top:14px">Column order under "per-provider": <span class="prov-dot openai"></span> OpenAI ·
+      <span class="prov-dot anthropic"></span> Anthropic · <span class="prov-dot google"></span> Google ·
+      <span class="prov-dot openrouter"></span> OpenRouter. Hover a cell → the fires / no-false split.</p>
+  </div>
+</div>
+
+<!-- ===================== VARIANT C ===================== -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>Compare to current · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>Pick a candidate from the list; the right pane shows it head-to-head against the live description —
+        the per-provider <b>delta</b> (what improves, what regresses) is the hero, so a candidate that wins
+        overall but quietly regresses one provider can't hide.</p>
+    </div>
+    <div class="callout"><b>Delta-first honesty.</b> Best for catching a candidate that lifts the average but
+      drops a provider below baseline — the thing the 4-axis SC#10 mandate exists to prevent.</div>
+
+    <div class="focus">
+      <div class="candlist">
+        <div class="candmini active win" onclick="pickCand(this)">
+          <div class="cm-top"><span class="cm-label">Candidate A ★</span><span class="score good">0.94</span></div>
+          <div class="cm-text">Build or update a project risk register — risks, likelihood, impact, mitigation…</div>
+        </div>
+        <div class="candmini" onclick="pickCand(this)">
+          <div class="cm-top"><span class="cm-label">Candidate B</span><span class="score mid">0.78</span></div>
+          <div class="cm-text">Create a risk register spreadsheet listing project risks…</div>
+        </div>
+        <div class="candmini" onclick="pickCand(this)">
+          <div class="cm-top"><span class="cm-label">Candidate C</span><span class="score mid">0.71</span></div>
+          <div class="cm-text">Track and update project risks with likelihood and impact scores.</div>
+        </div>
+        <div class="candmini" style="opacity:0.7">
+          <div class="cm-top"><span class="cm-label">Current</span><span class="score bad">0.54</span></div>
+          <div class="cm-text">Risk register.</div>
+        </div>
+      </div>
+
+      <div class="focuspane">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <span class="tag-win">★ best held-out</span>
+          <span style="font-weight:600">Candidate A</span>
+          <span class="cc-held" style="margin-left:auto;text-align:right"><span class="score good" style="font-size:var(--text-2xl)">0.94</span> <span class="note">vs 0.54 current</span></span>
+        </div>
+        <div class="fp-text">"Build or update a project risk register — risks, likelihood, impact, and mitigation — as a tracked spreadsheet from the knowledge base."</div>
+
+        <div class="s-label">Per-provider delta vs current</div>
+        <div class="fp-grid">
+          <div>
+            <div class="deltarow"><span><span class="prov-dot openai"></span> OpenAI <span class="prov-model">gpt-5.4-mini</span></span><span><span class="score good">0.96</span> <span class="delta-up">▲ +0.29</span></span></div>
+            <div class="deltarow"><span><span class="prov-dot anthropic"></span> Anthropic <span class="prov-model">haiku-4-5</span></span><span><span class="score good">1.00</span> <span class="delta-up">▲ +0.50</span></span></div>
+          </div>
+          <div>
+            <div class="deltarow"><span><span class="prov-dot google"></span> Google <span class="prov-model">gemini-3.5</span></span><span><span class="score mid">0.82</span> <span class="delta-up">▲ +0.49</span></span></div>
+            <div class="deltarow"><span><span class="prov-dot openrouter"></span> OpenRouter <span class="prov-model">glm-5.1</span></span><span><span class="score good">0.95</span> <span class="delta-up">▲ +0.28</span></span></div>
+          </div>
+        </div>
+        <p class="note" style="margin-top:12px">No provider regresses — every axis improves. One residual: OpenRouter
+          has <b>1 false-fire of 5</b> should-NOT cases (no-false 4/5). Add a sibling-skill case to harden it.</p>
+        <div style="display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--color-border-soft)">
+          <button class="btn primary">Use Candidate A → confirm &amp; save</button>
+          <button class="btn ghost">Refine cases &amp; re-run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>042</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+</div>
+
+<script>
+function showVariant(id, ev) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  ev.target.classList.add('active');
+}
+function openConfirm(){ const c=document.getElementById('confirm-a'); c.classList.add('show'); c.scrollIntoView({behavior:'smooth',block:'center'}); }
+function pickCand(el){ document.querySelectorAll('#variant-c .candmini').forEach(m=>m.classList.remove('active')); el.classList.add('active'); }
+</script>
+</body>
+</html>

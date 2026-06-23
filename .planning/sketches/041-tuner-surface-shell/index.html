@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 041 — Trigger Tuner: Surface & Shell</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { padding-top: 52px; }
+
+  /* ── App chrome (the 3-pane SkillsPage) ───────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 56px 1fr 384px;
+    height: calc(100vh - 52px);
+    overflow: hidden;
+  }
+  .app.tuner-wide { grid-template-columns: 56px 1fr 640px; }
+  .app.tuner-full { grid-template-columns: 56px 1fr; }
+
+  .rail {
+    background: var(--color-bg-elev1);
+    border-right: 1px solid var(--color-border-soft);
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 16px; gap: 14px;
+  }
+  .rail .logo {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+  }
+  .rail .ico {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: grid; place-items: center; color: var(--color-text-dim);
+    font-size: 15px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .rail .ico:hover { background: var(--color-accent); color: var(--color-text); }
+  .rail .ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* center list pane */
+  .listpane { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--color-border-soft); overflow: hidden; }
+  .listpane.hide { display: none; }
+  .page-head { padding: 26px 30px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-2xl); font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .page-head p { color: var(--color-text-muted); margin: 6px 0 0; font-size: var(--text-sm); }
+  .head-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .btn {
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500;
+    border-radius: var(--radius-md); padding: 8px 14px; cursor: pointer;
+    border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
+    display: inline-flex; align-items: center; gap: 7px; transition: all var(--dur-fast) var(--ease-out);
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--color-accent); }
+  .btn.primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--color-text-muted); }
+  .btn.ghost:hover { background: var(--color-accent); color: var(--color-text); }
+  .btn.sm { padding: 5px 10px; font-size: var(--text-xs); }
+
+  .list { flex: 1; overflow-y: auto; padding: 0 30px 30px; display: flex; flex-direction: column; gap: 12px; }
+  .skill-card {
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    border-radius: var(--radius-lg); padding: 16px; cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .skill-card:hover { border-color: var(--color-primary-glow); }
+  .skill-card.sel { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary-glow); }
+  .skill-card .sc-head { display: flex; align-items: center; gap: 9px; }
+  .skill-card .sc-head .zap { color: var(--color-primary); }
+  .skill-card .sc-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+  .pill {
+    font-size: 10px; padding: 3px 9px; border-radius: var(--radius-full);
+    background: var(--color-muted); color: var(--color-text-muted); font-family: var(--font-mono);
+  }
+  .pill.warn { background: var(--color-warning-dim); color: var(--color-warning); }
+  .pill.ok { background: var(--color-success-dim); color: var(--color-success); }
+  .skill-card .sc-desc { color: var(--color-text-muted); font-size: var(--text-sm); margin: 9px 0 0; line-height: 1.5; }
+  .sc-desc.weak { color: var(--color-warning); }
+
+  /* right detail/inspector pane */
+  .detail { background: hsl(220 30% 7% / 0.4); overflow-y: auto; display: flex; flex-direction: column; }
+  .detail.hide { display: none; }
+  .detail-head { padding: 22px 24px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .detail-head .dh-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); }
+  .detail-head .dh-sub { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 3px; }
+  .detail-body { padding: 18px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+  .field label { font-size: var(--text-sm); font-weight: 500; display: block; margin-bottom: 6px; }
+  .field .ctl, .field textarea {
+    width: 100%; background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 9px 11px; color: var(--color-text);
+    font-family: var(--font-sans); font-size: var(--text-sm); resize: vertical;
+  }
+  .field textarea.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+  /* the lint warning chip (preview of 044) */
+  .lint {
+    margin-top: 7px; display: flex; align-items: flex-start; gap: 8px;
+    background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3);
+    border-radius: var(--radius-md); padding: 9px 11px; font-size: var(--text-xs); color: var(--color-warning);
+  }
+  .lint .tunebtn {
+    margin-left: auto; flex-shrink: 0; background: var(--color-warning); color: #1a1205;
+    border: none; border-radius: var(--radius-sm); padding: 4px 9px; font-weight: 600;
+    font-size: var(--text-xs); cursor: pointer; font-family: var(--font-sans);
+  }
+
+  /* ── The Tuner surface (shared chunks) ────────────────────────── */
+  .tuner { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .tuner-head {
+    padding: 18px 26px; border-bottom: 1px solid var(--color-border-soft);
+    display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+    background: hsl(220 40% 5% / 0.5);
+  }
+  .tuner-head .back { color: var(--color-text-muted); cursor: pointer; font-size: var(--text-sm); display: inline-flex; gap: 6px; align-items: center; }
+  .tuner-head .back:hover { color: var(--color-text); }
+  .tuner-head .th-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-lg); }
+  .tuner-head .th-skill { color: var(--color-primary); }
+  .tuner-head .th-meta { color: var(--color-text-dim); font-size: var(--text-xs); font-family: var(--font-mono); margin-left: auto; }
+
+  .tuner-body { flex: 1; overflow-y: auto; padding: 22px 26px; }
+  .tuner-body.cols { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; align-items: start; }
+  @media (max-width: 1180px) { .tuner-body.cols { grid-template-columns: 1fr; } }
+
+  .section { margin-bottom: 22px; }
+  .section > .s-label {
+    font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--color-text-dim); font-weight: 600; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .s-label .count { background: var(--color-muted); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 1px 8px; font-size: 10px; letter-spacing: 0; }
+
+  .card2 { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-lg); padding: 16px; }
+
+  .desc-now {
+    border: 1px solid var(--color-border); background: var(--color-bg-elev1);
+    border-radius: var(--radius-md); padding: 13px 15px; font-size: var(--text-sm); line-height: 1.55;
+  }
+  .desc-now .dn-tag { font-size: 10px; font-family: var(--font-mono); color: var(--color-text-dim); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* scoreboard mini */
+  .scoreboard { display: flex; flex-direction: column; gap: 8px; }
+  .sb-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+  .sb-row.head { background: transparent; border: none; padding: 0 12px 2px; color: var(--color-text-dim); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.05em; }
+  .sb-prov { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+  .prov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .prov-dot.openai { background: #10a37f; }
+  .prov-dot.anthropic { background: #d97757; }
+  .prov-dot.google { background: #4285f4; }
+  .prov-dot.openrouter { background: var(--color-accent-violet); }
+  .prov-model { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .score { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500; }
+  .score.good { color: var(--color-success); }
+  .score.mid { color: var(--color-warning); }
+  .score.bad { color: var(--color-danger); }
+  .bar { height: 5px; border-radius: 3px; background: var(--color-muted); overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 3px; }
+  .bar > i.good { background: var(--color-success); }
+  .bar > i.mid { background: var(--color-warning); }
+  .bar > i.bad { background: var(--color-danger); }
+
+  /* candidate preview rows */
+  .cand { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 9px; transition: all var(--dur-fast) var(--ease-out); }
+  .cand:hover { border-color: var(--color-primary-glow); }
+  .cand.win { border-color: var(--color-success); background: var(--color-success-dim); }
+  .cand .c-top { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+  .cand .c-score { margin-left: auto; font-family: var(--font-mono); font-weight: 600; font-size: var(--text-sm); }
+  .cand .c-text { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.5; }
+  .tag-win { font-size: 10px; background: var(--color-success); color: #04140a; padding: 2px 8px; border-radius: var(--radius-full); font-weight: 700; }
+  .tag-cur { font-size: 10px; background: var(--color-muted); color: var(--color-text-muted); padding: 2px 8px; border-radius: var(--radius-full); }
+
+  .run-cta { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elev1); }
+  .run-cta .rc-txt { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .run-cta .rc-txt b { color: var(--color-text); font-weight: 600; }
+
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); line-height: 1.5; }
+
+  /* accordion (variant C) */
+  .acc { border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-top: 14px; overflow: hidden; }
+  .acc-head { padding: 12px 14px; display: flex; align-items: center; gap: 9px; cursor: pointer; background: var(--color-bg-elev1); font-weight: 600; font-size: var(--text-sm); }
+  .acc-head .chev { margin-left: auto; color: var(--color-text-dim); transition: transform var(--dur-base); }
+  .acc.open .acc-head .chev { transform: rotate(90deg); }
+  .acc-body { display: none; padding: 14px; border-top: 1px solid var(--color-border-soft); }
+  .acc.open .acc-body { display: block; }
+
+  .empty-hint { color: var(--color-text-dim); font-size: var(--text-sm); padding: 40px; text-align: center; }
+
+  .callout {
+    border-left: 3px solid var(--color-primary); background: var(--color-primary-dim);
+    padding: 11px 14px; border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.55; margin-bottom: 18px;
+  }
+  .callout b { color: var(--color-primary); }
+</style>
+</head>
+<body>
+
+<!-- Variant nav -->
+<div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
+  <span class="label">041 · Tuner shell</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Focused full-surface ★</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Wide push/split panel</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: In-panel accordion</button>
+</div>
+
+<!-- ============================ VARIANT A ============================ -->
+<div id="variant-a" class="variant">
+  <div class="app tuner-full" id="app-a">
+    <!-- rail -->
+    <div class="rail">
+      <div class="logo"></div>
+      <div class="ico">💬</div>
+      <div class="ico">📄</div>
+      <div class="ico active">⚡</div>
+      <div class="ico">⚙</div>
+    </div>
+    <!-- the Tuner takes over the center; list pane hidden -->
+    <div class="tuner">
+      <div class="tuner-head">
+        <span class="back" onclick="closeTunerA()">‹ Skills</span>
+        <div>
+          <div class="th-title">Tuning triggers · <span class="th-skill">Risk Register</span></div>
+        </div>
+        <span class="th-meta">held-out 40% · 3 repeats · iter 2 / 5</span>
+      </div>
+      <div class="tuner-body cols">
+        <!-- left column -->
+        <div>
+          <div class="callout">
+            <b>Why this surface.</b> A tuning run is <b>cases × 4 models × 3 repeats</b> of live LLM calls — a
+            multi-minute job with a per-provider scoreboard, a benchmark case editor, and a candidate list.
+            That's far more than the 384px detail panel holds, so the Tuner takes the whole working area
+            (a focused mode, reached from the skill — like the publish gauntlet). <code>‹ Skills</code> returns.
+          </div>
+
+          <div class="section">
+            <div class="s-label">Description being tuned</div>
+            <div class="desc-now">
+              <span class="dn-tag">current · live · drives firing</span>
+              "Risk register."
+            </div>
+            <p class="note" style="margin-top:8px">Too terse — echoes the name, no trigger verb. The
+              held-out scores below show why it misfires.</p>
+          </div>
+
+          <div class="section">
+            <div class="s-label">Benchmark <span class="count">11 cases</span></div>
+            <div class="card2" style="display:flex;flex-direction:column;gap:9px">
+              <div style="display:flex;gap:8px;align-items:center;font-size:var(--text-sm)">
+                <span class="pill ok">✓ should fire · 6</span>
+                <span class="pill warn">✕ should NOT · 5</span>
+                <span style="margin-left:auto;color:var(--color-text-dim);font-size:var(--text-xs)">edit cases →</span>
+              </div>
+              <div class="note">e.g. <i>"build a risk register for Project Meridian"</i> (fire) ·
+                <i>"what's the risk of deploying on Friday?"</i> (must not). The should-NOT cases are the
+                false-fire safety rail for the new description-driven policy.</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="s-label">Run</div>
+            <div class="run-cta">
+              <span class="rc-txt"><b>Built by</b> claude-haiku-4-5 · <b>measured on</b> 4 production models</span>
+              <button class="btn primary sm" style="margin-left:auto" onclick="event.stopPropagation()">▶ Run tuning</button>
+            </div>
+            <p class="note" style="margin-top:8px">Runs in the background — you can leave this surface and
+              come back; progress streams live.</p>
+          </div>
+        </div>
+
+        <!-- right column -->
+        <div>
+          <div class="section">
+            <div class="s-label">Per-provider held-out score</div>
+            <div class="scoreboard">
+              <div class="sb-row head"><span>provider</span><span>fires right</span><span>no false-fire</span></div>
+              <div class="sb-row">
+                <span class="sb-prov"><span class="prov-dot openai"></span>OpenAI<br><span class="prov-model">gpt-5.4-mini</span></span>
+                <span class="score mid">0.67</span><div class="bar"><i class="mid" style="width:67%"></i></div>
+              </div>
+              <div class="sb-row">
+                <span class="sb-prov"><span class="prov-dot anthropic"></span>Anthropic<br><span class="prov-model">claude-haiku-4-5</span></span>
+                <span class="score bad">0.50</span><div class="bar"><i class="bad" style="width:50%"></i></div>
+              </div>
+              <div class="sb-row">
+                <span class="sb-prov"><span class="prov-dot google"></span>Google<br><span class="prov-model">gemini-3.5-flash</span></span>
+                <span class="score bad">0.33</span><div class="bar"><i class="bad" style="width:33%"></i></div>
+              </div>
+              <div class="sb-row">
+                <span class="sb-prov"><span class="prov-dot openrouter"></span>OpenRouter<br><span class="prov-model">z-ai/glm-5.1</span></span>
+                <span class="score mid">0.67</span><div class="bar"><i class="mid" style="width:67%"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="s-label">Candidate rewrites <span class="count">≤ 4</span></div>
+            <div class="cand win">
+              <div class="c-top"><span class="tag-win">★ best held-out</span><span class="c-score good">0.94</span></div>
+              <div class="c-text">"Build or update a project risk register — risks, likelihood, impact, and mitigation — as a tracked spreadsheet from the knowledge base."</div>
+            </div>
+            <div class="cand">
+              <div class="c-top"><span class="tag-cur">candidate B</span><span class="c-score mid">0.78</span></div>
+              <div class="c-text">"Create a risk register spreadsheet listing project risks and their mitigations."</div>
+            </div>
+            <div class="cand">
+              <div class="c-top"><span class="tag-cur">current</span><span class="c-score bad">0.54</span></div>
+              <div class="c-text">"Risk register."</div>
+            </div>
+            <button class="btn primary" style="width:100%;margin-top:6px;justify-content:center" onclick="event.stopPropagation()">Use best → confirm &amp; save</button>
+            <p class="note" style="margin-top:8px;text-align:center">Author-confirmed. Saving runs the save-time
+              lint and writes via <code>PATCH /skills</code> — never auto-applied.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ VARIANT B ============================ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app tuner-wide">
+    <div class="rail">
+      <div class="logo"></div><div class="ico">💬</div><div class="ico">📄</div>
+      <div class="ico active">⚡</div><div class="ico">⚙</div>
+    </div>
+    <!-- list stays visible (shrunk) -->
+    <div class="listpane">
+      <div class="page-head">
+        <div><h1>Skills</h1><p>Define reusable AI behaviors the agent loads on demand.</p></div>
+      </div>
+      <div class="list">
+        <div class="skill-card sel">
+          <div class="sc-head"><span class="zap">⚡</span><span class="sc-name">Risk Register</span><span class="pill warn">weak trigger</span></div>
+          <p class="sc-desc weak">"Risk register."</p>
+        </div>
+        <div class="skill-card">
+          <div class="sc-head"><span class="zap">⚡</span><span class="sc-name">Quarterly Deck Builder</span><span class="pill ok">tuned</span></div>
+          <p class="sc-desc">"Generate a quarterly business-review slide deck from the knowledge base."</p>
+        </div>
+        <div class="skill-card">
+          <div class="sc-head"><span class="zap">⚡</span><span class="sc-name">SQL Writer</span><span class="pill">Global</span></div>
+          <p class="sc-desc">"Write and explain Postgres queries against the project schema."</p>
+        </div>
+      </div>
+    </div>
+    <!-- wide inspector (640px) -->
+    <div class="detail">
+      <div class="tuner">
+        <div class="tuner-head" style="padding:16px 22px">
+          <div><div class="th-title" style="font-size:var(--text-md)">Tune triggers · <span class="th-skill">Risk Register</span></div></div>
+          <span class="th-meta">iter 2 / 5</span>
+        </div>
+        <div class="tuner-body" style="padding:18px 22px">
+          <div class="callout">
+            <b>Why this surface.</b> The inspector widens from 384 → 640px so the scoreboard + candidates fit,
+            and the <b>skill list stays visible</b> — you can jump to the next weak-trigger skill without
+            leaving the loop. The trade: it's a tall scroll in a single column.
+          </div>
+          <div class="section">
+            <div class="s-label">Description being tuned</div>
+            <div class="desc-now"><span class="dn-tag">current · live</span>"Risk register."</div>
+          </div>
+          <div class="section">
+            <div class="s-label">Benchmark <span class="count">11 cases</span></div>
+            <div class="card2" style="display:flex;gap:8px;align-items:center;font-size:var(--text-sm)">
+              <span class="pill ok">✓ should fire · 6</span>
+              <span class="pill warn">✕ should NOT · 5</span>
+              <button class="btn ghost sm" style="margin-left:auto">Edit cases</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="s-label">Per-provider held-out score</div>
+            <div class="scoreboard">
+              <div class="sb-row"><span class="sb-prov"><span class="prov-dot openai"></span>OpenAI <span class="prov-model">gpt-5.4-mini</span></span><span class="score mid">0.67</span><div class="bar"><i class="mid" style="width:67%"></i></div></div>
+              <div class="sb-row"><span class="sb-prov"><span class="prov-dot anthropic"></span>Anthropic <span class="prov-model">claude-haiku-4-5</span></span><span class="score bad">0.50</span><div class="bar"><i class="bad" style="width:50%"></i></div></div>
+              <div class="sb-row"><span class="sb-prov"><span class="prov-dot google"></span>Google <span class="prov-model">gemini-3.5-flash</span></span><span class="score bad">0.33</span><div class="bar"><i class="bad" style="width:33%"></i></div></div>
+              <div class="sb-row"><span class="sb-prov"><span class="prov-dot openrouter"></span>OpenRouter <span class="prov-model">z-ai/glm-5.1</span></span><span class="score mid">0.67</span><div class="bar"><i class="mid" style="width:67%"></i></div></div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="s-label">Candidate rewrites <span class="count">≤ 4</span></div>
+            <div class="cand win"><div class="c-top"><span class="tag-win">★ best 0.94</span><span class="c-score good" style="margin-left:auto">use</span></div><div class="c-text">"Build or update a project risk register — risks, likelihood, impact, mitigation — as a tracked spreadsheet from the knowledge base."</div></div>
+            <div class="cand"><div class="c-top"><span class="tag-cur">B · 0.78</span></div><div class="c-text">"Create a risk register spreadsheet listing project risks and their mitigations."</div></div>
+            <button class="btn primary" style="width:100%;justify-content:center;margin-top:6px">Use best → confirm &amp; save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ VARIANT C ============================ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail">
+      <div class="logo"></div><div class="ico">💬</div><div class="ico">📄</div>
+      <div class="ico active">⚡</div><div class="ico">⚙</div>
+    </div>
+    <div class="listpane">
+      <div class="page-head">
+        <div><h1>Skills</h1><p>Define reusable AI behaviors the agent loads on demand.</p></div>
+        <div class="head-actions"><button class="btn">⬆ Import</button><button class="btn primary">＋ New</button></div>
+      </div>
+      <div class="list">
+        <div class="skill-card sel">
+          <div class="sc-head"><span class="zap">⚡</span><span class="sc-name">Risk Register</span><span class="pill warn">weak trigger</span></div>
+          <p class="sc-desc weak">"Risk register."</p>
+        </div>
+        <div class="skill-card">
+          <div class="sc-head"><span class="zap">⚡</span><span class="sc-name">Quarterly Deck Builder</span></div>
+          <p class="sc-desc">"Generate a quarterly business-review slide deck from the knowledge base."</p>
+        </div>
+      </div>
+    </div>
+    <!-- the standard 384px detail panel grows a Triggers accordion -->
+    <div class="detail">
+      <div class="detail-head">
+        <div class="dh-title">Risk Register</div>
+        <div class="dh-sub">Edit Skill</div>
+      </div>
+      <div class="detail-body">
+        <div class="field"><label>Name</label><div class="ctl">Risk Register</div></div>
+        <div class="field">
+          <label>Description</label>
+          <textarea rows="2">Risk register.</textarea>
+        </div>
+        <div class="field"><label>Instructions</label><textarea class="mono" rows="3">Build a spreadsheet with columns: risk, likelihood, impact, owner, mitigation…</textarea></div>
+
+        <!-- Triggers accordion -->
+        <div class="acc open">
+          <div class="acc-head" onclick="this.parentElement.classList.toggle('open')">
+            <span>🎯 Triggers</span>
+            <span class="pill warn" style="margin-left:8px">held-out 0.54</span>
+            <span class="chev">›</span>
+          </div>
+          <div class="acc-body">
+            <p class="note" style="margin-bottom:12px">The whole Tuner lives inline in the 384px panel. Fits the
+              existing layout with zero new surface — but everything is cramped: the scoreboard, candidates,
+              and case editor all compete in one narrow column.</p>
+            <div class="s-label" style="margin-bottom:8px">Per-provider <span class="count">held-out</span></div>
+            <div class="scoreboard" style="margin-bottom:14px">
+              <div class="sb-row" style="grid-template-columns:1fr auto"><span class="sb-prov"><span class="prov-dot openai"></span>OpenAI</span><span class="score mid">0.67</span></div>
+              <div class="sb-row" style="grid-template-columns:1fr auto"><span class="sb-prov"><span class="prov-dot anthropic"></span>Anthropic</span><span class="score bad">0.50</span></div>
+              <div class="sb-row" style="grid-template-columns:1fr auto"><span class="sb-prov"><span class="prov-dot google"></span>Google</span><span class="score bad">0.33</span></div>
+              <div class="sb-row" style="grid-template-columns:1fr auto"><span class="sb-prov"><span class="prov-dot openrouter"></span>OpenRouter</span><span class="score mid">0.67</span></div>
+            </div>
+            <div class="cand win" style="padding:10px"><div class="c-top"><span class="tag-win">★ 0.94</span></div><div class="c-text" style="font-size:var(--text-xs)">"Build or update a project risk register… as a tracked spreadsheet from the knowledge base."</div></div>
+            <button class="btn primary sm" style="width:100%;justify-content:center;margin-top:6px">Use best</button>
+          </div>
+        </div>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid var(--color-border-soft);display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn ghost">Discard</button><button class="btn primary">Update Skill</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>041</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVp('full')">Full</button>
+  <button onclick="setVp(1280)">1280</button>
+  <button onclick="setVp(768)">768</button>
+</div>
+
+<script>
+function showVariant(id, ev) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  ev.target.classList.add('active');
+}
+function closeTunerA() { alert('‹ Skills — returns to the skill list (focused mode exits).'); }
+function setVp(w) {
+  document.querySelectorAll('.app').forEach(a => {
+    if (w === 'full') { a.style.maxWidth = ''; a.style.margin = ''; }
+    else { a.style.maxWidth = w + 'px'; a.style.margin = '0 auto'; a.style.borderLeft = a.style.borderRight = '1px solid var(--color-border)'; }
+  });
+}
+</script>
+</body>
+</html>

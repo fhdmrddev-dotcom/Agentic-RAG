@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 043 — Tuner: Case Editor & Live Run</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { padding-top: 52px; }
+  .wrap { max-width: 1080px; margin:0 auto; padding: 24px 28px 80px; }
+  .vhead h2 { font-family: var(--font-headline); font-weight:700; font-size: var(--text-xl); margin:0; }
+  .vhead p { color: var(--color-text-muted); font-size: var(--text-sm); margin:6px 0 18px; max-width:760px; line-height:1.55; }
+
+  .btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight:500; border-radius: var(--radius-md); padding:8px 14px; cursor:pointer; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); display:inline-flex; align-items:center; gap:7px; transition: all var(--dur-fast) var(--ease-out); }
+  .btn:hover{ background:var(--color-accent); }
+  .btn.primary{ background:var(--color-primary-strong); border-color:var(--color-primary-strong); color:#fff; } .btn.primary:hover{ filter:brightness(1.08); }
+  .btn.ghost{ background:transparent; border-color:transparent; color:var(--color-text-muted); }
+  .btn.sm{ padding:5px 10px; font-size:var(--text-xs); }
+  .mono{ font-family:var(--font-mono); } .note{ font-size:var(--text-xs); color:var(--color-text-dim); line-height:1.55; }
+  .prov-dot{ width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0; }
+  .prov-dot.openai{background:#10a37f}.prov-dot.anthropic{background:#d97757}.prov-dot.google{background:#4285f4}.prov-dot.openrouter{background:var(--color-accent-violet)}
+  .prov-model{ font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+  .good{color:var(--color-success)} .mid{color:var(--color-warning)} .bad{color:var(--color-danger)}
+
+  .s-label{ font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.07em; color:var(--color-text-dim); font-weight:600; margin-bottom:11px; display:flex; align-items:center; gap:8px; }
+  .count{ background:var(--color-muted); color:var(--color-text-muted); border-radius:var(--radius-full); padding:1px 8px; font-size:10px; letter-spacing:0; }
+  .pill{ font-size:10px; padding:3px 9px; border-radius:var(--radius-full); font-family:var(--font-mono); }
+  .pill.fire{ background:var(--color-success-dim); color:var(--color-success); }
+  .pill.nofire{ background:var(--color-warning-dim); color:var(--color-warning); }
+  .pill.seed{ background:var(--color-primary-dim); color:var(--color-primary); }
+  .pill.held{ background:var(--color-accent); color:var(--color-text-muted); }
+
+  /* ── RUN BAR + LIVE PROGRESS (shared across variants) ───────── */
+  .runbar{ display:flex; align-items:center; gap:14px; border:1px solid var(--color-border); background:var(--color-bg-elev1); border-radius:var(--radius-lg); padding:14px 18px; margin-bottom:22px; }
+  .runbar .cfg{ font-size:var(--text-sm); color:var(--color-text-muted); }
+  .runbar .cfg b{ color:var(--color-text); }
+  .splitbar{ display:flex; height:8px; width:160px; border-radius:4px; overflow:hidden; border:1px solid var(--color-border); }
+  .splitbar .train{ background:var(--color-primary-strong); }
+  .splitbar .held{ background:var(--color-accent-violet); }
+
+  .live{ border:1px solid var(--color-primary-glow); background:var(--color-surface); border-radius:var(--radius-lg); padding:18px; margin-bottom:22px; display:none; }
+  .live.show{ display:block; animation: fadeSlideUp .3s var(--ease-out); }
+  .live .lh{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .live .lh .spin{ width:14px;height:14px;border-radius:50%;border:2px solid var(--color-primary-dim);border-top-color:var(--color-primary);animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .live .lh .title{ font-weight:600; }
+  .live .lh .elapsed{ margin-left:auto; font-family:var(--font-mono); font-size:var(--text-sm); color:var(--color-text-muted); }
+  .topbar{ height:3px; border-radius:2px; background:var(--color-primary-dim); overflow:hidden; margin-bottom:16px; }
+  .topbar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--color-primary-strong),var(--color-accent-violet)); transition:width .4s var(--ease-out); }
+  .provrun{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .pr{ border:1px solid var(--color-border-soft); border-radius:var(--radius-md); padding:11px; background:var(--color-bg-elev1); }
+  .pr .pn{ display:flex; align-items:center; gap:7px; font-size:var(--text-xs); margin-bottom:8px; }
+  .pr .pdone{ margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+  .pr .pbar{ height:5px; border-radius:3px; background:var(--color-muted); overflow:hidden; }
+  .pr .pbar>i{ display:block; height:100%; background:var(--color-success); transition:width .4s; }
+  .pr.waiting{ opacity:0.55; }
+  .pr.waiting .pbar>i{ background:var(--color-text-dim); }
+  .live .lfoot{ margin-top:14px; padding-top:12px; border-top:1px solid var(--color-border-soft); display:flex; align-items:center; gap:10px; }
+
+  /* ── VARIANT A — two-column lists ───────────────────────────── */
+  .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media(max-width:820px){ .twocol{ grid-template-columns:1fr; } }
+  .colbox{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:14px; }
+  .colbox.fire{ border-top:2px solid var(--color-success); }
+  .colbox.nofire{ border-top:2px solid var(--color-warning); }
+  .colbox .ch{ display:flex; align-items:center; gap:9px; margin-bottom:12px; font-weight:600; font-size:var(--text-sm); }
+  .case{ display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--color-border-soft); border-radius:var(--radius-md); margin-bottom:7px; background:var(--color-bg-elev1); font-size:var(--text-sm); transition:all var(--dur-fast) var(--ease-out); }
+  .case:hover{ border-color:var(--color-border); }
+  .case .ctxt{ flex:1; }
+  .case .cx{ color:var(--color-text-dim); cursor:pointer; }
+  .case .cx:hover{ color:var(--color-danger); }
+  .addcase{ width:100%; border:1px dashed var(--color-border); background:transparent; color:var(--color-text-muted); border-radius:var(--radius-md); padding:9px; cursor:pointer; font-size:var(--text-sm); margin-top:5px; }
+  .addcase:hover{ border-color:var(--color-primary-glow); color:var(--color-text); }
+
+  /* ── VARIANT B — unified table ──────────────────────────────── */
+  .table{ border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
+  .trow{ display:grid; grid-template-columns:120px 1fr 90px 36px; gap:12px; align-items:center; padding:11px 14px; border-bottom:1px solid var(--color-border-soft); font-size:var(--text-sm); }
+  .trow.head{ background:var(--color-bg-elev1); color:var(--color-text-dim); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.05em; }
+  .trow:last-child{ border-bottom:none; }
+  .trow:hover:not(.head){ background:var(--color-bg-elev1); }
+  .seg{ display:inline-flex; border:1px solid var(--color-border); border-radius:var(--radius-full); overflow:hidden; }
+  .seg button{ background:transparent; border:none; color:var(--color-text-dim); padding:3px 10px; font-size:10px; cursor:pointer; font-family:var(--font-mono); }
+  .seg button.on-fire{ background:var(--color-success-dim); color:var(--color-success); }
+  .seg button.on-no{ background:var(--color-warning-dim); color:var(--color-warning); }
+
+  /* ── VARIANT C — chip strip ─────────────────────────────────── */
+  .chipwrap{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:16px; }
+  .chipsec{ margin-bottom:16px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:var(--radius-full); font-size:var(--text-sm); border:1px solid; }
+  .chip.fire{ background:var(--color-success-dim); border-color:hsl(142 71% 45% / 0.3); color:var(--color-text); }
+  .chip.nofire{ background:var(--color-warning-dim); border-color:hsl(38 92% 60% / 0.3); color:var(--color-text); }
+  .chip .x{ color:var(--color-text-dim); cursor:pointer; font-size:11px; }
+  .chip .x:hover{ color:var(--color-danger); }
+  .chip.add{ background:transparent; border:1px dashed var(--color-border); color:var(--color-text-muted); cursor:pointer; }
+
+  .callout{ border-left:3px solid var(--color-primary); background:var(--color-primary-dim); padding:11px 14px; border-radius:0 var(--radius-md) var(--radius-md) 0; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.55; margin-bottom:20px; }
+  .callout b{ color:var(--color-primary); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
+  <span class="label">043 · Cases + live run</span>
+  <button class="variant-tab active" onclick="showVariant('a',event)">A: Two-column lists ★</button>
+  <button class="variant-tab" onclick="showVariant('b',event)">B: Unified tagged table</button>
+  <button class="variant-tab" onclick="showVariant('c',event)">C: Chip strip</button>
+  <button class="btn ghost sm" style="margin-left:auto" onclick="cycleRun()">▶ cycle run state</button>
+</div>
+
+<!-- shared run bar + live (rendered once, moved into the active variant via JS would be overkill; duplicate visually is fine — keep one shared at top of each) -->
+
+<!-- ===================== VARIANT A ===================== -->
+<div id="variant-a" class="variant">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>Benchmark cases &amp; run · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>The Tuner <b>auto-seeds</b> a starter benchmark (should-fire = paraphrases of the description;
+        should-NOT = sibling skills + generic off-topic prompts). You edit, approve, and add before running.
+        Then it runs in the <b>background</b> — cases × 4 models × 3 repeats.</p>
+    </div>
+
+    <div class="callout"><b>The 60/40 split is honest and visible.</b> 60% of cases train the candidate search;
+      the held-out 40% is what you pick the winner by — so a description can't be over-fit to the cases you
+      wrote. Auto-seeded cases are tagged <span class="pill seed">seeded</span> until you touch them.</div>
+
+    <!-- run bar -->
+    <div class="s-label">Run configuration</div>
+    <div class="runbar">
+      <div class="cfg"><b>11 cases</b> · <b>4 models</b> · <b>3 repeats</b> = 132 live calls</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="splitbar"><span class="train" style="width:60%"></span><span class="held" style="width:40%"></span></span>
+        <span class="note"><span style="color:var(--color-primary)">60% train</span> · <span style="color:var(--color-accent-violet)">40% held-out</span></span>
+      </div>
+      <button class="btn primary" style="margin-left:auto" onclick="startRun()">▶ Run tuning</button>
+    </div>
+
+    <!-- live progress (toggle) -->
+    <div class="live" id="live-a">
+      <div class="lh"><span class="spin"></span><span class="title">Tuning in progress</span><span class="elapsed" id="el-a">0:42</span></div>
+      <div class="topbar"><i id="tb-a" style="width:38%"></i></div>
+      <div class="provrun">
+        <div class="pr"><div class="pn"><span class="prov-dot openai"></span>OpenAI<span class="pdone">28/33</span></div><div class="pbar"><i style="width:85%"></i></div></div>
+        <div class="pr"><div class="pn"><span class="prov-dot anthropic"></span>Anthropic<span class="pdone">19/33</span></div><div class="pbar"><i style="width:58%"></i></div></div>
+        <div class="pr waiting"><div class="pn"><span class="prov-dot google"></span>Google<span class="pdone">9/33</span></div><div class="pbar"><i style="width:27%"></i></div></div>
+        <div class="pr waiting"><div class="pn"><span class="prov-dot openrouter"></span>OpenRouter<span class="pdone">queued</span></div><div class="pbar"><i style="width:0%"></i></div></div>
+      </div>
+      <div class="lfoot"><span class="note">Runs in the background (run-buffer + SSE) — you can leave this surface;
+        progress reconciles on return.</span><button class="btn ghost sm" style="margin-left:auto" onclick="stopRun()">Cancel run</button></div>
+    </div>
+
+    <!-- cases two-col -->
+    <div class="twocol">
+      <div class="colbox fire">
+        <div class="ch"><span class="pill fire">✓ should fire</span><span class="count">6</span><span style="margin-left:auto" class="note">the skill SHOULD load</span></div>
+        <div class="case"><span class="ctxt">build a risk register for Project Meridian</span><span class="pill held">held</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">update the risk log with the new supplier risks</span><span class="pill seed">seeded</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">what are our top project risks as a tracked register?</span><span class="pill held">held</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">add a likelihood/impact column to the risk sheet</span><span class="pill seed">seeded</span><span class="cx">✕</span></div>
+        <button class="addcase">＋ add should-fire case</button>
+      </div>
+      <div class="colbox nofire">
+        <div class="ch"><span class="pill nofire">✕ should NOT fire</span><span class="count">5</span><span style="margin-left:auto" class="note">the false-fire rail</span></div>
+        <div class="case"><span class="ctxt">what's the risk of deploying on Friday?</span><span class="pill held">held</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">build a slide deck about Q3</span><span class="pill seed">sibling</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">summarize the meeting notes</span><span class="pill seed">seeded</span><span class="cx">✕</span></div>
+        <div class="case"><span class="ctxt">write a SQL query for open issues</span><span class="pill seed">sibling</span><span class="cx">✕</span></div>
+        <button class="addcase">＋ add should-NOT case</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT B ===================== -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>Benchmark cases &amp; run · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>One table, a label-toggle per row. Denser than two columns; the expectation lives in a segmented
+        control you can flip, and held-out membership is a column. Same auto-seed provenance + run.</p>
+    </div>
+    <div class="callout"><b>Run state lives in a status card at the top</b> (same component as A). The completed
+      run resolves into the per-provider scoreboard (sketch 042).</div>
+
+    <div class="runbar">
+      <div class="cfg"><b>11 cases</b> · <b>4 models</b> · <b>3 repeats</b></div>
+      <span class="splitbar" style="margin-left:auto"><span class="train" style="width:60%"></span><span class="held" style="width:40%"></span></span>
+      <span class="note">60 / 40</span>
+      <button class="btn primary" onclick="startRunB()">▶ Run</button>
+    </div>
+    <div class="live" id="live-b">
+      <div class="lh"><span style="font-size:18px">✓</span><span class="title good">Run complete · iter 2</span><span class="elapsed">2:18 · 132 calls</span></div>
+      <div class="topbar"><i style="width:100%"></i></div>
+      <div class="note">Held-out winner: <b class="good">Candidate A · 0.94</b> → review in the scoreboard.
+        <button class="btn ghost sm" style="margin-left:8px">Open scoreboard →</button></div>
+    </div>
+
+    <div class="table">
+      <div class="trow head"><span>expectation</span><span>prompt</span><span>origin</span><span></span></div>
+      <div class="trow"><span class="seg"><button class="on-fire">fire</button><button>no</button></span><span>build a risk register for Project Meridian <span class="pill held">held</span></span><span class="note">seeded</span><span class="cx note" style="cursor:pointer">✕</span></div>
+      <div class="trow"><span class="seg"><button class="on-fire">fire</button><button>no</button></span><span>update the risk log with new supplier risks</span><span class="note">you</span><span class="cx note" style="cursor:pointer">✕</span></div>
+      <div class="trow"><span class="seg"><button>fire</button><button class="on-no">no</button></span><span>what's the risk of deploying on Friday? <span class="pill held">held</span></span><span class="note">seeded</span><span class="cx note" style="cursor:pointer">✕</span></div>
+      <div class="trow"><span class="seg"><button>fire</button><button class="on-no">no</button></span><span>build a slide deck about Q3</span><span class="note">sibling</span><span class="cx note" style="cursor:pointer">✕</span></div>
+      <div class="trow"><span class="seg"><button>fire</button><button class="on-no">no</button></span><span>summarize the meeting notes</span><span class="note">seeded</span><span class="cx note" style="cursor:pointer">✕</span></div>
+      <div class="trow" style="justify-content:center;color:var(--color-text-muted);cursor:pointer">＋ add case</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT C ===================== -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>Benchmark cases &amp; run · <span style="color:var(--color-primary)">Risk Register</span></h2>
+      <p>Cases as compact chips — fastest to scan a lot of short prompts, lightest to add. Trade: long prompts
+        truncate, and the held-out / origin metadata has less room than rows.</p>
+    </div>
+    <div class="callout"><b>Chip strip echoes the 029/037 condition-builder language</b> already in the app —
+      familiar, but built for short values; a verbose case has to truncate.</div>
+
+    <div class="runbar">
+      <div class="cfg"><b>11 cases</b> · <b>4 models</b> · <b>3 repeats</b></div>
+      <span class="splitbar" style="margin-left:auto"><span class="train" style="width:60%"></span><span class="held" style="width:40%"></span></span>
+      <button class="btn primary" onclick="startRunC()">▶ Run</button>
+    </div>
+    <div class="live" id="live-c">
+      <div class="lh"><span class="spin"></span><span class="title">Tuning… Google running</span><span class="elapsed">1:05</span></div>
+      <div class="topbar"><i style="width:62%"></i></div>
+      <div class="note">28/33 · 19/33 · 14/33 · queued — <span class="note">you can leave; it reconciles on return.</span></div>
+    </div>
+
+    <div class="chipwrap">
+      <div class="chipsec">
+        <div class="s-label"><span class="pill fire">✓ should fire</span><span class="count">6</span></div>
+        <div class="chips">
+          <span class="chip fire">build a risk register for Meridian<span class="pill held">H</span><span class="x">✕</span></span>
+          <span class="chip fire">update the risk log<span class="x">✕</span></span>
+          <span class="chip fire">top project risks as a register?<span class="pill held">H</span><span class="x">✕</span></span>
+          <span class="chip fire">add likelihood/impact column<span class="x">✕</span></span>
+          <span class="chip add">＋ add</span>
+        </div>
+      </div>
+      <div class="chipsec">
+        <div class="s-label"><span class="pill nofire">✕ should NOT fire</span><span class="count">5</span></div>
+        <div class="chips">
+          <span class="chip nofire">risk of deploying Friday?<span class="pill held">H</span><span class="x">✕</span></span>
+          <span class="chip nofire">build a slide deck<span class="x">✕</span></span>
+          <span class="chip nofire">summarize meeting notes<span class="x">✕</span></span>
+          <span class="chip nofire">SQL query for open issues<span class="x">✕</span></span>
+          <span class="chip add">＋ add</span>
+        </div>
+      </div>
+      <p class="note"><span class="pill held">H</span> = held-out · sibling skills auto-seed the should-NOT set.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>043</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="cycleRun()">cycle run</button>
+</div>
+
+<script>
+function showVariant(id, ev){ document.querySelectorAll('.variant').forEach(v=>v.style.display='none'); document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); document.getElementById('variant-'+id).style.display='block'; if(ev&&ev.target.classList.contains('variant-tab')) ev.target.classList.add('active'); }
+function startRun(){ document.getElementById('live-a').classList.add('show'); animateA(); }
+function stopRun(){ document.getElementById('live-a').classList.remove('show'); }
+function startRunB(){ document.getElementById('live-b').classList.toggle('show'); }
+function startRunC(){ document.getElementById('live-c').classList.toggle('show'); }
+function cycleRun(){ ['live-a','live-b','live-c'].forEach(i=>document.getElementById(i).classList.toggle('show')); }
+let t=null;
+function animateA(){ let el=42, w=38; clearInterval(t); t=setInterval(()=>{ el++; w=Math.min(100,w+4); document.getElementById('el-a').textContent='0:'+(el<60?el:('0'+(el-60))); document.getElementById('tb-a').style.width=w+'%'; if(w>=100) clearInterval(t); },700); }
+</script>
+</body>
+</html>
