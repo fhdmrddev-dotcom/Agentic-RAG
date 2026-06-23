@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: verifying
-last_updated: "2026-06-23T20:26:34.121Z"
+last_updated: "2026-06-23T22:13:52.369Z"
 last_activity: 2026-06-23
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
   total_plans: 15
   completed_plans: 15
-  percent: 80
+  percent: 67
 ---
 
 # Project State
@@ -210,6 +210,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
 **Planned Phase:** 112 (metadata-enrichment-document-detail-panel-manual-edit) — 4 plans — 2026-06-17T20:46:10.826Z
+
+- Phase 123.1 inserted after Phase 123: Trigger Tuner design fidelity + UX polish (post-live-UAT gaps) (URGENT)
 
 ## Performance Metrics
 
