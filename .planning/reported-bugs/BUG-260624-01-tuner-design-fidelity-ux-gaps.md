@@ -4,9 +4,9 @@ title: Skill Trigger Tuner — design-fidelity & UX gaps surfaced in live UAT (c
 reported: 2026-06-24
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [skills, frontend/tuner, frontend/SettingsPage, backend/skill_tuner]
-folded_into: null
+folded_into: "123.1"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
