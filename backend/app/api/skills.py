@@ -159,6 +159,13 @@ async def create_skill(
     supabase: Client = Depends(get_supabase),
 ):
     """Create a new skill owned by the current user."""
+    # Phase 123 (WR-07): reject an empty/whitespace name. A blank name would render a
+    # malformed catalog line ("- ****: ...", agent_loop catalog note) and produce an
+    # unaddressable skill (tool_dispatcher resolves by name). The lint is advisory-only,
+    # so this is the hard gate.
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Skill name cannot be empty")
+
     # TRIG-03 (D-09/D-10): lint the description PRE-persist against owner-scoped
     # siblings (own + global), attach warnings to the response, but ALWAYS save.
     siblings = _sibling_descriptions(supabase, current_user["id"])
@@ -303,6 +310,12 @@ async def update_skill(
     update_data = body.model_dump(exclude_none=True)
     if "name" in update_data:
         update_data["name"] = update_data["name"].strip()
+        # Phase 123 (WR-07): a name present in the patch that strips to empty must be
+        # rejected — otherwise a skill is renamed to "" (malformed catalog note + an
+        # unaddressable, dedupe-by-name-breaking skill). The ``if not update_data`` guard
+        # below does NOT catch this: the dict is still truthy (it carries ``name: ""``).
+        if not update_data["name"]:
+            raise HTTPException(status_code=400, detail="Skill name cannot be empty")
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 

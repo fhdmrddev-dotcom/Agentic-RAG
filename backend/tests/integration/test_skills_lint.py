@@ -111,6 +111,34 @@ class TestUpdateLint:
         assert resp.json()["description"] == WEAK_DESC  # update was applied
 
 
+# ── empty / whitespace name rejection (WR-07 — hard gate, not advisory) ──────────
+
+class TestEmptyNameRejected:
+    def test_post_whitespace_name_returns_400(self, client, auth_headers, mock_builder):
+        """POST with a whitespace-only name → 400 (a blank name breaks the catalog note +
+        makes the skill unaddressable). The reject fires BEFORE any DB write."""
+        resp = client.post("/skills", headers=auth_headers, json={
+            "name": "   ",
+            "description": HEALTHY_DESC,
+            "instructions": "do the thing",
+        })
+        assert resp.status_code == 400, resp.text
+        assert "name cannot be empty" in resp.json()["detail"].lower()
+        # No insert was attempted (the guard short-circuits before the DB).
+        mock_builder.insert.assert_not_called()
+
+    def test_patch_whitespace_name_returns_400(self, client, auth_headers, mock_builder):
+        """PATCH with a whitespace-only name → 400. The ``if not update_data`` guard does
+        NOT catch this (the dict still carries ``name: ""``)."""
+        resp = client.patch(f"/skills/{SKILL_ID}", headers=auth_headers, json={
+            "name": "   ",
+        })
+        assert resp.status_code == 400, resp.text
+        assert "name cannot be empty" in resp.json()["detail"].lower()
+        # No update was attempted (the guard short-circuits before the DB).
+        mock_builder.update.assert_not_called()
+
+
 # ── agent save_skill tool path ──────────────────────────────────────────────────
 
 class _FakeQuery:
