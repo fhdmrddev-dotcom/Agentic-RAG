@@ -20,7 +20,7 @@ Each maps to exactly one roadmap phase.
 
 - [x] **MP-01**: A model that silently fails a forced structured emit (e.g. the default model's no-metadata 400) is recovered by a force→coerce retry ladder in `forced_emit`, so a typed-artifact phase produces its emission instead of a silent empty result.
 - [x] **MP-02**: Provider forcing/strict behavior is doc-verified and honest per provider — an explicit `emit_tier` field replaces guesswork, the inert DeepSeek function-level `strict` is dropped, and GLM forcing is kept (intentional, live-verified) so each provider uses the emission path it actually supports.
-- [ ] **MP-03**: Cross-provider reliability is measured, not assumed — the eval treats provider as a first-class axis with a per-provider scoreboard (trigger / force / recovery / honest-fail), pass-OR-documented, which gates any MP-02 tier change.
+- [x] **MP-03**: Cross-provider reliability is measured, not assumed — the eval treats provider as a first-class axis with a per-provider scoreboard (trigger / force / recovery / honest-fail), pass-OR-documented, which gates any MP-02 tier change.
 - [x] **TDP-01**: Task/todo/workflow-step labels are concrete and honest on every provider (OpenAI-parity), not the bare tool name — an ungated prompt nudge fills `execute_code.description` and a deterministic frontend summarizer floor backstops providers that don't, without regressing providers that already do.
 
 ### Skill Triggering Quality
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IA-01 | Phase 121 | Complete |
 | MP-01 | Phase 122 | Complete |
 | MP-02 | Phase 122 | Complete |
-| MP-03 | Phase 122 | Pending |
+| MP-03 | Phase 122 | Complete |
 | TDP-01 | Phase 122 | Complete |
 | TRIG-01 | Phase 123 | Pending |
 | TRIG-03 | Phase 123 | Pending |
