@@ -1,0 +1,509 @@
+"""Phase 123 (TRIG-01) — the Skill Trigger Tuner network surface.
+
+This wraps the Plan-03 ``skill_tuner_service`` orchestration core in a net-new,
+owner-scoped router mounted under ``/skills/{skill_id}/tuner/...``:
+
+  1. ``POST /skills/{skill_id}/tuner/runs`` — owner-verify the skill, kick off a BOUNDED
+     background tuning run over the Phase-061+ Redis run-buffer, and return a ``run_id``
+     IMMEDIATELY (non-blocking, D-06). The author can leave and reconcile on return.
+  2. ``GET  /skills/{skill_id}/tuner/runs/{run_id}/stream`` — owner-verify, then return an
+     ``EventSourceResponse`` over the SHARED ``replay_tail_consumer`` (runs.py) so live
+     per-provider progress streams as tuner-specific SSE events.
+  3. ``GET  /skills/{skill_id}/tuner/runs/{run_id}`` — owner-verify, return the held-out
+     scoreboard (per-provider cells carrying BOTH fires/no_false sub-scores) + the candidate
+     descriptions once the run is complete.
+
+OWNER-SCOPING IS THE SOLE GATE (V4 / T-123-04-01): ``get_supabase()`` is the SERVICE-ROLE
+client (RLS bypassed), so the app-code ``.eq("user_id", ...)`` / ``.or_(...own,global)`` on
+EVERY route is the only thing standing between user A and user B's skill. A user can NEVER
+start, stream, or read a tuning run for another user's non-global skill — a miss returns 404
+(never 403 — don't leak existence). The cross-user-404 integration test is the load-bearing
+proof.
+
+BOUNDED RUN (DoS — T-123-04-02): the background job is capped on every axis — at most
+``MAX_CASES`` benchmark cases, at most ``MAX_TARGETS`` provider columns, at most
+``MAX_ITERATIONS`` (=5) candidate iterations, each provider call wrapped with the registry
+``get_per_call_timeout`` deadline, and exactly ONE in-flight job per skill (``runs:active``
++ a per-skill in-flight guard) — no unbounded fan-out / cost blow-up.
+
+TUNER-SPECIFIC EVENT VOCABULARY (T-123-04-03 / Open-Q4): progress rides the SAME run-buffer
+transport (``run:{tuner_run_id}`` stream) but uses a DISTINCT event set
+(``tuner_progress`` / ``tuner_provider_done`` / ``tuner_complete``) — chat event types are
+NEVER emitted by this router. The run is closed with a single ``done`` / ``error`` TERMINAL
+sentinel so the shared SSE consumer breaks cleanly (the ``tuner_*`` events themselves are
+non-terminal progress).
+
+RED LINE (D-14): the background task calls ONLY the Plan-03 service functions (which are thin
+orchestration over ``forced_emit``) — it NEVER opens the agent loop or a raw provider SDK.
+Provider differences stay at the gateway boundary.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import time as time_mod
+from uuid import UUID, uuid4
+
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+from sse_starlette import EventSourceResponse
+from supabase import Client
+
+from app.api.runs import replay_tail_consumer
+from app.config import get_model_capability, get_per_call_timeout, settings
+from app.dependencies import get_current_user, get_redis, get_supabase
+from app.services import skill_tuner_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/skills", tags=["skill-tuner"])
+
+# ── Bounds (T-123-04-02 — DoS guard; no unbounded fan-out / cost blow-up) ────────
+MAX_CASES = 40          # cap benchmark cases per run (should_fire + should_not combined)
+MAX_TARGETS = 8         # cap N provider columns (one representative model per provider)
+MAX_ITERATIONS = 5      # cap candidate iterations at <=5 (D-06 / hybrid 60/40/3x/<=5)
+DEFAULT_REPEATS = skill_tuner_service.DEFAULT_REPEATS  # 3 repeats per (candidate, target, case)
+
+# Tuner-specific SSE event vocabulary (Open-Q4 — NEVER overload chat event types).
+EVENT_PROGRESS = "tuner_progress"
+EVENT_PROVIDER_DONE = "tuner_provider_done"
+EVENT_COMPLETE = "tuner_complete"
+
+# Terminal sentinel types the SHARED replay_tail_consumer breaks on (threads.TERMINAL_TYPES).
+# The tuner_* events above are NON-terminal progress; we close the run with one of these so
+# the SSE consumer terminates cleanly. (Imported indirectly — kept local to avoid coupling.)
+TERMINAL_DONE = "done"
+TERMINAL_ERROR = "error"
+
+# Redis key TTL after a tuner run finalizes (mirrors REDIS-SETUP.md run-buffer discipline).
+_TUNER_BUFFER_TTL_S = 600
+
+# In-flight guard: exactly ONE tuner job per skill (no duplicate concurrent runs — T-123-04-02).
+# Per-process set (single-worker-per-skill is sufficient; the run-buffer is process-local for
+# the background task we spawn here). Keyed by skill_id.
+_INFLIGHT_SKILLS: set[str] = set()
+
+
+# ── Request body ────────────────────────────────────────────────────────────────
+class TunerCase(BaseModel):
+    """One (client-held) benchmark case: a user prompt + whether the skill SHOULD fire on it.
+
+    Cases are ephemeral / client-held (A2 / Open-Q5) — NO DB schema change; only the winning
+    description persists later via the owner-scoped PATCH (Plan 05).
+    """
+
+    prompt: str
+    should_fire: bool
+
+
+class TunerTarget(BaseModel):
+    """One benchmark target column (a provider + its representative model)."""
+
+    provider: str
+    model: str
+
+
+class StartTunerRunBody(BaseModel):
+    """POST body for a tuning run. All fields optional — defaults derive the configured
+    target set + auto-seed cases server-side from the owner-scoped catalog (Plan 03)."""
+
+    cases: list[TunerCase] = Field(default_factory=list)
+    targets: list[TunerTarget] = Field(default_factory=list)
+    n: int = skill_tuner_service.DEFAULT_CANDIDATE_COUNT
+
+
+# ── Owner-scoping helper (the SOLE leak gate — V4 / T-123-04-01) ─────────────────
+async def _fetch_owned_or_global_skill(supabase: Client, skill_id: str, user_id: str) -> dict:
+    """Return the skill row IFF the caller owns it OR it is global; else raise 404.
+
+    ``get_supabase()`` is SERVICE-ROLE — this ``.or_(user_id.eq, is_global.eq.true)`` scoping
+    (mirrors skills.py owner-scoping) is the only thing preventing a cross-user leak. 404 (never
+    403) on a miss so resource existence is not leaked to other users. Wrapped in
+    ``run_in_threadpool`` because supabase-py is blocking (D-v2.5-01).
+    """
+
+    def _read():
+        return (
+            supabase.table("skills")
+            .select("id, name, description, user_id, is_global")
+            .eq("id", skill_id)
+            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        resp = await run_in_threadpool(_read)
+    except Exception:
+        # A malformed skill_id (e.g. not a UUID) makes PostgREST raise — treat as a miss (404),
+        # never leak the error shape.
+        logger.debug("tuner skill ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Skill not found")
+    rows = list(resp.data or [])
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Skill not found")
+    return rows[0]
+
+
+# ── Run-buffer emit helpers (tuner-specific vocab on the shared transport) ───────
+async def _emit_tuner(redis, run_id: UUID, event_type: str, **fields) -> None:
+    """XADD one tuner-specific progress event to ``run:{run_id}`` (Open-Q4 vocab).
+
+    Mirrors threads._emit's canonical single-field ``data`` envelope + MAXLEN cap, but emits
+    ONLY tuner_* event types (never a chat event type). Best-effort: a Redis hiccup logs and
+    continues (the run keeps computing; the consumer reconciles via the next event)."""
+    try:
+        await redis.xadd(
+            f"run:{run_id}",
+            {"data": json.dumps({"type": event_type, **fields})},
+            maxlen=10000,
+            approximate=True,
+        )
+    except Exception:
+        logger.exception("tuner _emit_tuner XADD failed for run %s (type=%s)", run_id, event_type)
+
+
+async def _emit_terminal(redis, run_id: UUID, terminal_type: str, **fields) -> None:
+    """XADD the single terminal sentinel (``done`` / ``error``) so the shared SSE consumer
+    breaks cleanly, then EXPIRE the buffer (run-buffer TTL discipline)."""
+    try:
+        await redis.xadd(
+            f"run:{run_id}",
+            {"data": json.dumps({"type": terminal_type, **fields})},
+        )
+    except Exception:
+        logger.exception("tuner terminal sentinel XADD failed for run %s", run_id)
+    try:
+        await redis.expire(f"run:{run_id}", _TUNER_BUFFER_TTL_S)
+    except Exception:
+        logger.exception("tuner EXPIRE failed for run %s", run_id)
+
+
+# ── The bounded background tuning run ────────────────────────────────────────────
+async def _run_tuner_job(
+    *,
+    redis,
+    run_id: UUID,
+    skill_id: str,
+    skill: dict,
+    cases: list[dict],
+    targets: list[dict],
+    n: int,
+    user_id: str,
+) -> None:
+    """Execute the bounded tuning run and stream tuner_* progress.
+
+    For each candidate × target × case × ``DEFAULT_REPEATS`` repeats, call the Plan-03 service
+    (``build_candidates`` once, then ``classify_fires`` per case-repeat), score with the pure
+    60/40 held-out math, and emit progress. EVERY provider call is wrapped with the registry
+    per-call timeout (T-123-04-02). The whole job is bounded: <= MAX_ITERATIONS candidates,
+    <= MAX_TARGETS columns, <= MAX_CASES cases. Closes with a single terminal sentinel.
+
+    Honest-fail floors throughout (the service functions return [] / would_load=False rather
+    than crashing); a hard failure emits a terminal ``error`` event, never a silent hang.
+    """
+    try:
+        from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
+
+        try:
+            user_settings = await run_in_threadpool(load_user_settings, user_id)
+        except Exception:
+            await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="no_user_settings")
+            return
+
+        builder_model = skill_tuner_service.resolve_skill_builder_model(settings)
+        if builder_model is None:
+            await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="no_builder_model")
+            return
+
+        await _emit_tuner(
+            redis, run_id, EVENT_PROGRESS,
+            stage="building_candidates", builder_model=builder_model,
+        )
+
+        # Candidate generation — ONE forced shot on the builder model, wrapped with the
+        # builder's per-call timeout. <= n candidates, then bounded to MAX_ITERATIONS.
+        builder_timeout = get_per_call_timeout(builder_model)
+        try:
+            candidates = await asyncio.wait_for(
+                skill_tuner_service.build_candidates(
+                    name=skill.get("name", ""),
+                    description=skill.get("description", ""),
+                    builder_model=builder_model,
+                    user_settings=user_settings,
+                    n=n,
+                ),
+                timeout=builder_timeout,
+            )
+        except (asyncio.TimeoutError, Exception):
+            logger.exception("tuner build_candidates failed/timed out for run %s", run_id)
+            candidates = []
+
+        # Always include the CURRENT description as a baseline candidate so the run produces a
+        # comparison even when the builder honest-fails. Bound the candidate set (<= MAX_ITERATIONS).
+        baseline = (skill.get("description") or "").strip()
+        all_candidates = ([baseline] if baseline else []) + list(candidates)
+        # De-dupe preserving order, then cap at MAX_ITERATIONS.
+        seen: set[str] = set()
+        bounded_candidates: list[str] = []
+        for c in all_candidates:
+            if c and c not in seen:
+                seen.add(c)
+                bounded_candidates.append(c)
+            if len(bounded_candidates) >= MAX_ITERATIONS:
+                break
+
+        # The classifier catalog line MUST mirror the production firing surface (Pitfall 1):
+        # the SAME "- **{name}**: {description}" shape agent_loop.py builds.
+        skill_name = skill.get("name", "")
+
+        scored_candidates: list[dict] = []
+        for cand_idx, candidate_desc in enumerate(bounded_candidates):
+            catalog_lines = f"- **{skill_name}**: {candidate_desc}"
+            # Per-provider cells for this candidate (held-out split applied per axis).
+            train_cases, held_out_cases = skill_tuner_service.split_held_out(cases)
+            per_target_cells: list[dict] = []
+            for target in targets:
+                provider = target.get("provider", "unknown")
+                model = target.get("model") or ""
+                # An empty representative model (e.g. openrouter gateway) — skip honestly.
+                if not model:
+                    continue
+                target_timeout = get_per_call_timeout(model)
+
+                fire_decisions: list[bool] = []
+                no_false_decisions: list[bool] = []
+                # Score on the HELD-OUT cases (winner-by-held-out, never train).
+                for case in held_out_cases:
+                    prompt = case.get("prompt", "")
+                    expected_fire = bool(case.get("should_fire"))
+                    repeat_fires: list[bool] = []
+                    for _ in range(DEFAULT_REPEATS):
+                        try:
+                            decision = await asyncio.wait_for(
+                                skill_tuner_service.classify_fires(
+                                    target_model=model,
+                                    catalog_lines=catalog_lines,
+                                    user_prompt=prompt,
+                                    user_settings=user_settings,
+                                ),
+                                timeout=target_timeout,
+                            )
+                            repeat_fires.append(bool(decision.would_load))
+                        except (asyncio.TimeoutError, Exception):
+                            logger.debug(
+                                "tuner classify_fires failed/timed out (run %s, %s); "
+                                "treating as did-not-fire",
+                                run_id, model, exc_info=True,
+                            )
+                            repeat_fires.append(False)
+                    # Aggregate the repeats: majority-fired -> the case "fired".
+                    fired = sum(1 for f in repeat_fires if f) > (DEFAULT_REPEATS / 2)
+                    if expected_fire:
+                        fire_decisions.append(fired)
+                    else:
+                        no_false_decisions.append(fired)
+
+                cell = skill_tuner_service.build_cell(
+                    provider=provider,
+                    model=model,
+                    fire_decisions=fire_decisions,
+                    no_false_decisions=no_false_decisions,
+                )
+                per_target_cells.append(cell)
+                await _emit_tuner(
+                    redis, run_id, EVENT_PROVIDER_DONE,
+                    candidate_index=cand_idx, provider=provider, model=model, cell=cell,
+                )
+
+            held_out_score = (
+                sum(skill_tuner_service.cell_score(c) for c in per_target_cells)
+                / len(per_target_cells)
+                if per_target_cells else 0.0
+            )
+            scored_candidates.append({
+                "index": cand_idx,
+                "description": candidate_desc,
+                "cells": per_target_cells,
+                "held_out_score": held_out_score,
+                "is_baseline": (cand_idx == 0 and baseline == candidate_desc),
+            })
+            await _emit_tuner(
+                redis, run_id, EVENT_PROGRESS,
+                stage="candidate_scored", candidate_index=cand_idx,
+                held_out_score=held_out_score,
+            )
+
+        winner = skill_tuner_service.pick_winner(scored_candidates)
+        scoreboard = {
+            "skill_id": skill_id,
+            "candidates": scored_candidates,
+            "winner_index": winner.get("index") if winner else None,
+            "winner_description": winner.get("description") if winner else None,
+        }
+        # Stash the final scoreboard so GET results can return it (run-buffer key — ephemeral).
+        try:
+            await redis.set(
+                f"tuner_result:{run_id}",
+                json.dumps(scoreboard),
+                ex=_TUNER_BUFFER_TTL_S,
+            )
+        except Exception:
+            logger.exception("tuner result stash failed for run %s", run_id)
+
+        await _emit_tuner(redis, run_id, EVENT_COMPLETE, scoreboard=scoreboard)
+        await _emit_terminal(redis, run_id, TERMINAL_DONE)
+    except Exception:
+        logger.exception("tuner job crashed for run %s", run_id)
+        await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="tuner_job_failed")
+    finally:
+        # Cleanup: drop the in-flight guard + the active-run sorted-set entries.
+        _INFLIGHT_SKILLS.discard(skill_id)
+        try:
+            await redis.zrem("runs:active", str(run_id))
+            await redis.zrem(f"runs_by_thread:tuner:{skill_id}", str(run_id))
+        except Exception:
+            logger.exception("tuner job ZREM cleanup failed for run %s", run_id)
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+@router.post("/{skill_id}/tuner/runs", status_code=status.HTTP_202_ACCEPTED)
+async def start_tuner_run(
+    skill_id: str,
+    body: StartTunerRunBody,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Kick off a BOUNDED background tuning run; return the run id IMMEDIATELY (D-06).
+
+    Owner-verify the skill (404 on cross-user / not-global — T-123-04-01), bound the
+    inputs (cases / targets), ZADD the run to the run-buffer, spawn the background job, and
+    return without blocking. The author streams progress on the /stream route and reads the
+    final scoreboard on the results route.
+    """
+    skill = await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    # ONE job per skill (T-123-04-02 — no duplicate concurrent runs / fan-out).
+    if skill_id in _INFLIGHT_SKILLS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A tuning run is already in progress for this skill",
+        )
+
+    # Resolve + BOUND the targets (default to the configured N-column set; cap at MAX_TARGETS).
+    if body.targets:
+        targets = [{"provider": t.provider, "model": t.model} for t in body.targets]
+    else:
+        targets = skill_tuner_service.configured_targets(settings)
+    targets = targets[:MAX_TARGETS]
+
+    # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).
+    if body.cases:
+        cases = [{"prompt": c.prompt, "should_fire": c.should_fire} for c in body.cases]
+    else:
+        siblings = await run_in_threadpool(
+            skill_tuner_service.fetch_owner_scoped_siblings,
+            supabase, current_user["id"], skill_id,
+        )
+        seeded = skill_tuner_service.auto_seed_cases(skill, siblings)
+        cases = (
+            [{"prompt": p, "should_fire": True} for p in seeded.get("should_fire", [])]
+            + [{"prompt": p, "should_fire": False} for p in seeded.get("should_not", [])]
+        )
+    cases = cases[:MAX_CASES]
+
+    n = max(1, min(int(body.n or skill_tuner_service.DEFAULT_CANDIDATE_COUNT), MAX_ITERATIONS))
+
+    run_id = uuid4()
+    _started_score = time_mod.time()
+    # Run-buffer ZADD start (Phase-061+ transport). A tuner run isn't anchored to a chat
+    # thread, so the per-skill sorted set carries it (NOT runs_by_thread:{chat_thread}).
+    try:
+        await redis.zadd(f"runs_by_thread:tuner:{skill_id}", {str(run_id): _started_score})
+        await redis.zadd("runs:active", {str(run_id): _started_score})
+    except Exception:
+        logger.exception("tuner ZADD failed for run %s; continuing", run_id)
+
+    # Mark in-flight + spawn the bounded background task (non-blocking — D-06).
+    _INFLIGHT_SKILLS.add(skill_id)
+    asyncio.create_task(
+        _run_tuner_job(
+            redis=redis,
+            run_id=run_id,
+            skill_id=skill_id,
+            skill=skill,
+            cases=cases,
+            targets=targets,
+            n=n,
+            user_id=current_user["id"],
+        )
+    )
+
+    return {
+        "run_id": str(run_id),
+        "skill_id": skill_id,
+        "targets": targets,
+        "case_count": len(cases),
+        "n": n,
+    }
+
+
+@router.get("/{skill_id}/tuner/runs/{run_id}/stream")
+async def stream_tuner_run(
+    skill_id: str,
+    run_id: UUID,
+    since: str = "0",
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Stream live tuner_* progress over SSE (reusing the shared replay_tail_consumer).
+
+    Owner-verify the skill first (404 on cross-user — T-123-04-01), then hand the
+    ``run:{run_id}`` stream to the shared two-phase replay-then-tail consumer. The tuner_*
+    events are progress; the terminal ``done``/``error`` sentinel breaks the consumer."""
+    await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+    return EventSourceResponse(
+        replay_tail_consumer(
+            redis=redis,
+            run_id=run_id,
+            since=since,
+            settings=settings,
+        ),
+        ping=None,
+    )
+
+
+@router.get("/{skill_id}/tuner/runs/{run_id}")
+async def get_tuner_results(
+    skill_id: str,
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Return the held-out scoreboard (per-provider cells with BOTH fires/no_false sub-scores)
+    + candidate descriptions once the run completes.
+
+    Owner-verify first (404 on cross-user — T-123-04-01). The scoreboard is stashed at
+    ``tuner_result:{run_id}`` by the background job (ephemeral, TTL-bound — A2 / no DB schema
+    change). A 404 here means the run is still in progress or its buffer expired."""
+    await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+    try:
+        raw = await redis.get(f"tuner_result:{run_id}")
+    except Exception:
+        logger.exception("tuner result read failed for run %s", run_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Tuner result store unavailable",
+        )
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tuner run not complete or result expired",
+        )
+    return json.loads(raw)
