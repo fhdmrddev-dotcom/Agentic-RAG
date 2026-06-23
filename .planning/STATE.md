@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
-status: executing
-last_updated: "2026-06-23T18:31:59.672Z"
+status: verifying
+last_updated: "2026-06-23T20:26:34.121Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 60
+  completed_plans: 15
+  percent: 80
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 Phase: 123 (skill-triggering-quality) — EXECUTING
 Plan: 6 of 6
-Status: Plan 05 complete (Trigger Tuner UI + reachability triad, 14/14 vitest, tsc clean) — ready to execute Plan 06
+Status: Phase complete — ready for verification
 Last activity: 2026-06-23
 
 ### Quick Tasks Completed
@@ -234,6 +234,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123 P03 | 12min | 2 tasks | 6 files |
 | Phase 123 P04 | 8min | 2 tasks | 3 files |
 | Phase 123 P05 | ~10min | 3 tasks (2 TDD) | 11 files |
+| Phase 123 P06 | ~30min | 2 tasks | 8 files |
 
 ## Decisions
 
@@ -277,6 +278,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 123]: Phase 123-05 (TRIG-01): Trigger Tuner React surface + the reachability triad in ONE plan (App ActiveView 'skill-tuner' + tunerSkillId + onTuneSkill, ChatLayout skill-tuner mount branch, SkillsPage 'Tune triggers' entry action on the selected skill) — the Phase-118 built-but-unreachable lesson; SkillTunerPage is a focused full-surface entered WITH a skillId (GovernancePage/publish-gauntlet ActiveView no-router precedent).
 - [Phase 123]: Phase 123-05 (TRIG-01): ProviderScoreboard (no-analog, 042-A) derives its N columns PURELY from the server-returned cells — a provider the org doesn't run is simply absent so it never renders (a score you can't act on is fabricated); N=1 is the clean baseline (no degraded affordance), OpenRouter≠native zhipu/z-ai, EVERY cell shows BOTH fires (recall) + no-false (the false-fire rail), never a hidden aggregate (T-123-05-01).
 - [Phase 123]: Phase 123-05 (TRIG-01): author-confirm-not-auto-apply (042-A/D-03) — CandidateCard's Use→reveal-diff is NOT the write; updateSkill (PATCH /skills, re-lints) fires ONLY on explicit confirm. LiveRunCard: queued≠running (no fake percent, 043-A) + never-vanishing elapsed timer derived from a stable start-ts (the 095 lesson, frozen on terminal) + reconcile-on-return (terminal 'done' re-reads GET results, SSE tuner_complete a best-effort hint per D-v2.5-03). CaseEditor 60/40 split bar mirrors backend split_held_out. ZERO package/migration; chat subscribeToRun untouched (purpose-built streamTunerRun tuner_* reader). 14/14 vitest, tsc clean.
+- [Phase ?]: Phase 123-06 (TRIG-03/TRIG-01): inline never-block lint in the SHARED SkillForm under Description (covers modal + 3-pane); 'Tune this' reuses the verified Plan-05 onTuneSkill navigator (D-12); onSave widened to Promise<Skill|void> to capture lint_warnings.
+- [Phase ?]: Phase 123-06 [Rule 3]: wired skill_builder_model through the /settings router (FullSettingsResponse + SettingsUpdate + handler) + api.ts — Plan 03 added the field+resolver but NOT the router surface; the picker spans cloud+local (no paid-provider SPOF, test-proven). ZERO migration/package.
 
 ## Operator Next Steps
 

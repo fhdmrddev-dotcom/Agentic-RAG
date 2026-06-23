@@ -129,7 +129,7 @@
 - [x] 123-03-PLAN.md — TRIG-01 core: D-08 builder-model knob + skill_tuner_service (candidates, policy-faithful classification, 60/40 held-out scoring, N-column adaptivity, owner-scoped auto-seed)
 - [x] 123-04-PLAN.md — TRIG-01 routes: owner-scoped skill_tuner router (bounded background job over the run-buffer + tuner-specific SSE + held-out scoreboard)
 - [x] 123-05-PLAN.md — TRIG-01 UI: focused full-surface Trigger Tuner (reachability triad) — case editor, N-column scoreboard (fires/no-false), candidate cards, live-run card, author-confirm diff (041-A/042-A/043-A)
-- [ ] 123-06-PLAN.md — TRIG-03 UI loop: inline never-block lint warning + "Tune this" handoff + the D-08 builder-model Settings picker (044-A)
+- [x] 123-06-PLAN.md — TRIG-03 UI loop: inline never-block lint warning + "Tune this" handoff + the D-08 builder-model Settings picker (044-A)
 
 #### Phase 124: Workflow Studio UX — Soul + Strict↔Loose
 **Goal**: A user immediately sees the "soul" of a workflow (its purpose, what it needs, its phase spine, its tier, its output) in three consistent sizes, and meets a clear strict↔loose disclosure that offers two doors ("Describe & run" vs "Author & govern") without removing any control — accuracy and governance preserved, complexity demoted one click.
@@ -219,7 +219,7 @@
 | 120. Collision Fix + Context Isolation | 3/3 | Complete | 2026-06-22 |
 | 121. One Front Door for Workflows (IA) | 2/2 | Complete | 2026-06-23 |
 | 122. Cross-Provider Trust & Honesty Parity | 0/4 | Planned | - |
-| 123. Skill Triggering Quality | 0/6 | Planned | - |
+| 123. Skill Triggering Quality | 6/6 | Executed (ready for verification) | 2026-06-24 |
 | 124. Workflow Studio UX — Soul + Strict↔Loose | 0/? | Not started | - |
 | 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
 | 126 (STRETCH). Smart-Dispatch Relevance Pre-Filter | 0/? | Gated (behind CORE) | - |
