@@ -545,7 +545,9 @@ def test_pin_load_skill_survives_trim():
         messages.append(_user(f"Filler question {i} " * 20))
         messages.append(_assistant(f"Filler reply {i} " * 20))
 
-    result = trim_messages_to_fit(messages, max_tokens=400, reserve_recent=4)
+    # max_tokens=900 → pin budget = 300 tokens, comfortably fits the single
+    # ~150-token skill group while the full history (~2000+ tokens) forces trimming.
+    result = trim_messages_to_fit(messages, max_tokens=900, reserve_recent=4)
 
     # The pinned skill tool-result is STILL present
     skill_tool = next(
@@ -570,7 +572,7 @@ def test_pin_keeps_atomic_pair():
         messages.append(_user(f"Filler {i} " * 20))
         messages.append(_assistant(f"Reply {i} " * 20))
 
-    result = trim_messages_to_fit(messages, max_tokens=400, reserve_recent=4)
+    result = trim_messages_to_fit(messages, max_tokens=900, reserve_recent=4)
 
     # The pinned tool-result is present AND its parent assistant+tool_calls is too
     skill_tool = next(
@@ -609,7 +611,8 @@ def test_pin_dedupe_same_skill():
         messages.append(_user(f"Late {i} " * 20))
         messages.append(_assistant(f"LateReply {i} " * 20))
 
-    result = trim_messages_to_fit(messages, max_tokens=500, reserve_recent=4)
+    # pin budget = 300 tokens fits the single de-duped survivor (~150 tokens).
+    result = trim_messages_to_fit(messages, max_tokens=900, reserve_recent=4)
 
     pinned_tool_ids = [
         m.get("tool_call_id")
@@ -631,10 +634,11 @@ def test_pin_budget_evicts_lru_with_marker():
 
     system_msg = _sys("System.")
     max_tokens = 600
-    pin_budget = int(PIN_BUDGET_FRACTION * max_tokens)
-    # Build two big pinned skill groups; together they should exceed pin_budget.
-    # Each tool-result content is sized so a single one already approaches the budget.
-    big = "X" * (pin_budget * 4)  # chars/4 → ~pin_budget tokens per result
+    pin_budget = int(PIN_BUDGET_FRACTION * max_tokens)  # 200 tokens
+    # Size each pinned group so ONE fits the pin budget but TWO overflow it:
+    # target ~60% of the budget per group → two groups (~120%) exceed the cap,
+    # forcing exactly one LRU eviction (the least-recently-loaded skill-old).
+    big = "X" * int(pin_budget * 0.6 * 4)  # chars/4 → ~0.6*pin_budget tokens of content
     messages = [system_msg]
     # Older pinned skill (least-recently-loaded — should be evicted)
     messages.append(_assistant_tc([_tc("call_old", "load_skill", '{"skill_name": "skill-old"}')]))
@@ -642,6 +646,11 @@ def test_pin_budget_evicts_lru_with_marker():
     # Newer pinned skill (should be kept)
     messages.append(_assistant_tc([_tc("call_new", "load_skill", '{"skill_name": "skill-new"}')]))
     messages.append(_skill_tool("call_new", "skill-new", big))
+    # Non-skill filler turns so the total (demoted skill-old + filler) overflows
+    # max_tokens and the trim loop actually removes the demoted least-recent pin.
+    for i in range(8):
+        messages.append(_user(f"Filler {i} " * 20))
+        messages.append(_assistant(f"Reply {i} " * 20))
     # A couple of recent protected turns
     messages.append(_user("recent question"))
     messages.append(_assistant("recent reply"))
