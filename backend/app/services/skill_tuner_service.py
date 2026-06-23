@@ -429,13 +429,51 @@ def configured_targets(settings) -> list[dict]:
     is a VALID clean result — the single-provider baseline, NOT a degraded one. A provider
     the org doesn't run NEVER appears.
 
+    Phase 123 (CR-01): DUCK-TYPED across two settings shapes so the tuner job can pass the
+    DB-effective ``UserEffectiveSettings`` (where provider keys live in ``.providers``, a list
+    of ``LLMProvider`` — there is NO flat ``{provider}_api_key`` attribute) WITHOUT breaking
+    the env-level ``app.config.settings`` callers (flat ``{provider}_api_key`` attrs) or the
+    existing SimpleNamespace unit tests:
+      • If the passed object exposes a truthy ``providers`` list → derive the present-provider
+        set from ``[p.id for p in providers if p.api_key]`` (keyed providers) plus any LOCAL
+        provider (ollama/lmstudio) whose ``base_url`` is truthy.
+      • OTHERWISE fall back to the flat ``_PROVIDER_KEY_ATTR`` / ``_PROVIDER_BASE_URL_ATTR``
+        getattr probe.
+
     Returns a list of ``{provider, model}`` dicts (the scoreboard columns).
     """
+    present: list[str] = []
+
+    providers = getattr(settings, "providers", None)
+    if isinstance(providers, list) and providers:
+        # DB-effective (UserEffectiveSettings) shape — keys live on the LLMProvider list.
+        local_ids = set(_PROVIDER_BASE_URL_ATTR.keys())  # {"ollama", "lmstudio"}
+        for p in providers:
+            pid = getattr(p, "id", "") or ""
+            api_key = (getattr(p, "api_key", "") or "").strip()
+            base_url = (getattr(p, "base_url", "") or "").strip()
+            if pid in local_ids:
+                # Local providers are configured by base_url (no paid SPOF — D-08).
+                if base_url:
+                    present.append(pid)
+            elif pid in _PROVIDER_KEY_ATTR and api_key:
+                present.append(pid)
+    else:
+        # Env-level Settings / SimpleNamespace shape — flat per-provider attrs.
+        for provider, key_attr in _PROVIDER_KEY_ATTR.items():
+            if (getattr(settings, key_attr, "") or "").strip():
+                present.append(provider)
+        for provider, url_attr in _PROVIDER_BASE_URL_ATTR.items():
+            if (getattr(settings, url_attr, "") or "").strip():
+                present.append(provider)
+
+    # Map each present provider through its single representative model (presence-only —
+    # never reads/logs the key value, T-123-03-02). De-dupe preserving first-seen order.
     targets: list[dict] = []
-    for provider, key_attr in _PROVIDER_KEY_ATTR.items():
-        if (getattr(settings, key_attr, "") or "").strip():
-            targets.append({"provider": provider, "model": _REPRESENTATIVE_MODEL.get(provider, "")})
-    for provider, url_attr in _PROVIDER_BASE_URL_ATTR.items():
-        if (getattr(settings, url_attr, "") or "").strip():
-            targets.append({"provider": provider, "model": _REPRESENTATIVE_MODEL.get(provider, "")})
+    seen: set[str] = set()
+    for provider in present:
+        if provider in seen:
+            continue
+        seen.add(provider)
+        targets.append({"provider": provider, "model": _REPRESENTATIVE_MODEL.get(provider, "")})
     return targets

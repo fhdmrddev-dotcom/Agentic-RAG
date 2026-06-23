@@ -214,7 +214,15 @@ async def _run_tuner_job(
             await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="no_user_settings")
             return
 
-        builder_model = skill_tuner_service.resolve_skill_builder_model(settings)
+        # Phase 123 (CR-01): resolve the builder model from the DB-effective settings,
+        # NOT the env-level ``app.config.settings`` singleton. The Settings-UI knob writes
+        # to ``app_settings.skill_builder_model`` (surfaced via UserEffectiveSettings); the
+        # env object's ``skill_builder_model`` is None for any UI-configured install, so
+        # passing ``settings`` here silently fell through to the registry default while the
+        # Settings UI DISPLAYED the DB-resolved label (display-vs-run mismatch). ``user_settings``
+        # was already loaded above (load_user_settings -> load_app_settings, the DB-backed
+        # cache) and carries the resolved ``skill_builder_model``.
+        builder_model = skill_tuner_service.resolve_skill_builder_model(user_settings)
         if builder_model is None:
             await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="no_builder_model")
             return
@@ -398,7 +406,15 @@ async def start_tuner_run(
     if body.targets:
         targets = [{"provider": t.provider, "model": t.model} for t in body.targets]
     else:
-        targets = skill_tuner_service.configured_targets(settings)
+        # Phase 123 (CR-01): derive the default target set from the DB-effective settings
+        # (provider keys saved through the Settings UI live in app_settings, surfaced via
+        # UserEffectiveSettings.providers), NOT the env-level ``settings`` singleton whose
+        # flat ``{provider}_api_key`` attrs are empty for UI-configured installs. The
+        # duck-typed ``configured_targets`` handles the .providers-list shape.
+        from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
+
+        eff = await load_app_settings_async()
+        targets = skill_tuner_service.configured_targets(eff)
     targets = targets[:MAX_TARGETS]
 
     # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).

@@ -255,6 +255,64 @@ def test_configured_targets_reads_presence_not_value():
     assert providers == {"anthropic"}, "a whitespace-only key must be treated as absent"
 
 
+def test_configured_targets_reads_db_effective_providers_list():
+    """Phase 123 (CR-01): when passed a UserEffectiveSettings-shaped object (provider
+    keys live in ``.providers``, a list of LLMProvider — NO flat ``{provider}_api_key``
+    attrs), the duck-typed probe derives the present-provider set from that list. This is
+    the real DB-effective path the tuner job uses; the OLD flat ``getattr(eff,
+    "openai_api_key")`` probe returned "" for every provider and produced ZERO targets."""
+    from app.services.skill_tuner_service import configured_targets
+
+    # Mimic UserEffectiveSettings: a ``providers`` list of LLMProvider-shaped objects.
+    eff = SimpleNamespace(
+        providers=[
+            SimpleNamespace(id="openai", api_key="sk-real", base_url="https://api.openai.com/v1"),
+            SimpleNamespace(id="anthropic", api_key="sk-ant-real", base_url="https://api.anthropic.com"),
+            SimpleNamespace(id="google", api_key="", base_url="https://generativelanguage.googleapis.com"),  # unconfigured
+            SimpleNamespace(id="openrouter", api_key="sk-or-real", base_url="https://openrouter.ai/api/v1"),
+            SimpleNamespace(id="deepseek", api_key="", base_url="https://api.deepseek.com"),  # unconfigured
+            SimpleNamespace(id="ollama", api_key="ollama", base_url="http://localhost:11434/v1"),  # local, base_url present
+        ],
+    )
+    targets = configured_targets(eff)
+    providers = {t["provider"] for t in targets}
+
+    # Keyed providers with a truthy api_key appear; keyless ones never do.
+    assert "openai" in providers
+    assert "anthropic" in providers
+    assert "openrouter" in providers
+    assert "google" not in providers, "a keyless provider must NEVER appear"
+    assert "deepseek" not in providers
+    # Local provider configured by base_url appears (no paid SPOF — D-08).
+    assert "ollama" in providers
+    # Every emitted target carries a representative model (and OpenRouter is non-empty — CR-02).
+    or_target = next(t for t in targets if t["provider"] == "openrouter")
+    assert or_target["model"].strip(), "OpenRouter must carry a concrete representative model"
+
+
+def test_configured_targets_empty_providers_falls_back_to_flat_probe():
+    """An object with NO truthy ``providers`` list still works via the flat
+    ``{provider}_api_key`` getattr probe (env Settings / SimpleNamespace path) — the
+    existing unit tests above exercise this, this pins the fallback explicitly."""
+    from app.services.skill_tuner_service import configured_targets
+
+    flat = SimpleNamespace(
+        providers=[],  # empty → fall back to flat attrs
+        openai_api_key="sk-x",
+        anthropic_api_key="",
+        google_api_key="",
+        openrouter_api_key="",
+        deepseek_api_key="",
+        moonshot_api_key="",
+        minimax_api_key="",
+        zhipu_api_key="",
+        ollama_base_url="",
+        lmstudio_base_url="",
+    )
+    providers = {t["provider"] for t in configured_targets(flat)}
+    assert providers == {"openai"}
+
+
 # ── owner-scoped auto-seed (D-04 / V4 / T-123-03-01) ──────────────────────────
 class _FakeQuery:
     """Records the .or_() filter argument; returns its seeded rows on .execute()."""
