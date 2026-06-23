@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T03:57:18.363Z"
+last_updated: "2026-06-23T04:06:09.909Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 40
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 122 (cross-provider-trust-honesty-parity) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -226,6 +226,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 121 P01 | 6min | 2 tasks | 2 files |
 | Phase 121 P02 | ~12min | 2 tasks | 3 files |
 | Phase 122 P01 | 29min | 2 tasks | 4 files |
+| Phase 122 P04 | 5min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -250,6 +251,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 121-02 (IA-01): reset workflowLockByThread in ChatAreaBanner beforeEach (Rule 1 test-isolation — the lock map is not mock-cleared so a locked reconcile bled into the next test); reconcile-lock mocks use mockResolvedValue not …Once because the mount reconcile effect can re-fire
 - [Phase 122]: 122-01 (MP-02): emit_tier Literal[force_strict|force|coerce] is the single source of truth on every MODEL_CAPABILITIES row (D-122-04); 55 rows migrated 14/36/5; 2 DeepSeek DEMOTED to force (strict inert without /beta base_url, Pitfall 3); registry miss -> coerce (default-SAFE D-122-05). Old bools kept deprecated-unread for 1-phase rollback (no derived view re-reading strict_json_schema).
 - [Phase 122]: 122-01 (MP-02): removed the hardcoded 'and provider == openai' strict gate (now tier-driven: json_schema response_format requested whenever strict_response_format is true) + the inert function-level DeepSeek strict loop in openai_service.py forcing branch; A4 preserved (OpenAI force_strict still emits json_schema response_format). Pitfall 5 seams (deepseek thinking-off, 111.1 local-provider) untouched; removed now-dead import copy (Rule 3).
+- [Phase ?]: Phase 122-04 (TDP-01): TDP-01 is a PROMPT problem not a schema problem — the execute_code.description schema field (openai_service.py:601-603) is already strong; the fix is ONE ungated provider-agnostic nudge bullet in the shared SYSTEM_PROMPT (D-122-08, SC#4), one additive string no logic in G-5 hot file agent_loop.py, pinned by a string-presence guard.
+- [Phase ?]: Phase 122-04 (TDP-01): NO Anthropic-specific extraction added — BUG-260528-03's stated cause is WRONG; tool_args_progress is already cross-provider in all 3 adapters, so the ungated SHARED-prompt nudge is the correct provider-agnostic lever (red line D-14 held, no shared-path fork).
+- [Phase ?]: Phase 122-04 (TDP-01): exported humanize() (one word, no behavior change) to assert the bare-name floor (?? name) directly — no MEANINGFUL_TOOLS member is also absent from PRETTY_TOOL_NAMES (only execute_code, which has its own branch), so deriveWorkspacePanel() alone cannot exercise the floor; PRETTY_TOOL_NAMES NOT pre-emptively extended (D-122-08 — only if SC#10 UAT surfaces a bare name).
 
 ## Operator Next Steps
 
