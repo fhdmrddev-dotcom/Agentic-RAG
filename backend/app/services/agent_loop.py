@@ -812,11 +812,23 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                 })
                 # 2. Tool result messages (one per tool call)
                 for tc in tool_calls_data:
-                    messages.append({
+                    tool_msg = {
                         "role": "tool",
                         "tool_call_id": tc["tool_call_id"],
                         "content": tc.get("result") or "",
-                    })
+                    }
+                    # Phase 123-02 CTX-03 — tag load_skill tool-results as pinned so
+                    # context_window.trim_messages_to_fit keeps them out of the trim
+                    # window (a loaded skill stays available for the rest of the
+                    # session). The flag is set HERE in code, identified by the parent
+                    # tool_call name being load_skill — NEVER by sniffing the tool-result
+                    # content JSON (D-13 anti-pattern / D-14 no-fork). The flag value is
+                    # the skill name (for de-dupe), derived from the call args with a
+                    # stable fallback to the tool_call_id so de-dupe still works.
+                    if tc.get("name") == "load_skill":
+                        skill_name = (tc.get("args") or {}).get("skill_name") or tc["tool_call_id"]
+                        tool_msg["_pinned_skill"] = skill_name
+                    messages.append(tool_msg)
                 # 3. Assistant text response (only if content is non-empty)
                 if msg.get("content"):
                     messages.append({

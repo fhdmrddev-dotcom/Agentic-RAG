@@ -692,3 +692,113 @@ def test_pin_never_starves_recent():
     # The recent tail is fully preserved even though the pin overflowed the budget
     assert recent_user in result, "reserve_recent tail must never be starved by a pin"
     assert recent_assistant in result, "reserve_recent tail must never be starved by a pin"
+
+
+# ---------------------------------------------------------------------------
+# _reconstruct_history pin-tag (Plan 123-02 Task 2 — CTX-03 in code, no JSON sniff)
+# ---------------------------------------------------------------------------
+
+def _row_with_tool_calls(tool_calls: list[dict], content: str | None = None) -> dict:
+    """A stored assistant DB row with tool_calls (the _reconstruct_history input shape)."""
+    return {"role": "assistant", "content": content, "tool_calls": tool_calls}
+
+
+def test_reconstruct_history_tags_load_skill_pinned():
+    """A load_skill tool-result row gets _pinned_skill set (from tc args, in code),
+    while a non-skill (search_documents) tool row does NOT — proving the flag is set
+    from tc metadata, never by sniffing the tool-result content JSON."""
+    from app.services.agent_loop import _reconstruct_history
+
+    rows = [
+        _row_with_tool_calls([
+            {
+                "tool_call_id": "call_skill",
+                "name": "load_skill",
+                "args": {"skill_name": "pptx-builder"},
+                "result": '{"instructions": "build pptx", "files": []}',
+            },
+            {
+                "tool_call_id": "call_search",
+                "name": "search_documents",
+                "args": {"query": "budget"},
+                "result": '{"results": []}',
+            },
+        ]),
+    ]
+
+    messages = _reconstruct_history(rows)
+
+    skill_tool = next(
+        (m for m in messages if m.get("role") == "tool" and m.get("tool_call_id") == "call_skill"),
+        None,
+    )
+    search_tool = next(
+        (m for m in messages if m.get("role") == "tool" and m.get("tool_call_id") == "call_search"),
+        None,
+    )
+    assert skill_tool is not None and search_tool is not None
+    # load_skill tool-result IS pinned, tagged with the skill name from the args
+    assert skill_tool.get("_pinned_skill") == "pptx-builder"
+    # search_documents tool-result is NOT pinned
+    assert "_pinned_skill" not in search_tool
+
+
+def test_reconstruct_history_pin_fallback_to_tool_call_id():
+    """When the load_skill args lack skill_name, the pin flag falls back to the
+    tool_call_id so de-dupe still works (never unset on a load_skill row)."""
+    from app.services.agent_loop import _reconstruct_history
+
+    rows = [
+        _row_with_tool_calls([
+            {
+                "tool_call_id": "call_skill_noargs",
+                "name": "load_skill",
+                "args": {},
+                "result": '{"instructions": "x"}',
+            },
+        ]),
+    ]
+    messages = _reconstruct_history(rows)
+    skill_tool = next(
+        (m for m in messages if m.get("role") == "tool"),
+        None,
+    )
+    assert skill_tool is not None
+    assert skill_tool.get("_pinned_skill") == "call_skill_noargs"
+
+
+def test_reconstruct_pin_flag_drives_trim_pinning_end_to_end():
+    """The _pinned_skill flag set by _reconstruct_history survives into
+    trim_messages_to_fit and engages the pinning on a realistic reconstructed
+    history (Task 1 + Task 2 wired together)."""
+    from app.services.agent_loop import _reconstruct_history
+
+    rows = [
+        _row_with_tool_calls(
+            [
+                {
+                    "tool_call_id": "call_skill",
+                    "name": "load_skill",
+                    "args": {"skill_name": "docx-builder"},
+                    "result": "SKILL INSTRUCTIONS: build docx. " * 10,
+                },
+            ],
+            content="Loaded the docx skill.",
+        ),
+    ]
+    reconstructed = _reconstruct_history(rows)
+
+    messages = [_sys("System.")] + reconstructed
+    # Pile on filler turns to force trimming.
+    for i in range(20):
+        messages.append(_user(f"Filler {i} " * 20))
+        messages.append(_assistant(f"Reply {i} " * 20))
+
+    result = trim_messages_to_fit(messages, max_tokens=900, reserve_recent=4)
+
+    skill_tool = next(
+        (m for m in result if m.get("role") == "tool" and m.get("_pinned_skill") == "docx-builder"),
+        None,
+    )
+    assert skill_tool is not None, "Reconstructed load_skill result must be pinned through the trim path"
+    assert _has_parent_tool_calls(result, "call_skill"), "Pinned group must keep its parent"
