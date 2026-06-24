@@ -32,6 +32,12 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+  // D-11: a ~1500-char description (e.g. the `docx` skill) clamps to ~3 lines by default
+  // so it never buries the held-out score or the Use action. A "Show more"/"Show less"
+  // toggle reveals/re-clamps the full text. ONE toggle governs the header description AND
+  // both sides of the diff-confirm strip — purely presentational, no text is removed.
+  const [expanded, setExpanded] = useState(false)
+  const clampClass = expanded ? "" : "line-clamp-3"
   // WR-04: the write can fail (PATCH /skills rejects, network drop). Surface it
   // inline instead of swallowing the rejection — the strip stays open so the
   // author can retry, and they're told why nothing was saved.
@@ -69,7 +75,13 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
               {candidate.is_baseline ? "current (baseline)" : isWinner ? "winner" : "candidate"}
             </span>
           </div>
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{candidate.description}</p>
+          <p
+            data-testid="candidate-description"
+            className={cn("text-sm text-foreground whitespace-pre-wrap break-words", clampClass)}
+          >
+            {candidate.description}
+          </p>
+          <ShowMoreToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
         </div>
         <div className="flex flex-col items-end shrink-0">
           <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">held-out</span>
@@ -95,7 +107,13 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
           <div className="flex flex-col gap-2 text-xs">
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] uppercase tracking-wider font-mono text-[hsl(0_70%_72%)]">current</span>
-              <span className="text-muted-foreground line-through whitespace-pre-wrap break-words">
+              <span
+                data-testid="diff-current"
+                className={cn(
+                  "text-muted-foreground line-through whitespace-pre-wrap break-words",
+                  clampClass,
+                )}
+              >
                 {currentDescription || "(empty)"}
               </span>
             </div>
@@ -104,8 +122,14 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] uppercase tracking-wider font-mono text-[hsl(var(--panel-status-done))]">new</span>
-              <span className="text-foreground whitespace-pre-wrap break-words">{candidate.description}</span>
+              <span
+                data-testid="diff-new"
+                className={cn("text-foreground whitespace-pre-wrap break-words", clampClass)}
+              >
+                {candidate.description}
+              </span>
             </div>
+            <ShowMoreToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
           </div>
           <p className="text-[11px] text-muted-foreground">
             The skill begins firing on this description immediately. Nothing is applied until you confirm.
@@ -132,5 +156,20 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
         </div>
       )}
     </div>
+  )
+}
+
+/** D-11: a small accessible Show more / Show less control that flips the shared clamp
+ *  state. A real <button> (not a clickable span) so it stays keyboard-operable and out of
+ *  the tab-order trap. Purely presentational — it never removes or transforms text. */
+function ShowMoreToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="self-start text-[11px] font-mono text-primary hover:underline focus-visible:underline"
+    >
+      {expanded ? "Show less" : "Show more"}
+    </button>
   )
 }
