@@ -1179,3 +1179,158 @@ def test_cell_score_falls_back_to_recompute_when_no_stored_score():
     assert svc.cell_score(legacy) == pytest.approx((0.8 + 0.6) / 2.0), (
         "cell_score must fall back to the recompute when no stored score is present"
     )
+
+
+# ── TT-12 end-to-end — an all-error column is EXCLUDED from the persisted target_count ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_target_count_excludes_all_error_column():
+    """Drive _run_tuner_job with TWO targets where ONE target's classify ALWAYS raises (every
+    call) and the other measures normally. The persisted tuner_runs upsert payload's
+    ``target_count`` must be 1 (the all-error column is EXCLUDED), NOT 2 — and the all-error
+    cell carries measured=False / a non-zero error_count while the measured cell is
+    measured=True (TT-12)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    # The GOOD model measures honestly; the BAD model's classify ALWAYS raises (an all-400 /
+    # all-timeout provider). The raise is what TT-12 must distinguish from a real "did-not-fire".
+    GOOD = "gpt-5.4-mini"
+    BAD = "MiniMax-M2.7-highspeed"
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        if target_model == BAD:
+            raise RuntimeError("simulated all-400 provider — could not measure")
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": GOOD},
+               {"provider": "minimax", "model": BAD}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=run_id, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=sb,
+        )
+
+    # TT-12: the persisted target_count counts ONLY the measured column (the all-error minimax
+    # lane is excluded) — it is 1, NOT 2.
+    upserts = sb._tuner_store["_upserts"]
+    assert upserts, "expected a tuner_runs upsert after the run completed"
+    target_count = upserts[-1]["payload"].get("target_count")
+    assert target_count == 1, (
+        f"target_count must EXCLUDE the all-error column (measured on 1 model, not 2); "
+        f"got {target_count!r}"
+    )
+
+    # The scoreboard cells reflect the honest measured/unmeasured split.
+    scoreboard = upserts[-1]["payload"]["scoreboard"]
+    all_cells = [c for cand in scoreboard["candidates"] for c in cand["cells"]]
+    bad_cells = [c for c in all_cells if c["model"] == BAD]
+    good_cells = [c for c in all_cells if c["model"] == GOOD]
+    assert bad_cells, "the all-error minimax lane must still produce a cell (an unmeasured one)"
+    assert good_cells, "the good openai lane must produce a measured cell"
+    for c in bad_cells:
+        assert c["measured"] is False, f"the all-error cell must be measured=False; got {c!r}"
+        assert c["error_count"] > 0, f"the all-error cell must carry a non-zero error_count; got {c!r}"
+    for c in good_cells:
+        assert c["measured"] is True, f"the measured openai cell must be measured=True; got {c!r}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_target_count_equals_len_targets_when_all_measure():
+    """Happy-path anti-regression: when EVERY target measures normally (no all-error column),
+    target_count == len(targets) — the TT-12 fix only excludes all-error columns, never
+    under-counts a real measurement (TT-12 preserved path)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"},
+               {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=uuid4(), skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=sb,
+        )
+
+    upserts = sb._tuner_store["_upserts"]
+    assert upserts, "expected a tuner_runs upsert"
+    assert upserts[-1]["payload"].get("target_count") == 2, (
+        f"all-measured run: target_count must equal len(targets)=2; "
+        f"got {upserts[-1]['payload'].get('target_count')!r}"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_all_should_not_run_renders_fires_axis_unmeasured():
+    """End-to-end TT-05: a run whose cases are ALL should_not (no should_fire) produces cells
+    whose ``fires`` axis is the unmeasured sentinel None — NEVER a fabricated 1.0 — proving the
+    honest empty axis flows through the REAL job, not just the build_cell unit."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load=False, skill_name=None)
+
+    # ALL should_not — no should_fire case exists, so the fires axis has ZERO decisions.
+    cases = [
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+        {"prompt": "summarize this article", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=run_id, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=sb,
+        )
+
+    scoreboard = sb._tuner_store["_row"]["scoreboard"]
+    all_cells = [c for cand in scoreboard["candidates"] for c in cand["cells"]]
+    assert all_cells, "expected at least one cell in the all-should_not run"
+    for c in all_cells:
+        assert c["axes"]["fires"] is None, (
+            f"the fires axis must be the unmeasured sentinel None (no should-fire cases), "
+            f"NEVER a fabricated 1.0; got {c['axes']['fires']!r}"
+        )
+        assert c["axes"]["fires"] != 1.0, "an empty fire axis must never be a fabricated 1.0"
