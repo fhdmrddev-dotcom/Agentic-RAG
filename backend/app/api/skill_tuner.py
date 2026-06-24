@@ -756,9 +756,16 @@ async def get_seeded_cases(
     SHOW + edit the cases before a run (fixes WR-05 / HIGH #2 — the editor previously showed
     "0 cases"). Another user's private skill never reaches the seed.
 
-    Returns ``{should_fire: [{prompt, provenance}], should_not: [{prompt, provenance}]}`` where
-    provenance is ``"seeded"`` (this skill's own desc/paraphrase + the generic off-topic set) or
-    ``"sibling"`` (an owner-scoped sibling's description) — NEVER ``"held"``.
+    Returns ``{should_fire: [{prompt, provenance}], should_not: [{prompt, provenance}], total}``
+    where provenance is ``"seeded"`` (this skill's own desc/paraphrase + the generic off-topic
+    set) or ``"sibling"`` (an owner-scoped sibling's description) — NEVER ``"held"``.
+
+    ``total`` is the FULL UNCAPPED sibling-sourced should_not count (Phase 123.1-05 /
+    BUG-260624-01 #1). ``should_not`` is capped at ``MAX_SEEDED_SHOULD_NOT`` sibling entries
+    (the generic off-topic baseline is always kept on top, never part of the cap accounting),
+    so the editor shows an honest "showing N of M — capped" banner whenever ``total`` exceeds
+    the shown sibling count. The cap is a pure post-fetch slice of the already-owner-scoped
+    ``fetch_owner_scoped_siblings`` output — owner-scoping (404 cross-user) is unchanged.
     """
     skill = await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
 
@@ -770,4 +777,5 @@ async def get_seeded_cases(
     return {
         "should_fire": seeded.get("should_fire", []),
         "should_not": seeded.get("should_not", []),
+        "total": seeded.get("should_not_total", 0),
     }

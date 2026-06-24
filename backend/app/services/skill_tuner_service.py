@@ -55,6 +55,17 @@ DEFAULT_CANDIDATE_COUNT = 3
 DEFAULT_HELD_OUT_TRAIN_RATIO = 0.6
 DEFAULT_REPEATS = 3
 
+# Phase 123.1-05 (BUG-260624-01 HIGH #1) — the named cap on the SIBLING-sourced should_not
+# set (sketch 045-B default). It keeps the pre-run benchmark focused so a large skill library
+# doesn't seed an illegible wall of cases AND doesn't blow up the RUN TIME (each sibling case
+# runs cross-provider × 3 repeats; slow coerce-tier providers make an uncapped seed take many
+# minutes — see 123.1-AUDIT-BACKLOG §5). It applies to BOTH the editor seed (the GET) AND the
+# run path (auto_seed_cases) so the editor shows EXACTLY what runs (honest). The cap slices
+# ONLY the already-owner-scoped, leak-safe sibling list — it never re-reads the DB or widens
+# scope. The fixed generic off-topic baseline below is ALWAYS kept on top (never capped) so the
+# false-fire baseline never disappears.
+MAX_SEEDED_SHOULD_NOT = 8
+
 # A small fixed generic off-topic should-NOT set (D-04 / Open-Q2) — prompts that should
 # NEVER fire ANY skill, independent of the sibling catalog. Padding so a skill with no
 # siblings still gets a real false-fire rail.
@@ -299,11 +310,17 @@ def auto_seed_cases(skill: dict, sibling_skills: list[dict]) -> dict[str, list[s
     if name:
         should_fire.append(f"Use the {name} skill.")
 
-    should_not: list[str] = []
+    sibling_sourced: list[str] = []
     for sib in sibling_skills:
         sib_desc = (sib.get("description") or "").strip()
         if sib_desc and sib_desc != description:
-            should_not.append(sib_desc)
+            sibling_sourced.append(sib_desc)
+    # Cap the SIBLING-sourced false-fire bait at MAX_SEEDED_SHOULD_NOT (Phase 123.1-05 /
+    # BUG-260624-01 #1). A pure post-fetch slice of the already-leak-safe owner-scoped list —
+    # never re-reads the DB, never widens scope. The run path uses this same capped set so the
+    # editor (the GET) shows exactly what runs.
+    should_not: list[str] = sibling_sourced[:MAX_SEEDED_SHOULD_NOT]
+    # The generic off-topic baseline is ALWAYS kept in full (never part of the cap accounting).
     should_not.extend(_GENERIC_OFF_TOPIC)
 
     return {
@@ -362,7 +379,19 @@ def seed_cases_with_provenance(
         }
         for p in base["should_not"]
     ]
-    return {"should_fire": should_fire, "should_not": should_not}
+    # The FULL uncapped sibling-sourced count (Phase 123.1-05 / BUG-260624-01 #1) — the route
+    # turns this into the GET's top-level `total` so the editor can show "showing N of M —
+    # capped" honestly. `sibling_descs` is the de-duped uncapped sibling membership (the same
+    # filter auto_seed_cases applies: present AND != this skill's description) — `base`'s
+    # should_not is already SLICED to MAX_SEEDED_SHOULD_NOT, so derive the total from the
+    # pre-cap set, not from the (capped) base output. Only sibling-sourced entries count
+    # toward the cap; the constant generic off-topic set is never part of the accounting.
+    should_not_total = len(sibling_descs)
+    return {
+        "should_fire": should_fire,
+        "should_not": should_not,
+        "should_not_total": should_not_total,
+    }
 
 
 def fetch_owner_scoped_siblings(supabase, user_id: str, exclude_skill_id: str | None = None) -> list[dict]:
