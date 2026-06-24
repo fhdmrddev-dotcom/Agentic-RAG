@@ -2660,14 +2660,24 @@ export interface TunerCase {
   should_fire: boolean
 }
 
-/** A single per-provider scoreboard cell. BOTH sub-scores are always present (042-A — the
- *  false-fire rail is never a hidden aggregate): `fires` = should-trigger recall, `no_false`
- *  = should-NOT precision. `score` is the server-computed combined cell score. */
+/** A single per-provider scoreboard cell. BOTH sub-scores carry the honest unmeasured
+ *  sentinel from 123.1-06 (TT-05/TT-12): `fires` = should-trigger recall, `no_false`
+ *  = should-NOT precision — each is `null` when that axis had NO cases to score (the
+ *  frontend renders "n/a"), NEVER a fabricated `1.0`. `score` is the server-computed
+ *  combined cell score (the mean of the MEASURED axes) and is `null` when the cell is
+ *  WHOLLY unmeasured. `measured` is `false` (and `error_count > 0`) when every classify
+ *  call for the cell RAISED — an all-error column that the scoreboard must render
+ *  honestly as "could not measure", distinct from a measured `0.00`. `error_count` is the
+ *  count of classify calls that raised. (`measured`/`error_count` are optional so a
+ *  legacy cell that predates 123.1-06 still types — a missing `measured` is treated as
+ *  measured, and `score == null` is the unmeasured signal regardless.) */
 export interface TunerCell {
   provider: string
   model: string
-  axes: { fires: number; no_false: number }
-  score: number
+  axes: { fires: number | null; no_false: number | null }
+  score: number | null
+  measured?: boolean
+  error_count?: number
 }
 
 /** One scored candidate description: its held-out score + the per-provider cells. */

@@ -26,7 +26,20 @@ import { ProviderScoreboard } from "./ProviderScoreboard"
 import type { TunerCell } from "@/lib/api"
 
 function cell(provider: string, model: string, fires: number, noFalse: number, score: number): TunerCell {
-  return { provider, model, axes: { fires, no_false: noFalse }, score }
+  return { provider, model, axes: { fires, no_false: noFalse }, score, measured: true, error_count: 0 }
+}
+
+/** An UNMEASURED cell (123.1-06 sentinel): every classify call raised → measured:false,
+ *  score:null, both axes null, a positive error_count. TT-12 render half (Plan 08 Task 1). */
+function unmeasuredCell(provider: string, model: string, errorCount: number): TunerCell {
+  return {
+    provider,
+    model,
+    axes: { fires: null, no_false: null },
+    score: null,
+    measured: false,
+    error_count: errorCount,
+  }
 }
 
 describe("ProviderScoreboard — N-column provider-set adaptivity (042-A)", () => {
@@ -155,5 +168,60 @@ describe("ProviderScoreboard — D-02/D-12 vertical rows + magnitude bar + combi
       // the bar is a SIBLING of the honest sub-scores — never replacing them.
       expect(within(row).getByTestId("scoreboard-bar")).toBeTruthy()
     }
+  })
+})
+
+describe("ProviderScoreboard — TT-12 honest unmeasured-cell render (Plan 08 Task 1)", () => {
+  it("renders an unmeasured cell (measured:false / score:null) as 'could not measure' — never a fabricated number, bar, or sub-score", () => {
+    const cells = [
+      cell("openai", "gpt-5.4-mini", 0.9, 0.85, 0.875), // a MEASURED cell
+      unmeasuredCell("moonshot", "kimi-k2", 9), // an all-error UNMEASURED cell
+    ]
+    render(<ProviderScoreboard cells={cells} />)
+
+    const rows = screen.getAllByTestId("scoreboard-cell")
+    expect(rows).toHaveLength(2)
+
+    // The measured cell still shows its number + bar + both sub-scores.
+    const measuredRow = rows.find((r) => r.textContent?.toLowerCase().includes("openai"))!
+    expect(within(measuredRow).getByTestId("cell-score").textContent).toContain("0.88")
+    expect(within(measuredRow).getByTestId("scoreboard-bar")).toBeTruthy()
+    expect(within(measuredRow).queryByTestId("cell-unmeasured")).toBeNull()
+
+    // The unmeasured cell renders the honest label — and does NOT render a numeric score,
+    // a magnitude bar, or fires/no-false sub-scores (the exact fabrication TT-12 closes).
+    const unmeasuredRow = rows.find((r) => r.textContent?.toLowerCase().includes("moonshot"))!
+    expect(within(unmeasuredRow).getByTestId("cell-unmeasured")).toBeTruthy()
+    expect(unmeasuredRow.textContent?.toLowerCase()).toContain("could not measure")
+    expect(within(unmeasuredRow).queryByTestId("cell-score")).toBeNull()
+    expect(within(unmeasuredRow).queryByTestId("scoreboard-bar")).toBeNull()
+    expect(within(unmeasuredRow).queryByTestId("cell-fires")).toBeNull()
+    expect(within(unmeasuredRow).queryByTestId("cell-no-false")).toBeNull()
+    // provider·model is KEPT so the author sees WHICH column failed.
+    expect(unmeasuredRow.textContent?.toLowerCase()).toContain("moonshot")
+    expect(unmeasuredRow.textContent?.toLowerCase()).toContain("kimi-k2")
+    // and the failure count is surfaced honestly.
+    expect(unmeasuredRow.textContent).toContain("9")
+  })
+
+  it("renders an individually-null axis (one axis had no cases) as 'n/a' on an otherwise-measured cell", () => {
+    // A cell measured on no-false but with NO should-fire cases: fires axis is null, but the
+    // cell is still measured (score present) — it renders normally with 'n/a' for the empty axis.
+    const cells: TunerCell[] = [
+      {
+        provider: "anthropic",
+        model: "claude-haiku-4-5",
+        axes: { fires: null, no_false: 0.9 },
+        score: 0.9,
+        measured: true,
+        error_count: 0,
+      },
+    ]
+    render(<ProviderScoreboard cells={cells} />)
+    const row = screen.getByTestId("scoreboard-cell")
+    // Still a measured row (no "could not measure"), with the empty axis honestly "n/a".
+    expect(screen.queryByTestId("cell-unmeasured")).toBeNull()
+    expect(within(row).getByTestId("cell-fires").textContent?.toLowerCase()).toContain("n/a")
+    expect(within(row).getByTestId("cell-no-false").textContent).toContain("0.90")
   })
 })

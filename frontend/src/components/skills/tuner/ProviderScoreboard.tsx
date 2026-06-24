@@ -25,6 +25,17 @@
  * SERVER-computed scores ONLY — it never recomputes the held-out split or `(fires+no_false)/2`
  * client-side (the honesty boundary, T-123.1-02-01). It stays a pure cells-in render so
  * Plan 04 can mount a second instance for the baseline candidate's D-04 standalone block.
+ *
+ * Phase 123.1 Plan 08 Task 1 (TT-12 render half) — the UNMEASURED-cell honesty branch
+ * (T-123.1-08-01). 123.1-06 marks an all-error provider column `measured: false` /
+ * `score: null` (every classify call RAISED — we could not measure, distinct from a
+ * measured 0.00). Such a cell now renders a muted "could not measure" row — the
+ * provider·model column is KEPT (so the author sees WHICH column failed) but the score
+ * number, the colored magnitude bar, and the fires/no-false sub-scores are NOT rendered:
+ * rendering a fabricated 0.00 / a 1.00 axis for an unmeasured column is the exact lie
+ * TT-12 closes. A single individually-null axis (one axis measured, the other had no
+ * cases) renders "n/a" for that axis. `fmt`/`railTone`/`scoreTone` are never called with
+ * null — the unmeasured branch short-circuits before them, and a null axis renders "n/a".
  */
 import { cn } from "@/lib/utils"
 import type { TunerCell } from "@/lib/api"
@@ -65,15 +76,63 @@ function scoreTone(score: number): { text: string; bar: string } {
   return { text: "text-[hsl(0_80%_72%)]", bar: "bg-[hsl(0_80%_72%)]" }
 }
 
+/** A single sub-score (fires / no-false): "n/a" when that axis had no cases of its class
+ *  (null sentinel from 123.1-06), otherwise the honest 2dp value tinted by its rail tone. */
+function SubScore({ value, isNoFalse }: { value: number | null; isNoFalse: boolean }) {
+  if (value == null) {
+    return <span className="tabular-nums text-muted-foreground">n/a</span>
+  }
+  return <span className={cn("tabular-nums", railTone(value, isNoFalse))}>{fmt(value)}</span>
+}
+
 export function ProviderScoreboard({ cells }: Props) {
   return (
     // Vertical full-width rows (sketch 041 `.scoreboard` flex-column) — legible at 8+
     // providers, never a fixed N-column horizontal grid.
     <div data-testid="provider-scoreboard" className="flex flex-col gap-2">
       {cells.map((c) => {
-        const tone = scoreTone(c.score)
+        // TT-12 (render half): an all-error / wholly-unmeasured cell (measured === false OR
+        // score == null) renders an HONEST "could not measure" row — provider·model kept,
+        // NO fabricated number / bar / sub-scores. A measured 0.00 (real failures) is
+        // DISTINCT and falls through to the normal render below.
+        if (c.measured === false || c.score == null) {
+          return (
+            <div
+              key={`${c.provider}:${c.model}`}
+              data-testid="scoreboard-cell"
+              data-cell-unmeasured="true"
+              className="rounded-lg ghost-border bg-card/40 px-3 py-2.5 grid grid-cols-[1.3fr_auto_1fr] items-center gap-3 opacity-70"
+            >
+              {/* Col 1: provider · model — KEPT so the author sees WHICH column failed. */}
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-xs font-mono font-semibold text-foreground truncate" title={c.provider}>
+                  {c.provider}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground truncate" title={c.model}>
+                  {c.model}
+                </span>
+              </div>
+              {/* Cols 2+3 collapse into one honest label — no number, no bar, no sub-scores. */}
+              <div
+                data-testid="cell-unmeasured"
+                className="col-span-2 flex items-center gap-2 text-[11px] font-mono text-muted-foreground"
+              >
+                <span className="uppercase tracking-wider">could not measure</span>
+                {c.error_count != null && c.error_count > 0 && (
+                  <span className="text-[10px] opacity-80">
+                    ({c.error_count} call{c.error_count === 1 ? "" : "s"} failed)
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        // Measured cell — score is guaranteed non-null here (the branch above returned for null).
+        const score = c.score
+        const tone = scoreTone(score)
         // Bar width is the SERVER combined score (0..1) → %, clamped to [0,100].
-        const width = `${Math.max(0, Math.min(100, Math.round(c.score * 100)))}%`
+        const width = `${Math.max(0, Math.min(100, Math.round(score * 100)))}%`
         return (
           <div
             key={`${c.provider}:${c.model}`}
@@ -96,7 +155,7 @@ export function ProviderScoreboard({ cells }: Props) {
                 data-testid="cell-score"
                 className={cn("text-base font-mono font-bold tabular-nums", tone.text)}
               >
-                {fmt(c.score)}
+                {fmt(score)}
               </span>
               <span className="text-[9px] uppercase tracking-wider font-mono text-muted-foreground">score</span>
             </div>
@@ -118,11 +177,11 @@ export function ProviderScoreboard({ cells }: Props) {
               <div className="flex items-center justify-between gap-3 text-[11px] font-mono">
                 <span data-testid="cell-fires" className="flex items-center gap-1.5">
                   <span className="text-muted-foreground">fires</span>
-                  <span className={cn("tabular-nums", railTone(c.axes.fires, false))}>{fmt(c.axes.fires)}</span>
+                  <SubScore value={c.axes.fires} isNoFalse={false} />
                 </span>
                 <span data-testid="cell-no-false" className="flex items-center gap-1.5">
                   <span className="text-muted-foreground">no-false</span>
-                  <span className={cn("tabular-nums", railTone(c.axes.no_false, true))}>{fmt(c.axes.no_false)}</span>
+                  <SubScore value={c.axes.no_false} isNoFalse={true} />
                 </span>
               </div>
             </div>
