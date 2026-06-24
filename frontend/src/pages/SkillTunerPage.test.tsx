@@ -213,6 +213,83 @@ describe("SkillTunerPage — a transient SSE timeout is NOT a run failure (recon
   })
 })
 
+describe("SkillTunerPage — rehydration, empty state, cost preview, D-04 block (D-03/D-04/D-07/D-12)", () => {
+  const LATEST_RUN = {
+    skill_id: "skill-1",
+    run_id: "run-persisted",
+    scoreboard: SCOREBOARD,
+    builder_model: "claude-opus-4",
+    target_count: 5,
+    case_count: 12,
+    updated_at: new Date().toISOString(),
+  }
+
+  it("D-07: a persisted latest run rehydrates the scoreboard on open (survives refresh)", async () => {
+    getTunerLatest.mockResolvedValue(LATEST_RUN)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    // The completed result re-renders WITHOUT running a new benchmark.
+    const cards = await screen.findAllByTestId("candidate-card")
+    expect(cards.length).toBeGreaterThanOrEqual(2)
+    expect(startTunerRun).not.toHaveBeenCalled()
+  })
+
+  it("D-07: a null/404 (no run yet) leaves the empty/initial state and throws NO error", async () => {
+    getTunerLatest.mockResolvedValue(null)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    // No candidates, no scoreboard cells, no failure copy — the calm empty state.
+    expect(screen.queryByTestId("candidate-card")).toBeNull()
+    expect(screen.queryByText(/the tuning run failed/i)).toBeNull()
+    // The empty/initial prompt renders.
+    expect(screen.getByText(/run the benchmark to score candidate descriptions/i)).toBeTruthy()
+  })
+
+  it("D-12: the pre-run cost preview shows the CONFIGURED-TARGET model count (has_key && non-empty models)", async () => {
+    // SETTINGS_2_CONFIGURED has exactly 2 has_key && non-empty-models providers; the
+    // keyed-but-empty-models and models-but-no-key providers MUST be excluded.
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    const preview = await screen.findByTestId("cost-preview")
+    // Pre-run (no kickoff yet) the count is populated from configured targets → 2 models.
+    await waitFor(() => expect(preview.textContent).toMatch(/×\s*2\s*models/i))
+  })
+
+  it("D-04: a standalone per-provider scoreboard block renders from the baseline candidate", async () => {
+    getTunerLatest.mockResolvedValue(LATEST_RUN)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    // The D-04 standalone block wraps a ProviderScoreboard fed the baseline candidate's cells.
+    const block = await screen.findByTestId("baseline-scoreboard")
+    expect(within(block).getByTestId("provider-scoreboard")).toBeTruthy()
+    // The baseline candidate's single openai cell renders in the standalone block.
+    expect(within(block).getAllByTestId("scoreboard-cell")).toHaveLength(1)
+  })
+
+  it("D-12: attribution renders 'Built by {builder model} · measured on N models' from persisted metadata", async () => {
+    getTunerLatest.mockResolvedValue(LATEST_RUN)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    const attribution = await screen.findByTestId("run-attribution")
+    expect(attribution.textContent).toMatch(/built by/i)
+    expect(attribution.textContent).toContain("claude-opus-4")
+    expect(attribution.textContent).toMatch(/measured on\s*5\s*models/i)
+  })
+})
+
+describe("SkillTunerPage — full-width results layout (D-03)", () => {
+  it("the results area is NOT wedged into the 50/50 split column", async () => {
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    // The results region is a full-width / materially-wider section (its own testid),
+    // not a half-column of a 50/50 grid.
+    const results = await screen.findByTestId("tuner-results")
+    expect(results).toBeTruthy()
+    // The old 50/50 split class is gone from the rendered tree.
+    expect(document.body.querySelector(".lg\\:grid-cols-\\[minmax\\(0\\,1fr\\)_minmax\\(0\\,1fr\\)\\]")).toBeNull()
+  })
+})
+
 describe("LiveRunCard — queued ≠ running, stable never-vanishing timer (T-123-05-03)", () => {
   const lanes: ProviderLane[] = [
     { provider: "openai", model: "gpt-5.4-mini", status: "running" },

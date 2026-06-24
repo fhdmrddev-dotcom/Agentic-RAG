@@ -116,13 +116,9 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   //         pre-run cost preview, mirroring the backend `configured_targets` presence filter.
   //    The effect guards against a skill-switch race: a stale resolution is dropped. ──
   useEffect(() => {
-    if (!skillId) {
-      setCases([])
-      setScoreboard(null)
-      setLatestRun(null)
-      setConfiguredTargetCount(null)
-      return
-    }
+    // With no skill the surface renders the calm guard (see the early `if (!skillId)`
+    // return below), so stale results are never shown — no synchronous reset needed.
+    if (!skillId) return
     let cancelled = false
 
     // 1. Hydrate the case editor from the backend's seeded cases (real provenance).
@@ -324,6 +320,24 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
     [skillId, updateSkill],
   )
 
+  // ── D-04 standalone block: the BASELINE candidate is the current/live description
+  //    (TunerCandidate.is_baseline). Its `cells` feed a standalone ProviderScoreboard at
+  //    the top of the results area — distinct from the per-candidate grids. Server scores
+  //    only (no client fabrication). ──
+  const baselineCandidate = useMemo(
+    () => scoreboard?.candidates.find((c) => c.is_baseline) ?? null,
+    [scoreboard],
+  )
+
+  // ── D-12 pre-run cost-preview model count: the persisted run's target_count (once a
+  //    run has completed) takes precedence as the authoritative measured count; before
+  //    any run, fall back to the live configured-target count, then to the in-flight
+  //    `targets` once a kickoff sets it. ──
+  const previewModelCount =
+    runPhase === "running" && targets.length > 0
+      ? targets.length
+      : (latestRun?.target_count ?? configuredTargetCount)
+
   if (!skillId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -381,8 +395,11 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 px-8 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              {/* LEFT: current description + case editor + run config. */}
+            /* D-03: a NARROW left config rail + a materially-WIDER results column — the
+               results no longer wedge into a 50/50 half, they get all remaining width.
+               On narrow widths it stacks (single column). */
+            <div className="grid gap-6 px-8 py-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+              {/* LEFT (narrow rail): current description + case editor + run config. */}
               <div className="flex flex-col gap-5 min-w-0">
                 {/* The CURRENT live description — "drives firing" honesty label. */}
                 <section className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
@@ -400,11 +417,15 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
 
                 <CaseEditor cases={cases} onChange={setCases} skill={skill} />
 
-                {/* Run config / kickoff bar (cases × N models × 3 repeats). */}
+                {/* Run config / kickoff bar (cases × N models × 3 repeats). The model
+                    count is the CONFIGURED-TARGET count pre-run (D-12) — populated on
+                    open, not empty until kickoff. */}
                 <div className="flex items-center justify-between rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
-                  <p className="text-xs text-muted-foreground">
+                  <p data-testid="cost-preview" className="text-xs text-muted-foreground">
                     {cases.length} case{cases.length === 1 ? "" : "s"}
-                    {targets.length > 0 ? ` × ${targets.length} model${targets.length === 1 ? "" : "s"}` : ""} × 3 repeats
+                    {previewModelCount != null
+                      ? ` × ${previewModelCount} model${previewModelCount === 1 ? "" : "s"}`
+                      : ""} × 3 repeats
                   </p>
                   <Button size="sm" onClick={startRun} disabled={runPhase === "running"}>
                     {runPhase === "running" ? "Running…" : "Run tuning"}
@@ -412,8 +433,34 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                 </div>
               </div>
 
-              {/* RIGHT: live run + scoreboard + candidate cards. */}
-              <div className="flex flex-col gap-5 min-w-0">
+              {/* RIGHT (full-remaining-width results): D-04 standalone block + live run +
+                  candidate cards + attribution. */}
+              <div data-testid="tuner-results" className="flex flex-col gap-5 min-w-0">
+                {/* D-04 standalone per-provider scoreboard for the BASELINE (current/live
+                    description) — distinct from the per-candidate grids. Server cells only. */}
+                {baselineCandidate && baselineCandidate.cells.length > 0 && (
+                  <section
+                    data-testid="baseline-scoreboard"
+                    className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-[10px] uppercase tracking-wider font-mono text-primary">
+                        current description · per-provider scores
+                      </span>
+                      {latestRun && (
+                        <span
+                          data-testid="run-attribution"
+                          className="text-[10px] font-mono text-muted-foreground text-right"
+                        >
+                          Built by {latestRun.builder_model} · measured on {latestRun.target_count} model
+                          {latestRun.target_count === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </div>
+                    <ProviderScoreboard cells={baselineCandidate.cells} />
+                  </section>
+                )}
+
                 {(runPhase === "running" || runPhase === "error") && (
                   <LiveRunCard
                     lanes={lanes}
