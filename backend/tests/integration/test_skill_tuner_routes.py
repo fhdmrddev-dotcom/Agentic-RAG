@@ -29,7 +29,7 @@ from app.api import skill_tuner
 from app.dependencies import get_current_user, get_redis, get_supabase
 from app.main import app
 from app.services.skill_tuner_service import TriggerDecision
-from tests.integration._run_helpers import _build_mock_supabase, _make_result
+from tests.integration._run_helpers import _build_mock_supabase, _make_result, _make_table_builder
 
 OWNER = {"id": "00000000-0000-0000-0000-000000000001", "email": "owner@example.com"}
 OTHER_USER = {"id": "00000000-0000-0000-0000-000000000099", "email": "other@example.com"}
@@ -101,6 +101,48 @@ def _supabase_returning_skill(rows):
     sb = _build_mock_supabase()
     skills_builder = sb.table("skills")
     skills_builder.execute.side_effect = lambda *a, **k: _make_result(rows)
+    return sb
+
+
+# ── Phase 123.1 Plan 01 — tuner_runs durable-persistence + seeded-cases helpers ──
+def _supabase_with_tuner_runs(skill_rows, *, store=None):
+    """Mock supabase whose ``skills`` SELECT returns ``skill_rows`` AND whose ``tuner_runs``
+    table simulates the live latest-per-skill upsert/read.
+
+    ``store`` is a dict that backs the (single, UNIQUE(skill_id)) latest row: an upsert
+    OVERWRITES it (latest-wins via on_conflict=skill_id), a select returns the stored row.
+    Recorded upsert payloads land in ``store['_upserts']`` so a test can assert the
+    on_conflict key + that a re-run overwrote (one row) rather than accumulating.
+    """
+    if store is None:
+        store = {}
+    store.setdefault("_upserts", [])
+    store.setdefault("_row", None)
+
+    sb = _supabase_returning_skill(skill_rows)
+    tr = _make_table_builder(lambda *a, **k: _make_result(
+        [store["_row"]] if store["_row"] is not None else []
+    ))
+
+    def _upsert(payload, *a, **k):
+        # Record the upsert + the on_conflict kwarg, then OVERWRITE the single stored row
+        # (latest-wins — UNIQUE(skill_id)). Returns ``tr`` so ``.upsert(...).execute()`` chains.
+        store["_upserts"].append({"payload": payload, "kwargs": k})
+        store["_row"] = dict(payload)
+        return tr
+
+    tr.upsert.side_effect = _upsert
+
+    # Route the tuner_runs table to ``tr``; keep skills routed to the owner-scope mock.
+    _orig_table = sb.table.side_effect
+
+    def _route(name):
+        if name == "tuner_runs":
+            return tr
+        return _orig_table(name)
+
+    sb.table.side_effect = _route
+    sb._tuner_store = store  # test handle
     return sb
 
 
@@ -395,3 +437,277 @@ async def test_duplicate_concurrent_run_returns_409():
 
     assert resp.status_code == 409, \
         f"expected 409 for a duplicate concurrent run; got {resp.status_code} body={resp.text}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 123.1 Plan 01 — durable latest-per-skill persistence (D-07) + GET-latest
+# (D-08, owner-scoped 404) + seeded-cases GET with provenance (D-05).
+#
+# These mirror the existing cross-user-404 shape verbatim. RED until Task 3 ships
+# the two GET routes + the run_in_threadpool upsert in _run_tuner_job (and Task 2
+# applies the live tuner_runs table for the persistence assertions).
+# ═══════════════════════════════════════════════════════════════════════════════
+GLOBAL_SKILL_ID = str(uuid4())
+
+
+# ── 6. GET-latest cross-user → 404 (the load-bearing leak-safety assertion) ──────
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_get_latest_cross_user_returns_404():
+    """GET .../tuner/runs/latest for a skill owned by ANOTHER user (not global) → 404
+    (D-08 / V4). The owner-scope ``.or_(own,global)`` SELECT returns no row for OTHER_USER;
+    the route 404s (NOT 403 — never leak existence) BEFORE any tuner_runs read."""
+    sb = _supabase_returning_skill([])  # owner-scope filter finds NO row for OTHER_USER
+    fake_redis = _FakeRedis()
+    skills_execute_called = []
+    sb.table("skills").execute.side_effect = lambda *a, **k: (
+        skills_execute_called.append((a, k)) or _make_result([])
+    )
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/skills/{SKILL_ID}/tuner/runs/latest",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 404, \
+        f"expected 404 (NOT 403) on cross-user GET-latest; got {resp.status_code} body={resp.text}"
+    assert resp.json().get("detail") == "Skill not found", \
+        f"expected detail 'Skill not found'; got {resp.json()!r}"
+    # Anti-false-RED: the owner-scope SELECT must have actually run (route registered).
+    assert skills_execute_called, \
+        "expected skills ownership SELECT to be called (latest route may not be registered)"
+
+
+# ── 7. GET-latest on a GLOBAL skill is visible to a second user (owner-OR-global) ─
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_get_latest_global_skill_visible():
+    """A GLOBAL skill's latest tuner run is readable by a SECOND user (the owner-OR-global
+    gate — D-08). OTHER_USER (not the skill's owner) passes the ``.or_(own,global)`` gate
+    because is_global=true, and reads the stored latest scoreboard."""
+    global_skill = {"id": GLOBAL_SKILL_ID, "name": "Shared Skill", "description": "A shared skill.",
+                    "user_id": OWNER["id"], "is_global": True}
+    stored = {"_row": {
+        "skill_id": GLOBAL_SKILL_ID, "user_id": OWNER["id"], "run_id": str(uuid4()),
+        "scoreboard": {"skill_id": GLOBAL_SKILL_ID, "candidates": [], "winner_index": None,
+                       "winner_description": None},
+        "builder_model": "gpt-5.4-mini", "target_count": 1, "case_count": 4,
+    }}
+    sb = _supabase_with_tuner_runs([global_skill], store=stored)
+    fake_redis = _FakeRedis()
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER  # NOT the owner
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/skills/{GLOBAL_SKILL_ID}/tuner/runs/latest",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 200, \
+        f"expected 200 (global skill visible to second user); got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    assert body.get("scoreboard", body).get("skill_id") == GLOBAL_SKILL_ID \
+        or body.get("skill_id") == GLOBAL_SKILL_ID, \
+        f"expected the stored scoreboard for the global skill; got {body!r}"
+
+
+# ── 8. After a run the latest result PERSISTS (the D-07 durable upsert) ───────────
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_latest_result_persists_after_run():
+    """After ``_run_tuner_job`` completes, the latest scoreboard is upserted into tuner_runs
+    (one row for that skill_id) and GET-latest returns it — survives a Redis flush (D-07)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        # Task 3 threads ``supabase`` into _run_tuner_job for the durable upsert.
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis,
+            run_id=run_id,
+            skill_id=SKILL_ID,
+            skill=skill_row,
+            cases=cases,
+            targets=targets,
+            n=2,
+            user_id=OWNER["id"],
+            supabase=sb,
+        )
+
+    # The durable upsert ran with on_conflict=skill_id (the latest-wins key — D-07).
+    upserts = sb._tuner_store["_upserts"]
+    assert upserts, "expected a tuner_runs upsert after the run completed (D-07 persistence)"
+    on_conflict = upserts[-1]["kwargs"].get("on_conflict")
+    assert on_conflict == "skill_id", \
+        f"expected on_conflict='skill_id' (latest-wins UNIQUE(skill_id)); got {on_conflict!r}"
+    assert upserts[-1]["payload"].get("skill_id") == SKILL_ID
+    assert upserts[-1]["payload"].get("user_id") == OWNER["id"]
+
+    # Drop the Redis result stash (simulate a flush) — GET-latest must STILL return the row.
+    fake_redis.kv.pop(f"tuner_result:{run_id}", None)
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OWNER
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/skills/{SKILL_ID}/tuner/runs/latest",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 200, \
+        f"expected 200 from GET-latest after a run (durable, survives Redis flush); " \
+        f"got {resp.status_code} body={resp.text}"
+
+
+# ── 9. A re-run OVERWRITES the latest row (UNIQUE(skill_id) — never accumulates) ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_rerun_overwrites_latest():
+    """A second run for the SAME skill upserts on_conflict=skill_id — the stored latest row is
+    OVERWRITTEN (one row, latest-wins), never a second accumulated row (D-07)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load=False, skill_name=None)
+
+    cases = [{"prompt": "x", "should_fire": True}, {"prompt": "y", "should_fire": False}]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        # Two runs for the same skill_id.
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=uuid4(), skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=1, user_id=OWNER["id"], supabase=sb,
+        )
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=uuid4(), skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=1, user_id=OWNER["id"], supabase=sb,
+        )
+
+    upserts = sb._tuner_store["_upserts"]
+    assert len(upserts) == 2, f"expected exactly 2 upsert calls (one per run); got {len(upserts)}"
+    # Both upserts carry the latest-wins key — the stored backing is a SINGLE row (overwritten).
+    for u in upserts:
+        assert u["kwargs"].get("on_conflict") == "skill_id", \
+            f"every re-run upsert must use on_conflict='skill_id'; got {u['kwargs']!r}"
+    assert sb._tuner_store["_row"] is not None, "expected a single stored latest row after re-run"
+    assert sb._tuner_store["_row"]["skill_id"] == SKILL_ID
+
+
+# ── 10. Seeded-cases GET returns should_fire + should_not WITH provenance (D-05) ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_seeded_cases_returned():
+    """GET .../tuner/cases/seeded returns should_fire + should_not cases WITH provenance
+    (seeded/sibling) for an OWNED skill (D-05). Cross-user → 404 (owner-scoped, no catalog
+    leak)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+
+    # Owner reads seeded cases — sibling fetch returns one sibling (owner-scoped), so the
+    # should_not list carries a 'sibling'-provenance entry + the generic 'seeded' off-topic set.
+    sibling = {"id": str(uuid4()), "name": "Email Drafter", "description": "Draft an email."}
+    with patch.object(skill_tuner.skill_tuner_service, "fetch_owner_scoped_siblings",
+                      new=lambda *a, **k: [sibling]):
+        app.dependency_overrides[get_supabase] = lambda: sb
+        app.dependency_overrides[get_current_user] = lambda: OWNER
+        app.dependency_overrides[get_redis] = lambda: fake_redis
+        try:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                resp = await c.get(
+                    f"/skills/{SKILL_ID}/tuner/cases/seeded",
+                    headers={"Authorization": "Bearer test-token"},
+                )
+        finally:
+            app.dependency_overrides.pop(get_supabase, None)
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 200, \
+        f"expected 200 from seeded-cases for an owned skill; got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    assert body.get("should_fire"), "expected non-empty should_fire seeded cases"
+    assert body.get("should_not"), "expected non-empty should_not seeded cases"
+    # Every entry carries a prompt + provenance; provenance is seeded or sibling, never 'held'.
+    all_provenances = {item["provenance"] for item in body["should_fire"] + body["should_not"]}
+    assert all("prompt" in item and "provenance" in item
+               for item in body["should_fire"] + body["should_not"]), \
+        f"every seeded case must carry prompt+provenance; got {body!r}"
+    assert "seeded" in all_provenances, f"expected at least one 'seeded' provenance; got {all_provenances!r}"
+    assert "sibling" in all_provenances, \
+        f"expected a 'sibling'-provenance should_not (the owner-scoped false-fire rail); got {all_provenances!r}"
+    assert "held" not in all_provenances, f"'held' must never be a seed provenance; got {all_provenances!r}"
+
+    # Cross-user → 404 (owner-scoped; no sibling-catalog leak).
+    sb_other = _supabase_returning_skill([])  # no row for OTHER_USER
+    other_called = []
+    sb_other.table("skills").execute.side_effect = lambda *a, **k: (
+        other_called.append(1) or _make_result([])
+    )
+    app.dependency_overrides[get_supabase] = lambda: sb_other
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER
+    app.dependency_overrides[get_redis] = lambda: _FakeRedis()
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp2 = await c.get(
+                f"/skills/{SKILL_ID}/tuner/cases/seeded",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp2.status_code == 404, \
+        f"expected 404 on cross-user seeded-cases; got {resp2.status_code} body={resp2.text}"
+    assert other_called, "expected the owner-scope SELECT to run (seeded route may not be registered)"
