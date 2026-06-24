@@ -465,6 +465,11 @@ async def _run_tuner_job(
                 "cells": per_target_cells,
                 "held_out_score": held_out_score,
                 "is_baseline": (cand_idx == 0 and baseline == candidate_desc),
+                # Phase 123.1 (WR-05): a candidate is "measured" iff at least one cell measured
+                # (i.e. _measured_scores is non-empty). When NO candidate measured anything, the
+                # held_out_score above is the 0.0 unmeasured FALLBACK — pick_winner must NOT badge
+                # a noise winner from that, so it returns None and winner_index is recorded None.
+                "measured": bool(_measured_scores),
             })
             await _emit_tuner(
                 redis, run_id, EVENT_PROGRESS,

@@ -547,15 +547,37 @@ def cell_score(cell: dict) -> float | None:
     return (float(fires or 0.0) + float(no_false or 0.0)) / 2.0
 
 
+def _candidate_is_measured(candidate: dict) -> bool:
+    """True iff a scored candidate has AT LEAST ONE measured cell. The job marks the candidate
+    with a ``measured`` flag (preferred), but fall back to inspecting the cells so a hand-built
+    candidate dict still works: a candidate is measured iff any of its cells is measured=True
+    (an all-error / wholly-unmeasured candidate has ZERO measured cells)."""
+    if "measured" in candidate:
+        return bool(candidate["measured"])
+    return any(c.get("measured") for c in candidate.get("cells", []))
+
+
 def pick_winner(candidates: list[dict]) -> dict | None:
     """Pick the winning candidate by HELD-OUT score, NEVER by train (Pitfall —
     pick-by-train forbidden). Each candidate dict must carry a ``held_out_score`` (the
     aggregated held-out number). A candidate that wins TRAIN but loses HELD-OUT is NOT
     selected. Returns the winning candidate dict, or None when there are no candidates.
-    """
+
+    WR-05 (honest winner): a winner is only picked from candidates that ACTUALLY measured
+    something. When NO candidate has any measured cell (e.g. every provider all-errored), every
+    ``held_out_score`` is the 0.0 unmeasured FALLBACK — picking index 0 from that would badge a
+    "winner" chosen by noise (the same lie TT-12 closes for cells, leaking back at the candidate
+    level). In that case return ``None`` so the route records ``winner_index = None`` and the UI
+    renders "could not measure — no winner" instead of confirming a noise winner. When at least
+    one candidate measured, the winner is picked from the MEASURED candidates only (a measured
+    0.0 still beats an unmeasured one)."""
     if not candidates:
         return None
-    return max(candidates, key=lambda c: c.get("held_out_score", 0.0))
+    measured = [c for c in candidates if _candidate_is_measured(c)]
+    if not measured:
+        # No candidate measured anything — there is no honest winner (do not default to index 0).
+        return None
+    return max(measured, key=lambda c: c.get("held_out_score", 0.0))
 
 
 # ── N-column configured-target adaptivity (Pattern 4 / 042-A) ───────────────────

@@ -1343,6 +1343,84 @@ async def test_target_count_equals_len_targets_when_all_measure():
     )
 
 
+# ── WR-05 — an all-unmeasured run picks NO winner (winner_index None, not noise index 0) ──
+def test_pick_winner_returns_none_when_no_candidate_measured():
+    """WR-05 (unit): pick_winner returns None when NO candidate has any measured cell — the
+    held_out_score is the 0.0 unmeasured fallback for ALL of them, so defaulting to index 0
+    would badge a noise winner. A candidate is 'measured' iff it carries measured=True (or has a
+    measured cell). When at least one candidate measured, the winner is picked from the measured
+    set only (a measured 0.0 beats an unmeasured candidate)."""
+    from app.services import skill_tuner_service as svc
+
+    # All-unmeasured: every candidate scored on zero measured columns (held_out_score=0.0 fallback).
+    all_unmeasured = [
+        {"index": 0, "description": "baseline", "held_out_score": 0.0, "measured": False,
+         "cells": [{"provider": "minimax", "model": "m", "measured": False, "score": None}]},
+        {"index": 1, "description": "v2", "held_out_score": 0.0, "measured": False,
+         "cells": [{"provider": "minimax", "model": "m", "measured": False, "score": None}]},
+    ]
+    assert svc.pick_winner(all_unmeasured) is None, (
+        "an all-unmeasured run must pick NO winner (None), never default to index 0 (WR-05)"
+    )
+
+    # Mixed: a measured candidate (even a measured 0.0) wins over an unmeasured one.
+    mixed = [
+        {"index": 0, "description": "unmeasured", "held_out_score": 0.0, "measured": False,
+         "cells": [{"provider": "minimax", "model": "m", "measured": False, "score": None}]},
+        {"index": 1, "description": "measured-zero", "held_out_score": 0.0, "measured": True,
+         "cells": [{"provider": "openai", "model": "gpt", "measured": True, "score": 0.0}]},
+    ]
+    winner = svc.pick_winner(mixed)
+    assert winner is not None and winner["index"] == 1, (
+        f"a MEASURED candidate must win over an unmeasured one (even at score 0.0); got {winner!r}"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_all_error_run_records_no_winner():
+    """End-to-end WR-05: a run where EVERY target's classify always raises (wholly unmeasured)
+    persists a scoreboard with winner_index=None / winner_description=None — the job never
+    badges a noise winner from a degenerate signal."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        raise RuntimeError("simulated all-400 provider — could not measure")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=run_id, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=sb,
+        )
+
+    scoreboard = sb._tuner_store["_row"]["scoreboard"]
+    assert scoreboard["candidates"], "expected scored candidates (each with unmeasured cells)"
+    assert scoreboard["winner_index"] is None, (
+        f"a wholly-unmeasured run must record winner_index None, NOT a noise index 0; "
+        f"got {scoreboard['winner_index']!r}"
+    )
+    assert scoreboard["winner_description"] is None, (
+        f"a wholly-unmeasured run must record winner_description None; "
+        f"got {scoreboard['winner_description']!r}"
+    )
+
+
 @pytest.mark.asyncio
 @pytest.mark.timeout(20)
 async def test_all_should_not_run_renders_fires_axis_unmeasured():
