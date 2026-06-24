@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 045 · Tuner pre-run editor at scale</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 0; }
+
+  /* ── App frame (mirrors the real focused Tuner surface) ── */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .deco-rail { width: 56px; flex-shrink: 0; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border-soft); }
+  .surface { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .surface-head { padding: 20px 32px 16px; flex-shrink: 0; border-bottom: 1px solid var(--color-border-soft); }
+  .back-link { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; margin-bottom: 12px; background: none; border: none; }
+  .back-link:hover { color: var(--color-text); }
+  .surface-title { display: flex; align-items: center; gap: 10px; }
+  .surface-title .ico { color: var(--color-primary); }
+  .surface-title h1 { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 700; margin: 0; }
+  .surface-sub { font-size: var(--text-sm); color: var(--color-text-muted); margin: 6px 0 0; max-width: 76ch; }
+  .surface-body { flex: 1; overflow-y: auto; padding: 24px 32px 64px; }
+
+  /* ── Panels ── */
+  .panel { background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
+  .panel-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); color: var(--color-primary); }
+  .desc-text { font-size: var(--text-sm); color: var(--color-text); white-space: pre-wrap; margin: 8px 0 0; line-height: 1.5; }
+  .clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* ── Section heading inside body ── */
+  .sec-eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); color: var(--color-text-dim); margin-bottom: 8px; }
+
+  /* ── Case editor ── */
+  .add-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .add-bar input { flex: 1; font-size: var(--text-sm); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text); }
+  .add-bar input:focus { outline: none; border-color: var(--color-primary-glow); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  .seg { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; font-family: var(--font-mono); font-size: 12px; }
+  .seg button { background: none; border: none; color: var(--color-text-muted); padding: 7px 12px; cursor: pointer; }
+  .seg button.on-fire { background: var(--color-primary-dim); color: var(--color-primary); }
+  .seg button.on-no { background: var(--color-danger-dim); color: hsl(0 70% 72%); }
+
+  .case-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .case-col { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); padding: 12px; background: var(--color-surface); }
+  .case-col.rail { background: hsl(0 50% 50% / 0.05); border-color: hsl(0 50% 50% / 0.18); }
+  .case-col-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .case-col-head .title { font-family: var(--font-headline); font-size: var(--text-sm); font-weight: 700; }
+  .case-col-head .sub { font-size: 11px; color: var(--color-text-muted); }
+  .case-col-head .count { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .icon-btn { background: none; border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); width: 26px; height: 26px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; }
+  .icon-btn:hover { background: var(--color-accent); color: var(--color-text); }
+
+  .case-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 4px; }
+  .case-list.capped { max-height: 340px; }
+  .case-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; background: var(--color-surface-hi); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); padding: 9px 11px; }
+  .case-row .prompt { flex: 1; min-width: 0; font-size: var(--text-sm); color: var(--color-text); line-height: 1.45; word-break: break-word; }
+  .case-row .meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding-top: 2px; }
+  .prov-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); padding: 2px 5px; border-radius: var(--radius-full); }
+  .prov-seeded { background: var(--color-primary-dim); color: var(--color-primary); }
+  .prov-sibling { background: var(--color-warning-dim); color: var(--color-warning); }
+  .prov-you { background: var(--color-success-dim); color: var(--color-success); }
+  .rm { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+  .rm:hover { color: var(--color-danger); }
+  .empty-note { font-size: 12px; font-style: italic; color: var(--color-text-dim); padding: 6px 2px; }
+
+  .cap-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); color: var(--color-warning); border-radius: var(--radius-md); padding: 7px 10px; }
+  .cap-banner button { background: none; border: none; color: var(--color-warning); text-decoration: underline; cursor: pointer; font-size: 11px; font-family: var(--font-mono); }
+  .show-more { align-self: flex-start; background: none; border: 1px dashed var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: var(--font-mono); }
+  .show-more:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+
+  /* ── Split bar ── */
+  .split { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .split-track { display: flex; height: 8px; width: 100%; border-radius: var(--radius-full); overflow: hidden; background: var(--color-muted); }
+  .split-train { background: var(--color-primary-strong); }
+  .split-held { background: var(--color-accent-violet); flex: 1; }
+  .split-label { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+
+  /* ── Run bar ── */
+  .run-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+  .cost { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted); }
+  .btn { border: 1px solid var(--color-border); background: var(--color-surface-hi); color: var(--color-text); border-radius: var(--radius-md); padding: 9px 18px; font-size: var(--text-sm); font-weight: 600; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .btn:hover { background: var(--color-accent); }
+  .btn-primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color: hsl(226 60% 12%); }
+  .btn-primary:hover { background: var(--color-primary); }
+
+  /* ── Results / scoreboard (result mode preview) ── */
+  .results-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); background: hsl(220 30% 7% / 0.5); padding: 48px 24px; color: var(--color-text-muted); }
+  .results-empty .big { font-size: 40px; opacity: 0.25; }
+  .results-empty .t { font-size: var(--text-sm); max-width: 42ch; }
+  .scoreboard { display: flex; flex-direction: column; gap: 8px; }
+  .sb-row { display: grid; grid-template-columns: 180px 1fr auto; gap: 14px; align-items: center; background: var(--color-surface-hi); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); padding: 10px 14px; }
+  .sb-prov { display: flex; flex-direction: column; min-width: 0; }
+  .sb-prov .p { font-size: var(--text-sm); font-weight: 600; }
+  .sb-prov .m { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .sb-bar { position: relative; height: 8px; flex: 1; border-radius: var(--radius-full); background: var(--color-muted); overflow: hidden; }
+  .sb-bar > span { position: absolute; inset: 0 auto 0 0; border-radius: var(--radius-full); }
+  .sb-score { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; min-width: 42px; }
+  .sb-subs { display: flex; gap: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); }
+  .sb-subs .ok { color: var(--color-success); }
+  .sb-subs .bad { color: hsl(0 70% 72%); }
+
+  /* ── Digest (variant C) ── */
+  .digest { display: flex; flex-direction: column; gap: 10px; }
+  .digest-head { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+  .digest-head .shield { font-size: 15px; }
+  .chip-cluster { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11px; background: var(--color-warning-dim); color: var(--color-warning); border: 1px solid hsl(38 92% 60% / 0.25); border-radius: var(--radius-full); padding: 4px 9px; cursor: pointer; }
+  .chip:hover { background: hsl(38 92% 60% / 0.22); }
+  .chip.gen { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .chip .x { opacity: 0.6; }
+  .chip .x:hover { opacity: 1; color: var(--color-danger); }
+  .digest-expand { align-self: flex-start; background: none; border: none; color: var(--color-text-muted); text-decoration: underline; font-size: 12px; cursor: pointer; font-family: var(--font-mono); }
+  .digest-expand:hover { color: var(--color-text); }
+
+  /* ── Layout scaffolds per variant ── */
+  /* A: editor-first wide + config rail */
+  .va-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
+  .va-grid.result { grid-template-columns: 300px minmax(0, 1fr); }
+  /* B: full-width stack */
+  .vb-stack { display: flex; flex-direction: column; gap: 20px; max-width: 1100px; }
+  /* C: narrow rail + wide empty results (today's structure, density fixed) */
+  .vc-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 24px; }
+
+  .stack-gap { display: flex; flex-direction: column; gap: 18px; }
+  .mode-result { display: none; }
+  .variant[data-mode="result"] .mode-idle { display: none; }
+  .variant[data-mode="result"] .mode-result { display: block; }
+
+  .mode-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 5px 12px; font-size: 12px; font-family: var(--font-mono); cursor: pointer; }
+  .mode-toggle:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+
+  .editor-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--text-sm); }
+  .editor-summary .n { font-family: var(--font-mono); color: var(--color-text-muted); }
+
+  .scale-pill { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .hint { font-size: 11px; color: var(--color-text-dim); margin-top: 6px; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<!-- Variant nav -->
+<div class="variant-nav">
+  <span class="label">Sketch 045 · pre-run editor at scale</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Editor-first stage</button>
+  <button class="variant-tab active" onclick="showVariant('b', event)">B: Full-width stack <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Minimal-diff (density)</button>
+</div>
+
+<!-- ════════════════ VARIANT A — Editor-first wide stage ════════════════ -->
+<div id="variant-a" class="variant" data-mode="idle" style="display:none">
+  <div class="app">
+    <div class="deco-rail"></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Skills</button>
+        <div class="surface-title">
+          <span class="ico">◎</span>
+          <h1>Trigger Tuner · weekly-report-writer</h1>
+        </div>
+        <p class="surface-sub">Benchmark when this skill should — and should NOT — fire, score candidate descriptions cross-provider, and confirm the winner.</p>
+      </div>
+      <div class="surface-body">
+
+        <!-- IDLE: editor owns the wide column; config sits in the narrow rail -->
+        <div class="mode-idle">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div class="sec-eyebrow">benchmark · edit before you run</div>
+            <button class="mode-toggle" onclick="setMode('a','result')">▶ preview run result</button>
+          </div>
+          <div class="va-grid">
+            <!-- WIDE editor -->
+            <div class="panel">
+              <div class="add-bar">
+                <input placeholder="A user prompt to benchmark…" />
+                <div class="seg"><button class="on-fire">fire</button><button>no</button></div>
+                <button class="btn">Add</button>
+              </div>
+              <div class="case-cols" data-mount="A"></div>
+              <div class="split" data-split="A"></div>
+            </div>
+            <!-- narrow config rail -->
+            <div class="stack-gap">
+              <div class="panel">
+                <div class="panel-label">current · live · drives firing</div>
+                <p class="desc-text clamp3" id="descA"></p>
+                <button class="digest-expand" onclick="toggleClamp('descA', this)">Show more</button>
+              </div>
+              <div class="panel">
+                <div class="run-bar" style="margin-top:0;">
+                  <span class="cost" data-cost="A"></span>
+                </div>
+                <button class="btn btn-primary" style="width:100%;margin-top:12px;">Run tuning</button>
+                <p class="hint">Targets = your configured providers (one representative model each). N=1 is the clean baseline, not a stub.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESULT: layout flips — results take the stage, editor demotes to a rail summary -->
+        <div class="mode-result">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div class="sec-eyebrow">results · current description · per-provider scores</div>
+            <button class="mode-toggle" onclick="setMode('a','idle')">‹ back to editing</button>
+          </div>
+          <div class="va-grid result">
+            <!-- demoted editor summary -->
+            <div class="panel">
+              <div class="editor-summary">
+                <span>Benchmark</span><span class="n" data-summary="A"></span>
+              </div>
+              <button class="btn" style="width:100%;margin-top:12px;" onclick="setMode('a','idle')">Edit cases</button>
+              <div class="split" data-split="A2" style="margin-top:14px;"></div>
+            </div>
+            <!-- wide scoreboard -->
+            <div class="panel">
+              <div class="scoreboard" data-board="A"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ VARIANT B — Full-width stack ════════════════ -->
+<div id="variant-b" class="variant" data-mode="idle">
+  <div class="app">
+    <div class="deco-rail"></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Skills</button>
+        <div class="surface-title">
+          <span class="ico">◎</span>
+          <h1>Trigger Tuner · weekly-report-writer</h1>
+        </div>
+        <p class="surface-sub">Benchmark when this skill should — and should NOT — fire, score candidate descriptions cross-provider, and confirm the winner.</p>
+      </div>
+      <div class="surface-body">
+
+        <div class="mode-idle">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div class="sec-eyebrow">benchmark · one full-width flow · no empty rail</div>
+            <button class="mode-toggle" onclick="setMode('b','result')">▶ preview run result</button>
+          </div>
+          <div class="vb-stack">
+            <div class="panel">
+              <div class="panel-label">current · live · drives firing</div>
+              <p class="desc-text clamp3" id="descB"></p>
+              <button class="digest-expand" onclick="toggleClamp('descB', this)">Show more</button>
+            </div>
+            <div class="panel">
+              <div class="add-bar">
+                <input placeholder="A user prompt to benchmark…" />
+                <div class="seg"><button class="on-fire">fire</button><button>no</button></div>
+                <button class="btn">Add</button>
+              </div>
+              <div class="case-cols" data-mount="B"></div>
+              <div class="split" data-split="B"></div>
+            </div>
+            <div class="panel">
+              <div class="run-bar" style="margin-top:0;">
+                <span class="cost" data-cost="B"></span>
+                <button class="btn btn-primary">Run tuning</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-result">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div class="sec-eyebrow">results · per-provider scores</div>
+            <button class="mode-toggle" onclick="setMode('b','idle')">‹ back to editing</button>
+          </div>
+          <div class="vb-stack">
+            <div class="panel">
+              <div class="editor-summary">
+                <span>Benchmark</span><span class="n" data-summary="B"></span>
+              </div>
+              <button class="btn" style="margin-top:12px;" onclick="setMode('b','idle')">Edit cases</button>
+            </div>
+            <div class="panel">
+              <div class="scoreboard" data-board="B"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ VARIANT C — Minimal-diff (density only) ════════════════ -->
+<div id="variant-c" class="variant" data-mode="idle" style="display:none">
+  <div class="app">
+    <div class="deco-rail"></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Skills</button>
+        <div class="surface-title">
+          <span class="ico">◎</span>
+          <h1>Trigger Tuner · weekly-report-writer</h1>
+        </div>
+        <p class="surface-sub">Benchmark when this skill should — and should NOT — fire, score candidate descriptions cross-provider, and confirm the winner.</p>
+      </div>
+      <div class="surface-body">
+        <div class="sec-eyebrow" style="margin-bottom:14px;">same layout as today — the fix is density, not structure</div>
+        <!-- today's structure preserved: narrow left rail + wide results -->
+        <div class="vc-grid">
+          <!-- narrow rail with the COMPACT editor -->
+          <div class="stack-gap">
+            <div class="panel">
+              <div class="panel-label">current · live · drives firing</div>
+              <p class="desc-text clamp3" id="descC"></p>
+              <button class="digest-expand" onclick="toggleClamp('descC', this)">Show more</button>
+            </div>
+
+            <!-- should-fire: small, real -->
+            <div class="case-col">
+              <div class="case-col-head">
+                <div><div class="title">Should fire</div><div class="sub">should-trigger recall</div></div>
+                <button class="icon-btn">+</button>
+              </div>
+              <div class="case-list" data-mount="C-fire"></div>
+            </div>
+
+            <!-- should-NOT: collapsed DIGEST (skill-name chips, not full descriptions) -->
+            <div class="case-col rail">
+              <div class="case-col-head">
+                <div><div class="title">Should NOT fire</div><div class="sub">the false-fire rail</div></div>
+                <button class="icon-btn">+</button>
+              </div>
+              <div class="digest" data-mount="C-digest"></div>
+            </div>
+
+            <div class="panel">
+              <div class="split" data-split="C"></div>
+              <div class="run-bar">
+                <span class="cost" data-cost="C"></span>
+              </div>
+              <button class="btn btn-primary" style="width:100%;margin-top:10px;">Run tuning</button>
+            </div>
+          </div>
+          <!-- wide results column (idle placeholder, exactly like today — but now the rail reads as a calm config column, not a broken wall) -->
+          <div>
+            <div class="results-empty">
+              <div class="big">◎</div>
+              <div class="t">Run the benchmark to score candidate descriptions across your configured providers.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>scale:</span>
+  <select id="scale" onchange="renderAll()">
+    <option value="6">6 skills</option>
+    <option value="20" selected>20 skills</option>
+    <option value="50">50 skills</option>
+  </select>
+  <span>cap:</span>
+  <select id="cap" onchange="renderAll()">
+    <option value="8" selected>cap 8</option>
+    <option value="12">cap 12</option>
+    <option value="999">no cap</option>
+  </select>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   Real-ish data — weekly-report-writer + sibling skill catalog.
+   Mirrors the backend auto_seed_cases shape:
+     should_fire = this skill's description + paraphrase + "Use the {name} skill."  (seeded)
+     should_not  = one entry per sibling skill DESCRIPTION (sibling) + generic off-topic (seeded)
+   ───────────────────────────────────────────────────────────── */
+const SKILL = {
+  name: "weekly-report-writer",
+  description: "Generates a weekly status report as a formatted Word document. Pulls the week's shipped work, open blockers, and key metrics, then renders a clean .docx with an executive summary, a per-workstream table, and a risks section ready to send to stakeholders."
+};
+
+const SHOULD_FIRE = [
+  { prompt: SKILL.description, provenance: "seeded" },
+  { prompt: "I need to generate a weekly status report as a formatted Word document for my team.", provenance: "seeded" },
+  { prompt: "Use the weekly-report-writer skill.", provenance: "seeded" },
+];
+
+const SIBLINGS = [
+  ["docx", "Create and edit Microsoft Word .docx documents from structured content, with headings, tables, and consistent styles."],
+  ["pptx-builder", "Build PowerPoint .pptx slide decks from an outline, applying a template and a coherent visual layout."],
+  ["pdf-extract", "Extract text, tables, and metadata from uploaded PDF files for downstream analysis and search."],
+  ["csv-analyzer", "Load a CSV, profile its columns, and answer questions with summary statistics and charts."],
+  ["data-viz", "Generate matplotlib and plotly charts from a dataset and return them as embedded images."],
+  ["email-drafter", "Draft professional emails from a short brief, matching tone and including a clear call to action."],
+  ["meeting-notes", "Summarize a meeting transcript into decisions, action items with owners, and open questions."],
+  ["invoice-generator", "Produce a formatted invoice PDF from line items, tax rate, and client billing details."],
+  ["contract-summarizer", "Summarize a legal contract into key obligations, dates, termination terms, and liability clauses."],
+  ["slide-narrator", "Write speaker notes for an existing slide deck — one concise paragraph per slide."],
+  ["financial-model", "Build a three-statement financial model from assumptions and return an .xlsx workbook."],
+  ["calendar-scheduler", "Find mutually free times across calendars and propose meeting slots."],
+  ["code-reviewer", "Review a code diff for bugs, security issues, and style, returning grouped findings."],
+  ["sql-builder", "Translate a natural-language question into a parameterized SQL query against a known schema."],
+  ["translation", "Translate text between languages while preserving formatting and domain terminology."],
+  ["resume-parser", "Parse a resume into structured fields: experience, education, skills, and contact info."],
+  ["expense-tracker", "Categorize expense receipts and produce a monthly spend summary by category."],
+  ["survey-analyzer", "Analyze survey responses, computing distributions and surfacing notable free-text themes."],
+  ["changelog-writer", "Generate a release changelog grouped by feature, fix, and breaking change from merged PR titles."],
+  ["image-caption", "Generate descriptive alt-text captions for uploaded images."],
+  ["budget-planner", "Draft a quarterly budget plan from historical spend and target growth rates."],
+  ["okr-tracker", "Track OKRs, roll up progress per objective, and flag at-risk key results."],
+  ["ticket-triager", "Classify incoming support tickets by topic, urgency, and suggested owner."],
+  ["readme-writer", "Generate a project README from the repo structure, scripts, and a short description."],
+];
+
+const GENERIC_OFF_TOPIC = [
+  "What's the weather in Tokyo today?",
+  "Tell me a joke about cats.",
+  "What's the capital of Australia?",
+  "How do I boil a perfect soft egg?",
+];
+
+const PROVIDERS = [
+  ["OpenAI",    "gpt-4o",                 0.92, 0.96, 0.88],
+  ["Anthropic", "claude-sonnet-4-6",      0.95, 0.97, 0.93],
+  ["Google",    "gemini-2.5-pro",         0.81, 0.90, 0.72],
+  ["OpenRouter","deepseek-chat",          0.74, 0.83, 0.65],
+];
+
+const esc = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* Build the seeded should_not set at the chosen scale. */
+function buildShouldNot(scale) {
+  const sibs = SIBLINGS.slice(0, scale).map(([skill, desc]) => ({ prompt: desc, provenance: "sibling", skill }));
+  const gen = GENERIC_OFF_TOPIC.map((p) => ({ prompt: p, provenance: "seeded" }));
+  return sibs.concat(gen);
+}
+
+function provTag(p) {
+  const cls = p === "sibling" ? "prov-sibling" : p === "you" ? "prov-you" : "prov-seeded";
+  return `<span class="prov-tag ${cls}">${p}</span>`;
+}
+
+function caseRow(c) {
+  return `<div class="case-row"><span class="prompt">${esc(c.prompt)}</span>` +
+    `<span class="meta">${provTag(c.provenance)}<button class="rm" onclick="this.closest('.case-row').remove()" title="Remove">✕</button></span></div>`;
+}
+
+/* heldOf — mirror backend split_held_out per class (60/40). */
+function heldOf(n){ if(!n) return 0; let cut=Math.floor(n*0.6); if(cut>=n&&n>=2) cut=n-1; return n-cut; }
+
+function renderSplit(el, total){
+  const held = heldOf(SHOULD_FIRE.length) + heldOf(total - SHOULD_FIRE.length >= 0 ? (total - SHOULD_FIRE.length) : 0);
+  // simpler: held over the full set split per class is approximated here for the bar
+  const trainPct = total>0 ? Math.round(((total-held)/total)*100) : 60;
+  el.innerHTML = `<div class="split-track"><div class="split-train" style="width:${trainPct}%"></div><div class="split-held"></div></div>` +
+    `<div class="split-label">${total-held} train (~60%) · ${held} held-out (~40%) — the winner is picked by held-out</div>`;
+}
+
+/* Standard two-column renderer (variants A & B). Caps the should-NOT seed with a banner + show-all. */
+function renderColumns(mount, scale, cap){
+  const notAll = buildShouldNot(scale);
+  const shown = notAll.slice(0, cap);
+  const hidden = notAll.length - shown.length;
+
+  const fireHtml = SHOULD_FIRE.map(caseRow).join("");
+  let notHtml = shown.map(caseRow).join("");
+  if (hidden > 0) {
+    notHtml = `<div class="cap-banner"><span>showing ${shown.length} of ${notAll.length} seeded · capped to keep the benchmark focused</span>` +
+      `<button onclick="revealAll(this, ${JSON.stringify(scale)})">show all ${notAll.length}</button></div>` + notHtml;
+  }
+
+  mount.innerHTML =
+    `<div class="case-col">
+       <div class="case-col-head">
+         <div><div class="title">Should fire</div><div class="sub">should-trigger recall</div></div>
+         <div class="count">${SHOULD_FIRE.length}</div>
+       </div>
+       <div class="case-list capped scrollbar-thin">${fireHtml}</div>
+     </div>
+     <div class="case-col rail">
+       <div class="case-col-head">
+         <div><div class="title">Should NOT fire</div><div class="sub">the false-fire rail</div></div>
+         <div class="count">${notAll.length}</div>
+       </div>
+       <div class="case-list capped scrollbar-thin" data-notlist="1">${notHtml}</div>
+     </div>`;
+  // stash the full set for "show all"
+  mount.querySelector('[data-notlist]')._all = notAll;
+}
+
+function revealAll(btn, scale){
+  const list = btn.closest('[data-notlist]');
+  const all = list._all || buildShouldNot(Number(scale));
+  list.innerHTML = all.map(caseRow).join("");
+}
+
+/* Variant C — compact: small should-fire list + a should-NOT DIGEST (chips, not full descriptions). */
+function renderDigest(fireMount, digestMount, scale){
+  fireMount.innerHTML = SHOULD_FIRE.map(caseRow).join("");
+
+  const notAll = buildShouldNot(scale);
+  const sibs = notAll.filter(c => c.provenance === "sibling");
+  const gens = notAll.filter(c => c.provenance === "seeded");
+  const chips = sibs.map(c => `<span class="chip" title="${esc(c.prompt)}">${esc(c.skill)} <span class="x" onclick="this.closest('.chip').remove();event.stopPropagation();">✕</span></span>`).join("") +
+    gens.map(() => `<span class="chip gen">off-topic</span>`).join("");
+
+  digestMount.innerHTML =
+    `<div class="digest-head"><span class="shield">🛡</span><span><b>${sibs.length}</b> sibling skills + <b>${gens.length}</b> off-topic prompts seeded as false-fire bait</span></div>` +
+    `<div class="chip-cluster">${chips}</div>` +
+    `<button class="digest-expand" onclick="expandDigest(this, ${JSON.stringify(scale)})">Edit all ${notAll.length} as a list →</button>`;
+}
+
+function expandDigest(btn, scale){
+  const notAll = buildShouldNot(Number(scale));
+  const wrap = document.createElement('div');
+  wrap.className = 'case-list capped scrollbar-thin';
+  wrap.style.marginTop = '8px';
+  wrap.innerHTML = notAll.map(caseRow).join("");
+  btn.replaceWith(wrap);
+}
+
+/* Scoreboard (result-mode preview) — vertical rows, magnitude bar + fires/no-false subs. */
+function renderBoard(el){
+  el.innerHTML = PROVIDERS.map(([prov, model, score, fires, nofalse]) => {
+    const tone = score >= 0.9 ? "var(--color-success)" : score >= 0.78 ? "var(--color-primary-strong)" : "var(--color-warning)";
+    return `<div class="sb-row">
+      <div class="sb-prov"><span class="p">${prov}</span><span class="m">${model}</span></div>
+      <div class="sb-bar-wrap">
+        <div class="sb-bar"><span style="width:${Math.round(score*100)}%;background:${tone};"></span></div>
+        <span class="sb-score">${score.toFixed(2)}</span>
+      </div>
+      <div class="sb-subs"><span class="ok">fires ${fires.toFixed(2)}</span><span class="bad">no-false ${nofalse.toFixed(2)}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function renderAll(){
+  const scale = Number(document.getElementById('scale').value);
+  const cap = Number(document.getElementById('cap').value);
+
+  // descriptions
+  ['descA','descB','descC'].forEach(id => { const e=document.getElementById(id); if(e) e.textContent = SKILL.description; });
+
+  const notTotal = buildShouldNot(scale).length;
+  const grandTotal = SHOULD_FIRE.length + notTotal;
+
+  // A & B columns
+  ['A','B'].forEach(k => {
+    const mount = document.querySelector(`[data-mount="${k}"]`);
+    if (mount) renderColumns(mount, scale, cap);
+    const split = document.querySelector(`[data-split="${k}"]`);
+    if (split) renderSplit(split, grandTotal);
+    const split2 = document.querySelector(`[data-split="${k}2"]`);
+    if (split2) renderSplit(split2, grandTotal);
+    const cost = document.querySelector(`[data-cost="${k}"]`);
+    if (cost) cost.textContent = `${grandTotal} cases × ${PROVIDERS.length} models × 3 repeats`;
+    const summ = document.querySelector(`[data-summary="${k}"]`);
+    if (summ) summ.textContent = `${grandTotal} cases · ${PROVIDERS.length} models`;
+    const board = document.querySelector(`[data-board="${k}"]`);
+    if (board) renderBoard(board);
+  });
+
+  // C compact
+  const cFire = document.querySelector('[data-mount="C-fire"]');
+  const cDig = document.querySelector('[data-mount="C-digest"]');
+  if (cFire && cDig) renderDigest(cFire, cDig, scale);
+  const cSplit = document.querySelector('[data-split="C"]');
+  if (cSplit) renderSplit(cSplit, grandTotal);
+  const cCost = document.querySelector('[data-cost="C"]');
+  if (cCost) cCost.textContent = `${grandTotal} cases × ${PROVIDERS.length} models × 3 repeats`;
+}
+
+function setMode(v, mode){ document.getElementById('variant-'+v).dataset.mode = mode; }
+
+function toggleClamp(id, btn){
+  const el = document.getElementById(id);
+  el.classList.toggle('clamp3');
+  btn.textContent = el.classList.contains('clamp3') ? 'Show more' : 'Show less';
+}
+
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(v => v.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  ev.target.classList.add('active');
+}
+
+// segmented fire/no toggle interactivity
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.seg') && e.target.tagName === 'BUTTON') {
+    const seg = e.target.closest('.seg');
+    seg.querySelectorAll('button').forEach(b => b.classList.remove('on-fire','on-no'));
+    e.target.classList.add(e.target.textContent.trim()==='fire' ? 'on-fire' : 'on-no');
+  }
+});
+
+renderAll();
+</script>
+</body>
+</html>
