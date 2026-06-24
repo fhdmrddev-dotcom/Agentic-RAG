@@ -34,6 +34,7 @@ import {
   startTunerRun,
   getTunerResults,
   streamTunerRun,
+  cancelTunerRun,
   getSeededCases,
   getTunerLatest,
   getSettings,
@@ -266,9 +267,26 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
           )
         },
         onProgress: (data) => {
-          // A provider whose first cell starts flips queued→running (no fake %).
+          // TT-07: the backend emits a tuner_progress event with stage="provider_start"
+          // carrying provider+model at the START of each column (BEFORE the per-case loop),
+          // so the matching lane flips queued→running the moment scoring begins — lanes no
+          // longer sit "queued" for the whole run, then jump to "done". This is the honest
+          // queued/running/done vocabulary (LiveRunCard) — provider_start only moves
+          // queued→running, never fabricates a percent.
           const prov = data.provider as string | undefined
           const mdl = data.model as string | undefined
+          if (data.stage === "provider_start" && prov) {
+            setLanes((prev) =>
+              prev.map((l) =>
+                l.provider === prov && (!mdl || l.model === mdl) && l.status === "queued"
+                  ? { ...l, status: "running" as const }
+                  : l,
+              ),
+            )
+            return
+          }
+          // Legacy/idempotent: a provider whose cell starts flips queued→running (no fake %).
+          // Harmless to keep — provider_start above is the load-bearing pre-completion signal.
           if (prov) {
             setLanes((prev) =>
               prev.map((l) =>
@@ -336,10 +354,23 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
     }
   }, [skillId, runPhase, cases])
 
-  const cancelRun = useCallback(() => {
+  const cancelRun = useCallback(async () => {
+    // TT-08: a REAL cancel — abort the local SSE AND tell the server to stop the job so it
+    // stops burning paid provider calls + releases the in-flight claim (a retry no longer
+    // 409s). The DELETE is best-effort: a failure is logged but the local UI still goes idle
+    // (the server cancel is best-effort; the UI must never get stuck "running").
     abortRef.current?.abort()
+    if (skillId && runId) {
+      try {
+        await cancelTunerRun(skillId, runId)
+      } catch (err) {
+        // Log but do NOT block the UI transition — the run is cancelled server-side or will
+        // self-clear via the TTL'd flag / claim; the local UI must not hang.
+        console.warn("tuner cancel DELETE failed (UI still goes idle)", err)
+      }
+    }
     setRunPhase("idle")
-  }, [])
+  }, [skillId, runId])
 
   // ── Author-confirm winner write (042-A / D-03): writes the live description via
   //    PATCH /skills/{id} (useSkills().updateSkill re-lints). NEVER auto-applied —

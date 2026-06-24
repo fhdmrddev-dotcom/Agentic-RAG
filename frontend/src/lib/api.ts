@@ -2739,6 +2739,23 @@ export async function getTunerResults(
   return (await res.json()) as TunerScoreboard
 }
 
+/** REALLY cancel an in-flight tuning run (Phase 123.1-07 / TT-08). Issues a DELETE so the
+ *  background job stops at its next loop checkpoint (no more paid provider calls) and the
+ *  in-flight claim is released immediately (a retry no longer 409s). Best-effort from the
+ *  caller's view: on a non-ok response it throws an ApiError so the caller CAN log it, but the
+ *  caller still transitions the UI to idle (the run is being cancelled server-side regardless,
+ *  and the local SSE is aborted). */
+export async function cancelTunerRun(skillId: string, runId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/${runId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ApiError("Failed to cancel the tuning run on the server.", res.status)
+  }
+}
+
 /** The DURABLE latest tuner result for a skill (Phase 123.1 / D-07 — survives a Redis flush /
  *  refresh). Returned by GET .../tuner/runs/latest; the `scoreboard` is the same TunerScoreboard
  *  shape carried on `tuner_complete`, plus attribution fields. */
