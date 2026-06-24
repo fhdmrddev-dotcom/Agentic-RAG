@@ -7,6 +7,14 @@
  * stream-ends), an explicit "runs in the background — reconciles on return", and
  * Cancel. A QUEUED provider shows queued, NEVER a fake percent (queued ≠ running —
  * T-123-05-03): only running/done lanes carry a meaningful affordance.
+ *
+ * Phase 123.1 Plan 08 Task 2 (TT-14 no-flash) — a "reconciling" phase. On run
+ * completion the SkillTunerPage keeps this card MOUNTED in `phase="reconciling"`
+ * (timer frozen, an honest "finishing — loading results…" footer, Cancel hidden)
+ * through the gap between the 'done' terminal and getTunerResults resolving — so the
+ * pane never flashes empty between "done" and the final scoreboard arriving. The
+ * never-vanishes timer (the 095 lesson) is preserved: elapsed freezes when phase
+ * !== "running" but the card never disappears.
  */
 import { useEffect, useState } from "react"
 import { Clock, Loader2, CheckCircle2, X } from "lucide-react"
@@ -27,7 +35,9 @@ interface Props {
   /** The STABLE run start-ts (ms epoch) — the elapsed timer derives from this and
    *  never resets on a transient stream-end (the 095 never-vanishes lesson). */
   startTs: number | null
-  phase: "running" | "error"
+  /** "reconciling" (TT-14) keeps the card mounted with a frozen timer + an honest
+   *  "finishing — loading results…" footer through the done→getTunerResults gap. */
+  phase: "running" | "reconciling" | "error"
   error: string | null
   onCancel: () => void
 }
@@ -59,10 +69,14 @@ export function LiveRunCard({ lanes, startTs, phase, error, onCancel }: Props) {
             ⏱ {elapsedS.toFixed(1)}s
           </span>
         </div>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={onCancel}>
-          <X className="h-3 w-3" />
-          Cancel
-        </Button>
+        {/* Cancel is available only while a run is actually streaming — hidden once we're
+            reconciling (the job already finished) or errored (nothing to cancel). */}
+        {phase === "running" && (
+          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={onCancel}>
+            <X className="h-3 w-3" />
+            Cancel
+          </Button>
+        )}
       </div>
 
       {/* Per-provider lanes — queued ≠ running (no fake percent on a queued lane). */}
@@ -106,6 +120,14 @@ export function LiveRunCard({ lanes, startTs, phase, error, onCancel }: Props) {
       {phase === "error" && error ? (
         <p role="alert" className="text-xs text-destructive">
           {error}
+        </p>
+      ) : phase === "reconciling" ? (
+        // TT-14: the job is done — we're loading the final scoreboard. Honest, NOT the
+        // red error and NOT the "runs in the background" idle line; the card stays mounted
+        // (no empty-pane flash) until getTunerResults resolves.
+        <p data-testid="live-run-reconciling" className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+          finishing — loading results…
         </p>
       ) : (
         <p className="text-[11px] text-muted-foreground">

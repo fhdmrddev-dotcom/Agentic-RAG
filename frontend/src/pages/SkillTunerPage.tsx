@@ -72,8 +72,10 @@ const REPRESENTATIVE_PROVIDER_IDS = new Set<string>([
 ])
 
 // The lane status vocabulary for the live run (043-A): a queued provider NEVER shows
-// a fake percent — queued ≠ running.
-type RunPhase = "idle" | "running" | "done" | "error"
+// a fake percent — queued ≠ running. "reconciling" (Phase 123.1-08 / TT-14) is the
+// post-'done' sub-state held while getTunerResults resolves: the LiveRunCard stays
+// mounted (no empty-pane flash) and the scoreboard is not nulled.
+type RunPhase = "idle" | "running" | "reconciling" | "done" | "error"
 
 export function SkillTunerPage({ skillId, onBack }: Props) {
   // The Tuner reuses useSkills() so the author-confirm winner write goes through
@@ -93,6 +95,13 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   // "showing N of M — capped" banner when the backend capped the seed. undefined = no banner
   // (no seeded fetch yet, or it failed).
   const [seededNotTotal, setSeededNotTotal] = useState<number | undefined>(undefined)
+  // Phase 123.1-08 (TT-09): an HONEST seeded-fetch-failure note. A getSeededCases failure used to
+  // silently setCases([]) → the editor showed "0 cases", the cost-preview read "0 cases × N
+  // models" as if zero were the measured truth, and the POST sent cases=[] (the backend then
+  // auto-seeds server-side and scores generic off-topic). On failure we now log the swallowed
+  // error AND set this note so the empty state is honest (the run still auto-seeds). null = no
+  // failure (cleared on a successful fetch).
+  const [seededError, setSeededError] = useState<string | null>(null)
 
   // ── Run state. The elapsed timer derives from a STABLE start-ts (the 095
   //    never-vanishes lesson) — set once at kickoff, never reset on a transient
@@ -101,6 +110,11 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   const [runId, setRunId] = useState<string | null>(null)
   const [runStartTs, setRunStartTs] = useState<number | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
+  // Phase 123.1-08 (TT-16): an HONEST non-error "still running" note shown when reconnects are
+  // exhausted but the durable latest row proves THIS run persisted server-side. It is NOT a
+  // failure (no red error) — the job keeps grinding; the author can leave and reopen. null when
+  // there's nothing to say (cleared on a fresh kickoff and whenever the run terminates honestly).
+  const [runBackgroundNote, setRunBackgroundNote] = useState<string | null>(null)
   const [targets, setTargets] = useState<TunerTarget[]>([])
   const [lanes, setLanes] = useState<ProviderLane[]>([])
   const [scoreboard, setScoreboard] = useState<TunerScoreboard | null>(null)
@@ -166,13 +180,21 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
         setCases(hydrated)
         // The uncapped sibling total drives the honest "showing N of M — capped" banner.
         setSeededNotTotal(seeded.total)
+        // A successful fetch clears any stale seeded-fetch-failure note (TT-09).
+        setSeededError(null)
       })
-      .catch(() => {
-        // A seeded-cases read failure leaves the editor empty (author can add cases
-        // manually + the run auto-seeds) — never surfaces an error toast, and no cap banner.
+      .catch((err) => {
+        // TT-09: a seeded-cases read failure is non-fatal (the author can add cases manually +
+        // the run auto-seeds server-side), but it is NEVER silent: log the swallowed error AND
+        // surface an honest inline note so the editor's "0 cases" / the cost-preview do not
+        // present zero as the measured truth.
+        console.error("tuner: getSeededCases failed", err)
         if (!cancelled) {
           setCases([])
           setSeededNotTotal(undefined)
+          setSeededError(
+            "Couldn't load the seeded benchmark cases — add cases manually, or run to auto-seed.",
+          )
         }
       })
 
@@ -230,7 +252,12 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   const startRun = useCallback(async () => {
     if (!skillId || runPhase === "running") return
     setRunError(null)
-    setScoreboard(null)
+    setRunBackgroundNote(null) // TT-16: clear any stale "still running" note on a fresh kickoff
+    // TT-14 (no-flash): do NOT null the scoreboard if a durable latest result is already shown —
+    // keep the prior scoreboard visible until the new run's result arrives (it's replaced in
+    // place on completion). Only clear when there is nothing durable to show (so a stale
+    // ephemeral scoreboard from a previous in-session run doesn't linger past a fresh kickoff).
+    if (!latestRun) setScoreboard(null)
     try {
       const started = await startTunerRun(skillId, {
         cases: cases.map((c) => ({ prompt: c.prompt, should_fire: c.should_fire })),
@@ -316,10 +343,43 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                   // events is idempotent (setLanes / setScoreboard just re-set).
                   void streamTunerRun(skillId, runIdForStream, callbacks, "0", controller.signal)
                 } else {
-                  setRunPhase("error")
-                  setRunError(
-                    "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
-                  )
+                  // TT-16: reconnects exhausted. getTunerResults still 404s (it only resolves once
+                  // the WHOLE job finishes), but the job may simply be slow — so DON'T immediately
+                  // flip to a scary red error. Poll the DURABLE latest row and keep "still running"
+                  // ONLY when its run_id matches THIS run (so a previous run's durable row can
+                  // never mask a genuinely-dead current run). A null/404 OR a mismatched row means
+                  // the current run is dead → take the honest hard-error terminal (NOT stuck).
+                  getTunerLatest(skillId)
+                    .then((latest) => {
+                      if (controller.signal.aborted) return
+                      if (latest && latest.run_id === runIdForStream) {
+                        // THIS run persisted a durable row — it's still active (or just finished
+                        // and the durable upsert landed); keep it honest, no red error.
+                        setScoreboard(latest.scoreboard)
+                        setLatestRun(latest)
+                        setRunPhase("running")
+                        setRunError(null)
+                        setRunBackgroundNote(
+                          "Still running — this is taking a while. You can leave; reopen this skill to load the finished scoreboard.",
+                        )
+                      } else {
+                        // No durable row for THIS run (null/404) OR only a PREVIOUS run's row
+                        // exists — the current run is genuinely dead. Honest hard-error terminal.
+                        setRunPhase("error")
+                        setRunError(
+                          "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
+                        )
+                      }
+                    })
+                    .catch(() => {
+                      if (controller.signal.aborted) return
+                      // The durable poll itself failed — we cannot prove the run is alive, so a
+                      // dead run must still reach an honest terminal (never stuck forever).
+                      setRunPhase("error")
+                      setRunError(
+                        "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
+                      )
+                    })
                 }
               })
             return
@@ -332,13 +392,21 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
             return
           }
 
-          setRunPhase("done")
-          // Reconcile the final scoreboard from the authoritative GET results
-          // (the SSE tuner_complete is a best-effort hint — D-v2.5-03).
+          // TT-14 (no-flash): the job is done, but getTunerResults hasn't resolved yet. Hold the
+          // card in "reconciling" (it stays MOUNTED with a frozen timer + "finishing — loading
+          // results…") rather than unmounting into an empty pane, THEN drop to "done" once the
+          // authoritative scoreboard arrives (the SSE tuner_complete is a best-effort hint —
+          // D-v2.5-03). On a results-read failure we still leave "reconciling" → "done", keeping
+          // whatever the SSE carried (never a flash, never a hard error for a finished run).
+          setRunPhase("reconciling")
           getTunerResults(skillId, runIdForStream)
-            .then(setScoreboard)
+            .then((sb) => {
+              setScoreboard(sb)
+              setRunPhase("done")
+            })
             .catch(() => {
-              /* keep the SSE-carried scoreboard if results read fails */
+              // keep the SSE-carried scoreboard if the results read fails — still leave reconciling.
+              setRunPhase("done")
             })
         },
       }
@@ -352,7 +420,8 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
           : "Couldn't start the tuning run. Please try again.",
       )
     }
-  }, [skillId, runPhase, cases])
+    // latestRun gates the TT-14 keep-scoreboard-on-kickoff behaviour.
+  }, [skillId, runPhase, cases, latestRun])
 
   const cancelRun = useCallback(async () => {
     // TT-08: a REAL cancel — abort the local SSE AND tell the server to stop the job so it
@@ -392,12 +461,16 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
     [scoreboard],
   )
 
+  // A run is "active" (in flight) while streaming OR reconciling the final scoreboard
+  // (TT-14) — both keep the LiveRunCard mounted and the Run button disabled.
+  const runActive = runPhase === "running" || runPhase === "reconciling"
+
   // ── D-12 pre-run cost-preview model count: the persisted run's target_count (once a
   //    run has completed) takes precedence as the authoritative measured count; before
   //    any run, fall back to the live configured-target count, then to the in-flight
   //    `targets` once a kickoff sets it. ──
   const previewModelCount =
-    runPhase === "running" && targets.length > 0
+    runActive && targets.length > 0
       ? targets.length
       : (latestRun?.target_count ?? configuredTargetCount)
 
@@ -482,26 +555,42 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
 
                 <CaseEditor cases={cases} onChange={setCases} skill={skill} seededNotTotal={seededNotTotal} />
 
+                {/* TT-09: an HONEST, non-fatal note when the seeded-cases fetch failed — a muted
+                    amber line (NOT a toast, NOT an error boundary). It makes the empty editor +
+                    the "0 cases" preview honest: zero is a LOAD FAILURE, not the measured truth. */}
+                {seededError && (
+                  <p
+                    data-testid="seeded-error-note"
+                    role="status"
+                    className="text-xs text-[hsl(var(--panel-status-active))] -mt-2"
+                  >
+                    {seededError}
+                  </p>
+                )}
+
                 {/* Run config / kickoff bar (cases × N models × 3 repeats). The model
                     count is the CONFIGURED-TARGET count pre-run (D-12) — populated on
                     open, not empty until kickoff. */}
                 <div className="flex items-center justify-between rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
                   <p data-testid="cost-preview" className="text-xs text-muted-foreground">
                     {cases.length} case{cases.length === 1 ? "" : "s"}
+                    {/* TT-09: when the seed fetch failed AND there are no cases, "0 cases" is a
+                        LOAD FAILURE — say so, never imply zero is the measured truth. */}
+                    {seededError && cases.length === 0 ? " (seed load failed)" : ""}
                     {previewModelCount != null
                       ? ` × ${previewModelCount} model${previewModelCount === 1 ? "" : "s"}`
                       : ""} × 3 repeats
                   </p>
-                  <Button size="sm" onClick={startRun} disabled={runPhase === "running"}>
-                    {runPhase === "running" ? "Running…" : "Run tuning"}
+                  <Button size="sm" onClick={startRun} disabled={runActive}>
+                    {runActive ? "Running…" : "Run tuning"}
                   </Button>
                 </div>
               </div>
 
-              {/* FULL-WIDTH results — only when a run is live/errored OR results exist. Pre-run
-                  with no durable result, this whole block is absent (no empty void). Reuses the
-                  EXISTING ProviderScoreboard / LiveRunCard / CandidateCard components untouched. */}
-              {(runPhase === "running" ||
+              {/* FULL-WIDTH results — only when a run is live/reconciling/errored OR results
+                  exist. Pre-run with no durable result, this whole block is absent (no empty
+                  void). Reuses the EXISTING ProviderScoreboard / LiveRunCard / CandidateCard. */}
+              {(runActive ||
                 runPhase === "error" ||
                 (baselineCandidate && baselineCandidate.cells.length > 0) ||
                 (scoreboard && scoreboard.candidates.length > 0)) && (
@@ -531,14 +620,27 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                     </section>
                   )}
 
-                  {(runPhase === "running" || runPhase === "error") && (
-                    <LiveRunCard
-                      lanes={lanes}
-                      startTs={runStartTs}
-                      phase={runPhase}
-                      error={runError}
-                      onCancel={cancelRun}
-                    />
+                  {/* TT-14: the card renders while running OR reconciling OR error — staying
+                      MOUNTED through the done→getTunerResults gap so the pane never flashes
+                      empty. The phase union now includes "reconciling" (frozen timer + an
+                      honest "finishing — loading results…" footer). */}
+                  {(runActive || runPhase === "error") && (
+                    <div className="flex flex-col gap-2">
+                      <LiveRunCard
+                        lanes={lanes}
+                        startTs={runStartTs}
+                        phase={runPhase === "error" ? "error" : runPhase === "reconciling" ? "reconciling" : "running"}
+                        error={runError}
+                        onCancel={cancelRun}
+                      />
+                      {/* TT-16: an HONEST "still running" note (not a red error) shown when
+                          reconnects exhausted but the durable latest row proved THIS run persisted. */}
+                      {runBackgroundNote && runPhase === "running" && (
+                        <p data-testid="run-background-note" role="status" className="text-[11px] text-muted-foreground px-1">
+                          {runBackgroundNote}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {scoreboard && scoreboard.candidates.length > 0 && (
