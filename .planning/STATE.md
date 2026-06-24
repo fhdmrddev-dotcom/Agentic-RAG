@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-24T20:30:56.665Z"
+last_updated: "2026-06-24T20:46:41.140Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 24
   percent: 67
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
-Plan: 5 of 10
+Plan: 6 of 10
 Status: Ready to execute
-Last activity: 2026-06-25 (123.1-07 executed — TT-07 provider_start lane flip + TT-08 real owner-scoped cancel)
+Last activity: 2026-06-24
 
 ### Quick Tasks Completed
 
@@ -245,6 +245,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P10 P10 | ~1min | 1 tasks | 2 files |
 | Phase 123.1 P06 | 7min | 2 tasks | 3 files |
 | Phase 123.1 P07 | ~12min | 2 tasks | 4 files |
+| Phase 123.1 P08 | ~10min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -303,6 +304,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 123.1]: 123.1-06 (TT-05/12/15): tuner build_cell renders an empty axis as the unmeasured sentinel None (frontend 'n/a'), never a fabricated 1.0; an all-error column (every classify raised) is measured=False + EXCLUDED from the persisted target_count; cell_score returns the single stored cell['score'] verbatim (no recompute drift). _score_axis floor + held-out math + gateway untouched.
 - [Phase ?]: Phase 123.1-07: TT-07 — _run_tuner_job emits stage='provider_start' (provider+model) at each column start via the tuner's OWN _emit_tuner (not the shared runs.py consumer); the frontend onProgress flips the matching lane queued->running on it
 - [Phase ?]: Phase 123.1-07: TT-08 — DELETE cancel route is owner-verify THEN run<->skill bind (404 cross-user/foreign run_id, mirrors CR-01), sets a TTL'd tuner_cancel:{run_id} flag + releases the inflight claim; job checks the flag at candidate AND provider loop tops, skips winner/stash/durable upsert when cancelled, still runs its finally cleanup
+- [Phase ?]: 123.1-08 (TT-12 render half): unmeasured tuner cell renders 'could not measure' from the server measured/null sentinel, never a fabricated 0.00 or 1.00 axis
+- [Phase ?]: 123.1-08 (TT-16): reconnect-exhaustion keeps 'still running' ONLY when durable getTunerLatest.run_id === active run; a null/404 or previous-run row still hits the retained 'Lost connection' terminal (no stuck run)
 
 ## Operator Next Steps
 
