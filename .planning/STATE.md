@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-24T20:18:42.422Z"
+last_updated: "2026-06-24T20:30:56.665Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
   percent: 67
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
-Last activity: 2026-06-24
+Last activity: 2026-06-25 (123.1-07 executed — TT-07 provider_start lane flip + TT-08 real owner-scoped cancel)
 
 ### Quick Tasks Completed
 
@@ -244,6 +244,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P05 | 11min | 4 tasks | 7 files |
 | Phase 123.1 P10 P10 | ~1min | 1 tasks | 2 files |
 | Phase 123.1 P06 | 7min | 2 tasks | 3 files |
+| Phase 123.1 P07 | ~12min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -300,6 +301,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123.1-05 (sketch 045-B): pre-run layout = full-width single-column stack (description -> CaseEditor -> run bar) driven off existing runPhase + scoreboard (no new mode machine); editor stays mounted so author can re-edit + re-run; results render full-width below; ProviderScoreboard/LiveRunCard/CandidateCard reused untouched.
 - [Phase 123.1]: 123.1-10 (TT-10): silenced the langsmith logger to ERROR at module scope next to the asyncio suppressor (scoped to langsmith only; ERROR-and-above still surfaces; tracing not disabled) + documented an optional commented-out LANGSMITH_TRACING_SAMPLING_RATE knob in .env.example (no Settings field — the client reads it from os.environ via load_dotenv)
 - [Phase 123.1]: 123.1-06 (TT-05/12/15): tuner build_cell renders an empty axis as the unmeasured sentinel None (frontend 'n/a'), never a fabricated 1.0; an all-error column (every classify raised) is measured=False + EXCLUDED from the persisted target_count; cell_score returns the single stored cell['score'] verbatim (no recompute drift). _score_axis floor + held-out math + gateway untouched.
+- [Phase ?]: Phase 123.1-07: TT-07 — _run_tuner_job emits stage='provider_start' (provider+model) at each column start via the tuner's OWN _emit_tuner (not the shared runs.py consumer); the frontend onProgress flips the matching lane queued->running on it
+- [Phase ?]: Phase 123.1-07: TT-08 — DELETE cancel route is owner-verify THEN run<->skill bind (404 cross-user/foreign run_id, mirrors CR-01), sets a TTL'd tuner_cancel:{run_id} flag + releases the inflight claim; job checks the flag at candidate AND provider loop tops, skips winner/stash/durable upsert when cancelled, still runs its finally cleanup
 
 ## Operator Next Steps
 
