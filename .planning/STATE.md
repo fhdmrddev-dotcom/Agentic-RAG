@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-24T20:01:05.178Z"
+last_updated: "2026-06-24T20:05:53.507Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 25
-  completed_plans: 20
+  completed_plans: 21
   percent: 67
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-06-24
 
@@ -242,6 +242,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P03 | ~12min | 1 task (TDD) | 2 files |
 | Phase 123.1 P04 | 18min | 2 tasks | 4 files |
 | Phase 123.1 P05 | 11min | 4 tasks | 7 files |
+| Phase 123.1 P10 P10 | ~1min | 1 tasks | 2 files |
 
 ## Decisions
 
@@ -296,6 +297,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123.1-05 (BUG-260624-01 #1): MAX_SEEDED_SHOULD_NOT=8 caps the sibling-sourced should_not inside auto_seed_cases (the SOLE place) so the run path + editor seed share ONE capped set (editor shows exactly what runs); a pure post-fetch slice of the already-owner-scoped fetch_owner_scoped_siblings output — never re-reads DB / never widens scope. Generic off-topic baseline ALWAYS kept in full.
 - [Phase ?]: Phase 123.1-05 (D-honesty): GET /tuner/cases/seeded returns top-level total = uncapped sibling count (derived from len(sibling_descs), not the capped base); CaseEditor cap banner shows 'showing N of M — capped' ONLY when total > shown sibling-provenance count (never silent); 'show all N' is an honest disclosure, never fabricates the withheld cases.
 - [Phase ?]: Phase 123.1-05 (sketch 045-B): pre-run layout = full-width single-column stack (description -> CaseEditor -> run bar) driven off existing runPhase + scoreboard (no new mode machine); editor stays mounted so author can re-edit + re-run; results render full-width below; ProviderScoreboard/LiveRunCard/CandidateCard reused untouched.
+- [Phase 123.1]: 123.1-10 (TT-10): silenced the langsmith logger to ERROR at module scope next to the asyncio suppressor (scoped to langsmith only; ERROR-and-above still surfaces; tracing not disabled) + documented an optional commented-out LANGSMITH_TRACING_SAMPLING_RATE knob in .env.example (no Settings field — the client reads it from os.environ via load_dotenv)
 
 ## Operator Next Steps
 
