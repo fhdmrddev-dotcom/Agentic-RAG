@@ -310,10 +310,19 @@ def auto_seed_cases(skill: dict, sibling_skills: list[dict]) -> dict[str, list[s
     if name:
         should_fire.append(f"Use the {name} skill.")
 
+    # Phase 123.1 (WR-02): de-dup the sibling-sourced descriptions PRESERVING ORDER before the
+    # cap. Two owner/global siblings can share an identical description (common boilerplate); a
+    # plain (un-deduped) list would let the cap count a duplicate while ``seed_cases_with_provenance``
+    # reports ``should_not_total = len(set(...))`` (de-duped) — so the editor's "showing N of M"
+    # banner math disagreed (N could exceed the true distinct M). De-duping here makes the run
+    # path (auto_seed_cases), the GET-seed path, and ``should_not_total`` all agree on the SAME
+    # distinct set. Mirrors the order-preserving ``seen: set`` de-dupe used for candidates.
     sibling_sourced: list[str] = []
+    _seen_sib: set[str] = set()
     for sib in sibling_skills:
         sib_desc = (sib.get("description") or "").strip()
-        if sib_desc and sib_desc != description:
+        if sib_desc and sib_desc != description and sib_desc not in _seen_sib:
+            _seen_sib.add(sib_desc)
             sibling_sourced.append(sib_desc)
     # Cap the SIBLING-sourced false-fire bait at MAX_SEEDED_SHOULD_NOT (Phase 123.1-05 /
     # BUG-260624-01 #1). A pure post-fetch slice of the already-leak-safe owner-scoped list —

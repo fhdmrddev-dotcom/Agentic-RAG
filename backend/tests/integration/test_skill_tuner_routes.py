@@ -980,6 +980,42 @@ def test_seed_cases_with_provenance_caps_and_reports_total():
     )
 
 
+def test_auto_seed_cases_dedups_sibling_descriptions_before_cap():
+    """WR-02: auto_seed_cases (the RUN path) de-dups identical sibling descriptions PRESERVING
+    order BEFORE the cap, so the capped sibling-sourced count agrees with the de-duped
+    should_not_total reported by seed_cases_with_provenance. With duplicate descriptions the
+    pre-fix code counted the duplicate against the cap (N could exceed the true distinct M)."""
+    from app.services import skill_tuner_service as svc
+
+    skill = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register."}
+    # Three siblings but only TWO distinct descriptions (the boilerplate collision WR-02 cites).
+    siblings = [
+        {"id": str(uuid4()), "name": "A", "description": "Draft an email."},
+        {"id": str(uuid4()), "name": "B", "description": "Draft an email."},  # duplicate desc
+        {"id": str(uuid4()), "name": "C", "description": "Summarize a document."},
+    ]
+
+    seeded = svc.auto_seed_cases(skill, siblings)
+    sibling_sourced = [p for p in seeded["should_not"] if p not in svc._GENERIC_OFF_TOPIC]
+
+    # The duplicate is collapsed: exactly the DISTINCT sibling descriptions appear.
+    assert sibling_sourced == ["Draft an email.", "Summarize a document."], (
+        f"sibling-sourced should_not must be de-duped preserving order; got {sibling_sourced!r}"
+    )
+
+    # The provenance/GET path's reported total agrees with the de-duped run-path count.
+    prov = svc.seed_cases_with_provenance(skill, siblings)
+    prov_siblings = [c for c in prov["should_not"] if c["provenance"] == svc.PROVENANCE_SIBLING]
+    assert len(prov_siblings) == len(sibling_sourced), (
+        "the run path (auto_seed_cases) and the GET-seed path must agree on the distinct "
+        f"sibling set; run={len(sibling_sourced)} get={len(prov_siblings)}"
+    )
+    assert prov["should_not_total"] == len(sibling_sourced) == 2, (
+        f"should_not_total must equal the DISTINCT sibling count (2), not the raw 3; "
+        f"got {prov['should_not_total']}"
+    )
+
+
 def test_seed_cases_with_provenance_no_cap_when_under_limit():
     """With siblings <= cap, nothing is truncated and total equals the shown sibling count
     (the banner-suppression path — total == shown means no banner)."""
