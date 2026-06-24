@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qmYXYDEUiCdgn80hpwV44SzBL53bW6eJBkyPXDzw0qDSYUcGaxFNrYPx2zh0Pvi
+\restrict FikzvcktmQTDsQtGAdbnHa7wvW8QKXdDcTAvLm7I991h2g4ATrRU62aq2Ugecil
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -821,6 +821,31 @@ CREATE TABLE public.todos (
 
 
 --
+-- Name: tuner_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tuner_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    scoreboard jsonb DEFAULT '{}'::jsonb NOT NULL,
+    builder_model text DEFAULT ''::text NOT NULL,
+    target_count integer DEFAULT 0 NOT NULL,
+    case_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE tuner_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.tuner_runs IS 'Durable latest-per-skill Skill Trigger Tuner result (D-07). Exactly one row per skill (UNIQUE(skill_id) — upsert on_conflict=skill_id overwrites latest-wins). user_id = whoever last ran it; for a GLOBAL skill the SELECT-by-skill is identical for all global viewers (user_id is the last-runner attribution, NOT an access gate — T-123.1-05). Companion to the ephemeral Redis tuner_result:{run_id} stash — survives a Redis flush.';
+
+
+--
 -- Name: user_memory; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1242,6 +1267,22 @@ ALTER TABLE ONLY public.todos
 
 
 --
+-- Name: tuner_runs tuner_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tuner_runs tuner_runs_skill_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_skill_unique UNIQUE (skill_id);
+
+
+--
 -- Name: user_memory user_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1579,6 +1620,13 @@ CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (acti
 --
 
 CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_index);
+
+
+--
+-- Name: idx_tuner_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tuner_runs_user_id ON public.tuner_runs USING btree (user_id);
 
 
 --
@@ -2090,6 +2138,22 @@ ALTER TABLE ONLY public.threads
 
 ALTER TABLE ONLY public.todos
     ADD CONSTRAINT todos_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: tuner_runs tuner_runs_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: tuner_runs tuner_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2614,6 +2678,15 @@ CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT US
 
 
 --
+-- Name: tuner_runs Users can view tuner runs on own or global skills; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))));
+
+
+--
 -- Name: audit_log; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2809,6 +2882,12 @@ CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING
 
 
 --
+-- Name: tuner_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tuner_runs ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: user_memory; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2985,5 +3064,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qmYXYDEUiCdgn80hpwV44SzBL53bW6eJBkyPXDzw0qDSYUcGaxFNrYPx2zh0Pvi
+\unrestrict FikzvcktmQTDsQtGAdbnHa7wvW8QKXdDcTAvLm7I991h2g4ATrRU62aq2Ugecil
 
