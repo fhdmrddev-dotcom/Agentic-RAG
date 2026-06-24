@@ -464,14 +464,52 @@ def build_cell(
     model: str,
     fire_decisions: list[bool],
     no_false_decisions: list[bool],
+    fire_error_count: int = 0,
+    no_false_error_count: int = 0,
 ) -> dict:
     """Assemble one per-provider scoreboard cell carrying BOTH sub-scores (042-A — the
     false-fire rail is NEVER hidden). ``fires`` = recall over should-FIRE cases (fraction
     that fired); ``no_false`` = precision over should-NOT cases (fraction that did NOT
     fire). Mirrors the ``_build_forced_emit_cell`` axes-dict shape, but the Tuner's axes
-    are fires/no_false (not trigger/force/recovery/honest_fail)."""
-    fires = _score_axis(fire_decisions, expected=True)        # should-fire -> should fire
-    no_false = _score_axis(no_false_decisions, expected=False)  # should-NOT -> should NOT fire
+    are fires/no_false (not trigger/force/recovery/honest_fail).
+
+    Phase 123.1-06 HONESTY (backlog §2):
+
+    * **TT-05 — honest empty axis.** An axis with NO aggregated decisions is rendered as the
+      unmeasured sentinel ``None`` (the frontend shows "n/a"), NEVER a fabricated ``1.0``.
+      ``None`` means "no cases of that class were scored" — DISTINCT from a measured ``0.0``
+      (the model genuinely scored badly). The internal ``_score_axis`` 1.0-empty floor is for
+      the held-out math only; the TOP-LEVEL cell must not read that floor as a real score.
+      The combined ``score`` is computed from the MEASURED axes only: both measured -> mean of
+      the two; exactly one measured -> that one; neither measured -> ``None`` (wholly unmeasured).
+
+    * **TT-12 — per-cell error accounting.** ``fire_error_count`` / ``no_false_error_count``
+      are the counts of held-out classify CALLS that RAISED for each axis (the caller computes
+      them — an exception is "we could not measure", NOT "the model said no"). The cell carries
+      ``measured`` (True when at least one REAL aggregated decision landed on at least one axis;
+      False when EVERY call across both axes raised) and ``error_count`` (the summed raise count)
+      so the route can exclude an all-error column from ``target_count`` and the UI can explain
+      "could not measure". An empty-but-no-error axis (a candidate that simply had no cases of a
+      class) is NOT all-error — ``measured`` is driven by "had at least one real decision".
+    """
+    fires = (
+        _score_axis(fire_decisions, expected=True)  # should-fire -> should fire
+        if fire_decisions else None                  # TT-05: no cases -> unmeasured, NOT 1.0
+    )
+    no_false = (
+        _score_axis(no_false_decisions, expected=False)  # should-NOT -> should NOT fire
+        if no_false_decisions else None                   # TT-05: no cases -> unmeasured, NOT 1.0
+    )
+
+    # TT-05: the combined score is the mean of the MEASURED axes only (a None axis is excluded);
+    # if NEITHER axis measured, the whole cell is unmeasured -> score None.
+    measured_axes = [a for a in (fires, no_false) if a is not None]
+    score = (sum(measured_axes) / len(measured_axes)) if measured_axes else None
+
+    # TT-12: the cell measured iff at least one REAL aggregated decision landed (an all-error
+    # column has BOTH decision lists empty AND error_count > 0 -> measured=False).
+    measured = (len(fire_decisions) + len(no_false_decisions)) > 0
+
     return {
         "provider": provider,
         "model": model,
@@ -479,17 +517,25 @@ def build_cell(
             "fires": fires,
             "no_false": no_false,
         },
-        "score": (fires + no_false) / 2.0,
+        "score": score,
+        "measured": measured,
+        "error_count": int(fire_error_count) + int(no_false_error_count),
     }
 
 
-def cell_score(cell: dict) -> float:
-    """The combined held-out score for a cell (mean of fires + no_false). The single
-    number the winner is picked by — but BOTH sub-scores remain visible in ``cell.axes``."""
+def cell_score(cell: dict) -> float | None:
+    """The combined held-out score for a cell — the SINGLE stored value (TT-15: one source of
+    truth). Returns ``cell["score"]`` verbatim when present (no recomputation that could drift
+    from what ``build_cell`` stored). ``None`` propagates for a wholly-unmeasured cell (the
+    caller skips it in the held-out mean). Only when ``score`` is ABSENT (a legacy/hand-built
+    cell that predates the stored field) does it fall back to the ``(fires+no_false)/2``
+    recompute over MEASURED axes — treating a ``None`` axis as ``0.0`` for that fallback only."""
+    if "score" in cell:
+        return cell["score"]
     axes = cell.get("axes", {})
-    fires = float(axes.get("fires", 0.0))
-    no_false = float(axes.get("no_false", 0.0))
-    return (fires + no_false) / 2.0
+    fires = axes.get("fires")
+    no_false = axes.get("no_false")
+    return (float(fires or 0.0) + float(no_false or 0.0)) / 2.0
 
 
 def pick_winner(candidates: list[dict]) -> dict | None:
