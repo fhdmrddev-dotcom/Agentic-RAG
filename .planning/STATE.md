@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-24T03:34:15.394Z"
+last_updated: "2026-06-24T03:44:04.293Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
   percent: 67
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-24
 
@@ -238,6 +238,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123 P05 | ~10min | 3 tasks (2 TDD) | 11 files |
 | Phase 123 P06 | ~30min | 2 tasks | 8 files |
 | Phase 123.1 P01 | ~20min | 3 tasks | 6 files |
+| Phase 123.1 P02 | 5min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -285,6 +286,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123-06 [Rule 3]: wired skill_builder_model through the /settings router (FullSettingsResponse + SettingsUpdate + handler) + api.ts — Plan 03 added the field+resolver but NOT the router surface; the picker spans cloud+local (no paid-provider SPOF, test-proven). ZERO migration/package.
 - [Phase ?]: Phase 123.1-01 (D-07): tuner_runs durable latest-per-skill persistence — on_conflict=skill_id latest-wins upsert (UNIQUE(skill_id), one row/skill) in run_in_threadpool (D-v2.5-01), best-effort try/except ALONGSIDE the Redis stash; survives a Redis flush/refresh (closes BUG-260624-01 HIGH #3). user_id=last-runner attribution, NOT an access gate.
 - [Phase ?]: Phase 123.1-01 (D-05/D-08): two owner-gated GET routes — /tuner/runs/latest (registered BEFORE /runs/{run_id} so the literal beats the UUID converter; 404 cross-user owner-OR-global; rehydration-on-open) + /tuner/cases/seeded (provenance seeded/sibling never 'held'; owner-scoped sibling leak gate intact). seed_cases_with_provenance is a NEW fn over the unchanged string-only auto_seed_cases (run path untouched). Frontend getTunerLatest 404->null + getSeededCases. ZERO new pkg; red line held.
+- [Phase ?]: Phase 123.1-02 (D-02/D-12): ProviderScoreboard restored to sketch-041 vertical full-width rows (was a cramped grid, BUG-260624-01 HIGH #1); per-row magnitude bar + leading combined score from the server TunerCell.score (previously unused), both honest sub-scores kept visible; server-score-only; unchanged API so Plan 04 reuses it for the D-04 standalone block.
+- [Phase ?]: Phase 123.1-02 (D-11): CandidateCard descriptions line-clamp-3 with a shared useState Show more/less toggle across the header AND both diff-confirm sides (diff-current/diff-new); held-out score + Use action are siblings (never clamped) so a ~1500-char description never buries them (BUG-260624-01 MED #5); CandidateCard tests split into CandidateCard.test.tsx.
 
 ## Operator Next Steps
 
