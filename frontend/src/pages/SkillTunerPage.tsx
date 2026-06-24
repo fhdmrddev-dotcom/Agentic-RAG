@@ -412,7 +412,12 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
           </p>
         </div>
 
-        {/* Two-column body (041-A). On narrow widths it stacks (single column). */}
+        {/* Full-width single-column stack (sketch 045-B "Full-width stack"). The pre-run
+            360px config rail is GONE — the description, the CaseEditor (its two case columns
+            now each get ~half the FULL page width), and the run bar stack full-width, so the
+            old empty-results void next to a crammed rail no longer exists. Results render
+            full-width BELOW the editor once a run produces them (or a durable latest result
+            rehydrates on open). The editor stays mounted so the author can re-edit + re-run. */}
         <div className="flex-1 overflow-y-auto">
           {skillsLoading && !skill ? (
             <div className="flex items-center justify-center py-16 text-sm text-muted-foreground" role="status">
@@ -427,11 +432,8 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
               </p>
             </div>
           ) : (
-            /* D-03: a NARROW left config rail + a materially-WIDER results column — the
-               results no longer wedge into a 50/50 half, they get all remaining width.
-               On narrow widths it stacks (single column). */
-            <div className="grid gap-6 px-8 py-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-              {/* LEFT (narrow rail): current description + case editor + run config. */}
+            <div className="flex flex-col gap-6 px-8 py-6">
+              {/* PRE-RUN / always-editable stack: current description → CaseEditor → run bar. */}
               <div className="flex flex-col gap-5 min-w-0">
                 {/* The CURRENT live description — "drives firing" honesty label. */}
                 <section className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
@@ -465,68 +467,67 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                 </div>
               </div>
 
-              {/* RIGHT (full-remaining-width results): D-04 standalone block + live run +
-                  candidate cards + attribution. */}
-              <div data-testid="tuner-results" className="flex flex-col gap-5 min-w-0">
-                {/* D-04 standalone per-provider scoreboard for the BASELINE (current/live
-                    description) — distinct from the per-candidate grids. Server cells only. */}
-                {baselineCandidate && baselineCandidate.cells.length > 0 && (
-                  <section
-                    data-testid="baseline-scoreboard"
-                    className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-[10px] uppercase tracking-wider font-mono text-primary">
-                        current description · per-provider scores
-                      </span>
-                      {latestRun && (
-                        <span
-                          data-testid="run-attribution"
-                          className="text-[10px] font-mono text-muted-foreground text-right"
-                        >
-                          Built by {latestRun.builder_model} · measured on {latestRun.target_count} model
-                          {latestRun.target_count === 1 ? "" : "s"}
+              {/* FULL-WIDTH results — only when a run is live/errored OR results exist. Pre-run
+                  with no durable result, this whole block is absent (no empty void). Reuses the
+                  EXISTING ProviderScoreboard / LiveRunCard / CandidateCard components untouched. */}
+              {(runPhase === "running" ||
+                runPhase === "error" ||
+                (baselineCandidate && baselineCandidate.cells.length > 0) ||
+                (scoreboard && scoreboard.candidates.length > 0)) && (
+                <div data-testid="tuner-results" className="flex flex-col gap-5 min-w-0">
+                  {/* D-04 standalone per-provider scoreboard for the BASELINE (current/live
+                      description) — distinct from the per-candidate grids. Server cells only. */}
+                  {baselineCandidate && baselineCandidate.cells.length > 0 && (
+                    <section
+                      data-testid="baseline-scoreboard"
+                      className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-[10px] uppercase tracking-wider font-mono text-primary">
+                          current description · per-provider scores
                         </span>
-                      )}
+                        {latestRun && (
+                          <span
+                            data-testid="run-attribution"
+                            className="text-[10px] font-mono text-muted-foreground text-right"
+                          >
+                            Built by {latestRun.builder_model} · measured on {latestRun.target_count} model
+                            {latestRun.target_count === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
+                      <ProviderScoreboard cells={baselineCandidate.cells} />
+                    </section>
+                  )}
+
+                  {(runPhase === "running" || runPhase === "error") && (
+                    <LiveRunCard
+                      lanes={lanes}
+                      startTs={runStartTs}
+                      phase={runPhase}
+                      error={runError}
+                      onCancel={cancelRun}
+                    />
+                  )}
+
+                  {scoreboard && scoreboard.candidates.length > 0 && (
+                    <div className="flex flex-col gap-4" data-testid="tuner-candidates">
+                      {scoreboard.candidates
+                        .slice()
+                        .sort((a, b) => b.held_out_score - a.held_out_score)
+                        .map((candidate) => (
+                          <CandidateCard
+                            key={candidate.index}
+                            candidate={candidate}
+                            isWinner={candidate.index === scoreboard.winner_index}
+                            currentDescription={skill.description ?? ""}
+                            onConfirm={handleConfirmWinner}
+                          />
+                        ))}
                     </div>
-                    <ProviderScoreboard cells={baselineCandidate.cells} />
-                  </section>
-                )}
-
-                {(runPhase === "running" || runPhase === "error") && (
-                  <LiveRunCard
-                    lanes={lanes}
-                    startTs={runStartTs}
-                    phase={runPhase}
-                    error={runError}
-                    onCancel={cancelRun}
-                  />
-                )}
-
-                {scoreboard && scoreboard.candidates.length > 0 ? (
-                  <div className="flex flex-col gap-4" data-testid="tuner-candidates">
-                    {scoreboard.candidates
-                      .slice()
-                      .sort((a, b) => b.held_out_score - a.held_out_score)
-                      .map((candidate) => (
-                        <CandidateCard
-                          key={candidate.index}
-                          candidate={candidate}
-                          isWinner={candidate.index === scoreboard.winner_index}
-                          currentDescription={skill.description ?? ""}
-                          onConfirm={handleConfirmWinner}
-                        />
-                      ))}
-                  </div>
-                ) : runPhase === "idle" ? (
-                  <div className="rounded-xl ghost-border bg-card/30 p-8 text-center">
-                    <Target className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" aria-hidden="true" />
-                    <p className="text-sm text-muted-foreground">
-                      Run the benchmark to score candidate descriptions across your
-                      configured providers.
-                    </p>
-                  </div>
-                ) : null}
+                  )}
+                </div>
+              )}
               </div>
             </div>
           )}
