@@ -68,10 +68,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Pane 1: Decorative left — tonal depth anchor */}
-      <div className="w-16 shrink-0 bg-sidebar" />
-
-      {/* Pane 2: Center — page header + scrollable skill list */}
+      {/* Center — page header + scrollable skill list (sits flush against the real NavPanel) */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border/10">
         {/* Page header */}
         <div className="px-8 pt-8 pb-6 flex items-center justify-between shrink-0">

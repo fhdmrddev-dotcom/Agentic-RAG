@@ -491,9 +491,6 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Decorative left rail — tonal depth anchor (mirrors SkillsPage pane 1). */}
-      <div className="w-16 shrink-0 bg-sidebar" />
-
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Focused-surface header: ‹ Skills back + the skill name. */}
         <div className="px-8 pt-6 pb-4 shrink-0 border-b border-border/10">
