@@ -18,6 +18,7 @@ so the test runs without the gateway / any provider. Redis is a small in-memory 
 """
 import asyncio
 import json
+from datetime import datetime
 from uuid import uuid4
 from unittest.mock import AsyncMock, patch
 
@@ -577,6 +578,14 @@ async def test_latest_result_persists_after_run():
         f"expected on_conflict='skill_id' (latest-wins UNIQUE(skill_id)); got {on_conflict!r}"
     assert upserts[-1]["payload"].get("skill_id") == SKILL_ID
     assert upserts[-1]["payload"].get("user_id") == OWNER["id"]
+    # WR-07: ``updated_at`` MUST be a valid ISO-8601 timestamp, NOT the JSON string
+    # ``"now()"`` (which Postgres rejects as ``invalid input syntax for type timestamp
+    # with time zone``, silently swallowed by the upsert's best-effort try/except). The
+    # mock store records the payload verbatim, so ``fromisoformat`` parsing it cleanly
+    # is the regression guard against ``"now()"`` ever reaching real Postgres.
+    updated_at = upserts[-1]["payload"].get("updated_at")
+    assert updated_at, f"expected an updated_at in the upsert payload; got {upserts[-1]['payload']!r}"
+    datetime.fromisoformat(updated_at)  # raises ValueError on "now()" / any non-ISO value
 
     # Drop the Redis result stash (simulate a flush) — GET-latest must STILL return the row.
     fake_redis.kv.pop(f"tuner_result:{run_id}", None)
@@ -638,6 +647,10 @@ async def test_rerun_overwrites_latest():
     for u in upserts:
         assert u["kwargs"].get("on_conflict") == "skill_id", \
             f"every re-run upsert must use on_conflict='skill_id'; got {u['kwargs']!r}"
+        # WR-07: every re-run's updated_at is a valid ISO-8601 timestamp, never "now()".
+        updated_at = u["payload"].get("updated_at")
+        assert updated_at, f"expected an updated_at in every upsert payload; got {u['payload']!r}"
+        datetime.fromisoformat(updated_at)  # raises on "now()" / any non-ISO value
     assert sb._tuner_store["_row"] is not None, "expected a single stored latest row after re-run"
     assert sb._tuner_store["_row"]["skill_id"] == SKILL_ID
 

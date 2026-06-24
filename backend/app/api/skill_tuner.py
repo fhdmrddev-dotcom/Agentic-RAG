@@ -43,6 +43,7 @@ import asyncio
 import json
 import logging
 import time as time_mod
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import redis.asyncio as aioredis
@@ -407,7 +408,14 @@ async def _run_tuner_job(
                     "builder_model": builder_model,
                     "target_count": len(targets),
                     "case_count": len(cases),
-                    "updated_at": "now()",
+                    # Phase 123.1 (WR-07): a real ISO-8601 timestamptz, NOT the JSON string
+                    # ``"now()"`` — PostgREST sends the value literally and Postgres rejects
+                    # ``'now()'`` (parens) as ``invalid input syntax for type timestamp with
+                    # time zone`` (only the bare literal ``'now'`` is special). The reject was
+                    # swallowed by this best-effort try/except, so the D-07 durable persistence
+                    # SILENTLY never wrote against real Postgres. Mirrors every other
+                    # timestamptz write (agent_loop.py:2405, runs.py:1181).
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
 
                 def _persist_latest():
