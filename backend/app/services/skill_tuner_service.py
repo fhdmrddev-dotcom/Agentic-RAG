@@ -137,15 +137,51 @@ _CLASSIFIER_SYSTEM_PROMPT = (
 )
 
 
+def _flatten_nullable(node):
+    """Rewrite Pydantic's nullable ``{"anyOf": [{...}, {"type": "null"}]}`` into its single
+    non-null branch so strict OpenAI-compatible tool-schema validators (minimax/moonshot) and
+    Google's pre-sanitizer don't reject the ``anyOf``/multi-type shape
+    ([[reference_gemini_schema_type_array_trap]]). Recursive; returns a NEW structure (never
+    mutates the model's cached schema). TT-02 companion to the TT-01 wrapper fix below."""
+    if isinstance(node, dict):
+        any_of = node.get("anyOf")
+        if isinstance(any_of, list):
+            non_null = [b for b in any_of if not (isinstance(b, dict) and b.get("type") == "null")]
+            if len(non_null) == 1:
+                # A plain nullable (X | None): collapse to X. Carry over sibling keys
+                # (title/description) but drop the now-meaningless anyOf + null default.
+                collapsed = {k: v for k, v in node.items() if k not in ("anyOf", "default")}
+                collapsed.update(non_null[0])
+                return _flatten_nullable(collapsed)
+        return {k: _flatten_nullable(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_flatten_nullable(v) for v in node]
+    return node
+
+
 def _emit_tool(emitter: str, schema_model: type[BaseModel]) -> list[dict]:
-    """Build the single forced-emit tool spec from a Pydantic schema (FLAT, no
-    discriminator). The gateway derives the input schema from ``schema_model``; this
-    thin tools list just names the emitter."""
+    """Build the single forced-emit tool spec in the CANONICAL OpenAI shape —
+    ``{"type": "function", "function": {"name", "description", "parameters"}}`` — the SAME
+    shape every working ``forced_emit`` caller uses (``workflow_authoring.EMIT_TOOL``) and the
+    shape the shared gateway + per-provider adapters expect (``forced_emit._coerce_schema_block``
+    reads ``t["function"]``).
+
+    TT-01: the earlier Anthropic-native top-level shape (``{name, description, input_schema}``)
+    reached the openai-compat wire un-normalized → 400 on strict validators (minimax/moonshot),
+    while the NATIVE converters silently DROPPED the malformed tool (google: empty name → 0
+    declarations → narrates; anthropic: ``fn["name"]`` KeyError → honest-fail) → vacuous
+    all-"did-not-fire" cells across every provider. TT-02: ``_flatten_nullable`` collapses the
+    nullable ``anyOf`` so the emitted ``parameters`` also clears strict tool-schema validation.
+
+    Caller-side only — NEVER touches the shared gateway/adapters (red line D-14 / G-5)."""
     return [
         {
-            "name": emitter,
-            "description": f"Emit the structured result per the {schema_model.__name__} schema.",
-            "input_schema": schema_model.model_json_schema(),
+            "type": "function",
+            "function": {
+                "name": emitter,
+                "description": f"Emit the structured result per the {schema_model.__name__} schema.",
+                "parameters": _flatten_nullable(schema_model.model_json_schema()),
+            },
         }
     ]
 

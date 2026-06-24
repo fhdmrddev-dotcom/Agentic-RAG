@@ -412,3 +412,54 @@ def test_schemas_are_flat_single_typed():
         )
     else:
         assert skill_name.get("type") in ("string", None)
+
+
+# ── TT-01/TT-02: _emit_tool wire shape (the guard that was missing) ────────────
+def test_emit_tool_uses_canonical_openai_shape():
+    """REGRESSION (TT-01): _emit_tool MUST emit the canonical OpenAI shape
+    ``{"type":"function","function":{name,description,parameters}}`` — NOT the Anthropic
+    top-level ``{name,description,input_schema}`` shape that reached the openai-compat wire
+    un-normalized → 400 on minimax/moonshot and was silently dropped by the google/anthropic
+    native converters (vacuous all-"did-not-fire" cells). Mirrors workflow_authoring.EMIT_TOOL
+    + the Phase-122 type:function guard, which the tuner had NOT inherited."""
+    from app.services.skill_tuner_service import _emit_tool, TriggerDecision
+
+    tools = _emit_tool("emit_trigger_decision", TriggerDecision)
+    assert isinstance(tools, list) and len(tools) == 1
+    tool = tools[0]
+    assert tool.get("type") == "function", "tool MUST carry type:function (canonical OpenAI shape)"
+    fn = tool.get("function")
+    assert isinstance(fn, dict), "tool MUST wrap name/description/parameters under 'function'"
+    assert fn.get("name") == "emit_trigger_decision"
+    assert fn.get("description")
+    assert isinstance(fn.get("parameters"), dict) and fn["parameters"].get("type") == "object"
+    # the old Anthropic-native top-level keys must be GONE
+    assert "input_schema" not in tool and "name" not in tool, "Anthropic top-level shape must be gone"
+
+
+def _has_anyof(node) -> bool:
+    if isinstance(node, dict):
+        if "anyOf" in node:
+            return True
+        return any(_has_anyof(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_has_anyof(v) for v in node)
+    return False
+
+
+def test_emit_tool_flattens_nullable_anyof():
+    """REGRESSION (TT-02): the EMITTED parameters MUST NOT contain anyOf anywhere — Pydantic's
+    nullable ``skill_name: str | None`` (anyOf:[string,null]) is collapsed to a plain string so
+    strict tool-schema validators (minimax/moonshot) and Google's pre-sanitizer don't reject it.
+    (The model's own json schema may still carry the nullable anyOf — only the WIRE tool is flattened.)"""
+    from app.services.skill_tuner_service import _emit_tool, TriggerDecision, CandidateDescriptions
+
+    for model, emitter in ((TriggerDecision, "emit_trigger_decision"), (CandidateDescriptions, "emit_candidates")):
+        params = _emit_tool(emitter, model)[0]["function"]["parameters"]
+        assert not _has_anyof(params), f"{model.__name__} emitted parameters must have NO anyOf (flattened)"
+
+    # specifically: nullable skill_name collapses to a plain string type
+    trig_params = _emit_tool("emit_trigger_decision", TriggerDecision)[0]["function"]["parameters"]
+    assert trig_params["properties"]["skill_name"].get("type") == "string", (
+        "nullable skill_name must flatten to a plain string in the emitted tool schema"
+    )
