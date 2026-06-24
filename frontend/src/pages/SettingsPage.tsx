@@ -34,24 +34,14 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
   ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
 }
 
-// Phase 123 (D-08 / sketch 044-A) — the skill-builder model picker options. The
-// model that WRITES candidate descriptions + seeds Tuner cases. MUST span the FULL
-// provider list incl. LOCAL (Ollama / LM Studio / OpenAI-compat / DeepSeek-on-own-
-// infra) so a builder can never be locked to a single paid provider (no SPOF —
-// mirrors the 111.1 embedding-SPOF removal). Decoupled from the benchmark TARGETS
-// (the builder writes; the targets measure). The `kind` drives the always-on
-// cloud/local footer tag. Values are real model ids the backend stores verbatim;
-// `""` = unset (the resolver picks the strong default).
-type BuilderModelKind = "cloud" | "local"
-const SKILL_BUILDER_MODEL_OPTIONS: { value: string; label: string; kind: BuilderModelKind }[] = [
-  { value: "claude-haiku-4-5-20251001", label: "Anthropic · claude-haiku-4-5 (strong default)", kind: "cloud" },
-  { value: "gpt-5.4-mini", label: "OpenAI · gpt-5.4-mini", kind: "cloud" },
-  { value: "gemini-3.5-flash", label: "Google · gemini-3.5-flash", kind: "cloud" },
-  { value: "deepseek-chat", label: "DeepSeek · deepseek-chat (own infra)", kind: "cloud" },
-  { value: "ollama/llama3.1", label: "Ollama · llama3.1 (local)", kind: "local" },
-  { value: "lm-studio/qwen3", label: "LM Studio · qwen3 (local)", kind: "local" },
-  { value: "openai-compat/local-model", label: "OpenAI-compat endpoint (local / self-hosted)", kind: "local" },
-]
+// Phase 123.1-03 (D-09 / D-10) — the skill-builder model picker no longer uses a
+// hardcoded cheap-only list. It now derives its options from the user's CONFIGURED
+// per-provider models (the same `providers[].models` source the chat picker reads) so
+// the operator can pick STRONG models (Sonnet/Opus, GPT-pro, Gemini-Pro), and so the
+// LOCAL options come from the user's real providers (Ollama / LM Studio / OpenAI-compat)
+// instead of placeholder ids (IN-02). A cheap-but-capable default stays pre-selected via
+// the value="" Auto option (not forced); a custom persisted value is still selectable;
+// and a SOFT amber hint (never a hard block) shows when a chosen model is unverified.
 
 // ── Small reusable components ─────────────────────────────────────────────────
 
@@ -793,6 +783,21 @@ export function SettingsPage() {
 
   const activeModels = providerStates.find((p) => p.id === activeProvider)?.models ?? ""
 
+  // Phase 123.1-03 (D-09) — the skill-builder picker options derive from the user's
+  // CONFIGURED per-provider models across ALL providers (not just the active one),
+  // grouped per provider as <optgroup>s. Mirrors how the chat picker splits the
+  // comma-separated `Models` lists. Empty providers fall out (no empty optgroup).
+  const builderModelGroups = providerStates
+    .map((ps) => ({
+      provider: ps.id,
+      label: PROVIDER_META[ps.id]?.label ?? ps.id,
+      models: ps.models.split(",").map((m) => m.trim()).filter(Boolean),
+    }))
+    .filter((g) => g.models.length > 0)
+  // The flat set of all configured model ids — used by the custom-persisted-value guard
+  // so a stored id that IS configured doesn't also render as a duplicate "(current)" row.
+  const builderConfiguredModels = new Set(builderModelGroups.flatMap((g) => g.models))
+
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8">
       {/* Phase 111.1 D-03 — destructive re-embed confirm gate (sketch 025). Fires
@@ -1021,12 +1026,15 @@ export function SettingsPage() {
                 </FieldRow>
               </SectionCard>
 
-              {/* Phase 123 (D-08 / sketch 044-A) — Skill-builder model.
+              {/* Phase 123.1-03 (D-09 / D-10) — Skill-builder model.
                   The model that WRITES candidate descriptions + seeds the Trigger
-                  Tuner's benchmark cases. Selectable across the FULL provider list
-                  incl. LOCAL (no paid-provider SPOF); DECOUPLED from the benchmark
-                  TARGETS (the builder writes, the targets measure). Mirrors the
-                  Phase-111.1 provider-picker always-on cloud/local footer. */}
+                  Tuner's benchmark cases. Now driven by the user's CONFIGURED
+                  per-provider models (the chat-picker source) so STRONG models are
+                  selectable; LOCAL options come from real providers (no paid-provider
+                  SPOF, no placeholder ids). DECOUPLED from the benchmark TARGETS (the
+                  builder writes, the targets measure). The Auto default stays
+                  pre-selected (not forced); an unverified pick gets a SOFT amber hint,
+                  never a hard block. */}
               <SectionCard
                 title="Skill Trigger Tuner"
                 description="The model that writes candidate descriptions and seeds benchmark cases when you tune a skill's triggers."
@@ -1035,37 +1043,50 @@ export function SettingsPage() {
                   <label htmlFor="skill-builder-model" className="text-sm text-muted-foreground">
                     Skill-builder model
                   </label>
-                  <select
-                    id="skill-builder-model"
-                    value={skillBuilderModel}
-                    onChange={(e) => setSkillBuilderModel(e.target.value)}
-                    className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="">
-                      Auto · {resolvedSkillBuilderModel || "strong default"} (recommended)
-                    </option>
-                    {/* If the persisted value isn't one of the presets (e.g. a custom
-                        local id), keep it selectable so the round-trip never drops it. */}
-                    {skillBuilderModel &&
-                      !SKILL_BUILDER_MODEL_OPTIONS.some((o) => o.value === skillBuilderModel) && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="skill-builder-model"
+                      value={skillBuilderModel}
+                      onChange={(e) => setSkillBuilderModel(e.target.value)}
+                      className="flex-1 h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">
+                        Auto · {resolvedSkillBuilderModel || "strong default"} (recommended)
+                      </option>
+                      {/* If the persisted value isn't one of the configured models
+                          (e.g. a custom / removed id), keep it selectable so the
+                          round-trip never drops it (D-10). */}
+                      {skillBuilderModel && !builderConfiguredModels.has(skillBuilderModel) && (
                         <option value={skillBuilderModel}>{skillBuilderModel} (current)</option>
                       )}
-                    {SKILL_BUILDER_MODEL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  {/* Always-on cloud/local footer (mirrors the 111.1 endpoint footer) +
-                      the explicit decoupled-from-targets note (D-08). */}
+                      {/* D-09: configured per-provider models, grouped as optgroups. */}
+                      {builderModelGroups.map((g) => (
+                        <optgroup key={g.provider} label={g.label}>
+                          {g.models.map((m) => (
+                            <option key={`${g.provider}:${m}`} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {/* D-10: SOFT amber hint when the chosen builder model isn't in the
+                        verified registry — mirrors the Active-Model "unverified" chip.
+                        NEVER a hard block / disabled option. */}
+                    {skillBuilderModel && !verifiedModels.has(skillBuilderModel) && (
+                      <span
+                        className="shrink-0 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full ghost-border"
+                        title="This model isn't in our verified registry. It may lack structured-output / forced-emission support the builder relies on — it's still selectable; the run will fall back gracefully if it can't emit."
+                      >
+                        unverified
+                      </span>
+                    )}
+                  </div>
+                  {/* Always-on no-SPOF footer + the explicit decoupled-from-targets note. */}
                   <div className="mt-1.5 flex items-center gap-2 rounded-md border border-border/40 bg-muted/20 px-2.5 py-1.5 text-[10px] font-mono text-muted-foreground">
                     <span className="text-emerald-400">{"🔒"}</span>
                     <span>
-                      {(SKILL_BUILDER_MODEL_OPTIONS.find((o) => o.value === skillBuilderModel)?.kind ??
-                        "cloud") === "local"
-                        ? "local · runs on your own infra"
-                        : `${resolvedSkillBuilderModel || "claude-haiku-4-5"} · cloud-capable, local-capable`}
-                      {" · no single-point-of-failure"}
+                      {`${skillBuilderModel || resolvedSkillBuilderModel || "claude-haiku-4-5"} · your configured models · no single-point-of-failure`}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground/70 mt-1">

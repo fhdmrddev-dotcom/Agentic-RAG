@@ -1,11 +1,15 @@
 /**
- * Phase 123-06 Task 2 (D-08 / TRIG-01 / sketch 044-A) — the skill-builder model picker.
+ * Phase 123.1-03 (D-09 / D-10) — the skill-builder model picker, now driven by the
+ * user's CONFIGURED per-provider models (the same `providers[].models` source the chat
+ * picker uses) instead of the hardcoded cheap-only `SKILL_BUILDER_MODEL_OPTIONS`.
  *
- * Pins the no-SPOF contract (T-123-06-02): the builder-model picker offers the FULL
- * provider list incl. LOCAL options (Ollama / LM Studio / OpenAI-compat) — proven by
- * an option assertion, NOT a source grep. A model id is a VALUE not a secret, so it
- * rides the settings contract; the builder WRITES candidates while the benchmark
- * targets MEASURE firing (decoupled). The strong default renders when unset.
+ * D-09: strong configured models (Sonnet/Opus, GPT-pro, Gemini-Pro) are selectable when
+ *   configured — grouped per provider as <optgroup>s — not just haiku/mini/flash.
+ * D-10: a sensible default stays pre-selected via the value="" Auto option (NOT forced);
+ *   a custom persisted value is still selectable (never silently dropped); a SOFT amber
+ *   hint (never a hard block / disabled option) shows when a chosen model is unverified.
+ * IN-02: the placeholder local ids (lm-studio/qwen3, openai-compat/local-model) are GONE —
+ *   local models now come from the user's real providers[].models.
  *
  * Mirrors the WorkflowsPage.test.tsx api-mock idiom (vi.hoisted + vi.mock("@/lib/api")).
  */
@@ -45,8 +49,12 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     active_provider: "anthropic",
     llm_model: "claude-sonnet-4-6",
     available_models: ["claude-sonnet-4-6"],
+    // A multi-provider set incl. a STRONG cloud model (claude-opus-4) and a real LOCAL
+    // provider (ollama) — the configured-models source the builder picker now reads.
     providers: [
-      { id: "anthropic", name: "Anthropic", base_url: "api.anthropic.com", has_key: true, is_active: true, models: ["claude-sonnet-4-6"] },
+      { id: "anthropic", name: "Anthropic", base_url: "api.anthropic.com", has_key: true, is_active: true, models: ["claude-sonnet-4-6", "claude-opus-4"] },
+      { id: "openai", name: "OpenAI", base_url: "api.openai.com", has_key: true, is_active: false, models: ["gpt-5.5-pro"] },
+      { id: "ollama", name: "Ollama", base_url: "http://localhost:11434", has_key: false, is_active: false, models: ["llama3.1"] },
     ],
     embedding_model: "text-embedding-3-small",
     embedding_base_url: "",
@@ -98,29 +106,78 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe("SettingsPage — skill-builder model picker (123-06 / D-08)", () => {
-  it("offers at least one LOCAL-provider option (no paid-provider SPOF)", async () => {
+describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)", () => {
+  it("lists a STRONG configured model (D-09) grouped under its provider", async () => {
     render(<SettingsPage />)
-
-    // The builder-model picker is labeled; find its <select> control.
-    const picker = await screen.findByLabelText(/skill-builder model/i)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     expect(picker.tagName).toBe("SELECT")
 
-    const optionText = within(picker as HTMLElement)
-      .getAllByRole("option")
-      .map((o) => o.textContent?.toLowerCase() ?? "")
-      .join(" | ")
+    // A strong configured model surfaces as a selectable option (not just cheap models).
+    const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
+    expect(optionValues).toContain("claude-opus-4")
+    expect(optionValues).toContain("gpt-5.5-pro")
 
-    // At least one local-provider option must be present — proves the picker is NOT
-    // a paid-provider-only list (T-123-06-02 / D-08, the 111.1 embedding-SPOF removal).
-    const hasLocal =
-      /ollama/.test(optionText) || /lm studio|lm-studio|lmstudio/.test(optionText) || /openai-compat|openai compat/.test(optionText)
-    expect(hasLocal).toBe(true)
+    // Options are grouped per provider via <optgroup>.
+    const optgroups = picker.querySelectorAll("optgroup")
+    expect(optgroups.length).toBeGreaterThanOrEqual(1)
+    const groupLabels = Array.from(optgroups).map((g) => g.getAttribute("label")?.toLowerCase() ?? "")
+    expect(groupLabels.some((l) => /anthropic/.test(l))).toBe(true)
+  })
+
+  it("does NOT render the removed IN-02 placeholder local ids", async () => {
+    render(<SettingsPage />)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
+    const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
+    expect(optionValues).not.toContain("lm-studio/qwen3")
+    expect(optionValues).not.toContain("openai-compat/local-model")
+  })
+
+  it("derives the LOCAL option from the configured provider (no paid-provider SPOF)", async () => {
+    render(<SettingsPage />)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
+    // The local model comes from the user's real ollama provider, not a placeholder id.
+    const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
+    expect(optionValues).toContain("llama3.1")
+  })
+
+  it("keeps the Auto default option (value=\"\"), pre-selected when unset (D-10)", async () => {
+    render(<SettingsPage />)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
+    const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
+    expect(optionValues).toContain("")
+    // Unset => the Auto option is the selected value (default not forced to a model).
+    expect(picker.value).toBe("")
+  })
+
+  it("keeps a custom persisted value selectable as (current) so a stored id never drops", async () => {
+    mockGetSettings.mockResolvedValue(mkSettings({ skill_builder_model: "some/custom-unconfigured-id" }))
+    render(<SettingsPage />)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
+    await waitFor(() => expect(picker.value).toBe("some/custom-unconfigured-id"))
+    const current = within(picker).getByText(/some\/custom-unconfigured-id \(current\)/i)
+    expect(current).toBeInTheDocument()
+  })
+
+  it("shows a SOFT amber hint for an unverified selected model — option NOT disabled (D-10)", async () => {
+    // claude-opus-4 is configured but NOT in verified_models => soft hint, never a block.
+    mockGetSettings.mockResolvedValue(mkSettings({ skill_builder_model: "claude-opus-4" }))
+    render(<SettingsPage />)
+    const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
+    await waitFor(() => expect(picker.value).toBe("claude-opus-4"))
+
+    // The soft hint renders next to the builder picker (mirror of the amber
+    // "unverified" chip). Scope to the picker's immediate row so we don't collide
+    // with the Active-Model chip elsewhere on the tab.
+    const builderRow = picker.parentElement as HTMLElement
+    expect(within(builderRow).getByText(/unverified/i)).toBeInTheDocument()
+
+    // NO option in the builder picker carries a disabled attribute — never a hard block.
+    const anyDisabled = within(picker).getAllByRole("option").some((o) => (o as HTMLOptionElement).disabled)
+    expect(anyDisabled).toBe(false)
   })
 
   it("shows the strong resolved default label when the setting is unset", async () => {
     render(<SettingsPage />)
-    // The resolved default (claude-haiku-4-5) surfaces in the picker / footer.
     await waitFor(() => {
       expect(screen.getByLabelText(/skill-builder model/i)).toBeInTheDocument()
     })
