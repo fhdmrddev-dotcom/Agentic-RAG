@@ -136,15 +136,21 @@
 ### Phase 123.1: Skill Trigger Tuner — design fidelity and UX polish (INSERTED)
 
 **Goal:** The Skill Trigger Tuner reads cleanly at the org's real provider count, makes the benchmark visible/editable before a run, makes a completed result durable across refresh/restart, and lets the builder model be chosen from configured models — closing the live-UAT design-fidelity + UX gaps in BUG-260624-01 (HIGH + MED) without changing the scoring core, the agent loop, the shared chat path, or the CTX-03 trim-pin.
-**Requirements**: TBD (scope contract = the 12 locked decisions D-01..D-12 in 123.1-CONTEXT.md; each is covered by ≥1 plan)
+**Requirements**: TBD (scope contract = the 12 locked decisions D-01..D-12 in 123.1-CONTEXT.md + the live-UAT audit backlog TT-05/07/08/09/10/11/12/14/15/16 in 123.1-AUDIT-BACKLOG.md; each is covered by >=1 plan)
 **Depends on:** Phase 123
-**Plans:** 4 plans
+**Plans:** 10 plans (01-04 = D-01..D-12; 05-10 = the live-UAT audit "Wave B"; Wave A TT-01/TT-02 already committed; Wave C TT-03/TT-06 = a separate shared-gateway phase)
 
 Plans:
 - [x] 123.1-01-PLAN.md — Backend seam: tuner_runs table (migration 077) + durable latest-result upsert + GET-latest + seeded-cases GET + frontend wire (D-01/D-05/D-07/D-08)
 - [x] 123.1-02-PLAN.md — Scoreboard polish: ProviderScoreboard vertical rows + magnitude bar + combined score; CandidateCard line-clamp/expand (D-02/D-04/D-11/D-12)
 - [x] 123.1-03-PLAN.md — Settings builder-model picker from configured models + soft hint; remove IN-02 placeholders (D-09/D-10)
 - [x] 123.1-04-PLAN.md — Page integration: full-width results, seeded-case hydrate/edit, standalone live-description scoreboard, result rehydration, pre-run cost preview + attribution (D-03/D-05/D-06/D-07/D-12)
+- [ ] 123.1-05-PLAN.md — [Wave 1] Editor-wall fix (sketch 045-B): backend seed-cap (MAX_SEEDED_SHOULD_NOT) + seeded GET `total` + legible/bounded CaseEditor + full-width pre-run stack (BUG-260624-01; seed-cap now load-bearing for RUN TIME per backlog section 5)
+- [ ] 123.1-06-PLAN.md — [Wave 2] Backend honesty: empty axis -> n/a not 1.0 (TT-05); all-error column -> unmeasured, excluded from target_count (TT-12); single-source cell_score (TT-15)
+- [ ] 123.1-07-PLAN.md — [Wave 3] Run UX: emit stage=provider_start so lanes flip queued->running (TT-07); real owner-scoped + run<->skill-bound DELETE cancel route + job checkpoint + claim release (TT-08)
+- [ ] 123.1-08-PLAN.md — [Wave 4] Run resilience: honest seeded-fetch note (TT-09); unmeasured-cell render (TT-12 render half); reconciling sub-state no-flash (TT-14); durable-poll reconnect honesty (TT-16)
+- [ ] 123.1-09-PLAN.md — [Wave 5] Layout: delete both decorative bg-sidebar deco-rails on SkillsPage + SkillTunerPage (TT-11)
+- [ ] 123.1-10-PLAN.md — [Wave 1] Observability: silence the LangSmith 429 uploader flood to ERROR + document LANGSMITH_TRACING_SAMPLING_RATE (TT-10)
 
 #### Phase 124: Workflow Studio UX — Soul + Strict↔Loose
 **Goal**: A user immediately sees the "soul" of a workflow (its purpose, what it needs, its phase spine, its tier, its output) in three consistent sizes, and meets a clear strict↔loose disclosure that offers two doors ("Describe & run" vs "Author & govern") without removing any control — accuracy and governance preserved, complexity demoted one click.
@@ -235,7 +241,7 @@ Plans:
 | 121. One Front Door for Workflows (IA) | 2/2 | Complete | 2026-06-23 |
 | 122. Cross-Provider Trust & Honesty Parity | 0/4 | Planned | - |
 | 123. Skill Triggering Quality | 6/6 | Executed (human_needed UAT; gaps → 123.1) | 2026-06-24 |
-| 123.1 (INSERTED). Skill Trigger Tuner — Design Fidelity & UX Polish | 0/? | Not planned (discuss next) | - |
+| 123.1 (INSERTED). Skill Trigger Tuner — Design Fidelity & UX Polish | 4/10 | Planned (Wave B 05-10 added from live-UAT audit) | 2026-06-24 |
 | 124. Workflow Studio UX — Soul + Strict↔Loose | 0/? | Not started | - |
 | 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
 | 126 (STRETCH). Smart-Dispatch Relevance Pre-Filter | 0/? | Gated (behind CORE) | - |
