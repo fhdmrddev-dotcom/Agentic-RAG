@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-24T20:46:41.140Z"
+last_updated: "2026-06-24T20:51:17.361Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 25
-  completed_plans: 24
-  percent: 67
+  completed_plans: 25
+  percent: 83
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 ## Current Position
 
 Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
 Last activity: 2026-06-24
 
@@ -246,6 +246,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P06 | 7min | 2 tasks | 3 files |
 | Phase 123.1 P07 | ~12min | 2 tasks | 4 files |
 | Phase 123.1 P08 | ~10min | 2 tasks | 6 files |
+| Phase 123.1 P09 | ~6min | 1 tasks | 2 files |
 
 ## Decisions
 
@@ -306,6 +307,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123.1-07: TT-08 — DELETE cancel route is owner-verify THEN run<->skill bind (404 cross-user/foreign run_id, mirrors CR-01), sets a TTL'd tuner_cancel:{run_id} flag + releases the inflight claim; job checks the flag at candidate AND provider loop tops, skips winner/stash/durable upsert when cancelled, still runs its finally cleanup
 - [Phase ?]: 123.1-08 (TT-12 render half): unmeasured tuner cell renders 'could not measure' from the server measured/null sentinel, never a fabricated 0.00 or 1.00 axis
 - [Phase ?]: 123.1-08 (TT-16): reconnect-exhaustion keeps 'still running' ONLY when durable getTunerLatest.run_id === active run; a null/404 or previous-run row still hits the retained 'Lost connection' terminal (no stuck run)
+- [Phase ?]: Phase 123.1-09: TT-11 — removed both decorative w-16 shrink-0 bg-sidebar rails (SkillsPage + SkillTunerPage); content keeps existing px-8 so it sits flush against the real NavPanel; real NavPanel (ChatLayout.tsx:289) untouched; tsc clean
+- [Phase ?]: Phase 123.1-09: the SkillTunerPage rail survived the 123.1-05/07/08 restructure (relocated to lines 494-495) and was still present — removed here as the primary path, not the reconcile fallback the plan anticipated
 
 ## Operator Next Steps
 
