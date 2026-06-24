@@ -26,6 +26,9 @@ const updateSkill = vi.fn()
 const startTunerRun = vi.fn()
 const streamTunerRun = vi.fn()
 const getTunerResults = vi.fn()
+const getSeededCases = vi.fn()
+const getTunerLatest = vi.fn()
+const getSettings = vi.fn()
 
 vi.mock("@/lib/api", () => {
   class FakeApiError extends Error {
@@ -46,6 +49,9 @@ vi.mock("@/lib/api", () => {
     startTunerRun: (...a: unknown[]) => startTunerRun(...a),
     streamTunerRun: (...a: unknown[]) => streamTunerRun(...a),
     getTunerResults: (...a: unknown[]) => getTunerResults(...a),
+    getSeededCases: (...a: unknown[]) => getSeededCases(...a),
+    getTunerLatest: (...a: unknown[]) => getTunerLatest(...a),
+    getSettings: (...a: unknown[]) => getSettings(...a),
     ApiError: FakeApiError,
   }
 })
@@ -88,6 +94,20 @@ const SCOREBOARD: TunerScoreboard = {
   winner_description: "Use this skill when the user asks to write or fix SQL queries.",
 }
 
+// A settings fixture with EXACTLY 2 configured targets (has_key && non-empty models) plus
+// two non-targets the configured-target count MUST exclude: a keyed-but-empty-models
+// provider and a models-but-no-key provider (mirrors the backend `configured_targets` filter).
+const SETTINGS_2_CONFIGURED = {
+  providers: [
+    { id: "openai", name: "OpenAI", base_url: "api.openai.com", has_key: true, is_active: true, models: ["gpt-5.4-mini"] },
+    { id: "anthropic", name: "Anthropic", base_url: "api.anthropic.com", has_key: true, is_active: false, models: ["claude-haiku-4-5"] },
+    // keyed but NO usable model → excluded.
+    { id: "google", name: "Google", base_url: "googleapis.com", has_key: true, is_active: false, models: [] },
+    // has models but NO key → excluded.
+    { id: "zhipu", name: "Zhipu", base_url: "open.bigmodel.cn", has_key: false, is_active: false, models: ["glm-5-turbo"] },
+  ],
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   listSkills.mockResolvedValue([SKILL])
@@ -100,6 +120,14 @@ beforeEach(() => {
     n: 3,
   })
   getTunerResults.mockResolvedValue(SCOREBOARD)
+  // Default mount-effect reads: seeded cases hydrate, no persisted run yet (404→null),
+  // and a 2-configured-target settings fixture for the cost preview.
+  getSeededCases.mockResolvedValue({
+    should_fire: [{ prompt: "Write a SQL query", provenance: "seeded" }],
+    should_not: [{ prompt: "Summarize this PDF", provenance: "sibling" }],
+  })
+  getTunerLatest.mockResolvedValue(null)
+  getSettings.mockResolvedValue(SETTINGS_2_CONFIGURED)
   // Stream helper drives the scoreboard in via onComplete then a done terminal.
   streamTunerRun.mockImplementation(async (_skillId, _runId, callbacks) => {
     callbacks.onComplete?.(SCOREBOARD)

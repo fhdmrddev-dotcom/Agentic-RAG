@@ -34,11 +34,15 @@ import {
   startTunerRun,
   getTunerResults,
   streamTunerRun,
+  getSeededCases,
+  getTunerLatest,
+  getSettings,
   ApiError,
   type TunerTarget,
   type TunerScoreboard,
   type TunerCandidate,
   type TunerStreamCallbacks,
+  type LatestTunerRun,
 } from "@/lib/api"
 import type { Skill } from "@/types"
 
@@ -79,6 +83,17 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   const [lanes, setLanes] = useState<ProviderLane[]>([])
   const [scoreboard, setScoreboard] = useState<TunerScoreboard | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // ── D-12 pre-run cost preview: the CONFIGURED-TARGET model count resolved
+  //    client-side from the user's providers, mirroring the backend `configured_targets`
+  //    presence filter (skill_tuner_service.py:474). A provider counts IFF `has_key` is
+  //    true AND its `models` list is non-empty — so the `× M models` line is populated on
+  //    open (NOT empty until kickoff, NOT a raw all-models count). ──
+  const [configuredTargetCount, setConfiguredTargetCount] = useState<number | null>(null)
+  // ── D-07/D-12 persisted run metadata (attribution): the durable latest run carries the
+  //    builder model + the target count it was measured on — "Built by {model} · measured
+  //    on N models". Null until a run has ever completed for this skill. ──
+  const [latestRun, setLatestRun] = useState<LatestTunerRun | null>(null)
   // A transient SSE transport timeout (redis_timeout / consumer_timeout) is NOT a
   // run failure — the bounded job keeps computing server-side. We reconnect the
   // stream from the buffer rather than surfacing a hard failure; this counter
@@ -88,6 +103,95 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   // Cancel any in-flight stream on unmount / skill switch (leave-and-reconcile).
   useEffect(() => {
     return () => abortRef.current?.abort()
+  }, [skillId])
+
+  // ── Reconcile-via-fetch on open (D-v2.5-03 — SSE/Realtime is a hint, NOT truth). On
+  //    mount / skill-switch we fetch three things authoritatively:
+  //      1. getSeededCases  → hydrate the editor (D-05/D-06) so seeded/sibling cases show
+  //         + are editable BEFORE a run (no more "0 cases" while the run uses hidden cases).
+  //      2. getTunerLatest  → rehydrate the durable latest result (D-07) so a completed
+  //         scoreboard survives refresh / navigation / a Redis flush. A 404 → null (no run
+  //         yet) leaves `scoreboard` null and renders the empty/initial state — NEVER errors.
+  //      3. getSettings     → resolve the configured-target model count (D-12) for the
+  //         pre-run cost preview, mirroring the backend `configured_targets` presence filter.
+  //    The effect guards against a skill-switch race: a stale resolution is dropped. ──
+  useEffect(() => {
+    if (!skillId) {
+      setCases([])
+      setScoreboard(null)
+      setLatestRun(null)
+      setConfiguredTargetCount(null)
+      return
+    }
+    let cancelled = false
+
+    // 1. Hydrate the case editor from the backend's seeded cases (real provenance).
+    getSeededCases(skillId)
+      .then((seeded) => {
+        if (cancelled) return
+        const hydrated: EditorCase[] = [
+          ...seeded.should_fire.map((c, i) => ({
+            id: `seed-fire-${i}`,
+            prompt: c.prompt,
+            should_fire: true,
+            // The backend emits only "seeded" / "sibling"; anything else degrades to "seeded".
+            provenance: (c.provenance === "sibling" ? "sibling" : "seeded") as EditorCase["provenance"],
+          })),
+          ...seeded.should_not.map((c, i) => ({
+            id: `seed-not-${i}`,
+            prompt: c.prompt,
+            should_fire: false,
+            provenance: (c.provenance === "sibling" ? "sibling" : "seeded") as EditorCase["provenance"],
+          })),
+        ]
+        setCases(hydrated)
+      })
+      .catch(() => {
+        // A seeded-cases read failure leaves the editor empty (author can add cases
+        // manually + the run auto-seeds) — never surfaces an error toast.
+        if (!cancelled) setCases([])
+      })
+
+    // 2. Rehydrate the durable latest result (D-07). 404 → null (no run yet) → empty state.
+    getTunerLatest(skillId)
+      .then((latest) => {
+        if (cancelled) return
+        if (latest) {
+          setScoreboard(latest.scoreboard)
+          setLatestRun(latest)
+        } else {
+          // No run has ever completed for this skill — stay in the empty/initial state.
+          setScoreboard(null)
+          setLatestRun(null)
+        }
+      })
+      .catch(() => {
+        // A non-404 read failure is non-fatal — leave the empty state, never error-boundary.
+        if (!cancelled) {
+          setScoreboard(null)
+          setLatestRun(null)
+        }
+      })
+
+    // 3. Resolve the configured-target model count for the pre-run cost preview (D-12).
+    getSettings()
+      .then((settings) => {
+        if (cancelled) return
+        // Mirror the backend `configured_targets` presence filter: a provider counts IFF
+        // it has a key AND a usable model. (Local/keyless providers are exercised by the
+        // backend presence probe; the frontend signal for a present credential is `has_key`.)
+        const count = settings.providers.filter(
+          (p) => p.has_key && p.models.some((m) => m.trim().length > 0),
+        ).length
+        setConfiguredTargetCount(count)
+      })
+      .catch(() => {
+        if (!cancelled) setConfiguredTargetCount(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [skillId])
 
   // ── Kick off a background tuning run (D-06 non-blocking) and stream live

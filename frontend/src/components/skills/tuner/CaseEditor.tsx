@@ -23,8 +23,12 @@ export interface EditorCase {
   id: string
   prompt: string
   should_fire: boolean
-  /** auto-seed/authorship provenance (043-A): what the Tuner wrote vs what you own. */
-  provenance: "seeded" | "sibling" | "held" | "you"
+  /** auto-seed/authorship provenance (043-A): what the Tuner wrote vs what you own.
+   *  Phase 123.1-04 (Pitfall 4): the `held` value is RESOLVED OUT of the union — the
+   *  backend only ever emits `seeded` / `sibling`, the author adds `you`, and the
+   *  train/held-out split is owned by the 60/40 split bar (NOT a per-case tag). So the
+   *  union is now exactly the three provenances a case can actually carry. */
+  provenance: "seeded" | "sibling" | "you"
 }
 
 interface Props {
@@ -39,13 +43,15 @@ const TRAIN_RATIO = 0.6 // mirrors backend DEFAULT_HELD_OUT_TRAIN_RATIO
 const PROVENANCE_LABEL: Record<EditorCase["provenance"], string> = {
   seeded: "seeded",
   sibling: "sibling",
-  held: "held",
   you: "you",
 }
 
 function ProvenanceTag({ provenance }: { provenance: EditorCase["provenance"] }) {
   return (
-    <span className="text-[9px] uppercase tracking-wider font-mono text-muted-foreground shrink-0">
+    <span
+      data-testid="provenance-tag"
+      className="text-[9px] uppercase tracking-wider font-mono text-muted-foreground shrink-0"
+    >
       {PROVENANCE_LABEL[provenance]}
     </span>
   )
