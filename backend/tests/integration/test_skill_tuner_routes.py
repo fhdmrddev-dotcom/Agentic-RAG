@@ -29,7 +29,7 @@ from httpx import ASGITransport
 from app.api import skill_tuner
 from app.dependencies import get_current_user, get_redis, get_supabase
 from app.main import app
-from app.services.skill_tuner_service import TriggerDecision
+from app.services.skill_tuner_service import MAX_SEEDED_SHOULD_NOT, TriggerDecision
 from tests.integration._run_helpers import _build_mock_supabase, _make_result, _make_table_builder
 
 OWNER = {"id": "00000000-0000-0000-0000-000000000001", "email": "owner@example.com"}
@@ -904,3 +904,121 @@ async def test_seeded_cases_returned():
     assert resp2.status_code == 404, \
         f"expected 404 on cross-user seeded-cases; got {resp2.status_code} body={resp2.text}"
     assert other_called, "expected the owner-scope SELECT to run (seeded route may not be registered)"
+
+
+# ── 11. Phase 123.1-05 (BUG-260624-01 #1) — the sibling-sourced should_not is CAPPED ──
+def _distinct_siblings(n: int) -> list[dict]:
+    """n siblings, each with a UNIQUE description (so each contributes one distinct
+    sibling-sourced should_not entry — no dedup collapse)."""
+    return [
+        {"id": str(uuid4()), "name": f"Sibling {i}", "description": f"Do sibling task number {i}."}
+        for i in range(n)
+    ]
+
+
+def test_auto_seed_cases_caps_sibling_sourced_should_not():
+    """auto_seed_cases (the RUN path) caps the SIBLING-sourced should_not entries at
+    MAX_SEEDED_SHOULD_NOT — the generic off-topic baseline is ALWAYS kept on top and is
+    NOT counted against the sibling cap (non-vacuous: > cap distinct siblings)."""
+    from app.services import skill_tuner_service as svc
+
+    skill = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register."}
+    siblings = _distinct_siblings(MAX_SEEDED_SHOULD_NOT + 7)  # strictly > cap
+
+    seeded = svc.auto_seed_cases(skill, siblings)
+    sibling_descs = {s["description"] for s in siblings}
+    sibling_sourced = [p for p in seeded["should_not"] if p in sibling_descs]
+    generic = [p for p in seeded["should_not"] if p in svc._GENERIC_OFF_TOPIC]
+
+    assert len(sibling_sourced) == MAX_SEEDED_SHOULD_NOT, (
+        f"sibling-sourced should_not must be capped at {MAX_SEEDED_SHOULD_NOT}; "
+        f"got {len(sibling_sourced)}"
+    )
+    # The generic off-topic baseline is always fully present (never dropped by the cap).
+    assert len(generic) == len(svc._GENERIC_OFF_TOPIC), (
+        "the generic off-topic baseline must always be kept in full; "
+        f"got {len(generic)} of {len(svc._GENERIC_OFF_TOPIC)}"
+    )
+
+
+def test_seed_cases_with_provenance_caps_and_reports_total():
+    """seed_cases_with_provenance (the editor seed) caps sibling-provenance entries at the
+    same MAX_SEEDED_SHOULD_NOT AND exposes the full uncapped sibling-sourced count so the
+    route can return an honest total."""
+    from app.services import skill_tuner_service as svc
+
+    skill = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register."}
+    full = MAX_SEEDED_SHOULD_NOT + 5
+    siblings = _distinct_siblings(full)
+
+    seeded = svc.seed_cases_with_provenance(skill, siblings)
+    sibling_entries = [c for c in seeded["should_not"] if c["provenance"] == svc.PROVENANCE_SIBLING]
+
+    assert len(sibling_entries) == MAX_SEEDED_SHOULD_NOT, (
+        f"sibling-provenance should_not must be capped at {MAX_SEEDED_SHOULD_NOT}; "
+        f"got {len(sibling_entries)}"
+    )
+    # The full uncapped sibling-sourced count is exposed (the route turns it into `total`).
+    assert seeded["should_not_total"] == full, (
+        f"should_not_total must equal the full uncapped sibling count {full}; "
+        f"got {seeded['should_not_total']}"
+    )
+
+
+def test_seed_cases_with_provenance_no_cap_when_under_limit():
+    """With siblings <= cap, nothing is truncated and total equals the shown sibling count
+    (the banner-suppression path — total == shown means no banner)."""
+    from app.services import skill_tuner_service as svc
+
+    skill = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register."}
+    under = MAX_SEEDED_SHOULD_NOT - 2
+    siblings = _distinct_siblings(under)
+
+    seeded = svc.seed_cases_with_provenance(skill, siblings)
+    sibling_entries = [c for c in seeded["should_not"] if c["provenance"] == svc.PROVENANCE_SIBLING]
+
+    assert len(sibling_entries) == under, f"expected all {under} siblings shown; got {len(sibling_entries)}"
+    assert seeded["should_not_total"] == under, (
+        f"total must equal the shown count ({under}) when under the cap; got {seeded['should_not_total']}"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_seeded_cases_GET_returns_capped_slice_plus_total():
+    """GET .../tuner/cases/seeded with siblings > cap returns at most MAX_SEEDED_SHOULD_NOT
+    sibling-provenance should_not entries AND a top-level `total` == the full uncapped
+    sibling-sourced count; should_fire is untouched (non-vacuous: > cap distinct siblings)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+
+    full = MAX_SEEDED_SHOULD_NOT + 6
+    siblings = _distinct_siblings(full)
+    with patch.object(skill_tuner.skill_tuner_service, "fetch_owner_scoped_siblings",
+                      new=lambda *a, **k: siblings):
+        app.dependency_overrides[get_supabase] = lambda: sb
+        app.dependency_overrides[get_current_user] = lambda: OWNER
+        app.dependency_overrides[get_redis] = lambda: fake_redis
+        try:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                resp = await c.get(
+                    f"/skills/{SKILL_ID}/tuner/cases/seeded",
+                    headers={"Authorization": "Bearer test-token"},
+                )
+        finally:
+            app.dependency_overrides.pop(get_supabase, None)
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 200, f"expected 200; got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    sibling_entries = [c for c in body["should_not"] if c["provenance"] == "sibling"]
+    assert len(sibling_entries) <= MAX_SEEDED_SHOULD_NOT, (
+        f"sibling-provenance should_not must be <= {MAX_SEEDED_SHOULD_NOT}; got {len(sibling_entries)}"
+    )
+    assert body["total"] == full, (
+        f"body['total'] must equal the full uncapped sibling count {full}; got {body['total']}"
+    )
+    assert body.get("should_fire"), "should_fire must be untouched (non-empty)"
