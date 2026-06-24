@@ -102,6 +102,16 @@ def _inflight_key(skill_id: str) -> str:
     return f"tuner_inflight:{skill_id}"
 
 
+def _cancel_key(run_id) -> str:
+    """Redis key for the cooperative cancel flag (TT-08).
+
+    The DELETE cancel route SETs ``tuner_cancel:{run_id}`` (TTL'd) and the background job
+    reads it at the top of each candidate AND each provider loop, stopping cleanly before
+    burning further paid provider calls. run_ids are uuid4 (no reuse), and the flag is TTL'd
+    in the cancel route, so a stale flag can never pre-cancel a future run."""
+    return f"tuner_cancel:{run_id}"
+
+
 # ── Request body ────────────────────────────────────────────────────────────────
 class TunerCase(BaseModel):
     """One (client-held) benchmark case: a user prompt + whether the skill SHOULD fire on it.
@@ -285,7 +295,17 @@ async def _run_tuner_job(
         skill_name = skill.get("name", "")
 
         scored_candidates: list[dict] = []
+        # TT-08: cooperative cancel. The DELETE cancel route SETs ``tuner_cancel:{run_id}``;
+        # we read it at the top of the candidate loop AND the provider loop (one cheap redis.get
+        # per loop iteration, NOT per case) and break out cleanly. A cancelled run skips the
+        # winner pick + the Redis stash + the D-07 durable upsert (it must NOT persist a partial
+        # scoreboard as the durable latest), then falls through to the existing ``finally`` so the
+        # in-flight claim + the runs:active / per-skill ZREMs still run.
+        cancelled = False
         for cand_idx, candidate_desc in enumerate(bounded_candidates):
+            if await redis.get(_cancel_key(run_id)):
+                cancelled = True
+                break
             catalog_lines = f"- **{skill_name}**: {candidate_desc}"
             # Per-provider cells for this candidate (held-out split applied per axis).
             # Phase 123 (WR-02): split PER CLASS so the held-out partition is NOT vacuous on
@@ -303,12 +323,30 @@ async def _run_tuner_job(
             held_out_cases = _ho_f + _ho_n
             per_target_cells: list[dict] = []
             for target in targets:
+                # TT-08: cancel checkpoint at the provider loop top too — a cancel mid-candidate
+                # stops at the very next column instead of finishing the candidate's remaining
+                # providers (each a burst of paid provider calls).
+                if await redis.get(_cancel_key(run_id)):
+                    cancelled = True
+                    break
                 provider = target.get("provider", "unknown")
                 model = target.get("model") or ""
                 # An empty representative model (e.g. openrouter gateway) — skip honestly.
                 if not model:
                     continue
                 target_timeout = get_per_call_timeout(model)
+
+                # TT-07: emit a tuner_progress event with stage="provider_start" carrying
+                # provider+model at the START of this column (BEFORE the per-case loop), via the
+                # tuner's OWN _emit_tuner to run:{run_id}. The frontend flips the matching lane
+                # queued -> running on it — lanes no longer sit "queued" until tuner_provider_done
+                # (which fires only AFTER the whole column scores). Red line: this is the tuner's
+                # local emit, NOT the shared runs.py consumer (TT-06 heartbeat is Wave C).
+                await _emit_tuner(
+                    redis, run_id, EVENT_PROGRESS,
+                    stage="provider_start", candidate_index=cand_idx,
+                    provider=provider, model=model,
+                )
 
                 fire_decisions: list[bool] = []
                 no_false_decisions: list[bool] = []
@@ -378,6 +416,12 @@ async def _run_tuner_job(
                     candidate_index=cand_idx, provider=provider, model=model, cell=cell,
                 )
 
+            # TT-08: a cancel observed inside the provider loop breaks the candidate loop too —
+            # do NOT append a partial candidate (it would skew the winner pick) and do NOT score
+            # any further candidates.
+            if cancelled:
+                break
+
             # Phase 123.1-06 (TT-15): cell_score returns the SINGLE stored cell["score"]; a
             # wholly-unmeasured cell returns None -> SKIP it in the held-out mean (an all-error
             # column never drags the candidate's held-out signal). Fall back to 0.0 only when NO
@@ -401,6 +445,16 @@ async def _run_tuner_job(
                 stage="candidate_scored", candidate_index=cand_idx,
                 held_out_score=held_out_score,
             )
+
+        # TT-08: a cancelled run STOPS here — skip the winner pick + the Redis stash + the D-07
+        # durable upsert (a cancelled, partial run must NOT overwrite the durable latest
+        # scoreboard with garbage), emit a terminal ``error`` with reason ``cancelled`` (the
+        # existing SSE consumer + frontend onTerminal path handles it), and fall through to the
+        # existing ``finally`` so the in-flight claim + the runs:active / per-skill ZREMs still run.
+        if cancelled:
+            logger.info("tuner run %s cancelled — stopping without durable persist", run_id)
+            await _emit_terminal(redis, run_id, TERMINAL_ERROR, error="cancelled")
+            return
 
         winner = skill_tuner_service.pick_winner(scored_candidates)
         scoreboard = {
@@ -822,3 +876,53 @@ async def get_seeded_cases(
         "should_not": seeded.get("should_not", []),
         "total": seeded.get("should_not_total", 0),
     }
+
+
+@router.delete("/{skill_id}/tuner/runs/{run_id}")
+async def cancel_tuner_run(
+    skill_id: str,
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """REALLY cancel an in-flight tuning run (TT-08).
+
+    ``cancelRun`` previously only aborted the client SSE + went idle — the background job kept
+    burning paid provider calls and held the ``tuner_inflight`` claim for up to 1800s (so a
+    retry 409'd) and the cancelled run still finished + persisted. This route makes the cancel
+    real: it sets a ``tuner_cancel:{run_id}`` Redis flag (the running job observes it at its next
+    candidate/provider loop checkpoint and stops cleanly WITHOUT persisting a partial scoreboard)
+    and releases the in-flight claim immediately so a retry no longer 409s.
+
+    SECURITY (mirrors the CR-01 IDOR fix already in this phase): order of checks is load-bearing.
+      1. ``_fetch_owned_or_global_skill`` — 404 on a cross-user / non-global skill BEFORE any
+         flag is set (the SOLE owner gate; ``get_supabase`` is service-role).
+      2. run<->skill bind — ``redis.zscore(runs_by_thread:tuner:{skill_id}, run_id) is None``
+         -> 404. The skill gate only proves "you can SEE this skill"; it does NOT bind the
+         caller-supplied ``run_id``. The tuner reuses the SAME ``run:{run_id}`` keyspace as chat,
+         so owning/seeing a skill + a LEAKED run_id (logs / LangSmith / runs:active) must not let
+         a user cancel an arbitrary run. This route is IN-FLIGHT only (you cancel a RUNNING run),
+         so the live per-skill membership check suffices (same as the stream route).
+
+    Only AFTER both gates pass do we SET the (TTL'd) cancel flag + release the claim. 404 (never
+    403) on a miss so resource existence is not leaked.
+    """
+    await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    # run<->skill bind — refuse a foreign/leaked run_id even for a skill the caller CAN see.
+    if await redis.zscore(f"runs_by_thread:tuner:{skill_id}", str(run_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tuner run not found",
+        )
+
+    # Set the cooperative cancel flag (TTL'd so a stale flag self-clears; run_ids are uuid4 so it
+    # can never pre-cancel a different run) and release the in-flight claim immediately. The
+    # running job observes the flag at its next loop checkpoint and stops; its ``finally`` does the
+    # runs:active / per-skill ZREM cleanup — this route does not need to kill the task.
+    await redis.set(_cancel_key(run_id), "1", ex=_TUNER_BUFFER_TTL_S)
+    await redis.delete(_inflight_key(skill_id))
+    _INFLIGHT_SKILLS.discard(skill_id)  # same-process fast-path hint (NOT the gate)
+
+    return {"cancelled": True, "run_id": str(run_id)}
