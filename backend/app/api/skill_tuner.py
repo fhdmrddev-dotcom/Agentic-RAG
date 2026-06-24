@@ -312,11 +312,21 @@ async def _run_tuner_job(
 
                 fire_decisions: list[bool] = []
                 no_false_decisions: list[bool] = []
+                # Phase 123.1-06 (TT-12): an EXCEPTION is NOT "the model said no" — it is "we
+                # could not measure". Track, per axis, the number of held-out CASES whose every
+                # repeat RAISED (so an all-400 / all-timeout column ends with EMPTY decision
+                # lists + a positive error_count, and build_cell marks it measured=False). A
+                # PARTIALLY-failing case still yields a majority-vote decision (the honest-fail
+                # "treat a failed repeat as did-not-fire" robustness is preserved — only an
+                # ALL-repeats-raised case is counted as unmeasured for that axis).
+                fire_error_count = 0
+                no_false_error_count = 0
                 # Score on the HELD-OUT cases (winner-by-held-out, never train).
                 for case in held_out_cases:
                     prompt = case.get("prompt", "")
                     expected_fire = bool(case.get("should_fire"))
                     repeat_fires: list[bool] = []
+                    repeat_raises = 0
                     for _ in range(DEFAULT_REPEATS):
                         try:
                             decision = await asyncio.wait_for(
@@ -332,10 +342,21 @@ async def _run_tuner_job(
                         except (asyncio.TimeoutError, Exception):
                             logger.debug(
                                 "tuner classify_fires failed/timed out (run %s, %s); "
-                                "treating as did-not-fire",
+                                "treating a partial-fail repeat as did-not-fire",
                                 run_id, model, exc_info=True,
                             )
+                            repeat_raises += 1
+                            # Honest-fail floor for a PARTIALLY-failing case: a failed repeat
+                            # counts as did-not-fire in the majority vote (robustness preserved).
                             repeat_fires.append(False)
+                    if repeat_raises == DEFAULT_REPEATS:
+                        # EVERY repeat raised -> the case produced NO real signal. Count it as an
+                        # unmeasured case for its axis; do NOT append a fabricated decision.
+                        if expected_fire:
+                            fire_error_count += 1
+                        else:
+                            no_false_error_count += 1
+                        continue
                     # Aggregate the repeats: majority-fired -> the case "fired".
                     fired = sum(1 for f in repeat_fires if f) > (DEFAULT_REPEATS / 2)
                     if expected_fire:
@@ -348,6 +369,8 @@ async def _run_tuner_job(
                     model=model,
                     fire_decisions=fire_decisions,
                     no_false_decisions=no_false_decisions,
+                    fire_error_count=fire_error_count,
+                    no_false_error_count=no_false_error_count,
                 )
                 per_target_cells.append(cell)
                 await _emit_tuner(
@@ -355,10 +378,16 @@ async def _run_tuner_job(
                     candidate_index=cand_idx, provider=provider, model=model, cell=cell,
                 )
 
+            # Phase 123.1-06 (TT-15): cell_score returns the SINGLE stored cell["score"]; a
+            # wholly-unmeasured cell returns None -> SKIP it in the held-out mean (an all-error
+            # column never drags the candidate's held-out signal). Fall back to 0.0 only when NO
+            # cell measured (a candidate scored on zero measured columns), never crashing on None.
+            _measured_scores = [
+                s for s in (skill_tuner_service.cell_score(c) for c in per_target_cells)
+                if s is not None
+            ]
             held_out_score = (
-                sum(skill_tuner_service.cell_score(c) for c in per_target_cells)
-                / len(per_target_cells)
-                if per_target_cells else 0.0
+                sum(_measured_scores) / len(_measured_scores) if _measured_scores else 0.0
             )
             scored_candidates.append({
                 "index": cand_idx,
@@ -398,6 +427,20 @@ async def _run_tuner_job(
         # the whole thing is best-effort try/except so a DB hiccup never crashes the run (the Redis
         # stash still serves the per-run-id GET). ``user_id`` is the originating caller (whoever
         # ran the tuner — the documented global-skill last-runner attribution).
+        # Phase 123.1-06 (TT-12): the persisted "measured on N models" attribution must count
+        # ONLY the provider columns that actually produced a measurement — an all-error column
+        # (every classify call raised -> build_cell measured=False) is EXCLUDED, so the durable
+        # target_count can no longer over-state coverage. Count DISTINCT measured (provider,
+        # model) targets across the run's cells (each candidate scores the SAME target set, so a
+        # column measured iff it measured on any candidate). NOT ``len(targets)``.
+        measured_targets = {
+            (c.get("provider"), c.get("model"))
+            for cand in scored_candidates
+            for c in cand.get("cells", [])
+            if c.get("measured")
+        }
+        measured_target_count = len(measured_targets)
+
         if supabase is not None:
             try:
                 upsert_payload = {
@@ -406,7 +449,7 @@ async def _run_tuner_job(
                     "run_id": str(run_id),
                     "scoreboard": scoreboard,
                     "builder_model": builder_model,
-                    "target_count": len(targets),
+                    "target_count": measured_target_count,
                     "case_count": len(cases),
                     # Phase 123.1 (WR-07): a real ISO-8601 timestamptz, NOT the JSON string
                     # ``"now()"`` — PostgREST sends the value literally and Postgres rejects
