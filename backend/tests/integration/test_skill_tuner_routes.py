@@ -1334,3 +1334,305 @@ async def test_all_should_not_run_renders_fires_axis_unmeasured():
             f"NEVER a fabricated 1.0; got {c['axes']['fires']!r}"
         )
         assert c["axes"]["fires"] != 1.0, "an empty fire axis must never be a fabricated 1.0"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 123.1 Plan 07 (RUN UX — backlog §2) — honest live progress + a REAL cancel.
+#
+#   TT-07  the job emits a tuner_progress event with stage="provider_start" carrying
+#          provider+model at the START of each column (BEFORE the per-case loop) —
+#          so the frontend can flip a lane queued -> running the moment scoring
+#          begins, instead of every lane sitting "queued" until tuner_provider_done.
+#   TT-08  a real owner-scoped + run<->skill-bound DELETE cancel route sets a
+#          tuner_cancel:{run_id} Redis flag and releases the in-flight claim; the job
+#          checks the flag at the candidate AND provider loop tops and stops cleanly
+#          WITHOUT persisting a partial scoreboard; cross-user / foreign-run-id 404.
+#
+# These mirror the existing run<->skill bind 404 shape (test_get_results_cross_user,
+# test_visible_skill_foreign_run_id_returns_404_both_routes) + the direct
+# _run_tuner_job invocation pattern (test_results_carry_both_fires_and_no_false).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ── TT-07 — the job emits stage="provider_start" at each column start ─────────────
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_provider_start_emitted_before_provider_done():
+    """Drive _run_tuner_job directly and assert the run-buffer carries a tuner_progress event
+    with stage="provider_start" carrying provider+model for EACH measured target, emitted
+    BEFORE that target's tuner_provider_done (TT-07 — the lane-flip honesty signal)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"},
+               {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=run_id, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=sb,
+        )
+
+    stream_key = f"run:{run_id}"
+    # A provider_start tuner_progress event was emitted for EACH measured target.
+    starts = [
+        p for p in fake_redis.events_of_type(stream_key, skill_tuner.EVENT_PROGRESS)
+        if p.get("stage") == "provider_start"
+    ]
+    assert starts, "expected at least one tuner_progress stage='provider_start' event (TT-07)"
+    started_models = {(p.get("provider"), p.get("model")) for p in starts}
+    assert ("openai", "gpt-5.4-mini") in started_models, \
+        f"expected a provider_start for the openai column; got {started_models!r}"
+    assert ("anthropic", "claude-haiku-4-5-20251001") in started_models, \
+        f"expected a provider_start for the anthropic column; got {started_models!r}"
+
+    # The provider_start for a column precedes that column's tuner_provider_done (the lane
+    # flips queued->running BEFORE it lands "done"). Compare positions in the raw stream.
+    raw = [json.loads(f["data"]) for f in fake_redis.streams.get(stream_key, [])]
+    for model in ("gpt-5.4-mini", "claude-haiku-4-5-20251001"):
+        start_idx = next(
+            (i for i, e in enumerate(raw)
+             if e.get("type") == skill_tuner.EVENT_PROGRESS
+             and e.get("stage") == "provider_start" and e.get("model") == model),
+            None,
+        )
+        done_idx = next(
+            (i for i, e in enumerate(raw)
+             if e.get("type") == skill_tuner.EVENT_PROVIDER_DONE and e.get("model") == model),
+            None,
+        )
+        assert start_idx is not None, f"no provider_start for model {model!r}"
+        assert done_idx is not None, f"no tuner_provider_done for model {model!r}"
+        assert start_idx < done_idx, (
+            f"provider_start for {model!r} (idx {start_idx}) must precede its "
+            f"tuner_provider_done (idx {done_idx}) — the lane flips running BEFORE done"
+        )
+
+
+# ── TT-08 — cross-user DELETE cancel → 404 (the owner gate, mirrors CR-01 IDOR) ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_cancel_cross_user_returns_404():
+    """DELETE .../tuner/runs/{run_id} for a skill owned by ANOTHER user (not global) → 404
+    (TT-08 owner gate, mirrors test_get_results_cross_user_returns_404). The owner-scope
+    SELECT finds no row for OTHER_USER; the route 404s (NOT 403 — never leak existence) and
+    NEVER sets the cancel flag."""
+    sb = _supabase_returning_skill([])  # no row for OTHER_USER
+    fake_redis = _FakeRedis()
+    run_id = str(uuid4())
+    skills_execute_called = []
+    sb.table("skills").execute.side_effect = lambda *a, **k: (
+        skills_execute_called.append((a, k)) or _make_result([])
+    )
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.delete(
+                f"/skills/{SKILL_ID}/tuner/runs/{run_id}",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 404, \
+        f"expected 404 (NOT 403) on cross-user cancel; got {resp.status_code} body={resp.text}"
+    assert resp.json().get("detail") == "Skill not found", \
+        f"expected detail 'Skill not found'; got {resp.json()!r}"
+    assert skills_execute_called, "expected the owner-scope SELECT to run (cancel route registered)"
+    # No cancel flag was set for the foreign caller.
+    assert skill_tuner._cancel_key(run_id) not in fake_redis.kv, \
+        "a cross-user cancel must NEVER set the tuner_cancel flag"
+
+
+# ── TT-08 — a VISIBLE skill + a FOREIGN run_id → 404 (run<->skill bind, mirrors CR-01) ─
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_cancel_foreign_run_id_returns_404():
+    """DELETE with a run_id NOT a member of runs_by_thread:tuner:{skill_id} (a foreign/leaked
+    run_id, even for a skill the caller CAN see) → 404 (TT-08 run<->skill bind, mirrors
+    test_visible_skill_foreign_run_id_returns_404_both_routes). The cancel flag is NEVER set
+    for an unbound run_id, and the in-flight claim of the unrelated skill is NOT released."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+    foreign_run_id = str(uuid4())
+    # The membership set for THIS skill is empty — the foreign run was never ZADDed here.
+    # Pre-seed an unrelated in-flight claim to prove the bad cancel does NOT release it.
+    fake_redis.kv[skill_tuner._inflight_key(SKILL_ID)] = "some-other-active-run"
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OWNER  # OWNER can SEE the skill
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.delete(
+                f"/skills/{SKILL_ID}/tuner/runs/{foreign_run_id}",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 404, \
+        f"expected 404 on a foreign run_id cancel; got {resp.status_code} body={resp.text}"
+    assert resp.json().get("detail") == "Tuner run not found", \
+        f"expected the run<->skill membership 404 detail; got {resp.json()!r}"
+    # The foreign run_id never got a cancel flag (no cross-buffer cancel).
+    assert skill_tuner._cancel_key(foreign_run_id) not in fake_redis.kv, \
+        "a foreign run_id cancel must NEVER set the tuner_cancel flag"
+    # The unrelated skill's in-flight claim was NOT released by the bad cancel.
+    assert fake_redis.kv.get(skill_tuner._inflight_key(SKILL_ID)) == "some-other-active-run", \
+        "a foreign-run-id cancel must NOT release the skill's in-flight claim"
+
+
+# ── TT-08 — happy path: an owned, in-flight, bound run cancels (flag + claim release) ─
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_cancel_owned_inflight_run_sets_flag_and_releases_claim():
+    """DELETE for an OWNED, in-flight, BOUND run → 2xx, SETs tuner_cancel:{run_id} AND DELetes
+    tuner_inflight:{skill_id} (the claim is released so a retry no longer 409s) — TT-08 happy
+    path. The membership set + the in-flight claim are both pre-seeded (the start route's state)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+    run_id = str(uuid4())
+    # Simulate the start route's state: the run IS a member of the skill's set + claim is HELD.
+    fake_redis.zsets[f"runs_by_thread:tuner:{SKILL_ID}"] = {run_id: 1.0}
+    fake_redis.kv[skill_tuner._inflight_key(SKILL_ID)] = run_id
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OWNER
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.delete(
+                f"/skills/{SKILL_ID}/tuner/runs/{run_id}",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code in (200, 202), \
+        f"expected 2xx on a legitimate cancel; got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    assert body.get("cancelled") is True, f"expected cancelled=True; got {body!r}"
+    # The cancel flag was set so the running job stops at its next loop checkpoint.
+    assert fake_redis.kv.get(skill_tuner._cancel_key(run_id)) is not None, \
+        "DELETE must SET tuner_cancel:{run_id} so the job stops"
+    # The in-flight claim was released immediately — a retry no longer 409s for the full TTL.
+    assert skill_tuner._inflight_key(SKILL_ID) not in fake_redis.kv, \
+        "DELETE must release the tuner_inflight claim so a retry no longer 409s"
+
+
+# ── TT-08 — the job checkpoint: a pre-set cancel flag stops the run early ──────────
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_run_stops_early_when_cancel_flag_preset():
+    """Drive _run_tuner_job with the tuner_cancel flag PRE-SET in the fake redis; assert the job
+    STOPS early (FEWER classify calls than an uncancelled run over the same inputs), does NOT
+    persist a durable scoreboard (no tuner_runs upsert), and still runs its finally cleanup (the
+    inflight key is cleared, runs:active is ZREM'd) — TT-08 checkpoint."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"},
+               {"provider": "anthropic", "model": "claude-haiku-4-5-20251001"}]
+
+    # Baseline: an UNCANCELLED run to count the classify calls over the same inputs.
+    base_count = {"n": 0}
+
+    async def _classify_counting(target_model, catalog_lines, user_prompt, user_settings):
+        base_count["n"] += 1
+        return await _classify(target_model, catalog_lines, user_prompt, user_settings)
+
+    base_redis = _FakeRedis()
+    base_store = {}
+    base_sb = _supabase_with_tuner_runs([skill_row], store=base_store)
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify_counting), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=base_redis, run_id=uuid4(), skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=base_sb,
+        )
+    assert base_count["n"] > 0, "baseline run must make classify calls (anti-vacuous)"
+    assert base_store["_upserts"], "baseline run must persist a durable scoreboard"
+
+    # Cancelled: the flag is PRE-SET before the job starts; it must stop early.
+    cancel_count = {"n": 0}
+
+    async def _classify_counting_cancel(target_model, catalog_lines, user_prompt, user_settings):
+        cancel_count["n"] += 1
+        return await _classify(target_model, catalog_lines, user_prompt, user_settings)
+
+    cancel_redis = _FakeRedis()
+    cancel_store = {}
+    cancel_sb = _supabase_with_tuner_runs([skill_row], store=cancel_store)
+    run_id = uuid4()
+    # Pre-set the cancel flag + the in-flight claim + the active-run membership (start state).
+    cancel_redis.kv[skill_tuner._cancel_key(run_id)] = "1"
+    cancel_redis.kv[skill_tuner._inflight_key(SKILL_ID)] = str(run_id)
+    cancel_redis.zsets["runs:active"] = {str(run_id): 1.0}
+    cancel_redis.zsets[f"runs_by_thread:tuner:{SKILL_ID}"] = {str(run_id): 1.0}
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify_counting_cancel), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=cancel_redis, run_id=run_id, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=2, user_id=OWNER["id"], supabase=cancel_sb,
+        )
+
+    # The cancelled run scored FEWER cases than the full baseline (it stopped at a loop top).
+    assert cancel_count["n"] < base_count["n"], (
+        f"a pre-cancelled run must make FEWER classify calls than the full run; "
+        f"cancelled={cancel_count['n']} baseline={base_count['n']}"
+    )
+    # A cancelled run does NOT persist a partial scoreboard as the durable latest.
+    assert not cancel_store["_upserts"], (
+        "a cancelled run must NOT upsert a partial scoreboard into tuner_runs (no durable persist)"
+    )
+    # The finally cleanup STILL ran: the in-flight claim is released + runs:active is ZREM'd.
+    assert skill_tuner._inflight_key(SKILL_ID) not in cancel_redis.kv, \
+        "the cancelled run's finally must still release the in-flight claim"
+    assert str(run_id) not in cancel_redis.zsets.get("runs:active", {}), \
+        "the cancelled run's finally must still ZREM runs:active"
