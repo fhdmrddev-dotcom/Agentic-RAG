@@ -18,7 +18,7 @@
  * The labels read approximate (~60% / ~40%) because the exact ratio no longer holds for
  * small/unbalanced sets. The bar reads the honest train/held-out counts without lecturing.
  */
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -42,6 +42,11 @@ interface Props {
   onChange: (cases: EditorCase[]) => void
   /** The skill being tuned — used to auto-seed the starter should-fire paraphrases. */
   skill: Skill
+  /** Phase 123.1-05 (BUG-260624-01 #1): the FULL uncapped sibling-sourced should_not count
+   *  from the backend (SeededCasesResponse.total). When provided AND greater than the shown
+   *  sibling-provenance count, the should-NOT column shows an honest "showing N of M — capped"
+   *  banner. Undefined (e.g. the seeded fetch failed) → no banner. */
+  seededNotTotal?: number
 }
 
 const TRAIN_RATIO = 0.6 // mirrors backend DEFAULT_HELD_OUT_TRAIN_RATIO
@@ -66,7 +71,7 @@ function ProvenanceTag({ provenance }: { provenance: EditorCase["provenance"] })
   return (
     <span
       data-testid="provenance-tag"
-      className="text-[9px] uppercase tracking-wider font-mono text-muted-foreground shrink-0"
+      className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground shrink-0"
     >
       {PROVENANCE_LABEL[provenance]}
     </span>
@@ -79,12 +84,16 @@ function CaseColumn({
   onAdd,
   onRemove,
   isRail,
+  capBanner,
 }: {
   testId: string
   cases: EditorCase[]
   onAdd: () => void
   onRemove: (id: string) => void
   isRail: boolean
+  /** Optional honest "showing N of M — capped" banner rendered ABOVE the list (should-NOT
+   *  column only, Phase 123.1-05). Never silent truncation. */
+  capBanner?: ReactNode
 }) {
   return (
     <div
@@ -96,10 +105,14 @@ function CaseColumn({
     >
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <span className="text-xs font-headline font-bold text-foreground">
+          <span className="text-sm font-headline font-bold text-foreground">
             {isRail ? "Should NOT fire" : "Should fire"}
+            {/* Per-column count (Phase 123.1-05) — the shown case length next to the title. */}
+            <span data-testid="case-col-count" className="ml-1.5 text-xs font-mono font-normal text-muted-foreground">
+              {cases.length}
+            </span>
           </span>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {isRail ? "the false-fire rail (should-NOT precision)" : "should-trigger recall"}
           </span>
         </div>
@@ -107,16 +120,20 @@ function CaseColumn({
           <Plus className="h-3 w-3" />
         </Button>
       </div>
-      <ul className="flex flex-col gap-1.5">
+      {capBanner}
+      {/* Bounded + scrollable (Phase 123.1-05): a long seeded set scrolls inside a 340px
+          column instead of stacking into an illegible wall (mirrors sketch 045-B
+          `.case-list.capped { max-height: 340px }` + scrollbar-thin). */}
+      <ul className="flex flex-col gap-1.5 max-h-[340px] overflow-y-auto scrollbar-thin">
         {cases.length === 0 && (
-          <li className="text-[11px] text-muted-foreground italic py-1">No cases yet — add one or run to auto-seed.</li>
+          <li className="text-xs text-muted-foreground italic py-1">No cases yet — add one or run to auto-seed.</li>
         )}
         {cases.map((c) => (
           <li
             key={c.id}
-            className="flex items-start justify-between gap-2 rounded-lg bg-card/40 px-2 py-1.5 text-xs"
+            className="flex items-start justify-between gap-2 rounded-lg bg-card/40 px-2 py-1.5"
           >
-            <span className="flex-1 min-w-0 text-foreground break-words">{c.prompt}</span>
+            <span className="flex-1 min-w-0 text-sm text-foreground break-words">{c.prompt}</span>
             <div className="flex items-center gap-1.5 shrink-0">
               <ProvenanceTag provenance={c.provenance} />
               <button
@@ -134,12 +151,25 @@ function CaseColumn({
   )
 }
 
-export function CaseEditor({ cases, onChange, skill: _skill }: Props) {
+export function CaseEditor({ cases, onChange, skill: _skill, seededNotTotal }: Props) {
   const [draft, setDraft] = useState("")
   const [draftFire, setDraftFire] = useState(true)
+  // "show all N" reveals an HONEST explanation of the cap, never fabricated cases (Phase
+  // 123.1-05). The backend deliberately withheld the rest to keep the benchmark focused/fast;
+  // the editor has no withheld cases to reveal, so "show all" discloses what the cap is and how
+  // the author can extend it (add cases) — it MUST NOT invent the seeded cases the backend cut.
+  const [showCapNote, setShowCapNote] = useState(false)
 
   const fireCases = cases.filter((c) => c.should_fire)
   const noFireCases = cases.filter((c) => !c.should_fire)
+
+  // Phase 123.1-05 (BUG-260624-01 #1): the honest cap banner. The backend caps the
+  // sibling-sourced should_not at MAX_SEEDED_SHOULD_NOT and returns the full uncapped count as
+  // `seededNotTotal`. The "shown" sibling count is the number of sibling-provenance cases in
+  // the should-NOT column (author-added "you" cases never count toward the cap). The banner is
+  // shown ONLY when total > shown — capping is never silent (a load-bearing honesty rule).
+  const shownSiblingCount = noFireCases.filter((c) => c.provenance === "sibling").length
+  const isCapped = seededNotTotal != null && seededNotTotal > shownSiblingCount
 
   // ~60/40 split (deterministic, mirrors the backend): the backend splits EACH class
   // independently then concatenates the held-out halves, so the honest held-out count is
@@ -193,8 +223,10 @@ export function CaseEditor({ cases, onChange, skill: _skill }: Props) {
         </Button>
       </div>
 
-      {/* Two columns: should-fire / should-NOT (the false-fire rail). */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Two columns: should-fire / should-NOT (the false-fire rail). Full-width two-up grid
+          (Phase 123.1-05): each column gets ~half the FULL page width once the page is
+          full-width (no longer ~170px crammed in a 360px rail). Stacks on narrow widths. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <CaseColumn
           testId="case-col-should-fire"
           cases={fireCases}
@@ -208,6 +240,35 @@ export function CaseEditor({ cases, onChange, skill: _skill }: Props) {
           onAdd={() => addCase(false)}
           onRemove={removeCase}
           isRail
+          capBanner={
+            isCapped ? (
+              <div
+                data-testid="cap-banner"
+                className="flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-amber-200/90">
+                    showing {shownSiblingCount} of {seededNotTotal} seeded · capped to keep the
+                    benchmark focused
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCapNote((v) => !v)}
+                    className="shrink-0 text-xs font-medium text-amber-300 hover:text-amber-200 underline-offset-2 hover:underline"
+                  >
+                    show all {seededNotTotal}
+                  </button>
+                </div>
+                {showCapNote && (
+                  <p className="text-[11px] leading-snug text-amber-100/70">
+                    The benchmark seeds the {shownSiblingCount} most relevant sibling skills as
+                    false-fire bait — the rest are withheld so the run stays fast and the editor
+                    legible. To benchmark against more, add your own should-NOT cases above.
+                  </p>
+                )}
+              </div>
+            ) : undefined
+          }
         />
       </div>
 

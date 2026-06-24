@@ -87,6 +87,11 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   //    persisted. Task 2b's CaseEditor owns the two-column should-fire/should-NOT
   //    editing; the page holds the case list + the run config. ──
   const [cases, setCases] = useState<EditorCase[]>([])
+  // Phase 123.1-05 (BUG-260624-01 #1): the FULL uncapped sibling-sourced should_not count from
+  // the seeded GET. Threaded into CaseEditor so the should-NOT column shows an honest
+  // "showing N of M — capped" banner when the backend capped the seed. undefined = no banner
+  // (no seeded fetch yet, or it failed).
+  const [seededNotTotal, setSeededNotTotal] = useState<number | undefined>(undefined)
 
   // ── Run state. The elapsed timer derives from a STABLE start-ts (the 095
   //    never-vanishes lesson) — set once at kickoff, never reset on a transient
@@ -158,11 +163,16 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
           })),
         ]
         setCases(hydrated)
+        // The uncapped sibling total drives the honest "showing N of M — capped" banner.
+        setSeededNotTotal(seeded.total)
       })
       .catch(() => {
         // A seeded-cases read failure leaves the editor empty (author can add cases
-        // manually + the run auto-seeds) — never surfaces an error toast.
-        if (!cancelled) setCases([])
+        // manually + the run auto-seeds) — never surfaces an error toast, and no cap banner.
+        if (!cancelled) {
+          setCases([])
+          setSeededNotTotal(undefined)
+        }
       })
 
     // 2. Rehydrate the durable latest result (D-07). 404 → null (no run yet) → empty state.
@@ -437,7 +447,7 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                   </p>
                 </section>
 
-                <CaseEditor cases={cases} onChange={setCases} skill={skill} />
+                <CaseEditor cases={cases} onChange={setCases} skill={skill} seededNotTotal={seededNotTotal} />
 
                 {/* Run config / kickoff bar (cases × N models × 3 repeats). The model
                     count is the CONFIGURED-TARGET count pre-run (D-12) — populated on

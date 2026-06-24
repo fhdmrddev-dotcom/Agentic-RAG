@@ -2761,10 +2761,14 @@ export interface SeededCase {
 }
 
 /** The seeded-cases response — should_fire (recall rail) + should_not (false-fire rail), each
- *  carrying provenance so the editor can show + edit them before a run (fixes WR-05). */
+ *  carrying provenance so the editor can show + edit them before a run (fixes WR-05).
+ *  `total` (Phase 123.1-05 / BUG-260624-01 #1) is the FULL uncapped sibling-sourced should_not
+ *  count; `should_not` is capped (MAX_SEEDED_SHOULD_NOT) so the editor shows an honest
+ *  "showing N of M — capped" banner whenever `total` exceeds the shown sibling count. */
 export interface SeededCasesResponse {
   should_fire: SeededCase[]
   should_not: SeededCase[]
+  total: number
 }
 
 /** Read the DURABLE latest tuner result for a skill (D-07 rehydration-on-open). Unlike
