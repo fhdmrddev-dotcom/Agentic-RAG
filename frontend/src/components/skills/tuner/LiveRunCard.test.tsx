@@ -86,6 +86,46 @@ describe("LiveRunCard — phase footers + never-vanishes timer", () => {
     expect(screen.queryByRole("button", { name: /cancel/i })).toBeNull()
   })
 
+  it("WR-06: the frozen elapsed reflects the true finish delta from a stable startTs", () => {
+    // A run that started 5s ago and has now finished (phase flipped to reconciling). The frozen
+    // elapsed must be ≥ ~5s (the true finish delta), NOT a reset 0 / a sub-second under-report.
+    const startTs = Date.now() - 5000
+    render(
+      <LiveRunCard
+        lanes={[lane("openai", "gpt-5.4-mini", "done", 0.9)]}
+        startTs={startTs}
+        phase="reconciling"
+        error={null}
+        onCancel={() => {}}
+      />,
+    )
+    const timer = screen.getByTestId("live-run-timer")
+    const match = timer.textContent?.match(/([\d.]+)\s*s/)
+    expect(match).not.toBeNull()
+    const seconds = parseFloat(match![1])
+    // The true finish delta is ~5s — never a reset 0 and never wildly larger.
+    expect(seconds).toBeGreaterThanOrEqual(4.5)
+    expect(seconds).toBeLessThan(10)
+  })
+
+  it("WR-04: an all-error (null-score) done lane renders 'done', never a crash / fabricated 0.00", () => {
+    // TT-12 made `score: null` reachable for an all-error provider column. The lane type now
+    // permits `number | null`; the `!= null` guard renders "done" instead of a fabricated 0.00.
+    render(
+      <LiveRunCard
+        lanes={[lane("minimax", "MiniMax-M2.7-highspeed", "done", null)]}
+        startTs={Date.now()}
+        phase="reconciling"
+        error={null}
+        onCancel={() => {}}
+      />,
+    )
+    const laneEl = screen.getByTestId("lane-minimax")
+    expect(laneEl.textContent?.toLowerCase()).toContain("done")
+    // A null score must NOT render a fabricated numeric score.
+    expect(laneEl.textContent).not.toMatch(/0\.00/)
+  })
+
   it("phase='error' renders the alert error copy", () => {
     render(
       <LiveRunCard

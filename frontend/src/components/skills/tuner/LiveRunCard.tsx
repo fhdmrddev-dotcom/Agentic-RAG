@@ -55,13 +55,29 @@ export function LiveRunCard({ lanes, startTs, phase, error, onCancel }: Props) {
   // continuously. Elapsed derives ONLY from the stable startTs (immune to dropped
   // SSE / temp remounts); it freezes only when phase is no longer running.
   const [now, setNow] = useState<number>(() => Date.now())
+  // WR-06: on the running→non-running transition capture a one-shot `frozenAt` (Date.now()).
+  // The 250ms interval `now` can be up to ~250ms stale relative to the actual phase flip, so
+  // rendering the frozen elapsed from `now` under-reports the true finish delta. `frozenAt`
+  // pins the real finish instant; it is cleared back to null whenever a (re)run goes running
+  // again so a subsequent run re-freezes honestly.
+  const [frozenAt, setFrozenAt] = useState<number | null>(null)
   useEffect(() => {
-    if (phase !== "running") return
+    if (phase !== "running") {
+      // Capture the finish instant ONCE on the transition out of "running" (and keep it stable
+      // across reconciling→error/done — only a fresh "running" clears it below).
+      setFrozenAt((prev) => prev ?? Date.now())
+      return
+    }
+    // Back to running (a fresh kickoff / reconnect) — drop any stale freeze + resume ticking.
+    setFrozenAt(null)
+    setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), 250)
     return () => clearInterval(id)
   }, [phase])
 
-  const elapsedS = startTs != null ? Math.max(0, (now - startTs) / 1000) : 0
+  // While frozen, use the true finish instant (frozenAt), not the up-to-250ms-stale interval now.
+  const elapsedRef = frozenAt ?? now
+  const elapsedS = startTs != null ? Math.max(0, (elapsedRef - startTs) / 1000) : 0
 
   return (
     <div data-testid="live-run-card" className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm flex flex-col gap-3">
