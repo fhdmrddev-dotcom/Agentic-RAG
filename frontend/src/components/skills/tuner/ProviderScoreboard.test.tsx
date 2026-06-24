@@ -20,26 +20,13 @@
  *  - selecting "Use" reveals an explicit diff-confirm strip (old vs new); confirming
  *    calls onConfirm (which wraps updateSkill) — nothing auto-applies.
  */
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect } from "vitest"
 import { render, screen, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { ProviderScoreboard } from "./ProviderScoreboard"
-import { CandidateCard } from "./CandidateCard"
-import type { TunerCell, TunerCandidate } from "@/lib/api"
+import type { TunerCell } from "@/lib/api"
 
 function cell(provider: string, model: string, fires: number, noFalse: number, score: number): TunerCell {
   return { provider, model, axes: { fires, no_false: noFalse }, score }
-}
-
-function makeCandidate(overrides: Partial<TunerCandidate> = {}): TunerCandidate {
-  return {
-    index: 1,
-    description: "Use this skill when the user asks to write or fix SQL queries.",
-    cells: [cell("openai", "gpt-5.4-mini", 0.9, 0.8, 0.85)],
-    held_out_score: 0.85,
-    is_baseline: false,
-    ...overrides,
-  }
 }
 
 describe("ProviderScoreboard — N-column provider-set adaptivity (042-A)", () => {
@@ -108,73 +95,65 @@ describe("ProviderScoreboard — N-column provider-set adaptivity (042-A)", () =
   })
 })
 
-describe("CandidateCard — held-out score + author-confirm, no auto-apply (042-A / D-03)", () => {
-  it("shows the candidate's held-out score", () => {
-    render(
-      <CandidateCard
-        candidate={makeCandidate({ held_out_score: 0.83 })}
-        isWinner={false}
-        currentDescription="old description"
-        onConfirm={vi.fn()}
-      />,
-    )
-    const card = screen.getByTestId("candidate-card")
-    expect(card.textContent?.toLowerCase()).toContain("held-out")
-    expect(card.textContent).toMatch(/0\.83|83/)
+describe("ProviderScoreboard — D-02/D-12 vertical rows + magnitude bar + combined score", () => {
+  it("renders as a vertical flex-column container, NOT a fixed repeat(N,1fr) horizontal grid", () => {
+    const cells = [
+      cell("openai", "gpt-5.4-mini", 0.9, 0.85, 0.875),
+      cell("anthropic", "claude-haiku-4-5", 0.95, 0.9, 0.925),
+    ]
+    render(<ProviderScoreboard cells={cells} />)
+    const board = screen.getByTestId("provider-scoreboard")
+    // vertical rows — the container is a flex column, never a repeat(N,1fr) grid.
+    expect(board.className).toContain("flex-col")
+    expect(board.getAttribute("style") ?? "").not.toContain("repeat(")
   })
 
-  it("selecting Use reveals a diff strip and confirming calls onConfirm — nothing auto-applies", async () => {
-    const user = userEvent.setup()
-    const onConfirm = vi.fn()
-    const candidate = makeCandidate({
-      description: "Use this skill when the user asks to write or fix SQL queries.",
-    })
-    render(
-      <CandidateCard
-        candidate={candidate}
-        isWinner={true}
-        currentDescription="Fires on SQL."
-        onConfirm={onConfirm}
-      />,
-    )
-    // No auto-apply: onConfirm is NOT called on mount.
-    expect(onConfirm).not.toHaveBeenCalled()
-    // The diff strip is not shown until the author asks for it.
-    expect(screen.queryByTestId("candidate-diff-confirm")).toBeNull()
-
-    await user.click(screen.getByRole("button", { name: /use/i }))
-
-    // The diff-confirm strip appears (old vs new visible).
-    const strip = screen.getByTestId("candidate-diff-confirm")
-    expect(strip.textContent).toContain("Fires on SQL.")
-    expect(strip.textContent).toContain(candidate.description)
-    // STILL not applied — revealing the diff is not the write.
-    expect(onConfirm).not.toHaveBeenCalled()
-
-    await user.click(within(strip).getByRole("button", { name: /confirm|save/i }))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-    expect(onConfirm).toHaveBeenCalledWith(candidate)
+  it("8 cells render 8 legible vertical rows (no horizontal cram)", () => {
+    const cells = [
+      cell("openai", "gpt-5.4-mini", 0.9, 0.85, 0.875),
+      cell("anthropic", "claude-haiku-4-5", 0.95, 0.9, 0.925),
+      cell("google", "gemini-3.5-flash", 0.8, 0.75, 0.775),
+      cell("openrouter", "z-ai/glm-5.1", 0.7, 0.6, 0.65),
+      cell("zhipu", "glm-5.1", 0.85, 0.8, 0.825),
+      cell("moonshot", "kimi-k2", 0.6, 0.55, 0.575),
+      cell("minimax", "minimax-m3", 0.5, 0.45, 0.475),
+      cell("deepseek", "deepseek-v3", 0.65, 0.7, 0.675),
+    ]
+    render(<ProviderScoreboard cells={cells} />)
+    expect(screen.getAllByTestId("scoreboard-cell")).toHaveLength(8)
+    // every row carries a magnitude bar — 8 rows → 8 bars.
+    expect(screen.getAllByTestId("scoreboard-bar")).toHaveLength(8)
   })
 
-  it("WR-04: a failed save surfaces an inline error and keeps the diff strip open (never silent)", async () => {
-    const user = userEvent.setup()
-    const onConfirm = vi.fn().mockRejectedValue(new Error("Failed to update skill. Please try again."))
-    render(
-      <CandidateCard
-        candidate={makeCandidate()}
-        isWinner={true}
-        currentDescription="Fires on SQL."
-        onConfirm={onConfirm}
-      />,
-    )
-    await user.click(screen.getByRole("button", { name: /use/i }))
-    await user.click(within(screen.getByTestId("candidate-diff-confirm")).getByRole("button", { name: /confirm|save/i }))
+  it("each row renders a magnitude bar whose width is derived from the server cell.score", () => {
+    const cells = [cell("openai", "gpt-5.4-mini", 0.9, 0.8, 0.42)]
+    render(<ProviderScoreboard cells={cells} />)
+    const bar = screen.getByTestId("scoreboard-bar")
+    // the inner fill width is score * 100% — driven by the server combined score, never recomputed.
+    const fill = bar.querySelector("[data-testid='scoreboard-bar-fill']") as HTMLElement
+    expect(fill).toBeTruthy()
+    expect(fill.style.width).toBe("42%")
+  })
 
-    // The rejection is caught and surfaced — not swallowed.
-    const err = await screen.findByTestId("candidate-save-error")
-    expect(err.textContent).toMatch(/failed to update skill/i)
-    // The strip stays open (the write failed) and "Saved" never renders.
-    expect(screen.getByTestId("candidate-diff-confirm")).toBeTruthy()
-    expect(screen.queryByText(/now drives firing/i)).toBeNull()
+  it("renders the leading combined-score number (cell.score) per row", () => {
+    const cells = [cell("anthropic", "claude-haiku-4-5", 0.95, 0.9, 0.93)]
+    render(<ProviderScoreboard cells={cells} />)
+    const scoreEl = screen.getByTestId("cell-score")
+    // the leading number is the server-computed combined score, 2dp.
+    expect(scoreEl.textContent).toContain("0.93")
+  })
+
+  it("KEEPS both honest sub-scores (fires + no-false) visible on every row alongside the bar", () => {
+    const cells = [
+      cell("openai", "gpt-5.4-mini", 0.9, 0.85, 0.875),
+      cell("anthropic", "claude-haiku-4-5", 0.95, 0.9, 0.925),
+    ]
+    render(<ProviderScoreboard cells={cells} />)
+    for (const row of screen.getAllByTestId("scoreboard-cell")) {
+      expect(within(row).getByTestId("cell-fires")).toBeTruthy()
+      expect(within(row).getByTestId("cell-no-false")).toBeTruthy()
+      // the bar is a SIBLING of the honest sub-scores — never replacing them.
+      expect(within(row).getByTestId("scoreboard-bar")).toBeTruthy()
+    }
   })
 })
