@@ -2739,6 +2739,55 @@ export async function getTunerResults(
   return (await res.json()) as TunerScoreboard
 }
 
+/** The DURABLE latest tuner result for a skill (Phase 123.1 / D-07 — survives a Redis flush /
+ *  refresh). Returned by GET .../tuner/runs/latest; the `scoreboard` is the same TunerScoreboard
+ *  shape carried on `tuner_complete`, plus attribution fields. */
+export interface LatestTunerRun {
+  skill_id: string
+  run_id: string
+  scoreboard: TunerScoreboard
+  builder_model: string
+  target_count: number
+  case_count: number
+  updated_at: string
+}
+
+/** One seeded benchmark case carrying its provenance (Phase 123.1 / D-05): `"seeded"` =
+ *  this skill's own description/paraphrase or the generic off-topic set; `"sibling"` = an
+ *  owner-scoped sibling skill's description (the false-fire rail). NEVER `"held"`. */
+export interface SeededCase {
+  prompt: string
+  provenance: string
+}
+
+/** The seeded-cases response — should_fire (recall rail) + should_not (false-fire rail), each
+ *  carrying provenance so the editor can show + edit them before a run (fixes WR-05). */
+export interface SeededCasesResponse {
+  should_fire: SeededCase[]
+  should_not: SeededCase[]
+}
+
+/** Read the DURABLE latest tuner result for a skill (D-07 rehydration-on-open). Unlike
+ *  `getTunerResults` (per-run-id, ephemeral Redis), this survives a refresh. A 404 means NO
+ *  run has ever completed for this skill yet → resolves to `null` (the caller renders the
+ *  empty / never-run state), NOT a thrown error. */
+export async function getTunerLatest(skillId: string): Promise<LatestTunerRun | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/latest`, { headers })
+  if (res.status === 404) return null
+  if (!res.ok) throw new ApiError("Failed to load the latest tuner result.", res.status)
+  return (await res.json()) as LatestTunerRun
+}
+
+/** Read the already-computed seeded benchmark cases (with provenance) so the editor can show +
+ *  edit them before a run (D-05 / WR-05). Owner-scoped on the server (404 cross-user). */
+export async function getSeededCases(skillId: string): Promise<SeededCasesResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/cases/seeded`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the seeded tuner cases.", res.status)
+  return (await res.json()) as SeededCasesResponse
+}
+
 /** Tuner-specific SSE events (the Plan-04 vocab — NEVER chat event types). The
  *  terminal `done` / `error` sentinel breaks the consumer (mirrors the shared
  *  replay_tail_consumer contract). */

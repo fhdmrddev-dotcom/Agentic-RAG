@@ -207,6 +207,7 @@ async def _run_tuner_job(
     targets: list[dict],
     n: int,
     user_id: str,
+    supabase: Client | None = None,
 ) -> None:
     """Execute the bounded tuning run and stream tuner_* progress.
 
@@ -388,6 +389,38 @@ async def _run_tuner_job(
         except Exception:
             logger.exception("tuner result stash failed for run %s", run_id)
 
+        # D-07 durable persistence: upsert the latest scoreboard into ``tuner_runs`` ALONGSIDE
+        # the ephemeral Redis stash so it SURVIVES a Redis flush / refresh (BUG-260624-01 HIGH #3).
+        # One row per skill — ``on_conflict="skill_id"`` overwrites latest-wins (UNIQUE(skill_id)),
+        # never accumulating. supabase-py is BLOCKING, so the call is wrapped in
+        # ``run_in_threadpool`` (D-v2.5-01 — a bare blocking call here freezes the event loop), and
+        # the whole thing is best-effort try/except so a DB hiccup never crashes the run (the Redis
+        # stash still serves the per-run-id GET). ``user_id`` is the originating caller (whoever
+        # ran the tuner — the documented global-skill last-runner attribution).
+        if supabase is not None:
+            try:
+                upsert_payload = {
+                    "skill_id": skill_id,
+                    "user_id": user_id,
+                    "run_id": str(run_id),
+                    "scoreboard": scoreboard,
+                    "builder_model": builder_model,
+                    "target_count": len(targets),
+                    "case_count": len(cases),
+                    "updated_at": "now()",
+                }
+
+                def _persist_latest():
+                    return (
+                        supabase.table("tuner_runs")
+                        .upsert(upsert_payload, on_conflict="skill_id")
+                        .execute()
+                    )
+
+                await run_in_threadpool(_persist_latest)
+            except Exception:
+                logger.exception("tuner durable upsert into tuner_runs failed for run %s", run_id)
+
         await _emit_tuner(redis, run_id, EVENT_COMPLETE, scoreboard=scoreboard)
         await _emit_terminal(redis, run_id, TERMINAL_DONE)
     except Exception:
@@ -500,6 +533,7 @@ async def start_tuner_run(
                 targets=targets,
                 n=n,
                 user_id=current_user["id"],
+                supabase=supabase,  # D-07 durable upsert into tuner_runs
             )
         )
     except Exception:
@@ -547,6 +581,65 @@ async def stream_tuner_run(
     )
 
 
+@router.get("/{skill_id}/tuner/runs/latest")
+async def get_latest_tuner_run(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the DURABLE latest tuner result for a skill (D-07 rehydration-on-open).
+
+    Owner-verify first (404 on cross-user / not-global — T-123.1-01). Then read the single
+    ``tuner_runs`` row for this ``skill_id`` (UNIQUE(skill_id) — latest-wins). Unlike the
+    per-run-id GET (which reads the ephemeral Redis stash), this survives a Redis flush / a
+    page refresh — it is the rehydrate-on-open source for Plan 04.
+
+    A 404 here means NO tuning run has ever completed for this skill (no row yet). The
+    ``tuner_runs`` read is wrapped in ``run_in_threadpool`` (supabase-py is blocking — D-v2.5-01).
+
+    REGISTRATION ORDER (load-bearing): this literal-``latest`` route is declared BEFORE the
+    ``GET .../runs/{run_id}`` route below so FastAPI matches ``latest`` here first. The
+    ``{run_id}`` route types its param as ``UUID``; the string ``"latest"`` fails that converter
+    and would 422 rather than fall through if the order were reversed.
+    """
+    await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    def _read_latest():
+        return (
+            supabase.table("tuner_runs")
+            .select("skill_id, user_id, run_id, scoreboard, builder_model, target_count, case_count, updated_at")
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        resp = await run_in_threadpool(_read_latest)
+    except Exception:
+        logger.exception("tuner latest read failed for skill %s", skill_id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Tuner result store unavailable",
+        )
+    rows = list(resp.data or [])
+    if not rows:
+        # No completed run for this skill yet — 404 (the wire's getTunerLatest maps this to null).
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No tuner run for this skill yet",
+        )
+    row = rows[0]
+    return {
+        "skill_id": row.get("skill_id"),
+        "run_id": row.get("run_id"),
+        "scoreboard": row.get("scoreboard"),
+        "builder_model": row.get("builder_model"),
+        "target_count": row.get("target_count"),
+        "case_count": row.get("case_count"),
+        "updated_at": row.get("updated_at"),
+    }
+
+
 @router.get("/{skill_id}/tuner/runs/{run_id}")
 async def get_tuner_results(
     skill_id: str,
@@ -576,3 +669,34 @@ async def get_tuner_results(
             detail="Tuner run not complete or result expired",
         )
     return json.loads(raw)
+
+
+@router.get("/{skill_id}/tuner/cases/seeded")
+async def get_seeded_cases(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the already-computed seeded benchmark cases WITH provenance (D-05).
+
+    Owner-verify first (404 on cross-user — T-123.1-02). Then fetch the owner-scoped siblings
+    (the SOLE false-fire-rail leak gate — ``.or_(user_id.eq, is_global.eq.true)`` inside
+    ``fetch_owner_scoped_siblings``) and return the provenance-carrying seed so the editor can
+    SHOW + edit the cases before a run (fixes WR-05 / HIGH #2 — the editor previously showed
+    "0 cases"). Another user's private skill never reaches the seed.
+
+    Returns ``{should_fire: [{prompt, provenance}], should_not: [{prompt, provenance}]}`` where
+    provenance is ``"seeded"`` (this skill's own desc/paraphrase + the generic off-topic set) or
+    ``"sibling"`` (an owner-scoped sibling's description) — NEVER ``"held"``.
+    """
+    skill = await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    siblings = await run_in_threadpool(
+        skill_tuner_service.fetch_owner_scoped_siblings,
+        supabase, current_user["id"], skill_id,
+    )
+    seeded = skill_tuner_service.seed_cases_with_provenance(skill, siblings)
+    return {
+        "should_fire": seeded.get("should_fire", []),
+        "should_not": seeded.get("should_not", []),
+    }

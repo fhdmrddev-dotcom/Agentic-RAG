@@ -268,6 +268,59 @@ def auto_seed_cases(skill: dict, sibling_skills: list[dict]) -> dict[str, list[s
     }
 
 
+# Provenance labels for the seeded cases (Phase 123.1 / D-05). NEVER ``"held"`` — the 60/40
+# held-out split is computed at SCORING time (split_held_out), not authored into the seed.
+PROVENANCE_SEEDED = "seeded"    # this skill's own description/paraphrase + the generic off-topic set
+PROVENANCE_SIBLING = "sibling"  # a sibling skill's description (the owner-scoped false-fire rail)
+
+
+def seed_cases_with_provenance(
+    skill: dict, sibling_skills: list[dict]
+) -> dict[str, list[dict[str, str]]]:
+    """Provenance-carrying variant of ``auto_seed_cases`` (Phase 123.1 / D-05).
+
+    Returns ``should_fire`` / ``should_not`` as lists of ``{"prompt", "provenance"}`` dicts so
+    the editor can SHOW (and edit) the seeded cases with their origin before a run (HIGH #2 /
+    WR-05 — the editor previously showed "0 cases"):
+
+      - the skill's own description / paraphrase / ``"Use the {name} skill."`` → ``"seeded"``
+      - each sibling's description (the false-fire rail)                        → ``"sibling"``
+      - the fixed ``_GENERIC_OFF_TOPIC`` set                                    → ``"seeded"``
+
+    ``"held"`` is NEVER authored here — the held-out partition is a scoring-time concept
+    (``split_held_out`` takes a deterministic 60/40 cut), not a seed provenance.
+
+    Like ``auto_seed_cases``, this function NEVER reads the DB itself — ``sibling_skills`` MUST
+    arrive only from the owner-scoped ``fetch_owner_scoped_siblings`` so a caller cannot widen
+    the scope here (D-04 / V4 leak gate preserved). A reused thin string-only contract:
+    ``auto_seed_cases`` is unchanged and still drives the run path.
+    """
+    base = auto_seed_cases(skill, sibling_skills)
+    description = (skill.get("description") or "").strip()
+
+    # Reconstruct which should_not entries came from a sibling (vs the generic off-topic set):
+    # mirror auto_seed_cases' membership test (sib_desc present AND != this skill's description).
+    sibling_descs = {
+        d
+        for d in (
+            (sib.get("description") or "").strip() for sib in sibling_skills
+        )
+        if d and d != description
+    }
+
+    should_fire = [
+        {"prompt": p, "provenance": PROVENANCE_SEEDED} for p in base["should_fire"]
+    ]
+    should_not = [
+        {
+            "prompt": p,
+            "provenance": PROVENANCE_SIBLING if p in sibling_descs else PROVENANCE_SEEDED,
+        }
+        for p in base["should_not"]
+    ]
+    return {"should_fire": should_fire, "should_not": should_not}
+
+
 def fetch_owner_scoped_siblings(supabase, user_id: str, exclude_skill_id: str | None = None) -> list[dict]:
     """Fetch the requesting owner's + global skills via the EXACT owner-scoped catalog
     query (D-04 / V4 / T-123-03-01). ``get_supabase()`` is the SERVICE-ROLE client (RLS
