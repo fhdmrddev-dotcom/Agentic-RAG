@@ -1022,3 +1022,160 @@ async def test_seeded_cases_GET_returns_capped_slice_plus_total():
         f"body['total'] must equal the full uncapped sibling count {full}; got {body['total']}"
     )
     assert body.get("should_fire"), "should_fire must be untouched (non-empty)"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Phase 123.1 Plan 06 (BACKEND HONESTY — backlog §2) — the scoreboard never reports
+# a score that was not measured; the attribution count never over-counts.
+#
+#   TT-05  an EMPTY should-fire/should-NOT axis renders as the unmeasured sentinel
+#          (None / "n/a"), NEVER a fabricated 1.00 perfect recall.
+#   TT-12  an ALL-error provider column (every classify call raised) is measured=False
+#          and EXCLUDED from the persisted target_count / "measured on N models".
+#   TT-15  cell_score returns the SINGLE stored cell["score"] (no recompute drift).
+#
+# These mirror the existing pure-service unit shape (test_seed_cases_with_provenance_*).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ── TT-05 — an empty axis is the honest unmeasured sentinel (None), never 1.0 ─────
+def test_build_cell_empty_fire_axis_is_unmeasured_not_one():
+    """build_cell with fire_decisions=[] (no should-FIRE cases) records the fires axis as the
+    unmeasured sentinel None — NOT a fabricated 1.0 recall — and the combined score reflects
+    ONLY the measured no_false axis (TT-05)."""
+    from app.services import skill_tuner_service as svc
+
+    cell = svc.build_cell(
+        provider="openai", model="gpt-5.4-mini",
+        fire_decisions=[],                       # NO should-fire cases -> unmeasured
+        no_false_decisions=[False, False, True],  # 2/3 correctly did-not-fire -> 2/3
+    )
+    assert cell["axes"]["fires"] is None, (
+        f"empty fire axis must be the unmeasured sentinel None, NOT a fabricated score; "
+        f"got {cell['axes']['fires']!r}"
+    )
+    assert cell["axes"]["fires"] != 1.0, "an empty fire axis must never be a fabricated 1.0"
+    # The combined score is ONLY the measured (no_false) axis: 2 of 3 -> 2/3.
+    assert cell["score"] == pytest.approx(2.0 / 3.0), (
+        f"combined score must reflect ONLY the measured no_false axis (2/3); got {cell['score']!r}"
+    )
+
+
+def test_build_cell_both_axes_empty_is_wholly_unmeasured():
+    """When BOTH axes are empty (no cases of either class), the cell is wholly unmeasured:
+    both axes None, the combined score None, measured=False (TT-05 + TT-12 boundary)."""
+    from app.services import skill_tuner_service as svc
+
+    cell = svc.build_cell("openai", "gpt-5.4-mini", fire_decisions=[], no_false_decisions=[])
+    assert cell["axes"]["fires"] is None and cell["axes"]["no_false"] is None, (
+        f"both empty axes must be the unmeasured sentinel None; got {cell['axes']!r}"
+    )
+    assert cell["score"] is None, f"a wholly-unmeasured cell must have score None; got {cell['score']!r}"
+    assert cell["measured"] is False, f"a cell with no real decisions must be measured=False; got {cell!r}"
+
+
+def test_build_cell_measured_axis_scored_honestly():
+    """A real fire_decisions list still scores fires as the matching fraction — the honest
+    measured path is UNCHANGED (TT-05 anti-regression: the fix only touches the empty case)."""
+    from app.services import skill_tuner_service as svc
+
+    cell = svc.build_cell(
+        provider="anthropic", model="claude-haiku-4-5-20251001",
+        fire_decisions=[True, True, False],        # 2/3 fired -> 2/3 recall
+        no_false_decisions=[False, False],         # 2/2 did-not-fire -> 1.0 precision
+    )
+    assert cell["axes"]["fires"] == pytest.approx(2.0 / 3.0)
+    assert cell["axes"]["no_false"] == pytest.approx(1.0)
+    assert cell["score"] == pytest.approx(((2.0 / 3.0) + 1.0) / 2.0)
+    assert cell["measured"] is True, "a cell with real decisions on both axes must be measured=True"
+
+
+# ── TT-12 — an all-error column is measured=False, distinct from a measured 0.0 ───
+def test_build_cell_all_error_is_unmeasured_distinct_from_zero():
+    """A cell where EVERY classify call raised (both decision lists empty AND a positive
+    error_count) is marked measured=False — DISTINCT from a cell that genuinely measured 0.0
+    (TT-12). The error_count is surfaced so the route/UI can explain "could not measure"."""
+    from app.services import skill_tuner_service as svc
+
+    # All-error: no real decision landed on either axis, but calls DID happen and raised.
+    all_error = svc.build_cell(
+        "minimax", "MiniMax-M2.7-highspeed",
+        fire_decisions=[], no_false_decisions=[],
+        fire_error_count=4, no_false_error_count=2,
+    )
+    assert all_error["measured"] is False, f"an all-error cell must be measured=False; got {all_error!r}"
+    assert all_error["error_count"] == 6, (
+        f"error_count must sum the per-axis raise counts (4+2=6); got {all_error['error_count']!r}"
+    )
+    assert all_error["score"] is None, "an all-error (no-decision) cell has no measured score -> None"
+
+    # A genuinely measured 0.0 (the model really fired on a should-NOT, zero errors) is NOT the
+    # same — it measured, it just scored badly.
+    measured_zero = svc.build_cell(
+        "openai", "gpt-5.4-mini",
+        fire_decisions=[False, False],   # model NEVER fired when it should -> 0.0 recall
+        no_false_decisions=[],
+        fire_error_count=0, no_false_error_count=0,
+    )
+    assert measured_zero["measured"] is True, "a real 0.0 measurement must be measured=True (it measured)"
+    assert measured_zero["axes"]["fires"] == 0.0, "a real all-wrong fire axis is 0.0, not None"
+    assert measured_zero["error_count"] == 0
+
+
+def test_build_cell_empty_but_no_error_is_not_all_error():
+    """A candidate that simply had NO cases of a class (empty list, ZERO errors) is NOT an
+    all-error column — measured is driven by the OTHER axis having a real decision (TT-12
+    precision: empty-no-error != all-error)."""
+    from app.services import skill_tuner_service as svc
+
+    cell = svc.build_cell(
+        "openai", "gpt-5.4-mini",
+        fire_decisions=[True, True],   # measured the fires axis
+        no_false_decisions=[],         # no should-NOT cases existed (NOT an error)
+        fire_error_count=0, no_false_error_count=0,
+    )
+    assert cell["measured"] is True, "a cell that measured at least one axis is measured=True"
+    assert cell["error_count"] == 0, "no errors -> error_count 0 (empty != errored)"
+    assert cell["axes"]["no_false"] is None, "the absent no_false axis is the unmeasured sentinel None"
+
+
+# ── TT-15 — cell_score returns the single stored cell["score"] (no drift) ─────────
+def test_cell_score_returns_stored_value_verbatim():
+    """cell_score(cell) returns cell["score"] verbatim when present — NO second computation
+    that could drift from build_cell's stored value (TT-15)."""
+    from app.services import skill_tuner_service as svc
+
+    # A stored score that does NOT equal the (fires+no_false)/2 recompute proves cell_score is
+    # NOT recomputing — it returns the stored single source of truth.
+    cell = {"provider": "openai", "model": "m", "axes": {"fires": 1.0, "no_false": 1.0}, "score": 0.42}
+    assert svc.cell_score(cell) == 0.42, (
+        f"cell_score must return the stored cell['score'] verbatim (no recompute); got {svc.cell_score(cell)!r}"
+    )
+
+
+def test_cell_score_no_drift_against_build_cell():
+    """A cell whose stored score was set by build_cell and cell_score(cell) agree EXACTLY —
+    the single-source guarantee (TT-15: the two can never drift)."""
+    from app.services import skill_tuner_service as svc
+
+    cell = svc.build_cell(
+        "openai", "gpt-5.4-mini",
+        fire_decisions=[True, False, True],   # 2/3
+        no_false_decisions=[False, True],     # 1/2
+    )
+    assert svc.cell_score(cell) == cell["score"], (
+        f"cell_score must equal the build_cell-stored score (no drift); "
+        f"cell_score={svc.cell_score(cell)!r} stored={cell['score']!r}"
+    )
+
+
+def test_cell_score_falls_back_to_recompute_when_no_stored_score():
+    """When "score" is absent (a legacy/hand-built cell), cell_score falls back to the
+    (fires+no_false)/2 recompute over MEASURED axes, treating a None axis as 0.0 for the
+    fallback only (TT-15 safety net)."""
+    from app.services import skill_tuner_service as svc
+
+    legacy = {"axes": {"fires": 0.8, "no_false": 0.6}}  # no "score" key
+    assert svc.cell_score(legacy) == pytest.approx((0.8 + 0.6) / 2.0), (
+        "cell_score must fall back to the recompute when no stored score is present"
+    )
