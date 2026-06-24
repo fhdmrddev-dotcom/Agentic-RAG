@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
 status: executing
-last_updated: "2026-06-23T23:11:50.174Z"
-last_activity: 2026-06-23 -- Phase 123.1 planning complete
+last_updated: "2026-06-24T03:34:15.394Z"
+last_activity: 2026-06-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 15
+  completed_plans: 16
   percent: 67
 ---
 
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 123 — skill-triggering-quality
+**Current focus:** Phase 123.1 — skill-trigger-tuner-design-fidelity-and-ux-polish
 
 ## Current Position
 
-Phase: 123 (skill-triggering-quality) — EXECUTING
-Plan: 6 of 6
+Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-23 -- Phase 123.1 planning complete
+Last activity: 2026-06-24
 
 ### Quick Tasks Completed
 
@@ -237,6 +237,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123 P04 | 8min | 2 tasks | 3 files |
 | Phase 123 P05 | ~10min | 3 tasks (2 TDD) | 11 files |
 | Phase 123 P06 | ~30min | 2 tasks | 8 files |
+| Phase 123.1 P01 | ~20min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -282,6 +283,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 123]: Phase 123-05 (TRIG-01): author-confirm-not-auto-apply (042-A/D-03) — CandidateCard's Use→reveal-diff is NOT the write; updateSkill (PATCH /skills, re-lints) fires ONLY on explicit confirm. LiveRunCard: queued≠running (no fake percent, 043-A) + never-vanishing elapsed timer derived from a stable start-ts (the 095 lesson, frozen on terminal) + reconcile-on-return (terminal 'done' re-reads GET results, SSE tuner_complete a best-effort hint per D-v2.5-03). CaseEditor 60/40 split bar mirrors backend split_held_out. ZERO package/migration; chat subscribeToRun untouched (purpose-built streamTunerRun tuner_* reader). 14/14 vitest, tsc clean.
 - [Phase ?]: Phase 123-06 (TRIG-03/TRIG-01): inline never-block lint in the SHARED SkillForm under Description (covers modal + 3-pane); 'Tune this' reuses the verified Plan-05 onTuneSkill navigator (D-12); onSave widened to Promise<Skill|void> to capture lint_warnings.
 - [Phase ?]: Phase 123-06 [Rule 3]: wired skill_builder_model through the /settings router (FullSettingsResponse + SettingsUpdate + handler) + api.ts — Plan 03 added the field+resolver but NOT the router surface; the picker spans cloud+local (no paid-provider SPOF, test-proven). ZERO migration/package.
+- [Phase ?]: Phase 123.1-01 (D-07): tuner_runs durable latest-per-skill persistence — on_conflict=skill_id latest-wins upsert (UNIQUE(skill_id), one row/skill) in run_in_threadpool (D-v2.5-01), best-effort try/except ALONGSIDE the Redis stash; survives a Redis flush/refresh (closes BUG-260624-01 HIGH #3). user_id=last-runner attribution, NOT an access gate.
+- [Phase ?]: Phase 123.1-01 (D-05/D-08): two owner-gated GET routes — /tuner/runs/latest (registered BEFORE /runs/{run_id} so the literal beats the UUID converter; 404 cross-user owner-OR-global; rehydration-on-open) + /tuner/cases/seeded (provenance seeded/sibling never 'held'; owner-scoped sibling leak gate intact). seed_cases_with_provenance is a NEW fn over the unchanged string-only auto_seed_cases (run path untouched). Frontend getTunerLatest 404->null + getSeededCases. ZERO new pkg; red line held.
 
 ## Operator Next Steps
 
