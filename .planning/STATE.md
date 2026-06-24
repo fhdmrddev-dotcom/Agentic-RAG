@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers
-status: verifying
-last_updated: "2026-06-24T04:08:33.077Z"
+status: executing
+last_updated: "2026-06-24T20:01:05.178Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
-  percent: 83
+  completed_phases: 4
+  total_plans: 25
+  completed_plans: 20
+  percent: 67
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 ## Current Position
 
-Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTED
-Plan: 4 of 4 (all complete)
-Status: Phase complete — ready for verification (run live cross-provider UAT per VALIDATION.md)
+Phase: 123.1 (skill-trigger-tuner-design-fidelity-and-ux-polish) — EXECUTING
+Plan: 2 of 10
+Status: Ready to execute
 Last activity: 2026-06-24
 
 ### Quick Tasks Completed
@@ -241,6 +241,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P02 | 5min | 2 tasks | 4 files |
 | Phase 123.1 P03 | ~12min | 1 task (TDD) | 2 files |
 | Phase 123.1 P04 | 18min | 2 tasks | 4 files |
+| Phase 123.1 P05 | 11min | 4 tasks | 7 files |
 
 ## Decisions
 
@@ -292,6 +293,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123.1-02 (D-11): CandidateCard descriptions line-clamp-3 with a shared useState Show more/less toggle across the header AND both diff-confirm sides (diff-current/diff-new); held-out score + Use action are siblings (never clamped) so a ~1500-char description never buries them (BUG-260624-01 MED #5); CandidateCard tests split into CandidateCard.test.tsx.
 - [Phase ?]: Phase 123.1-03 (D-09/D-10): Skill-builder picker now derives options from configured providers[].models across ALL providers (grouped as optgroups via PROVIDER_META labels w/ id fallback), replacing the hardcoded SKILL_BUILDER_MODEL_OPTIONS — strong models (Sonnet/Opus, GPT-pro) selectable. Auto value="" default kept pre-selected (NOT forced) + custom-persisted "(current)" branch guarded by a builderConfiguredModels Set (no duplicate row). IN-02 placeholder local ids (lm-studio/qwen3, openai-compat/local-model) removed — local models come from real providers. SOFT amber "unverified" hint mirrors the Active-Model chip via verified_models; NEVER hard-disables an option; A4 honored (no new forced_emission_models field, verified_models signal reused). Stored field/contract (app_settings.skill_builder_model) + resolver unchanged. No-SPOF footer rewritten to a provider-derived line. 7/7 vitest, tsc clean.
 - [Phase 123.1]: Phase 123.1-04 (D-03/D-04/D-05/D-06/D-07/D-12): integration wave wired Plan-01 GET routes + Plan-02 ProviderScoreboard into SkillTunerPage. Mount reconcile-via-fetch effect: getSeededCases hydrates the editor with real seeded/sibling provenance (editable before run, startRun POST-body unchanged so edits run verbatim); getTunerLatest rehydrates the durable scoreboard on open (null/404 = graceful empty, no error); getSettings resolves the configured-target count (has_key && non-empty models, mirroring backend configured_targets). held tag RESOLVED by DROPPING it from the EditorCase union (split bar owns train/held-out). D-04 standalone block = scoreboard.candidates.find(c=>c.is_baseline) rendered via the Plan-02 component. Layout widened to 360px config rail + full-width results. previewModelCount precedence: in-flight targets -> persisted target_count -> live configured count. subscribeToRun untouched (WR-06 red line).
+- [Phase ?]: Phase 123.1-05 (BUG-260624-01 #1): MAX_SEEDED_SHOULD_NOT=8 caps the sibling-sourced should_not inside auto_seed_cases (the SOLE place) so the run path + editor seed share ONE capped set (editor shows exactly what runs); a pure post-fetch slice of the already-owner-scoped fetch_owner_scoped_siblings output — never re-reads DB / never widens scope. Generic off-topic baseline ALWAYS kept in full.
+- [Phase ?]: Phase 123.1-05 (D-honesty): GET /tuner/cases/seeded returns top-level total = uncapped sibling count (derived from len(sibling_descs), not the capped base); CaseEditor cap banner shows 'showing N of M — capped' ONLY when total > shown sibling-provenance count (never silent); 'show all N' is an honest disclosure, never fabricates the withheld cases.
+- [Phase ?]: Phase 123.1-05 (sketch 045-B): pre-run layout = full-width single-column stack (description -> CaseEditor -> run bar) driven off existing runPhase + scoreboard (no new mode machine); editor stays mounted so author can re-edit + re-run; results render full-width below; ProviderScoreboard/LiveRunCard/CandidateCard reused untouched.
 
 ## Operator Next Steps
 
