@@ -27,7 +27,11 @@ export interface ProviderLane {
   provider: string
   model: string
   status: "queued" | "running" | "done"
-  score?: number
+  // WR-04: widen to `number | null` to match the assigned `TunerCell.score` (api.ts), which is
+  // `number | null` — an all-error provider cell flows in as `null` (= unmeasured, the honest
+  // sentinel TT-12 made reachable). The `!= null` guard below renders "done" for it instead of
+  // a fabricated 0.00. Keeping the type `number | undefined` was a lie about what can arrive.
+  score?: number | null
 }
 
 interface Props {

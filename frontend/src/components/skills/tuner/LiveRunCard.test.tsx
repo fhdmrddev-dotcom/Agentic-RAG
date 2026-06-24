@@ -15,7 +15,12 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import { LiveRunCard, type ProviderLane } from "./LiveRunCard"
 
-function lane(provider: string, model: string, status: ProviderLane["status"], score?: number): ProviderLane {
+function lane(
+  provider: string,
+  model: string,
+  status: ProviderLane["status"],
+  score?: number | null,
+): ProviderLane {
   return { provider, model, status, score }
 }
 
