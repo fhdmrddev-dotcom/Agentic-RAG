@@ -440,6 +440,79 @@ async def test_duplicate_concurrent_run_returns_409():
         f"expected 409 for a duplicate concurrent run; got {resp.status_code} body={resp.text}"
 
 
+# ── 5b. WR-01 — unscored empty-model lanes are dropped (target_count is honest) ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_empty_model_targets_dropped_from_count_and_dispatch():
+    """An ollama-only configured-target set (no representative model -> ``model: ""``) yields
+    ZERO targets — so ``target_count``, the dispatched lanes, the rendered cells, and the
+    "measured on N models" attribution all AGREE (WR-01).
+
+    ``configured_targets`` appends local providers with an empty model (``_REPRESENTATIVE_MODEL``
+    has no ollama/lmstudio entry); the scoring loop skips empty-model lanes (``if not model:
+    continue``), so counting them fabricated a number. The route now filters empty-model
+    targets at resolution time. We POST with empty ``body.targets`` (the default-resolution
+    path), patch ``configured_targets`` to return an ollama-only empty-model lane, and assert
+    the echoed (post-filter) ``targets`` is empty AND the background job got an empty target
+    list (no fan-out onto an unscorable lane)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+
+    captured = {}
+    _orig_job = skill_tuner._run_tuner_job
+
+    async def _spy_job(**kwargs):
+        captured["targets"] = kwargs.get("targets")
+        return await _orig_job(**kwargs)
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OWNER
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    # Empty body.targets -> the route resolves configured_targets(eff). Patch it to the
+    # ollama-only empty-model lane the live service would actually produce, and stub the
+    # app-settings load so no DB is touched. classify/build are stubbed (job never reached for
+    # an empty lane, but keep them honest-fail-safe).
+    with patch.object(skill_tuner.skill_tuner_service, "configured_targets",
+                      new=lambda *a, **k: [{"provider": "ollama", "model": ""}]), \
+         patch("app.models.user_settings.load_app_settings_async",
+               new=AsyncMock(return_value=object())), \
+         patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=[])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires",
+                      new=AsyncMock(return_value=TriggerDecision(would_load=False, skill_name=None))), \
+         patch.object(skill_tuner.skill_tuner_service, "fetch_owner_scoped_siblings",
+                      new=lambda *a, **k: []), \
+         patch.object(skill_tuner, "_run_tuner_job", new=_spy_job):
+        try:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                resp = await c.post(
+                    f"/skills/{SKILL_ID}/tuner/runs",
+                    json={"cases": [{"prompt": "x", "should_fire": True}], "targets": []},
+                    headers={"Authorization": "Bearer test-token"},
+                )
+            # Yield so the fire-and-forget background job records its target list.
+            for _ in range(20):
+                if captured.get("targets") is not None:
+                    break
+                await asyncio.sleep(0.01)
+        finally:
+            app.dependency_overrides.pop(get_supabase, None)
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_redis, None)
+
+    assert resp.status_code == 202, f"expected 202; got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    # The echoed (post-filter) target set is EMPTY — target_count == len(targets) == 0, so the
+    # persisted count equals the number of scored cells (zero), not a fabricated N.
+    assert body["targets"] == [], \
+        f"expected empty targets (the unscorable ollama lane dropped); got {body['targets']!r}"
+    # The background job received the empty list (no dispatch onto the unscorable lane).
+    assert captured.get("targets") == [], \
+        f"background job must get the empty post-filter target list; got {captured.get('targets')!r}"
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Phase 123.1 Plan 01 — durable latest-per-skill persistence (D-07) + GET-latest
 # (D-08, owner-scoped 404) + seeded-cases GET with provenance (D-05).

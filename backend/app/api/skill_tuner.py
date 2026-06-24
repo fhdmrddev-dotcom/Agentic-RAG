@@ -503,6 +503,17 @@ async def start_tuner_run(
             targets = skill_tuner_service.configured_targets(eff)
         targets = targets[:MAX_TARGETS]
 
+        # Phase 123.1 (WR-01): drop empty-model targets so the scored lanes, the rendered
+        # cells, the persisted ``target_count``, and the "measured on N models" attribution all
+        # AGREE. ``configured_targets`` appends local providers (ollama/lmstudio) when a base_url
+        # is set, but ``_REPRESENTATIVE_MODEL`` has no entry for them -> ``model: ""``; the
+        # scoring loop then ``if not model: continue`` (no cell). Counting those unscored lanes
+        # in ``target_count`` fabricated a number (e.g. a default-Ollama install reported
+        # "measured on N models" while only N-1 columns were ever scored). Excluding the unscored
+        # lanes is the HONEST fix — local model ids are user-specific, so we do NOT synthesize a
+        # fake representative model for them.
+        targets = [t for t in targets if (t.get("model") or "").strip()]
+
         # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).
         if body.cases:
             cases = [{"prompt": c.prompt, "should_fire": c.should_fire} for c in body.cases]
