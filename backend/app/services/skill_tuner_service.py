@@ -551,10 +551,19 @@ def _candidate_is_measured(candidate: dict) -> bool:
     """True iff a scored candidate has AT LEAST ONE measured cell. The job marks the candidate
     with a ``measured`` flag (preferred), but fall back to inspecting the cells so a hand-built
     candidate dict still works: a candidate is measured iff any of its cells is measured=True
-    (an all-error / wholly-unmeasured candidate has ZERO measured cells)."""
+    (an all-error / wholly-unmeasured candidate has ZERO measured cells).
+
+    Legacy/hand-built candidates that carry neither a ``measured`` flag nor ``cells`` (e.g. the
+    Phase-123 ``pick_winner`` unit tests, or any caller that supplies only an aggregated
+    ``held_out_score``) are treated as measured when ``held_out_score`` is non-None — that real
+    score is itself the measured signal, distinct from the 0.0 unmeasured FALLBACK the WR-05 path
+    guards against. Real all-error candidates from ``_run_tuner_job`` always carry
+    ``measured=False`` and so are still correctly excluded by the first branch."""
     if "measured" in candidate:
         return bool(candidate["measured"])
-    return any(c.get("measured") for c in candidate.get("cells", []))
+    if "cells" in candidate:
+        return any(c.get("measured") for c in candidate.get("cells", []))
+    return candidate.get("held_out_score") is not None
 
 
 def pick_winner(candidates: list[dict]) -> dict | None:
