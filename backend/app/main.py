@@ -20,6 +20,18 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # gracefully at the ASGI layer, so these warnings are noise.
 logging.getLogger("asyncio").setLevel(logging.ERROR)
 
+# Phase 123.1 TT-10 — Suppress the LangSmith background-uploader 429 flood.
+# Once the monthly unique-trace quota is exceeded, the langsmith client's
+# background ingest thread emits a repeating "Failed to multipart ingest runs:
+# ... 429 Client Error: Too Many Requests" WARNING. This is upload-retry noise,
+# NOT the latency path — it does not slow the run (audit TT-06), it just drowns
+# the backend log during the exact tuner/heavy runs an operator needs to read.
+# ERROR-and-above (auth failure, hard client error) still surfaces; this is
+# scoped to the langsmith logger only — app/uvicorn/asyncio logging is unchanged.
+# To throttle the uploads at the source, set LANGSMITH_TRACING_SAMPLING_RATE in
+# backend/.env (documented in .env.example) — no code change required.
+logging.getLogger("langsmith").setLevel(logging.ERROR)
+
 logger = logging.getLogger(__name__)
 
 # Phase 093 D-20 — opt-in backend file log-sink. Runs AFTER load_dotenv (so
