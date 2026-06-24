@@ -94,17 +94,23 @@ const SCOREBOARD: TunerScoreboard = {
   winner_description: "Use this skill when the user asks to write or fix SQL queries.",
 }
 
-// A settings fixture with EXACTLY 2 configured targets (has_key && non-empty models) plus
-// two non-targets the configured-target count MUST exclude: a keyed-but-empty-models
-// provider and a models-but-no-key provider (mirrors the backend `configured_targets` filter).
+// A settings fixture with EXACTLY 2 scored targets, mirroring the POST-WR-01 effective
+// backend scored set: a keyed provider with a backend representative model counts EVEN
+// with an empty `models` list; a keyless/local provider does NOT count.
+//  - openai: keyed + a representative → counts.
+//  - google: keyed but EMPTY models → STILL counts (its representative comes from the
+//            fixed backend map, not its listed models). This is the WR-02 fix in action.
+//  - zhipu:  models but NO key → excluded (no credential to score with).
+//  - ollama: a local provider with no backend representative model → NOT scored after WR-01.
 const SETTINGS_2_CONFIGURED = {
   providers: [
     { id: "openai", name: "OpenAI", base_url: "api.openai.com", has_key: true, is_active: true, models: ["gpt-5.4-mini"] },
-    { id: "anthropic", name: "Anthropic", base_url: "api.anthropic.com", has_key: true, is_active: false, models: ["claude-haiku-4-5"] },
-    // keyed but NO usable model → excluded.
+    // keyed but EMPTY models → STILL counts (representative comes from the fixed map).
     { id: "google", name: "Google", base_url: "googleapis.com", has_key: true, is_active: false, models: [] },
     // has models but NO key → excluded.
     { id: "zhipu", name: "Zhipu", base_url: "open.bigmodel.cn", has_key: false, is_active: false, models: ["glm-5-turbo"] },
+    // a local provider has no representative model → NOT scored after WR-01.
+    { id: "ollama", name: "Ollama (local)", base_url: "localhost:11434", has_key: true, is_active: false, models: ["llama3"] },
   ],
 }
 
@@ -245,9 +251,10 @@ describe("SkillTunerPage — rehydration, empty state, cost preview, D-04 block 
     expect(screen.getByText(/run the benchmark to score candidate descriptions/i)).toBeTruthy()
   })
 
-  it("D-12: the pre-run cost preview shows the CONFIGURED-TARGET model count (has_key && non-empty models)", async () => {
-    // SETTINGS_2_CONFIGURED has exactly 2 has_key && non-empty-models providers; the
-    // keyed-but-empty-models and models-but-no-key providers MUST be excluded.
+  it("D-12 / WR-02: the pre-run cost preview counts keyed providers with a backend representative model", async () => {
+    // SETTINGS_2_CONFIGURED has exactly 2 scored targets: openai (keyed + listed model)
+    // and google (keyed but EMPTY models — STILL scored via the fixed backend map). The
+    // keyless zhipu and the local ollama (no representative model) MUST be excluded.
     render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
     await screen.findByText(/current · live · drives firing/i)
     const preview = await screen.findByTestId("cost-preview")

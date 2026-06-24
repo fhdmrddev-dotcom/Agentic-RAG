@@ -54,6 +54,22 @@ interface Props {
   onBack: () => void
 }
 
+// The provider ids the backend has a representative model for (the effective scored set
+// after WR-01 drops empty-model targets). Used by the pre-run cost preview so the
+// `× N models` count equals the set the run will actually score — keyed cloud providers
+// count even with an empty `models` list; locals (ollama/lmstudio) do NOT (no representative).
+// must mirror backend _REPRESENTATIVE_MODEL keys (skill_tuner_service.py)
+const REPRESENTATIVE_PROVIDER_IDS = new Set<string>([
+  "openai",
+  "anthropic",
+  "google",
+  "openrouter",
+  "deepseek",
+  "moonshot",
+  "minimax",
+  "zhipu",
+])
+
 // The lane status vocabulary for the live run (043-A): a queued provider NEVER shows
 // a fake percent — queued ≠ running.
 type RunPhase = "idle" | "running" | "done" | "error"
@@ -84,11 +100,12 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   const [scoreboard, setScoreboard] = useState<TunerScoreboard | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  // ── D-12 pre-run cost preview: the CONFIGURED-TARGET model count resolved
-  //    client-side from the user's providers, mirroring the backend `configured_targets`
-  //    presence filter (skill_tuner_service.py:474). A provider counts IFF `has_key` is
-  //    true AND its `models` list is non-empty — so the `× M models` line is populated on
-  //    open (NOT empty until kickoff, NOT a raw all-models count). ──
+  // ── D-12 pre-run cost preview: the SCORED-TARGET model count resolved client-side from
+  //    the user's providers, mirroring the POST-WR-01 effective backend scored set
+  //    (skill_tuner_service.py — `_REPRESENTATIVE_MODEL` + `_run_tuner_job` drops
+  //    empty-model targets). A provider counts IFF `has_key` is true AND the backend has a
+  //    representative model for it — so the `× M models` line is populated on open (NOT
+  //    empty until kickoff, NOT a raw all-models count) and equals what the run will score. ──
   const [configuredTargetCount, setConfiguredTargetCount] = useState<number | null>(null)
   // ── D-07/D-12 persisted run metadata (attribution): the durable latest run carries the
   //    builder model + the target count it was measured on — "Built by {model} · measured
@@ -173,11 +190,16 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
     getSettings()
       .then((settings) => {
         if (cancelled) return
-        // Mirror the backend `configured_targets` presence filter: a provider counts IFF
-        // it has a key AND a usable model. (Local/keyless providers are exercised by the
-        // backend presence probe; the frontend signal for a present credential is `has_key`.)
+        // Mirror the POST-WR-01 effective backend scored set: a provider is scored IFF it
+        // has a key AND has a backend representative model. The run's `_run_tuner_job` drops
+        // empty-model targets, so a keyed cloud provider with an empty `models` list is STILL
+        // scored (its representative model comes from the fixed map), and a local provider
+        // (ollama/lmstudio) with no representative is NOT scored. Counting `p.models.some(...)`
+        // under-counts the former; including locals over-counts the latter — so count keyed
+        // providers that the backend has a representative model for. `has_key` is the
+        // present-credential signal (backend: `bool(api_key && api_key != "ollama")`).
         const count = settings.providers.filter(
-          (p) => p.has_key && p.models.some((m) => m.trim().length > 0),
+          (p) => p.has_key && REPRESENTATIVE_PROVIDER_IDS.has(p.id),
         ).length
         setConfiguredTargetCount(count)
       })
