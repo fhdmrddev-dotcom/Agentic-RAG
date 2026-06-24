@@ -89,6 +89,64 @@ describe("CaseEditor — hydrated seeded cases with real provenance (D-05/D-06)"
   })
 })
 
+describe("CaseEditor — split bar uses the PER-CLASS held-out count (WR-03)", () => {
+  // Mirrors the backend `split_held_out` held-out count for a single class of n cases:
+  // cut = floor(n * 0.6), bumped to n-1 when cut >= n && n >= 2; held-out = n - cut.
+  const heldOf = (n: number): number => {
+    if (n === 0) return 0
+    let cut = Math.floor(n * 0.6)
+    if (cut >= n && n >= 2) cut = n - 1
+    return n - cut
+  }
+
+  it("an UNBALANCED set (8 fire / 2 no-fire) splits per class, NOT a single combined cut", () => {
+    const unbalanced: EditorCase[] = [
+      ...Array.from({ length: 8 }, (_, i): EditorCase => ({
+        id: `f${i}`,
+        prompt: `fire case ${i}`,
+        should_fire: true,
+        provenance: "seeded",
+      })),
+      ...Array.from({ length: 2 }, (_, i): EditorCase => ({
+        id: `n${i}`,
+        prompt: `no-fire case ${i}`,
+        should_fire: false,
+        provenance: "sibling",
+      })),
+    ]
+    render(<CaseEditor cases={unbalanced} onChange={vi.fn()} skill={SKILL} />)
+    const split = screen.getByTestId("split-bar")
+
+    // The honest per-class held-out = heldOf(8) + heldOf(2) = 4 + 1 = 5; train = 10 - 5 = 5.
+    const expectedHeldOut = heldOf(8) + heldOf(2)
+    const expectedTrain = unbalanced.length - expectedHeldOut
+    expect(expectedHeldOut).toBe(5)
+    expect(expectedTrain).toBe(5)
+
+    expect(split.textContent).toContain(`${expectedTrain} train`)
+    expect(split.textContent).toContain(`${expectedHeldOut} held-out`)
+
+    // It must NOT use the OLD single combined cut (total - floor(total*0.6) = 10 - 6 = 4
+    // held-out / 6 train) — that fabricated the count for unbalanced sets.
+    const combinedHeldOut = unbalanced.length - Math.floor(unbalanced.length * 0.6)
+    expect(combinedHeldOut).toBe(4)
+    expect(split.textContent).not.toContain("6 train")
+    expect(split.textContent).not.toContain("4 held-out")
+  })
+
+  it("labels read approximate (~60% / ~40%) since the exact ratio no longer holds", () => {
+    const cases: EditorCase[] = [
+      { id: "f0", prompt: "fire", should_fire: true, provenance: "seeded" },
+      { id: "f1", prompt: "fire2", should_fire: true, provenance: "seeded" },
+      { id: "n0", prompt: "no", should_fire: false, provenance: "sibling" },
+    ]
+    render(<CaseEditor cases={cases} onChange={vi.fn()} skill={SKILL} />)
+    const split = screen.getByTestId("split-bar")
+    expect(split.textContent).toMatch(/~\s*60\s*%/)
+    expect(split.textContent).toMatch(/~\s*40\s*%/)
+  })
+})
+
 describe("CaseEditor — the held tag is resolved (dropped from the provenance union)", () => {
   it("the split bar owns the train/held-out display (no dead 'held' provenance tag)", () => {
     render(<CaseEditor cases={HYDRATED} onChange={vi.fn()} skill={SKILL} />)

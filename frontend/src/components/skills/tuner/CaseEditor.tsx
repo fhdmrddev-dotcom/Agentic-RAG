@@ -8,9 +8,15 @@
  * hybrid auto-seed + author edits (D-04); cases are ephemeral / client-held — never
  * persisted (only the winning description persists via PATCH /skills).
  *
- * The 60/40 split mirrors the backend split_held_out (DEFAULT_HELD_OUT_TRAIN_RATIO =
- * 0.6 → first 60% train, rest held-out); the bar reads the honest train/held-out
- * counts without lecturing.
+ * The ~60/40 split mirrors the backend split_held_out (DEFAULT_HELD_OUT_TRAIN_RATIO =
+ * 0.6 → first 60% train, rest held-out) — but the backend (skill_tuner.py) splits each
+ * class (should_fire / should_not) INDEPENDENTLY then concatenates the held-out halves,
+ * and split_held_out bumps the cut to n-1 when the floor would leave a class with zero
+ * held-out (guarantees ≥1 held-out per non-trivial class). So the bar computes the
+ * held-out count PER CLASS (heldOf(fire) + heldOf(noFire)) — not a single cut over the
+ * combined list, which fabricates the count for unbalanced sets (e.g. 8 fire / 2 no-fire).
+ * The labels read approximate (~60% / ~40%) because the exact ratio no longer holds for
+ * small/unbalanced sets. The bar reads the honest train/held-out counts without lecturing.
  */
 import { useState } from "react"
 import { Plus, X } from "lucide-react"
@@ -39,6 +45,16 @@ interface Props {
 }
 
 const TRAIN_RATIO = 0.6 // mirrors backend DEFAULT_HELD_OUT_TRAIN_RATIO
+
+/** Held-out count for a single class of `n` cases — mirrors the backend `split_held_out`
+ *  (skill_tuner_service.py): cut = floor(n * ratio), bumped to n-1 when cut >= n && n >= 2
+ *  (guarantees ≥1 held-out per non-trivial class); held-out = n - cut. */
+function heldOf(n: number): number {
+  if (n === 0) return 0
+  let cut = Math.floor(n * TRAIN_RATIO)
+  if (cut >= n && n >= 2) cut = n - 1
+  return n - cut
+}
 
 const PROVENANCE_LABEL: Record<EditorCase["provenance"], string> = {
   seeded: "seeded",
@@ -125,10 +141,13 @@ export function CaseEditor({ cases, onChange, skill: _skill }: Props) {
   const fireCases = cases.filter((c) => c.should_fire)
   const noFireCases = cases.filter((c) => !c.should_fire)
 
-  // 60/40 split (deterministic, mirrors the backend): first 60% train, rest held-out.
+  // ~60/40 split (deterministic, mirrors the backend): the backend splits EACH class
+  // independently then concatenates the held-out halves, so the honest held-out count is
+  // heldOf(fire) + heldOf(noFire) — NOT a single cut over the combined list (which
+  // fabricates the count for unbalanced sets, e.g. 8 fire / 2 no-fire).
   const total = cases.length
-  const trainCount = Math.floor(total * TRAIN_RATIO)
-  const heldOutCount = total - trainCount
+  const heldOutCount = heldOf(fireCases.length) + heldOf(noFireCases.length)
+  const trainCount = total - heldOutCount
 
   const addCase = (should_fire: boolean) => {
     const text = draft.trim()
@@ -192,15 +211,21 @@ export function CaseEditor({ cases, onChange, skill: _skill }: Props) {
         />
       </div>
 
-      {/* 60/40 train/held-out split bar — honest counts, no lecture. The winner is
-          picked by the held-out 40% (never used to generate candidates). */}
+      {/* ~60/40 train/held-out split bar — honest PER-CLASS counts, no lecture. The winner
+          is picked by the held-out set (never used to generate candidates). The exact ratio
+          no longer holds for small/unbalanced sets, so the bar is driven by the real counts
+          and the labels read approximate (~60% / ~40%). */}
       <div data-testid="split-bar" className="flex flex-col gap-1">
         <div className="flex h-2 w-full overflow-hidden rounded-full bg-card/40">
-          <div className="bg-primary/40" style={{ width: `${TRAIN_RATIO * 100}%` }} aria-hidden="true" />
+          <div
+            className="bg-primary/40"
+            style={{ width: total > 0 ? `${(trainCount / total) * 100}%` : `${TRAIN_RATIO * 100}%` }}
+            aria-hidden="true"
+          />
           <div className="bg-[hsl(var(--panel-status-active))]" style={{ flex: 1 }} aria-hidden="true" />
         </div>
         <p className="text-[10px] font-mono text-muted-foreground">
-          {trainCount} train (60%) · {heldOutCount} held-out (40%) — the winner is picked by held-out
+          {trainCount} train (~60%) · {heldOutCount} held-out (~40%) — the winner is picked by held-out
         </p>
       </div>
     </div>
