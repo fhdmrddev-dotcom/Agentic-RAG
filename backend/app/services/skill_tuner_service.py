@@ -218,6 +218,10 @@ async def build_candidates(
         user_settings=user_settings,
         system_prompt=_BUILDER_SYSTEM_PROMPT,
         schema_model=CandidateDescriptions,
+        # Force-without-strict for the optional-heavy schema (mirrors workflow_authoring's
+        # Pitfall-1 fix): skips the doomed strict_force rung so OpenAI/DeepSeek don't waste a
+        # strict-400 round-trip per call (live-verify follow-on to the TT-01 shape fix).
+        strict=False,
     )
     emitted = result.get("emitted")
     if emitted is None:
@@ -258,6 +262,10 @@ async def classify_fires(
         user_settings=user_settings,
         system_prompt=_CLASSIFIER_SYSTEM_PROMPT,
         schema_model=TriggerDecision,
+        # Force-without-strict (optional skill_name): skip the doomed strict_force rung — OpenAI
+        # strict 400s on the optional field — so each per-case classification is one clean
+        # forced call (mirrors workflow_authoring; live-verify follow-on to the TT-01 shape fix).
+        strict=False,
     )
     emitted = result.get("emitted")
     if emitted is None:
