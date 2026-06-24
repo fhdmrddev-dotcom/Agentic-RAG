@@ -63,6 +63,12 @@ class _FakeRedis:
             z.pop(m, None)
         return 1
 
+    async def zscore(self, key, member):
+        # CR-01 run<->skill membership oracle: returns the score if the member is in the
+        # sorted set, else None (mirrors redis ZSCORE — the "is this run a member of this
+        # skill's run set?" probe the stream + results routes use).
+        return self.zsets.get(key, {}).get(member)
+
     async def set(self, key, value, *a, **k):
         # Honor the SET NX semantic the tuner in-flight guard relies on (WR-01): when
         # ``nx=True`` the write succeeds ONLY if the key is absent, returning a truthy value;
@@ -267,6 +273,102 @@ async def test_get_results_cross_user_returns_404():
     assert resp.json().get("detail") == "Skill not found"
 
 
+# ── 2c. CR-01 — a VISIBLE skill + a FOREIGN run_id → 404 (no cross-buffer read) ───
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_visible_skill_foreign_run_id_returns_404_both_routes():
+    """Owning/seeing a skill does NOT grant reading an ARBITRARY ``run_id``'s buffer (CR-01).
+
+    The tuner reuses the SAME ``run:{run_id}`` keyspace as chat, so the skill gate alone (which
+    only proves "you can see this skill") would let a holder of any visible/global skill + a
+    LEAKED run_id read an arbitrary chat/tuner buffer. Both the stream and results routes now
+    bind run_id<->skill (per-skill ZSET membership / durable tuner_runs row). A FOREIGN run_id
+    — never started for THIS skill, present in the shared buffer keyspace — must 404 on BOTH,
+    and the foreign buffer's content must NOT be returned (non-vacuous)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_with_tuner_runs([skill_row], store={})  # no tuner_runs row for any run
+    fake_redis = _FakeRedis()
+
+    # A foreign run that was NEVER started for SKILL_ID — but its buffers DO exist in the shared
+    # keyspace (as if it were someone else's chat/tuner run). The membership set for THIS skill
+    # is deliberately EMPTY (the run was never ZADDed under runs_by_thread:tuner:{SKILL_ID}).
+    foreign_run_id = str(uuid4())
+    secret_marker = "CROSS-USER-BUFFER-SHOULD-NEVER-BE-RETURNED"
+    fake_redis.kv[f"tuner_result:{foreign_run_id}"] = json.dumps({"secret": secret_marker})
+    fake_redis.streams[f"run:{foreign_run_id}"] = [
+        {"data": json.dumps({"type": "tuner_progress", "secret": secret_marker})}
+    ]
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_current_user] = lambda: OWNER  # OWNER can SEE the skill
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            results_resp = await c.get(
+                f"/skills/{SKILL_ID}/tuner/runs/{foreign_run_id}",
+                headers={"Authorization": "Bearer test-token"},
+            )
+            stream_resp = await c.get(
+                f"/skills/{SKILL_ID}/tuner/runs/{foreign_run_id}/stream",
+                headers={"Authorization": "Bearer test-token"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+    # Both routes refuse the foreign run_id with 404 (never 403 — don't leak existence).
+    assert results_resp.status_code == 404, \
+        f"expected 404 on a foreign run_id (results); got {results_resp.status_code} body={results_resp.text}"
+    assert results_resp.json().get("detail") == "Tuner run not found", \
+        f"expected the run<->skill membership 404 detail; got {results_resp.json()!r}"
+    assert stream_resp.status_code == 404, \
+        f"expected 404 on a foreign run_id (stream); got {stream_resp.status_code} body={stream_resp.text}"
+    assert stream_resp.json().get("detail") == "Tuner run not found", \
+        f"expected the run<->skill membership 404 detail; got {stream_resp.json()!r}"
+    # Non-vacuous: the foreign buffer's content was NOT exfiltrated through either route.
+    assert secret_marker not in results_resp.text, \
+        "the foreign tuner_result buffer must NOT be returned (cross-buffer read)"
+    assert secret_marker not in stream_resp.text, \
+        "the foreign run-buffer stream must NOT be returned (cross-buffer read)"
+
+
+# ── 2d. CR-01 — the LEGITIMATE in-flight run passes the gate (anti-overblock) ─────
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_stream_legitimate_in_flight_run_passes_membership_gate():
+    """A run that WAS started for this skill (its run_id is in runs_by_thread:tuner:{skill_id})
+    is NOT denied by the CR-01 membership gate — the gate blocks FOREIGN run_ids WITHOUT
+    over-blocking the legitimate in-flight stream (anti-overblock).
+
+    We call the route coroutine directly and assert it RETURNS an EventSourceResponse (i.e. it
+    did NOT raise the 404 ``HTTPException`` the foreign-run_id path raises) — without consuming
+    the SSE body (the shared replay_tail_consumer's xread tail is covered by the runs.py
+    tests; here we only prove the membership gate let a legitimate member through)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    sb = _supabase_returning_skill([skill_row])
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    # Simulate the start route's ZADD: this run IS a member of the skill's run set (in-flight).
+    fake_redis.zsets[f"runs_by_thread:tuner:{SKILL_ID}"] = {str(run_id): 1.0}
+
+    from sse_starlette import EventSourceResponse
+
+    resp = await skill_tuner.stream_tuner_run(
+        skill_id=SKILL_ID,
+        run_id=run_id,
+        since="0",
+        current_user=OWNER,
+        supabase=sb,
+        redis=fake_redis,
+    )
+    # The legitimate member got PAST the gate — an SSE response, not the 404 HTTPException.
+    assert isinstance(resp, EventSourceResponse), \
+        f"expected an EventSourceResponse for a legitimate in-flight run; got {resp!r}"
+
+
 # ── 3. Results returns BOTH fires + no_false per provider cell ───────────────────
 @pytest.mark.asyncio
 @pytest.mark.timeout(20)
@@ -277,6 +379,11 @@ async def test_results_carry_both_fires_and_no_false_subscores():
                  "user_id": OWNER["id"], "is_global": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
+    # CR-01: the GET binds run_id<->skill via the live per-skill set OR the durable tuner_runs
+    # row. The job's ``finally`` ZREMs the live membership, so back this run with a durable
+    # store (the job upserts the matching run_id) — the post-completion legitimate path.
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
 
     # classify_fires fires correctly: True on should_fire prompts, False on should_not.
     async def _classify(target_model, catalog_lines, user_prompt, user_settings):
@@ -305,10 +412,10 @@ async def test_results_carry_both_fires_and_no_false_subscores():
             targets=targets,
             n=2,
             user_id=OWNER["id"],
+            supabase=sb,  # CR-01: durable run_id<->skill binding for the post-completion GET
         )
 
     # The scoreboard is stashed at tuner_result:{run_id}; GET reads it owner-scoped.
-    sb = _supabase_returning_skill([skill_row])
     app.dependency_overrides[get_supabase] = lambda: sb
     app.dependency_overrides[get_current_user] = lambda: OWNER
     app.dependency_overrides[get_redis] = lambda: fake_redis

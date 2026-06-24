@@ -589,6 +589,22 @@ async def stream_tuner_run(
     ``run:{run_id}`` stream to the shared two-phase replay-then-tail consumer. The tuner_*
     events are progress; the terminal ``done``/``error`` sentinel breaks the consumer."""
     await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    # Phase 123.1 (CR-01): the skill gate above only proves "you can SEE this skill" — it does
+    # NOT bind the CALLER-SUPPLIED ``run_id`` to this skill. The tuner reuses the SAME
+    # ``run:{run_id}`` keyspace as chat (threads.py XADDs ``run:{run_id}``; replay_tail_consumer
+    # reads it keyed SOLELY on run_id), so owning any visible/global skill + a LEAKED run_id
+    # (logs / LangSmith / ``runs:active``) would otherwise read an arbitrary chat/tuner buffer.
+    # The start path ZADDs the run into ``runs_by_thread:tuner:{skill_id}`` (the per-skill
+    # membership oracle); assert run<->skill membership before touching the buffer. This route
+    # is IN-FLIGHT only (the ZADD entry is ZREM'd in the job ``finally``), so the live zscore
+    # check suffices here — 404 (never 403 — don't leak existence) on a miss.
+    if await redis.zscore(f"runs_by_thread:tuner:{skill_id}", str(run_id)) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tuner run not found",
+        )
+
     return EventSourceResponse(
         replay_tail_consumer(
             redis=redis,
@@ -674,6 +690,42 @@ async def get_tuner_results(
     ``tuner_result:{run_id}`` by the background job (ephemeral, TTL-bound — A2 / no DB schema
     change). A 404 here means the run is still in progress or its buffer expired."""
     await _fetch_owned_or_global_skill(supabase, skill_id, current_user["id"])
+
+    # Phase 123.1 (CR-01): bind the CALLER-SUPPLIED ``run_id`` to this skill BEFORE reading the
+    # shared ``tuner_result:{run_id}`` buffer (the skill gate above only proves "you can SEE
+    # this skill"; the buffer keyspace is shared with chat). Unlike the in-flight stream route,
+    # this is post-completion: the live ``runs_by_thread:tuner:{skill_id}`` membership is ZREM'd
+    # in the job ``finally``, so a legitimately-COMPLETED run would 404 on the live check alone.
+    # Accept EITHER the live membership OR a durable ``tuner_runs`` row for THIS skill whose
+    # ``run_id`` matches — else 404 (never leak existence). The durable read goes through
+    # ``run_in_threadpool`` (supabase-py is blocking — D-v2.5-01); the zscore is on the async
+    # client (fine in async).
+    live_member = await redis.zscore(f"runs_by_thread:tuner:{skill_id}", str(run_id)) is not None
+    if not live_member:
+        def _read_run_id():
+            return (
+                supabase.table("tuner_runs")
+                .select("run_id")
+                .eq("skill_id", skill_id)
+                .limit(1)
+                .execute()
+            )
+
+        try:
+            durable = await run_in_threadpool(_read_run_id)
+        except Exception:
+            logger.exception("tuner run<->skill durable membership read failed for run %s", run_id)
+            durable = None
+        durable_rows = list((durable.data if durable else None) or [])
+        durable_match = bool(durable_rows) and str(durable_rows[0].get("run_id")) == str(run_id)
+        if not durable_match:
+            # Neither the live per-skill membership nor the durable latest row binds this
+            # run_id to this skill — refuse the cross-buffer read (404, not 403).
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tuner run not found",
+            )
+
     try:
         raw = await redis.get(f"tuner_result:{run_id}")
     except Exception:
