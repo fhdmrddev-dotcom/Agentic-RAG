@@ -71,6 +71,12 @@ const REPRESENTATIVE_PROVIDER_IDS = new Set<string>([
   "zhipu",
 ])
 
+// WR-03: the backend caps the scored target set at MAX_TARGETS (skill_tuner.py:67). The pre-run
+// cost preview must clamp to the SAME bound so the "× N models" line never over-states what the
+// run will actually score when an org has >8 keyed providers (the honesty class TT-12 closes on
+// the backend). Keep this in lockstep with backend MAX_TARGETS.
+const MAX_TARGETS = 8
+
 // The lane status vocabulary for the live run (043-A): a queued provider NEVER shows
 // a fake percent — queued ≠ running. "reconciling" (Phase 123.1-08 / TT-14) is the
 // post-'done' sub-state held while getTunerResults resolves: the LiveRunCard stays
@@ -465,14 +471,36 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   // (TT-14) — both keep the LiveRunCard mounted and the Run button disabled.
   const runActive = runPhase === "running" || runPhase === "reconciling"
 
+  // WR-05: a winner is only honest when the backend actually measured something. winner_index
+  // is null/None for a wholly-unmeasured / cancelled-then-partial run (every candidate's
+  // held_out_score is the 0.0 unmeasured fallback). When there is no winner, the UI must NOT
+  // badge a noise winner NOR offer the Use/confirm strip (which would PATCH the live description
+  // from a degenerate signal) — it renders an honest "could not measure — no winner" note + a
+  // read-only per-candidate breakdown instead.
+  const hasCandidates = !!scoreboard && scoreboard.candidates.length > 0
+  const hasWinner = !!scoreboard && scoreboard.winner_index != null
+  const sortedCandidates = useMemo(
+    () =>
+      scoreboard
+        ? scoreboard.candidates.slice().sort((a, b) => b.held_out_score - a.held_out_score)
+        : [],
+    [scoreboard],
+  )
+
   // ── D-12 pre-run cost-preview model count: the persisted run's target_count (once a
   //    run has completed) takes precedence as the authoritative measured count; before
   //    any run, fall back to the live configured-target count, then to the in-flight
-  //    `targets` once a kickoff sets it. ──
+  //    `targets` once a kickoff sets it.
+  //    WR-03: the authoritative in-flight `targets.length` and the durable `target_count` are
+  //    already backend-bounded (the run scored ≤ MAX_TARGETS columns). Only the pre-run
+  //    `configuredTargetCount` (a raw keyed-provider count) can exceed the cap, so clamp THAT to
+  //    MAX_TARGETS — otherwise an org with >8 keyed providers sees "× 10 models" while the run
+  //    scores only 8 (the exact over-statement TT-12 closes on the backend). ──
   const previewModelCount =
     runActive && targets.length > 0
       ? targets.length
-      : (latestRun?.target_count ?? configuredTargetCount)
+      : (latestRun?.target_count ??
+          (configuredTargetCount != null ? Math.min(configuredTargetCount, MAX_TARGETS) : null))
 
   if (!skillId) {
     return (
@@ -640,20 +668,49 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                     </div>
                   )}
 
-                  {scoreboard && scoreboard.candidates.length > 0 && (
+                  {/* WR-05: no winner -> an honest "could not measure" note + a READ-ONLY
+                      per-candidate breakdown (NO winner badge, NO Use/confirm strip). */}
+                  {hasCandidates && scoreboard && !hasWinner && (
                     <div className="flex flex-col gap-4" data-testid="tuner-candidates">
-                      {scoreboard.candidates
-                        .slice()
-                        .sort((a, b) => b.held_out_score - a.held_out_score)
-                        .map((candidate) => (
-                          <CandidateCard
-                            key={candidate.index}
-                            candidate={candidate}
-                            isWinner={candidate.index === scoreboard.winner_index}
-                            currentDescription={skill.description ?? ""}
-                            onConfirm={handleConfirmWinner}
-                          />
-                        ))}
+                      <p
+                        data-testid="no-winner-note"
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Could not measure — no winner. None of the candidate descriptions scored on
+                        a measured provider column (every target was unmeasured), so there is nothing
+                        to confirm. Re-run once the provider columns can be measured.
+                      </p>
+                      {sortedCandidates.map((candidate) => (
+                        <section
+                          key={candidate.index}
+                          data-testid="candidate-readonly"
+                          className="rounded-xl ghost-border bg-card/50 p-4 shadow-sm flex flex-col gap-3"
+                        >
+                          <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+                            {candidate.is_baseline ? "current (baseline)" : "candidate"}
+                          </span>
+                          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                            {candidate.description}
+                          </p>
+                          <ProviderScoreboard cells={candidate.cells} />
+                        </section>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* The normal winner path: badge the winner + offer the Use/confirm strip. */}
+                  {hasCandidates && scoreboard && hasWinner && (
+                    <div className="flex flex-col gap-4" data-testid="tuner-candidates">
+                      {sortedCandidates.map((candidate) => (
+                        <CandidateCard
+                          key={candidate.index}
+                          candidate={candidate}
+                          isWinner={candidate.index === scoreboard.winner_index}
+                          currentDescription={skill.description ?? ""}
+                          onConfirm={handleConfirmWinner}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>

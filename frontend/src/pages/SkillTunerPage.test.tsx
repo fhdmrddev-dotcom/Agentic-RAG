@@ -175,6 +175,58 @@ describe("SkillTunerPage — page-level author-confirm, no auto-apply (T-123-05-
   })
 })
 
+describe("SkillTunerPage — WR-05: a wholly-unmeasured run picks NO winner (no badge, no confirm)", () => {
+  // A run where every candidate scored on zero measured columns: winner_index is null and the
+  // cells are unmeasured (score null / measured false). The page must NOT badge or offer to
+  // confirm a noise winner — it renders an honest "could not measure — no winner" note instead.
+  const UNMEASURED_SCOREBOARD: TunerScoreboard = {
+    skill_id: "skill-1",
+    candidates: [
+      {
+        index: 0,
+        description: "Fires on SQL.",
+        cells: [{ provider: "minimax", model: "MiniMax-M2.7-highspeed", axes: { fires: null, no_false: null }, score: null, measured: false, error_count: 6 }],
+        held_out_score: 0.0,
+        is_baseline: true,
+      },
+      {
+        index: 1,
+        description: "Use this skill when the user asks to write or fix SQL queries.",
+        cells: [{ provider: "minimax", model: "MiniMax-M2.7-highspeed", axes: { fires: null, no_false: null }, score: null, measured: false, error_count: 6 }],
+        held_out_score: 0.0,
+        is_baseline: false,
+      },
+    ],
+    winner_index: null,
+    winner_description: null,
+  }
+
+  it("renders the 'could not measure — no winner' note and NO CandidateCard / Use strip", async () => {
+    const user = userEvent.setup()
+    streamTunerRun.mockImplementation(async (_s: unknown, _r: unknown, callbacks: any) => {
+      callbacks.onComplete?.(UNMEASURED_SCOREBOARD)
+      callbacks.onTerminal("done")
+    })
+    getTunerResults.mockResolvedValue(UNMEASURED_SCOREBOARD)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    await user.click(screen.getByRole("button", { name: /run tuning/i }))
+
+    // The honest no-winner note renders.
+    const note = await screen.findByTestId("no-winner-note")
+    expect(note.textContent?.toLowerCase()).toContain("could not measure")
+    expect(note.textContent?.toLowerCase()).toContain("no winner")
+
+    // NO CandidateCard (so no winner badge / no "Use"/confirm strip — no PATCH of a noise winner).
+    expect(screen.queryByTestId("candidate-card")).toBeNull()
+    expect(screen.queryByRole("button", { name: /^use$/i })).toBeNull()
+    // The read-only candidate breakdown still renders (the descriptions + per-provider cells).
+    expect(screen.getAllByTestId("candidate-readonly").length).toBeGreaterThanOrEqual(2)
+    // Nothing was ever auto-applied.
+    expect(updateSkill).not.toHaveBeenCalled()
+  })
+})
+
 describe("SkillTunerPage — a transient SSE timeout is NOT a run failure (reconnect/reconcile)", () => {
   it("a redis_timeout terminal reconciles to the finished scoreboard, never a hard failure", async () => {
     const user = userEvent.setup()
