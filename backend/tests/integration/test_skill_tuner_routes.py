@@ -90,6 +90,21 @@ class _FakeRedis:
                 n += 1
         return n
 
+    async def eval(self, script, numkeys, *keys_and_args):
+        # CR-01 compare-and-delete (CAS) emulation: the only Lua the tuner uses is
+        # ``_RELEASE_IF_OWNED`` — "delete KEYS[1] IFF its value == ARGV[1]". Emulate exactly
+        # that semantic (atomic in-process here): delete only when the stored value matches the
+        # supplied run_id, return 1 on delete else 0. A NEWER run's re-claim (different value)
+        # makes this a no-op — proving a stale run never evicts the live claim.
+        keys = list(keys_and_args[:numkeys])
+        args = list(keys_and_args[numkeys:])
+        key = keys[0]
+        expected = args[0]
+        if self.kv.get(key) == expected:
+            del self.kv[key]
+            return 1
+        return 0
+
     async def expire(self, key, ttl):
         return True
 
@@ -1509,13 +1524,16 @@ async def test_cancel_foreign_run_id_returns_404():
         "a foreign-run-id cancel must NOT release the skill's in-flight claim"
 
 
-# ── TT-08 — happy path: an owned, in-flight, bound run cancels (flag + claim release) ─
+# ── TT-08 / WR-01 — happy path: an owned, in-flight, bound run cancels (flag set, claim HELD) ─
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
-async def test_cancel_owned_inflight_run_sets_flag_and_releases_claim():
-    """DELETE for an OWNED, in-flight, BOUND run → 2xx, SETs tuner_cancel:{run_id} AND DELetes
-    tuner_inflight:{skill_id} (the claim is released so a retry no longer 409s) — TT-08 happy
-    path. The membership set + the in-flight claim are both pre-seeded (the start route's state)."""
+async def test_cancel_owned_inflight_run_sets_flag_and_keeps_claim():
+    """DELETE for an OWNED, in-flight, BOUND run → 2xx and SETs tuner_cancel:{run_id} — but
+    WR-01: the route does NOT release the in-flight claim. The cancel is cooperative; the
+    draining job's ``finally`` CAS-releases its own claim once it actually stops, so a retry
+    HONESTLY 409s until the old run drains (releasing here would let a retry start a SECOND
+    concurrent run while the old one is still burning paid calls). The membership set + the
+    in-flight claim are both pre-seeded (the start route's state)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
                  "user_id": OWNER["id"], "is_global": False}
     sb = _supabase_returning_skill([skill_row])
@@ -1546,9 +1564,93 @@ async def test_cancel_owned_inflight_run_sets_flag_and_releases_claim():
     # The cancel flag was set so the running job stops at its next loop checkpoint.
     assert fake_redis.kv.get(skill_tuner._cancel_key(run_id)) is not None, \
         "DELETE must SET tuner_cancel:{run_id} so the job stops"
-    # The in-flight claim was released immediately — a retry no longer 409s for the full TTL.
-    assert skill_tuner._inflight_key(SKILL_ID) not in fake_redis.kv, \
-        "DELETE must release the tuner_inflight claim so a retry no longer 409s"
+    # WR-01: the in-flight claim is STILL held — the cancel route does not release it; the
+    # draining job's finally CAS-releases its own claim once it actually stops.
+    assert fake_redis.kv.get(skill_tuner._inflight_key(SKILL_ID)) == run_id, \
+        "WR-01: the cancel route must NOT release the in-flight claim (the draining job does)"
+
+
+# ── CR-01 — the in-flight claim is released by CAS: a stale run never evicts a newer claim ─
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_inflight_release_is_owner_checked_cas():
+    """The in-flight release is a compare-and-delete keyed on the OWNING run_id (CR-01).
+
+    Concrete cross-run eviction race the blind DELETE allowed (and this CAS now prevents):
+      1. Run A claims ``tuner_inflight:{skill}`` (value = A).
+      2. Run A's TTL expires / it is cancelled; a NEWER Run B ``SET NX``-re-claims the freed
+         key (value = B) and starts.
+      3. Run A finally reaches its ``finally`` and releases — a BLIND DELETE here would evict
+         Run B's claim, letting a Run C start concurrently with B (DoS bound bypass, T-123-04-02).
+    With the CAS release, Run A's release is a NO-OP because the stored value is now B, NOT A —
+    Run B's claim SURVIVES. The normal case (Run A releases its OWN un-superseded claim) still
+    deletes the key. Both halves are asserted (non-vacuous)."""
+    fake_redis = _FakeRedis()
+    run_a = uuid4()
+    run_b = uuid4()
+    key = skill_tuner._inflight_key(SKILL_ID)
+
+    # ── Eviction case: A claims, B re-claims (newer), then A's release runs. B must survive. ──
+    fake_redis.kv[key] = str(run_a)                 # Run A owns the claim
+    fake_redis.kv[key] = str(run_b)                 # Run B re-claimed the freed key (value=B)
+    await skill_tuner._release_inflight_if_owned(fake_redis, SKILL_ID, run_a)  # A's stale release
+    assert fake_redis.kv.get(key) == str(run_b), (
+        "a stale run A's CAS-release must NOT evict the NEWER run B's claim (CR-01); "
+        f"got {fake_redis.kv.get(key)!r}"
+    )
+
+    # ── Normal case: B releases its OWN un-superseded claim → the key is gone. ──
+    await skill_tuner._release_inflight_if_owned(fake_redis, SKILL_ID, run_b)
+    assert key not in fake_redis.kv, (
+        "a run releasing its OWN un-superseded claim must delete the key (CR-01 normal path); "
+        f"got {fake_redis.kv.get(key)!r}"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_job_finally_cas_release_preserves_a_newer_runs_claim():
+    """End-to-end CR-01: a dying run's ``_run_tuner_job`` ``finally`` must NOT evict a newer
+    run's claim. We drive run A's job to completion, but BEFORE it runs we simulate a newer run
+    B having re-claimed ``tuner_inflight:{skill}`` (as if A's TTL expired and B started). After
+    A's job finishes (its ``finally`` CAS-releases), B's claim must STILL be held — proving the
+    real job path uses the owner-checked release, not a blind DELETE."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_a = uuid4()
+    run_b = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    # The key is owned by the NEWER run B before A's job even finishes its finally.
+    fake_redis.kv[skill_tuner._inflight_key(SKILL_ID)] = str(run_b)
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        return TriggerDecision(would_load="risk register" in user_prompt.lower(),
+                               skill_name="Risk Register")
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+    ]
+    targets = [{"provider": "openai", "model": "gpt-5.4-mini"}]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis, run_id=run_a, skill_id=SKILL_ID, skill=skill_row,
+            cases=cases, targets=targets, n=1, user_id=OWNER["id"], supabase=sb,
+        )
+
+    # Run A's finally CAS-released keyed on run_a — but the key is owned by run_b, so it is a
+    # NO-OP. Run B's claim SURVIVES (the DoS bound is intact).
+    assert fake_redis.kv.get(skill_tuner._inflight_key(SKILL_ID)) == str(run_b), (
+        "run A's job finally must CAS-release (no-op while B owns the claim) and NEVER evict "
+        f"run B's claim; got {fake_redis.kv.get(skill_tuner._inflight_key(SKILL_ID))!r}"
+    )
 
 
 # ── TT-08 — the job checkpoint: a pre-set cancel flag stops the run early ──────────

@@ -102,6 +102,32 @@ def _inflight_key(skill_id: str) -> str:
     return f"tuner_inflight:{skill_id}"
 
 
+# Phase 123.1 (CR-01): the in-flight claim is taken with ``SET NX`` and its VALUE is the
+# owning ``run_id``. EVERY release MUST be a compare-and-delete so a run only ever releases
+# its OWN claim — a blind ``DELETE`` lets a stale/dying run's ``finally`` evict a NEWER run's
+# claim (defeating the "exactly ONE in-flight job per skill" DoS bound, T-123-04-02). The CAS
+# is a single atomic Lua ``eval`` (NEVER a GET-then-DELETE, which re-introduces a TOCTOU
+# between the two round-trips).
+_RELEASE_IF_OWNED = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+else
+    return 0
+end
+"""
+
+
+async def _release_inflight_if_owned(redis, skill_id: str, run_id) -> None:
+    """Compare-and-delete the in-flight claim: delete ``tuner_inflight:{skill_id}`` IFF its
+    stored value still equals ``run_id`` (atomic Lua — no TOCTOU). A no-op when a NEWER run
+    already re-claimed the key (its value differs), so a dying run never evicts the live one.
+    Best-effort: a Redis hiccup logs and continues (mirrors the existing cleanup handling)."""
+    try:
+        await redis.eval(_RELEASE_IF_OWNED, 1, _inflight_key(skill_id), str(run_id))
+    except Exception:
+        logger.exception("tuner inflight CAS-release failed (skill %s)", skill_id)
+
+
 def _cancel_key(run_id) -> str:
     """Redis key for the cooperative cancel flag (TT-08).
 
@@ -534,14 +560,15 @@ async def _run_tuner_job(
     finally:
         # Cleanup: release the in-flight guard + the active-run sorted-set entries.
         _INFLIGHT_SKILLS.discard(skill_id)  # same-process fast-path hint
+        # Phase 123.1 (CR-01): CAS-release the cross-worker Redis claim so this run only
+        # releases its OWN claim — a blind DELETE here could evict a NEWER run's claim if this
+        # run's TTL expired (or it was cancelled) and a fresh run already re-claimed the key.
+        await _release_inflight_if_owned(redis, skill_id, run_id)
         try:
-            # Phase 123 (WR-01): release the cross-worker Redis claim so the NEXT run for
-            # this skill can start (the SET NX above is the gate).
-            await redis.delete(_inflight_key(skill_id))
             await redis.zrem("runs:active", str(run_id))
             await redis.zrem(f"runs_by_thread:tuner:{skill_id}", str(run_id))
         except Exception:
-            logger.exception("tuner job cleanup (DEL/ZREM) failed for run %s", run_id)
+            logger.exception("tuner job cleanup (ZREM) failed for run %s", run_id)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -654,12 +681,11 @@ async def start_tuner_run(
         )
     except Exception:
         # Job never spawned — release the claim NOW (its owner-on-finally never starts) so a
-        # transient resolution error doesn't wedge the skill for the full TTL.
+        # transient resolution error doesn't wedge the skill for the full TTL. Phase 123.1
+        # (CR-01): CAS-release so we only ever drop OUR OWN claim (the one this POST just took
+        # with SET NX, value=run_id) and never a concurrent run's claim.
         _INFLIGHT_SKILLS.discard(skill_id)
-        try:
-            await redis.delete(_inflight_key(skill_id))
-        except Exception:
-            logger.exception("tuner inflight-claim release failed after spawn error (skill %s)", skill_id)
+        await _release_inflight_if_owned(redis, skill_id, run_id)
         raise
 
     return {
@@ -891,9 +917,20 @@ async def cancel_tuner_run(
     ``cancelRun`` previously only aborted the client SSE + went idle — the background job kept
     burning paid provider calls and held the ``tuner_inflight`` claim for up to 1800s (so a
     retry 409'd) and the cancelled run still finished + persisted. This route makes the cancel
-    real: it sets a ``tuner_cancel:{run_id}`` Redis flag (the running job observes it at its next
-    candidate/provider loop checkpoint and stops cleanly WITHOUT persisting a partial scoreboard)
-    and releases the in-flight claim immediately so a retry no longer 409s.
+    real: it sets a ``tuner_cancel:{run_id}`` Redis flag and the running job observes it at its
+    next candidate/provider loop checkpoint, stops cleanly WITHOUT persisting a partial
+    scoreboard, and CAS-releases its OWN in-flight claim in its ``finally``.
+
+    WR-01: this route does NOT release the in-flight claim itself. The cancel is COOPERATIVE —
+    the background job only stops at its next candidate/provider loop checkpoint (which can be a
+    whole provider column of paid calls later). Releasing the claim here (the previous behavior)
+    opened a window where a retry POST could ``SET NX``-claim the freed key and start a SECOND
+    run while the old one was still draining — violating the "exactly ONE in-flight job per
+    skill" invariant the claim exists to enforce. By leaving the claim to the draining job's
+    ``finally`` (which CAS-releases it once the run actually stops), a retry HONESTLY 409s until
+    the draining run finishes — typically within one provider column. The honest 409-until-drained
+    is the correct contract; the "release immediately so a retry no longer 409s" promise was
+    exactly what created the overlap.
 
     SECURITY (mirrors the CR-01 IDOR fix already in this phase): order of checks is load-bearing.
       1. ``_fetch_owned_or_global_skill`` — 404 on a cross-user / non-global skill BEFORE any
@@ -918,11 +955,12 @@ async def cancel_tuner_run(
         )
 
     # Set the cooperative cancel flag (TTL'd so a stale flag self-clears; run_ids are uuid4 so it
-    # can never pre-cancel a different run) and release the in-flight claim immediately. The
-    # running job observes the flag at its next loop checkpoint and stops; its ``finally`` does the
-    # runs:active / per-skill ZREM cleanup — this route does not need to kill the task.
+    # can never pre-cancel a different run). The running job observes the flag at its next loop
+    # checkpoint and stops; its ``finally`` does the CAS in-flight release + the runs:active /
+    # per-skill ZREM cleanup. WR-01: this route does NOT release the in-flight claim — doing so
+    # would let a retry start a SECOND run while the cancelled run is still draining (the
+    # draining job's ``finally`` CAS-releases its own claim; a retry honestly 409s until then).
     await redis.set(_cancel_key(run_id), "1", ex=_TUNER_BUFFER_TTL_S)
-    await redis.delete(_inflight_key(skill_id))
     _INFLIGHT_SKILLS.discard(skill_id)  # same-process fast-path hint (NOT the gate)
 
     return {"cancelled": True, "run_id": str(run_id)}
