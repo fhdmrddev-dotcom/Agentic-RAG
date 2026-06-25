@@ -715,7 +715,6 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                   )}
                 </div>
               )}
-              </div>
             </div>
           )}
         </div>
