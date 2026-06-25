@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, Target, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { useSkills } from "@/hooks/useSkills"
 import { CaseEditor, type EditorCase } from "@/components/skills/tuner/CaseEditor"
 import { ProviderScoreboard } from "@/components/skills/tuner/ProviderScoreboard"
@@ -487,6 +488,19 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
     [scoreboard],
   )
 
+  // 123.1-rev: the winner can BE the baseline (no rewrite beat the current description).
+  // Surface that as an explicit verdict instead of leaving N tied cards with no plain-language
+  // recommendation — the honest read of winner_index pointing at the is_baseline candidate is
+  // "keep your current description".
+  const winningCandidate = useMemo(
+    () =>
+      scoreboard && scoreboard.winner_index != null
+        ? scoreboard.candidates.find((c) => c.index === scoreboard.winner_index) ?? null
+        : null,
+    [scoreboard],
+  )
+  const winnerIsBaseline = winningCandidate?.is_baseline === true
+
   // ── D-12 pre-run cost-preview model count: the persisted run's target_count (once a
   //    run has completed) takes precedence as the authoritative measured count; before
   //    any run, fall back to the live configured-target count, then to the in-flight
@@ -620,6 +634,21 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                 (baselineCandidate && baselineCandidate.cells.length > 0) ||
                 (scoreboard && scoreboard.candidates.length > 0)) && (
                 <div data-testid="tuner-results" className="flex flex-col gap-5 min-w-0">
+                  {/* 123.1-rev: score legend (sketch 042) — rendered ONCE above every scoreboard
+                      so a first-time author can read the numbers. The build had dropped it. */}
+                  <div
+                    data-testid="score-legend"
+                    className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed"
+                  >
+                    <span className="font-semibold text-foreground">How to read the scores.</span>{" "}
+                    Every number is <span className="font-mono text-foreground">0.00–1.00</span> (1.00 = perfect).{" "}
+                    <span className="font-mono text-foreground">fires</span> = should-trigger recall (did the skill load when it should?) ·{" "}
+                    <span className="font-mono text-foreground">no-false</span> = should-NOT precision (did it stay quiet when it should?).{" "}
+                    A description that fires on everything scores high on <span className="font-mono">fires</span> but fails{" "}
+                    <span className="font-mono">no-false</span> — both must be high.{" "}
+                    <span className="font-mono text-foreground">held-out</span> = the ~40% of cases never used to pick the winner.
+                  </div>
+
                   {/* D-04 standalone per-provider scoreboard for the BASELINE (current/live
                       description) — distinct from the per-candidate grids. Server cells only. */}
                   {baselineCandidate && baselineCandidate.cells.length > 0 && (
@@ -702,6 +731,30 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                   {/* The normal winner path: badge the winner + offer the Use/confirm strip. */}
                   {hasCandidates && scoreboard && hasWinner && (
                     <div className="flex flex-col gap-4" data-testid="tuner-candidates">
+                      {/* 123.1-rev: plain-language verdict so tied/perfect scores aren't a mystery.
+                          winner_index pointing at the baseline = no rewrite beat the current. */}
+                      <p
+                        data-testid="winner-verdict"
+                        role="status"
+                        className={cn(
+                          "text-xs rounded-lg px-3 py-2 border",
+                          winnerIsBaseline
+                            ? "text-muted-foreground border-border/40 bg-card/40"
+                            : "text-foreground border-primary/30 bg-primary/5",
+                        )}
+                      >
+                        {winnerIsBaseline ? (
+                          <>
+                            <span className="font-semibold">No candidate beat your current description — keeping it.</span>{" "}
+                            The rewrites below scored the same or lower on held-out, so there's nothing to change. Your current description already triggers reliably across the measured providers.
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-semibold">A reworded description scored best on held-out.</span>{" "}
+                            Review the highlighted candidate below and press <span className="font-mono">Use</span> to apply it — nothing changes until you confirm.
+                          </>
+                        )}
+                      </p>
                       {sortedCandidates.map((candidate) => (
                         <CandidateCard
                           key={candidate.index}
