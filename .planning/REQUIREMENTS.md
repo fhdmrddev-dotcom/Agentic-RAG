@@ -100,12 +100,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRH-01 (STRETCH) | Phase 131 | Pending (gated) |
 
 **Coverage:**
+
 - v1 (CORE) requirements: 12 total — **12 mapped** (Phases 120-124)
 - STRETCH requirements: 7 (gated, in-roadmap) — **7 mapped** (Phases 125-131)
 - Mapped to phases: **19 / 19** ✓
 - Unmapped: **0** ✓
 
 **Phase map (CORE 120-124 · STRETCH 125-130):**
+
 - Phase 120 — Collision Fix + Context Isolation: COLL-01, CTX-01
 - Phase 121 — One Front Door for Workflows (IA): IA-01
 - Phase 122 — Cross-Provider Trust & Honesty Parity: MP-01, MP-02, MP-03, TDP-01
