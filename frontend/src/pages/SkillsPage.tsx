@@ -3,6 +3,7 @@ import { Plus, Zap, Upload, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSkills } from "@/hooks/useSkills"
 import { useAuth } from "@/hooks/useAuth"
+import { useResizablePanel } from "@/hooks/useResizablePanel"
 import { SkillCard } from "@/components/skills/SkillCard"
 import { SkillDetailPanel } from "@/components/skills/SkillFormDialog"
 import { exportSkill, importSkillZip } from "@/lib/api"
@@ -26,6 +27,18 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<{ text: string; isError: boolean } | null>(null)
+
+  // Sketch 046-C: the detail rail is resizable. It defaults to the standard
+  // 384px side-rail width (consistent with every other panel at rest); dragging
+  // the left-edge handle widens it for editing long instructions, and the width
+  // is remembered. minWidth keeps it from collapsing below the form's needs;
+  // maxWidth keeps it from swallowing the skill list.
+  const { width: panelWidth, isResizing, separatorProps } = useResizablePanel({
+    storageKey: "skills-detail-panel-width",
+    defaultWidth: 384,
+    minWidth: 340,
+    maxWidth: 760,
+  })
 
   const handleSave = async (body: SkillCreate | SkillUpdate): Promise<Skill> => {
     if (selectedSkill) {
@@ -67,7 +80,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className={cn("flex h-full overflow-hidden", isResizing && "select-none")}>
       {/* Center — page header + scrollable skill list (sits flush against the real NavPanel) */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border/10">
         {/* Page header */}
@@ -143,9 +156,23 @@ export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
         </div>
       </div>
 
-      {/* Pane 3: Right — inline detail/create panel */}
+      {/* Drag handle — widen the detail rail for editing long instructions (sketch
+          046-C). Doubles as the seam between the list and the panel; keyboard users
+          can focus it and use ←/→ to resize. */}
       <div
-        className="w-96 shrink-0 border-l border-border/10 overflow-y-auto bg-card/30"
+        {...separatorProps}
+        aria-label="Resize skill details panel"
+        className={cn(
+          "w-1.5 shrink-0 cursor-col-resize touch-none bg-border/10 transition-colors",
+          "hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none",
+          isResizing && "bg-primary/60",
+        )}
+      />
+
+      {/* Pane 3: Right — resizable inline detail/create panel */}
+      <div
+        className="shrink-0 overflow-y-auto bg-card/30"
+        style={{ width: panelWidth }}
         role="region"
         aria-label="Skill details"
         aria-live="polite"

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target } from "lucide-react"
+import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target, Maximize2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,10 @@ function SkillForm({
   lintWarnings,
   onTuneThis,
 }: SkillFormProps) {
+  // Sketch 046-C: the "Expand" full-size editor for long instructions. Lives in
+  // the SHARED form so both the inline SkillDetailPanel and the modal get it.
+  const [editorExpanded, setEditorExpanded] = useState(false)
+
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -127,15 +131,30 @@ function SkillForm({
         )}
       </div>
 
-      {/* Instructions */}
+      {/* Instructions — taller by default + a soft drag-to-grow handle, and an
+          "Expand" button that opens a focused full-size editor for long markdown
+          (sketch 046-C). The Expand editor binds the SAME `instructions` value, so
+          closing it just returns to the form with edits already applied. */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Instructions</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-foreground">Instructions</label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setEditorExpanded(true)}
+          >
+            <Maximize2 className="h-3 w-3" />
+            Expand
+          </Button>
+        </div>
         <Textarea
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
-          rows={6}
-          className="font-mono text-sm"
+          rows={10}
+          className="min-h-[12rem] resize-y font-mono text-sm"
         />
       </div>
 
@@ -193,6 +212,28 @@ function SkillForm({
           wrapped in <div className="flex items-center gap-2">, with a Required or ReadOnly
           <span> badge (bg-rose-500/10 text-rose-400 OR bg-muted text-muted-foreground)
           as a sibling after the Input. */}
+
+      {/* Focused full-size instructions editor (sketch 046-C escape hatch). Edits
+          the same `instructions` string; "Done" just closes — Save is unchanged. */}
+      <Dialog open={editorExpanded} onOpenChange={setEditorExpanded}>
+        <DialogContent className="flex h-[85vh] w-[92vw] max-w-4xl flex-col gap-3">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Instructions{name ? ` — ${name}` : ""}</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
+            className="min-h-0 flex-1 resize-none font-mono text-sm"
+            autoFocus
+          />
+          <DialogFooter className="shrink-0">
+            <Button type="button" onClick={() => setEditorExpanded(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

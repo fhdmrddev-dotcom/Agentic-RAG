@@ -12,7 +12,7 @@
  * `SkillFormDialog` covers the 3-pane `SkillDetailPanel` too.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup } from "@testing-library/react"
+import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
@@ -41,7 +41,7 @@ vi.mock("@/lib/api", async () => {
   }
 })
 
-import { SkillFormDialog } from "./SkillFormDialog"
+import { SkillFormDialog, SkillDetailPanel } from "./SkillFormDialog"
 
 function mkSkill(overrides: Partial<Skill> = {}): Skill {
   return {
@@ -176,5 +176,45 @@ describe("SkillFormDialog — inline lint warning + Tune this (123-06)", () => {
     await user.click(tuneBtn)
 
     expect(onTuneSkill).toHaveBeenCalledWith("skill-xyz")
+  })
+})
+
+describe("SkillDetailPanel — Expand full-size instructions editor (sketch 046-C)", () => {
+  beforeEach(() => {
+    listSkillFiles.mockClear()
+    listSkillFiles.mockResolvedValue([])
+  })
+
+  it("opens a focused editor bound to the same instructions value and keeps edits on close", async () => {
+    const user = userEvent.setup()
+    const skill = mkSkill({ instructions: "line one\nline two" })
+
+    render(
+      <SkillDetailPanel
+        skill={skill}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+      />,
+    )
+
+    // The inline editor shows the seeded instructions.
+    expect(screen.getByPlaceholderText(/step-by-step instructions/i)).toHaveValue("line one\nline two")
+
+    // Open the full-size editor — it binds the SAME value.
+    await user.click(screen.getByRole("button", { name: /expand/i }))
+    const dialog = await screen.findByRole("dialog")
+    const big = within(dialog).getByRole("textbox")
+    expect(big).toHaveValue("line one\nline two")
+
+    // Edit in the big editor; "Done" closes it and the edit survives in the form.
+    await user.clear(big)
+    await user.type(big, "rewritten in the big editor")
+    await user.click(within(dialog).getByRole("button", { name: /done/i }))
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(screen.getByPlaceholderText(/step-by-step instructions/i)).toHaveValue(
+      "rewritten in the big editor",
+    )
   })
 })
