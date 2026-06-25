@@ -630,18 +630,18 @@ async def start_tuner_run(
 
             eff = await load_app_settings_async()
             targets = skill_tuner_service.configured_targets(eff)
-        targets = targets[:MAX_TARGETS]
-
-        # Phase 123.1 (WR-01): drop empty-model targets so the scored lanes, the rendered
-        # cells, the persisted ``target_count``, and the "measured on N models" attribution all
-        # AGREE. ``configured_targets`` appends local providers (ollama/lmstudio) when a base_url
-        # is set, but ``_REPRESENTATIVE_MODEL`` has no entry for them -> ``model: ""``; the
-        # scoring loop then ``if not model: continue`` (no cell). Counting those unscored lanes
-        # in ``target_count`` fabricated a number (e.g. a default-Ollama install reported
-        # "measured on N models" while only N-1 columns were ever scored). Excluding the unscored
-        # lanes is the HONEST fix — local model ids are user-specific, so we do NOT synthesize a
-        # fake representative model for them.
+        # Phase 123.1 (WR-01 + 123.1-rev): drop empty-model targets BEFORE the MAX_TARGETS cap.
+        # ``configured_targets`` appends local providers (ollama/lmstudio) when a base_url is set,
+        # but ``_REPRESENTATIVE_MODEL`` has no entry for them -> ``model: ""``; the scoring loop
+        # then ``if not model: continue`` (no cell). Filtering the unscored lanes FIRST keeps the
+        # scored lanes, the rendered cells, the persisted ``target_count``, and the "measured on N
+        # models" attribution in AGREEMENT. ORDER MATTERS: if the cap ran first, an unscored local
+        # lane (e.g. a default-Ollama base_url) would consume one of the MAX_TARGETS slots and
+        # silently push a real configured cloud provider (e.g. zhipu/GLM) off the end — the user
+        # configures 8 providers, sees a preview of 8, but only 7 ever get scored. We do NOT
+        # synthesize a fake representative model for local providers (model ids are user-specific).
         targets = [t for t in targets if (t.get("model") or "").strip()]
+        targets = targets[:MAX_TARGETS]
 
         # Resolve + BOUND the cases (default to the owner-scoped auto-seed; cap at MAX_CASES).
         if body.cases:
