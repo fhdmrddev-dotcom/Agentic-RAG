@@ -111,6 +111,43 @@ describe("CandidateCard — held-out score + author-confirm, no auto-apply (042-
   })
 })
 
+describe("CandidateCard — 123.1-rev calibrated winner pop (honest, not misleading)", () => {
+  it("an ACTIONABLE winner (a rewrite that beat baseline) shows the loud '★ best held-out' badge + filled CTA", () => {
+    render(
+      <CandidateCard
+        candidate={makeCandidate({ is_baseline: false, held_out_score: 0.94 })}
+        isWinner={true}
+        currentDescription="old description"
+        onConfirm={vi.fn()}
+      />,
+    )
+    const card = screen.getByTestId("candidate-card")
+    // The unmistakable "apply this one" badge.
+    expect(card.textContent?.toLowerCase()).toContain("best held-out")
+    // The filled CTA reads "Use this →", not the quiet "Use".
+    expect(screen.getByRole("button", { name: /use this/i })).toBeTruthy()
+  })
+
+  it("a BASELINE winner (nothing beat current) stays CALM — no '★ best held-out', no 'apply me' CTA", () => {
+    render(
+      <CandidateCard
+        candidate={makeCandidate({ is_baseline: true, held_out_score: 1.0 })}
+        isWinner={true}
+        currentDescription="old description"
+        onConfirm={vi.fn()}
+      />,
+    )
+    const card = screen.getByTestId("candidate-card")
+    // Honesty: the description you ALREADY run must not scream "best, apply me!" — the page's
+    // winner-verdict banner ("keeping it") owns that message. The baseline card shows its
+    // "current (baseline)" label and NOT the loud badge.
+    expect(card.textContent?.toLowerCase()).toContain("current (baseline)")
+    expect(card.textContent?.toLowerCase()).not.toContain("best held-out")
+    // No "Use this →" filled CTA on the baseline winner (the quiet "Use" remains for re-save).
+    expect(screen.queryByRole("button", { name: /use this/i })).toBeNull()
+  })
+})
+
 describe("CandidateCard — D-11 long-description line-clamp + expand", () => {
   it("clamps a ~1500-char header description by default and keeps the held-out score + Use action visible", () => {
     render(

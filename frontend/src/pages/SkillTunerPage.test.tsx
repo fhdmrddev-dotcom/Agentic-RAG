@@ -160,9 +160,11 @@ describe("SkillTunerPage — page-level author-confirm, no auto-apply (T-123-05-
     // Nothing auto-applied on completion.
     expect(updateSkill).not.toHaveBeenCalled()
 
-    // Winner card is first (sorted by held-out). Use → diff → confirm.
+    // Winner card is first (sorted by held-out). It's an ACTIONABLE winner (a rewrite that beat
+    // the baseline), so its CTA is the filled "Use this →" (123.1-rev calibrated winner pop).
+    // Use → diff → confirm.
     const winnerCard = cards[0]
-    await user.click(within(winnerCard).getByRole("button", { name: /^use$/i }))
+    await user.click(within(winnerCard).getByRole("button", { name: /use this/i }))
     const strip = within(winnerCard).getByTestId("candidate-diff-confirm")
     expect(strip.textContent).toContain("Fires on SQL.")
     expect(updateSkill).not.toHaveBeenCalled()
@@ -299,8 +301,11 @@ describe("SkillTunerPage — rehydration, empty state, cost preview, D-04 block 
     // No candidates, no scoreboard cells, no failure copy — the calm empty state.
     expect(screen.queryByTestId("candidate-card")).toBeNull()
     expect(screen.queryByText(/the tuning run failed/i)).toBeNull()
-    // The empty/initial prompt renders.
-    expect(screen.getByText(/run the benchmark to score candidate descriptions/i)).toBeTruthy()
+    // The calm pre-run state IS the always-editable stack (the sketch-045 full-width restructure
+    // replaced the old placeholder copy): the "Run tuning" kickoff is present and the results
+    // block is ABSENT (no empty void). No candidates, no error, no throw.
+    expect(screen.getByRole("button", { name: /run tuning/i })).toBeTruthy()
+    expect(screen.queryByTestId("tuner-results")).toBeNull()
   })
 
   it("D-12 / WR-02: the pre-run cost preview counts keyed providers with a backend representative model", async () => {
@@ -338,8 +343,13 @@ describe("SkillTunerPage — rehydration, empty state, cost preview, D-04 block 
 
 describe("SkillTunerPage — full-width results layout (D-03)", () => {
   it("the results area is NOT wedged into the 50/50 split column", async () => {
+    // Results are CONDITIONAL post-restructure (D-03/045): they mount once a run produces them,
+    // never pre-run (no empty void). Kick a run (the beforeEach stream mock drives SCOREBOARD in)
+    // so the results block actually renders.
+    const user = userEvent.setup()
     render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
     await screen.findByText(/current · live · drives firing/i)
+    await user.click(screen.getByRole("button", { name: /run tuning/i }))
     // The results region is a full-width / materially-wider section (its own testid),
     // not a half-column of a 50/50 grid.
     const results = await screen.findByTestId("tuner-results")

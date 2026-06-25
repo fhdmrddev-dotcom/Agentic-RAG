@@ -10,7 +10,7 @@
  * (40% never used to generate the candidates).
  */
 import { useState } from "react"
-import { Crown, ArrowRight } from "lucide-react"
+import { Crown, Star, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ProviderScoreboard } from "./ProviderScoreboard"
@@ -43,6 +43,14 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
   // author can retry, and they're told why nothing was saved.
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // 123.1-rev "make the winner pop": the loud green "★ best held-out" treatment fires ONLY for
+  // an ACTIONABLE winner — a REWRITE that beat the current description (something to apply). When
+  // the server-picked winner IS the baseline (the all-tied / nothing-beat-current case), this
+  // card must stay calm: the page's winner-verdict banner already says "keeping it", and screaming
+  // "★ best, apply me!" on the description you ALREADY run would be dishonest. So a baseline winner
+  // keeps the quiet crown; only a rewrite winner gets the green pill + ring + filled CTA.
+  const isActionableWinner = isWinner && !candidate.is_baseline
+
   const handleConfirm = async () => {
     if (saving) return
     setSaving(true)
@@ -63,17 +71,30 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
       data-testid="candidate-card"
       className={cn(
         "rounded-xl ghost-border bg-card/50 p-4 shadow-sm flex flex-col gap-3",
-        isWinner && "ring-1 ring-primary/40",
+        // Actionable rewrite winner → loud green ring; a baseline winner stays the quiet violet ring.
+        isActionableWinner
+          ? "ring-2 ring-[hsl(var(--panel-status-done))]/55 shadow-[0_0_0_1px_hsl(var(--panel-status-done)/0.18)]"
+          : isWinner && "ring-1 ring-primary/40",
       )}
     >
-      {/* Header: held-out score (the number the author picks by) + winner crown. */}
+      {/* Header: held-out score (the number the author picks by) + the winner signal. */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">
-            {isWinner && <Crown className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />}
-            <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
-              {candidate.is_baseline ? "current (baseline)" : isWinner ? "winner" : "candidate"}
-            </span>
+            {isActionableWinner ? (
+              // The unmistakable "this is the one to apply" badge (sketch 042-A "★ best held-out").
+              <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--panel-status-done))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--background))]">
+                <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                best held-out
+              </span>
+            ) : (
+              <>
+                {isWinner && <Crown className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />}
+                <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+                  {candidate.is_baseline ? "current (baseline)" : isWinner ? "winner" : "candidate"}
+                </span>
+              </>
+            )}
           </div>
           <p
             data-testid="candidate-description"
@@ -85,7 +106,12 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
         </div>
         <div className="flex flex-col items-end shrink-0">
           <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">held-out</span>
-          <span className="text-lg font-mono font-bold tabular-nums text-foreground">
+          <span
+            className={cn(
+              "font-mono font-bold tabular-nums",
+              isActionableWinner ? "text-xl text-[hsl(var(--panel-status-done))]" : "text-lg text-foreground",
+            )}
+          >
             {candidate.held_out_score.toFixed(2)}
           </span>
         </div>
@@ -150,8 +176,14 @@ export function CandidateCard({ candidate, isWinner, currentDescription, onConfi
         </div>
       ) : (
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
-            Use
+          {/* The actionable winner gets the filled CTA so the recommended action is unmistakable;
+              every other card keeps the quiet outline "Use". */}
+          <Button
+            variant={isActionableWinner ? "default" : "outline"}
+            size="sm"
+            onClick={() => setConfirming(true)}
+          >
+            {isActionableWinner ? "Use this →" : "Use"}
           </Button>
         </div>
       )}
