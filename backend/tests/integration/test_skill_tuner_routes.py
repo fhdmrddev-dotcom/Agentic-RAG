@@ -461,6 +461,89 @@ async def test_results_carry_both_fires_and_no_false_subscores():
         "expected a tuner_complete event on the run-buffer"
 
 
+# ── 3b. TT-perf: the provider columns score CONCURRENTLY (not one-after-another) ──
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_provider_columns_score_concurrently():
+    """Drive the job with 3 targets and a classify mock that tracks how many calls are in
+    flight at once. With the per-provider concurrency (asyncio.gather over columns) the peak
+    in-flight count reaches the COLUMN count; the old serial loop would peak at 1. Also assert
+    gather preserves target ORDER (deterministic cells) — concurrency must not reorder the
+    scoreboard. cases × repeats stay serial INSIDE a column (that's why peak == #columns, not
+    #columns × #cases)."""
+    skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
+                 "user_id": OWNER["id"], "is_global": False}
+    fake_redis = _FakeRedis()
+    run_id = uuid4()
+    stored = {}
+    sb = _supabase_with_tuner_runs([skill_row], store=stored)
+
+    in_flight = 0
+    max_in_flight = 0
+    lock = asyncio.Lock()
+
+    async def _classify(target_model, catalog_lines, user_prompt, user_settings):
+        nonlocal in_flight, max_in_flight
+        async with lock:
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+        # Hold the call open briefly so genuinely-concurrent columns overlap here; a serial
+        # loop would never have more than one call inside this window.
+        await asyncio.sleep(0.03)
+        async with lock:
+            in_flight -= 1
+        return TriggerDecision(
+            would_load="risk register" in user_prompt.lower(), skill_name="Risk Register",
+        )
+
+    cases = [
+        {"prompt": "fill a risk register for me", "should_fire": True},
+        {"prompt": "fill a risk register now", "should_fire": True},
+        {"prompt": "tell me a joke", "should_fire": False},
+        {"prompt": "what's the weather", "should_fire": False},
+    ]
+    # Three DISTINCT provider columns — the axis the gather parallelizes.
+    targets = [
+        {"provider": "openai", "model": "gpt-5.4-mini"},
+        {"provider": "anthropic", "model": "claude-haiku-4-5"},
+        {"provider": "google", "model": "gemini-3.5-flash"},
+    ]
+
+    with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
+                      new=AsyncMock(return_value=["v2 description"])), \
+         patch.object(skill_tuner.skill_tuner_service, "classify_fires", new=_classify), \
+         patch("app.models.user_settings.load_user_settings", return_value=object()):
+        await skill_tuner._run_tuner_job(
+            redis=fake_redis,
+            run_id=run_id,
+            skill_id=SKILL_ID,
+            skill=skill_row,
+            cases=cases,
+            targets=targets,
+            n=2,
+            user_id=OWNER["id"],
+            supabase=sb,
+        )
+
+    # The PROOF: peak concurrency == the number of provider columns (would be 1 if serial).
+    assert max_in_flight == len(targets), (
+        f"expected peak in-flight == {len(targets)} (one per concurrent provider column); "
+        f"got {max_in_flight} — columns are running serially, not concurrently"
+    )
+
+    # Order preserved: each candidate's cells are in the SAME order as ``targets`` (gather
+    # returns input order regardless of which column finished first).
+    result = json.loads(fake_redis.kv[f"tuner_result:{run_id}"])
+    expected_order = [t["provider"] for t in targets]
+    for cand in result["candidates"]:
+        got_order = [c["provider"] for c in cand["cells"]]
+        assert got_order == expected_order, (
+            f"cells reordered by concurrency: expected {expected_order}, got {got_order}"
+        )
+    assert fake_redis.events_of_type(f"run:{run_id}", "tuner_complete"), \
+        "expected a tuner_complete event after the concurrent run"
+
+
 # ── 4. The background run is BOUNDED — target cap honored (no unbounded fan-out) ─
 @pytest.mark.asyncio
 @pytest.mark.timeout(20)

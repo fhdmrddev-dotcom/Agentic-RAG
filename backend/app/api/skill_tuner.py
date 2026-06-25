@@ -40,6 +40,7 @@ Provider differences stay at the gateway boundary.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time as time_mod
@@ -233,6 +234,133 @@ async def _emit_terminal(redis, run_id: UUID, terminal_type: str, **fields) -> N
         logger.exception("tuner EXPIRE failed for run %s", run_id)
 
 
+# A column-scoring sentinel: a cooperative cancel was already set as this column STARTED, so the
+# column did no provider work. Distinct from ``None`` (a gateway target with no representative
+# model, skipped honestly) so the caller can tell "cancel" from "skip".
+_COLUMN_CANCELLED = object()
+
+
+async def _score_provider_column(
+    *,
+    redis,
+    run_id: UUID,
+    cand_idx: int,
+    catalog_lines: str,
+    held_out_cases: list[dict],
+    target: dict,
+    user_settings,
+    sem: asyncio.Semaphore | None = None,
+):
+    """Score ONE provider column for ONE candidate over the held-out cases.
+
+    Returns the built ``cell`` dict; ``None`` when the target has no representative model (e.g. an
+    OpenRouter-style gateway with an empty model — skipped honestly); or ``_COLUMN_CANCELLED`` when
+    a cooperative cancel is already set as the column starts (it then does no provider work).
+
+    Performance (TT-perf): the caller runs these columns CONCURRENTLY (one per provider). The
+    cases × repeats loop INSIDE a column stays SERIAL on purpose — concurrency is taken across
+    PROVIDERS, never within one, so (a) we get the ~N-provider speedup and (b) each concurrent call
+    lands in a DIFFERENT provider's rate-limit bucket, which is the rate-limit-safe axis to
+    parallelize. EVERY provider call keeps its registry per-call timeout (T-123-04-02), and the
+    honest-fail floors (a partial-fail repeat counts as did-not-fire; an all-repeats-raised case is
+    counted as unmeasured for its axis) are byte-for-byte the serial version's.
+
+    ``sem`` (when supplied) bounds the number of in-flight columns; the whole column — including the
+    provider_start emit and the cancel checkpoint — runs under it so a queued column doesn't flip
+    its lane to "running" until it actually has a slot.
+    """
+    cm = sem if sem is not None else contextlib.nullcontext()
+    async with cm:
+        provider = target.get("provider", "unknown")
+        model = target.get("model") or ""
+        # An empty representative model (e.g. openrouter gateway) — skip honestly.
+        if not model:
+            return None
+        # TT-08: cancel checkpoint as the column starts — a cancel set before this column launched
+        # stops it before any (paid) provider call. Columns already in flight finish their cases
+        # (one column's worth — now the run's wall-clock unit, since columns run in parallel).
+        if await redis.get(_cancel_key(run_id)):
+            return _COLUMN_CANCELLED
+        target_timeout = get_per_call_timeout(model)
+
+        # TT-07: flip THIS lane queued -> running as the column starts (BEFORE the case loop). With
+        # parallel columns every lane flips ~together — which is the honest picture: the provider
+        # columns ARE all running at once now, not one-after-another. Red line: the tuner's OWN
+        # _emit_tuner to run:{run_id}, NOT the shared runs.py consumer (TT-06 heartbeat is Wave C).
+        await _emit_tuner(
+            redis, run_id, EVENT_PROGRESS,
+            stage="provider_start", candidate_index=cand_idx,
+            provider=provider, model=model,
+        )
+
+        fire_decisions: list[bool] = []
+        no_false_decisions: list[bool] = []
+        # Phase 123.1-06 (TT-12): an EXCEPTION is NOT "the model said no" — it is "we could not
+        # measure". Track, per axis, the number of held-out CASES whose every repeat RAISED (so an
+        # all-400 / all-timeout column ends with EMPTY decision lists + a positive error_count, and
+        # build_cell marks it measured=False). A PARTIALLY-failing case still yields a majority-vote
+        # decision (the honest-fail "treat a failed repeat as did-not-fire" robustness is preserved
+        # — only an ALL-repeats-raised case is counted as unmeasured for that axis).
+        fire_error_count = 0
+        no_false_error_count = 0
+        # Score on the HELD-OUT cases (winner-by-held-out, never train).
+        for case in held_out_cases:
+            prompt = case.get("prompt", "")
+            expected_fire = bool(case.get("should_fire"))
+            repeat_fires: list[bool] = []
+            repeat_raises = 0
+            for _ in range(DEFAULT_REPEATS):
+                try:
+                    decision = await asyncio.wait_for(
+                        skill_tuner_service.classify_fires(
+                            target_model=model,
+                            catalog_lines=catalog_lines,
+                            user_prompt=prompt,
+                            user_settings=user_settings,
+                        ),
+                        timeout=target_timeout,
+                    )
+                    repeat_fires.append(bool(decision.would_load))
+                except (asyncio.TimeoutError, Exception):
+                    logger.debug(
+                        "tuner classify_fires failed/timed out (run %s, %s); "
+                        "treating a partial-fail repeat as did-not-fire",
+                        run_id, model, exc_info=True,
+                    )
+                    repeat_raises += 1
+                    # Honest-fail floor for a PARTIALLY-failing case: a failed repeat counts as
+                    # did-not-fire in the majority vote (robustness preserved).
+                    repeat_fires.append(False)
+            if repeat_raises == DEFAULT_REPEATS:
+                # EVERY repeat raised -> the case produced NO real signal. Count it as an unmeasured
+                # case for its axis; do NOT append a fabricated decision.
+                if expected_fire:
+                    fire_error_count += 1
+                else:
+                    no_false_error_count += 1
+                continue
+            # Aggregate the repeats: majority-fired -> the case "fired".
+            fired = sum(1 for f in repeat_fires if f) > (DEFAULT_REPEATS / 2)
+            if expected_fire:
+                fire_decisions.append(fired)
+            else:
+                no_false_decisions.append(fired)
+
+        cell = skill_tuner_service.build_cell(
+            provider=provider,
+            model=model,
+            fire_decisions=fire_decisions,
+            no_false_decisions=no_false_decisions,
+            fire_error_count=fire_error_count,
+            no_false_error_count=no_false_error_count,
+        )
+        await _emit_tuner(
+            redis, run_id, EVENT_PROVIDER_DONE,
+            candidate_index=cand_idx, provider=provider, model=model, cell=cell,
+        )
+        return cell
+
+
 # ── The bounded background tuning run ────────────────────────────────────────────
 async def _run_tuner_job(
     *,
@@ -347,106 +475,42 @@ async def _run_tuner_job(
             _, _ho_f = skill_tuner_service.split_held_out(_fire)
             _, _ho_n = skill_tuner_service.split_held_out(_nofire)
             held_out_cases = _ho_f + _ho_n
-            per_target_cells: list[dict] = []
-            for target in targets:
-                # TT-08: cancel checkpoint at the provider loop top too — a cancel mid-candidate
-                # stops at the very next column instead of finishing the candidate's remaining
-                # providers (each a burst of paid provider calls).
-                if await redis.get(_cancel_key(run_id)):
-                    cancelled = True
-                    break
-                provider = target.get("provider", "unknown")
-                model = target.get("model") or ""
-                # An empty representative model (e.g. openrouter gateway) — skip honestly.
-                if not model:
-                    continue
-                target_timeout = get_per_call_timeout(model)
-
-                # TT-07: emit a tuner_progress event with stage="provider_start" carrying
-                # provider+model at the START of this column (BEFORE the per-case loop), via the
-                # tuner's OWN _emit_tuner to run:{run_id}. The frontend flips the matching lane
-                # queued -> running on it — lanes no longer sit "queued" until tuner_provider_done
-                # (which fires only AFTER the whole column scores). Red line: this is the tuner's
-                # local emit, NOT the shared runs.py consumer (TT-06 heartbeat is Wave C).
-                await _emit_tuner(
-                    redis, run_id, EVENT_PROGRESS,
-                    stage="provider_start", candidate_index=cand_idx,
-                    provider=provider, model=model,
+            # TT-perf: score the provider columns CONCURRENTLY — one coroutine per target. The
+            # columns are independent (each scores the SAME held-out cases on a different model)
+            # and each lands in a DIFFERENT provider rate-limit bucket, so cross-provider
+            # concurrency is BOTH the ~N-provider speedup AND the rate-limit-safe axis (cases ×
+            # repeats stay serial INSIDE a column — see _score_provider_column — so we never stack
+            # same-bucket calls). asyncio.gather preserves INPUT order, so per_target_cells stays
+            # deterministic target-order no matter which column finishes first. The shared semaphore
+            # bounds in-flight columns to the target count (``targets`` is already <= MAX_TARGETS).
+            _col_sem = asyncio.Semaphore(min(len(targets), MAX_TARGETS) or 1)
+            column_results = await asyncio.gather(*[
+                _score_provider_column(
+                    redis=redis,
+                    run_id=run_id,
+                    cand_idx=cand_idx,
+                    catalog_lines=catalog_lines,
+                    held_out_cases=held_out_cases,
+                    target=target,
+                    user_settings=user_settings,
+                    sem=_col_sem,
                 )
+                for target in targets
+            ])
 
-                fire_decisions: list[bool] = []
-                no_false_decisions: list[bool] = []
-                # Phase 123.1-06 (TT-12): an EXCEPTION is NOT "the model said no" — it is "we
-                # could not measure". Track, per axis, the number of held-out CASES whose every
-                # repeat RAISED (so an all-400 / all-timeout column ends with EMPTY decision
-                # lists + a positive error_count, and build_cell marks it measured=False). A
-                # PARTIALLY-failing case still yields a majority-vote decision (the honest-fail
-                # "treat a failed repeat as did-not-fire" robustness is preserved — only an
-                # ALL-repeats-raised case is counted as unmeasured for that axis).
-                fire_error_count = 0
-                no_false_error_count = 0
-                # Score on the HELD-OUT cases (winner-by-held-out, never train).
-                for case in held_out_cases:
-                    prompt = case.get("prompt", "")
-                    expected_fire = bool(case.get("should_fire"))
-                    repeat_fires: list[bool] = []
-                    repeat_raises = 0
-                    for _ in range(DEFAULT_REPEATS):
-                        try:
-                            decision = await asyncio.wait_for(
-                                skill_tuner_service.classify_fires(
-                                    target_model=model,
-                                    catalog_lines=catalog_lines,
-                                    user_prompt=prompt,
-                                    user_settings=user_settings,
-                                ),
-                                timeout=target_timeout,
-                            )
-                            repeat_fires.append(bool(decision.would_load))
-                        except (asyncio.TimeoutError, Exception):
-                            logger.debug(
-                                "tuner classify_fires failed/timed out (run %s, %s); "
-                                "treating a partial-fail repeat as did-not-fire",
-                                run_id, model, exc_info=True,
-                            )
-                            repeat_raises += 1
-                            # Honest-fail floor for a PARTIALLY-failing case: a failed repeat
-                            # counts as did-not-fire in the majority vote (robustness preserved).
-                            repeat_fires.append(False)
-                    if repeat_raises == DEFAULT_REPEATS:
-                        # EVERY repeat raised -> the case produced NO real signal. Count it as an
-                        # unmeasured case for its axis; do NOT append a fabricated decision.
-                        if expected_fire:
-                            fire_error_count += 1
-                        else:
-                            no_false_error_count += 1
-                        continue
-                    # Aggregate the repeats: majority-fired -> the case "fired".
-                    fired = sum(1 for f in repeat_fires if f) > (DEFAULT_REPEATS / 2)
-                    if expected_fire:
-                        fire_decisions.append(fired)
-                    else:
-                        no_false_decisions.append(fired)
-
-                cell = skill_tuner_service.build_cell(
-                    provider=provider,
-                    model=model,
-                    fire_decisions=fire_decisions,
-                    no_false_decisions=no_false_decisions,
-                    fire_error_count=fire_error_count,
-                    no_false_error_count=no_false_error_count,
-                )
-                per_target_cells.append(cell)
-                await _emit_tuner(
-                    redis, run_id, EVENT_PROVIDER_DONE,
-                    candidate_index=cand_idx, provider=provider, model=model, cell=cell,
-                )
-
-            # TT-08: a cancel observed inside the provider loop breaks the candidate loop too —
-            # do NOT append a partial candidate (it would skew the winner pick) and do NOT score
-            # any further candidates.
-            if cancelled:
+            # TT-08: a cooperative cancel observed as any column started stops the whole run — do
+            # NOT append a partial candidate (it would skew the winner pick) and score no further
+            # candidates. With parallel columns the cancel lands at the candidate boundary instead
+            # of mid-candidate, but each candidate is now ~one column's wall-clock, so the cancel
+            # responsiveness the UAT exercises is unchanged-or-better.
+            if any(r is _COLUMN_CANCELLED for r in column_results):
+                cancelled = True
                 break
+            # Skipped (no-rep-model gateway) columns return None — drop them; keep real cells in
+            # target order. No _COLUMN_CANCELLED survives here (we broke above if any appeared).
+            per_target_cells = [
+                r for r in column_results if r is not None and r is not _COLUMN_CANCELLED
+            ]
 
             # Phase 123.1-06 (TT-15): cell_score returns the SINGLE stored cell["score"]; a
             # wholly-unmeasured cell returns None -> SKIP it in the held-out mean (an all-error
