@@ -66,6 +66,12 @@ router = APIRouter(prefix="/skills", tags=["skill-tuner"])
 # ── Bounds (T-123-04-02 — DoS guard; no unbounded fan-out / cost blow-up) ────────
 MAX_CASES = 40          # cap benchmark cases per run (should_fire + should_not combined)
 MAX_TARGETS = 8         # cap N provider columns (one representative model per provider)
+# TT-perf: how many provider columns score CONCURRENTLY per candidate. Capped at 4 (NOT the full
+# MAX_TARGETS) because an 8-wide burst, repeated back-to-back across candidates, trips provider
+# rate limits — the first candidate runs fast on a fresh budget, then later candidates get
+# throttled (429-backoff near each call's timeout) and crawl. 4 keeps most of the speedup
+# (~4x vs serial) while staying gentle enough that sustained multi-candidate runs don't throttle.
+MAX_COLUMN_CONCURRENCY = 4
 MAX_ITERATIONS = 5      # cap candidate iterations at <=5 (D-06 / hybrid 60/40/3x/<=5)
 DEFAULT_REPEATS = skill_tuner_service.DEFAULT_REPEATS  # 3 repeats per (candidate, target, case)
 
@@ -476,14 +482,14 @@ async def _run_tuner_job(
             _, _ho_n = skill_tuner_service.split_held_out(_nofire)
             held_out_cases = _ho_f + _ho_n
             # TT-perf: score the provider columns CONCURRENTLY — one coroutine per target. The
-            # columns are independent (each scores the SAME held-out cases on a different model)
-            # and each lands in a DIFFERENT provider rate-limit bucket, so cross-provider
-            # concurrency is BOTH the ~N-provider speedup AND the rate-limit-safe axis (cases ×
-            # repeats stay serial INSIDE a column — see _score_provider_column — so we never stack
-            # same-bucket calls). asyncio.gather preserves INPUT order, so per_target_cells stays
-            # deterministic target-order no matter which column finishes first. The shared semaphore
-            # bounds in-flight columns to the target count (``targets`` is already <= MAX_TARGETS).
-            _col_sem = asyncio.Semaphore(min(len(targets), MAX_TARGETS) or 1)
+            # columns are independent (each scores the SAME held-out cases on a different model) so
+            # cross-provider concurrency is the speedup axis (cases × repeats stay serial INSIDE a
+            # column — see _score_provider_column). asyncio.gather preserves INPUT order, so
+            # per_target_cells stays deterministic target-order no matter which column finishes
+            # first. The shared semaphore bounds in-flight columns to MAX_COLUMN_CONCURRENCY (4, NOT
+            # the full target count) — an 8-wide burst repeated across candidates throttles the
+            # providers; 4 keeps most of the speedup while staying under their rate limits.
+            _col_sem = asyncio.Semaphore(min(len(targets), MAX_COLUMN_CONCURRENCY) or 1)
             column_results = await asyncio.gather(*[
                 _score_provider_column(
                     redis=redis,

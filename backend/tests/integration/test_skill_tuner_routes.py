@@ -465,12 +465,13 @@ async def test_results_carry_both_fires_and_no_false_subscores():
 @pytest.mark.asyncio
 @pytest.mark.timeout(20)
 async def test_provider_columns_score_concurrently():
-    """Drive the job with 3 targets and a classify mock that tracks how many calls are in
-    flight at once. With the per-provider concurrency (asyncio.gather over columns) the peak
-    in-flight count reaches the COLUMN count; the old serial loop would peak at 1. Also assert
-    gather preserves target ORDER (deterministic cells) — concurrency must not reorder the
-    scoreboard. cases × repeats stay serial INSIDE a column (that's why peak == #columns, not
-    #columns × #cases)."""
+    """Drive the job with MORE targets than the concurrency cap and a classify mock that tracks
+    how many calls are in flight at once. With the per-provider concurrency (asyncio.gather over
+    columns, bounded by MAX_COLUMN_CONCURRENCY) the peak in-flight count reaches the CAP — proving
+    BOTH that columns run concurrently (the old serial loop would peak at 1) AND that the burst is
+    bounded (it does NOT reach the full target count, so an 8-wide rate-limit-tripping burst can't
+    happen). Also assert gather preserves target ORDER (deterministic cells) — concurrency must
+    not reorder the scoreboard. cases × repeats stay serial INSIDE a column."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
                  "user_id": OWNER["id"], "is_global": False}
     fake_redis = _FakeRedis()
@@ -502,11 +503,15 @@ async def test_provider_columns_score_concurrently():
         {"prompt": "tell me a joke", "should_fire": False},
         {"prompt": "what's the weather", "should_fire": False},
     ]
-    # Three DISTINCT provider columns — the axis the gather parallelizes.
+    # SIX distinct provider columns — MORE than MAX_COLUMN_CONCURRENCY (4), so the cap is
+    # exercised (not just "are they concurrent" but "is the burst bounded").
     targets = [
         {"provider": "openai", "model": "gpt-5.4-mini"},
         {"provider": "anthropic", "model": "claude-haiku-4-5"},
         {"provider": "google", "model": "gemini-3.5-flash"},
+        {"provider": "openrouter", "model": "deepseek/deepseek-chat"},
+        {"provider": "deepseek", "model": "deepseek-v4-flash"},
+        {"provider": "moonshot", "model": "kimi-k2.6"},
     ]
 
     with patch.object(skill_tuner.skill_tuner_service, "build_candidates",
@@ -525,10 +530,16 @@ async def test_provider_columns_score_concurrently():
             supabase=sb,
         )
 
-    # The PROOF: peak concurrency == the number of provider columns (would be 1 if serial).
-    assert max_in_flight == len(targets), (
-        f"expected peak in-flight == {len(targets)} (one per concurrent provider column); "
-        f"got {max_in_flight} — columns are running serially, not concurrently"
+    # The PROOF: peak concurrency == the cap (NOT 1 = serial, and NOT len(targets) = unbounded
+    # burst). With 6 targets and a cap of 4, exactly 4 columns run at once — concurrent yet bounded.
+    cap = skill_tuner.MAX_COLUMN_CONCURRENCY
+    assert max_in_flight == cap, (
+        f"expected peak in-flight == MAX_COLUMN_CONCURRENCY ({cap}); got {max_in_flight} — "
+        f"{'columns are running serially' if max_in_flight <= 1 else 'the burst is NOT bounded by the cap'}"
+    )
+    assert max_in_flight < len(targets), (
+        f"peak in-flight ({max_in_flight}) should be CAPPED below the target count "
+        f"({len(targets)}) — an unbounded 8-wide burst is what trips provider rate limits"
     )
 
     # Order preserved: each candidate's cells are in the SAME order as ``targets`` (gather
