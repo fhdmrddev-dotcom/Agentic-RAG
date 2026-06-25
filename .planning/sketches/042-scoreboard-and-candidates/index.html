@@ -110,13 +110,57 @@
   .deltarow:last-child { border:none; }
   .delta-up { color: var(--color-success); font-family:var(--font-mono); font-size: var(--text-xs); }
   .delta-down { color: var(--color-danger); font-family:var(--font-mono); font-size: var(--text-xs); }
+
+  /* ── VARIANT D — AS SHIPPED (vertical full-width provider rows) ──────────────────
+     The faithful as-built reference. The per-provider breakdown is N vertical full-width
+     ROWS (driven by the org's configured targets), NOT variant A's fixed 4-up grid — the
+     grid crammed illegibly at the org's real 7-8 providers (BUG-260624-01 HIGH #1), so
+     Phase 123.1 replaced it with these rows. Mirrors ProviderScoreboard.tsx exactly. */
+  .legend { border:1px solid var(--color-primary-glow); background:var(--color-primary-dim); border-radius:var(--radius-md); padding:10px 13px; font-size:11px; color:var(--color-text-muted); line-height:1.65; margin-bottom:16px; }
+  .legend b { color: var(--color-text); } .legend .k { font-family:var(--font-mono); color:var(--color-text); }
+
+  .verdict { border:1px solid var(--color-primary-glow); background:var(--color-primary-dim); border-radius:var(--radius-md); padding:10px 13px; font-size:var(--text-xs); color:var(--color-text); line-height:1.55; margin-bottom:16px; }
+  .verdict.keep { border-color:var(--color-border); background:var(--color-bg-elev1); color:var(--color-text-muted); }
+  .verdict b { font-weight:700; }
+
+  .sb-sec { border:1px solid var(--color-border); background:var(--color-surface); border-radius:var(--radius-lg); padding:14px 16px; margin-bottom:16px; }
+  .sb-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:11px; }
+  .sb-head .t { font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--color-primary); font-family:var(--font-mono); }
+  .sb-head .attr { font-size:10px; font-family:var(--font-mono); color:var(--color-text-dim); text-align:right; }
+
+  .rows { display:flex; flex-direction:column; gap:8px; }
+  .prow { border:1px solid var(--color-border-soft); background:var(--color-bg-elev1); border-radius:var(--radius-md); padding:9px 12px; display:grid; grid-template-columns:1.3fr auto 1fr; align-items:center; gap:14px; }
+  .prow .pm { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .prow .pm .p { font-size:var(--text-xs); font-family:var(--font-mono); font-weight:600; color:var(--color-text); }
+  .prow .pm .m { font-size:10px; font-family:var(--font-mono); color:var(--color-text-muted); }
+  .prow .sc { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+  .prow .sc .v { font-size:var(--text-md); font-family:var(--font-mono); font-weight:700; }
+  .prow .sc .l { font-size:9px; text-transform:uppercase; letter-spacing:0.05em; font-family:var(--font-mono); color:var(--color-text-dim); }
+  .prow .mb { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .prow .mb .bar { height:5px; border-radius:3px; background:var(--color-muted); overflow:hidden; }
+  .prow .mb .bar > i { display:block; height:100%; border-radius:3px; }
+  .prow .mb .subs { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:11px; font-family:var(--font-mono); }
+  .prow .mb .subs .lab { color:var(--color-text-muted); }
+
+  .ccard2 { border:1px solid var(--color-border); background:var(--color-surface); border-radius:var(--radius-lg); padding:15px 17px; margin-bottom:14px; }
+  .ccard2.win { border:2px solid var(--color-success); box-shadow:0 0 0 1px var(--color-success-dim); }
+  .ccard2.cur { border-style:dashed; opacity:0.94; }
+  .ccard2 .ch { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:6px; }
+  .badge-best { display:inline-flex; align-items:center; gap:5px; background:var(--color-success); color:#04140a; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:3px 9px; border-radius:var(--radius-full); }
+  .tag-min { font-size:10px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); }
+  .ccard2 .cdesc { font-size:var(--text-sm); color:var(--color-text); line-height:1.5; margin:8px 0 12px; }
+  .ho { text-align:right; display:flex; flex-direction:column; flex-shrink:0; }
+  .ho .v { font-family:var(--font-mono); font-weight:700; }
+  .ho .l { font-size:9px; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-dim); }
+  .ccard2 .cact { display:flex; justify-content:flex-end; margin-top:12px; }
 </style>
 </head>
 <body>
 
 <div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
   <span class="label">042 · Scoreboard + candidates</span>
-  <button class="variant-tab active" onclick="showVariant('a', event)">A: Candidate cards + grid ★</button>
+  <button class="variant-tab active" onclick="showVariant('d', event)">D: As shipped ★ (vertical rows)</button>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Candidate cards + 4-up grid (original)</button>
   <button class="variant-tab" onclick="showVariant('b', event)">B: Leaderboard rows</button>
   <button class="variant-tab" onclick="showVariant('c', event)">C: Diff-against-current</button>
 </div>
@@ -167,7 +211,7 @@
 </div>
 
 <!-- ===================== VARIANT A ===================== -->
-<div id="variant-a" class="variant">
+<div id="variant-a" class="variant" style="display:none">
   <div class="wrap">
     <div class="vhead">
       <h2>One tuning iteration · <span style="color:var(--color-primary)">Risk Register</span></h2>
@@ -382,6 +426,115 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===================== VARIANT D — AS SHIPPED ===================== -->
+<div id="variant-d" class="variant">
+  <div class="wrap">
+    <div class="vhead">
+      <h2>As shipped · <span style="color:var(--color-primary)">the real results surface</span></h2>
+      <p>The faithful <b>as-built</b> reference — Phase 123.1 + the 2026-06-25 polish, mirroring
+        <span class="mono">SkillTunerPage.tsx</span> / <span class="mono">ProviderScoreboard.tsx</span> /
+        <span class="mono">CandidateCard.tsx</span>. The per-provider breakdown is <b>vertical full-width
+        rows</b> (one per configured target), NOT variant A's fixed 4-up grid — that grid crammed
+        illegibly at the org's real 7-8 providers (BUG-260624-01 HIGH #1), so 123.1 replaced it with
+        these rows. This view also carries the score legend, the plain-language winner verdict, and the
+        calibrated "★ best held-out" winner pop.</p>
+    </div>
+
+    <!-- score legend (rendered once above every scoreboard) -->
+    <div class="legend">
+      <b>How to read the scores.</b> Every number is <span class="k">0.00–1.00</span> (1.00 = perfect).
+      <span class="k">fires</span> = should-trigger recall (did the skill load when it should?) ·
+      <span class="k">no-false</span> = should-NOT precision (did it stay quiet when it should?).
+      A description that fires on everything scores high on <span class="k">fires</span> but fails
+      <span class="k">no-false</span> — both must be high. <span class="k">held-out</span> = the ~40% of
+      cases never used to pick the winner.
+    </div>
+
+    <!-- plain-language winner verdict (actionable: a rewrite won) -->
+    <div class="verdict">
+      <b>A reworded description scored best on held-out.</b> Review the highlighted candidate below and
+      press <span class="mono">Use</span> to apply it — nothing changes until you confirm.
+    </div>
+
+    <!-- D-04 standalone baseline scoreboard (current/live description) -->
+    <div class="sb-sec">
+      <div class="sb-head">
+        <span class="t">current description · per-provider scores</span>
+        <span class="attr">Built by claude-haiku-4-5 · measured on 5 models</span>
+      </div>
+      <div class="rows">
+        <div class="prow"><div class="pm"><span class="p">openai</span><span class="m">gpt-5.4-mini</span></div><div class="sc"><span class="v mid">0.67</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:67%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.67</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">anthropic</span><span class="m">claude-haiku-4-5</span></div><div class="sc"><span class="v bad">0.50</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:50%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.40</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">google</span><span class="m">gemini-3.5-flash</span></div><div class="sc"><span class="v bad">0.33</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:33%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.17</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">openrouter</span><span class="m">deepseek/deepseek-chat</span></div><div class="sc"><span class="v mid">0.67</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:67%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.67</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">deepseek</span><span class="m">deepseek-v4-flash</span></div><div class="sc"><span class="v bad">0.55</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:55%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.50</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+      </div>
+    </div>
+
+    <!-- WINNER candidate card — calibrated pop (green ring + ★ badge + filled "Use this →") -->
+    <div class="ccard2 win">
+      <div class="ch">
+        <div style="min-width:0">
+          <span class="badge-best">★ best held-out</span>
+          <div class="cdesc">"Build or update a project risk register — risks, likelihood, impact, and mitigation — as a tracked spreadsheet from the knowledge base."</div>
+        </div>
+        <div class="ho"><span class="v good" style="font-size:22px">0.94</span><span class="l">held-out</span></div>
+      </div>
+      <div class="rows">
+        <div class="prow"><div class="pm"><span class="p">openai</span><span class="m">gpt-5.4-mini</span></div><div class="sc"><span class="v good">0.96</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-good" style="width:96%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="good">1.00</span></span><span><span class="lab">no-false</span> <span class="good">0.92</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">anthropic</span><span class="m">claude-haiku-4-5</span></div><div class="sc"><span class="v good">1.00</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-good" style="width:100%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="good">1.00</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">google</span><span class="m">gemini-3.5-flash</span></div><div class="sc"><span class="v mid">0.82</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:82%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.83</span></span><span><span class="lab">no-false</span> <span class="mid">0.80</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">openrouter</span><span class="m">deepseek/deepseek-chat</span></div><div class="sc"><span class="v good">0.95</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-good" style="width:95%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="good">1.00</span></span><span><span class="lab">no-false</span> <span class="good">0.90</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">deepseek</span><span class="m">deepseek-v4-flash</span></div><div class="sc"><span class="v good">0.93</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-good" style="width:93%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="good">1.00</span></span><span><span class="lab">no-false</span> <span class="good">0.86</span></span></div></div></div>
+      </div>
+      <div class="cact"><button class="btn primary">Use this →</button></div>
+    </div>
+
+    <!-- a weaker candidate (quiet "Use" outline) -->
+    <div class="ccard2">
+      <div class="ch">
+        <div style="min-width:0">
+          <span class="tag-min">candidate</span>
+          <div class="cdesc">"Create a risk register spreadsheet listing project risks and their mitigations."</div>
+        </div>
+        <div class="ho"><span class="v mid" style="font-size:var(--text-lg)">0.71</span><span class="l">held-out</span></div>
+      </div>
+      <div class="rows">
+        <div class="prow"><div class="pm"><span class="p">openai</span><span class="m">gpt-5.4-mini</span></div><div class="sc"><span class="v mid">0.75</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:75%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.83</span></span><span><span class="lab">no-false</span> <span class="mid">0.67</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">anthropic</span><span class="m">claude-haiku-4-5</span></div><div class="sc"><span class="v mid">0.78</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:78%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.83</span></span><span><span class="lab">no-false</span> <span class="mid">0.73</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">google</span><span class="m">gemini-3.5-flash</span></div><div class="sc"><span class="v bad">0.55</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:55%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.50</span></span><span><span class="lab">no-false</span> <span class="mid">0.60</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">openrouter</span><span class="m">deepseek/deepseek-chat</span></div><div class="sc"><span class="v mid">0.76</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:76%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.83</span></span><span><span class="lab">no-false</span> <span class="mid">0.69</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">deepseek</span><span class="m">deepseek-v4-flash</span></div><div class="sc"><span class="v mid">0.70</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:70%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.67</span></span><span><span class="lab">no-false</span> <span class="mid">0.73</span></span></div></div></div>
+      </div>
+      <div class="cact"><button class="btn">Use</button></div>
+    </div>
+
+    <!-- the current baseline as a card (dashed, calm — it's what you already run) -->
+    <div class="ccard2 cur">
+      <div class="ch">
+        <div style="min-width:0">
+          <span class="tag-min">current (baseline)</span>
+          <div class="cdesc">"Risk register."</div>
+        </div>
+        <div class="ho"><span class="v bad" style="font-size:var(--text-lg)">0.54</span><span class="l">held-out</span></div>
+      </div>
+      <div class="rows">
+        <div class="prow"><div class="pm"><span class="p">openai</span><span class="m">gpt-5.4-mini</span></div><div class="sc"><span class="v mid">0.67</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:67%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.67</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">anthropic</span><span class="m">claude-haiku-4-5</span></div><div class="sc"><span class="v bad">0.50</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:50%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.40</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">google</span><span class="m">gemini-3.5-flash</span></div><div class="sc"><span class="v bad">0.33</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:33%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.17</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">openrouter</span><span class="m">deepseek/deepseek-chat</span></div><div class="sc"><span class="v mid">0.67</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-mid" style="width:67%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="mid">0.67</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+        <div class="prow"><div class="pm"><span class="p">deepseek</span><span class="m">deepseek-v4-flash</span></div><div class="sc"><span class="v bad">0.55</span><span class="l">score</span></div><div class="mb"><div class="bar"><i class="bg-bad" style="width:55%"></i></div><div class="subs"><span><span class="lab">fires</span> <span class="bad">0.50</span></span><span><span class="lab">no-false</span> <span class="good">1.00</span></span></div></div></div>
+      </div>
+      <p class="note" style="margin-top:6px">Never false-fires — but it barely fires at all. The description-driven policy (D-01) makes that a problem, which is why a rewrite wins here.</p>
+    </div>
+
+    <p class="note" style="margin-top:4px">Row set = the org's configured targets (1 row for a single-provider org — the clean baseline,
+      not a degraded mode; N rows otherwise). An all-error column renders an honest "could not measure" row, never a fabricated 0.00.
+      When NO rewrite beats the current description the verdict flips to the muted "No candidate beat your current description — keeping it"
+      and no card gets the green ★ pop.</p>
   </div>
 </div>
 

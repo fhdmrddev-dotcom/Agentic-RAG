@@ -2,7 +2,7 @@
 sketch: 042
 name: scoreboard-and-candidates
 question: "How does one tuning iteration read — the per-provider held-out score, the ≤N candidate rewrites each auto-scored, picking the winner by held-out score, and the author-confirm → PATCH?"
-winner: "A"
+winner: "D"  # was "A"; D = the as-built reference added 2026-06-25 (A's 4-up grid was superseded by vertical rows in Phase 123.1)
 tags: [phase-123, skill-triggering, trigger-tuner, scoreboard, candidates, held-out, honesty, author-confirm, trig-01]
 ---
 
@@ -21,9 +21,17 @@ confirm the write — without anything being auto-applied, and without the false
 
 ## Variants
 
-- **A: Candidate cards + per-provider grid ★** — each candidate is a card carrying its held-out score and a
-  4-cell provider grid; every cell shows BOTH sub-scores (**fires** = should-trigger recall · **no-false** =
-  should-NOT precision). "Use → confirm & save" reveals an explicit diff confirm strip. Most honest, most space.
+- **D: As shipped ★ (vertical rows)** — the faithful **as-built** reference (added 2026-06-25), mirroring the
+  shipped `SkillTunerPage.tsx` / `ProviderScoreboard.tsx` / `CandidateCard.tsx`. The per-provider breakdown is
+  **N vertical full-width rows** (one per configured target), NOT variant A's fixed 4-up grid — that grid crammed
+  illegibly at the org's real 7-8 providers (BUG-260624-01 HIGH #1), so **Phase 123.1 replaced the grid with these
+  rows**. The ★ moved here from A because A is the design the phase deliberately superseded; D is what the app
+  actually renders. Carries the score legend, the plain-language winner verdict (actionable vs "keeping it"), and
+  the calibrated "★ best held-out" winner pop (loud only for a rewrite that beat the baseline).
+- **A: Candidate cards + 4-up grid (original)** — the original design exploration: each candidate is a card
+  carrying its held-out score and a 4-cell provider GRID; every cell shows BOTH sub-scores (**fires** =
+  should-trigger recall · **no-false** = should-NOT precision). Superseded by D for legibility (see above) but
+  kept as the record of the chosen DATA model (held-out + both sub-scores per provider + author-confirm).
 - **B: Leaderboard rows** — all candidates + baseline in one ranked table sorted by held-out, with a compact
   4-cell provider sparkline. Densest, comparison-first; the fires/no-false split drops to hover.
 - **C: Diff-against-current** — pick a candidate from a list; the right pane shows it head-to-head vs the live
