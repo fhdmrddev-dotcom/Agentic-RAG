@@ -23,7 +23,7 @@
  * (useSkills().updateSkill) — NEVER auto-applied (042-A / D-03).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, Target, RefreshCw } from "lucide-react"
+import { ChevronLeft, Target, RefreshCw, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useSkills } from "@/hooks/useSkills"
@@ -610,17 +610,32 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
                 {/* Run config / kickoff bar (cases × N models × 3 repeats). The model
                     count is the CONFIGURED-TARGET count pre-run (D-12) — populated on
                     open, not empty until kickoff. */}
-                <div className="flex items-center justify-between rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
-                  <p data-testid="cost-preview" className="text-xs text-muted-foreground">
-                    {cases.length} case{cases.length === 1 ? "" : "s"}
-                    {/* TT-09: when the seed fetch failed AND there are no cases, "0 cases" is a
-                        LOAD FAILURE — say so, never imply zero is the measured truth. */}
-                    {seededError && cases.length === 0 ? " (seed load failed)" : ""}
-                    {previewModelCount != null
-                      ? ` × ${previewModelCount} model${previewModelCount === 1 ? "" : "s"}`
-                      : ""} × 3 repeats
-                  </p>
-                  <Button size="sm" onClick={startRun} disabled={runActive}>
+                <div className="flex items-center justify-between gap-4 rounded-xl ghost-border bg-card/50 p-4 shadow-sm">
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <p data-testid="cost-preview" className="text-xs text-muted-foreground">
+                      {cases.length} case{cases.length === 1 ? "" : "s"}
+                      {/* TT-09: when the seed fetch failed AND there are no cases, "0 cases" is a
+                          LOAD FAILURE — say so, never imply zero is the measured truth. */}
+                      {seededError && cases.length === 0 ? " (seed load failed)" : ""}
+                      {previewModelCount != null
+                        ? ` × ${previewModelCount} model${previewModelCount === 1 ? "" : "s"}`
+                        : ""} × 3 repeats
+                    </p>
+                    {/* Honest cost warning: a tuning run is NOT free — it makes live trigger-
+                        classification calls to every configured model and consumes provider
+                        tokens. Make that explicit so the author re-runs deliberately, not by
+                        reflex (the run is the expensive part of the Tuner). */}
+                    <p
+                      data-testid="cost-warning"
+                      className="flex items-start gap-1.5 text-[11px] text-[hsl(var(--panel-status-active))] leading-snug"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px" aria-hidden="true" />
+                      <span>
+                        Running makes live calls to every model above and <span className="font-semibold">uses provider tokens (real cost)</span>. Re-run only when you want fresh scores.
+                      </span>
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={startRun} disabled={runActive} className="shrink-0">
                     {runActive ? "Running…" : "Run tuning"}
                   </Button>
                 </div>
