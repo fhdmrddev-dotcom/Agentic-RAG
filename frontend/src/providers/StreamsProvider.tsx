@@ -1355,7 +1355,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   // double-render on reload). The untyped-temp branch below is untouched
                   // (it protects the 075.7 pre-stamp optimistic-placeholder race).
                   return (
-                    subscriptionsRef.current.has(m.runId) ||
+                    // BUG-260626-01: also require the DB to NOT yet hold this runId.
+                    // After a transient-done→reattach re-adds the runId to
+                    // subscriptionsRef, the bare subscription survival kept the
+                    // completed temp even once its persisted twin arrived in the
+                    // snapshot → two same-runId rows → duplicate React key
+                    // (MessageList `run-${runId}`) → duplicated GENERATED FILES
+                    // panels / source-doc bleed. Drop the temp the moment its
+                    // persisted twin exists. Harness is unaffected (its persisted
+                    // answer returns runId=undefined, so dbRunIds never holds it;
+                    // the streaming arm still governs harness temps).
+                    (subscriptionsRef.current.has(m.runId) && !dbRunIds.has(m.runId)) ||
                     (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
                   )
                 }
@@ -2076,7 +2086,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     // stale duplicate of the just-fetched `data` answer → drop it (the
                     // answer is preserved in `data`). Deep is unaffected (its fetched msg
                     // carries runId, so it was already dropped via dbRunIds.has).
-                    (subscriptionsRef.current.has(m.runId) ||
+                    // BUG-260626-01: require !dbRunIds.has on the subscription arm
+                    // too, so a reattached completed temp is dropped the instant its
+                    // persisted twin is fetched (prevents the duplicate-runId →
+                    // duplicate-key duplicated-render). Harness unaffected (returns
+                    // runId=undefined → not in dbRunIds; streaming arm governs it).
+                    ((subscriptionsRef.current.has(m.runId) && !dbRunIds.has(m.runId)) ||
                       (!dbRunIds.has(m.runId) && m.runStatus === "streaming")),
                 )
                 return [...data, ...liveTempPlaceholders]

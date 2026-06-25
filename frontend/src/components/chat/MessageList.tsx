@@ -147,6 +147,36 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   const chipStepCount = streamingMessage ? unifiedStepCount(streamingMessage) : 0
   const chipElapsed = formatFloatingElapsed(streamingMessage?.created_at) ?? ""
 
+  // BUG-260626-01: collapse same-runId duplicates before render. In the
+  // live/just-completed window of a multi-run thread the chat bucket can
+  // transiently hold TWO assistant messages with the same runId — the
+  // in-place-completed `temp-…` placeholder AND the persisted/reconciled row.
+  // Both are keyed `run-${runId}` below, so React would duplicate/omit subtrees
+  // (duplicated GENERATED FILES panels + source-doc bleed). Dedup by runId,
+  // keeping the persisted (non-`temp-`) row, so the key is always unique.
+  // Order-preserving; a no-op for single runs (no twin) and for rows without a
+  // runId (e.g. harness answers, user rows).
+  const renderMessages: Message[] = []
+  const runIdToIndex = new Map<string, number>()
+  for (const msg of messages) {
+    const runKey = msg.role === "assistant" && msg.runId ? msg.runId : null
+    if (!runKey) {
+      renderMessages.push(msg)
+      continue
+    }
+    const existingIdx = runIdToIndex.get(runKey)
+    if (existingIdx === undefined) {
+      runIdToIndex.set(runKey, renderMessages.length)
+      renderMessages.push(msg)
+    } else {
+      const existing = renderMessages[existingIdx]
+      const existingIsTemp = typeof existing.id === "string" && existing.id.startsWith("temp-")
+      const incomingIsTemp = typeof msg.id === "string" && msg.id.startsWith("temp-")
+      // Replace a kept temp with its persisted twin; otherwise keep the first.
+      if (existingIsTemp && !incomingIsTemp) renderMessages[existingIdx] = msg
+    }
+  }
+
   return (
     <ScrollArea className="flex-1">
       <div ref={containerRef} className="relative space-y-1 px-6 py-6 max-w-4xl mx-auto">
@@ -159,9 +189,9 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
         {isLoading && messages.length === 0 ? (
           <MessageSkeleton />
         ) : (
-          messages.map((msg, idx) => {
+          renderMessages.map((msg, idx) => {
             const isLastAssistant =
-              msg.role === "assistant" && idx === messages.length - 1
+              msg.role === "assistant" && idx === renderMessages.length - 1
             return (
               <MessageItem
                 key={msg.role === "assistant" && msg.runId ? `run-${msg.runId}` : msg.id}
