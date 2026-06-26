@@ -304,22 +304,22 @@ This is the exact copy the failed run `2c711ee4` surfaced (classification alread
 | A3 | The "recovered" signal can be a quiet agent-loop SSE/audit emit (not a literal `forced_emit` call, which the Deep loop bypasses) | D-01 / Pattern 3 | If a reviewer insists the signal must route through `forced_emit`, the design needs adjustment — but forced_emit.py's own docstring says the agent loop bypasses it, so a Deep-side equivalent is correct. LOW. |
 | A4 | MiniMax-M3's effective `max_output_tokens` at run time was 8192, despite config.py:325 listing 131072 | Open Q2 | If the cap is actually configurable/higher and the 8192 was a different limit (e.g. account-tier), the truncation framing still holds (it hit *a* cap), only the knob differs. LOW for the repair design; see Open Q2. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What exact "recovered" event name should the Deep agent loop emit?**
    - What we know: Phase 122 uses `emit_recovered` + `recovered_from_narration` in the harness `forced_emit` substrate; the Deep loop bypasses that substrate and uses `_emit(redis, run_id, <event>, ...)`.
    - What's unclear: whether to reuse the literal `emit_recovered` name on the Deep channel or coin a `tool_args_recovered` event.
-   - Recommendation: planner picks a name consistent with the 122 family; keep it quiet (not a user-facing error). Confirm the FE doesn't need a new handler (it can ignore unknown events).
+   - **RESOLVED:** `tool_args_recovered` (Phase-122-family, Deep-side `_emit`, quiet — not a user-facing error delta; FE ignores unknown events). Locked in Plan 02 Task 1.
 
 2. **Why did the live run cap at `output_tokens=8192` when config.py:325 sets MiniMax-M3 `max_output_tokens: 131072`?**
    - What we know: the failed run (2026-06-07, commit `0af81c8e`) hit exactly 8192. config.py currently lists 131072 for `MiniMax-M3` (`:325`); the OpenRouter MiniMax fallback default is 8192 (`config.py:424`).
    - What's unclear: whether the run predates the 131072 registry value, or whether MiniMax's API enforced a lower server-side cap, or the `_resolve_max_tokens` path applied a different ceiling.
-   - Recommendation: does NOT change the repair design (truncation holds regardless of the exact cap). Confirm at execution by checking `_resolve_max_tokens` (openai_service.py:1479) for the MiniMax path and re-running the heavy prompt on current config. Treat as evidence-gathering, not a blocker.
+   - **RESOLVED:** non-blocking — the repair design is unchanged (truncation holds regardless of the exact cap; it hit *a* cap). Confirm at execution by checking `_resolve_max_tokens` (openai_service.py:1479) for the MiniMax path and re-running the heavy prompt on current config. Evidence-gathering, not a design input.
 
 3. **Does a single re-ask reliably recover, or should the corrective nudge tell the model to split the code?**
    - What we know: the prose-before-code recovery (`:1998-2008`) injects a corrective user message and `continue`s — a proven in-loop recovery shape.
    - What's unclear: whether a bare re-ask suffices or whether the nudge should instruct the model to emit a smaller/complete arg.
-   - Recommendation: start with a plain re-ask (D-01 says "re-ask it to re-emit the tool call"); the SC#10 MiniMax recovered/failed rungs will measure the recovery rate. Confirm at execution.
+   - **RESOLVED:** corrective-nudge re-ask (per Plan 02 Task 1 action — inject a corrective user message then `continue`, mirroring `:1998-2008`); the SC#10 MiniMax recovered/failed rungs measure the live recovery rate. Confirm at execution.
 
 ## Environment Availability
 
