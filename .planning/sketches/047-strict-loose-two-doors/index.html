@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 047 · Strict / Loose — two doors</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 0; }
+
+  /* ── App frame (mirrors 045 house chrome) ── */
+  .app { display: flex; height: 100vh; overflow: hidden; }
+  .deco-rail { width: 56px; flex-shrink: 0; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border-soft); display:flex; flex-direction:column; align-items:center; padding-top:16px; gap:18px; }
+  .deco-rail .dr-dot { width: 22px; height: 22px; border-radius: var(--radius-sm); display:grid; place-items:center; font-size:13px; color: var(--color-text-dim); }
+  .deco-rail .dr-dot.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .surface { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .surface-head { padding: 18px 32px 14px; flex-shrink: 0; border-bottom: 1px solid var(--color-border-soft); }
+  .back-link { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; margin-bottom: 10px; background: none; border: none; }
+  .back-link:hover { color: var(--color-text); }
+  .surface-title { display: flex; align-items: center; gap: 10px; }
+  .surface-title .ico { color: var(--color-primary); font-size: 18px; }
+  .surface-title h1 { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 700; margin: 0; }
+  .surface-sub { font-size: var(--text-sm); color: var(--color-text-muted); margin: 6px 0 0; max-width: 80ch; }
+  .ctx-pill { margin-left: auto; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px 10px; }
+  .surface-body { flex: 1; overflow-y: auto; padding: 22px 32px 80px; }
+
+  /* ════════ SHARED SOUL HEADER (from sketch 046) ════════ */
+  .soul { display: flex; align-items: center; gap: 20px; background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); padding: 16px 20px; box-shadow: var(--shadow-sm); margin-bottom: 22px; max-width: 1180px; }
+  .soul-main { flex: 1; min-width: 0; }
+  .soul-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .soul-name { font-family: var(--font-headline); font-size: var(--text-md); font-weight: 700; }
+  .soul-ver { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 1px 6px; }
+  .soul-status { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: var(--radius-full); padding: 2px 8px; display:inline-flex; align-items:center; gap:4px; }
+  .soul-status.published { background: var(--color-success-dim); color: var(--color-success); }
+  .soul-status.draft { background: var(--color-muted); color: var(--color-text-muted); }
+  .soul-proj { font-size: 11px; color: var(--color-text-dim); }
+  /* purpose = business_requirement — the headline new field */
+  .soul-purpose { font-size: var(--text-sm); color: var(--color-text); line-height: 1.5; max-width: 86ch; }
+  .soul-purpose .pq { color: var(--color-text-dim); }
+  /* phase spine — glyph-dot only, NO type ribbon, NO index number */
+  .soul-side { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; flex-shrink: 0; }
+  .spine-dots { display: flex; align-items: center; gap: 0; }
+  .spine-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; background: var(--color-surface-hi); border: 1.5px solid var(--color-border); color: var(--color-text); cursor: default; position: relative; transition: all var(--dur-fast) var(--ease-out); }
+  .spine-dot.emit { border-color: color-mix(in srgb, var(--color-accent-violet) 55%, transparent); color: var(--color-accent-violet); background: color-mix(in srgb, var(--color-accent-violet) 8%, transparent); }
+  .spine-dot:hover { border-color: var(--color-primary-glow); transform: translateY(-1px); }
+  .spine-link { width: 14px; height: 2px; background: var(--color-border); flex-shrink: 0; }
+  .spine-dot .tip { position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; font-family: var(--font-mono); background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text-muted); padding: 3px 8px; border-radius: var(--radius-sm); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast); box-shadow: var(--shadow-md); z-index: 5; }
+  .spine-dot:hover .tip { opacity: 1; }
+  /* tier chip — glyph + WORD, never colour-alone */
+  .tier-chip { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; font-weight: 500; border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 5px 13px; color: var(--color-text); cursor: help; position: relative; transition: all var(--dur-fast) var(--ease-out); }
+  .tier-chip .tg { font-size: 14px; }
+  .tier-chip .tw { text-transform: uppercase; letter-spacing: 0.04em; }
+  .tier-chip.strict { border-color: color-mix(in srgb, var(--color-success) 40%, transparent); background: color-mix(in srgb, var(--color-success) 6%, transparent); }
+  .tier-chip.middle { border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); background: color-mix(in srgb, var(--color-warning) 6%, transparent); }
+  .tier-chip.loose  { border-color: var(--color-border); background: var(--color-muted); }
+  .tier-chip .tier-tip { position: absolute; top: calc(100% + 8px); right: 0; width: 240px; white-space: normal; text-align: left; font-family: var(--font-sans); font-size: 11px; line-height: 1.5; color: var(--color-text-muted); background: var(--color-surface-hi); border: 1px solid var(--color-border); padding: 9px 11px; border-radius: var(--radius-md); opacity: 0; pointer-events: none; transition: opacity var(--dur-fast); box-shadow: var(--shadow-lg); z-index: 6; }
+  .tier-chip:hover .tier-tip { opacity: 1; }
+  /* needs strip — kickoff inputs (5th soul part), header scale */
+  .soul-needs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+  .soul-needs .sn-k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); color: var(--color-text-dim); margin-right: 2px; }
+  .soul-needs .need-chip { font-size: 9.5px; padding: 2px 7px; }
+  .soul-needs .need-chip .nt { font-size: 7.5px; }
+  /* output line — the deliverable */
+  .soul-output { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--color-text-muted); margin-top: 10px; }
+  .soul-output .oico { color: var(--color-accent-violet); font-size: 13px; }
+  .soul-output .ofile { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text); }
+
+  .sec-eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); color: var(--color-text-dim); margin-bottom: 10px; }
+
+  /* ════════ A — EXPLICIT FORK: two big door cards ════════ */
+  .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 1100px; }
+  .door { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: 22px; cursor: pointer; transition: all var(--dur-base) var(--ease-out); position: relative; overflow: hidden; }
+  .door:hover { border-color: var(--color-primary-glow); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .door-glyph { font-size: 28px; margin-bottom: 12px; }
+  .door-kicker { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim); margin-bottom: 6px; }
+  .door-title { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 700; margin-bottom: 8px; }
+  .door-desc { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.5; }
+  .door-foot { margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-primary); font-weight: 600; }
+  .door.describe .door-glyph { color: var(--color-primary); }
+  .door.govern .door-glyph { color: var(--color-accent-violet); }
+  .door .nothing-lost { position: absolute; bottom: 0; left: 0; right: 0; font-size: 9px; font-family: var(--font-mono); color: var(--color-text-dim); padding: 6px 22px; border-top: 1px solid var(--color-border-soft); background: var(--color-bg-elev1); }
+
+  .door-open { display: none; max-width: 1100px; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .door-open.on { display: block; }
+  .both-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-text-muted); background: none; border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 5px 13px; cursor: pointer; margin-bottom: 16px; transition: all var(--dur-fast); }
+  .both-link:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+
+  /* ════════ Describe-and-run door content ════════ */
+  .describe-pane { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; }
+  .describe-box-wrap { }
+  .desc-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-primary); font-family: var(--font-mono); margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+  .desc-box { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 16px; color: var(--color-text); font-family: inherit; font-size: var(--text-base); line-height: 1.6; resize: none; min-height: 130px; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+  .desc-box:focus { outline: none; border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+  .desc-hint { font-size: 11px; color: var(--color-text-dim); margin-top: 8px; line-height: 1.5; }
+  .run-cta { width: 100%; margin-top: 16px; font-size: var(--text-md); font-weight: 600; padding: 12px; border-radius: var(--radius-md); background: var(--color-primary-strong); color: var(--color-bg); border: none; cursor: pointer; transition: filter var(--dur-fast); display:flex; align-items:center; justify-content:center; gap:8px; }
+  .run-cta:hover { filter: brightness(1.08); }
+  .run-cta.publish { background: var(--color-accent-violet); color: var(--color-text); }
+  .switch-strip { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 11px 14px; border: 1px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elev1); font-size: 12px; color: var(--color-text-muted); }
+  .switch-strip .ss-ico { font-size: 14px; color: var(--color-accent-violet); }
+  .switch-strip button { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--color-accent-violet); background: none; border: 1px solid color-mix(in srgb, var(--color-accent-violet) 40%, transparent); border-radius: var(--radius-full); padding: 4px 11px; cursor: pointer; transition: all var(--dur-fast); }
+  .switch-strip button:hover { background: color-mix(in srgb, var(--color-accent-violet) 12%, transparent); }
+  /* soul preview mini (inside describe door) */
+  .soul-preview { background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); padding: 14px; }
+  .sp-h { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: 10px; }
+  .sp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .sp-row .sp-k { font-size: 10px; color: var(--color-text-dim); font-family: var(--font-mono); width: 56px; flex-shrink: 0; }
+  .sp-needs { display: flex; flex-wrap: wrap; gap: 5px; }
+  .need-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; padding: 3px 8px; border-radius: var(--radius-md); background: var(--color-muted); border: 1px solid var(--color-border-soft); }
+  .need-chip .nt { font-family: var(--font-mono); font-size: 8px; color: var(--color-text-dim); }
+  .need-chip.kbauto { border-color: color-mix(in srgb, var(--color-accent-violet) 35%, transparent); }
+  .need-chip.template { border-color: color-mix(in srgb, var(--color-accent-violet) 35%, transparent); }
+
+  /* ════════ Author-and-govern door content (read-only spine + right form panel) ════════ */
+  .govern-pane { display: grid; grid-template-columns: minmax(0,1fr) 400px; gap: 0; border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; background: var(--color-surface); }
+  .spine-col { padding: 20px 22px; overflow-y: auto; background: var(--color-bg); }
+  .spine-vert { list-style: none; margin: 0; padding: 0; }
+  .spine-vert > li { position: relative; padding-left: 34px; padding-bottom: 12px; }
+  .spine-vert > li:last-child { padding-bottom: 0; }
+  .spine-vert > li::before { content:''; position:absolute; left:13px; top:36px; bottom:-6px; width:2px; background: var(--color-border-soft); }
+  .spine-vert > li:last-child::before { display:none; }
+  .svn { position:absolute; left:2px; top:12px; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:13px; background: var(--color-surface); border:1.5px solid var(--color-border); color: var(--color-text); z-index:1; }
+  .spine-vert > li.emit .svn { border-color: color-mix(in srgb, var(--color-accent-violet) 55%, transparent); color: var(--color-accent-violet); }
+  .pcard { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 11px 13px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .pcard:hover { border-color: var(--color-primary-glow); }
+  .pcard.sel { border-color: var(--color-primary); background: var(--color-primary-dim); }
+  .pcard .p-name { font-weight: 600; font-size: var(--text-sm); }
+  .pcard .p-quiet { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-top: 3px; }
+  .pcard .p-chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
+  .ptiny { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-soft); color: var(--color-text-muted); }
+  .ptiny.scope { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 35%, transparent); }
+  .ptiny.cit { color: var(--color-accent-violet); border-color: color-mix(in srgb, var(--color-accent-violet) 40%, transparent); }
+  .ptiny.model { color: var(--color-text-dim); }
+
+  /* right form panel — ALL advanced controls */
+  .form-col { border-left: 1px solid var(--color-border); background: var(--color-surface); padding: 18px 18px 24px; overflow-y: auto; }
+  .fc-h { font-family: var(--font-headline); font-size: var(--text-md); font-weight: 700; margin-bottom: 4px; }
+  .fc-sub { font-size: 11px; color: var(--color-text-dim); margin-bottom: 16px; }
+  .fc-block { margin-bottom: 18px; }
+  .fc-blabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); font-family: var(--font-mono); margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+  .fc-drives { font-size: 9px; font-family: var(--font-mono); color: var(--color-primary); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 1px 5px; }
+  /* citation_policy picker */
+  .cit-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cit-opt { text-align: left; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elev1); padding: 8px 10px; cursor: pointer; transition: all var(--dur-fast); }
+  .cit-opt:hover { border-color: var(--color-primary-glow); }
+  .cit-opt.on { border-color: var(--color-primary); background: var(--color-primary-dim); }
+  .cit-opt .co-n { font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
+  .cit-opt.on .co-n { color: var(--color-primary); }
+  .cit-opt .co-d { font-size: 9.5px; color: var(--color-text-dim); margin-top: 3px; line-height: 1.35; }
+  /* gate chips */
+  .gates { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gate-chip { display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 11px; padding: 4px 10px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text-dim); cursor: pointer; transition: all var(--dur-fast); }
+  .gate-chip.on { background: var(--color-success-dim); color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 35%, transparent); }
+  .gate-chip .gbox { width: 13px; height: 13px; border-radius: 3px; border: 1px solid currentColor; display:grid; place-items:center; font-size: 8px; }
+  .gate-chip.locked { cursor: not-allowed; background: color-mix(in srgb, var(--color-accent-violet) 10%, transparent); color: var(--color-accent-violet); border-color: color-mix(in srgb, var(--color-accent-violet) 40%, transparent); }
+  .gate-chip.locked .lk { font-size: 10px; }
+  .gate-floor { font-size: 9px; font-family: var(--font-mono); color: var(--color-text-dim); margin-top: 7px; line-height: 1.5; }
+  .gate-floor b { color: var(--color-text-muted); }
+  /* folder scope + model override */
+  .ctl-row { display: flex; align-items: center; gap: 8px; }
+  .scope-chip { display:inline-flex; align-items:center; gap:6px; font-size: 11.5px; font-family: var(--font-mono); padding: 5px 11px; border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent); background: var(--color-success-dim); color: var(--color-success); }
+  .scope-chip .sc-x { color: var(--color-text-dim); }
+  .ctl-change { font-size: 11px; color: var(--color-primary); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+  .ctl-change:hover { filter: brightness(1.1); }
+  .model-seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .model-seg button { background: var(--color-bg-elev1); color: var(--color-text-muted); border: none; border-right: 1px solid var(--color-border); padding: 6px 11px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; transition: all var(--dur-fast); }
+  .model-seg button:last-child { border-right: none; }
+  .model-seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .model-pick { margin-top: 7px; font-size: 11.5px; }
+  .model-pick select { width: 100%; background: var(--color-bg-elev1); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 9px; color: var(--color-text); font-family: var(--font-mono); font-size: 11px; }
+  /* live tier readout in form */
+  .live-tier-bar { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elev1); margin-top: 6px; }
+  .live-tier-bar .ltb-l { font-size: 10px; font-family: var(--font-mono); color: var(--color-text-dim); }
+  .judge-note { display:flex; align-items:flex-start; gap:8px; margin-top: 10px; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--color-accent-violet) 40%, transparent); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-accent-violet) 8%, transparent); }
+  .judge-note .jn-ico { font-size: 14px; flex-shrink: 0; }
+  .judge-note .jn-t { font-size: 10.5px; color: var(--color-text-muted); line-height: 1.45; }
+  .judge-note .jn-t b { color: var(--color-accent-violet); }
+
+  /* ════════ B — LOOSE-DEFAULT + EXPANDER ════════ */
+  .vb-wrap { max-width: 880px; }
+  .expander-bar { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 13px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all var(--dur-fast); font-family: inherit; width: 100%; text-align: left; color: var(--color-text); }
+  .expander-bar:hover { border-color: var(--color-accent-violet); }
+  .expander-bar .eb-glyph { font-size: 17px; color: var(--color-accent-violet); }
+  .expander-bar .eb-body { flex: 1; }
+  .expander-bar .eb-title { font-size: var(--text-sm); font-weight: 600; }
+  .expander-bar .eb-sub { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+  .expander-bar .eb-caret { font-size: 13px; color: var(--color-text-dim); transition: transform var(--dur-base) var(--ease-out); }
+  .expander-bar.open .eb-caret { transform: rotate(90deg); }
+  .expander-bar .eb-onaff { font-size: 9px; font-family: var(--font-mono); color: var(--color-text-dim); margin-left: 8px; border:1px solid var(--color-border); border-radius: var(--radius-full); padding: 1px 7px; }
+  .advanced-drawer { display: none; margin-top: 14px; border: 1px solid color-mix(in srgb, var(--color-accent-violet) 35%, transparent); border-radius: var(--radius-lg); overflow: hidden; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .advanced-drawer.open { display: block; }
+  .ad-head { display:flex; align-items:center; gap:10px; padding: 12px 18px; background: color-mix(in srgb, var(--color-accent-violet) 8%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--color-accent-violet) 25%, transparent); }
+  .ad-head .adh-t { font-family: var(--font-headline); font-size: var(--text-sm); font-weight: 700; }
+  .ad-head .adh-collapse { margin-left:auto; font-size:11px; color: var(--color-text-muted); background:none; border:none; cursor:pointer; }
+  .ad-head .adh-collapse:hover { color: var(--color-text); }
+  .ad-body { display: grid; grid-template-columns: minmax(0,1fr) 400px; }
+
+  /* ════════ C — TIER-ADAPTIVE ════════ */
+  .vc-wrap { max-width: 1100px; }
+  .adapt-note { display: flex; align-items: center; gap: 10px; padding: 11px 15px; border-radius: var(--radius-md); margin-bottom: 18px; font-size: 12px; }
+  .adapt-note.high { background: color-mix(in srgb, var(--color-success) 7%, transparent); border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent); color: var(--color-success); }
+  .adapt-note.low { background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .adapt-note .an-ico { font-size: 15px; }
+  .adapt-note b { color: var(--color-text); }
+  /* foregrounded primary vs quiet secondary */
+  .primary-door { border: 1px solid var(--color-primary-glow); border-radius: var(--radius-lg); background: linear-gradient(180deg, var(--color-primary-dim), var(--color-surface)); padding: 22px; margin-bottom: 14px; }
+  .primary-door.govern { border-color: color-mix(in srgb, var(--color-accent-violet) 50%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-violet) 8%, transparent), var(--color-surface)); }
+  .pd-kicker { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-primary); margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
+  .primary-door.govern .pd-kicker { color: var(--color-accent-violet); }
+  .pd-title { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 700; margin-bottom: 6px; }
+  .pd-why { font-size: 12px; color: var(--color-text-muted); margin-bottom: 16px; line-height: 1.5; }
+  .secondary-link { display: flex; align-items: center; gap: 9px; padding: 12px 15px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all var(--dur-fast); }
+  .secondary-link:hover { border-color: var(--color-text-dim); }
+  .secondary-link .sl-glyph { font-size: 15px; color: var(--color-text-muted); }
+  .secondary-link .sl-body { flex: 1; }
+  .secondary-link .sl-t { font-size: var(--text-sm); font-weight: 600; }
+  .secondary-link .sl-s { font-size: 11px; color: var(--color-text-dim); margin-top: 2px; }
+  .secondary-link .sl-arrow { color: var(--color-text-dim); font-size: 14px; }
+
+  /* running-context reframe band */
+  .run-frame-note { display: none; align-items: center; gap: 10px; font-size: 11.5px; color: var(--color-text-muted); background: var(--color-bg-elev1); border: 1px dashed var(--color-border); border-radius: var(--radius-md); padding: 9px 14px; margin-bottom: 18px; }
+  body[data-ctx="running"] .run-frame-note { display: flex; }
+  .run-frame-note .rfn-ico { font-size: 14px; color: var(--color-primary); }
+
+  /* utility */
+  .hidden { display: none !important; }
+
+  /* toolbar */
+  .sketch-toolbar { gap: 10px; }
+  .sketch-toolbar .tb-seg { display: inline-flex; gap: 2px; }
+  .sketch-toolbar .tb-seg button.on { background: rgba(255,255,255,0.22); }
+</style>
+</head>
+<body data-ctx="authoring">
+
+<!-- Variant nav -->
+<div class="variant-nav">
+  <span class="label">Sketch 047 · strict / loose — two doors</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Explicit fork <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Loose-default + expander</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Tier-adaptive</button>
+</div>
+
+<!-- ════════════════ VARIANT A — EXPLICIT FORK ════════════════ -->
+<div id="variant-a" class="variant">
+  <div class="app">
+    <div class="deco-rail"><span class="dr-dot">✎</span><span class="dr-dot on">⚙</span><span class="dr-dot">▦</span></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Workflows</button>
+        <div class="surface-title">
+          <span class="ico">⚙</span>
+          <h1 id="a-headline">Two doors · one workflow</h1>
+          <span class="ctx-pill" data-ctxlabel></span>
+        </div>
+        <p class="surface-sub" id="a-sub">Pick how you want to work. Nothing is hidden — every advanced control is one click from either door.</p>
+      </div>
+      <div class="surface-body">
+        <div class="soul" data-soul></div>
+        <div class="run-frame-note"><span class="rfn-ico">▶</span><span data-runframe></span></div>
+
+        <!-- BOTH DOORS (default) -->
+        <div id="a-fork">
+          <div class="sec-eyebrow" data-forkeyebrow></div>
+          <div class="doors">
+            <div class="door describe" onclick="openDoor('a','describe')">
+              <div class="door-glyph">⚡</div>
+              <div class="door-kicker">loose · fastest path</div>
+              <div class="door-title" data-doorA-d-title>Describe &amp; run</div>
+              <div class="door-desc" data-doorA-d-desc></div>
+              <div class="door-foot">Open <span>›</span></div>
+              <div class="nothing-lost">nothing locked — switch to Author &amp; govern anytime</div>
+            </div>
+            <div class="door govern" onclick="openDoor('a','govern')">
+              <div class="door-glyph">🔧</div>
+              <div class="door-kicker">power · full control</div>
+              <div class="door-title" data-doorA-g-title>Author &amp; govern</div>
+              <div class="door-desc" data-doorA-g-desc></div>
+              <div class="door-foot">Open <span>›</span></div>
+              <div class="nothing-lost">citation policy · gate set · per-phase scope &amp; model</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DESCRIBE DOOR OPEN -->
+        <div id="a-describe" class="door-open">
+          <button class="both-link" onclick="bothDoors('a')">‹ both doors</button>
+          <div class="describe-pane">
+            <div class="describe-box-wrap">
+              <div class="desc-label" data-describelabel></div>
+              <textarea class="desc-box" data-describebox></textarea>
+              <p class="desc-hint" data-describehint></p>
+              <button class="run-cta" data-runcta onclick="fakeRun(this)"></button>
+              <div class="switch-strip">
+                <span class="ss-ico">🔧</span>
+                <span>Need citation policy, gates, or per-phase scope?</span>
+                <button onclick="openDoor('a','govern')">Author &amp; govern ›</button>
+              </div>
+            </div>
+            <div class="soul-preview" data-soulpreview></div>
+          </div>
+        </div>
+
+        <!-- GOVERN DOOR OPEN -->
+        <div id="a-govern" class="door-open">
+          <button class="both-link" onclick="bothDoors('a')">‹ both doors</button>
+          <div class="govern-pane">
+            <div class="spine-col" data-spinecol="a"></div>
+            <div class="form-col" data-formcol="a"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ VARIANT B — LOOSE-DEFAULT + EXPANDER ════════════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app">
+    <div class="deco-rail"><span class="dr-dot">✎</span><span class="dr-dot on">⚙</span><span class="dr-dot">▦</span></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Workflows</button>
+        <div class="surface-title">
+          <span class="ico">⚡</span>
+          <h1>Describe &amp; run</h1>
+          <span class="ctx-pill" data-ctxlabel></span>
+        </div>
+        <p class="surface-sub">Calm by default. Advanced governance is exactly one click down — collapsed, never removed.</p>
+      </div>
+      <div class="surface-body">
+        <div class="soul" data-soul></div>
+        <div class="run-frame-note"><span class="rfn-ico">▶</span><span data-runframe></span></div>
+
+        <div class="vb-wrap">
+          <div class="describe-pane">
+            <div class="describe-box-wrap">
+              <div class="desc-label" data-describelabel></div>
+              <textarea class="desc-box" data-describebox></textarea>
+              <p class="desc-hint" data-describehint></p>
+              <button class="run-cta" data-runcta onclick="fakeRun(this)"></button>
+            </div>
+            <div class="soul-preview" data-soulpreview></div>
+          </div>
+
+          <!-- the SINGLE one-click affordance -->
+          <button class="expander-bar" id="b-expander" onclick="toggleExpander()">
+            <span class="eb-glyph">🔧</span>
+            <span class="eb-body">
+              <span class="eb-title">Author &amp; govern</span>
+              <span class="eb-sub" data-bexpandsub></span>
+            </span>
+            <span class="eb-onaff" data-bcurtier></span>
+            <span class="eb-caret">›</span>
+          </button>
+
+          <div class="advanced-drawer" id="b-drawer">
+            <div class="ad-head">
+              <span class="adh-t">Advanced — citation policy, gates, per-phase scope &amp; model</span>
+              <button class="adh-collapse" onclick="toggleExpander()">collapse ›</button>
+            </div>
+            <div class="ad-body">
+              <div class="spine-col" data-spinecol="b"></div>
+              <div class="form-col" data-formcol="b"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ VARIANT C — TIER-ADAPTIVE ════════════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app">
+    <div class="deco-rail"><span class="dr-dot">✎</span><span class="dr-dot on">⚙</span><span class="dr-dot">▦</span></div>
+    <div class="surface">
+      <div class="surface-head">
+        <button class="back-link">‹ Workflows</button>
+        <div class="surface-title">
+          <span class="ico">◈</span>
+          <h1>The surface keys to the stakes</h1>
+          <span class="ctx-pill" data-ctxlabel></span>
+        </div>
+        <p class="surface-sub">A loose workflow opens describe-and-run. A strict workflow opens with governance foregrounded — because the stakes are high. Cycle the workflow in the toolbar to watch it re-key.</p>
+      </div>
+      <div class="surface-body">
+        <div class="soul" data-soul></div>
+        <div class="run-frame-note"><span class="rfn-ico">▶</span><span data-runframe></span></div>
+
+        <div class="vc-wrap">
+          <div class="adapt-note" data-adaptnote></div>
+          <div id="c-stack"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>context:</span>
+  <span class="tb-seg" id="ctx-seg">
+    <button class="on" onclick="setContext('authoring')">Authoring</button>
+    <button onclick="setContext('running')">Running</button>
+  </span>
+  <span style="opacity:.4">|</span>
+  <span>workflow:</span>
+  <span class="tb-seg" id="wf-seg">
+    <button class="on" onclick="setWorkflow('ex1')">EX-1 STRICT</button>
+    <button onclick="setWorkflow('ex2')">EX-2 MIDDLE</button>
+    <button onclick="setWorkflow('ex3')">EX-3 LOOSE</button>
+  </span>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   THE SOUL OBJECTS — three real example workflows.
+   purpose = business_requirement · needs = kickoff inputs ·
+   phases = ordered phase-type glyph spine · output = deliverable line.
+   tier is DERIVED at render via deriveTier() — never stored.
+   ───────────────────────────────────────────────────────────── */
+
+// phase-type → single real glyph mapping (spine shows GLYPH only; the type label is the stripped thing)
+const PT = {
+  programmatic:     { glyph: '⚙', label: 'server' },
+  llm_single:       { glyph: '✎', label: 'AI write' },
+  llm_agent:        { glyph: '🤖', label: 'agent' },
+  llm_batch_agents: { glyph: '⛓', label: 'parallel' },
+  llm_human_input:  { glyph: '☺', label: 'needs you' },
+  llm_emit:         { glyph: '◆', label: 'deliverable' },
+};
+
+const WORKFLOWS = {
+  ex1: {
+    name: 'Weekly Status Report', slug: 'weekly-status-report', ver: 'v3', status: 'published',
+    project: 'Project Meridian',
+    purpose: "Every Monday, turn the week’s project activity into a stakeholder-ready status report — shipped work, open risks, and key metrics — as a formatted Word document, grounded only in our project knowledge base.",
+    needs: [
+      { key: 'week_ending', label: 'week_ending', type: 'date',  source: 'user' },
+      { key: 'audience',    label: 'audience',    type: 'enum',  source: 'user', enum: 'Exec | Team | Client' },
+      { key: 'template',    label: 'template',    type: 'file',  source: 'template_derived', asset: 'status-report.docx' },
+    ],
+    phases: [
+      { id:'retrieve-activity', type:'programmatic', name:'retrieve-activity', scope:'Project Meridian', model:'inherit' },
+      { id:'draft-narrative',   type:'llm_agent',    name:'draft-narrative',   scope:'Project Meridian', model:'inherit' },
+      { id:'confirm-risks',     type:'llm_human_input', name:'confirm-risks',   scope:null, model:'inherit' },
+      { id:'render-report',     type:'llm_emit',     name:'render-report',     scope:'Project Meridian', model:'inherit', emit:true },
+    ],
+    citation_policy: 'strict',
+    gates: { citations_required: true, output_file_valid: true, structure_check: true, freshness: false, llm_judge_rubric: true },
+    output: 'Weekly-Status-Report.docx — filled from your template, every figure cited',
+    outputFile: 'Weekly-Status-Report.docx',
+  },
+  ex2: {
+    name: 'Competitor Quarter Scan', slug: 'competitor-quarter-scan', ver: 'v2', status: 'published',
+    project: 'Market Research',
+    purpose: "Summarize what three named competitors shipped this quarter from our research folder, flagging anything material to our roadmap — citations flagged where the source supports it.",
+    needs: [
+      { key: 'competitors', label: 'competitors', type: 'text', source: 'user' },
+      { key: 'quarter',     label: 'quarter',     type: 'enum', source: 'user', enum: 'Q1 | Q2 | Q3 | Q4' },
+    ],
+    phases: [
+      { id:'gather-sources',   type:'programmatic', name:'gather-sources',   scope:'Market Research', model:'inherit' },
+      { id:'scan-and-compare', type:'llm_agent',    name:'scan-and-compare', scope:'Market Research', model:'inherit' },
+      { id:'write-brief',      type:'llm_emit',     name:'write-brief',      scope:'Market Research', model:'inherit', emit:true },
+    ],
+    citation_policy: 'flag',
+    gates: { citations_required: false, output_file_valid: true, structure_check: false, freshness: false, llm_judge_rubric: true },
+    output: 'Competitor-Scan-Q3.md — a flagged-citation brief',
+    outputFile: 'Competitor-Scan-Q3.md',
+  },
+  ex3: {
+    name: 'Blog Angle Brainstorm', slug: 'blog-angle-brainstorm', ver: 'v1', status: 'draft',
+    project: null,
+    purpose: "Given a topic, brainstorm ten fresh blog-post angles with a one-line hook each — quick ideation, no sourcing required.",
+    needs: [
+      { key: 'topic', label: 'topic', type: 'text', source: 'user' },
+    ],
+    phases: [
+      { id:'brainstorm-angles', type:'llm_single', name:'brainstorm-angles', scope:null, model:'inherit' },
+    ],
+    citation_policy: 'draft',
+    gates: { citations_required: false, output_file_valid: false, structure_check: false, freshness: false, llm_judge_rubric: true },
+    output: '10 angles — a markdown list',
+    outputFile: '10-angles.md',
+  },
+};
+
+/* ─────────────────────────────────────────────────────────────
+   deriveTier() — the REAL logic, ported to JS. Single source of truth.
+   primary dial = strictest llm_emit phase citation_policy (default draft).
+   floor gates {output_file_valid, structure_check, freshness} refine UP.
+   judge (llm_judge_rubric) ALWAYS ON.
+   ───────────────────────────────────────────────────────────── */
+const FLOOR_GATES = ['output_file_valid', 'structure_check', 'freshness'];
+
+const TIERS = {
+  strict: { glyph: '🔒', word: 'STRICT', cls: 'strict', tip: 'Citations required; the full gate set enforced.' },
+  middle: { glyph: '◐', word: 'MIDDLE', cls: 'middle', tip: 'Citations flagged or partial; core gates enforced.' },
+  loose:  { glyph: '○', word: 'LOOSE',  cls: 'loose',  tip: 'Draft citations; the judge still runs (always-on).' },
+};
+
+function deriveTier(policy, gates) {
+  const floorsPresent = FLOOR_GATES.filter(g => gates[g]);
+  const allFloors = floorsPresent.length === FLOOR_GATES.length;
+  const anyFloor = floorsPresent.length > 0;
+  if (policy === 'strict') return TIERS.strict;
+  if (policy === 'flag' || policy === 'partial') return allFloors ? TIERS.strict : TIERS.middle;
+  // draft
+  return anyFloor ? TIERS.middle : TIERS.loose;
+}
+
+const CIT_OPTS = [
+  { v: 'strict',  d: 'Citations required — honest fail if unsourced' },
+  { v: 'flag',    d: 'Mark uncited values + a coverage note' },
+  { v: 'partial', d: 'Blank the uncited values + a gap list' },
+  { v: 'draft',   d: 'No enforcement; judge still runs' },
+];
+const GATE_KEYS = ['citations_required', 'output_file_valid', 'structure_check', 'freshness', 'llm_judge_rubric'];
+const MODELS = ['claude-sonnet-4-6 (default)', 'gpt-4o', 'gemini-2.5-pro', 'deepseek-chat'];
+
+const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ── live UI state ── */
+let CUR_WF = 'ex1';      // ex1 | ex2 | ex3
+let CUR_CTX = 'authoring'; // authoring | running
+let SEL_PHASE = { a: 0, b: 0, c: 0 };  // selected phase per variant's form panel
+
+// per-variant editable copy of policy+gates+per-phase modelMode so the form drives
+// the live state without mutating the source workflow. modelMode is a per-phase
+// array seeded from each phase's `model` field (so a 'pick a model' choice survives
+// gate/policy re-renders instead of silently resetting to inherit).
+let EDIT = {};
+function makeEdit(wf) {
+  return {
+    policy: wf.citation_policy,
+    gates: { ...wf.gates },
+    modelMode: wf.phases.map(p => (p.model === 'inherit' ? 'inherit' : 'pick')),
+  };
+}
+function resetEdit() {
+  const wf = WORKFLOWS[CUR_WF];
+  EDIT = { a: makeEdit(wf), b: makeEdit(wf), c: makeEdit(wf) };
+}
+
+/* ════════ shared renderers (keyed on variant + workflow) ════════ */
+
+function spineDotsHTML(wf) {
+  return wf.phases.map((p, i) => {
+    const t = PT[p.type];
+    const dot = `<span class="spine-dot ${p.emit ? 'emit' : ''}"><span class="tip">${esc(p.name)} · ${t.label}</span>${t.glyph}</span>`;
+    return i < wf.phases.length - 1 ? dot + '<span class="spine-link"></span>' : dot;
+  }).join('');
+}
+
+function tierChipHTML(policy, gates, withTip) {
+  const t = deriveTier(policy, gates);
+  const tip = withTip ? `<span class="tier-tip">${esc(t.tip)}</span>` : '';
+  return `<span class="tier-chip ${t.cls}"><span class="tg">${t.glyph}</span><span class="tw">${t.word}</span>${tip}</span>`;
+}
+
+function soulHTML(wf) {
+  const stCls = wf.status === 'published' ? 'published' : 'draft';
+  const stGlyph = wf.status === 'published' ? '◉' : '○';
+  const proj = wf.project ? `<span class="soul-proj">· ${esc(wf.project)}</span>` : `<span class="soul-proj">· no project</span>`;
+  return `
+    <div class="soul-main">
+      <div class="soul-top">
+        <span class="soul-name">${esc(wf.name)}</span>
+        <span class="soul-ver">${esc(wf.ver)}</span>
+        <span class="soul-status ${stCls}">${stGlyph} ${esc(wf.status)}</span>
+        ${proj}
+      </div>
+      <p class="soul-purpose"><span class="pq">“</span>${esc(wf.purpose)}<span class="pq">”</span></p>
+      <div class="soul-needs"><span class="sn-k">needs</span>${wf.needs.map(needChipHTML).join('')}</div>
+      <div class="soul-output"><span class="oico">◆</span><span>Delivers <span class="ofile">${esc(wf.outputFile)}</span> — ${esc(wf.output.split('—')[1] ? wf.output.split('—')[1].trim() : wf.output)}</span></div>
+    </div>
+    <div class="soul-side">
+      <div class="spine-dots">${spineDotsHTML(wf)}</div>
+      ${tierChipHTML(wf.citation_policy, wf.gates, true)}
+    </div>`;
+}
+
+function needChipHTML(n) {
+  let cls = '';
+  if (n.source === 'kb_auto') cls = 'kbauto';
+  if (n.source === 'template_derived') cls = 'template';
+  const extra = n.asset ? ` · ${esc(n.asset)}` : (n.enum ? ` · ${esc(n.enum)}` : '');
+  return `<span class="need-chip ${cls}">${esc(n.label)}<span class="nt">${esc(n.type)}${extra}</span></span>`;
+}
+
+function soulPreviewHTML(wf) {
+  return `
+    <div class="sp-h">soul preview</div>
+    <div class="sp-row"><span class="sp-k">spine</span><div class="spine-dots" style="transform:scale(.85);transform-origin:left">${spineDotsHTML(wf)}</div></div>
+    <div class="sp-row"><span class="sp-k">tier</span>${tierChipHTML(wf.citation_policy, wf.gates, false)}</div>
+    <div class="sp-row" style="align-items:flex-start"><span class="sp-k">needs</span><div class="sp-needs">${wf.needs.map(needChipHTML).join('')}</div></div>
+    <div class="sp-row" style="margin-bottom:0;align-items:flex-start"><span class="sp-k">delivers</span><span style="font-size:11.5px;color:var(--color-text-muted)">${esc(wf.output)}</span></div>`;
+}
+
+/* read-only vertical spine (Author & govern left column) */
+function spineColHTML(wf, variant) {
+  const items = wf.phases.map((p, i) => {
+    const t = PT[p.type];
+    const sel = i === SEL_PHASE[variant] ? 'sel' : '';
+    const chips = [];
+    if (p.scope) chips.push(`<span class="ptiny scope">scoped: ${esc(p.scope)}</span>`);
+    if (p.emit) chips.push(`<span class="ptiny cit">cit: ${esc(EDIT[variant].policy)}</span>`);
+    chips.push(`<span class="ptiny model">model: ${p.model}</span>`);
+    return `<li class="${p.emit ? 'emit' : ''}">
+      <span class="svn">${t.glyph}</span>
+      <div class="pcard ${sel}" onclick="selPhase('${variant}', ${i})">
+        <div class="p-name">${esc(p.name)}</div>
+        <div class="p-quiet">phase ${i + 1} · ${t.label}</div>
+        <div class="p-chips">${chips.join('')}</div>
+      </div>
+    </li>`;
+  }).join('');
+  return `<div class="sec-eyebrow" style="margin-bottom:14px">read-only phase spine · click a phase to edit it →</div><ol class="spine-vert">${items}</ol>`;
+}
+
+/* the right-side form panel — ALL advanced controls for the selected phase */
+function formColHTML(wf, variant) {
+  const e = EDIT[variant];
+  const phase = wf.phases[SEL_PHASE[variant]];
+  const t = PT[phase.type];
+
+  const citOpts = CIT_OPTS.map(o =>
+    `<button class="cit-opt ${e.policy === o.v ? 'on' : ''}" onclick="setPolicy('${variant}','${o.v}')">
+       <div class="co-n">${o.v}</div><div class="co-d">${o.d}</div></button>`).join('');
+
+  const gates = GATE_KEYS.map(g => {
+    if (g === 'llm_judge_rubric') {
+      return `<span class="gate-chip locked on" title="The judge is always on — it cannot be switched off">
+        <span class="lk">\u{1f512}</span>${g}</span>`;
+    }
+    const on = e.gates[g];
+    const isFloor = FLOOR_GATES.includes(g);
+    return `<button class="gate-chip ${on ? 'on' : ''}" onclick="toggleGate('${variant}','${g}')"${isFloor ? ' data-floor="1"' : ''}>
+      <span class="gbox">${on ? '✓' : ''}</span>${g}</button>`;
+  }).join('');
+
+  const scopeBlock = phase.scope
+    ? `<div class="ctl-row"><span class="scope-chip">\u{1f4c1} ${esc(phase.scope)}<span class="sc-x">×</span></span><button class="ctl-change" onclick="fakeChange(this,'scope')">change</button></div>`
+    : `<div class="ctl-row"><span style="font-size:11.5px;color:var(--color-text-dim);font-style:italic">no folder scope on this phase type</span></div>`;
+
+  const modelMode = e.modelMode[SEL_PHASE[variant]] || 'inherit';
+  const modelBlock = `
+    <div class="ctl-row">
+      <span class="model-seg">
+        <button class="${modelMode === 'inherit' ? 'on' : ''}" onclick="setModelMode('${variant}','inherit')">inherit default</button>
+        <button class="${modelMode === 'pick' ? 'on' : ''}" onclick="setModelMode('${variant}','pick')">pick a model</button>
+      </span>
+    </div>
+    <div class="model-pick ${modelMode === 'inherit' ? 'hidden' : ''}" data-modelpick>
+      <select onchange="fakeChange(this,'model')">${MODELS.map(m => `<option>${m}</option>`).join('')}</select>
+    </div>`;
+
+  return `
+    <div class="fc-h">${t.glyph} ${esc(phase.name)}</div>
+    <div class="fc-sub">phase ${SEL_PHASE[variant] + 1} of ${wf.phases.length} · ${t.label} · advanced controls</div>
+
+    <div class="fc-block">
+      <div class="fc-blabel">citation_policy <span class="fc-drives">drives the tier</span></div>
+      <div class="cit-seg">${citOpts}</div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-blabel">validator / gate set</div>
+      <div class="gates">${gates}</div>
+      <div class="gate-floor"><b>Floor gates</b> (output_file_valid · structure_check · freshness) refine the tier UP within a band. The <b>judge</b> is locked on for every tier.</div>
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-blabel">folder_scope</div>
+      ${scopeBlock}
+    </div>
+
+    <div class="fc-block">
+      <div class="fc-blabel">model override</div>
+      ${modelBlock}
+    </div>
+
+    <div class="fc-block" style="margin-bottom:0">
+      <div class="fc-blabel">live tier · recomputed by deriveTier()</div>
+      <div class="live-tier-bar">
+        ${tierChipHTML(e.policy, e.gates, false)}
+        <span class="ltb-l" data-tierwhy></span>
+      </div>
+      <div class="judge-note"><span class="jn-ico">\u{1f6e1}</span><span class="jn-t"><b>llm_judge_rubric</b> stays on no matter what you pick — governance and accuracy are preserved even at the loosest setting. A strict workflow can never be silently downgraded.</span></div>
+    </div>`;
+}
+
+function tierWhy(policy, gates) {
+  const t = deriveTier(policy, gates);
+  const floors = FLOOR_GATES.filter(g => gates[g]).length;
+  if (policy === 'strict') return 'strict policy → STRICT';
+  if (policy === 'flag' || policy === 'partial') return floors === 3 ? `${policy} + all 3 floor gates → STRICT` : `${policy} (not all floors) → MIDDLE`;
+  return floors > 0 ? 'draft + a floor gate → MIDDLE' : 'draft, no floor gates → LOOSE';
+}
+
+/* ════════ context-specific copy (Authoring vs Running) ════════ */
+const COPY = {
+  authoring: {
+    ctxLabel: 'authoring',
+    a: {
+      headline: 'Two doors · author this workflow',
+      sub: 'Pick how you want to work. Nothing is hidden — every advanced control is one click from either door.',
+      forkEyebrow: 'how do you want to author this?',
+      doorD_title: 'Describe &amp; draft',
+      doorD_desc: 'Type what you need in plain language. The AI drafts the whole workflow, sets a sensible strictness, and you run or publish in one click.',
+      doorG_title: 'Author &amp; govern',
+      doorG_desc: 'Open the full Builder: the read-only phase spine plus every advanced control — citation policy, the gate set, per-phase folder scope and model.',
+    },
+    describeLabel: 'business requirement ★',
+    describeHint: 'This becomes the workflow’s purpose — the one line that drives the whole draft. The AI grounds the draft in this alone, then reveals what it needs.',
+    bExpandSub: 'citation policy · gate set · per-phase scope &amp; model — one click down',
+    runframe: '',
+  },
+  running: {
+    ctxLabel: 'running',
+    a: {
+      headline: 'Two doors · run this workflow',
+      sub: 'Run it now from a plain prompt, or inspect the governed run — its phases and the gates it must clear. Nothing is hidden.',
+      forkEyebrow: 'how do you want to run this?',
+      doorD_title: 'Describe &amp; run',
+      doorD_desc: 'Give the run its inputs in plain language and go. The soul preview shows exactly what it will produce before you commit.',
+      doorG_title: 'Inspect the governed run',
+      doorG_desc: 'See the locked phase spine, the citation policy in force, and every gate this run must clear before it can deliver — then launch.',
+    },
+    describeLabel: 'what should this run produce? ★',
+    describeHint: 'Fill in the kickoff inputs in plain words — the run is locked to the published definition; this only supplies its needs.',
+    bExpandSub: 'phase spine · citation policy in force · the gates this run must clear',
+    runframe: 'At run time the two doors reframe: Describe &amp; run vs inspect the governed run + its gates.',
+  },
+};
+
+/* ════════ per-variant mount ════════ */
+
+function mountSoul() {
+  const wf = WORKFLOWS[CUR_WF];
+  document.querySelectorAll('[data-soul]').forEach(el => el.innerHTML = soulHTML(wf));
+  document.querySelectorAll('[data-soulpreview]').forEach(el => el.innerHTML = soulPreviewHTML(wf));
+  document.querySelectorAll('[data-ctxlabel]').forEach(el => el.textContent = COPY[CUR_CTX].ctxLabel);
+  document.querySelectorAll('[data-runframe]').forEach(el => el.innerHTML = COPY[CUR_CTX].runframe);
+}
+
+// CTA verb is honest to context + status:
+//   running              → ▶ Run now (the published definition is locked; this only supplies inputs)
+//   authoring · draft    → ✨ Draft → publish gauntlet (first-time creation, must clear the gauntlet)
+//   authoring · published→ ✎ Re-draft from this requirement (an edit of an already-published v2/v3, not first creation)
+function ctaForState() {
+  const wf = WORKFLOWS[CUR_WF];
+  if (CUR_CTX === 'running') return { text: '▶ Run now', publish: false };
+  if (wf.status === 'draft') return { text: '✨ Draft → publish gauntlet', publish: true };
+  return { text: '✎ Re-draft from this requirement', publish: false };
+}
+
+function mountDescribeBits() {
+  const c = COPY[CUR_CTX];
+  const wf = WORKFLOWS[CUR_WF];
+  const cta = ctaForState();
+  document.querySelectorAll('[data-describelabel]').forEach(el => el.textContent = c.describeLabel);
+  document.querySelectorAll('[data-describebox]').forEach(el => {
+    el.value = CUR_CTX === 'running'
+      ? `${wf.needs.map(n => n.label + ': ').join('\n')}`.trim()
+      : wf.purpose;
+  });
+  document.querySelectorAll('[data-describehint]').forEach(el => el.textContent = c.describeHint);
+  document.querySelectorAll('[data-runcta]').forEach(el => {
+    el.textContent = cta.text;
+    el.classList.toggle('publish', cta.publish);
+  });
+}
+
+function mountVariantA() {
+  const c = COPY.authoring.a, cc = COPY[CUR_CTX].a;
+  document.getElementById('a-headline').textContent = cc.headline;
+  document.getElementById('a-sub').textContent = cc.sub;
+  document.querySelector('[data-forkeyebrow]').textContent = cc.forkEyebrow;
+  document.querySelector('[data-doorA-d-title]').innerHTML = cc.doorD_title;
+  document.querySelector('[data-doorA-d-desc]').innerHTML = cc.doorD_desc;
+  document.querySelector('[data-doorA-g-title]').innerHTML = cc.doorG_title;
+  document.querySelector('[data-doorA-g-desc]').innerHTML = cc.doorG_desc;
+  mountGovern('a');
+}
+
+function mountGovern(variant) {
+  const wf = WORKFLOWS[CUR_WF];
+  const sc = document.querySelector(`[data-spinecol="${variant}"]`);
+  const fc = document.querySelector(`[data-formcol="${variant}"]`);
+  if (sc) sc.innerHTML = spineColHTML(wf, variant);
+  if (fc) {
+    fc.innerHTML = formColHTML(wf, variant);
+    const why = fc.querySelector('[data-tierwhy]');
+    if (why) why.textContent = tierWhy(EDIT[variant].policy, EDIT[variant].gates);
+  }
+}
+
+function mountVariantB() {
+  document.querySelector('[data-bexpandsub]').innerHTML = COPY[CUR_CTX].bExpandSub;
+  const tierEl = document.querySelector('[data-bcurtier]');
+  if (tierEl) {
+    const t = deriveTier(EDIT.b.policy, EDIT.b.gates);
+    tierEl.textContent = `now: ${t.glyph} ${t.word}`;
+  }
+  mountGovern('b');
+}
+
+function mountVariantC() {
+  const wf = WORKFLOWS[CUR_WF];
+  const tier = deriveTier(wf.citation_policy, wf.gates);
+  const note = document.querySelector('[data-adaptnote]');
+  const stack = document.getElementById('c-stack');
+  const isStrict = tier.cls === 'strict';
+  const isMiddle = tier.cls === 'middle';
+
+  // note explains WHY the surface keyed itself this way
+  if (isStrict) {
+    note.className = 'adapt-note high';
+    note.innerHTML = `<span class="an-ico">\u{1f512}</span><span>This workflow is <b>${tier.word}</b> — high stakes. <b>Author &amp; govern is foregrounded</b> so the citation policy and gate set are front-and-centre. Describe-and-run is still one click away.</span>`;
+  } else if (isMiddle) {
+    note.className = 'adapt-note high';
+    note.innerHTML = `<span class="an-ico">◐</span><span>This workflow is <b>${tier.word}</b>. Governance is foregrounded but lighter — you can describe-and-run, or inspect the gates first.</span>`;
+  } else {
+    note.className = 'adapt-note low';
+    note.innerHTML = `<span class="an-ico">○</span><span>This workflow is <b>${tier.word}</b> — low stakes. <b>Describe-and-run is foregrounded</b>; governance is a quiet secondary link. Nothing is removed.</span>`;
+  }
+
+  const c = COPY[CUR_CTX].a;
+  // FOREGROUND the door that matches the stakes; the other becomes a quiet secondary link
+  if (isStrict || isMiddle) {
+    // govern foregrounded
+    stack.innerHTML = `
+      <div class="primary-door govern">
+        <div class="pd-kicker">\u{1f527} foregrounded · ${esc(tier.word)} stakes ${tierChipHTML(wf.citation_policy, wf.gates, false)}</div>
+        <div class="pd-title">${c.doorG_title}</div>
+        <div class="pd-why">${c.doorG_desc}</div>
+        <div class="govern-pane">
+          <div class="spine-col" data-spinecol="c"></div>
+          <div class="form-col" data-formcol="c"></div>
+        </div>
+      </div>
+      <div class="secondary-link" onclick="cToggleSecondary(this)">
+        <span class="sl-glyph">⚡</span>
+        <span class="sl-body"><span class="sl-t">${c.doorD_title}</span><span class="sl-s">Skip the controls — ${CUR_CTX === 'running' ? 'run from a plain prompt' : 'describe it and let the AI draft'} (one click).</span></span>
+        <span class="sl-arrow">›</span>
+      </div>`;
+    mountGovern('c');
+  } else {
+    // describe foregrounded
+    stack.innerHTML = `
+      <div class="primary-door describe">
+        <div class="pd-kicker">⚡ foregrounded · ${esc(tier.word)} stakes ${tierChipHTML(wf.citation_policy, wf.gates, false)}</div>
+        <div class="pd-title">${c.doorD_title}</div>
+        <div class="pd-why">${c.doorD_desc}</div>
+        <div class="describe-pane">
+          <div class="describe-box-wrap">
+            <div class="desc-label" data-describelabel></div>
+            <textarea class="desc-box" data-describebox></textarea>
+            <p class="desc-hint" data-describehint></p>
+            <button class="run-cta" data-runcta onclick="fakeRun(this)"></button>
+          </div>
+          <div class="soul-preview" data-soulpreview></div>
+        </div>
+      </div>
+      <div class="secondary-link" onclick="cToggleSecondary(this)">
+        <span class="sl-glyph">\u{1f527}</span>
+        <span class="sl-body"><span class="sl-t">${c.doorG_title}</span><span class="sl-s">Reach citation policy, the gate set, and per-phase scope &amp; model.</span></span>
+        <span class="sl-arrow">›</span>
+      </div>`;
+    // re-mount the describe bits + soul preview that we just injected
+    mountSoul();
+    mountDescribeBits();
+  }
+}
+
+function cToggleSecondary(el) {
+  // clicking the quiet secondary link reveals the OTHER door inline below it (nothing lost — one click)
+  if (el.dataset.opened) {
+    el.nextElementSibling && el.nextElementSibling.classList.contains('c-secondary-body') && el.nextElementSibling.remove();
+    delete el.dataset.opened;
+    el.querySelector('.sl-arrow').textContent = '›';
+    return;
+  }
+  el.dataset.opened = '1';
+  el.querySelector('.sl-arrow').textContent = '˅';
+  const wf = WORKFLOWS[CUR_WF];
+  const tier = deriveTier(wf.citation_policy, wf.gates);
+  const body = document.createElement('div');
+  body.className = 'c-secondary-body';
+  body.style.cssText = 'margin-top:12px;animation:fadeSlideUp var(--dur-base) var(--ease-out)';
+  if (tier.cls === 'loose') {
+    // secondary = govern
+    body.innerHTML = `<div class="govern-pane"><div class="spine-col" data-spinecol="c2"></div><div class="form-col" data-formcol="c2"></div></div>`;
+    el.after(body);
+    EDIT.c2 = makeEdit(wf);
+    SEL_PHASE.c2 = 0;
+    mountGovern('c2');
+  } else {
+    // secondary = describe
+    const cta = ctaForState();
+    body.innerHTML = `<div class="describe-pane" style="border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:18px">
+      <div class="describe-box-wrap">
+        <div class="desc-label">${esc(COPY[CUR_CTX].describeLabel)}</div>
+        <textarea class="desc-box">${esc(CUR_CTX === 'running' ? wf.needs.map(n => n.label + ': ').join('\n') : wf.purpose)}</textarea>
+        <p class="desc-hint">${esc(COPY[CUR_CTX].describeHint)}</p>
+        <button class="run-cta ${cta.publish ? 'publish' : ''}" onclick="fakeRun(this)">${esc(cta.text)}</button>
+      </div>
+      <div class="soul-preview">${soulPreviewHTML(wf)}</div></div>`;
+    el.after(body);
+  }
+}
+
+/* ════════ interactions ════════ */
+
+function showVariant(id, ev) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  ev.target.classList.add('active');
+  renderAll();
+}
+
+function openDoor(variant, which) {
+  // variant A only
+  document.getElementById('a-fork').style.display = 'none';
+  document.getElementById('a-describe').classList.toggle('on', which === 'describe');
+  document.getElementById('a-govern').classList.toggle('on', which === 'govern');
+  if (which === 'govern') mountGovern('a');
+  if (which === 'describe') { mountSoul(); mountDescribeBits(); }
+}
+function bothDoors(variant) {
+  document.getElementById('a-fork').style.display = 'block';
+  document.getElementById('a-describe').classList.remove('on');
+  document.getElementById('a-govern').classList.remove('on');
+}
+
+function toggleExpander() {
+  const bar = document.getElementById('b-expander');
+  const drawer = document.getElementById('b-drawer');
+  const open = !drawer.classList.contains('open');
+  drawer.classList.toggle('open', open);
+  bar.classList.toggle('open', open);
+  if (open) mountGovern('b');
+}
+
+function selPhase(variant, i) {
+  SEL_PHASE[variant] = i;
+  mountGovern(variant);
+}
+
+function setPolicy(variant, v) {
+  EDIT[variant].policy = v;
+  mountGovern(variant);
+  if (variant === 'b') mountVariantB();
+}
+
+function toggleGate(variant, g) {
+  EDIT[variant].gates[g] = !EDIT[variant].gates[g];
+  mountGovern(variant);
+  if (variant === 'b') mountVariantB();
+}
+
+function setModelMode(variant, mode) {
+  // persist per-phase so the 'pick a model' choice survives gate/policy re-renders
+  if (EDIT[variant] && EDIT[variant].modelMode) EDIT[variant].modelMode[SEL_PHASE[variant]] = mode;
+  mountGovern(variant);
+}
+
+function fakeChange(el, what) {
+  // cosmetic feedback only
+  const orig = el.tagName === 'BUTTON' ? el.textContent : null;
+  if (orig) { el.textContent = '✓ changing…'; setTimeout(() => el.textContent = orig, 900); }
+}
+
+function fakeRun(btn) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = CUR_CTX === 'running' ? '⏳ launching run…' : '⏳ drafting…';
+  setTimeout(() => { btn.textContent = CUR_CTX === 'running' ? '✓ run started' : '✓ draft ready'; }, 1100);
+  setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 2400);
+}
+
+function setContext(ctx) {
+  CUR_CTX = ctx;
+  document.body.dataset.ctx = ctx;
+  document.querySelectorAll('#ctx-seg button').forEach((b, i) => b.classList.toggle('on', (i === 0) === (ctx === 'authoring')));
+  renderAll();
+}
+
+function setWorkflow(wf) {
+  CUR_WF = wf;
+  document.querySelectorAll('#wf-seg button').forEach(b => b.classList.remove('on'));
+  const idx = { ex1: 0, ex2: 1, ex3: 2 }[wf];
+  document.querySelectorAll('#wf-seg button')[idx].classList.add('on');
+  SEL_PHASE = { a: 0, b: 0, c: 0 };
+  renderAll();
+}
+
+function renderAll() {
+  resetEdit();
+  // drop any C secondary-door edit-state so it can't linger across workflow/context cycling
+  // (the c-stack is fully rebuilt below, so the opened secondary body is discarded too)
+  delete EDIT.c2;
+  delete SEL_PHASE.c2;
+  mountSoul();
+  mountDescribeBits();
+  mountVariantA();
+  mountVariantB();
+  mountVariantC();
+  // reset A doors to both-doors view on workflow/context change
+  if (document.getElementById('a-fork')) bothDoors('a');
+}
+
+renderAll();
+</script>
+</body>
+</html>
