@@ -15,19 +15,21 @@
  *  - the shell adds NO new api fetch path and NO local tier re-derivation.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within, fireEvent } from "@testing-library/react"
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (the idiomatic vitest way — the
 // G-5 grep precedent at PhaseSpineGraph.test.tsx:16-19,153-159).
 import workflowDoorSwitchSource from "./WorkflowDoorSwitch?raw"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
-// on mount (103-ux name maps). Mock the api seam so the unit render is offline.
-const { mockListFolders, mockListSkills } = vi.hoisted(() => ({
+// on mount (103-ux name maps) and owns the generate→draft flow. Mock the api seam so
+// the unit render is offline; the generate mock backstops the CR-01 auto-draft path.
+const { mockGenerateWorkflow, mockListFolders, mockListSkills } = vi.hoisted(() => ({
+  mockGenerateWorkflow: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
 }))
 vi.mock("@/lib/api", () => ({
-  generateWorkflow: vi.fn(),
+  generateWorkflow: mockGenerateWorkflow,
   createWorkflowDraft: vi.fn(),
   updateWorkflowDraft: vi.fn(),
   listFolders: mockListFolders,
@@ -58,6 +60,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockListFolders.mockResolvedValue([])
   mockListSkills.mockResolvedValue([])
+  // The Builder's generate→draft seam — resolve to a valid drafted definition so the
+  // CR-01 auto-draft hand-off completes cleanly.
+  mockGenerateWorkflow.mockResolvedValue({ ok: true, definition: { slug: "vendor-risk", phases: [] } })
 })
 
 describe("WorkflowDoorSwitch — the 'both' chooser (047-A variant A)", () => {
@@ -119,6 +124,49 @@ describe("WorkflowDoorSwitch — the describe door (loose, D-05)", () => {
     expect(onDescribeDraft).toHaveBeenCalledWith("Summarise weekly vendor risk")
     // The govern door (the existing Builder) owns the actual generate→draft flow.
     expect(screen.getByTestId("door-govern")).toBeInTheDocument()
+  })
+
+  it("the describe CTA SEEDS the Builder and auto-runs the draft with the typed text (CR-01 — no data-loss dead-end)", async () => {
+    // No onDescribeDraft handler passed — proves the door is self-sufficient and the
+    // typed requirement survives the hand-off WITHOUT a parent callback (the gap CR-01
+    // flagged: the only production call site never wired onDescribeDraft).
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise weekly vendor risk" },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+    // The govern door's Builder auto-runs the EXISTING generate→draft flow with the
+    // seeded text — the requirement is NOT dropped on the floor.
+    await waitFor(() =>
+      expect(mockGenerateWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({ describe: "Summarise weekly vendor risk" }),
+      ),
+    )
+  })
+
+  it("the switch-to-govern strip seeds the typed text but does NOT auto-draft (configure-first path)", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Configure strictness first" },
+    })
+    fireEvent.click(screen.getByTestId("switch-to-govern"))
+    expect(screen.getByTestId("door-govern")).toBeInTheDocument()
+    // Choosing "Author & govern" is the configure-first path — no premature generate.
+    expect(mockGenerateWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("the soul preview reflects the typed business requirement live (WR-01)", () => {
+    // No def passed → fresh build. The preview must track what the user types instead
+    // of staying frozen on the honest empty-state.
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Draft a cited vendor-risk report" },
+    })
+    const preview = screen.getByTestId("describe-soul-preview")
+    expect(within(preview).getByTestId("soul-purpose")).toHaveTextContent("Draft a cited vendor-risk report")
   })
 })
 

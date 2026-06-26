@@ -78,10 +78,19 @@ export interface WorkflowBuilderPageProps {
    *     frozen published row is never touched).
    *  Absent → the existing describe-first FRESH build, byte-identical. */
   initial?: BuilderInitial
+  /** Phase 124 CR-01 fix: seed the describe textarea from an upstream "Describe &
+   *  run" door so the loose-path text survives the hand-off into the Builder (it was
+   *  otherwise silently dropped). Only meaningful for a FRESH build (no `initial`) —
+   *  the drafted editing view ignores it. */
+  initialDescribe?: string
+  /** Phase 124 CR-01 fix: when true (the loose door's "Draft the workflow" CTA), run
+   *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
+   *  so the fast path actually drafts instead of dead-ending on an empty screen. */
+  autoDraft?: boolean
 }
 
-export function WorkflowBuilderPage({ renderPublish, initial }: WorkflowBuilderPageProps) {
-  const [describe, setDescribe] = useState("")
+export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, autoDraft }: WorkflowBuilderPageProps) {
+  const [describe, setDescribe] = useState(initialDescribe ?? "")
   // OPEN/TWEAK: when `initial` is provided, boot straight into the drafted editing
   // view on the loaded definition (the describe/composing screen is skipped). A
   // fresh build (no `initial`) starts "empty" exactly as before.
@@ -203,6 +212,23 @@ export function WorkflowBuilderPage({ renderPublish, initial }: WorkflowBuilderP
       })
     }
   }, [describe, projectFolderId])
+
+  // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
+  // "Draft the workflow" CTA (autoDraft), run the EXISTING generate→draft flow ONCE
+  // with the seeded text — so the fast path actually drafts instead of dead-ending on
+  // an empty describe screen. Guarded to fire exactly once, fresh-build ("empty") only.
+  const autoDraftFiredRef = useRef(false)
+  useEffect(() => {
+    if (
+      autoDraft &&
+      !autoDraftFiredRef.current &&
+      (initialDescribe ?? "").trim().length > 0 &&
+      state.phase === "empty"
+    ) {
+      autoDraftFiredRef.current = true
+      void onDraft()
+    }
+  }, [autoDraft, initialDescribe, state.phase, onDraft])
 
   // Merge a phase-form patch into the selected phase's config (immutable).
   const onPhaseChange = useCallback(

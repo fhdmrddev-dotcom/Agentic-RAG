@@ -66,7 +66,25 @@ export function WorkflowDoorSwitch({
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
   const [describe, setDescribe] = useState("")
+  // Phase 124 CR-01 fix: the loose "Draft the workflow" CTA hands the typed text to
+  // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
+  // returns to the chooser (goBoth) so a Builder remount can't re-fire the generate.
+  const [handoffDraft, setHandoffDraft] = useState(false)
   const canDraft = describe.trim().length > 0
+
+  // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
+  // the govern door later doesn't re-trigger a generate).
+  const goBoth = () => {
+    setDoor("both")
+    setHandoffDraft(false)
+  }
+
+  // Phase 124 WR-01 fix: with nothing typed yet show the passed def (honest
+  // empty-state); once the user types, synthesize a live preview def so the soul
+  // PREVIEW reflects the in-progress business requirement instead of staying frozen
+  // on the empty-state (D-05 — the preview tracks what you're describing).
+  const previewDef: DefShape | null | undefined =
+    def ?? (describe.trim().length > 0 ? { business_requirement: describe } : undefined)
 
   // ── GOVERN DOOR — the EXISTING Builder (delegated, never re-implemented). The
   //    Builder's form panel owns the citation-policy picker / gate chips /
@@ -79,7 +97,7 @@ export function WorkflowDoorSwitch({
           <button
             type="button"
             data-testid="both-doors"
-            onClick={() => setDoor("both")}
+            onClick={goBoth}
             className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
           >
             ‹ both doors
@@ -95,8 +113,16 @@ export function WorkflowDoorSwitch({
         </div>
         <div className="min-h-0 flex-1">
           {/* The govern door IS the existing Builder — its advanced governance
-              controls are delegated, with live tier recompute + the locked judge. */}
-          <WorkflowBuilderPage initial={initial} renderPublish={renderPublish} />
+              controls are delegated, with live tier recompute + the locked judge.
+              CR-01 fix: seed the typed describe text + (when arriving via the loose
+              "Draft the workflow" CTA) auto-run the draft, so the fast path never
+              dead-ends and the user's requirement is never dropped. */}
+          <WorkflowBuilderPage
+            initial={initial}
+            renderPublish={renderPublish}
+            initialDescribe={describe}
+            autoDraft={handoffDraft}
+          />
         </div>
       </div>
     )
@@ -111,7 +137,7 @@ export function WorkflowDoorSwitch({
           <button
             type="button"
             data-testid="both-doors"
-            onClick={() => setDoor("both")}
+            onClick={goBoth}
             className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
           >
             ‹ both doors
@@ -146,8 +172,12 @@ export function WorkflowDoorSwitch({
                 onClick={() => {
                   // Forward the describe text to the EXISTING draft/generate path
                   // (the shell adds no new sink). The govern door (the Builder) owns
-                  // the actual generate→draft flow — D-05/T-124-08.
+                  // the actual generate→draft flow — D-05/T-124-08. CR-01 fix: arm the
+                  // hand-off so the Builder seeds the text AND auto-runs the draft
+                  // (previously the text was dropped and the user landed on an empty
+                  // screen). onDescribeDraft stays as an optional parent observer hook.
                   onDescribeDraft?.(describe)
+                  setHandoffDraft(true)
                   setDoor("govern")
                 }}
                 className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
@@ -183,7 +213,7 @@ export function WorkflowDoorSwitch({
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
               This workflow's soul
             </p>
-            <WorkflowSoul def={def} scale="card" />
+            <WorkflowSoul def={previewDef} scale="card" />
           </aside>
         </div>
       </div>

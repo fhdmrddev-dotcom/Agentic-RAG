@@ -75,7 +75,9 @@ export function WorkflowSoul({ def, scale }: WorkflowSoulProps) {
         <span className="font-medium">needs</span>{" "}
         {needs.length > 0 ? (
           needs.map((k, i) => (
-            <span key={k}>
+            // WR-02: input_keys can carry duplicates (authored JSONB, not de-duped),
+            // so the key string alone collides — suffix the index for a stable key.
+            <span key={`${k}-${i}`}>
               {i > 0 && <span className="text-muted-foreground/60">, </span>}
               <span className="font-mono text-foreground/80">{k}</span>
             </span>
