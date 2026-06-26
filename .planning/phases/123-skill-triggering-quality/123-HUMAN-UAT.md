@@ -34,7 +34,7 @@ updated: 2026-06-25T21:20:00Z
 
 ## Current Test
 
-Axis 1 PASS. Axis 2 PASS (render re-test 2026-06-26 — BUG-260626-01 verified fixed live + its workspace-todos sibling BUG-260626-04 fixed+verified; BUG-260626-02 confirmed-live-but-deferred to SEED-094; BUG-260626-03 deferred to SEED-094). Next: finish **Test 3 — Parallel-thread isolation** + **Test 4 — long-message pin**.
+Axis 1 PASS. Axis 2 PASS (render re-test 2026-06-26 — BUG-260626-01 verified fixed live + its workspace-todos sibling BUG-260626-04 fixed+verified; BUG-260626-02 confirmed-live-but-deferred to SEED-094; BUG-260626-03 deferred to SEED-094). Axis 3 PASS (2026-06-26 — 3-run simultaneous buffer isolation + cross-thread pinned-skill isolation, watched the render). Next: **Test 4 — long-message pin** (needs `CONTEXT_WINDOW_MAX_TOKENS=8000` in backend/.env + restart — operator drives the backend).
 
 ## Tests
 
@@ -71,7 +71,11 @@ steps:
 - Thread B (second tab): new thread → `Summarize one of my documents.`
 - While both are live, Claude inspects Redis (via the backend venv, no docker): `run:*`, `runs_by_thread:*`, `runs:active` — confirm distinct `run:{id}` keys and the tuner's namespaced `runs_by_thread:tuner:{skill_id}`; and checks Thread B's LangSmith input carries none of Thread A's `weekly-report-writer` content.
 pass: distinct run-buffer keys (no collision) AND Thread B has its own clean context (no inherited pinned skill).
-result: [pending]
+result: PASS (render re-test 2026-06-26, OpenAI `gpt-5.4-mini`, watching the render). Ran two concurrent Thread-A(skill-loaded)/Thread-B(no-skill) pairs.
+- **Run-buffer isolation (no collision):** captured a true simultaneous snapshot of **3 distinct runs streaming at once** — A4's main run (thread `19fbf5ff`, run `9ad73e3b`), A4's `task` sub-agent (thread `38879ffe`, run `954dadf8`, its OWN buffer), and B4 (thread `4354808a`, run `e51e5370`). 3 distinct run_ids → 3 distinct `run:{id}` stream buffers → 3 distinct `runs_by_thread:{thread}` buckets, **zero shared keys**. Even the sub-agent is namespaced to its own buffer.
+- **Pinned-skill isolation:** across BOTH pairs, the skill-loading thread's DB tool_calls include `load_skill` (weekly-report-writer) while the concurrent Thread B used NONE — pair 1: A `[load_skill, write_todos, task, execute_code]` vs B `[search_documents]`; pair 2: A4 `[write_todos, load_skill, search_documents, analyze_document, execute_code]` vs B4 `[write_todos, search_documents, write_todos, execute_code, write_todos]` (loaded a skill: False). Thread B never inherited A's pinned skill.
+- **Render isolation + no concurrency regression:** B4's foreground showed no skill card and only its OWN file (`cm_iso.png`; 1 GENERATED FILES header, 1 card), no A-thread docx bleed; console stayed 100% clean under concurrent streaming (the BUG-01 dedup fix holds under parallel load).
+Note: tuner_* namespacing (`runs_by_thread:tuner:{skill_id}`) was not separately exercised (no tuner run during this pass) — the chat-thread isolation above covers the SC#10 parallel-thread axis; tuner-vs-chat namespacing remains an optional deepening.
 
 ### 4. Long-message pin durability + honest eviction (CTX-03)
 expected: After ≥ 50 prior messages (or a ≥ 5 KB prompt) roll the trim window, a loaded skill's instructions persist in context (3rd protected class, capped at 1/3 budget). On genuine LRU eviction of a pinned skill over budget, the honest `_TRIM_MARKER` appears; it NEVER drops a pinned skill silently. Reload of the same skill de-dupes (no duplicate pinned group).
@@ -95,9 +99,9 @@ result: [pending]
 ## Summary
 
 total: 4
-passed: 2
+passed: 3
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
