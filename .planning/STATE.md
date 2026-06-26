@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: executing
-last_updated: "2026-06-26T00:00:00.000Z"
+status: "Phase 124 context gathered (2026-06-26) — G-2 sketch gate SATISFIED (046-A + 047-A operator-approved). Ready for `/gsd:plan-phase 124`"
+last_updated: "2026-06-26T19:50:08.450Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 6
@@ -22,13 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 124 — workflow-studio-ux-soul-strict-loose (NEXT; G-2 sketch-gated — `/gsd:sketch 124` before discuss/plan)
+**Current focus:** Phase 124 — workflow-studio-ux-soul-strict-loose (context gathered 2026-06-26; G-2 sketch gate satisfied; next: `/gsd:plan-phase 124`)
 
 ## Current Position
 
 Phase: 124
-Plan: Not started
-Status: Sketch-gated (G-2) — run `/gsd:sketch 124` before `/gsd:discuss-phase` / `/gsd:plan-phase`
+Plan: Not started — CONTEXT.md captured (`124-CONTEXT.md`, commit `6e85fb9d`)
+Status: Context gathered 2026-06-26 — G-2 sketch gate SATISFIED (sketches 046-A soul + 047-A two-doors, operator-approved). 4 decisions locked: pure-FE (business_requirement + deriveTier already exist) · two-door fork = Studio-entry-only (P121 card Run preserved) · honest soul empty-states · soul-block-only publish summary (gauntlet ladder = WUX-03/P127). 2 open workflow-UI bugs reviewed → left open w/ re-open trigger. Next: `/gsd:plan-phase 124`
 Last activity: 2026-06-26
 
 ### Quick Tasks Completed
