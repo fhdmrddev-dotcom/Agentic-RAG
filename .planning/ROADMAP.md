@@ -243,10 +243,12 @@ Plans:
 
 **Plans**: TBD
 
-#### Phase 129 (STRETCH): MiniMax/OpenRouter Arg Repair
+#### Phase 129: MiniMax/OpenRouter Arg Repair
+
+> **STRETCH-origin** — promoted to active 2026-06-26 after v3.1 CORE (120–124) shipped clean; selected as a highest-value STRETCH (the only one closing a live open bug).
 
 **Goal**: Broader provider robustness — MiniMax malformed tool-args are repaired at the adapter boundary, and OpenRouter requests set `require_parameters` so a wider set of routed providers honor the tool schema.
-**Depends on**: Phase 122 (extends the cross-provider trust cluster at the gateway/adapter boundary); gated behind CORE completion
+**Depends on**: Phase 122 (extends the cross-provider trust cluster at the gateway/adapter boundary); CORE complete (gate lifted)
 **Requirements**: MP-04 (STRETCH)
 **Success Criteria** (what must be TRUE):
 
