@@ -34,109 +34,17 @@ import {
   type WorkflowDraftRow,
   type WorkflowDefinitionJSON,
 } from "@/lib/api"
-import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/components/workflows/deriveTier"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
+// Phase 124-02 Task 1 (WUX-01): the soul atoms (tier + glyph + needs) now come from
+// the ONE shared soulData module (Plan 01 extracted them VERBATIM from this page —
+// the page is no longer their owner). The card renders the shared <WorkflowSoul>.
+import { entryInputKeys, type DefShape } from "@/components/workflows/soulData"
+import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import type { Folder } from "@/types"
-
-// ── Phase-type glyph vocabulary (mirrors PhaseSpineGraph by VALUE, not import —
-//    the established 103-04 pattern; the 6th ◆ llm_emit "deliverable"). ──
-const PHASE_GLYPHS: Record<string, string> = {
-  programmatic: "⚙",
-  llm_single: "✎",
-  llm_agent: "🤖",
-  llm_batch_agents: "⛓",
-  llm_human_input: "☺",
-  llm_emit: "◆",
-}
-const PHASE_TYPE_LABELS: Record<string, string> = {
-  programmatic: "server",
-  llm_single: "AI write",
-  llm_agent: "agent",
-  llm_batch_agents: "parallel",
-  llm_human_input: "needs you",
-  llm_emit: "deliverable",
-}
-
-/** A loose read-shape over the definition JSONB (we only read what the card needs). */
-interface DefShape {
-  project_folder_id?: string | null
-  inputs?: Array<{ key?: string }> | null
-  input_keys?: string[] | null
-  phases?: Array<{
-    slug?: string
-    phase_index?: number
-    name?: string | null
-    config?: { phase_type?: string; citation_policy?: string; [k: string]: unknown }
-    validators?: Array<{ kind?: string }> | null
-  }> | null
-  [k: string]: unknown
-}
 
 /** Sentinel for the "Unbound (no project)" filter (IR-04 — module-scope, not per-render). */
 const UNBOUND = "__unbound__"
-
-const ALL_VALIDATOR_KINDS: ReadonlySet<string> = new Set<ValidatorKind>([
-  "citations_required",
-  "output_file_valid",
-  "freshness",
-  "structure_check",
-  "llm_judge_rubric",
-])
-
-/**
- * The citation_policy strictness order (loosest → strictest). Used to pick the
- * STRICTEST declared policy across multiple emit phases deterministically (WR-03).
- * Mirrors the deriveTier mapping intent — strict refines a workflow's whole tier up.
- */
-const POLICY_ORDER: readonly CitationPolicy[] = ["draft", "partial", "flag", "strict"]
-
-/** Return the stricter of two citation policies (the higher POLICY_ORDER rank). */
-function stricterPolicy(a: CitationPolicy, b: CitationPolicy): CitationPolicy {
-  return POLICY_ORDER.indexOf(b) > POLICY_ORDER.indexOf(a) ? b : a
-}
-
-/**
- * Derive the strictness tier for a card from its REAL definition (D10): the
- * citation_policy comes from the strictest llm_emit phase's config (default
- * "draft" when no emit phase declares one — no per-phase citation gate), and the
- * validator-kind set is the union across all phases. The badge is computed on
- * every render — there is NO stored tier string read anywhere.
- */
-function tierForDefinition(def: DefShape | null | undefined) {
-  const phases = def?.phases ?? []
-  // Pick the STRICTEST citation_policy across all emit phases (WR-03 — deterministic
-  // "stricter wins" via POLICY_ORDER, not iteration-order-dependent). Default "draft"
-  // when there is no emit phase at all (the only place citation_policy lives).
-  let citationPolicy: CitationPolicy = "draft"
-  let sawEmit = false
-  for (const p of phases) {
-    if (p.config?.phase_type === "llm_emit") {
-      const cp = p.config?.citation_policy
-      if (cp === "strict" || cp === "flag" || cp === "partial" || cp === "draft") {
-        citationPolicy = sawEmit ? stricterPolicy(citationPolicy, cp) : cp
-        sawEmit = true
-      }
-    }
-  }
-  const kinds = new Set<ValidatorKind>()
-  for (const p of phases) {
-    for (const v of p.validators ?? []) {
-      if (v.kind && ALL_VALIDATOR_KINDS.has(v.kind)) kinds.add(v.kind as ValidatorKind)
-    }
-  }
-  return deriveTier(citationPolicy, kinds)
-}
-
-/** The entry input_keys the card surfaces ("entry needs <keys>"). */
-function entryInputKeys(def: DefShape | null | undefined): string[] {
-  if (!def) return []
-  if (Array.isArray(def.input_keys) && def.input_keys.length > 0) return def.input_keys
-  const fromInputs = (def.inputs ?? []).map((i) => i?.key).filter((k): k is string => !!k)
-  if (fromInputs.length > 0) return fromInputs
-  // The wire kickoff is always content-only → kickoff_prompt (D-103-CONF-1).
-  return ["kickoff_prompt"]
-}
 
 /** A small violet net-new honesty flag (D14). */
 function NetNewFlag({ label = "net-new" }: { label?: string }) {
@@ -147,52 +55,6 @@ function NetNewFlag({ label = "net-new" }: { label?: string }) {
       className="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet"
     >
       {label}
-    </span>
-  )
-}
-
-/** The phase-type chain (glyph + name + type label), color-honest and read-only. */
-function PhaseChain({ def }: { def: DefShape | null | undefined }) {
-  const phases = [...(def?.phases ?? [])].sort(
-    (a, b) => (a.phase_index ?? 0) - (b.phase_index ?? 0),
-  )
-  if (phases.length === 0) {
-    return <p className="text-[11px] italic text-muted-foreground">No phases</p>
-  }
-  return (
-    <div data-testid="phase-chain" className="flex flex-wrap items-center gap-1">
-      {phases.map((p, i) => {
-        const type = p.config?.phase_type ?? "?"
-        const glyph = PHASE_GLYPHS[type] ?? "•"
-        const typeLabel = PHASE_TYPE_LABELS[type] ?? type
-        const title = p.name?.trim() || p.slug || typeLabel
-        return (
-          <span key={p.slug ?? i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-[10px] text-muted-foreground">→</span>}
-            <span className="inline-flex items-center gap-1 rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-foreground">
-              <span aria-hidden="true">{glyph}</span>
-              <span className="max-w-[120px] truncate">{title}</span>
-              <span className="font-mono text-[8.5px] uppercase text-muted-foreground">{typeLabel}</span>
-            </span>
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
-/** The tier badge (D10 — derived, glyph + label, non-color-alone). */
-function TierBadge({ def }: { def: DefShape | null | undefined }) {
-  const tier = tierForDefinition(def)
-  return (
-    <span
-      data-testid="tier-badge"
-      data-tier={tier.id}
-      title={tier.description}
-      className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-foreground"
-    >
-      <span aria-hidden="true">{tier.glyph}</span>
-      {tier.label}
     </span>
   )
 }
@@ -588,12 +450,12 @@ function FilterItem({ label, active, onClick }: { label: string; active: boolean
 
 function DraftCard({ draft, onOpen }: { draft: WorkflowDraftRow; onOpen: () => void }) {
   const def = draft.definition as DefShape | undefined
-  const keys = entryInputKeys(def)
   return (
     <div
       data-testid="draft-card"
       className="flex flex-col gap-3 rounded-lg border border-dashed border-border bg-card p-4"
     >
+      {/* Card chrome (NOT a soul atom): name/version header row + status pill. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -604,17 +466,13 @@ function DraftCard({ draft, onOpen }: { draft: WorkflowDraftRow; onOpen: () => v
             <span className="font-mono text-[11px] text-muted-foreground">v{draft.version}</span>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <TierBadge def={def} />
-          <span className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-muted-foreground">
-            draft
-          </span>
-        </div>
+        <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-muted-foreground">
+          draft
+        </span>
       </div>
-      <PhaseChain def={def} />
-      <span className="text-[11px] text-muted-foreground">
-        entry needs <span className="font-mono text-foreground">{keys.join(", ")}</span>
-      </span>
+      {/* WUX-01: the shared card-scale soul replaces the old TierBadge + PhaseChain +
+          "entry needs" trio — the SAME essence the run header + publish summary show. */}
+      <WorkflowSoul def={def} scale="card" />
       {/* D12: a draft CANNOT be Run — Open✎ + Publish… only (publish is the test). */}
       <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
         <button
@@ -650,10 +508,10 @@ function PublishedCard({
   onTweak: () => void
 }) {
   const def = wf.definition as DefShape | undefined
-  const keys = entryInputKeys(def)
   const version = typeof def?.version === "number" ? def.version : undefined
   return (
     <div data-testid="published-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+      {/* Card chrome (NOT a soul atom): name/version header, folder chip, status pill. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -667,17 +525,15 @@ function PublishedCard({
             <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">📁 {folderName}</span>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <TierBadge def={def} />
-          <span className="rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
-            published
-          </span>
-        </div>
+        <span className="shrink-0 rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
+          published
+        </span>
       </div>
-      <PhaseChain def={def} />
-      <span className="text-[11px] text-muted-foreground">
-        entry needs <span className="font-mono text-foreground">{keys.join(", ")}</span>
-      </span>
+      {/* WUX-01: the shared card-scale soul (tier chip + glyph-dot spine + needs +
+          output) replaces the old TierBadge + PhaseChain + "entry needs" trio. */}
+      <WorkflowSoul def={def} scale="card" />
+      {/* D-01: the Run button below stays the Phase-121 one-click launch-into-thread —
+          it is NEVER routed through the two-door fork. */}
       <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
         <button
           type="button"

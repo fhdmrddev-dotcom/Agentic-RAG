@@ -204,25 +204,39 @@ describe("WorkflowsPage — drafts-above-published shelves + build-card", () => 
   })
 })
 
-describe("WorkflowsPage — client-derived tier badge (D10, no extra fetch)", () => {
-  it("a strict-policy def renders a different tier badge than a draft-policy def", async () => {
+describe("WorkflowsPage — card renders the shared WorkflowSoul (WUX-01, D10, no extra fetch)", () => {
+  it("a published card renders a WorkflowSoul (the card-scale soul + its derived tier chip)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    const strictBadge = within(cards[0]).getByTestId("tier-badge")
-    const looseBadge = within(cards[1]).getByTestId("tier-badge")
-    expect(strictBadge.getAttribute("data-tier")).toBe("STRICT")
-    expect(looseBadge.getAttribute("data-tier")).toBe("LOOSE")
-    expect(strictBadge.getAttribute("data-tier")).not.toBe(looseBadge.getAttribute("data-tier"))
-    // The badge is derived: listPublishedWorkflows was the ONLY fetch (no per-badge call).
+    // The shared soul mounts at card scale (replacing the old TierBadge/PhaseChain trio).
+    const soul = within(cards[0]).getByTestId("workflow-soul")
+    expect(soul.getAttribute("data-scale")).toBe("card")
+    // And it carries the soul's derived tier chip + glyph-dot spine.
+    expect(within(cards[0]).getByTestId("soul-tier")).toBeInTheDocument()
+    expect(within(cards[0]).getByTestId("soul-spine")).toBeInTheDocument()
+    // The OLD ad-hoc trio is gone from the card body.
+    expect(within(cards[0]).queryByTestId("tier-badge")).not.toBeInTheDocument()
+    expect(within(cards[0]).queryByTestId("phase-chain")).not.toBeInTheDocument()
+  })
+
+  it("a strict-policy def renders a different soul tier chip than a draft-policy def (derived, no per-card fetch)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const cards = await screen.findAllByTestId("published-card")
+    const strictTier = within(cards[0]).getByTestId("soul-tier")
+    const looseTier = within(cards[1]).getByTestId("soul-tier")
+    expect(strictTier.getAttribute("data-tier")).toBe("STRICT")
+    expect(looseTier.getAttribute("data-tier")).toBe("LOOSE")
+    expect(strictTier.getAttribute("data-tier")).not.toBe(looseTier.getAttribute("data-tier"))
+    // The tier is derived: listPublishedWorkflows was the ONLY fetch (no per-card call).
     expect(mockListPublished).toHaveBeenCalledTimes(1)
   })
 })
 
-describe("WorkflowsPage — tier badge picks the STRICTEST emit policy (WR-03, order-independent)", () => {
+describe("WorkflowsPage — soul tier picks the STRICTEST emit policy (WR-03, order-independent)", () => {
   it("a [flag, strict, partial] multi-emit def derives STRICT regardless of phase order", async () => {
     // Old logic only overwrote on 'strict' after the first emit set the policy, so a
-    // 'partial' following a 'flag' was dropped and order mattered. The fix uses a
-    // deterministic stricter-wins comparison: the strict emit must win here.
+    // 'partial' following a 'flag' was dropped and order mattered. The shared soulData
+    // derivation uses a deterministic stricter-wins comparison: the strict emit wins.
     const multiEmit = {
       id: "pub-multi",
       slug: "multi-emit",
@@ -241,7 +255,7 @@ describe("WorkflowsPage — tier badge picks the STRICTEST emit policy (WR-03, o
     mockListPublished.mockResolvedValue([multiEmit])
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const card = await screen.findByTestId("published-card")
-    expect(within(card).getByTestId("tier-badge").getAttribute("data-tier")).toBe("STRICT")
+    expect(within(card).getByTestId("soul-tier").getAttribute("data-tier")).toBe("STRICT")
   })
 })
 
@@ -276,6 +290,23 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     fireEvent.click(screen.getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
     expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp")
+  })
+
+  it("D-01: the library-card Run path stays the Phase-121 launch (onLaunch), NOT wrapped by the door fork", async () => {
+    // The two-door fork lives at the Studio authoring ENTRY only. The published-card
+    // Run must reach onLaunch (doRun → createThread → postMessage → create_workflow_run)
+    // directly — it is never routed through WorkflowDoorSwitch. Asserting Run still
+    // opens the run modal + calls onLaunch (and does NOT mount the door chooser) pins it.
+    const onLaunch = vi.fn().mockResolvedValue(undefined)
+    render(<WorkflowsPage folders={folders} onLaunch={onLaunch} />)
+    const cards = await screen.findAllByTestId("published-card")
+    fireEvent.click(within(cards[0]).getByTestId("published-run"))
+    // The run modal opens (the Phase-121 launch surface), NOT the two-door chooser.
+    expect(await screen.findByTestId("run-modal")).toBeInTheDocument()
+    expect(screen.queryByTestId("workflow-doors")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("run-confirm"))
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
+    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "")
   })
 
   it("WR-05: a double-tap of Run creates ONLY ONE launch (in-flight guard)", async () => {
