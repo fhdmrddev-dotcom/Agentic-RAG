@@ -34,7 +34,7 @@ updated: 2026-06-25T21:20:00Z
 
 ## Current Test
 
-Axis 1 PASS. Axis 2 = functional pass but surfaced BUG-260626-01/-02/-03 (see Gaps). Axis 3 started then interrupted. Next: finish **Test 3 — Parallel-thread isolation** + **Test 4 — long-message pin**.
+Axis 1 PASS. Axis 2 PASS (render re-test 2026-06-26 — BUG-260626-01 verified fixed live + its workspace-todos sibling BUG-260626-04 fixed+verified; BUG-260626-02 confirmed-live-but-deferred to SEED-094; BUG-260626-03 deferred to SEED-094). Next: finish **Test 3 — Parallel-thread isolation** + **Test 4 — long-message pin**.
 
 ## Tests
 
@@ -56,7 +56,12 @@ steps:
 - Confirm BOTH `search_documents` and `execute_code` fire (two tool rows).
 - Hand Claude the run_id/thread_id; Claude pulls the LangSmith trace inputs (or open the run in LangSmith → the LLM call's `inputs.messages`) and confirms the `weekly-report-writer` tool-result is still present in that turn's context.
 pass: both tools fire AND the loaded skill's instructions are still in the messages sent to the provider.
-result: FUNCTIONAL PASS, but lived-experience UAT surfaced 2 real defects (do NOT mark a clean pass). (2026-06-25, OpenAI `gpt-5.4-mini`, thread 13ae9bfe, run 89125149.) The CTX-03/multi-tool MECHANISM passed: one prompt drove FOUR tools (`[write_todos, search_documents, load_skill, task, execute_code, execute_code]`, 5 citations); `load_skill` loaded `weekly-report-writer` and the skill stayed usable through the sequence to produce `Weekly_Report_2026-06-25.docx`. BUT watching the rendered UI (which the first pass skipped) exposed: **BUG-260626-01** — generated-file cards duplicate (file card rendered 4× / 4 "GENERATED FILES" headers; KB source-docs bleed in) in MULTI-RUN threads (frontend duplicate React key `run-${runId}`; DB clean; self-heals on reload); and **BUG-260626-03** — todos left visibly stuck (model omitted a completion `write_todos`; panel faithful; no run-end finalizer). Single clean run is clean (1 card; todos 2/2). Also logged the separate latent **BUG-260626-02** (Phase-120 baseline leak into the live final_output_files emit). All 3 root-caused + adversarially verified (workflow wf_cf429301-479). LESSON: the wire being correct ≠ the screen being correct — watch the render.
+result: PASS (render re-test 2026-06-26, OpenAI `gpt-5.4-mini`). First pass was a FUNCTIONAL pass that surfaced 3 defects by watching the rendered UI (which an earlier wire-only pass had skipped); the render re-test then verified the fixes live.
+
+- First pass (2026-06-25, thread 13ae9bfe, run 89125149): CTX-03/multi-tool MECHANISM passed — one prompt drove FOUR tools (`[write_todos, search_documents, load_skill, task, execute_code, execute_code]`, 5 citations); `load_skill` loaded `weekly-report-writer` and it stayed usable to produce `Weekly_Report_2026-06-25.docx`. Watching the render exposed **BUG-260626-01** (file cards duplicate 4× + source bleed in MULTI-RUN threads — frontend duplicate React key `run-${runId}`), **BUG-260626-03** (todos stuck — model omitted completion `write_todos`, no run-end finalizer), and the separate latent **BUG-260626-02** (Phase-120 baseline leak into the live final_output_files emit). All root-caused + adversarially verified (workflow wf_cf429301-479).
+- Render re-test (2026-06-26, watching the render — 2 multi-tool runs + a clean single run): **BUG-260626-01 VERIFIED FIXED** (commit 2a48fea4) — each run's persisted GENERATED FILES panel shows exactly its own file, no same-file duplication, no source bleed, console 100% clean (zero duplicate-key warnings; pre-fix fired 273×). The re-test ALSO surfaced **BUG-260626-04** (workspace "DERIVED FROM ACTIVITY" todos doubled in the temp+persisted window — same root cause, second consumer); FIXED + verified live in commit 6ec8be77 (hoisted the dedup to a shared `dedupMessagesByRunId` helper used by MessageList AND useDerivedPanel; single-run thread now shows 2 todos, was 4). **BUG-260626-02 confirmed LIVE** with richer evidence (run 2's live emit re-lists run 1's *valid/downloadable* file, not just dead baseline cards; self-heals on reload) → stays deferred to SEED-094. **BUG-260626-03** → deferred to SEED-094.
+
+LESSON (reinforced): the wire being correct ≠ the screen being correct — watch the render, count rendered cards/todos, test single AND multi-run.
 
 ### 3. Parallel-thread isolation (tuner run vs pinned context)
 expected: Thread A streaming a Trigger Tuner run (background job + tuner_* SSE events) does NOT contaminate Thread B's chat context or its pinned skill. Tuner events never overload chat event types; Thread B's pinned `load_skill` group and streaming are unaffected while Thread A tunes.
@@ -90,20 +95,21 @@ result: [pending]
 ## Summary
 
 total: 4
-passed: 1
-issues: 1
+passed: 2
+issues: 0
 pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-Defects found during Axis 2 lived-experience UAT (all root-caused + adversarially verified — workflow wf_cf429301-479; logged in .planning/reported-bugs/). **Routing applied 2026-06-26:**
+Defects found during Axis 2 (all root-caused + adversarially verified — workflow wf_cf429301-479; logged in .planning/reported-bugs/). **Status after the 2026-06-26 render re-test:**
 
-- **BUG-260626-01** (major) — **FIX COMMITTED `2a48fea4`** (unit + tsc green; status stays `open` until the Axis-2 multi-run scenario is re-run live and the screen is confirmed). Generated-file cards duplicate + KB source-docs bleed in MULTI-RUN chat threads. Frontend duplicate React key `run-${runId}` in MessageList.tsx:167 (temp + persisted same-runId rows coexist in the live window). Fix = dedup-by-runId before map (prefer persisted) + tighten BOTH StreamsProvider keep-predicates with `&& !dbRunIds.has(runId)` + 5 regression tests (MessageList.dedup.test.tsx). Frontend-only, shared-path-safe (D-14 intact); harness path confirmed unaffected.
-- **BUG-260626-03** (minor) — **ROUTED → SEED-094** (status `deferred`). Workspace TODOS left stuck after a run when the model omits a completion `write_todos`. Panel is faithful to the DB; root cause = model behavior + no run-end finalizer. NOT a code regression. Fix: additive run-end todo reconciler (honest "ended with open todos", not silent auto-complete).
-- **BUG-260626-02** (minor, separate latent) — **ROUTED → SEED-094** (status `deferred`). Phase-120 sandbox baseline files leak into the LIVE final_output_files emit (agent_loop.py ~2239 aggregates the whole `_previous_files_in_run` incl. `iteration:-1`); shows dead "Download unavailable" cards on a reused sandbox. Phase-120 tests covered the delta, not the emit. Fix: filter `iteration == -1` from the emit.
+- **BUG-260626-01** (major) — **CLOSED.** Fixed `2a48fea4`, hardened `6ec8be77`; verified live in the render re-test (multi-run file cards correct, no source bleed, console clean). Generated-file cards duplicate + KB source bleed in MULTI-RUN threads via duplicate React key `run-${runId}` (temp + persisted twin in the live window).
+- **BUG-260626-04** (minor) — **CLOSED.** Found DURING the BUG-01 re-test: workspace "DERIVED FROM ACTIVITY" todos doubled in the temp+persisted window (same root cause, second consumer — `useDerivedPanel` flat-maps across the twin; `dedupToolCalls` can't merge temp's `clientKey` vs persisted's none). Fixed `6ec8be77` by hoisting the dedup to a shared `dedupMessagesByRunId` helper used by both MessageList AND useDerivedPanel; verified live (single run → 2 todos, was 4).
+- **BUG-260626-03** (minor) — **ROUTED → SEED-094** (`deferred`). Workspace TODOS left stuck when the model omits a completion `write_todos`. Panel faithful to DB; root cause = model behavior + no run-end finalizer. Fix: additive run-end todo reconciler (honest "ended with open todos", not silent auto-complete).
+- **BUG-260626-02** (minor, separate latent) — **ROUTED → SEED-094** (`deferred`); **confirmed LIVE** in the re-test with richer evidence (run 2's live emit re-lists run 1's *valid/downloadable* file, not just dead `iteration:-1` cards; self-heals on reload → live-emit artifact, DB persist is clean). Fix scope widened: filter the emit to the current run's freshly-produced files, not merely drop `iteration == -1`.
 
-BUG-02 + BUG-03 are bundled into **SEED-094** (`.planning/seeds/SEED-094-run-end-honesty-baseline-emit-leak-and-todo-finalizer.md`) — one dedicated backend run-end-honesty fix phase, candidate to schedule after CORE Phase 124 or at the next agent_loop.py-touching phase / /gsd:new-milestone.
+BUG-02 + BUG-03 remain bundled in **SEED-094** (`.planning/seeds/SEED-094-run-end-honesty-baseline-emit-leak-and-todo-finalizer.md`) — one dedicated backend run-end-honesty fix phase, candidate to schedule after CORE Phase 124 or at the next agent_loop.py-touching phase / /gsd:new-milestone.
 
 Process note: the first Axis-2 pass was declared on wire/DB evidence WITHOUT watching the render — missed all of the above. Lived-experience watch (count rendered cards, watch todos to completion, both single- and multi-run) is mandatory before marking a streaming/UI axis pass.

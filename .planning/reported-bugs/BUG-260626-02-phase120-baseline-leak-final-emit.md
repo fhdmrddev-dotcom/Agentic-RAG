@@ -34,6 +34,17 @@ On a thread that reuses its sandbox container, the live "GENERATED FILES" panel 
 
 **FINDING.** Phase 120 fixed the per-cell delta but did not reconcile that the **same `_previous_files_in_run` dict also feeds the final emit aggregation**. Phase 120's tests (`test_120_collision_regression.py`) asserted only on `harvest_output_files`'s `delta` return value; the `agent_loop` final-emit aggregation was never covered → the cross-run leak was half-closed.
 
+## CONFIRMED LIVE — richer than first logged (Phase 123 Axis-2 re-test, 2026-06-26)
+
+Reproduced live during the BUG-260626-01 render re-test (OpenAI `gpt-5.4-mini`,
+thread `ef221f76`, 2 multi-tool runs in one thread, reused sandbox):
+
+- Run 2's **live** GENERATED FILES panel re-listed run 1's `risk_chart.png` **alongside** its own `cm_chart.png` — perPanel = run1 `[risk_chart.png]`, run2 `[risk_chart.png, cm_chart.png]`.
+- **Important nuance the original report missed:** the leaked `risk_chart.png` was **valid and downloadable** (12.4 KB, real URL), NOT the predicted url-empty "Download unavailable" dead card. So the live emit re-aggregates **real prior-iteration files** (not only the `iteration:-1`/`url:None` baseline seeds). The fix must filter the emit to the CURRENT run's freshly-produced files, not merely drop `iteration == -1`.
+- **Self-heals on reload:** after reload+reopen, run 2's panel correctly showed only `[cm_chart.png]` (the persisted DB message is clean) → this is a LIVE-emit artifact, the DB persist path is correct. Confirms the bug lives in the `agent_loop` final-emit aggregation, exactly as hypothesized.
+
+Status stays `deferred` (routed to SEED-094); this section enriches the fix scope.
+
 ## Surface classification
 
 `Agentic-RAG` — backend emit + frontend render. Routing candidate.

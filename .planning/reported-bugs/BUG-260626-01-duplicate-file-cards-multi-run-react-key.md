@@ -4,10 +4,10 @@ title: Generated-file cards duplicate + search source-docs bleed in multi-run ch
 reported: 2026-06-26
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/streaming, frontend/chat-render]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: 2a48fea4
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -33,10 +33,18 @@ steps applied verbatim:
    different-runId NOT collapsed, no-runId rows untouched).
 
 Verified: `npx vitest run` (14/14 green across both MessageList test files) +
-`npx tsc --noEmit` (exit 0). **Status stays `open`** until the Phase 123 SC#10
-Axis-2 multi-tool/multi-run scenario is re-run live and the rendered screen is
-confirmed (1 card / 1 GENERATED FILES header per run, zero duplicate-key console
-warnings) — wire+unit green ≠ screen correct (the lesson that found this bug).
+`npx tsc --noEmit` (exit 0).
+
+**CLOSED — Axis-2 render re-test PASSED live (2026-06-26, OpenAI `gpt-5.4-mini`).**
+Multi-run thread (2 multi-tool runs): each run's persisted GENERATED FILES panel
+shows exactly its own file (run1 `[risk_chart.png]`, run2 `[cm_chart.png]`), no
+same-file duplication within a panel, no source-doc bleed, and the console was
+**100% clean** through the whole session — zero "two children with the same key"
+warnings (the pre-fix smoking gun fired 273×). The fix was subsequently hardened
+in `6ec8be77` (the inline dedup hoisted to the shared `dedupMessagesByRunId`
+helper) which ALSO closed the workspace-todos sibling BUG-260626-04. Note: the
+re-test separately confirmed BUG-260626-02 live (run 2's *live* emit re-listing a
+prior file) — distinct bug, still deferred to SEED-094.
 
 ## What we observed
 
