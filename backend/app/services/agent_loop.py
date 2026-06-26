@@ -89,6 +89,77 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Phase 129 D-01 / D-03 (MP-04): MiniMax truncated-tool-args repair primitives
+# ---------------------------------------------------------------------------
+# These are pure, side-effect-free helpers so the guard's decision logic is
+# unit-testable in isolation (test_129_minimax_argrepair.py) WITHOUT driving the
+# full streaming agent loop. The inline seam in run_agent_loop delegates to them.
+
+# The corrective nudge injected on a re-ask (drop the bad turn, ask the model to
+# re-emit complete arguments; suggest splitting large code across calls — Open Q3).
+MINIMAX_ARGREPAIR_NUDGE = (
+    "Your previous tool call's arguments were truncated or invalid JSON "
+    "(the model hit its output token limit mid-argument). Re-emit the tool call "
+    "with complete, well-formed arguments. If the code is large, split it across "
+    "multiple smaller execute_code calls so no single call exceeds the output budget."
+)
+
+
+def _minimax_args_all_valid(tool_calls: list[dict]) -> bool:
+    """True iff EVERY tool_call's `arguments` string is well-formed JSON.
+
+    The MiniMax truncation failure mode: the model runs out of output budget
+    mid-`arguments` and emits a truncated (therefore invalid) JSON string, yet
+    still reports finish_reason="tool_calls" (so the existing length guards never
+    fire — Pitfall 2). We validate the args JSON DIRECTLY here, independent of
+    finish_reason. A truncated arg CANNOT be coerced (never brace-balance /
+    re-escape — that fabricates a partial dispatch, violating D-01); the caller
+    re-asks instead. Mirrors the stdlib coercion precedent at
+    tool_dispatcher.py:2450 (write_todos, BUG-260529-01).
+    """
+    for tc in tool_calls:
+        try:
+            json.loads(tc["arguments"])
+        except (ValueError, TypeError):
+            return False
+    return True
+
+
+def minimax_argrepair_decision(
+    resolved_provider: str,
+    tool_calls: list[dict],
+    argrepair_retries: int,
+    argrepair_pending: bool,
+) -> str:
+    """Decide what the round-trip seam should do for a buffered tool-call turn.
+
+    Pure decision function (no I/O) — the single source of truth for the D-01
+    ladder. Returns one of:
+
+      - "ok"         : append the assistant tool_calls turn unchanged (happy path
+                       AND every non-MiniMax provider — D-14 RED LINE).
+      - "reask"      : MiniMax args invalid + re-ask budget remaining → drop the
+                       bad turn, inject the corrective nudge, continue (bounded to
+                       ONE re-ask via argrepair_retries < 1).
+      - "honest_fail": MiniMax args invalid + budget exhausted → surface the
+                       existing bad_request copy and end the run (never a silent
+                       swallow, never a fabricated dispatch).
+      - "recovered"  : a prior re-ask just succeeded (this turn's MiniMax args are
+                       valid AND argrepair_pending was set) → emit the quiet
+                       tool_args_recovered signal, then append.
+
+    RED LINE (D-14): for any non-MiniMax provider this always returns "ok" — the
+    guard NEVER fires for openai/anthropic/google (test_non_minimax_unaffected).
+    """
+    if resolved_provider != "minimax":
+        return "ok"
+    if _minimax_args_all_valid(tool_calls):
+        return "recovered" if argrepair_pending else "ok"
+    # Invalid args under MiniMax.
+    return "reask" if argrepair_retries < 1 else "honest_fail"
+
+
+# ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
 
@@ -1222,6 +1293,16 @@ async def run_agent_loop(
     _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
     _message_persisted = False  # guard against double-insert
     _empty_retries = 0  # tracks empty-response retries across all iterations
+    # Phase 129 D-01 / D-03 (MP-04): run-scoped single-shot counter for the
+    # MiniMax truncated-tool-args re-ask. SEPARATE from _provider_retries
+    # (:1508, the transient-error budget that resets per-iteration) — Pitfall 3:
+    # a code-heavy MiniMax run that also hits a transient 503 must NOT burn its
+    # arg-repair budget on the transient path, or vice-versa. Mirrors the
+    # _empty_retries single-shot shape (top-of-run init, max 1).
+    _minimax_argrepair_retries = 0
+    # Set when a prior iteration dropped a bad MiniMax tool-call turn and re-asked;
+    # used to emit the quiet `tool_args_recovered` signal once the re-ask succeeds.
+    _minimax_argrepair_pending = False
 
     async def _persist_assistant_message() -> str | None:
         """Insert the assistant message row. Idempotent — only runs once.
@@ -2035,6 +2116,101 @@ async def run_agent_loop(
 
             # --- Tool execution round ---
             tool_calls = list(tool_calls_buffer.values())
+
+            # Phase 129 D-01 / D-03 (MP-04): MiniMax truncated-tool-args guard.
+            # RED LINE (D-14): the ENTIRE guard is gated on the RESOLVED provider
+            # identity (_resolved_provider, set from ctx.resolved_provider at
+            # :1023) — NOT the model string (D-09 #3 / BUG-260616-01: slash-gating
+            # on `org/model` ids misfired). For non-MiniMax round-trips
+            # (openai/anthropic/google) this branch is skipped entirely and the
+            # `messages.append` below is byte-identical to today.
+            #
+            # Root cause (run 2c711ee4, output_tokens=8192 = the cap): MiniMax-M3
+            # truncates a large `execute_code.code` arg mid-stream, producing an
+            # invalid (truncated) JSON `arguments` string, and reports
+            # finish_reason="tool_calls" anyway (Pitfall 2 — the length guards at
+            # :1975/:1983 never fire). The 400 only happens on the NEXT request
+            # (the round-trip re-send below), so we validate PROACTIVELY here,
+            # before the append, independent of finish_reason.
+            #
+            # A truncated arg CANNOT be coerced into validity (Anti-pattern: never
+            # brace-balance / re-escape — that fabricates a partial dispatch,
+            # violating D-01). Only a fresh re-ask is honest: drop the bad turn,
+            # inject a corrective user nudge, `continue` (mirrors the
+            # prose-before-code recovery at :1998-2008), bounded to ONE re-ask via
+            # the run-scoped _minimax_argrepair_retries counter. Still-malformed
+            # after the one re-ask → honest-fail via the existing
+            # `message_for_kind("bad_request")` copy (never a silent swallow).
+            # The decision logic is the pure helper minimax_argrepair_decision
+            # (defined at module scope, unit-pinned by test_129_minimax_argrepair).
+            # For every non-MiniMax provider it returns "ok" and this block is a
+            # no-op (the messages.append below is byte-identical to today).
+            _argrepair_decision = minimax_argrepair_decision(
+                _resolved_provider,
+                tool_calls,
+                _minimax_argrepair_retries,
+                _minimax_argrepair_pending,
+            )
+            if _argrepair_decision == "reask":
+                # One-shot re-ask: do NOT append the malformed tool_calls turn.
+                # Inject a corrective nudge and continue the loop so MiniMax
+                # re-emits the tool call with complete arguments. Mirrors the
+                # prose-before-code recovery shape at :1998-2008.
+                _minimax_argrepair_retries += 1
+                _minimax_argrepair_pending = True
+                messages.append({
+                    "role": "user",
+                    "content": MINIMAX_ARGREPAIR_NUDGE,
+                })
+                logger.warning(
+                    "minimax_argrepair: iteration %d (thread %s) — "
+                    "truncated/invalid tool-call arguments detected; "
+                    "dropping the bad turn and re-asking once",
+                    iteration, thread_id,
+                )
+                # Reset the per-iteration accumulators we are discarding along
+                # with the bad turn (mirrors the reset at :2076-2081).
+                full_content = ""
+                full_reasoning_content = ""
+                continue
+            elif _argrepair_decision == "honest_fail":
+                # Re-ask budget exhausted and still malformed: honest-fail with
+                # the existing fixed `bad_request` copy. No raw 400 detail
+                # interpolation for this known kind (Information-Disclosure
+                # control T-095.1-01-02 / T-129-06). Never a silent swallow,
+                # never a fabricated/partial dispatch (T-129-05). Mirrors the
+                # finish_reason=="length" honest-fail shape at :1975-1981.
+                _argrepair_fail_msg = message_for_kind("bad_request")
+                full_content += _argrepair_fail_msg
+                await _emit(redis, run_id, 'delta', content=_argrepair_fail_msg)
+                await _emit(
+                    redis, run_id, 'error',
+                    message='minimax tool-call arguments still invalid after re-ask',
+                )
+                logger.warning(
+                    "minimax_argrepair: iteration %d (thread %s) — re-ask "
+                    "exhausted, tool-call arguments still invalid; "
+                    "honest-failing with bad_request copy",
+                    iteration, thread_id,
+                )
+                break
+            elif _argrepair_decision == "recovered":
+                # The re-ask recovered: this iteration's MiniMax args are valid
+                # after a prior _minimax_argrepair_retries increment. Surface a
+                # quiet, Deep-side honesty signal (Phase-122 family) on the run
+                # SSE channel BEFORE the normal append. This is the Deep agent
+                # loop's own _emit (threads.py:152 → one XADD on run:{run_id}),
+                # NOT the harness forced_emit substrate the Deep loop bypasses
+                # (forced_emit.py:74). The event is a quiet audit signal, not a
+                # user-facing error delta — the FE can ignore unknown events; no
+                # new FE handler required (Open Q1).
+                _minimax_argrepair_pending = False
+                await _emit(
+                    redis, run_id, 'tool_args_recovered',
+                    provider=_resolved_provider, iteration=iteration,
+                )
+            # "ok" → fall through to the normal append (happy path + every
+            # non-MiniMax provider).
 
             messages.append({
                 "role": "assistant",
