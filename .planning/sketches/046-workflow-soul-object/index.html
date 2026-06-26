@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 046 · Workflow soul object</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 0; }
+
+  /* ── App frame (mirrors the house chrome from 045) ── */
+  .app { display: flex; min-height: 100vh; }
+  .deco-rail { width: 56px; flex-shrink: 0; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border-soft); }
+  .surface { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .surface-head { padding: 22px 40px 18px; flex-shrink: 0; border-bottom: 1px solid var(--color-border-soft); }
+  .surface-title { display: flex; align-items: center; gap: 10px; }
+  .surface-title .ico { color: var(--color-primary); font-size: 18px; }
+  .surface-title h1 { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 700; margin: 0; }
+  .surface-sub { font-size: var(--text-sm); color: var(--color-text-muted); margin: 6px 0 0; max-width: 80ch; }
+  .surface-body { flex: 1; padding: 8px 40px 96px; }
+
+  /* ── Comparison-surface scaffold ── */
+  .compare { max-width: 1080px; margin: 0 auto; }
+  .size-section { margin-top: 56px; }
+  .size-section:first-child { margin-top: 28px; }
+  .size-eyebrow { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .size-eyebrow .num { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+  .size-eyebrow .name { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-text-dim); }
+  .size-cap { font-size: 12px; color: var(--color-text-dim); margin: 0 0 18px; max-width: 64ch; line-height: 1.5; }
+
+  /* ════════ THE GLYPH-DOT SPINE (load-bearing shared component) ════════ */
+  .spine-dots { display: flex; align-items: flex-start; }
+  .spine-node { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .spine-glyph {
+    display: grid; place-items: center; border-radius: var(--radius-full);
+    background: var(--color-muted); border: 1px solid var(--color-border);
+    color: var(--color-text); flex-shrink: 0;
+    transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast);
+  }
+  .spine-node:hover .spine-glyph { transform: translateY(-1px); border-color: var(--color-primary-glow); }
+  .spine-glyph.is-emit { background: color-mix(in srgb, var(--color-primary) 8%, transparent); border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .spine-name { font-size: 10px; color: var(--color-text-dim); text-align: center; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; }
+  .spine-conn { flex: 1; height: 1px; background: var(--color-border); min-width: 12px; }
+  /* spine scale variants */
+  .spine-dots.s-card .spine-glyph { width: 26px; height: 26px; font-size: 13px; }
+  .spine-dots.s-card .spine-node { max-width: 64px; }
+  .spine-dots.s-card .spine-conn { margin-top: 13px; }
+  .spine-dots.s-card .spine-name { font-size: 9px; margin-top: 5px; }
+  .spine-dots.s-run .spine-glyph { width: 34px; height: 34px; font-size: 16px; }
+  .spine-dots.s-run .spine-node { max-width: 96px; }
+  .spine-dots.s-run .spine-conn { margin-top: 17px; }
+  .spine-dots.s-run .spine-name { font-size: 10px; margin-top: 7px; }
+  .spine-dots.s-pub .spine-glyph { width: 42px; height: 42px; font-size: 19px; }
+  .spine-dots.s-pub .spine-node { max-width: 124px; }
+  .spine-dots.s-pub .spine-conn { margin-top: 21px; }
+  .spine-dots.s-pub .spine-name { font-size: 11px; margin-top: 8px; }
+
+  /* ════════ TIER CHIP (glyph + WORD, never colour-alone) ════════ */
+  .tier-chip {
+    display: inline-flex; align-items: center; gap: 6px; cursor: help;
+    font-family: var(--font-mono); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    border: 1px solid var(--color-border); border-radius: var(--radius-full);
+    background: var(--color-muted); color: var(--color-text);
+    transition: border-color var(--dur-fast);
+  }
+  .tier-chip:hover { border-color: var(--color-primary-glow); }
+  .tier-chip .tg { font-size: 1.1em; }
+  /* subtle tone — never the sole signal (word + glyph carry it) */
+  .tier-chip.t-strict { border-color: color-mix(in srgb, var(--color-warning) 40%, transparent); }
+  .tier-chip.t-middle { border-color: color-mix(in srgb, var(--color-accent-violet) 40%, transparent); }
+  .tier-chip.t-loose  { border-color: var(--color-border); }
+  .tier-chip.sz-s { font-size: 9.5px; padding: 2px 8px; }
+  .tier-chip.sz-m { font-size: 10.5px; padding: 3px 10px; }
+  .tier-chip.sz-l { font-size: 11.5px; padding: 4px 12px; }
+
+  /* status atom (glyph + word) */
+  .status-atom { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-dim); }
+  .status-atom .sg { font-size: 1em; }
+  .status-atom.st-published { color: var(--color-success); }
+  .status-atom.st-draft { color: var(--color-warning); }
+
+  /* output line */
+  .output-line { display: flex; align-items: center; gap: 8px; }
+  .output-line .out-glyph { color: var(--color-primary); flex-shrink: 0; }
+  .output-line .out-text { color: var(--color-text-muted); }
+  .output-line .out-text .fname { font-family: var(--font-mono); color: var(--color-text); }
+
+  /* needs (kickoff inputs) */
+  .needs-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .need-chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: var(--radius-full); background: var(--color-secondary); border: 1px solid var(--color-border-soft); color: var(--color-text-muted); }
+  .need-chip .nk { color: var(--color-text); }
+  .need-chip .nt { color: var(--color-text-dim); }
+  .need-chip.src-tmpl { border-color: color-mix(in srgb, var(--color-accent-violet) 30%, transparent); }
+
+  /* meta row: project + version + status */
+  .soul-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--color-text-dim); }
+  .soul-meta .proj { display: inline-flex; align-items: center; gap: 5px; }
+  .soul-meta .ver { font-family: var(--font-mono); }
+  .soul-meta .dot { opacity: 0.4; }
+
+  /* tiny eyebrow label inside a soul block */
+  .micro-label { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-dim); }
+
+  /* ════════ ① LIBRARY CARD GRID ════════ */
+  .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .lib-card {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-surface); padding: 16px; box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: 12px;
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast), transform var(--dur-fast);
+  }
+  .lib-card:hover { border-color: var(--color-primary-glow); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .lib-card.focused { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+  .lib-card .card-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); margin: 0; }
+  .lib-card.draft-card { border-style: dashed; }
+
+  /* ════════ ② RUN HEADER STRIP ════════ */
+  .run-strip {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-surface); box-shadow: var(--shadow-sm); overflow: hidden;
+  }
+  .run-soul { padding: 20px 24px; }
+  .run-live {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 24px; border-top: 1px solid var(--color-border-soft);
+    background: var(--color-bg-elev1); font-size: var(--text-sm);
+  }
+  .run-live .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.2s infinite; flex-shrink: 0; }
+  .run-live .phase-count { font-family: var(--font-mono); font-size: 11px; color: var(--color-warning); }
+  .run-live .activity { color: var(--color-text-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .run-live .running-word { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-warning); }
+  /* draft test-run: the phase-count reads as the honest 'draft · test run' label, dimmed so it never mimics a published run's amber phase counter */
+  .run-live.is-draft-run .phase-count { color: var(--color-text-dim); }
+
+  /* ════════ ③ PUBLISH SUMMARY BLOCK ════════ */
+  .pub-block {
+    border: 1px solid var(--color-border); border-radius: var(--radius-xl);
+    background: var(--color-surface); box-shadow: var(--shadow-md); overflow: hidden;
+  }
+  .pub-soul { padding: 28px 32px; }
+  .pub-gauntlet { padding: 16px 32px 22px; border-top: 1px solid var(--color-border-soft); background: var(--color-bg-elev1); }
+  .pub-gauntlet .g-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .pub-gauntlet .g-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+  .pub-gauntlet .g-rollup { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); margin-left: auto; }
+  .stage-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stage-pip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 9.5px; padding: 3px 8px; border-radius: var(--radius-full); background: var(--color-muted); border: 1px solid var(--color-border-soft); color: var(--color-text-muted); }
+  .stage-pip .sx { color: var(--color-success); }
+  .stage-pip.judge-pip { border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .stage-pip .sn { color: var(--color-text-dim); }
+  .tier-line { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--color-border-soft); font-size: 12px; color: var(--color-text-muted); }
+
+  /* the business_requirement text, with per-variant scale */
+  .breq { line-height: 1.5; color: var(--color-text); }
+  .breq.hero-card { font-family: var(--font-headline); font-size: var(--text-sm); font-weight: 600; }
+  .breq.hero-run { font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 700; max-width: 70ch; }
+  .breq.hero-pub { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 700; max-width: 72ch; }
+  .breq.sub-card { font-size: 12px; color: var(--color-text-muted); font-weight: 400; }
+  .breq.sub-run { font-size: var(--text-sm); color: var(--color-text-muted); max-width: 76ch; }
+  .breq.sub-pub { font-size: var(--text-base); color: var(--color-text-muted); max-width: 78ch; }
+
+  /* outcome hero (variant C) */
+  .outcome-hero { display: flex; flex-direction: column; gap: 6px; }
+  .outcome-hero .oh-label { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-dim); }
+  .outcome-hero .oh-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .outcome-hero .oh-file { display: flex; align-items: center; gap: 8px; }
+  .outcome-hero .oh-glyph { color: var(--color-primary); }
+  .outcome-hero .oh-card .oh-name { font-family: var(--font-mono); font-weight: 600; }
+  .outcome-hero.sz-card .oh-name { font-size: var(--text-sm); }
+  .outcome-hero.sz-run .oh-name { font-size: var(--text-md); }
+  .outcome-hero.sz-pub .oh-name { font-size: var(--text-lg); }
+  .outcome-hero .oh-desc { font-size: 12px; color: var(--color-text-dim); }
+
+  /* layout helpers */
+  .col { display: flex; flex-direction: column; }
+  .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; } .gap-5 { gap: 20px; }
+  .row-between { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .quiet { color: var(--color-text-dim); }
+  .divider { height: 1px; background: var(--color-border-soft); margin: 4px 0; }
+
+  /* viewport width cap (toolbar cycler) */
+  .compare { transition: max-width var(--dur-base) var(--ease-out); }
+  body[data-vw="375"] .compare { max-width: 375px; }
+  body[data-vw="375"] .card-grid { grid-template-columns: 1fr; }
+  body[data-vw="768"] .compare { max-width: 768px; }
+  body[data-vw="768"] .card-grid { grid-template-columns: repeat(2, 1fr); }
+  body[data-vw="1280"] .compare { max-width: 1080px; }
+</style>
+</head>
+<body data-vw="1280">
+
+<!-- Variant nav -->
+<div class="variant-nav">
+  <span class="label">Sketch 046 · workflow soul</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Purpose-led <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Spine-led</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Outcome-led</button>
+</div>
+
+<div class="app">
+  <div class="deco-rail"></div>
+  <div class="surface">
+    <div class="surface-head">
+      <div class="surface-title">
+        <span class="ico">◆</span>
+        <h1>The soul of a workflow</h1>
+      </div>
+      <p class="surface-sub">One essence — purpose, needs, phase spine, tier, and the thing you get — seen at the three sizes it must live in. Switch the focused workflow in the toolbar; the same soul atoms — spine, tier chip, needs, output — feed every size, so the identity stays in lockstep even though each size tunes its own layout. <span id="surfaceSub" class="quiet"></span></p>
+    </div>
+    <div class="surface-body">
+      <div class="compare">
+
+        <!-- ① LIBRARY CARD -->
+        <section class="size-section">
+          <div class="size-eyebrow"><span class="num">①</span><span class="name">Library card — smallest, densest</span></div>
+          <p class="size-cap">As it sits in the Workflows page library, alongside its peers. The focused workflow is highlighted.</p>
+          <div class="card-grid" id="cardGrid"></div>
+        </section>
+
+        <!-- ② RUN HEADER -->
+        <section class="size-section">
+          <div class="size-eyebrow"><span class="num">②</span><span class="name">Run header — medium, in an active run</span></div>
+          <p class="size-cap">As it sits above a live run: the soul, then a thin stub of the running phase spine.</p>
+          <div id="runHeader"></div>
+        </section>
+
+        <!-- ③ PUBLISH SUMMARY -->
+        <section class="size-section">
+          <div class="size-eyebrow"><span class="num">③</span><span class="name">Publish summary — largest, most explanatory</span></div>
+          <p class="size-cap">As it sits at the top of the publish surface, above a condensed stub of the 8-stage gauntlet and the tier line.</p>
+          <div id="pubSummary"></div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>workflow:</span>
+  <select id="wfSel" onchange="renderAll()">
+    <option value="ex1">EX-1 · Weekly Status (STRICT)</option>
+    <option value="ex2">EX-2 · Competitor Scan (MIDDLE)</option>
+    <option value="ex3">EX-3 · Blog Brainstorm (LOOSE)</option>
+  </select>
+  <span style="opacity:.4">|</span>
+  <span>vw:</span>
+  <button id="vwBtn" onclick="cycleVw()">1280</button>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   THE SOUL DATA — three example workflows, exact field names.
+   purpose = business_requirement (the headline new field).
+   needs   = kickoff inputs {key,label,type,source}.
+   phases  = ordered [name, type] (type drives the glyph; ribbon STRIPPED).
+   citation_policy + gates → deriveTier().
+   output  = the llm_emit deliverable, one short line.
+   ───────────────────────────────────────────────────────────── */
+
+/* Phase type → glyph (the single real mapping; only the GLYPH shows in the spine). */
+const PT = {
+  programmatic:     { glyph: '⚙', type: 'server' },
+  llm_single:       { glyph: '✎', type: 'AI write' },
+  llm_agent:        { glyph: '🤖', type: 'agent' },
+  llm_batch_agents: { glyph: '⛓', type: 'parallel' },
+  llm_human_input:  { glyph: '☺', type: 'needs you' },
+  llm_emit:         { glyph: '◆', type: 'deliverable' },
+};
+
+/* deriveTier() — primary dial = strictest llm_emit citation_policy;
+   floor gates {output_file_valid, structure_check} refine UP;
+   judge (llm_judge_rubric) is ALWAYS ON. Returns {key,glyph,word,desc}. */
+const TIER_META = {
+  strict: { glyph: '🔒', word: 'STRICT', desc: 'Citations required; the full gate set enforced.' },
+  middle: { glyph: '◐', word: 'MIDDLE', desc: 'Citations flagged or partial; core gates enforced.' },
+  loose:  { glyph: '○', word: 'LOOSE', desc: 'Draft citations; the judge still runs (always-on).' },
+};
+const FLOOR_GATES = ['output_file_valid', 'structure_check'];
+
+/* selectEmitPolicy() — the single definition of "the emit policy that sets the
+   tier": the STRICTEST citation_policy across all llm_emit phases (falls back to
+   the workflow-level policy, then 'draft'). Both deriveTier() and the publish
+   tier-line read from this so the displayed policy always matches the band. */
+const EMIT_ORDER = { strict: 3, flag: 2, partial: 2, draft: 1 };
+function selectEmitPolicy(wf) {
+  const emitPhases = wf.phases.filter(p => p.type === 'llm_emit');
+  if (emitPhases.length) {
+    return emitPhases.reduce(
+      (acc, p) => (EMIT_ORDER[p.citation_policy] || 1) > (EMIT_ORDER[acc] || 1) ? p.citation_policy : acc,
+      emitPhases[0].citation_policy || 'draft');
+  }
+  return wf.citation_policy || 'draft';
+}
+
+function deriveTier(wf) {
+  const policy = selectEmitPolicy(wf);
+  const gates = wf.gates || [];
+  const allFloor = FLOOR_GATES.every(g => gates.includes(g));
+  const anyFloor = FLOOR_GATES.some(g => gates.includes(g));
+  let key;
+  if (policy === 'strict') key = 'strict';
+  else if (policy === 'flag' || policy === 'partial') key = allFloor ? 'strict' : 'middle';
+  else /* draft */ key = anyFloor ? 'middle' : 'loose';
+  return Object.assign({ key }, TIER_META[key]);
+}
+
+const WORKFLOWS = {
+  ex1: {
+    id: 'ex1', slug: 'weekly-status-report', name: 'Weekly Status Report',
+    version: 3, status: 'published', project: 'Project Meridian',
+    business_requirement: "Every Monday, turn the week’s project activity into a stakeholder-ready status report — shipped work, open risks, and key metrics — as a formatted Word document, grounded only in our project knowledge base.",
+    citation_policy: 'strict',
+    gates: ['citations_required', 'output_file_valid', 'structure_check', 'llm_judge_rubric'],
+    needs: [
+      { key: 'week_ending', label: 'Week ending', type: 'date', source: 'user' },
+      { key: 'audience', label: 'Audience', type: 'enum', enumVals: 'Exec|Team|Client', source: 'user' },
+      { key: 'template', label: 'Template', type: 'file', source: 'template_derived', note: 'status-report.docx' },
+    ],
+    phases: [
+      { name: 'retrieve-activity', type: 'programmatic' },
+      { name: 'draft-narrative', type: 'llm_agent' },
+      { name: 'confirm-risks', type: 'llm_human_input' },
+      { name: 'render-report', type: 'llm_emit', citation_policy: 'strict' },
+    ],
+    output: { file: 'Weekly-Status-Report.docx', desc: 'filled from your template, every figure cited' },
+    live: { current: 2, total: 4, phaseName: 'draft-narrative', activity: 'drafting the executive summary from 18 retrieved updates…' },
+  },
+  ex2: {
+    id: 'ex2', slug: 'competitor-quarter-scan', name: 'Competitor Quarter Scan',
+    version: 2, status: 'published', project: 'Market Research',
+    business_requirement: "Summarize what three named competitors shipped this quarter from our research folder, flagging anything material to our roadmap — citations flagged where the source supports it.",
+    citation_policy: 'flag',
+    gates: ['output_file_valid', 'llm_judge_rubric'],
+    needs: [
+      { key: 'competitors', label: 'Competitors', type: 'text', source: 'user' },
+      { key: 'quarter', label: 'Quarter', type: 'enum', enumVals: 'Q1|Q2|Q3|Q4', source: 'user' },
+    ],
+    phases: [
+      { name: 'gather-sources', type: 'programmatic' },
+      { name: 'scan-and-compare', type: 'llm_agent' },
+      { name: 'write-brief', type: 'llm_emit', citation_policy: 'flag' },
+    ],
+    output: { file: 'Competitor-Scan-Q3.md', desc: 'a flagged-citation brief' },
+    live: { current: 2, total: 3, phaseName: 'scan-and-compare', activity: 'comparing what 3 competitors shipped against our roadmap…' },
+  },
+  ex3: {
+    id: 'ex3', slug: 'blog-angle-brainstorm', name: 'Blog Angle Brainstorm',
+    version: 1, status: 'draft', project: null,
+    business_requirement: "Given a topic, brainstorm ten fresh blog-post angles with a one-line hook each — quick ideation, no sourcing required.",
+    citation_policy: 'draft',
+    gates: ['llm_judge_rubric'],
+    needs: [
+      { key: 'topic', label: 'Topic', type: 'text', source: 'user' },
+    ],
+    phases: [
+      { name: 'brainstorm-angles', type: 'llm_single', citation_policy: 'draft' },
+    ],
+    output: { file: '10 angles', desc: 'a markdown list' },
+    live: { current: 1, total: 1, phaseName: 'brainstorm-angles', activity: 'generating ten angles with a one-line hook each…' },
+  },
+};
+
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/* ── shared atoms ───────────────────────────────────────────── */
+
+/* the glyph-dot spine — sole signal differing by scale. */
+function spineHTML(wf, scale /* 'card'|'run'|'pub' */) {
+  const showNames = scale !== 'card'; // card: glyph-only by default, name on hover
+  const nodes = wf.phases.map((p, i) => {
+    const meta = PT[p.type];
+    const isEmit = p.type === 'llm_emit';
+    const glyph = `<div class="spine-glyph ${isEmit ? 'is-emit' : ''}" title="${esc(p.name)} · ${meta.type}">${meta.glyph}</div>`;
+    const name = showNames ? `<div class="spine-name" title="${esc(p.name)}">${esc(p.name)}</div>` : '';
+    const conn = i < wf.phases.length - 1 ? `<div class="spine-conn"></div>` : '';
+    return `<div class="spine-node">${glyph}${name}</div>${conn}`;
+  }).join('');
+  return `<div class="spine-dots s-${scale}">${nodes}</div>`;
+}
+
+function tierChipHTML(wf, sz /* 's'|'m'|'l' */) {
+  const t = deriveTier(wf);
+  return `<span class="tier-chip t-${t.key} sz-${sz}" title="${esc(t.desc)}"><span class="tg">${t.glyph}</span>${t.word}</span>`;
+}
+
+function statusAtomHTML(wf) {
+  const g = wf.status === 'published' ? '◉' : '○';
+  return `<span class="status-atom st-${wf.status}"><span class="sg">${g}</span>${wf.status}</span>`;
+}
+
+function outputLineHTML(wf) {
+  const o = wf.output;
+  return `<span class="output-line"><span class="out-glyph">◆</span><span class="out-text"><span class="fname">${esc(o.file)}</span> — ${esc(o.desc)}</span></span>`;
+}
+
+function needsHTML(wf) {
+  return `<div class="needs-row">${wf.needs.map(n => {
+    const cls = n.source === 'template_derived' ? 'src-tmpl' : '';
+    const tval = n.type === 'enum' && n.enumVals ? `${n.type}: ${n.enumVals}` : n.type;
+    const note = n.note ? ` · ${n.note}` : '';
+    return `<span class="need-chip ${cls}" title="${esc(n.label)} · source: ${n.source}${note}"><span class="nk">${esc(n.key)}</span><span class="nt">${esc(tval)}</span></span>`;
+  }).join('')}</div>`;
+}
+
+function metaHTML(wf) {
+  const proj = wf.project ? `<span class="proj">📁 ${esc(wf.project)}</span><span class="dot">·</span>` : `<span class="proj quiet">no project</span><span class="dot">·</span>`;
+  return `<div class="soul-meta">${proj}<span class="ver">v${wf.version}</span><span class="dot">·</span>${statusAtomHTML(wf)}</div>`;
+}
+
+/* ── the 8-stage gauntlet stub (publish-summary context) ── */
+const STAGES = [
+  { n: '0', label: 'Owner' }, { n: '0b', label: 'Valid' }, { n: '1', label: 'Business req' },
+  { n: '2', label: 'Lint' }, { n: '2.5', label: 'Interactive' }, { n: '3', label: 'Golden run' },
+  { n: '3b', label: 'Structural gate' }, { n: '4', label: 'Judge', judge: true }, { n: '5', label: 'Publish' },
+];
+function gauntletStubHTML() {
+  const pips = STAGES.map(s =>
+    `<span class="stage-pip ${s.judge ? 'judge-pip' : ''}"><span class="sn">${s.n}</span>${esc(s.label)}<span class="sx">✓</span></span>`
+  ).join('');
+  return `<div class="pub-gauntlet">
+    <div class="g-head"><span class="g-title">Publish gauntlet</span><span class="g-rollup">8 stages · judge always on</span></div>
+    <div class="stage-row">${pips}</div>
+  </div>`;
+}
+
+/* ════════ ① LIBRARY CARD ════════ */
+function cardHTML(wf, focused) {
+  return `<div class="lib-card ${focused ? 'focused' : ''} ${wf.status === 'draft' ? 'draft-card' : ''}">
+    ${VARIANT === 'a' ? cardBodyA(wf) : VARIANT === 'b' ? cardBodyB(wf) : cardBodyC(wf)}
+  </div>`;
+}
+
+/* A — purpose-led card */
+function cardBodyA(wf) {
+  return `
+    <div class="row-between">
+      <h3 class="card-title">${esc(wf.name)}</h3>
+      ${tierChipHTML(wf, 's')}
+    </div>
+    <p class="breq hero-card">${esc(wf.business_requirement)}</p>
+    <div class="divider"></div>
+    ${spineHTML(wf, 'card')}
+    <div class="col gap-2">
+      ${needsHTML(wf)}
+      ${outputLineHTML(wf)}
+      ${metaHTML(wf)}
+    </div>`;
+}
+
+/* B — spine-led card */
+function cardBodyB(wf) {
+  return `
+    <div class="row-between">
+      <h3 class="card-title">${esc(wf.name)}</h3>
+      ${statusAtomHTML(wf)}
+    </div>
+    <div class="col gap-2" style="align-items:flex-start">
+      ${spineHTML(wf, 'card')}
+      <div style="margin-top:4px">${tierChipHTML(wf, 's')}</div>
+    </div>
+    <p class="breq sub-card">${esc(wf.business_requirement)}</p>
+    <div class="divider"></div>
+    <div class="col gap-2">
+      ${needsHTML(wf)}
+      ${outputLineHTML(wf)}
+    </div>`;
+}
+
+/* C — outcome-led card */
+function cardBodyC(wf) {
+  return `
+    <div class="row-between">
+      <h3 class="card-title">${esc(wf.name)}</h3>
+      ${statusAtomHTML(wf)}
+    </div>
+    <div class="outcome-hero sz-card">
+      <span class="oh-label">you get</span>
+      <div class="oh-line">
+        <span class="oh-file oh-card"><span class="oh-glyph">◆</span><span class="oh-name">${esc(wf.output.file)}</span></span>
+        ${tierChipHTML(wf, 's')}
+      </div>
+      <span class="oh-desc">${esc(wf.output.desc)}</span>
+    </div>
+    <p class="breq sub-card">${esc(wf.business_requirement)}</p>
+    <div class="divider"></div>
+    ${spineHTML(wf, 'card')}
+    ${needsHTML(wf)}`;
+}
+
+/* ════════ ② RUN HEADER ════════ */
+function runHeaderHTML(wf) {
+  const soul = VARIANT === 'a' ? runSoulA(wf) : VARIANT === 'b' ? runSoulB(wf) : runSoulC(wf);
+  const live = wf.live;
+  // a draft (unpublished) workflow can only be TEST-run — label the strip honestly
+  // so the run context never silently contradicts the ○ draft status atom above it.
+  const isDraft = wf.status === 'draft';
+  return `<div class="run-strip">
+    <div class="run-soul">${soul}</div>
+    <div class="run-live${isDraft ? ' is-draft-run' : ''}">
+      <span class="pulse"></span>
+      <span class="phase-count">${isDraft ? 'draft · test run' : `Phase ${live.current} / ${live.total}`}</span>
+      <span class="activity">${esc(live.phaseName)} · ${esc(live.activity)}</span>
+      <span class="running-word">▸ running</span>
+    </div>
+  </div>`;
+}
+
+function runSoulA(wf) {
+  return `
+    <div class="micro-label" style="margin-bottom:8px">running this workflow</div>
+    <p class="breq hero-run">${esc(wf.business_requirement)}</p>
+    <div class="col gap-3" style="margin-top:16px">
+      <div class="row-between" style="align-items:center">
+        ${spineHTML(wf, 'run')}
+        ${tierChipHTML(wf, 'm')}
+      </div>
+      <div class="divider"></div>
+      <div class="soul-meta"><span style="font-weight:600;color:var(--color-text)">${esc(wf.name)}</span><span class="dot">·</span>${metaInner(wf)}</div>
+      ${needsHTML(wf)}
+      ${outputLineHTML(wf)}
+    </div>`;
+}
+
+function runSoulB(wf) {
+  return `
+    <div class="row-between" style="align-items:center;margin-bottom:14px">
+      <div class="col gap-2">
+        <span style="font-family:var(--font-headline);font-weight:700;font-size:var(--text-lg)">${esc(wf.name)}</span>
+        <p class="breq sub-run" style="margin:0">${esc(wf.business_requirement)}</p>
+      </div>
+    </div>
+    <div class="row-between" style="align-items:center">
+      ${spineHTML(wf, 'run')}
+      ${tierChipHTML(wf, 'm')}
+    </div>
+    <div class="divider" style="margin:16px 0 12px"></div>
+    <div class="col gap-2">
+      ${needsHTML(wf)}
+      ${outputLineHTML(wf)}
+    </div>`;
+}
+
+function runSoulC(wf) {
+  return `
+    <div class="row-between" style="align-items:flex-start;margin-bottom:14px">
+      <div class="outcome-hero sz-run">
+        <span class="oh-label">you get</span>
+        <div class="oh-line">
+          <span class="oh-file"><span class="oh-glyph" style="font-size:18px">◆</span><span class="oh-name">${esc(wf.output.file)}</span></span>
+          ${tierChipHTML(wf, 'm')}
+        </div>
+        <span class="oh-desc">${esc(wf.output.desc)}</span>
+      </div>
+    </div>
+    <p class="breq sub-run">${esc(wf.business_requirement)}</p>
+    <div class="divider" style="margin:14px 0"></div>
+    <div class="row-between" style="align-items:center">
+      ${spineHTML(wf, 'run')}
+      <div class="soul-meta"><span style="font-weight:600;color:var(--color-text)">${esc(wf.name)}</span><span class="dot">·</span>${metaInner(wf)}</div>
+    </div>
+    <div style="margin-top:12px">${needsHTML(wf)}</div>`;
+}
+
+/* ════════ ③ PUBLISH SUMMARY ════════ */
+function pubSummaryHTML(wf) {
+  const soul = VARIANT === 'a' ? pubSoulA(wf) : VARIANT === 'b' ? pubSoulB(wf) : pubSoulC(wf);
+  const t = deriveTier(wf);
+  return `<div class="pub-block">
+    <div class="pub-soul">${soul}</div>
+    ${gauntletStubHTML()}
+    <div class="pub-gauntlet" style="border-top:none;padding-top:0">
+      <div class="tier-line">
+        ${tierChipHTML(wf, 'l')}
+        <span>${esc(t.desc)} Strictest emit policy <span class="quiet" style="font-family:var(--font-mono)">${esc(emitPolicyLabel(wf))}</span> → this tier.</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* the policy STRING shown on the publish tier-line — same selection deriveTier
+   uses (selectEmitPolicy), so the displayed policy always matches the band that
+   was actually set. Annotates the no-emit-phase fallback for honesty. */
+function emitPolicyLabel(wf) {
+  const hasEmit = wf.phases.some(p => p.type === 'llm_emit');
+  const policy = selectEmitPolicy(wf);
+  return hasEmit ? policy : `${policy} (no emit phase)`;
+}
+
+function pubSoulA(wf) {
+  return `
+    <div class="micro-label" style="margin-bottom:10px">publishing · the business requirement is what the judge grades against</div>
+    <p class="breq hero-pub">${esc(wf.business_requirement)}</p>
+    <div class="col gap-4" style="margin-top:22px">
+      <div class="row-between" style="align-items:center">
+        ${spineHTML(wf, 'pub')}
+        ${tierChipHTML(wf, 'l')}
+      </div>
+      <div class="divider"></div>
+      <div class="soul-meta"><span style="font-weight:700;color:var(--color-text);font-size:var(--text-md);font-family:var(--font-headline)">${esc(wf.name)}</span><span class="dot">·</span>${metaInner(wf)}</div>
+      <div class="col gap-2">
+        <div class="micro-label">kickoff needs</div>
+        ${needsHTML(wf)}
+      </div>
+      <div class="col gap-2">
+        <div class="micro-label">deliverable</div>
+        ${outputLineHTML(wf)}
+      </div>
+    </div>`;
+}
+
+function pubSoulB(wf) {
+  return `
+    <div class="micro-label" style="margin-bottom:14px">publishing · the shape of the work</div>
+    <div style="display:flex;justify-content:center;margin:8px 0 18px">${spineHTML(wf, 'pub')}</div>
+    <div class="row-between" style="align-items:center;margin-bottom:14px">
+      <span style="font-family:var(--font-headline);font-weight:700;font-size:var(--text-lg)">${esc(wf.name)}</span>
+      ${tierChipHTML(wf, 'l')}
+    </div>
+    <p class="breq sub-pub">${esc(wf.business_requirement)}</p>
+    <div class="divider" style="margin:18px 0"></div>
+    <div class="row-between" style="align-items:flex-end">
+      <div class="col gap-2" style="flex:1">
+        <div class="micro-label">kickoff needs</div>
+        ${needsHTML(wf)}
+      </div>
+    </div>
+    <div class="col gap-2" style="margin-top:14px">
+      <div class="micro-label">deliverable</div>
+      ${outputLineHTML(wf)}
+      ${metaHTML(wf)}
+    </div>`;
+}
+
+function pubSoulC(wf) {
+  return `
+    <div class="micro-label" style="margin-bottom:12px">publishing · what you get + how trustworthy</div>
+    <div class="outcome-hero sz-pub">
+      <span class="oh-label">deliverable</span>
+      <div class="oh-line">
+        <span class="oh-file"><span class="oh-glyph" style="font-size:22px">◆</span><span class="oh-name">${esc(wf.output.file)}</span></span>
+        ${tierChipHTML(wf, 'l')}
+      </div>
+      <span class="oh-desc" style="font-size:var(--text-sm)">${esc(wf.output.desc)}</span>
+    </div>
+    <p class="breq sub-pub" style="margin-top:18px">${esc(wf.business_requirement)}</p>
+    <div class="divider" style="margin:18px 0"></div>
+    <div class="row-between" style="align-items:center">
+      ${spineHTML(wf, 'pub')}
+      <div class="soul-meta"><span style="font-weight:700;color:var(--color-text);font-family:var(--font-headline)">${esc(wf.name)}</span><span class="dot">·</span>${metaInner(wf)}</div>
+    </div>
+    <div class="col gap-2" style="margin-top:16px">
+      <div class="micro-label">kickoff needs</div>
+      ${needsHTML(wf)}
+    </div>`;
+}
+
+/* meta without the wrapping div (project · version · status) */
+function metaInner(wf) {
+  const proj = wf.project ? `📁 ${esc(wf.project)}` : '<span class="quiet">no project</span>';
+  return `${proj} <span class="dot">·</span> <span class="ver" style="font-family:var(--font-mono)">v${wf.version}</span> <span class="dot">·</span> ${statusAtomHTML(wf)}`;
+}
+
+/* ── orchestration ──────────────────────────────────────────── */
+let VARIANT = 'a';
+let FOCUS = 'ex1';
+
+/* the active-lens caption — wired into #surfaceSub so the header names which
+   composition you're looking at as you switch the A/B/C tabs. */
+const VARIANT_CAPTIONS = {
+  a: 'Lens A · purpose-led — the business requirement leads at every size.',
+  b: 'Lens B · spine-led — the glyph-dot phase spine is the anchor.',
+  c: 'Lens C · outcome-led — what you get + how trustworthy leads.',
+};
+
+function renderAll() {
+  FOCUS = document.getElementById('wfSel').value;
+  const focused = WORKFLOWS[FOCUS];
+
+  document.getElementById('surfaceSub').textContent = VARIANT_CAPTIONS[VARIANT];
+
+  // ① library card grid — focused first, then the other two as real peers
+  const order = [FOCUS, ...Object.keys(WORKFLOWS).filter(k => k !== FOCUS)];
+  document.getElementById('cardGrid').innerHTML =
+    order.map(k => cardHTML(WORKFLOWS[k], k === FOCUS)).join('');
+
+  // ② run header
+  document.getElementById('runHeader').innerHTML = runHeaderHTML(focused);
+
+  // ③ publish summary
+  document.getElementById('pubSummary').innerHTML = pubSummaryHTML(focused);
+}
+
+function showVariant(id, ev) {
+  VARIANT = id;
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  ev.target.classList.add('active');
+  renderAll();
+}
+
+const VWS = ['1280', '768', '375'];
+function cycleVw() {
+  const cur = document.body.dataset.vw;
+  const next = VWS[(VWS.indexOf(cur) + 1) % VWS.length];
+  document.body.dataset.vw = next;
+  document.getElementById('vwBtn').textContent = next;
+}
+
+renderAll();
+</script>
+</body>
+</html>
