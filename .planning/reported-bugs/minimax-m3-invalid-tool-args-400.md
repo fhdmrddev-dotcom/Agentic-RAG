@@ -30,6 +30,12 @@ MiniMax-M3 is one of the freshly-curated 096-08 registry models. If M3 regularly
 
 Model-side: M3 truncated or mis-escaped a very large `execute_code.code` argument (the benchmark script). Hypothesis, not finding — needs the provider-docs-first pass (MiniMax official docs on function-calling limits) + a LangSmith trace of the offending call before any code change.
 
+**CONFIRMED (Phase 129 RESEARCH, 2026-06-27):** truncation, not mis-escaping. Run `2c711ee4` hit `output_tokens=8192` (exactly the model's output-token cap) and the 400 named a specific `tool_call_id` — M3 ran out of output budget mid-`arguments` and emitted a truncated (therefore invalid) JSON string, reporting `finish_reason="tool_calls"` anyway (so the existing length guards never fired). A truncated arg cannot be coerced; only a fresh re-ask is honest.
+
+## Fix (folded into Phase 129 Plan 02 — D-01 / D-03 / MP-04)
+
+Addressed by the MiniMax-gated arg-validity guard at the agent-loop round-trip seam (`backend/app/services/agent_loop.py`, commit `876996c7`): `json.loads`-validate each buffered tool-call `arguments` string before the round-trip re-send; on invalid args run ONE bounded re-ask (drop the bad turn, inject a corrective nudge, continue) via a separate single-shot counter; a successful re-ask emits a quiet `tool_args_recovered` signal, a still-malformed re-ask honest-fails with the existing `bad_request` copy (never a silent swallow, never a fabricated/partial dispatch). Provider-gated to MiniMax (D-14 RED LINE — openai/anthropic/google byte-identical). Unit-pinned in `backend/tests/test_129_minimax_argrepair.py`.
+
 ## Surface classification
 
 `Agentic-RAG` (our hardening opportunity at the MiniMax service boundary) with an external component (model behavior).
