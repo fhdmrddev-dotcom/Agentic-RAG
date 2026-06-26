@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: completed
-last_updated: "2026-06-26T22:52:32.166Z"
-last_activity: 2026-06-26
+status: in_progress
+last_updated: "2026-06-27T00:00:00.000Z"
+last_activity: 2026-06-27
 progress:
   total_phases: 7
   completed_phases: 6
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Milestone complete
+**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair (context gathered, ready to plan). v3.1 CORE (120–124) shipped clean; now building the highest-value STRETCH phases (129 → 128 → optional 127). 129 promoted from STRETCH to active 2026-06-26.
 
 ## Current Position
 
-Phase: 124
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-06-26
+Phase: 129
+Plan: Not started (context gathered — ready for /gsd:plan-phase 129)
+Status: Discussing → Planning
+Last activity: 2026-06-27
 
 ### Quick Tasks Completed
 
