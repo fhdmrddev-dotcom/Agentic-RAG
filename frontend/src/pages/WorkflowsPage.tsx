@@ -251,6 +251,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
               draftId ? (
                 <PublishGauntlet
                   definitionId={draftId}
+                  // Phase 124-03 Task 2 (WUX-01, D-06): thread the authored definition
+                  // (already supplied by the Builder's renderPublish) into the prepended
+                  // pub-scale soul block. Additive only — zero change to the publish flow.
+                  definition={_def as DefShape}
                   onPublished={(version) =>
                     // WR-04: the definition's own slug is the lookup key (the loaded
                     // definition carries it for Open/Tweak; the just-built draft

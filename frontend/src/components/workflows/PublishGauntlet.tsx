@@ -40,10 +40,21 @@
  */
 import { useEffect, useRef, useState } from "react"
 import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
+// Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
+// block. PREPEND ONLY: <WorkflowSoul scale="pub"> sits ABOVE the existing 8-stage
+// gauntlet ladder + verdict, which stay byte-behavior-identical (the ladder re-skin
+// is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
+import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
+import type { DefShape } from "@/components/workflows/soulData"
 
 export interface PublishGauntletProps {
   /** The draft definition id to publish (POST /workflows/{id}/publish). */
   definitionId: string
+  /** Phase 124-03 Task 2 (WUX-01, D-06): the authored definition for the prepended
+   *  pub-scale soul block. OPTIONAL + additive — absent (e.g. a draftId-only call
+   *  site) renders the soul's honest draft empty-states, never a crash. Threaded
+   *  from the Builder's renderPublish(state.definition, draftId). */
+  definition?: DefShape | null
   /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. */
   onPublished?: (version: number) => void
 }
@@ -327,12 +338,14 @@ function PublishingNotice({ elapsedSec }: { elapsedSec: number }) {
  */
 function GauntletContent({
   definitionId,
+  definition,
   onPublished,
   loading,
   setLoading,
   goldenInputRef,
 }: {
   definitionId: string
+  definition?: DefShape | null
   onPublished?: (version: number) => void
   loading: boolean
   setLoading: (v: boolean) => void
@@ -385,6 +398,15 @@ function GauntletContent({
 
   return (
     <div className="w-full">
+      {/* Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③): the PREPENDED pub-scale
+          soul block — purpose · needs · glyph-dot spine · tier chip · output — ABOVE
+          the resting publish form. The 8-stage ladder + verdict below stay UNCHANGED
+          (the ladder re-skin is WUX-03 / Phase 127). When `definition` is absent the
+          soul renders its honest draft empty-states. */}
+      <div data-testid="publish-soul" className="mb-4 rounded-lg border border-border bg-card p-4">
+        <WorkflowSoul def={definition} scale="pub" />
+      </div>
+
       {/* D1 — the resting publish form: ONE golden_input textarea + Publish. */}
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
@@ -523,7 +545,7 @@ function GauntletContent({
  * modal is `position:fixed`, it escapes the header's overflow/shrink-0 context
  * and never clips or crams into the layout.
  */
-export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletProps) {
+export function PublishGauntlet({ definitionId, definition, onPublished }: PublishGauntletProps) {
   const [open, setOpen] = useState(false)
   // `loading` lives on the wrapper so close affordances (✕ / backdrop / Escape)
   // can be BLOCKED while a publish is in flight (the gauntlet runs synchronously).
@@ -623,6 +645,7 @@ export function PublishGauntlet({ definitionId, onPublished }: PublishGauntletPr
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <GauntletContent
                 definitionId={definitionId}
+                definition={definition}
                 onPublished={onPublished}
                 loading={loading}
                 setLoading={setLoading}

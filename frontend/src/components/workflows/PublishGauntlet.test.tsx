@@ -290,6 +290,41 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     }
   })
 
+  // --- Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the prepended soul block ---
+
+  it("prepends the pub-scale soul block (purpose + tier chip) ABOVE the gauntlet ladder (D-06)", async () => {
+    const definition = {
+      name: "Weekly Status",
+      business_requirement: "Summarize the week's progress for stakeholders.",
+      phases: [
+        { slug: "gather", phase_index: 0, name: "Gather", config: { phase_type: "llm_agent" } },
+        { slug: "emit", phase_index: 1, name: "Emit", config: { phase_type: "llm_emit", citation_policy: "strict" } },
+      ],
+    }
+    render(<PublishGauntlet definitionId="def-1" definition={definition} />)
+    await openModal()
+
+    // The soul block renders at pub scale with the authored purpose + the tier chip.
+    const soul = screen.getByTestId("workflow-soul")
+    expect(soul).toHaveAttribute("data-scale", "pub")
+    expect(screen.getByText(/Summarize the week's progress/i)).toBeInTheDocument()
+    expect(screen.getByTestId("soul-tier")).toHaveAttribute("data-tier", "STRICT")
+
+    // DOM order: the soul block precedes the 8-stage gauntlet spine.
+    const spine = screen.getByTestId("gauntlet-spine")
+    expect(soul.compareDocumentPosition(spine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("renders the soul's honest draft empty-state when no definition is passed — and does not crash (additive, optional prop)", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    // The soul block still mounts; the purpose atom shows the honest empty-state (D-03).
+    expect(screen.getByTestId("workflow-soul")).toBeInTheDocument()
+    expect(screen.getByText(/draft · purpose not declared yet/i)).toBeInTheDocument()
+    // The 8-stage ladder is unaffected (byte-behavior-identical — D-06).
+    expect(screen.getByTestId("gauntlet-spine")).toBeInTheDocument()
+  })
+
   // --- Source-grep guards (the locked render rules survive refactors) ---
 
   it("renderFailure uses KEY-DETECTION (criterion / code / typeof string), NOT a switch on blocked_stage", () => {

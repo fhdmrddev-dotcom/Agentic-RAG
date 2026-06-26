@@ -60,7 +60,14 @@ export interface WorkflowBuilderPageProps {
   /** Optional Plan-05 publish-gauntlet seam — the page composes it when present
    *  (the gauntlet owns the publish-disabled-on-empty-golden_input rule). Left as
    *  a typed prop so Plan 05 can land independently without an import-before-exists
-   *  break. */
+   *  break.
+   *
+   *  Phase 124-03 Task 2 (WUX-01, D-06): `def` is the WORKING definition forwarded
+   *  to the gauntlet so its prepended pub-scale soul block reads the same authored
+   *  purpose / tier / spine / needs / output. `BuilderDefinition` already carries
+   *  the soul-readable fields (business_requirement / project_folder_id / phases),
+   *  so this seam is additive — the describe/draft/publish flow is unchanged; the
+   *  call site (WorkflowsPage) just passes the supplied `def` through as `definition`. */
   renderPublish?: (def: BuilderDefinition, draftId: string | null) => React.ReactNode
   /** Phase 103-ux OPEN/TWEAK: when present, the Builder starts DIRECTLY in the
    *  "drafted" editing view on this existing definition — it SKIPS the
