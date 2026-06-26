@@ -1,9 +1,9 @@
 ---
-status: partial
+status: passed
 phase: 123-skill-triggering-quality
 source: [123-VERIFICATION.md]
 started: 2026-06-23T21:22:25Z
-updated: 2026-06-25T21:20:00Z
+updated: 2026-06-26T00:00:00Z
 ---
 
 ## How to run
@@ -28,13 +28,13 @@ updated: 2026-06-25T21:20:00Z
 | Test skill | ✅ | `weekly-report-writer` (most specific trigger of the 4 skills: `docx`, `pptx`, `risk-lens_099uat`, `weekly-report-writer`; no `zscore` skill exists) |
 | Tuner durable table | ✅ | `tuner_runs` present (2 prior rows) |
 | 4 provider keys in `.env` | ⬜ operator confirm | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` (all 4 needed so each provider appears in the composer dropdown) |
-| LangSmith tracing | ⬜ operator confirm | `LANGSMITH_TRACING=true`, project `agentic-rag` — **load-bearing for axes 2–4** |
+| LangSmith tracing | ⚠️ NOT emitting | `langsmith_tracing=true` + key set, but project `agentic-rag-module2` shows **no traces since 2026-06-20** — the running backend isn't emitting (raw-SDK `wrap_openai` path). Axes 2–4 were verified WITHOUT LangSmith: live render + Supabase DB + Redis + the deterministic `_reconstruct_history`+`trim_messages_to_fit` replay. (Tracing wiring worth a separate look.) |
 
 **Models to cycle:** `gpt-5.4-mini` · `claude-haiku-4-5-20251001` · `gemini-3.5-flash` · `z-ai/glm-5.1`
 
 ## Current Test
 
-Axis 1 PASS. Axis 2 PASS (render re-test 2026-06-26 — BUG-260626-01 verified fixed live + its workspace-todos sibling BUG-260626-04 fixed+verified; BUG-260626-02 confirmed-live-but-deferred to SEED-094; BUG-260626-03 deferred to SEED-094). Axis 3 PASS (2026-06-26 — 3-run simultaneous buffer isolation + cross-thread pinned-skill isolation, watched the render). Next: **Test 4 — long-message pin** (needs `CONTEXT_WINDOW_MAX_TOKENS=8000` in backend/.env + restart — operator drives the backend).
+ALL 4 SC#10 AXES PASS (2026-06-26). Axis 1 PASS. Axis 2 PASS (render re-test — BUG-260626-01 verified fixed live + its workspace-todos sibling BUG-260626-04 fixed+verified; BUG-260626-02 confirmed-live-but-deferred to SEED-094; BUG-260626-03 deferred to SEED-094). Axis 3 PASS (3-run simultaneous buffer isolation + cross-thread pinned-skill isolation, watched the render). Axis 4 PASS (forced a real 12,150→4,102-token trim at the 8000 cap — pinned skill survives + honest `_TRIM_MARKER`; live model still used the skill after the trim). **Operator cleanup pending: remove `CONTEXT_WINDOW_MAX_TOKENS=8000` from backend/.env + restart.**
 
 ## Tests
 
@@ -86,7 +86,11 @@ steps:
 - Hand Claude the final run_id; Claude pulls the LangSmith input for that turn and checks: (a) skill tool-result still present, (b) `_TRIM_MARKER` text `[Earlier conversation history was trimmed…]` present, (c) an early "fun fact" turn is gone.
 - Cleanup: remove `CONTEXT_WINDOW_MAX_TOKENS`, restart backend.
 pass: skill survives the trim; trim is honest (marker present). The ONLY fail is the skill vanishing with NO marker (silent drop). If the skill is large enough to be evicted, the marker MUST still appear (honest eviction = acceptable).
-result: [pending]
+result: PASS (2026-06-26, OpenAI `gpt-5.4-mini`, `CONTEXT_WINDOW_MAX_TOKENS=8000` set by operator + backend restarted; thread `2dc4d3da`). Ran Turn 1 `Load the weekly-report-writer skill` → 10 distinct throwaway turns (fun facts 7–16) → a ~28.7 KB filler message (also satisfies the SC#10 ≥5 KB long-message sub-axis) → final `Using the skill…draft the heading with placeholders`.
+- **Live behavioral:** the final turn (overflowing context) still drove the loaded skill — the model wrote python-docx code producing `weekly_report_heading_placeholder.docx` with the skill's heading fields. The pin kept the skill usable AFTER the trim. (An earlier final-turn variant fired `ask_user` asking for the exact weekly-report heading fields — also only possible if the skill instructions were still in context.)
+- **Deterministic trace-equivalent** (LangSmith was NOT emitting — last trace 2026-06-20 — so verified via the REAL production `_reconstruct_history` + `trim_messages_to_fit` on the actual DB conversation at the live 8000 budget): PRE-trim total **12,150 tokens** > 8000 → trim fires → POST-trim **4,102** ≤ 8000. (a) pinned `weekly-report-writer` tool-result **SURVIVES** ✓; (b) honest `_TRIM_MARKER` **present** ✓ (never silent); (c) all 10 fun-fact turns (7–16) dropped ✓. Post-trim order = `[system, TRIM-MARKER(user), …, PINNED-SKILL(tool)]` — exactly the CTX-03 design (pin placed right after system + marker, out of the trim window). The fail mode (skill vanishes with no marker) did NOT occur.
+- Sanity: with only the skill + 10 short turns the context was just 4,210 tokens (< 8000) → no trim, no marker (correct — marker only required when trimming occurs); the ~28.7 KB message is what forced the genuine overflow.
+**Cleanup required:** operator should REMOVE `CONTEXT_WINDOW_MAX_TOKENS=8000` from backend/.env and restart the backend (it globally caps ALL chats to 8000 tokens).
 
 ## Evidence commands (Claude runs)
 
@@ -99,9 +103,9 @@ result: [pending]
 ## Summary
 
 total: 4
-passed: 3
+passed: 4
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
