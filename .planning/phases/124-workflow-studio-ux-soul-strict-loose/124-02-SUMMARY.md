@@ -126,3 +126,11 @@ None. The describe-door soul preview renders real `<WorkflowSoul>` over the live
 - The card-scale soul + the two-door entry are live for Plan 03 (which owns the run-header soul section + the publish-summary soul block + the SC#10 4-axis run/pub UAT rows).
 - The exact card-soul deliverable-label copy + the door framing remain flagged for operator sketch-match confirmation at the phase-gate UAT (A1 carry-forward from Plan 01).
 - No blockers. STATE.md / ROADMAP.md intentionally NOT touched (orchestrator owns those writes after the wave).
+
+## Self-Check: PASSED
+
+- All 4 plan files + the SUMMARY exist on disk (WorkflowDoorSwitch.tsx/.test.tsx, WorkflowsPage.tsx/.test.tsx, 124-02-SUMMARY.md).
+- All task commits present in git log: `15a59f52` (Task 1), `0cbcadf3` (Task 2), `37a8b0ab` (docs).
+- STATE.md / ROADMAP.md NOT in any of this plan's 3 commits (the unstaged working-tree `M` on both pre-existed this plan — orchestrator owns those writes).
+- G-5 hot files `PhaseTimeline.tsx` / `PhaseCard.tsx` / `ChatLayout.tsx doRun` byte-identical (`git diff --stat HEAD` empty).
+- 30/30 plan specs green · 159/159 workflows+pages no-regression · 0 tsc errors.
