@@ -122,6 +122,13 @@ The **deliverable-label string** rendered by `WorkflowSoul`'s output atom (curre
 - `PhaseTimeline.tsx` / `PhaseCard.tsx` remain byte-identical (G-5 / D-07) — confirmed via empty `git diff --stat`.
 - No blockers. STATE.md / ROADMAP.md intentionally NOT touched (orchestrator owns those writes after the wave).
 
+## Self-Check: PASSED
+
+- All 6 created files exist on disk (soulData.ts/.test.ts, WorkflowSoul.tsx/.test.tsx, PhaseSpine.tsx/.test.tsx) + the SUMMARY.
+- All task commits present in git log: `0946bb54` (Task 1), `c5a6c610` (Task 2), `0bfaabb8` (docs).
+- STATE.md / ROADMAP.md NOT touched by any of this plan's 3 commits and NOT staged (the unstaged STATE.md working-tree change pre-existed this plan — orchestrator owns those writes).
+- `PhaseTimeline.tsx` / `PhaseCard.tsx` byte-identical (`git diff --stat` empty) — G-5 / D-07 held.
+
 ---
 *Phase: 124-workflow-studio-ux-soul-strict-loose*
 *Completed: 2026-06-26*
