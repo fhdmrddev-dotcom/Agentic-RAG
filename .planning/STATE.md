@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: "Phase 124 context gathered (2026-06-26) — G-2 sketch gate SATISFIED (046-A + 047-A operator-approved). Ready for `/gsd:plan-phase 124`"
-last_updated: "2026-06-26T19:50:08.450Z"
-last_activity: 2026-06-26
+status: executing
+last_updated: "2026-06-26T20:44:18.847Z"
+last_activity: 2026-06-26 -- Phase 124 planning complete
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 25
+  total_plans: 28
   completed_plans: 25
   percent: 83
 ---
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 Phase: 124
 Plan: Not started — CONTEXT.md captured (`124-CONTEXT.md`, commit `6e85fb9d`)
-Status: Context gathered 2026-06-26 — G-2 sketch gate SATISFIED (sketches 046-A soul + 047-A two-doors, operator-approved). 4 decisions locked: pure-FE (business_requirement + deriveTier already exist) · two-door fork = Studio-entry-only (P121 card Run preserved) · honest soul empty-states · soul-block-only publish summary (gauntlet ladder = WUX-03/P127). 2 open workflow-UI bugs reviewed → left open w/ re-open trigger. Next: `/gsd:plan-phase 124`
-Last activity: 2026-06-26
+Status: Ready to execute
+Last activity: 2026-06-26 -- Phase 124 planning complete
 
 ### Quick Tasks Completed
 
