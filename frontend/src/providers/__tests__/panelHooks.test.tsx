@@ -596,6 +596,47 @@ describe("Phase 095.1 panel — useDerivedPanel (activity-derived workspace pane
     expect(result.current.map((i) => i.label)).toEqual(["Search documents", "Query tables"])
   })
 
+  // BUG-260626-01 sibling: in the live/just-completed window the bucket holds a
+  // `temp-…` placeholder AND its persisted twin for the SAME runId. Flat-mapping
+  // tool_calls across both double-counts the run — dedupToolCalls can't merge the
+  // temp copy (carries clientKey) with the DB-reconstructed copy (no clientKey),
+  // so the derived todos render each step twice. dedupMessagesByRunId at the
+  // bucket-read seam keeps the persisted twin, collapsing the double-count.
+  it("does NOT double the derived todos when a temp + persisted twin share a runId", () => {
+    mountProviderForDerived()
+    const RUN = "run-twin"
+    const codeArgs = { code: "print(1)" } as unknown as Record<string, string>
+    // persisted twin (DB-reconstructed): tool_calls WITHOUT clientKey.
+    const persisted: Message = {
+      ...assistantMsg([
+        tc({ name: "search_documents" }),
+        tc({ name: "execute_code", args: codeArgs }),
+      ]),
+      id: "real-uuid",
+      runId: RUN,
+    }
+    // temp placeholder (live-SSE): same logical calls, WITH clientKey — so without
+    // the message-level dedup, dedupToolCalls keeps these as 2 extra entries.
+    const temp: Message = {
+      ...assistantMsg([
+        tc({ name: "search_documents", clientKey: "ck-1" }),
+        tc({ name: "execute_code", clientKey: "ck-2", args: codeArgs }),
+      ]),
+      id: "temp-1",
+      runId: RUN,
+    }
+    // temp appears first (placeholder created on send), persisted arrives after.
+    seedChat(THREAD_A, [temp, persisted])
+    const { result } = renderHook(() => useDerivedPanel(THREAD_A), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    // Exactly 2 items (one run × 2 meaningful tools), not 4.
+    expect(result.current).toHaveLength(2)
+    expect(result.current.map((i) => i.label)).toEqual(["Search documents", "Print output"])
+  })
+
   it("does NOT mutate todosByThread and does NOT change the chat bucket reference (PANEL-06 / FC#1)", () => {
     mountProviderForDerived()
     seedChat(THREAD_A, [

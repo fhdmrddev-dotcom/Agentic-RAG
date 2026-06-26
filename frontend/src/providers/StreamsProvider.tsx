@@ -102,6 +102,9 @@ import {
   deriveWorkspacePanel,
   type DerivedPanelItem,
 } from "@/lib/workspacePanel"
+// BUG-260626-01 (+ sibling): collapse same-runId temp/persisted twins at the
+// bucket-read seam so useDerivedPanel's flat-map doesn't double-count a run.
+import { dedupMessagesByRunId } from "@/lib/dedupMessages"
 // Phase 092-07 (Facet C): the Continue affordance (MessageItem) fires this signal
 // with the FRESH producer_run_id from the /continue 200 body; the provider
 // re-subscribes that thread's producer stream (additive, per-thread keyed).
@@ -2649,7 +2652,13 @@ export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
   )
   return useMemo(() => {
     if (!threadId) return EMPTY_DERIVED
-    const allToolCalls = messages.flatMap((m) => m.tool_calls ?? [])
+    // BUG-260626-01 sibling: in the live/just-completed window the bucket holds
+    // BOTH a `temp-…` placeholder and its persisted twin for the same runId.
+    // Flat-mapping tool_calls across both double-counts the run (dedupToolCalls
+    // can't merge them — the temp copy carries clientKey, the DB-reconstructed
+    // copy doesn't), so the derived todos render each step twice. Collapse the
+    // twin first with the SAME helper MessageList uses (keeps the persisted row).
+    const allToolCalls = dedupMessagesByRunId(messages).flatMap((m) => m.tool_calls ?? [])
     if (!shouldPopulate(allToolCalls)) return EMPTY_DERIVED
     return deriveWorkspacePanel(allToolCalls)
   }, [threadId, messages])

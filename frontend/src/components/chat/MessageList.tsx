@@ -5,6 +5,7 @@ import { MessageSkeleton } from "./MessageSkeleton"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { useFollowScroll } from "@/hooks/useFollowScroll"
 import { unifiedStepCount } from "@/lib/stepCount"
+import { dedupMessagesByRunId } from "@/lib/dedupMessages"
 import type { Message } from "@/types"
 
 interface Props {
@@ -152,30 +153,12 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   // transiently hold TWO assistant messages with the same runId — the
   // in-place-completed `temp-…` placeholder AND the persisted/reconciled row.
   // Both are keyed `run-${runId}` below, so React would duplicate/omit subtrees
-  // (duplicated GENERATED FILES panels + source-doc bleed). Dedup by runId,
-  // keeping the persisted (non-`temp-`) row, so the key is always unique.
-  // Order-preserving; a no-op for single runs (no twin) and for rows without a
-  // runId (e.g. harness answers, user rows).
-  const renderMessages: Message[] = []
-  const runIdToIndex = new Map<string, number>()
-  for (const msg of messages) {
-    const runKey = msg.role === "assistant" && msg.runId ? msg.runId : null
-    if (!runKey) {
-      renderMessages.push(msg)
-      continue
-    }
-    const existingIdx = runIdToIndex.get(runKey)
-    if (existingIdx === undefined) {
-      runIdToIndex.set(runKey, renderMessages.length)
-      renderMessages.push(msg)
-    } else {
-      const existing = renderMessages[existingIdx]
-      const existingIsTemp = typeof existing.id === "string" && existing.id.startsWith("temp-")
-      const incomingIsTemp = typeof msg.id === "string" && msg.id.startsWith("temp-")
-      // Replace a kept temp with its persisted twin; otherwise keep the first.
-      if (existingIsTemp && !incomingIsTemp) renderMessages[existingIdx] = msg
-    }
-  }
+  // (duplicated GENERATED FILES panels + source-doc bleed). The shared
+  // dedupMessagesByRunId keeps the persisted (non-`temp-`) row so the key is
+  // always unique; the SAME helper de-doubles useDerivedPanel's workspace todos
+  // (BUG-260626-01 sibling). Order-preserving; a no-op for single runs and for
+  // rows without a runId (harness answers, user rows).
+  const renderMessages = dedupMessagesByRunId(messages)
 
   return (
     <ScrollArea className="flex-1">
