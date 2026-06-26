@@ -31,8 +31,8 @@ Each maps to exactly one roadmap phase.
 
 ### Workflow Studio UX
 
-- [ ] **WUX-01**: A user sees the "soul" of a workflow at a glance in three sizes (library card / run header / publish summary): its purpose (`business_requirement`), what it needs, a glyph-dot phase spine (no type ribbons/index noise), one tier chip, and its output line. (G-2 sketch-gated.)
-- [ ] **WUX-02**: Authoring and running expose a strict↔loose disclosure keyed off `deriveTier` — two clear doors ("Describe & run" vs "Author & govern") — where nothing is removed, advanced controls are demoted one click, and accuracy + control are preserved. (G-2 sketch-gated.)
+- [x] **WUX-01**: A user sees the "soul" of a workflow at a glance in three sizes (library card / run header / publish summary): its purpose (`business_requirement`), what it needs, a glyph-dot phase spine (no type ribbons/index noise), one tier chip, and its output line. (G-2 sketch-gated.)
+- [x] **WUX-02**: Authoring and running expose a strict↔loose disclosure keyed off `deriveTier` — two clear doors ("Describe & run" vs "Author & govern") — where nothing is removed, advanced controls are demoted one click, and accuracy + control are preserved. (G-2 sketch-gated.)
 
 ## Stretch Requirements (this milestone — ship only if CORE lands clean and budget remains)
 
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRIG-01 | Phase 123 | In Progress (foundation in 123-01: D-01 + shared LOAD_SKILL_POLICY; tuner delivered in 123-03/04/05) |
 | TRIG-03 | Phase 123 | Complete |
 | CTX-03 | Phase 123 | Complete |
-| WUX-01 | Phase 124 | Pending |
-| WUX-02 | Phase 124 | Pending |
+| WUX-01 | Phase 124 | Complete |
+| WUX-02 | Phase 124 | Complete |
 | SI-02 (STRETCH) | Phase 125 | Pending (gated) |
 | TRIG-02 (STRETCH) | Phase 126 | Pending (gated) |
 | WUX-03 (STRETCH) | Phase 127 | Pending (gated) |
