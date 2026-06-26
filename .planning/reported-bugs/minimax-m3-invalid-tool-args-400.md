@@ -4,9 +4,9 @@ title: MiniMax-M3 emits malformed tool-call arguments JSON — API rejects the r
 reported: 2026-06-07
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/provider-minimax, backend/tool-dispatch]
-folded_into: null
+folded_into: 129
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Reviewed at Phase 101 discuss-phase (2026-06-10, D-15): COVER + DOCUMENT, leave open. Overlaps Phase 101's full-native-roster field-map structured-output UAT (Cond 7) — the MiniMax row is exercised; it passes OR is documented as a known provider limitation (SC#4 'pass OR documented' + Cond 7 service-boundary rule). 101 does NOT own fixing MiniMax's malformed tool-arg JSON. The original trigger 'cross-provider workflow UAT surfaces it' is satisfied by this phase. Stays OPEN; re-route to a dedicated MiniMax service-boundary repair (args-JSON coercion/retry, provider-docs-first) when scoped."

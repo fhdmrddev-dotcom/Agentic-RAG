@@ -22,13 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair (context gathered, ready to plan). v3.1 CORE (120–124) shipped clean; now building the highest-value STRETCH phases (129 → 128 → optional 127). 129 promoted from STRETCH to active 2026-06-26.
+**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair (PLANNED — 3 plans / 2 waves, plan-check passed, ready to execute). v3.1 CORE (120–124) shipped clean; now building the highest-value STRETCH phases (129 → 128 → optional 127). 129 promoted from STRETCH to active 2026-06-26.
 
 ## Current Position
 
 Phase: 129
-Plan: Not started (context gathered — ready for /gsd:plan-phase 129)
-Status: Discussing → Planning
+Plan: Planned (3 plans, 2 waves — Wave 1: 129-01 OpenRouter require_parameters + 129-02 MiniMax arg-repair, parallel; Wave 2: 129-03 SC#10 cross-provider scoreboard. Ready for /gsd:execute-phase 129)
+Status: Planning → Executing
 Last activity: 2026-06-27
 
 ### Quick Tasks Completed
