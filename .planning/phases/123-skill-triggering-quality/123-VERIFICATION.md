@@ -1,7 +1,9 @@
 ---
 phase: 123-skill-triggering-quality
 verified: 2026-06-24T01:30:00Z
-status: human_needed
+status: passed
+human_uat_completed: 2026-06-26
+human_uat_result: "SC#10 4-axis live UAT ALL 4 PASS — see 123-HUMAN-UAT.md (status: passed). Axis 1 cross-provider D-01 fidelity PASS · Axis 2 multi-tool pin durability PASS (surfaced+fixed render bugs BUG-260626-01/-04, both shipped + verified live) · Axis 3 parallel-thread isolation PASS (3-run Redis snapshot: distinct buffers, no pin leak) · Axis 4 long-message pin + honest eviction PASS (forced real overflow at 8000-tok cap: pinned skill survives + honest _TRIM_MARKER + early turns dropped). BUG-260626-02/-03 routed to SEED-094 (deferred, backend run-end honesty)."
 score: 12/12 must-haves verified
 overrides_applied: 0
 human_verification:
@@ -22,9 +24,9 @@ human_verification:
 # Phase 123: Skill Triggering Quality — Verification Report
 
 **Phase Goal:** A skill author can measurably tune a skill's trigger description (against a held-out cross-provider benchmark), the system flags weak trigger descriptions before a skill is saved (warn-never-block), and a loaded skill's instructions stay available for the rest of the session instead of silently falling out of context.
-**Verified:** 2026-06-24T01:30:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-06-24T01:30:00Z (code) · SC#10 live UAT 2026-06-26 (all 4 axes PASS)
+**Status:** passed
+**Re-verification:** No — initial verification; `human_needed` → `passed` 2026-06-26 after the SC#10 4-axis live UAT completed (see `123-HUMAN-UAT.md`).
 
 ---
 
@@ -157,9 +159,18 @@ No `TBD`, `FIXME`, or `XXX` debt markers were found in any Phase 123 modified fi
 
 ---
 
-### Human Verification Required
+### Human Verification — COMPLETED 2026-06-26 (all 4 axes PASS)
 
-All 12 observable truths are VERIFIED in code. The only items standing between this phase and `passed` are the SC#10 4-axis cross-provider UAT rows, which are mandatory per CLAUDE.md ("phase verification only passes when all 4 axes are exercised") and by the VALIDATION.md explicit gate. These are live/operator tests that cannot be verified by code analysis.
+All 12 observable truths were VERIFIED in code at initial verification. The four SC#10 4-axis cross-provider UAT rows below (mandatory per CLAUDE.md "phase verification only passes when all 4 axes are exercised" and by the VALIDATION.md gate) were subsequently exercised live on 2026-06-26 — **all four PASS**, recorded in `123-HUMAN-UAT.md` (status: passed). Outcome summary:
+
+- **Axis 1 — Cross-provider D-01 no-false-fire:** PASS.
+- **Axis 2 — Multi-tool pin durability:** PASS. Watching the *rendered* surface (not just the wire) surfaced two latent chat-render defects — **BUG-260626-01** (duplicate file cards, duplicate React key) and sibling **BUG-260626-04** (workspace todos doubled in the temp+persisted window). Both root-caused, fixed, shipped (`2a48fea4` / `6ec8be77`, shared `dedupMessagesByRunId` helper), and re-verified live (console 100% clean, single-card render).
+- **Axis 3 — Parallel-thread isolation:** PASS. Captured a 3-run simultaneous Redis snapshot (distinct `run:{run_id}` buffers, no collision) + DB-confirmed Thread B never inherits Thread A's pinned skill.
+- **Axis 4 — Long-message pin + honest eviction:** PASS. Forced a real context overflow (skill + 10 turns + ~28.7 KB filler at an 8000-tok cap): deterministic replay of the real `_reconstruct_history` + `trim_messages_to_fit` showed PRE 12,150 → POST 4,102 tok with the pinned skill SURVIVING, an honest `_TRIM_MARKER` present, all 10 throwaway turns dropped, order `[system, marker, pinned-skill, …]`; the live model still used the skill after trim.
+
+**Deferred (not blockers):** BUG-260626-02 (Phase-120 baseline leak into the live final-emit) and BUG-260626-03 (run-end todo finalizer) routed to **SEED-094** — a dedicated backend run-end-honesty fix phase; both `deferred`, neither a Phase-123 correctness/security defect.
+
+_The four rows below are retained verbatim as the original test definitions; all four are now satisfied._
 
 #### 1. Cross-Provider D-01 No-False-Fire Check (TRIG-01 / D-01 — the load-bearing axis)
 
@@ -189,11 +200,11 @@ All 12 observable truths are VERIFIED in code. The only items standing between t
 
 ### Gaps Summary
 
-No gaps in code implementation — all 12 must-have truths are verified in the codebase. The `human_needed` status reflects the mandatory SC#10 4-axis UAT gate established in VALIDATION.md and CLAUDE.md, not any code defect.
+No gaps. All 12 must-have truths are verified in code, and the mandatory SC#10 4-axis live UAT (the only gate that held this phase at `human_needed`) completed 2026-06-26 with all four axes PASS. Status is now `passed`. The two render bugs found during Axis-2 UAT were fixed and shipped in-phase; the two backend honesty items found were routed to SEED-094 as deferred follow-up — none are Phase-123 code defects.
 
 Three accepted-non-blocking findings (WR-03, WR-05, WR-08) plus four info items (IN-01 through IN-04) remain as backlog suitable for a follow-up phase or `/gsd:code-review 123 --fix`, as documented in REVIEW.md. None of these are correctness or security blockers — the code review adversarial pass confirmed this.
 
 ---
 
-_Verified: 2026-06-24T01:30:00Z_
-_Verifier: Claude (gsd-verifier)_
+_Verified: 2026-06-24T01:30:00Z (code) · SC#10 live UAT 2026-06-26 (all 4 axes PASS)_
+_Verifier: Claude (gsd-verifier) · UAT operator-driven (Claude + DB/Redis evidence)_

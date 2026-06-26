@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
 status: executing
-last_updated: "2026-06-25T19:59:17.419Z"
-last_activity: 2026-06-25
+last_updated: "2026-06-26T00:00:00.000Z"
+last_activity: 2026-06-26
 progress:
   total_phases: 6
   completed_phases: 5
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 123.1 — skill-trigger-tuner-design-fidelity-and-ux-polish
+**Current focus:** Phase 124 — workflow-studio-ux-soul-strict-loose (NEXT; G-2 sketch-gated — `/gsd:sketch 124` before discuss/plan)
 
 ## Current Position
 
 Phase: 124
 Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-25
+Status: Sketch-gated (G-2) — run `/gsd:sketch 124` before `/gsd:discuss-phase` / `/gsd:plan-phase`
+Last activity: 2026-06-26
 
 ### Quick Tasks Completed
 
@@ -38,6 +38,8 @@ Last activity: 2026-06-25
 | 260611-irx | Per-process log filename — fix Windows multi-worker RotatingFileHandler rollover crash (WinError 32) | 2026-06-11 | `b5e916e2` | [260611-irx-worker-log-rotation-pid](./quick/260611-irx-worker-log-rotation-pid/) |
 
 ### Recent Completed Phases
+
+**Phase 123 — Skill Triggering Quality (TRIG-01 / TRIG-03 / CTX-03) — COMPLETE (2026-06-26).** All 3 gates clear: secure-phase 29/29 threats CLOSED (threats_open 0, `fc17016b`) · validate-phase NYQUIST-COMPLIANT 12/12 Per-Task COVERED (148 backend + 40 frontend = 188 tests green, `06ae19dc`) · verify 12/12 must-haves + **SC#10 4-axis live UAT 4/4 PASS** (2026-06-26): Axis 1 cross-provider D-01 fidelity · Axis 2 multi-tool pin durability (surfaced+fixed render bugs BUG-260626-01/-04 — shared `dedupMessagesByRunId` helper, `2a48fea4`/`6ec8be77`, verified live) · Axis 3 parallel-thread isolation (3-run Redis snapshot, no pin leak) · Axis 4 long-message pin + honest `_TRIM_MARKER` eviction (forced real 8000-tok overflow). `123-VERIFICATION.md` flipped `human_needed` → `passed`; `123-HUMAN-UAT.md` status passed (4/4). **Deferred (NOT 123 blockers):** BUG-260626-02 (Phase-120 baseline leak into live final-emit) + BUG-260626-03 (run-end todo finalizer) → **SEED-094** (backend run-end honesty). Follow-up candidate: LangSmith not emitting since 2026-06-20 (raw-SDK `wrap_openai` path). **Next: Phase 124 (Workflow Studio UX) — G-2 sketch-gated; run `/gsd:sketch 124`.**
 
 **Phase 098 — Project Binding & Server-Side KB Scope Governance — COMPLETE (2026-06-10).** 5/5 plans. VERIFICATION verified (4/4 observable truths + 14 artifacts). HUMAN-UAT complete 6/6 (SC#10 cross-provider × multi-tool × parallel-thread × long-message + `scope_violation` observability + D-13 whitelist refusal). SECURE-PHASE `threats_open: 0` — 13 planned threats closed; WR-03 (fail-open scope → observable emit + kickoff fail-closed) + IN-01 (cycle guard) fixed in code, IN-02/IN-03 accepted (`098-SECURITY.md`). **Still OPEN (run-honesty UI polish, NOT security/scope):** BUG-260609-02 (SUB-RESULTS "Sub-task" loses desc on nav), BUG-260609-04 (phase card placeholder slug "phase-0"), 1-2s empty-bubble. **Next: `/gsd:plan-phase 099` (Workflow ↔ Skill Composition).**
 
