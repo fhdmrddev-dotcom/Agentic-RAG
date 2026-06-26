@@ -9,7 +9,7 @@ affected_areas: [frontend/streaming, frontend/run-honesty, harness/workflow-ui]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Reviewed at /gsd:discuss-phase 124 (2026-06-26) — left OPEN, NOT folded: live-run timer/reconcile mechanics, not the soul/door chrome Phase 124 re-skins. Re-check after the 124 run-header soul re-skin lands — if the soul header touches the run strip, this timer-reseed + duplicate-avatar bug may then be in-scope to fix."
 reproduces_on:
   branch: develop
   commit: 66dca2d8
