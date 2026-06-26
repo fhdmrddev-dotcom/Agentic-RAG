@@ -341,9 +341,13 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # + minimax/minimax-m2.5:free removed (no longer served by OpenRouter live /models)
     # Phase 101.1 D-15: OpenRouter is TIER-FORCE *conditional* — forced_emission True
     # ONLY where the routed upstream is itself forceable (deepseek / z-ai-glm / minimax).
-    # The forcing adapter MUST send provider.require_parameters=true so OpenRouter does
-    # NOT silently downgrade. A route to Kimi/Moonshot is STILL unforceable even with
-    # require_parameters → those rows LEAVE forced_emission ABSENT (default SAFE coerce).
+    # The forcing adapter sends provider.require_parameters=true so OpenRouter does
+    # NOT silently downgrade — WIRED in Phase 129 (D-02 / MP-04) into the
+    # openrouter_tool_strategy=="quality" extra_body block at
+    # openai_service.py (beside :exacto + plugins:[response-healing]); it was
+    # documented here but unwired until then. A route to Kimi/Moonshot is STILL
+    # unforceable even with require_parameters → those rows LEAVE forced_emission
+    # ABSENT (default SAFE coerce).
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},

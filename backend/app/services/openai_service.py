@@ -1623,6 +1623,12 @@ def create_adaptive_streaming_chat(
                     # Enable Response Healing plugin
                     kwargs.setdefault("extra_body", {})
                     kwargs["extra_body"]["plugins"] = [{"id": "response-healing"}]
+                    # Phase 129 (D-02 / MP-04 — wires the config.py D-15 directive):
+                    # require_parameters so OpenRouter excludes upstreams that would
+                    # silently drop the tool schema. Strictly inside the quality +
+                    # openrouter double-gate — native/xml strategies and every
+                    # non-OpenRouter provider stay byte-identical (D-14 RED LINE).
+                    kwargs["extra_body"]["provider"] = {"require_parameters": True}
         else:
             # Structured mode: DO NOT pass tools param
             # Tool schemas are injected into system prompt by caller (threads.py)
