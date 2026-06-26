@@ -181,14 +181,17 @@ describe("WorkflowsPage — drafts-above-published shelves + build-card", () => 
     expect(drafts.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it("the dashed build-card is present in the drafts shelf and opens the Builder", async () => {
+  it("the dashed build-card is present in the drafts shelf and opens the two-door chooser (WUX-02)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     const buildCard = within(draftsShelf).getByTestId("build-card")
     expect(buildCard).toBeInTheDocument()
     fireEvent.click(buildCard)
-    // The Builder host renders the describe-first empty screen (its hint testid).
-    expect(await screen.findByTestId("describe-hint")).toBeInTheDocument()
+    // A fresh build now forks at the Studio authoring ENTRY into the two-door chooser
+    // (047-A) — Describe & run vs Author & govern — NOT the describe screen directly.
+    expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
+    expect(screen.getByTestId("door-card-describe")).toBeInTheDocument()
+    expect(screen.getByTestId("door-card-govern")).toBeInTheDocument()
   })
 
   it("NO draft card exposes a Run affordance; published cards DO", async () => {
@@ -381,11 +384,12 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
     expect(mockCreateDraft).not.toHaveBeenCalled()
   })
 
-  it("the build-card opens a TRUE fresh build (the describe screen, no initial)", async () => {
+  it("the build-card opens a TRUE fresh build (the 'both' door chooser, no initial)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     fireEvent.click(within(draftsShelf).getByTestId("build-card"))
-    expect(await screen.findByTestId("describe-hint")).toBeInTheDocument()
+    // Fresh build → the chooser, NOT an already-loaded definition's spine nodes.
+    expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
     expect(screen.queryByTestId("spine-node-draft")).not.toBeInTheDocument()
   })
 })
@@ -393,10 +397,11 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
 describe("WorkflowsPage — back-nav refreshes the library lists", () => {
   it("the ← Workflows back button refetches drafts + published", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    // Enter the Builder via a fresh build (does not itself refetch).
+    // Enter the Builder host via a fresh build (does not itself refetch). The fresh
+    // build opens the two-door chooser.
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     fireEvent.click(within(draftsShelf).getByTestId("build-card"))
-    await screen.findByTestId("describe-hint")
+    await screen.findByTestId("workflow-doors")
     mockListDrafts.mockClear()
     mockListPublished.mockClear()
     // Back to the library → both lists refresh (newly-created drafts appear w/o F5).

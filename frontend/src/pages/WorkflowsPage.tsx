@@ -34,13 +34,17 @@ import {
   type WorkflowDraftRow,
   type WorkflowDefinitionJSON,
 } from "@/lib/api"
-import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
+import { type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // Phase 124-02 Task 1 (WUX-01): the soul atoms (tier + glyph + needs) now come from
 // the ONE shared soulData module (Plan 01 extracted them VERBATIM from this page —
 // the page is no longer their owner). The card renders the shared <WorkflowSoul>.
 import { entryInputKeys, type DefShape } from "@/components/workflows/soulData"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
+// Phase 124-02 Task 2 (WUX-02): the Studio authoring entry forks into the two-door
+// shell (047-A). The govern door delegates to the existing Builder (the shell mounts
+// it; the page no longer mounts WorkflowBuilderPage directly).
+import { WorkflowDoorSwitch } from "@/components/workflows/WorkflowDoorSwitch"
 import type { Folder } from "@/types"
 
 /** Sentinel for the "Unbound (no project)" filter (IR-04 — module-scope, not per-render). */
@@ -225,12 +229,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           <NetNewFlag />
         </div>
         <div className="min-h-0 flex-1">
-          <WorkflowBuilderPage
-            // OPEN/TWEAK: load the existing definition straight into the editing
-            // view with its real row id (saves PATCH it). Absent → fresh build.
-            // The api layer's definition JSONB is intentionally opaque
-            // (Record<string, unknown>); the Builder refines it internally, so the
-            // initial pair is built once + cast at this single seam.
+          {/* WUX-02 (047-A): the Studio authoring entry forks into the two-door shell.
+              A FRESH build opens at the "both" chooser; Open/Tweak land straight in the
+              govern door with the loaded definition (D-01/D-05 — the fork is the Studio
+              authoring entry). The govern door delegates to the existing Builder; the
+              describe door carries a soul preview + the one-click switch strip. The
+              library-card Run path is NOT routed through this shell (D-01). */}
+          <WorkflowDoorSwitch
+            // The current draft/definition powers the describe-door soul preview.
+            def={builderInitial?.definition as DefShape | undefined}
+            // Open/Tweak land in the govern door; a fresh build opens at "both".
+            initialDoor={builderInitial ? "govern" : "both"}
+            // OPEN/TWEAK: the existing definition + its real row id flows straight
+            // through to the Builder's `initial` (saves PATCH it). Absent → fresh build.
             initial={
               builderInitial
                 ? ({ definition: builderInitial.definition, draftId: builderInitial.draftId } as BuilderInitial)
