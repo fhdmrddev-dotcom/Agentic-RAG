@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react"
 import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { providerLogo } from "@/lib/providerLogo"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { RunStatusStrip } from "./RunStatusStrip"
@@ -247,6 +248,13 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     ? `${message.provider} · ${message.model} · turn ${turnNumber}`
     : `turn ${turnNumber}`
 
+  // Phase 128 Plan 04 (CTC-01 / D-01): the tool-card header avatar shows the
+  // REAL per-provider @lobehub/icons mark (via the shared providerLogo helper)
+  // on the existing gradient-primary backing; unmapped providers (lmstudio /
+  // unknown / undefined) resolve to null → the brand-pulse Bot fallback (D-08).
+  // Pure presentation over the already-resolved message.provider — no new wire.
+  const HeaderMark = providerLogo(message.provider)
+
   return (
     <div
       data-testid="run-card"
@@ -277,14 +285,24 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           !isStreamingNow && "cursor-pointer hover:bg-popover/98 transition-colors",
         )}
       >
-        {/* Brand-pulse avatar — mirrors MessageItem.tsx:137 predicate verbatim. */}
+        {/* Brand-pulse avatar — mirrors MessageItem.tsx:137 predicate verbatim.
+            Phase 128 Plan 04 (CTC-01): the inner glyph is now the per-provider
+            @lobehub mark (HeaderMark) at ~18px inside the 32px (w-8 h-8) backing,
+            or the Bot fallback when providerLogo() returns null. The
+            gradient-primary backing + the isStreamingNow animate-brandPulse ring
+            are UNCHANGED (D-01: the pulse stays while streaming in every case). */}
         <div
+          data-testid="run-card-avatar"
           className={cn(
             "flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center shadow-sm shadow-primary/20",
             isStreamingNow && "animate-brandPulse",
           )}
         >
-          <Bot className="w-4 h-4 text-white" />
+          {HeaderMark ? (
+            <HeaderMark size={18} />
+          ) : (
+            <Bot className="w-4 h-4 text-white" />
+          )}
         </div>
 
         {/* Title + the ONE RunStatusStrip (header placement). Per SKETCH §B the
