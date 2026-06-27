@@ -191,14 +191,31 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
       <p className="px-2 text-[12px] text-panel-muted-foreground">{doingNow}</p>
 
       {/* The phase rows — <ol>/<li> (native order + position). aria-busy flips
-          false at a terminal run_status. PhaseCard renders one row per phase. */}
-      <ol aria-label="Phases" aria-busy={isBusy || undefined} className="flex flex-col gap-1.5">
-        {phases.map((phase, i) => (
-          <li key={`${phase.phaseIndex}-${phase.slug}`}>
-            <PhaseCard phase={phase} position={i} />
-          </li>
-        ))}
-      </ol>
+          false at a terminal run_status. PhaseCard renders one row per phase.
+
+          Phase 127-03 (WUX-03) — a DECORATIVE vertical energy-connector spine threads
+          the rows in a relatively-positioned wrapper. It is aria-hidden +
+          pointer-events-none + adds NO focusable/interactive element, so the
+          <ol>/<li>/<PhaseCard> structure, aria-label, aria-busy, and the axe-locked
+          list semantics are byte-unchanged. The energy comet is reduced-motion-gated
+          (motion-safe:) and only animates while the run is live. */}
+      <div className="relative">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-[hsl(var(--panel-status-active)/0.25)] to-transparent"
+        >
+          {isBusy && (
+            <span className="absolute inset-x-0 top-0 h-8 rounded-full bg-[hsl(var(--panel-status-active)/0.55)] blur-[1px] motion-safe:animate-pulse" />
+          )}
+        </span>
+        <ol aria-label="Phases" aria-busy={isBusy || undefined} className="flex flex-col gap-1.5">
+          {phases.map((phase, i) => (
+            <li key={`${phase.phaseIndex}-${phase.slug}`}>
+              <PhaseCard phase={phase} position={i} />
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   )
 }
