@@ -247,7 +247,7 @@ Plans:
   6. The unified surface is sketch-approved (G-2) before planning — the operator-approved mockup is the acceptance bar.
 
 **Plans**: 6 plans
-- [ ] 128-01-PLAN.md — Install @lobehub/icons (supply-chain checkpoint) [D-08]
+- [x] 128-01-PLAN.md — Install @lobehub/icons (supply-chain checkpoint) [D-08]
 - [x] 128-02-PLAN.md — CTC-04 long-prompt clamp + gradient fade + Read-more (independent) [D-03]
 - [ ] 128-03-PLAN.md — providerLogo.tsx shared helper (logo map + preparingDescription) + Wave-0 unit tests [D-05]
 - [ ] 128-04-PLAN.md — CTC-01 RunCard logo + TDP-02 ToolCallPanel description = the unified card (CTC-02) [D-01/D-04]
