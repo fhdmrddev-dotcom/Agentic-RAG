@@ -246,7 +246,13 @@ Plans:
   5. Long user prompts collapse to a clamped preview with a "Read more" expander instead of rendering full-height (CTC-04).
   6. The unified surface is sketch-approved (G-2) before planning — the operator-approved mockup is the acceptance bar.
 
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 128-01-PLAN.md — Install @lobehub/icons (supply-chain checkpoint) [D-08]
+- [ ] 128-02-PLAN.md — CTC-04 long-prompt clamp + gradient fade + Read-more (independent) [D-03]
+- [ ] 128-03-PLAN.md — providerLogo.tsx shared helper (logo map + preparingDescription) + Wave-0 unit tests [D-05]
+- [ ] 128-04-PLAN.md — CTC-01 RunCard logo + TDP-02 ToolCallPanel description = the unified card (CTC-02) [D-01/D-04]
+- [ ] 128-05-PLAN.md — D-06 LIVE native-7+OpenRouter cross-provider scoreboard (operator-run) [D-06]
+- [ ] 128-06-PLAN.md — CTC-03 StickyTimerBar deletion (LAST, gated on the D-06 proof) [D-02/D-07]
 **UI hint**: yes
 
 #### Phase 129: MiniMax/OpenRouter Arg Repair
@@ -305,7 +311,7 @@ Plans:
 | 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
 | 126 (STRETCH). Smart-Dispatch Relevance Pre-Filter | 0/? | Gated (behind CORE) | - |
 | 127 (STRETCH). Gauntlet Pip-Strip + Quiet Idle Cards | 0/? | Gated (behind CORE) | - |
-| 128 (STRETCH). Chat Tool-Card Unification + Chat-Area Reclaim | 0/? | Sketch-gated (G-2) — scoping | - |
+| 128 (STRETCH). Chat Tool-Card Unification + Chat-Area Reclaim | 0/6 | Planned (6 plans, 5 waves) | - |
 | 129 (STRETCH). MiniMax/OpenRouter Arg Repair | 0/? | Gated (behind CORE) | - |
 | 130 (STRETCH). template_input Resolver Run-Scope | 0/? | Gated (behind CORE) | - |
 | 131 (STRETCH). Non-Python Skill-Script Honesty | 0/? | Gated (behind CORE) | - |
