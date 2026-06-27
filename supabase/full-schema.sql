@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FikzvcktmQTDsQtGAdbnHa7wvW8QKXdDcTAvLm7I991h2g4ATrRU62aq2Ugecil
+\restrict oLfuW48P9jgqmxhHj97FTQPzuJcyLQYFOLcYYBihzuFqcDBh1Vynnd9WougJ9JC
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -333,6 +333,7 @@ CREATE TABLE public.app_settings (
     extraction_provider text,
     confidence_bucket_high double precision DEFAULT 0.54,
     confidence_bucket_medium double precision DEFAULT 0.38,
+    skill_builder_model text DEFAULT ''::text NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -3064,5 +3065,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FikzvcktmQTDsQtGAdbnHa7wvW8QKXdDcTAvLm7I991h2g4ATrRU62aq2Ugecil
+\unrestrict oLfuW48P9jgqmxhHj97FTQPzuJcyLQYFOLcYYBihzuFqcDBh1Vynnd9WougJ9JC
 
