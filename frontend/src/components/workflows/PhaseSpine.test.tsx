@@ -43,6 +43,16 @@ describe("PhaseSpine — horizontal glyph-dot row", () => {
     expect(within(screen.getByTestId("spine-dot-server")).getByText("⚙")).toBeInTheDocument()
   })
 
+  it("renders 3D SVG glyph components via phaseGlyph() for known phase types", () => {
+    // RED gate: this test fails until PHASE_GLYPHS is swapped + phaseGlyph() is wired.
+    // After GREEN: known types render as bundled SVG components (not flat unicode text).
+    render(<PhaseSpine def={def} scale="card" />)
+    expect(screen.getByTestId("spine-dot-gather").querySelector("svg")).not.toBeNull()
+    expect(screen.getByTestId("spine-dot-draft").querySelector("svg")).not.toBeNull()
+    expect(screen.getByTestId("spine-dot-emit").querySelector("svg")).not.toBeNull()
+    expect(screen.getByTestId("spine-dot-server").querySelector("svg")).not.toBeNull()
+  })
+
   it("STRIPS type ribbons — no 'server'/'agent'/'deliverable' type-label text (046-A)", () => {
     const { container } = render(<PhaseSpine def={def} scale="card" />)
     const text = container.textContent ?? ""
