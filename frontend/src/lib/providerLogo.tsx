@@ -33,6 +33,7 @@
  *     antd-free across the full transitive graph.
  */
 import type { ComponentType } from "react"
+import type { ToolCall } from "@/types"
 // Deep COMPONENT subpath imports — the `.Color`/`.Mono` leaf files only. Using
 // the brand index (`es/<Brand>`) would eager-load its `Avatar` sub-component
 // and drag antd; these leaf paths bypass it. `.Color` = the gradient brand
@@ -84,4 +85,54 @@ const MARKS: Record<string, ProviderMark> = {
 export function providerLogo(provider: string | undefined): ProviderMark | null {
   // The `?? null` mirrors fileIcon's `?? DEFAULT_SPEC` — total over any key.
   return provider ? (MARKS[provider] ?? null) : null
+}
+
+/** First complete `"description":"…"` key in a JSON string (escapes tolerated). */
+const DESCRIPTION_RE = /"description"\s*:\s*"((?:[^"\\]|\\.)*)"/
+
+/**
+ * Extract a tool's `description` for the tool-card header (TDP-02).
+ *
+ * During the `preparing` window the parsed `tc.args` is still `{}` (the
+ * StreamsProvider reducer keeps it empty until `tool_start` — research
+ * Pitfall 1 / Anti-Pattern), but the raw partial-JSON args stream is already
+ * in `tc.argsCodeText`. This reads, in order:
+ *   1. the parsed `tc.args.description` once present + non-empty (running/done,
+ *      or a provider that delivered args atomically);
+ *   2. a full `JSON.parse` of the partial-JSON `tc.argsCodeText`;
+ *   3. a targeted `"description":"…"` regex over the (possibly truncated)
+ *      partial JSON, JSON-unescaped.
+ * Returns `null` when nothing is on the wire yet so the caller shows the quiet
+ * `Preparing {tool}…` fallback (D-06: never fabricate; the description is
+ * additive — the card always renders the logo + status regardless).
+ *
+ * NEVER throws: every `JSON.parse` is wrapped in try/catch returning `null`,
+ * mirroring the `seamCardPayloadFor` "never throw in a render-path mapper" rule
+ * (`MessageItem.tsx`). Never mutates `tc.args` (the reducer owns it).
+ */
+export function preparingDescription(tc: ToolCall): string | null {
+  // 1. Trust the parsed value once present (and non-empty).
+  if (typeof tc.args?.description === "string" && tc.args.description) {
+    return tc.args.description
+  }
+  // 2. During preparing the parsed args are {} — the bytes live in argsCodeText.
+  const raw = tc.argsCodeText
+  if (!raw) return null
+  // 2a. Try a full parse first (complete JSON object).
+  try {
+    const parsed = JSON.parse(raw) as { description?: unknown }
+    if (typeof parsed?.description === "string") return parsed.description
+  } catch {
+    /* partial / truncated JSON — fall through to the targeted regex */
+  }
+  // 2b. Targeted regex for the first complete "description":"…" key, then
+  //     JSON-unescape the captured group. Guarded so malformed escapes in the
+  //     captured text can never throw in this render-path mapper.
+  const m = raw.match(DESCRIPTION_RE)
+  if (!m) return null
+  try {
+    return JSON.parse(`"${m[1]}"`) as string
+  } catch {
+    return null
+  }
 }
