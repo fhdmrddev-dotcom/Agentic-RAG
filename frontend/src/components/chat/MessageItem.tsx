@@ -1,7 +1,8 @@
-import { memo, useRef, useState } from "react"
+import { memo, useLayoutEffect, useRef, useState } from "react"
 import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 // Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
 // workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
 // thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered
@@ -52,6 +53,71 @@ function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
     toolCalls?.some(
       (tc) => tc.name === "ask_user" && (tc.status === "running" || tc.status === "interrupted"),
     ) ?? false
+  )
+}
+
+/**
+ * Phase 128 Plan 02 — CTC-04 user-prompt clamp (sketch 050-A / D-03).
+ *
+ * A long USER prompt (a pasted ≥5KB spec) renders at full height today and
+ * shoves the live run off-screen. This collapses it to a `-webkit-line-clamp:7`
+ * preview with a fade matched to the violet END of the bubble's 135°
+ * `gradient-primary` (`index.css:199` → `hsl(258 90% 66%)`, NOT the page bg) and
+ * an inline "Read more" / "Show less" chip. SHORT prompts render byte-identically
+ * to today — the clamp classes are gated on `!expanded`, and the fade + chip on
+ * `overflowing`, which only trips when the clamped <p> actually overflows.
+ *
+ * Factored as a LOCAL subcomponent (mirrors FinalOutputsPanel) so its
+ * useRef/useLayoutEffect/useState do NOT perturb MessageItem's hook order
+ * (MessageItem has hooks before the `if (isUser)` early return).
+ *
+ * `content` renders as React text children (auto-escaped) — never
+ * dangerouslySetInnerHTML (T-128-02-01 / V5 output-encoding). The overflow
+ * measure is a pure ref-guarded DOM read (scrollHeight/clientHeight) that cannot
+ * throw on user content (T-128-02-02); jsdom reports 0/0 (no layout) so the
+ * effect no-ops in tests, which assert structure + the fade class instead.
+ */
+function UserBubble({ content }: { content: string }) {
+  const pRef = useRef<HTMLParagraphElement>(null)
+  const [overflowing, setOverflowing] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  // useLayoutEffect (NOT useEffect) so the measure runs pre-paint — avoids the
+  // one-frame full-height flash before the clamp applies (RESEARCH Pitfall 5).
+  useLayoutEffect(() => {
+    const el = pRef.current
+    if (el) setOverflowing(el.scrollHeight > el.clientHeight + 1)
+  }, [content])
+
+  return (
+    <div className="relative">
+      <p
+        ref={pRef}
+        className={cn(
+          "whitespace-pre-wrap break-words",
+          !expanded && "[display:-webkit-box] [-webkit-line-clamp:7] [-webkit-box-orient:vertical] overflow-hidden",
+        )}
+      >
+        {content}
+      </p>
+      {/* Fade dissolves into the bubble violet (the 135° gradient's END,
+          index.css:199), NOT the page bg — D-03. Only while clamped + overflowing. */}
+      {overflowing && !expanded && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[hsl(258_90%_66%)] to-transparent"
+        />
+      )}
+      {overflowing && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs text-white/80 underline"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -207,7 +273,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
       <div className="flex justify-end py-2 animate-fadeSlideUp" data-testid="user-message">
         <div className="flex items-end gap-2.5 max-w-[70%]">
           <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+            <UserBubble content={message.content} />
           </div>
           <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
             <User className="w-3.5 h-3.5 text-foreground/70" />
