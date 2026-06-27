@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
 status: executing
-last_updated: "2026-06-27T05:53:55.414Z"
-last_activity: 2026-06-27 -- Phase 128 planning complete
+last_updated: "2026-06-27T06:05:55.014Z"
+last_activity: 2026-06-27 -- Phase 128 execution started
 progress:
   total_phases: 7
   completed_phases: 7
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Building STRETCH **128 → then 127** (operator-decided 2026-06-27). Phase 129 COMPLETE (first STRETCH). **NEXT ACTION: `/gsd:plan-phase 128`** — 128 sketch COMPLETE (`b0070379`, winners all A) + **context gathered 2026-06-27 (`0e3608fa`; 8 locked decisions D-01..D-08 in `128-CONTEXT.md`)**. 128 = "Chat Tool-Card Unification + Chat-Area Reclaim" (TDP-02 + CTC-01..04: provider logos in tool-card header `RunCard.tsx:280` · unified cross-provider tool card · remove redundant sticky composer timer `ChatArea.tsx:533` `StickyTimerBar` · Read-more on long prompts `MessageItem.tsx:205`); G-2 sketch DONE + discussed, then plan→execute. After 128 ships, do **127** (Gauntlet pip-strip + quiet idle cards; also `/gsd:sketch 127` first; gauntlet=`PublishGauntlet.tsx`, PhaseCard=`panel/PhaseCard.tsx`). Existing sketches to extend: 020-publish-gauntlet-honesty (127), 002-tool-call-panel + 014/015 (128). Then `/gsd:complete-milestone` (tag v3.1). Detail → [[project_128_reframed]], [[project_129_executed]].
+**Current focus:** Phase 128 — chat-tool-card-unification-chat-area-reclaim
 
 ## Current Position
 
-Phase: 128 (Chat Tool-Card Unification + Chat-Area Reclaim) — **context gathered, ready to plan**. 129 COMPLETE.
-Plan: Not started — `128-CONTEXT.md` committed (`0e3608fa`); G-2 sketch (048/049/050, all A) is the acceptance bar; 8 decisions locked (D-01..D-08). Next: `/gsd:plan-phase 128` (scope in ROADMAP Phase Details + REQUIREMENTS TDP-02/CTC-01..04).
-Status: Ready to execute
-Last activity: 2026-06-27 -- Phase 128 planning complete
+Phase: 128 (chat-tool-card-unification-chat-area-reclaim) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 128
+Last activity: 2026-06-27 -- Phase 128 execution started
 
 ### Quick Tasks Completed
 
