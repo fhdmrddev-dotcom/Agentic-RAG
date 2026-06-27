@@ -365,3 +365,30 @@ HIGH a11y defects fixed before lock; an early "Undo" removed to honor re-fetch-n
 ### Downstream
 `/gsd:plan-phase 117` — G-2 (sketch-before-plan) satisfied by 034 + 035; the plan MUST own the
 D-117-7 shared `GET` read seam (extract + share-don't-fork). Then `/gsd:execute-phase 117`.
+
+---
+
+## 2026-06-27 — Phase 127: Gauntlet Pip-Strip + Quiet Idle Cards (WUX-03), energized
+
+**Sketches processed:** 2 (both included) — 051, 052 (both winner A)
+**Design areas (2 new reference files):** Workflow Studio Energized Re-skin (051 + 052 → `references/workflow-energized-reskin.md`) · Icon Convention — cross-cutting (`references/icon-convention.md`)
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode)
+**Mode note:** appended onto the Phase-117 baseline. Sketches **036–050** (Phases 118 / 119 / 123 / 123.1 / 124 / 128) remain a **pre-existing unwrapped backlog** — fully recorded in `MANIFEST.md` + their READMEs; not folded in this session (operator asked to wrap the 127 work without interrupting). A future `--wrap-up` can fold them.
+
+### Included Sketches
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 051 | gauntlet-pip-strip | A — Recipe-literal | Workflow Studio Energized Re-skin |
+| 052 | living-step-flow | A — Density-by-status | Workflow Studio Energized Re-skin |
+
+### Design Direction
+A density + visual-energy re-skin of two ALREADY-SHIPPED workflow surfaces (the 020-B publish gauntlet, the 008-D/022-A live phase spine), riding UNDER the Phase-124 soul (which stays). Operator direction 2026-06-27: make the workflow feel alive and powerful — imported 3D icons, an Asian-tech energy language, the live moment "building," and which AI engine is on each step — WITHOUT breaking the quiet-at-rest promise or any honesty/a11y contract. Energized is the operator-loved default; a calm anchor is the in-sketch toggle. Locked Aether Deep Midnight palette.
+
+### Key Decisions
+- **051-A — Publish gauntlet:** 8 stages → a compact horizontal energy-spine (3D icon per stage, a comet into the live stage); the resolved state LEADS with a plain-worded verdict and DEMOTES the raw 5-field `PublishVerdict` grid behind "Show raw verdict." Honesty preserved (verbatim verdict · judge HARD WALL · 4 distinct HTTP outcomes · run-link gated on `golden_run_id` · judge criteria first-class on a block). Under the 124 pub soul.
+- **052-A — Live step-flow:** idle steps quiet/still/no-animation (SC#2); the active step blooms (glow + vertical energy comet + running-only activity line + AI-engine chip); done folds to essence; failed = closed-taxonomy reason. Under the 124 run soul. ⚠ G-5 `PhaseCard`/`PhaseTimeline` (shared with the live harness — re-run replay tests).
+- **Icon convention (cross-cutting):** an icon for the same concept is byte-identical everywhere. Provider/model icons = single-source `@lobehub/icons` (Phase 128 `providerLogo.tsx`); phase-type icons = the shared 3D `PHASE_GLYPHS` map (one additive swap propagates to soul card/run/pub + 127 surfaces); decorative `fluent-emoji` slugs must be verified-or-bundled (the empty `direct-hit` → `bullseye` trap, found live via the Iconify API).
+- **Provider/model management home (future):** SEED-095 — Settings → admin control center (visual + functional) with first-class provider/model items + this icon convention surfaced there; routes to v3.2 Operator UX; bundles SEED-012/024/040/088/058/085.
+
+### Downstream
+`/gsd:plan-phase 127` — G-2 (sketch-before-plan) satisfied by 051 + 052; the plan adopts the icon convention (Running Design Decision 43) and re-runs the harness replay tests for the G-5 `PhaseCard`/`PhaseTimeline` re-skin. Then `/gsd:execute-phase 127` → verify → `/gsd:complete-milestone` (tag v3.1 — 127 is the last piece). The skill auto-loads during build for the publish gauntlet, the live phase spine, provider/model logos, and the icon convention.

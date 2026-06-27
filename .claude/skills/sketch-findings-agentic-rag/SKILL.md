@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-agentic-rag
-description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, or any chat-surface component that touches the agent's mid-execution moment.
+description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell); AND the Phase 127 energized Workflow Studio re-skin (the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow) PLUS the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet (its energized pip/energy-spine + worded verdict), the live phase spine (PhaseCard / PhaseTimeline), provider/model logos anywhere, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, or any chat-surface component that touches the agent's mid-execution moment.
 ---
 
 <context>
@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127)
 </context>
 
 <design_direction>
@@ -138,6 +138,44 @@ A), hardened by the 3-lens fidelity audit `wf_1ec2afac-687`. Full reference:
   read endpoint whose leak-safe traversal is **extracted into a shared `document_relationship_service`
   and shared with the agent tool, never forked** (D-117-7, share-don't-fork); plus the typeahead
   candidate source + per-type exclusion, the `api.ts` client fns, and the `Relationships` section.
+
+## Workflow Studio Energized Re-skin (Phase 127)
+
+v3.1 WUX-03 re-skins two ALREADY-SHIPPED workflow surfaces for density + visual energy,
+riding UNDER the Phase-124 soul (which stays). Winners 051-A + 052-A (operator 2026-06-27).
+Full detail: `references/workflow-energized-reskin.md`.
+
+- **Publish gauntlet (051-A)** — the 8 stages become a compact horizontal **energy-spine**
+  (a 3D icon per stage; a comet of energy flows into the live stage), the resolved state
+  **leads with a plain-worded verdict** and **demotes the raw 5-field `PublishVerdict` grid
+  behind "Show raw verdict"** (the verbatim render + the `▦ rendered verbatim` cap stay
+  inside the disclosure). Honesty preserved: verbatim verdict, judge HARD WALL (no override),
+  4 distinct HTTP outcomes, run-link gated on `golden_run_id`, judge per-criterion rows
+  first-class on a block. Sits under `<WorkflowSoul scale="pub">`.
+- **Live step-flow (052-A)** — "calm at rest, comprehensive on the active step" (the 022-A
+  target the shipped 094 card never reached): **idle steps stay quiet/still/no-animation**
+  (SC#2); the **active step blooms** (glow + a vertical energy comet flowing in + the
+  running-ONLY activity line + the AI-engine chip); done folds to a one-line essence; failed
+  = the closed-taxonomy reason. Sits under `<WorkflowSoul scale="run">`. ⚠ G-5 — `PhaseCard`/
+  `PhaseTimeline` are shared with the live harness run; re-run replay tests.
+- **Energized intensity** is the operator-loved default; a calm anchor is kept as an
+  in-sketch toggle (the build can dial the exact glow/motion).
+
+## Icon Convention (cross-cutting, Phase 127)
+
+One rule: **an icon for the same concept is byte-identical everywhere.** Full detail:
+`references/icon-convention.md`.
+
+- **Provider/model icons = ONE source: `@lobehub/icons`** (Phase 128 `providerLogo.tsx`) —
+  all native-7 + OpenRouter, identical in chat / workflow-run engine chips / scoreboards /
+  (future) Settings. Never hand-drawn, never per-surface (sketch placeholders for Kimi/GLM/
+  MiniMax are NOT shipped art).
+- **Phase-type icons = ONE source: the shared `PHASE_GLYPHS` map** (`soulData.ts`); Phase 127
+  upgrades flat ⚙✎🤖⛓☺◆ → a 3D set in ONE additive swap that propagates to the soul
+  card/run/pub + the 127 gauntlet stages + step cards.
+- **Decorative/status icons** (`fluent-emoji`): VERIFY each slug resolves or bundle the SVG
+  (the empty `fluent-emoji:direct-hit` → `bullseye` trap). Future Settings home for
+  provider/model management + this convention: SEED-095.
 </design_direction>
 
 <findings_index>
@@ -206,6 +244,13 @@ A), hardened by the 3-lens fidelity audit `wf_1ec2afac-687`. Full reference:
 |------|-----------|--------------|
 | Document Relationships Panel | [references/document-relationships-panel.md](references/document-relationships-panel.md) | **034-A + 035-A.** ONE accordion section added to the EXISTING Phase 112/028 `DocumentDetailPanel` (extend the shell, **not a new surface**). Chip-led, **grouped-by-direction** (Outgoing then Incoming), each row a rel-type pill chip + filename + a keyboard/touch-reachable remove ✕; **incoming uses INVERSE labels mirrored 1:1 from the backend `_INVERSE_LABEL`** (never invented). **Create = outgoing-only, remove = either-direction** (deliberate asymmetry, locked vs review drift). The masked **"linked document (no access)"** row (verbatim `_NO_ACCESS_MASK`, no id/title leak) is present by default — honesty, not error/empty. **Mutation = re-fetch, NOT optimistic → NO undo** (D-117-9; the audit killed an early Undo). Create-link picker = the **`MoveToFolderDialog` shell with `Select` → searchable typeahead** (D-117-3 — a Select dies past ~30 docs); type-first (rel-type chips → typeahead → "references → X" preview); **per-type exclusion** of self + already-linked (D-117-4). **A11y load-bearing (audit-locked):** the typeahead is a **net-new combobox** (`role=combobox/listbox/option` + `aria-activedescendant` — the Select swap loses APG roles), remove reachable on keyboard/touch, panel-scoped AA token for the masked string + all copy, `updating`=`role=status`/error=`role=alert`. **Net-new wire:** a `GET` read endpoint (116 shipped POST/DELETE only) whose leak-safe traversal is **extracted into a shared `document_relationship_service`, never forked** (D-117-7). |
 
+**Workflow Studio energized re-skin + icon convention (sketches 051–052, Phase 127):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Workflow Energized Re-skin | [references/workflow-energized-reskin.md](references/workflow-energized-reskin.md) | **051-A** publish gauntlet = energy-spine of the 8 stages + a plain-worded verdict + the raw 5-field `PublishVerdict` behind "Show raw verdict" (honesty kept: verbatim · judge hard-wall · 4 HTTP outcomes · run-link gated · criteria first-class on block); under the 124 pub soul. **052-A** live step-flow = quiet/still idle steps (SC#2) + a bloomed active step (glow + energy comet + running-only activity + AI-engine chip) + folded-essence done; under the 124 run soul; ⚠ G-5 `PhaseCard`/`PhaseTimeline`. Energized default + calm toggle. |
+| Icon Convention (cross-cutting) | [references/icon-convention.md](references/icon-convention.md) | An icon for the same concept is byte-identical everywhere. Provider/model icons = single-source `@lobehub/icons` (Phase 128 `providerLogo.tsx`); phase-type icons = the shared 3D `PHASE_GLYPHS` map (one additive swap propagates to soul card/run/pub + 127 surfaces); decorative `fluent-emoji` slugs must be verified-or-bundled (the empty `direct-hit`→`bullseye` trap). Future Settings home: SEED-095. |
+
 ## Theme
 
 The winning theme file is at [sources/themes/default.css](sources/themes/default.css). Tokens are direct mirrors of `frontend/src/index.css :.dark` — so transitioning sketches to React code should be a straight port, not a rebuild.
@@ -240,6 +285,8 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/033-foldertree-navrow-polish/](sources/033-foldertree-navrow-polish/) — winner: A (unified Folders+Views NavRow; Before/After of today's tree)
 - [sources/034-relationship-section/](sources/034-relationship-section/) — winner: A (chip-led grouped-by-direction relationships accordion; masked no-access row; State strip cycles populated/empty/loading/error)
 - [sources/035-link-target-picker/](sources/035-link-target-picker/) — winner: A (dialog · type-first create-link picker; MoveToFolderDialog shell + searchable typeahead; per-type exclusion; simulate-failure error line)
+- [sources/051-gauntlet-pip-strip/](sources/051-gauntlet-pip-strip/) — winner: A (energized gauntlet energy-spine + worded verdict + raw-on-demand; under the 124 pub soul; lifecycle + Calm⇄Energized cyclers)
+- [sources/052-living-step-flow/](sources/052-living-step-flow/) — winner: A (quiet-idle / alive-active living step-flow; vertical energy comet into the active step; AI-engine chip; under the 124 run soul)
 
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
@@ -366,4 +413,9 @@ Skip when:
 
 - 034-relationship-section (winner: A — chip-led grouped-by-direction relationships accordion; inverse incoming labels; masked no-access row; re-fetch-not-optimistic)
 - 035-link-target-picker (winner: A — dialog · type-first create-link picker; MoveToFolderDialog shell + searchable typeahead; per-type exclusion; net-new combobox a11y)
+
+**Phase 127 — Workflow Studio Energized Re-skin + Icon Convention (2026-06-27):**
+
+- 051-gauntlet-pip-strip (winner: A — energized energy-spine + worded verdict + raw-on-demand; under the 124 pub soul)
+- 052-living-step-flow (winner: A — quiet-idle / alive-active living step-flow; under the 124 run soul)
 </metadata>

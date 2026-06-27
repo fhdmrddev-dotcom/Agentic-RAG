@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 051 — Gauntlet: Pip-Strip + Worded Verdict (energized)</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- Iconify: imported 3D/colorful icon sets (fluent-emoji), no build step. Loads from web;
+     emoji children are the offline fallback if the script can't load. -->
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  /* ── Energized extension tokens (layered ON TOP of Aether Deep Midnight) ── */
+  :root {
+    --neon-cyan: hsl(190 95% 60%);
+    --neon-violet: hsl(266 90% 70%);
+    --neon-gold: hsl(43 96% 62%);
+    --grad-energy: linear-gradient(100deg, var(--color-primary), var(--color-accent-violet) 45%, var(--neon-cyan));
+    --grad-power: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet) 60%, var(--neon-cyan));
+  }
+
+  body {
+    background:
+      radial-gradient(1100px 560px at 72% -12%, hsl(239 100% 82% / .07), transparent),
+      radial-gradient(820px 520px at 6% 112%, hsl(266 90% 66% / .06), transparent),
+      var(--color-bg);
+    background-attachment: fixed;
+    padding-bottom: 80px;
+  }
+  /* faint cyber grid for depth */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .35;
+    background-image:
+      linear-gradient(hsl(220 30% 50% / .035) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 30% 50% / .035) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(circle at 50% 30%, #000, transparent 78%);
+            mask-image: radial-gradient(circle at 50% 30%, #000, transparent 78%);
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 30px 22px 40px; }
+
+  .page-h { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-2xl); margin: 6px 0 2px; }
+  .grad-text {
+    background: var(--grad-energy); -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  .page-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 22px; max-width: 64ch; }
+
+  /* ─────────────────────── ENERGY SPINE ─────────────────────── */
+  .espine { display: flex; align-items: flex-start; gap: 0; padding: 8px 4px 4px; }
+  .estage { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 0 0 auto; width: 78px; text-align: center; }
+  .enode {
+    position: relative; width: 50px; height: 50px; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--color-surface); border: 1.5px solid var(--color-border);
+    transition: all var(--dur-base) var(--ease-out);
+  }
+  .enode iconify-icon { font-size: 26px; filter: saturate(.55) opacity(.55); transition: filter var(--dur-base); }
+  .estage .lab { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); line-height: 1.25; letter-spacing: .02em; }
+  .estage .what { font-size: 9px; color: var(--color-text-dim); opacity: 0; max-height: 0; transition: all var(--dur-base); }
+  .estage:hover .what { opacity: .8; max-height: 30px; }
+
+  /* connector lives between stages */
+  .econn { flex: 1 1 auto; height: 3px; margin-top: 24px; border-radius: 3px; background: var(--color-border); position: relative; overflow: hidden; min-width: 14px; }
+  .econn.passed { background: linear-gradient(90deg, var(--color-success), hsl(142 71% 58%)); }
+  .econn.flowing::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+    background-size: 220% 100%; animation: flow 1.15s linear infinite;
+  }
+  .econn .comet { position: absolute; top: 50%; left: 0; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+    background: var(--neon-cyan); box-shadow: 0 0 10px 2px var(--neon-cyan); animation: cometRun 1.15s linear infinite; }
+  @keyframes flow { from { background-position: 200% 0; } to { background-position: -120% 0; } }
+  @keyframes cometRun { 0% { left: -4px; opacity: 0; } 25% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+
+  /* node states */
+  .enode.done { border-color: hsl(142 71% 45% / .55); box-shadow: 0 0 18px hsl(142 71% 45% / .16); }
+  .enode.done iconify-icon { filter: none; }
+  .estage.done .lab { color: var(--color-success); }
+  .enode.done .badge { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-success); color: #04210f; display: grid; place-items: center; font-size: 11px; font-weight: 800; animation: checkPop .35s var(--ease-bounce); }
+
+  .enode.run { border-color: var(--color-warning); background: var(--color-warning-dim); box-shadow: 0 0 26px hsl(38 92% 60% / .34); }
+  .enode.run iconify-icon { filter: none; animation: floaty 2.2s ease-in-out infinite; }
+  .enode.run::before { content: ""; position: absolute; inset: -5px; border-radius: 19px; border: 2px solid var(--color-warning); animation: auraPulse 1.5s var(--ease-out) infinite; }
+  .estage.run .lab { color: var(--color-warning); font-weight: 600; }
+  @keyframes auraPulse { 0% { transform: scale(.92); opacity: .8; } 100% { transform: scale(1.5); opacity: 0; } }
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+  .enode.blocked { border-color: var(--color-danger); background: var(--color-danger-dim); box-shadow: 0 0 24px hsl(0 72% 51% / .3); }
+  .enode.blocked iconify-icon { filter: none; }
+  .enode.blocked .badge { position: absolute; right: -5px; bottom: -5px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-danger); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+  .estage.blocked .lab { color: var(--color-danger); font-weight: 600; }
+
+  /* ─────────────────────── GOLDEN-RUN HERO ─────────────────────── */
+  .grhero {
+    position: relative; overflow: hidden; margin-top: 18px;
+    border: 1.5px solid hsl(38 92% 60% / .4); border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, hsl(38 92% 60% / .10), hsl(220 30% 7% / .6));
+    padding: 22px; box-shadow: 0 0 50px hsl(38 92% 60% / .12); animation: rise .4s var(--ease-out);
+  }
+  .grhero::before { content: ""; position: absolute; inset: -40%; opacity: .5;
+    background: radial-gradient(closest-side, hsl(38 92% 60% / .22), transparent 70%);
+    animation: drift 7s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: translate(-8%, -6%); } to { transform: translate(10%, 8%); } }
+  .grhero > * { position: relative; z-index: 1; }
+  .grh-top { display: flex; align-items: center; gap: 14px; }
+  .grh-rocket { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; background: hsl(38 92% 60% / .14); border: 1px solid hsl(38 92% 60% / .35); flex: none; }
+  .grh-rocket iconify-icon { font-size: 34px; animation: launch 2.6s ease-in-out infinite; }
+  @keyframes launch { 0%,100% { transform: translateY(1px) rotate(-2deg); } 50% { transform: translateY(-4px) rotate(2deg); } }
+  .grh-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-lg); display: flex; align-items: center; gap: 9px; }
+  .grh-title .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 10px 2px var(--color-warning); animation: brandPulse 1.3s infinite; }
+  .grh-clock { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-lg); color: var(--neon-gold); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .grh-sub { margin-top: 10px; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; }
+  .grh-bar { margin-top: 14px; }
+  .grh-engine { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .grh-honest { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--color-border); font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); line-height: 1.6; }
+
+  /* engine chip = which AI is powering this */
+  .engine-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-surface-hi); }
+  .engine-mark { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; flex: none; box-shadow: 0 0 12px -2px currentColor; }
+  .engine-mark svg { width: 22px; height: 22px; display: block; }
+  .engine-mark.real { background: #fff; box-shadow: none; }
+  .engine-mark.real iconify-icon { font-size: 17px; }
+  .engine-name { font-family: var(--font-mono); font-size: 11px; color: var(--color-text); font-weight: 500; }
+  .engine-role { font-size: 10px; color: var(--color-text-dim); }
+
+  /* ─────────────────────── WORDED VERDICT ─────────────────────── */
+  .wverdict { margin-top: 18px; border-radius: var(--radius-lg); padding: 20px; animation: rise .4s var(--ease-out); border: 1.5px solid var(--color-border); background: var(--color-surface); }
+  .wverdict.ok { border-color: hsl(142 71% 45% / .5); background: linear-gradient(180deg, hsl(142 71% 45% / .10), hsl(220 30% 7% / .5)); box-shadow: 0 0 44px hsl(142 71% 45% / .14); }
+  .wverdict.bad { border-color: hsl(0 72% 51% / .5); background: linear-gradient(180deg, hsl(0 72% 51% / .10), hsl(220 30% 7% / .5)); box-shadow: 0 0 44px hsl(0 72% 51% / .12); }
+  .wv-top { display: flex; align-items: center; gap: 14px; }
+  .wv-ic { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; flex: none; background: hsl(220 30% 11% / .6); border: 1px solid var(--color-border); }
+  .wv-ic iconify-icon { font-size: 36px; }
+  .wverdict.ok .wv-ic { animation: pop .5s var(--ease-bounce); }
+  @keyframes pop { 0% { transform: scale(.4); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .wv-head { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-xl); }
+  .wverdict.ok .wv-head { color: var(--color-success); }
+  .wverdict.bad .wv-head { color: var(--color-danger); }
+  .wv-line { margin-top: 4px; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.6; max-width: 60ch; }
+  .wv-stamp { margin-left: auto; align-self: flex-start; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 3px 8px; }
+
+  /* judge criteria rows (the human "why" — stays first-class on a block) */
+  .crit-cap { margin: 16px 0 8px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-dim); }
+  .crit { display: grid; grid-template-columns: 26px 1fr 70px; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid hsl(0 72% 51% / .35); border-radius: var(--radius-md); background: hsl(220 30% 7% / .7); margin-bottom: 8px; }
+  .crit .cx { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: hsl(0 72% 51% / .16); color: var(--color-danger); font-weight: 800; font-size: 13px; }
+  .crit .cn { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); }
+  .crit .ce { margin-top: 2px; font-size: 11px; color: var(--color-text-muted); line-height: 1.5; }
+  .crit .cs { text-align: right; }
+  .crit .cs-num { font-family: var(--font-mono); font-size: 13px; color: var(--color-danger); font-weight: 600; }
+  .crit .cs-bar { height: 4px; border-radius: 3px; background: var(--color-muted); margin-top: 4px; overflow: hidden; }
+  .crit .cs-bar > i { display: block; height: 100%; background: var(--color-danger); border-radius: 3px; }
+  .judge-by { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: 11px; color: var(--color-text-muted); }
+
+  .hardwall { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: hsl(220 30% 7% / .7); font-size: 12px; }
+  .hardwall .no-ovr { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .hardwall .no-ovr s { opacity: .6; }
+  .btn { border: none; border-radius: var(--radius-md); padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--grad-power); color: #06091d; box-shadow: var(--shadow-glow-primary); }
+  .btn-ghost { background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); }
+
+  .run-link { margin-top: 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--color-primary); padding: 8px 13px; border-radius: var(--radius-md); border: 1px solid var(--color-primary-glow); background: var(--color-primary-dim); }
+  .no-run { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--color-border); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); line-height: 1.6; }
+
+  /* raw-on-demand disclosure (verbatim verdict — preserved, just not leading) */
+  .rawbox { margin-top: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: hsl(220 30% 7% / .5); }
+  .rawbox > summary { cursor: pointer; list-style: none; padding: 10px 13px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); display: flex; align-items: center; gap: 8px; }
+  .rawbox > summary::-webkit-details-marker { display: none; }
+  .rawbox > summary::before { content: "▸"; color: var(--color-accent-violet); transition: transform var(--dur-fast); }
+  .rawbox[open] > summary::before { transform: rotate(90deg); }
+  .rawbox[open] > summary { border-bottom: 1px solid var(--color-border); }
+  .vf { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 8px 13px; border-bottom: 1px solid var(--color-border-soft); font-size: 12px; }
+  .vf:last-of-type { border-bottom: none; }
+  .vf .k { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .vf .v { font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
+  .v-true { color: var(--color-success); } .v-false { color: var(--color-danger); } .v-null { color: var(--color-text-dim); font-style: italic; } .v-block { color: var(--color-danger); }
+  .verbatim-cap { padding: 8px 13px; font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); display: flex; gap: 7px; align-items: center; border-top: 1px solid var(--color-border-soft); }
+  .verbatim-cap .g { color: var(--color-accent-violet); }
+
+  /* resting publish form */
+  .pubcard { margin-top: 6px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: 20px; }
+  .pubcard h3 { font-family: var(--font-headline); font-weight: 700; margin: 0 0 4px; font-size: var(--text-md); display: flex; align-items: center; gap: 9px; }
+  .pubcard p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; line-height: 1.6; }
+  .gi-label { display: block; margin: 16px 0 6px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-dim); }
+  .gi-input { width: 100%; min-height: 84px; resize: vertical; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 11px 13px; color: var(--color-text); font-family: inherit; font-size: 13px; line-height: 1.6; }
+  .gi-input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  .pub-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .dial-chip { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 4px 11px; }
+  .dial-chip .lk { color: var(--neon-gold); }
+
+  /* thin spine rail (variant B) */
+  .railspine { display: flex; align-items: center; gap: 5px; padding: 12px 2px 2px; flex-wrap: wrap; }
+  .rpip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-surface); font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+  .rpip iconify-icon { font-size: 13px; }
+  .rpip.done { border-color: hsl(142 71% 45% / .4); color: var(--color-success); }
+  .rpip.run { border-color: var(--color-warning); color: var(--color-warning); background: var(--color-warning-dim); }
+  .rpip.blocked { border-color: hsl(0 72% 51% / .5); color: var(--color-danger); background: var(--color-danger-dim); }
+  .rconn { width: 12px; height: 2px; background: var(--color-border); flex: none; }
+  .rconn.passed { background: var(--color-success); }
+
+  /* variant C inline bubble pointing at a node */
+  .bubble { position: relative; margin-top: 22px; }
+  .bubble::before { content: ""; position: absolute; top: -8px; left: 44px; width: 16px; height: 16px; background: var(--color-surface); border-left: 1.5px solid var(--bub-border, var(--color-border)); border-top: 1.5px solid var(--bub-border, var(--color-border)); transform: rotate(45deg); z-index: 2; }
+
+  .legend { margin-top: 18px; font-size: 11px; color: var(--color-text-dim); display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 0 0; border-top: 1px solid var(--color-border-soft); }
+  .legend b { color: var(--color-text-muted); font-weight: 600; }
+
+  /* "today (before)" reference */
+  .today-box { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; background: var(--color-surface); }
+  .today-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .today-grid .box { border: 1px solid var(--color-border); border-radius: 6px; padding: 6px 10px; }
+  .today-grid .box .bl { font-family: var(--font-mono); font-size: 10px; color: var(--color-text); }
+  .today-grid .box .bw { font-size: 9px; color: var(--color-text-dim); }
+  .note-amber { margin: 8px 0 16px; font-size: 12px; color: var(--color-warning); }
+
+  /* ── SOUL block (shipped Phase 124, scale="pub") — sits ABOVE the gauntlet in the real modal ── */
+  .soul051 { position: relative; margin-bottom: 16px; border: 1px dashed hsl(258 90% 66% / .4); border-radius: var(--radius-md); background: hsl(258 90% 66% / .05); padding: 16px 16px 14px; }
+  .soul051 .tag124 { position: absolute; top: -9px; right: 12px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .04em; color: var(--neon-violet); background: var(--color-bg); border: 1px solid hsl(258 90% 66% / .4); border-radius: var(--radius-full); padding: 1px 8px; }
+  .soul051 .s-purpose { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-lg); line-height: 1.35; }
+  .soul051 .s-needs { margin-top: 6px; font-size: 11px; color: var(--color-text-muted); }
+  .soul051 .s-needs .mono { color: var(--color-text); }
+  .soul051 .s-spine { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .soul051 .mdot { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; border: 1px solid var(--color-border); background: var(--color-surface); }
+  .soul051 .mdot iconify-icon { font-size: 18px; }
+  .soul051 .mdot.emit { border-color: hsl(258 90% 66% / .5); box-shadow: 0 0 10px hsl(258 90% 66% / .2); }
+  .soul051 .msep { color: var(--color-text-dim); }
+  .soul051 .s-foot { margin-top: 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .soul051 .s-tier { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border: 1px solid hsl(43 96% 62% / .45); color: var(--neon-gold); border-radius: var(--radius-full); padding: 4px 12px; }
+  .soul051 .s-out { font-size: 12px; color: var(--color-text-muted); } .soul051 .s-out .mono { color: var(--color-text); }
+
+  /* calm-mode anchor: dials the energy down so the operator can compare moods */
+  body.calm body::before, body.calm .grhero::before { animation: none; }
+  body.calm .econn .comet, body.calm .enode.run iconify-icon, body.calm .grh-rocket iconify-icon { animation: none; }
+  body.calm .enode.run::before { animation: none; opacity: .4; }
+  body.calm .grad-text { background: none; color: var(--color-primary); -webkit-text-fill-color: var(--color-primary); }
+  body.calm .grhero, body.calm .wverdict.ok, body.calm .wverdict.bad { box-shadow: none; }
+  body.calm .btn-primary { background: var(--color-primary); color: #06091d; box-shadow: none; }
+
+  /* lifecycle stepper (under nav) */
+  .life { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 18px; }
+  .life .ll { font-size: 11px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: .07em; margin-right: 4px; }
+  .life button { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all var(--dur-fast); }
+  .life button:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .life button.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); font-weight: 600; }
+
+  .variant.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">051 · Gauntlet</span>
+  <button class="variant-tab active" data-v="a" onclick="setVariant('a')">A · Recipe-literal <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" onclick="setVariant('b')">B · Verdict-first</button>
+  <button class="variant-tab" data-v="c" onclick="setVariant('c')">C · Progressive-strip</button>
+  <button class="variant-tab" data-v="today" onclick="setVariant('today')">▣ Today (before)</button>
+</div>
+
+<div class="wrap">
+  <h1 class="page-h">Publish test — <span class="grad-text">read it at a glance</span></h1>
+  <p class="page-sub">The 8-stage gauntlet as a living energy-spine: a real run of your workflow on your KB, graded by an independent AI. Plain-worded result up front; the raw verdict is one click away. Hover a stage to see what it checks.</p>
+
+  <div class="life">
+    <span class="ll">Lifecycle</span>
+    <button data-s="resting" class="on" onclick="setStage('resting')">1 · Resting</button>
+    <button data-s="running" onclick="setStage('running')">2 · Golden run</button>
+    <button data-s="published" onclick="setStage('published')">3 · Published ✓</button>
+    <button data-s="judge" onclick="setStage('judge')">4 · Judge block ★</button>
+    <button data-s="prerun" onclick="setStage('prerun')">5 · Early block</button>
+  </div>
+
+  <div id="stage-root"></div>
+
+  <div class="legend">
+    <span><b>Energy spine</b> — passed stages glow green; the live stage pulses; energy flows into it.</span>
+    <span><b>Worded first</b> — the result in plain language; raw 5-field verdict behind “Show raw verdict”.</span>
+    <span><b>Honesty kept</b> — verbatim verdict · judge = hard wall · no override.</span>
+    <span><b>Provider marks</b> — REAL logos where Iconify has them (DeepSeek/Claude/Gemini); Kimi/GLM/MiniMax are placeholders. The build uses the installed <span class="mono">@lobehub/icons</span> for all 8.</span>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <button onclick="document.body.classList.toggle('calm')" title="Toggle calm vs energized mood">⚡ Calm⇄Energized</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'" title="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ───────── provider engine marks (hand-built inline SVG, brand-ish colors) ─────────
+   Small stylized marks so you can read WHICH AI engine powers a step — featuring the
+   app's Asian-tech natives (DeepSeek / Kimi / GLM / MiniMax) alongside Claude/Gemini. */
+const PROVIDERS = {
+  deepseek: { name: "DeepSeek-V3", color: "#4D6BFE", bg: "linear-gradient(135deg,#3b54e0,#6f8bff)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 9c3.5 1 5.5 3 7 6 .6-4 3-6.5 7-7-3 .2-5 1.4-7 4-1-2.3-2.6-3.2-4-3z" fill="#fff"/><circle cx="16.5" cy="8.5" r="1" fill="#fff"/></svg>` },
+  kimi:     { name: "Kimi K2", color: "#6F4CF0", bg: "linear-gradient(135deg,#161324,#4b3aa6)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M16.5 15.5A6 6 0 1 1 10 6.2a4.7 4.7 0 1 0 6.5 9.3z" fill="#fff"/></svg>` },
+  glm:      { name: "GLM-4.6", color: "#19B5A6", bg: "linear-gradient(135deg,#0f8f86,#2fe0cf)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v8l-7 4-7-4V7z" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M9 14h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>` },
+  minimax:  { name: "MiniMax-M2", color: "#F0414B", bg: "linear-gradient(135deg,#d62a35,#ff6a72)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 17V8l3.5 5L12 8l3.5 5L19 8v9" stroke="#fff" stroke-width="1.7" fill="none" stroke-linejoin="round" stroke-linecap="round"/></svg>` },
+  claude:   { name: "Claude Opus 4.8", color: "#D97757", bg: "linear-gradient(135deg,#c75f3e,#e89274)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"/></g></svg>` },
+  gemini:   { name: "Gemini 2.5", color: "#5B8CFF", bg: "linear-gradient(135deg,#3f6fe0,#9b7bff)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3c.6 4.4 2.6 6.4 7 7-4.4.6-6.4 2.6-7 7-.6-4.4-2.6-6.4-7-7 4.4-.6 6.4-2.6 7-7z" fill="#fff"/></svg>` },
+};
+// Real brand logos from Iconify's `logos` set where it HAS them; the rest are hand-built
+// placeholders. ⚠ THE REAL BUILD USES THE INSTALLED @lobehub/icons FOR ALL 8 PROVIDERS
+// (Phase 128 / sketch 048) — these mockup marks are NOT the shipped art.
+const PROVIDER_LOGO = { deepseek: "logos:deepseek-icon", claude: "logos:claude-icon", gemini: "logos:google-gemini" };
+function engineChip(key, role) {
+  const p = PROVIDERS[key];
+  const logo = PROVIDER_LOGO[key];
+  const mark = logo
+    ? `<span class="engine-mark real"><iconify-icon icon="${logo}"></iconify-icon></span>`
+    : `<span class="engine-mark mock" style="background:${p.bg};color:${p.color}" title="placeholder logo — the build uses the installed @lobehub/icons">${p.svg}</span>`;
+  return `<span class="engine-chip">${mark}<span><span class="engine-name">${p.name}</span> ${role ? `<span class="engine-role">· ${role}</span>` : ""}</span></span>`;
+}
+
+/* ───────── the 8 server-fixed stages (real STAGES order) + a 3D icon each ───────── */
+const STAGES = [
+  { key: "owner",       lab: "Owner",       icon: "fluent-emoji:shield",                      fb: "🛡️", what: "you own it" },
+  { key: "valid",       lab: "Valid",       icon: "fluent-emoji:check-mark-button",           fb: "✅", what: "re-validates" },
+  { key: "requirement", lab: "Goal",        icon: "fluent-emoji:bullseye",                    fb: "🎯", what: "one clear goal" },
+  { key: "lint",        lab: "Structure",   icon: "fluent-emoji:magnifying-glass-tilted-left",fb: "🔎", what: "reachable · no orphans" },
+  { key: "interactive", lab: "Pause-check", icon: "fluent-emoji:raised-hand",                 fb: "✋", what: "no sync-blocking pauses" },
+  { key: "golden",      lab: "Golden run",  icon: "fluent-emoji:rocket",                      fb: "🚀", what: "REAL run on your KB" },
+  { key: "gate",        lab: "Citations",   icon: "fluent-emoji:locked",                      fb: "🔒", what: "cited · integrity" },
+  { key: "judge",       lab: "Judge",       icon: "fluent-emoji:balance-scale",               fb: "⚖️", what: "independent AI grades it" },
+];
+const GOLDEN_IDX = 5, JUDGE_IDX = 7, LINT_IDX = 3;
+
+/* per-lifecycle: which stage index is blocked (-1 none), how far passed, is the run live */
+function stageModel(s) {
+  switch (s) {
+    case "resting":   return { passedTo: -1, running: -1, blocked: -1, hasRun: false };
+    case "running":   return { passedTo: 4,  running: GOLDEN_IDX, blocked: -1, hasRun: false };
+    case "published": return { passedTo: 7,  running: -1, blocked: -1, hasRun: true };
+    case "judge":     return { passedTo: 6,  running: -1, blocked: JUDGE_IDX, hasRun: true };
+    case "prerun":    return { passedTo: 2,  running: -1, blocked: LINT_IDX, hasRun: false };
+  }
+}
+
+function spineHTML(s) {
+  const m = stageModel(s);
+  let html = '<div class="espine">';
+  STAGES.forEach((st, i) => {
+    let cls = "pending", badge = "";
+    if (m.blocked === i) { cls = "blocked"; badge = '<span class="badge">!</span>'; }
+    else if (m.running === i) { cls = "run"; }
+    else if (i <= m.passedTo) { cls = "done"; badge = '<span class="badge">✓</span>'; }
+    if (i > 0) {
+      const flowing = m.running === i;
+      const passed = i <= m.passedTo;            // connector into a done node is complete
+      html += `<div class="econn ${passed ? 'passed' : ''} ${flowing ? 'flowing' : ''}">${flowing ? '<span class="comet"></span>' : ''}</div>`;
+    }
+    html += `<div class="estage ${cls}">
+      <div class="enode ${cls}"><iconify-icon icon="${st.icon}">${st.fb}</iconify-icon>${badge}</div>
+      <div class="lab">${st.lab}</div><div class="what">${st.what}</div></div>`;
+  });
+  return html + "</div>";
+}
+
+function railSpineHTML(s) {
+  const m = stageModel(s);
+  let html = '<div class="railspine">';
+  STAGES.forEach((st, i) => {
+    let cls = "";
+    if (m.blocked === i) cls = "blocked";
+    else if (m.running === i) cls = "run";
+    else if (i <= m.passedTo) cls = "done";
+    if (i > 0) html += `<span class="rconn ${ (i-1) < m.passedTo ? 'passed' : ''}"></span>`;
+    html += `<span class="rpip ${cls}"><iconify-icon icon="${st.icon}">${st.fb}</iconify-icon>${st.lab}</span>`;
+  });
+  return html + "</div>";
+}
+
+function heroHTML() {
+  return `<div class="grhero">
+    <div class="grh-top">
+      <div class="grh-rocket"><iconify-icon icon="fluent-emoji:rocket">🚀</iconify-icon></div>
+      <div style="min-width:0">
+        <div class="grh-title"><span class="dot"></span> Running the golden run on your KB…</div>
+      </div>
+      <div class="grh-clock" id="clk">0:41</div>
+    </div>
+    <div class="grh-sub">Publish runs your <b>whole workflow for real</b> against your knowledge base, then an independent AI grades the result — a multi-step workflow can take a <b>few minutes</b>. Same tools, same model, so the grade is on a <b>real</b> deliverable, not a dry-run.</div>
+    <div class="grh-bar progress-bar"></div>
+    <div class="grh-engine">
+      ${engineChip("deepseek", "running this workflow")}
+      <span style="opacity:.5">→ graded by</span>
+      ${engineChip("claude", "independent judge")}
+    </div>
+    <div class="grh-honest">↳ honest wait: this blocks the request — don’t close the tab. The verdict comes back inline when the run + grade finish.</div>
+  </div>`;
+}
+
+const RAW = {
+  published: { published: true, version: 1, golden_run_id: "a7f3c1d2-44e1-4b90-9c1a-7e2f", blocked_stage: null, named_failures: "[] (empty)" },
+  judge:     { published: false, version: null, golden_run_id: "a7f3c1d2-44e1-4b90-9c1a-7e2f", blocked_stage: "judge", named_failures: "list · 2 items (rendered above)" },
+  prerun:    { published: false, version: null, golden_run_id: null, blocked_stage: "lint", named_failures: "list · 1 item (rendered above)" },
+};
+function rawHTML(kind) {
+  const v = RAW[kind];
+  const cell = (k, val) => {
+    let inner;
+    if (val === null) inner = '<span class="v-null">null</span>';
+    else if (val === true) inner = '<span class="v-true">true</span>';
+    else if (val === false) inner = '<span class="v-false">false</span>';
+    else if (k === "blocked_stage") inner = `<span class="v-block">${val}</span>`;
+    else inner = val;
+    return `<div class="vf"><span class="k">${k}</span><span class="v">${inner}</span></div>`;
+  };
+  return `<details class="rawbox">
+    <summary>Show raw verdict — the 5 server fields, verbatim</summary>
+    ${cell("published", v.published)}${cell("version", v.version)}${cell("golden_run_id", v.golden_run_id)}${cell("blocked_stage", v.blocked_stage)}${cell("named_failures", v.named_failures)}
+    <div class="verbatim-cap"><span class="g">▦</span> rendered verbatim from the server — not re-derived in the client.</div>
+  </details>`;
+}
+
+function criteriaHTML() {
+  return `<div class="judge-by">${engineChip("claude", "independent judge")} <span style="opacity:.6">— independent of the model that ran the workflow</span></div>
+  <div class="crit-cap">Why it blocked — failed criteria</div>
+  <div class="crit"><div class="cx">✕</div><div><div class="cn">grounded_in_evidence</div><div class="ce">3 of 12 figures are uncited — residual-risk scores for 3 vendors trace to no source.</div></div><div class="cs"><div class="cs-num">0.42</div><div class="cs-bar"><i style="width:42%"></i></div></div></div>
+  <div class="crit"><div class="cx">✕</div><div><div class="cn">answers_business_requirement</div><div class="ce">The brief omits the mitigation deadline the requirement asked for.</div></div><div class="cs"><div class="cs-num">0.58</div><div class="cs-bar"><i style="width:58%"></i></div></div></div>`;
+}
+
+function pubFormHTML() {
+  return `<div class="pubcard">
+    <h3><iconify-icon icon="fluent-emoji:rocket" style="font-size:20px">🚀</iconify-icon> Publish this workflow</h3>
+    <p>Publishing runs the full <b>8-stage gauntlet</b> — including a <b>real run</b> of this workflow on your KB and an <b>independent AI grade</b> of the result. It can honestly block.</p>
+    <label class="gi-label">golden_input — a representative kickoff prompt</label>
+    <textarea class="gi-input" placeholder="Something typical, not a corner case — e.g. “Build the Q3 vendor-risk brief for the procurement committee.”"></textarea>
+    <div class="pub-foot">
+      <span class="dial-chip"><span class="lk">🔒</span> STRICT · citations strict · output valid · judge always on</span>
+      <button class="btn btn-primary" onclick="setStage('running')">Publish ▸ run the gauntlet</button>
+    </div>
+  </div>`;
+}
+
+/* ───────── verdict pieces (worded-first) ───────── */
+function verdictPublished() {
+  return `<div class="wverdict ok">
+    <div class="wv-top">
+      <div class="wv-ic"><iconify-icon icon="fluent-emoji:party-popper">🎉</iconify-icon></div>
+      <div><div class="wv-head">Published — version 1 is live</div>
+        <div class="wv-line">Passed all 8 checks, including a real run on your KB and the independent AI grade. It’s now available to run.</div></div>
+      <span class="wv-stamp">200 OK</span>
+    </div>
+    <a class="run-link" href="#" onclick="return false">▦ Open the run that was graded · a7f3c1d2…</a>
+    ${rawHTML("published")}
+  </div>`;
+}
+function verdictJudge() {
+  return `<div class="wverdict bad">
+    <div class="wv-top">
+      <div class="wv-ic"><iconify-icon icon="fluent-emoji:balance-scale">⚖️</iconify-icon></div>
+      <div><div class="wv-head">Blocked by the independent grader</div>
+        <div class="wv-line">The run finished — but the grader wouldn’t pass the result. This is a hard wall: there is no “publish anyway.”</div></div>
+      <span class="wv-stamp">200 · read blocked_stage</span>
+    </div>
+    ${criteriaHTML()}
+    <div class="hardwall">
+      <span class="text-muted" style="flex:1 1 240px">The only way forward is to fix the deliverable and re-publish — each attempt is a fresh run and a fresh grade.</span>
+      <span class="no-ovr">no override · <s>publish anyway</s></span>
+      <button class="btn btn-ghost">↻ Fix &amp; re-publish</button>
+    </div>
+    <a class="run-link" href="#" onclick="return false">▦ Open the run that was graded · a7f3c1d2…</a>
+    ${rawHTML("judge")}
+  </div>`;
+}
+function verdictPrerun() {
+  return `<div class="wverdict bad">
+    <div class="wv-top">
+      <div class="wv-ic"><iconify-icon icon="fluent-emoji:no-entry">⛔</iconify-icon></div>
+      <div><div class="wv-head">Blocked early — structure check</div>
+        <div class="wv-line">A phase can’t be reached (an orphan step). Caught before any run started — so there’s no run to open. Fix the wiring and re-publish.</div></div>
+      <span class="wv-stamp">200 · read blocked_stage</span>
+    </div>
+    <div class="crit"><div class="cx">✕</div><div><div class="cn">lint · unreachable_phase</div><div class="ce">Phase “score_vendors” has no inbound edge — nothing routes to it.</div></div><div class="cs"></div></div>
+    <div class="no-run">↳ <span style="color:var(--color-text)">golden_run_id</span> is <span class="v-null">null</span> — this blocked before stage 6, so there is no run to open.</div>
+    ${rawHTML("prerun")}
+  </div>`;
+}
+
+/* ───────── variant compositions ───────── */
+function renderA(s) {
+  if (s === "resting") return spineHTML(s) + pubFormHTML();
+  if (s === "running") return spineHTML(s) + heroHTML();
+  if (s === "published") return spineHTML(s) + verdictPublished();
+  if (s === "judge") return spineHTML(s) + verdictJudge();
+  if (s === "prerun") return spineHTML(s) + verdictPrerun();
+}
+function renderB(s) {
+  if (s === "resting") return `<div class="wverdict"><div class="wv-top"><div class="wv-ic"><iconify-icon icon="fluent-emoji:rocket">🚀</iconify-icon></div><div><div class="wv-head" style="color:var(--color-text)">Ready to publish</div><div class="wv-line">When you publish, the result goes through the 8-stage gauntlet below.</div></div></div></div>` + pubFormHTML() + railSpineHTML(s);
+  if (s === "running") return heroHTML() + railSpineHTML(s);
+  let body = s === "published" ? verdictPublished() : s === "judge" ? verdictJudge() : verdictPrerun();
+  return body + railSpineHTML(s);
+}
+function renderC(s) {
+  const spine = spineHTML(s);
+  if (s === "resting") return spine + `<div class="bubble" style="--bub-border:var(--color-border)">${pubFormHTML()}</div>`;
+  let inner, border = "var(--color-warning)";
+  if (s === "running") { inner = heroHTML(); }
+  else if (s === "published") { inner = verdictPublished(); border = "hsl(142 71% 45% / .5)"; }
+  else if (s === "judge") { inner = verdictJudge(); border = "hsl(0 72% 51% / .5)"; }
+  else { inner = verdictPrerun(); border = "hsl(0 72% 51% / .5)"; }
+  return spine + `<div class="bubble" style="--bub-border:${border}">${inner}</div>`;
+}
+function renderToday() {
+  let boxes = STAGES.map(st => `<div class="box"><div class="bl">${st.lab.toLowerCase().replace(/ /g,"_")}</div><div class="bw">${st.what}</div></div>`).join("");
+  return `<div class="note-amber">▣ Today’s shipped version — for contrast. Eight verbose boxes that wrap, plus a raw 5-field grid shown by default.</div>
+  <div class="today-box">
+    <div class="today-grid">${boxes}</div>
+    <div style="margin-top:14px" class="rawbox" >
+      <div style="padding:10px 13px;font-family:var(--font-mono);font-size:11px;color:var(--color-text-muted);border-bottom:1px solid var(--color-border)">PublishVerdict (shown by default today)</div>
+      <div class="vf"><span class="k">published</span><span class="v"><span class="v-false">false</span></span></div>
+      <div class="vf"><span class="k">version</span><span class="v"><span class="v-null">null</span></span></div>
+      <div class="vf"><span class="k">golden_run_id</span><span class="v">a7f3c1d2-…</span></div>
+      <div class="vf"><span class="k">blocked_stage</span><span class="v"><span class="v-block">judge</span></span></div>
+      <div class="vf"><span class="k">named_failures</span><span class="v">list · 2 item(s) (rendered above)</span></div>
+    </div>
+  </div>`;
+}
+
+/* the soul block (shipped Phase 124, scale="pub") that sits ABOVE the gauntlet in the real modal */
+function soulBlockHTML() {
+  const ph = [["fluent-emoji:gear","⚙️"],["fluent-emoji:robot","🤖"],["fluent-emoji:busts-in-silhouette","👥"],["fluent-emoji:memo","📝"],["fluent-emoji:raised-hand","✋"],["fluent-emoji:package","📦"]];
+  const dots = ph.map((x,i)=>`<span class="mdot ${i===ph.length-1?"emit":""}" ><iconify-icon icon="${x[0]}">${x[1]}</iconify-icon></span>`).join('<span class="msep">·</span>');
+  return `<div class="soul051"><span class="tag124">soul · shipped Phase 124</span>
+    <div class="s-purpose">Produce a cited vendor-risk brief for the procurement committee.</div>
+    <div class="s-needs">needs <span class="mono">kickoff_prompt</span> · reads <span class="mono">Vendors KB</span></div>
+    <div class="s-spine">${dots}</div>
+    <div class="s-foot"><span class="s-tier">🔒 Strict</span><span class="s-out">produces: <span class="mono">committee_brief.docx</span> (cited)</span></div>
+  </div>`;
+}
+
+let V = "a", S = "resting";
+function render() {
+  const root = document.getElementById("stage-root");
+  let html;
+  if (V === "today") html = renderToday();
+  else if (V === "a") html = renderA(S);
+  else if (V === "b") html = renderB(S);
+  else html = renderC(S);
+  // The real publish modal shows the 124 soul block ABOVE the gauntlet — prepend it so the
+  // sketch reads as the TRUE composition (124 soul → 127 energized test), never a contradiction.
+  const soul = V === "today" ? "" : soulBlockHTML();
+  root.innerHTML = `<div class="variant">${soul}${html}</div>`;
+}
+function setVariant(v) {
+  V = v;
+  document.querySelectorAll(".variant-tab").forEach(t => t.classList.toggle("active", t.dataset.v === v));
+  document.querySelector(".life").style.display = (v === "today") ? "none" : "flex";
+  render();
+}
+function setStage(s) {
+  S = s;
+  document.querySelectorAll(".life button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
+  render();
+}
+render();
+</script>
+</body>
+</html>
