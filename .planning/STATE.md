@@ -22,13 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Building STRETCH **128 → then 127** (operator-decided 2026-06-27). Phase 129 COMPLETE (first STRETCH). **NEXT ACTION: `/gsd:sketch 128`** — 128 was reframed to "Chat Tool-Card Unification + Chat-Area Reclaim" (TDP-02 + CTC-01..04: provider logos in tool-card header `ToolCallPanel.tsx:454` · unified cross-provider tool card · remove redundant sticky composer timer `ChatArea.tsx:517` · Read-more on long prompts `MessageItem.tsx`); G-2 sketch-gated, then discuss→plan→execute. After 128 ships, do **127** (Gauntlet pip-strip + quiet idle cards; also `/gsd:sketch 127` first; gauntlet=`PublishGauntlet.tsx`, PhaseCard=`panel/PhaseCard.tsx`). Existing sketches to extend: 020-publish-gauntlet-honesty (127), 002-tool-call-panel + 014/015 (128). Then `/gsd:complete-milestone` (tag v3.1). Detail → [[project_128_reframed]], [[project_129_executed]].
+**Current focus:** Building STRETCH **128 → then 127** (operator-decided 2026-06-27). Phase 129 COMPLETE (first STRETCH). **NEXT ACTION: `/gsd:plan-phase 128`** — 128 sketch COMPLETE (`b0070379`, winners all A) + **context gathered 2026-06-27 (`0e3608fa`; 8 locked decisions D-01..D-08 in `128-CONTEXT.md`)**. 128 = "Chat Tool-Card Unification + Chat-Area Reclaim" (TDP-02 + CTC-01..04: provider logos in tool-card header `RunCard.tsx:280` · unified cross-provider tool card · remove redundant sticky composer timer `ChatArea.tsx:533` `StickyTimerBar` · Read-more on long prompts `MessageItem.tsx:205`); G-2 sketch DONE + discussed, then plan→execute. After 128 ships, do **127** (Gauntlet pip-strip + quiet idle cards; also `/gsd:sketch 127` first; gauntlet=`PublishGauntlet.tsx`, PhaseCard=`panel/PhaseCard.tsx`). Existing sketches to extend: 020-publish-gauntlet-honesty (127), 002-tool-call-panel + 014/015 (128). Then `/gsd:complete-milestone` (tag v3.1). Detail → [[project_128_reframed]], [[project_129_executed]].
 
 ## Current Position
 
-Phase: 128 (reframed — Chat Tool-Card Unification + Chat-Area Reclaim) — NEXT, not started. 129 COMPLETE.
-Plan: Not started — 128 is G-2 sketch-gated → start with `/gsd:sketch 128` (reframe committed `692b3b78`; scope in ROADMAP Phase Details + REQUIREMENTS TDP-02/CTC-01..04).
-Status: Phase 129 closed (verify 11/11; nyquist false-with-caveat — trigger dormant). 128 awaiting sketch.
+Phase: 128 (Chat Tool-Card Unification + Chat-Area Reclaim) — **context gathered, ready to plan**. 129 COMPLETE.
+Plan: Not started — `128-CONTEXT.md` committed (`0e3608fa`); G-2 sketch (048/049/050, all A) is the acceptance bar; 8 decisions locked (D-01..D-08). Next: `/gsd:plan-phase 128` (scope in ROADMAP Phase Details + REQUIREMENTS TDP-02/CTC-01..04).
+Status: Phase 129 closed (verify 11/11; nyquist false-with-caveat — trigger dormant). 128 discuss-phase done — G-5 audit = PROCEED (surgical/subtractive); reported-bugs routed (setting-up-agent partial/TDP-02, BUG-260610-01 conditional reseed, BUG-260609-02 open); CTC-03 gated on live native-7+OR proof.
 Last activity: 2026-06-27
 
 ### Quick Tasks Completed
