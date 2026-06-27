@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: executing
-last_updated: "2026-06-27T06:05:55.014Z"
+status: ready_to_plan
+last_updated: 2026-06-27T08:56:11.168Z
 last_activity: 2026-06-27 -- Phase 128 execution started
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 31
-  completed_plans: 31
+  completed_plans: 37
   percent: 100
+stopped_at: Phase 128 complete (6/6) — ready to discuss Phase 129
 ---
 
 # Project State
@@ -22,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 128 — chat-tool-card-unification-chat-area-reclaim
+**Current focus:** Phase 129 — minimax openrouter arg repair
 
 ## Current Position
 
-Phase: 128 (chat-tool-card-unification-chat-area-reclaim) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 128
-Last activity: 2026-06-27 -- Phase 128 execution started
+Phase: 129
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-27
 
 ### Quick Tasks Completed
 
