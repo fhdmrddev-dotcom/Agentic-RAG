@@ -294,7 +294,16 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
         <div
           data-testid="run-card-avatar"
           className={cn(
-            "flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center shadow-sm shadow-primary/20",
+            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm",
+            // Phase 128 (CTC-01 contrast fix): real @lobehub brand marks need a light
+            // chip to stay legible in BOTH themes — .Color marks show true brand colors
+            // on white, and .Mono marks (OpenAI/Anthropic/Moonshot/OpenRouter/Ollama)
+            // inherit the forced dark `currentColor` instead of vanishing on the violet
+            // gradient. The unmapped Bot fallback keeps the gradient-primary identity
+            // (a white glyph reads fine there).
+            HeaderMark
+              ? "bg-white text-zinc-900 ring-1 ring-black/10"
+              : "gradient-primary text-white shadow-primary/20",
             isStreamingNow && "animate-brandPulse",
           )}
         >

@@ -47,6 +47,7 @@ import ZhipuColor from "@lobehub/icons/es/Zhipu/components/Color"
 import MinimaxColor from "@lobehub/icons/es/Minimax/components/Color"
 import OpenRouter from "@lobehub/icons/es/OpenRouter/components/Mono"
 import Ollama from "@lobehub/icons/es/Ollama/components/Mono"
+import LmStudio from "@lobehub/icons/es/LmStudio/components/Mono"
 
 /** An `@lobehub/icons` brand mark — a React component accepting a `size` prop. */
 type ProviderMark = ComponentType<{ size?: number }>
@@ -59,8 +60,10 @@ type ProviderMark = ComponentType<{ size?: number }>
  *     model's brand (D-08).
  * `.Color` is used where the brand ships a gradient mark (google/deepseek/
  * zhipu/minimax); the others use the brand default (the `.Mono` mark) — both
- * are pure SVG. `lmstudio` / `unknown` / undefined are deliberately ABSENT →
- * `providerLogo` returns null → the caller renders the brand-pulse `Bot` dot.
+ * are pure SVG. `ollama` + `lmstudio` are the two local-connector marks (one per
+ * local base-URL connector — operator override of the original D-08 Bot-fallback
+ * for lmstudio). Only `unknown` / undefined are ABSENT → `providerLogo` returns
+ * null → the caller renders the brand-pulse `Bot` dot.
  */
 const MARKS: Record<string, ProviderMark> = {
   openai: OpenAI,
@@ -72,6 +75,7 @@ const MARKS: Record<string, ProviderMark> = {
   minimax: MinimaxColor,
   openrouter: OpenRouter,
   ollama: Ollama,
+  lmstudio: LmStudio,
 }
 
 /**
@@ -80,7 +84,7 @@ const MARKS: Record<string, ProviderMark> = {
  * @param provider the resolved `message.provider` string (or undefined for
  *   historical/loading messages)
  * @returns the `@lobehub/icons` mark component, or `null` for any unmapped
- *   provider (`lmstudio` / `unknown` / undefined) so the caller renders `Bot`.
+ *   provider (`unknown` / undefined) so the caller renders `Bot`.
  */
 export function providerLogo(provider: string | undefined): ProviderMark | null {
   // The `?? null` mirrors fileIcon's `?? DEFAULT_SPEC` — total over any key.

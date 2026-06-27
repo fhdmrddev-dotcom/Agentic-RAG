@@ -11,7 +11,8 @@
  * Locked map contract (D-08, research §Pattern 1):
  *   - GLM is keyed "zhipu" (NOT "glm"); Kimi is keyed "moonshot" (NOT "kimi").
  *   - "openrouter" → the OpenRouter mark; it is NOT unwrapped to a routed brand.
- *   - lmstudio / unknown / undefined are deliberately ABSENT → null.
+ *   - ollama + lmstudio are the two local-connector marks (one per local base-URL
+ *     connector); only unknown / undefined are ABSENT → null.
  */
 import { describe, it, expect } from "vitest"
 import { providerLogo } from "@/lib/providerLogo"
@@ -19,7 +20,7 @@ import { providerLogo } from "@/lib/providerLogo"
 describe("providerLogo", () => {
   // Test 1 — mapped provider → a non-null mark (a React component).
   it("returns a non-null mark for each mapped native provider", () => {
-    for (const p of ["openai", "anthropic", "google", "deepseek", "moonshot", "zhipu", "minimax", "ollama"]) {
+    for (const p of ["openai", "anthropic", "google", "deepseek", "moonshot", "zhipu", "minimax", "ollama", "lmstudio"]) {
       const Mark = providerLogo(p)
       expect(Mark, `expected a mark for "${p}"`).not.toBeNull()
       // @lobehub/icons marks are callable React components (function or memo object).
@@ -27,9 +28,10 @@ describe("providerLogo", () => {
     }
   })
 
-  // Test 2 — D-08 fallback → null (caller renders <Bot/>).
-  it("returns null for lmstudio / unknown / undefined (Bot fallback)", () => {
-    expect(providerLogo("lmstudio")).toBeNull()
+  // Test 2 — only truly-unknown providers fall back → null (caller renders <Bot/>).
+  // Operator override (2026-06-27): lmstudio now maps to the LM Studio mark (a known
+  // local connector, like ollama) — so ONLY unknown / undefined return null.
+  it("returns null for unknown / undefined (Bot fallback)", () => {
     expect(providerLogo("unknown")).toBeNull()
     expect(providerLogo(undefined)).toBeNull()
   })

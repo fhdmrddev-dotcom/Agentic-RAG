@@ -2,10 +2,11 @@
  * Phase 128 Plan 04 (CTC-01 / CTC-02) — RunCard tool-card header logo swap.
  *
  * The brand-pulse avatar in the RunCard header (RunCard.tsx:280-288) now renders
- * the REAL per-provider `@lobehub/icons` mark via `providerLogo(message.provider)`
- * on the existing `gradient-primary` backing, with the `<Bot>` fallback for any
- * unmapped provider (D-08). The `animate-brandPulse` ring STAYS while streaming
- * (D-01) — only the inner glyph changes.
+ * the REAL per-provider `@lobehub/icons` mark via `providerLogo(message.provider)`.
+ * CTC-01 contrast fix (2026-06-27, operator-approved): a mapped provider's mark sits
+ * on a WHITE chip (`bg-white`) so it stays legible in both light + dark themes; an
+ * unmapped provider keeps the violet `gradient-primary` backing + the `<Bot>` fallback
+ * (D-08). The `animate-brandPulse` ring STAYS while streaming (D-01) — both pulse.
  *
  * jsdom note: jsdom renders SVG components structurally (no layout). These tests
  * assert STRUCTURE — the presence/absence of the Lucide `<Bot>` glyph (which
@@ -74,12 +75,15 @@ describe("RunCard — CTC-01 tool-card header provider logo", () => {
     expect(avatar.querySelector("svg")).not.toBeNull()
   })
 
-  it("Test 2 — an unmapped provider (lmstudio) renders the Bot fallback", () => {
+  it("Test 2 — an unmapped provider renders the Bot fallback on the gradient backing", () => {
     const { getByTestId } = renderWithTooltip(
-      <RunCard message={makeRunMessage({ provider: "lmstudio", runStatus: "streaming" })} />,
+      <RunCard message={makeRunMessage({ provider: "some-unmapped-provider", runStatus: "streaming" })} />,
     )
     const avatar = getByTestId("run-card-avatar")
     expect(avatar.querySelector(".lucide-bot")).not.toBeNull()
+    // The unmapped/Bot case keeps the violet gradient-primary identity (not the white chip).
+    expect(avatar.className).toContain("gradient-primary")
+    expect(avatar.className).not.toContain("bg-white")
   })
 
   it("Test 2b — an undefined provider (legacy/loading) renders the Bot fallback", () => {
@@ -96,8 +100,8 @@ describe("RunCard — CTC-01 tool-card header provider logo", () => {
     )
     const avatar = getByTestId("run-card-avatar")
     expect(avatar.className).toContain("animate-brandPulse")
-    // The gradient-primary backing is preserved alongside the pulse.
-    expect(avatar.className).toContain("gradient-primary")
+    // CTC-01 contrast fix: a mapped provider's mark sits on the white chip.
+    expect(avatar.className).toContain("bg-white")
   })
 
   it("Test 3b — animate-brandPulse is ABSENT on a terminal run", () => {
@@ -106,7 +110,7 @@ describe("RunCard — CTC-01 tool-card header provider logo", () => {
     )
     const avatar = getByTestId("run-card-avatar")
     expect(avatar.className).not.toContain("animate-brandPulse")
-    // The gradient-primary backing stays even when not streaming.
-    expect(avatar.className).toContain("gradient-primary")
+    // The white chip stays even when not streaming (only the pulse toggles).
+    expect(avatar.className).toContain("bg-white")
   })
 })
