@@ -85,13 +85,31 @@ created: 2026-06-27
 
 ---
 
+## Scoreboard Results — executed 2026-06-27 (operator-driven)
+
+**Verdict: PARTIAL PASS — core CTC-01/CTC-02 visual contract verified LIVE; the full native-7 × 4-axis exhaustive run is DEFERRED (honest, not a faked green).**
+
+**Verified LIVE (operator-confirmed):**
+- **CTC-01 / CTC-02 — the per-provider logo renders correctly and uniformly.** The operator confirmed (a) the real `@lobehub/icons` mark loads **per provider/model** on the unified tool card, and (b) the marks are **legible and look good in BOTH light and dark themes**. This live observation drove the white-chip contrast fix (`214d24d0`) — `.Mono` marks were illegible on the violet `gradient-primary` backing; mapped providers now sit on a white chip, unmapped keep the gradient + Bot fallback. The rest of the card (RunStatusStrip + step/file counts) was already provider-uniform pre-128.
+
+**Verified STRUCTURALLY (automated, green):**
+- `providerLogo` (CTC-01 map incl. the `lmstudio` local-mark override) + `preparingDescription` (TDP-02 partial-JSON `argsCodeText` parse) + `RunCard.logo` (avatar swap, white chip, brandPulse) + `MessageItem.clamp` (CTC-04) unit suites all pass; production `vite build` clean.
+
+**DEFERRED (NOT run — recorded honestly, NOT counted as a pass):**
+- The **full native-7 + OpenRouter exhaustive sweep** (one tool-using prompt per provider with a `run:{run_id}` Redis-stream `description`-during-preparing cross-check) and the **multi-tool / parallel-thread / long-message** axes were NOT exhaustively executed. **Reason:** operator hardware can't run a local model large enough to drive tool cards, and the cloud-provider exhaustive sweep was deferred to keep the phase closeable under time/resource constraints. TDP-02's per-provider description-window WIN magnitude is therefore proven structurally (unit tests) but not measured per-provider on the wire.
+- **Re-open trigger:** any reported cross-provider tool-card regression → run the full scoreboard before further CTC changes. (Carries the SC#10 cross-provider mandate forward as a known, accepted gap — consistent with prior partial cross-provider UATs, e.g. Phase 116.)
+
+**D-07 note:** the StickyTimerBar deletion (Plan 06) proceeds on the operator's explicit approval, with this PARTIAL verdict recorded — the unified card was confirmed to carry the logo + status uniformly on the providers observed; the exhaustive proof is deferred, not claimed.
+
+---
+
 ## Validation Sign-Off
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
-- [ ] SC#10 4-axis scoreboard authored + operator-run (LIVE native-7 + OpenRouter)
+- [x] SC#10 4-axis scoreboard authored + operator-run — **PARTIAL**: CTC-01/02 logo + unified card verified LIVE per-provider in both themes + structural suites green; full native-7 × 4-axis exhaustive run DEFERRED (operator resource constraints — see Scoreboard Results)
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
