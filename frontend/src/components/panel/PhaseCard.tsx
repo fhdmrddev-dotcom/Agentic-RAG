@@ -28,6 +28,8 @@
  */
 import { useEffect, useId, useState } from "react"
 import { cn } from "@/lib/utils"
+import { phaseGlyph } from "@/lib/phaseGlyph"
+import { providerLogo } from "@/lib/providerLogo"
 import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
@@ -255,6 +257,21 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
   const subStep =
     phase.emitSubStep && !hasEmitFailure ? subStepMeta(phase.emitSubStep) : null
 
+  // Phase 127-03 (WUX-03 / SC#2) — density-by-status re-skin (visual-only).
+  // `isActive` carries the type one-liner (the active step's honest context); idle
+  // (pending) and done fold quiet (no type-lecture). The running-only activity line
+  // + engine chip live below; pending/done never show motion or the activity line.
+  const isActive = isRunning || phase.status === "retrying"
+  // The shared 3D phase-type glyph (icon-convention §2 — ONE source). `phaseGlyph`
+  // returns null on an unknown type → the unicode "•"/type fallback (meta.glyph).
+  const Glyph = phaseGlyph(phase.phaseType)
+  // Engine chip — the honest per-phase provider from the sub-agent index. `subAgents`
+  // is [] for almost every phase today (no demux handler populates it), so the chip is
+  // honestly-ABSENT for most phases. Rendered ONLY on a running phase with a REAL
+  // provider; never a Bot fabrication on the live card (T-127-08).
+  const provider = phase.subAgents?.[0]?.provider
+  const EngineMark = provider ? providerLogo(provider) : null
+
   // Active (running) + failed phases auto-expand; done/pending/skipped collapse to
   // a summary row. The running phase is FORCED open (aria-disabled, no-op toggle).
   const [open, setOpen] = useState<boolean>(isRunning || isFailed)
@@ -281,16 +298,26 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
   return (
     <div
       className={cn(
-        "flex flex-col rounded-md border",
+        "flex flex-col rounded-md border transition-colors",
         isFailed
           ? "border-[hsl(var(--destructive)/0.55)] bg-[hsl(var(--destructive)/0.08)]"
           : isRunning
-            ? "border-[hsl(var(--panel-status-active)/0.45)] bg-[hsl(var(--panel-status-active)/0.06)]"
+            ? // BLOOM — the active step: amber wash + glowing left bar + soft glow.
+              // The eye lands here instantly (SC#2 "unmistakably alive").
+              "border-[hsl(var(--panel-status-active)/0.5)] border-l-[3px] border-l-[hsl(var(--panel-status-active))] bg-gradient-to-r from-[hsl(var(--panel-status-active)/0.12)] to-transparent shadow-[0_0_24px_hsl(var(--panel-status-active)/0.1)]"
             : phase.status === "retrying"
               ? "border-accent-violet/50 bg-accent-violet/5"
-              : "border-border/60 bg-card/40",
+              : phase.status === "pending"
+                ? // QUIET idle — dim, still, no motion (SC#2 "quiet at rest").
+                  "border-border/40 bg-card/20 opacity-60"
+                : // done / skipped — folded calm.
+                  "border-border/50 bg-card/30",
         // The llm_batch_agents purple left-border accent (--accent-violet, Plan 01).
-        phase.phaseType === "llm_batch_agents" && "border-l-2 border-l-accent-violet",
+        // Kept for non-running states; the running BLOOM owns the left bar while live.
+        phase.phaseType === "llm_batch_agents" &&
+          !isRunning &&
+          !isFailed &&
+          "border-l-2 border-l-accent-violet",
       )}
     >
       <h3 className="m-0">
@@ -309,9 +336,11 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
             canToggle ? "cursor-pointer hover:bg-accent/40" : "cursor-default",
           )}
         >
-          {/* Phase-type glyph (decorative — the label text carries the meaning). */}
-          <span aria-hidden="true" className="flex-none text-[13px] leading-none text-panel-muted-foreground">
-            {meta.glyph}
+          {/* Phase-type glyph — the shared 3D mark (phaseGlyph, icon-convention §2),
+              with the unicode "•"/type fallback (meta.glyph) when the type is unknown.
+              Decorative — the label text carries the meaning (wrapper stays aria-hidden). */}
+          <span aria-hidden="true" className="flex-none leading-none text-panel-muted-foreground">
+            {Glyph ? <Glyph className="h-4 w-4" /> : <span className="text-[13px]">{meta.glyph}</span>}
           </span>
 
           {/* Phase identity: the honest ordinal + the slug (plain text children). */}
@@ -354,7 +383,35 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
         aria-busy={isRunning || undefined}
         className="flex flex-col gap-2 px-3 pb-3"
       >
-        <p className="text-[12px] leading-relaxed text-panel-muted-foreground">{meta.oneLiner}</p>
+        {/* The type one-liner is the ACTIVE step's honest context ONLY — never on idle
+            (pending) or done (those fold to a quiet essence line). SC#2 / RESEARCH
+            Pitfall 4. It is a DIFFERENT string from the running activity line below. */}
+        {isActive && (
+          <p className="text-[12px] leading-relaxed text-panel-muted-foreground">{meta.oneLiner}</p>
+        )}
+
+        {/* Running-ONLY activity line — the live "alive" affordance + the honest engine
+            chip. NEVER on pending/done (RESEARCH Pitfall 4). No fabricated count: where
+            no live activity string is on the wire, the pulse dot + bloom + status +
+            progressbar carry "alive". The engine chip renders ONLY from a REAL sub-agent
+            provider (honestly-ABSENT otherwise — never a Bot on the live card, T-127-08).
+            The pulse is reduced-motion-gated via the motion-safe: variant. */}
+        {isRunning && (
+          <div data-activity-line className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 flex-none rounded-full bg-[hsl(var(--panel-status-active))] motion-safe:animate-pulse"
+            />
+            <span className="min-w-0 truncate text-[12px] font-medium text-[hsl(var(--panel-status-active))]">
+              Working
+            </span>
+            {EngineMark && (
+              <span className="ml-auto flex-none" title={provider}>
+                <EngineMark size={16} />
+              </span>
+            )}
+          </div>
+        )}
 
         {/* GAP-C (D-11) emit sub-step — a status-node SUB-ROW on the EXISTING rail (NOT a
             new container / affordance, A5). The node fills per the sub-step state: active
