@@ -12,6 +12,7 @@ import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 import { dedupToolCalls } from "@/lib/stepCount"
 
@@ -819,6 +820,22 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                         {tc.status === "preparing" ? (
                           <span className="font-semibold text-foreground/50 italic">
                             Preparing {toolLabel(tc.name)}…
+                            {/* Phase 128 Plan 04 (TDP-02 / D-04): surface the
+                                tool's description DURING the preparing window —
+                                preparingDescription parses the partial-JSON
+                                tc.argsCodeText (tc.args is still {} until
+                                tool_start). Additive: when it returns null the
+                                quiet "Preparing {tool}…" copy stays — never
+                                fabricate (D-06 honest fallback). Rendered as a
+                                React text child (auto-escaped), never innerHTML. */}
+                            {(() => {
+                              const prepDesc = preparingDescription(tc)
+                              return prepDesc ? (
+                                <span className="ml-1 font-normal text-foreground/60 not-italic">
+                                  {" "}— {prepDesc}
+                                </span>
+                              ) : null
+                            })()}
                             {/* T-260523-09: bytes-streamed badge during the
                                 long LLM tool-args generation. Replaces the
                                 prior silent "preparing" state with a live
@@ -936,11 +953,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                       // always use toolLabel(tc.name). D-08: surface
                       // tc.args.description when available.
                       const isExecuteCode = tc.name === "execute_code"
+                      // Phase 128 Plan 04 (TDP-02 / D-04): route the title
+                      // through the shared preparingDescription helper instead
+                      // of reading tc.args?.description directly — tc.args is
+                      // EMPTY {} during early preparing (the reducer keeps it
+                      // empty until tool_start), so the direct read showed
+                      // nothing; preparingDescription parses the partial-JSON
+                      // tc.argsCodeText. Null → the honest "Generating {tool}…"
+                      // fallback (D-06, never fabricate).
+                      const prepDesc = preparingDescription(tc)
                       return (
                         <ToolArgsLivePanel
                           title={
-                            tc.args?.description
-                              ? `Generating ${toolLabel(tc.name)}: ${tc.args.description}`
+                            prepDesc
+                              ? `Generating ${toolLabel(tc.name)}: ${prepDesc}`
                               : `Generating ${toolLabel(tc.name)}…`
                           }
                           contentText={tc.argsCodeText!}
