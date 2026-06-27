@@ -19,13 +19,19 @@ import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/component
 // ── Phase-type glyph vocabulary (the ONE shared copy — previously duplicated by
 //    value in WorkflowsPage.tsx:44-51 and PhaseSpineGraph.tsx:24-31; the 6th ◆
 //    llm_emit "deliverable"). All soul surfaces import THIS map. ──
+// Phase 127-01 (WUX-03): upgraded flat unicode → verified fluent-emoji slug strings.
+// phaseGlyph() (src/lib/phaseGlyph.tsx) is the render-time resolver — it returns
+// a bundled 3D SVG component for each slug. This map is the single source of truth
+// for the phase-type → icon vocabulary; PhaseSpine.tsx reads it for the unicode
+// fallback ("•" for unknown types). Slugs verified API-present 2026-06-27.
+// NEVER use: "direct-hit" (missing from the set), "no-entry-sign" (missing).
 export const PHASE_GLYPHS: Record<string, string> = {
-  programmatic: "⚙",
-  llm_single: "✎",
-  llm_agent: "🤖",
-  llm_batch_agents: "⛓",
-  llm_human_input: "☺",
-  llm_emit: "◆",
+  programmatic: "gear",
+  llm_single: "memo",
+  llm_agent: "robot",
+  llm_batch_agents: "busts-in-silhouette",
+  llm_human_input: "raised-hand",
+  llm_emit: "package",
 }
 
 /** A loose read-shape over the definition JSONB (we only read what the soul needs). */

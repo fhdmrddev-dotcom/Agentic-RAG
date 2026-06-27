@@ -35,12 +35,13 @@ describe("PhaseSpine — horizontal glyph-dot row", () => {
     expect(order).toEqual(["gather", "draft", "emit", "server"])
   })
 
-  it("renders the type glyph for each phase (from PHASE_GLYPHS)", () => {
+  it("renders the correct phase type for each dot (data-phase-type hook, 127-01 migration)", () => {
+    // Migrated from literal unicode assertions to data-attribute hooks (durable after 3D swap).
     render(<PhaseSpine def={def} scale="card" />)
-    expect(within(screen.getByTestId("spine-dot-gather")).getByText("🤖")).toBeInTheDocument()
-    expect(within(screen.getByTestId("spine-dot-draft")).getByText("✎")).toBeInTheDocument()
-    expect(within(screen.getByTestId("spine-dot-emit")).getByText("◆")).toBeInTheDocument()
-    expect(within(screen.getByTestId("spine-dot-server")).getByText("⚙")).toBeInTheDocument()
+    expect(screen.getByTestId("spine-dot-gather").getAttribute("data-phase-type")).toBe("llm_agent")
+    expect(screen.getByTestId("spine-dot-draft").getAttribute("data-phase-type")).toBe("llm_single")
+    expect(screen.getByTestId("spine-dot-emit").getAttribute("data-phase-type")).toBe("llm_emit")
+    expect(screen.getByTestId("spine-dot-server").getAttribute("data-phase-type")).toBe("programmatic")
   })
 
   it("renders 3D SVG glyph components via phaseGlyph() for known phase types", () => {
