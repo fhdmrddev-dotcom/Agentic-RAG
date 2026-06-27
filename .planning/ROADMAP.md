@@ -191,7 +191,7 @@ Plans:
 
 **UI hint**: yes
 
-#### Phase 125 (STRETCH): Self-Improve Proposer (description-only)
+#### Phase 125: Self-Improve Proposer (description-only)
 
 **Goal**: A bounded, human-in-the-loop, description-only self-improvement proposer: eval surfaces a weak description → proposes a description diff → DRAFT → human approves → a new immutable version; it never auto-publishes, uses held-out selection, and uses the Phase-102 judge as a gate.
 **Depends on**: Phase 122 + Phase 123 (reuses the cross-provider scoreboard, the Trigger Tuner's held-out selection, and the judge gate); gated behind CORE completion
@@ -205,7 +205,7 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
-#### Phase 126 (STRETCH): Smart-Dispatch Relevance Pre-Filter
+#### Phase 126: Smart-Dispatch Relevance Pre-Filter
 
 **Goal**: Only plausibly-relevant skills are surfaced to the model and the skill catalog stays within a token budget, so the model isn't flooded with irrelevant skills and the catalog doesn't blow the context budget.
 **Depends on**: Phase 123 (builds on the skill-triggering work); gated behind CORE completion
@@ -218,7 +218,7 @@ Plans:
 
 **Plans**: TBD
 
-#### Phase 127 (STRETCH): Gauntlet Pip-Strip + Quiet Idle Cards
+#### Phase 127: Gauntlet Pip-Strip + Quiet Idle Cards
 
 **Goal**: The publish gauntlet reads at a glance as a pip-strip + worded verdict with raw detail on demand, and idle PhaseCards stay visually quiet instead of competing for attention.
 **Depends on**: Phase 124 (rides on the Workflow Studio UX re-skin); gated behind CORE completion
@@ -231,7 +231,7 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
-#### Phase 128 (STRETCH): Chat Tool-Card Unification + Chat-Area Reclaim
+#### Phase 128: Chat Tool-Card Unification + Chat-Area Reclaim
 
 **Goal**: One honest, unified, space-efficient chat surface across every provider — the tool card becomes the single canonical place for live run info, it reads identically on all providers, redundant chrome is removed, and every pixel of the chat area earns its place.
 **Depends on**: Phase 122 (extends the task-label parity / tool-card honesty work); gated behind CORE completion
@@ -272,7 +272,7 @@ Plans:
 - [ ] 129-02-PLAN.md — MiniMax-gated arg-validity guard + bounded re-ask + recovered signal / honest-fail (D-01/D-03); folds BUG-260607-03 + unit tests
 - [ ] 129-03-PLAN.md — SC#10 4-axis live cross-provider scoreboard (authored in VALIDATION.md + operator-run)
 
-#### Phase 130 (STRETCH): template_input Resolver Run-Scope
+#### Phase 130: template_input Resolver Run-Scope
 
 **Goal**: Defense-in-depth for the collision — the `template_input` resolver is run-scoped too, so the `render_template` path can't re-introduce a cross-run leak alongside the COLL-01 harvest fix.
 **Depends on**: Phase 120 (pairs with COLL-01 on the same collision/harvest surface); gated behind CORE completion
@@ -284,7 +284,7 @@ Plans:
 
 **Plans**: TBD
 
-#### Phase 131 (STRETCH): Non-Python Skill-Script Honesty
+#### Phase 131: Non-Python Skill-Script Honesty
 
 **Goal**: A user who imports or runs a market skill that bundles a non-Python script the Python-only sandbox can't execute (e.g. `.js`) gets an honest, specific signal instead of a silent/confusing failure — closing the trust gap from the 2026-05-31 JS-skill-import incident (SEED-044 Layer 1). This is the honesty precursor to v3.2's DISC-01 (the full Node-execution capability); it is purely additive and stays OFF the COLL-01 sandbox-injection seam.
 **Depends on**: Nothing hard; sequence after Phase 120 only to avoid touching the COLL-01 harvest/execution seam concurrently. Gated behind CORE completion. Lightweight (G-3-adjacent — import-boundary detection + an execution pre-check + message; no Node runtime, no image rebuild, no shared-path fork).
