@@ -6,11 +6,11 @@ status: in_progress
 last_updated: "2026-06-27T00:00:00.000Z"
 last_activity: 2026-06-27
 progress:
-  total_phases: 7
-  completed_phases: 6
-  total_plans: 28
-  completed_plans: 28
-  percent: 86
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 31
+  completed_plans: 31
+  percent: 88
 ---
 
 # Project State
@@ -22,13 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair (PLANNED — 3 plans / 2 waves, plan-check passed, ready to execute). v3.1 CORE (120–124) shipped clean; now building the highest-value STRETCH phases (129 → 128 → optional 127). 129 promoted from STRETCH to active 2026-06-26.
+**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair **COMPLETE 2026-06-27** (verify 11/11 · 12 unit tests green · SC#10 live 7/9 rows PASS). First v3.1 STRETCH shipped. v3.1 CORE (120–124) already clean. **NEXT decision: continue STRETCH (128 Live-Description needs `/gsd:sketch` first per G-2; 127 Gauntlet polish also G-2; 130/131 backend) OR `/gsd:complete-milestone` (tag v3.1).**
 
 ## Current Position
 
-Phase: 129
-Plan: Planned (3 plans, 2 waves — Wave 1: 129-01 OpenRouter require_parameters + 129-02 MiniMax arg-repair, parallel; Wave 2: 129-03 SC#10 cross-provider scoreboard. Ready for /gsd:execute-phase 129)
-Status: Planning → Executing
+Phase: 129 — COMPLETE (all 3 plans shipped + verified)
+Plan: 3/3 done — 129-01 OpenRouter require_parameters, 129-02 MiniMax arg-repair guard, 129-03 SC#10 live scoreboard
+Status: Complete (verify PASSED 11/11; nyquist_compliant held false-with-caveat — repair rungs unit-proven, truncation trigger dormant)
 Last activity: 2026-06-27
 
 ### Quick Tasks Completed
