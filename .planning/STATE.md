@@ -22,13 +22,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 129 — MiniMax/OpenRouter Arg Repair **COMPLETE 2026-06-27** (verify 11/11 · 12 unit tests green · SC#10 live 7/9 rows PASS). First v3.1 STRETCH shipped. v3.1 CORE (120–124) already clean. **NEXT decision: continue STRETCH (128 Live-Description needs `/gsd:sketch` first per G-2; 127 Gauntlet polish also G-2; 130/131 backend) OR `/gsd:complete-milestone` (tag v3.1).**
+**Current focus:** Building STRETCH **128 → then 127** (operator-decided 2026-06-27). Phase 129 COMPLETE (first STRETCH). **NEXT ACTION: `/gsd:sketch 128`** — 128 was reframed to "Chat Tool-Card Unification + Chat-Area Reclaim" (TDP-02 + CTC-01..04: provider logos in tool-card header `ToolCallPanel.tsx:454` · unified cross-provider tool card · remove redundant sticky composer timer `ChatArea.tsx:517` · Read-more on long prompts `MessageItem.tsx`); G-2 sketch-gated, then discuss→plan→execute. After 128 ships, do **127** (Gauntlet pip-strip + quiet idle cards; also `/gsd:sketch 127` first; gauntlet=`PublishGauntlet.tsx`, PhaseCard=`panel/PhaseCard.tsx`). Existing sketches to extend: 020-publish-gauntlet-honesty (127), 002-tool-call-panel + 014/015 (128). Then `/gsd:complete-milestone` (tag v3.1). Detail → [[project_128_reframed]], [[project_129_executed]].
 
 ## Current Position
 
-Phase: 129 — COMPLETE (all 3 plans shipped + verified)
-Plan: 3/3 done — 129-01 OpenRouter require_parameters, 129-02 MiniMax arg-repair guard, 129-03 SC#10 live scoreboard
-Status: Complete (verify PASSED 11/11; nyquist_compliant held false-with-caveat — repair rungs unit-proven, truncation trigger dormant)
+Phase: 128 (reframed — Chat Tool-Card Unification + Chat-Area Reclaim) — NEXT, not started. 129 COMPLETE.
+Plan: Not started — 128 is G-2 sketch-gated → start with `/gsd:sketch 128` (reframe committed `692b3b78`; scope in ROADMAP Phase Details + REQUIREMENTS TDP-02/CTC-01..04).
+Status: Phase 129 closed (verify 11/11; nyquist false-with-caveat — trigger dormant). 128 awaiting sketch.
 Last activity: 2026-06-27
 
 ### Quick Tasks Completed
