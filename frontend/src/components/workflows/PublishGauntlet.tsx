@@ -366,36 +366,28 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
 }
 
 /**
- * An honest engine chip — the resolved provider's `@lobehub/icons` brand mark, or
- * the neutral `Bot` fallback for an unmapped provider. Mirrors RunCard's
- * `providerLogo()`→`Bot` pattern (icon-convention §1). Rendered ONLY when a real
- * provider string is available; the publish surface omits the chip entirely
- * otherwise — never a fabricated engine (T-127-06).
- */
-function EngineChip({ provider }: { provider: string }) {
-  const EngineMark = providerLogo(provider)
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-      {EngineMark ? <EngineMark size={14} /> : <Bot className="h-3.5 w-3.5" />}
-      <span>{provider}</span>
-    </span>
-  )
-}
-
-/**
  * The golden-run HERO while the gauntlet blocks the request. Phase 127-02 Task 1
  * (WUX-03, sketch 051-A): the calm notice becomes the hero moment — a glowing
  * amber panel (breathing aura, reduced-motion-gated) around the rocket node + a
  * live elapsed-seconds clock, so the synchronous golden-run wait reads as "your
  * workflow is running for real," not a dead spinner. The `publish-elapsed` testid
  * + the live mm/ss clock are unchanged. The optional `provider` drives the engine
- * chip — when no honest provider value is available on this surface the chip is
- * OMITTED (honestly-absent), never guessed.
+ * chip via the shared `providerLogo()`→`Bot` pattern (mirrors RunCard.tsx:256/310,
+ * icon-convention §1) — when no honest provider value is available on this surface
+ * the chip is OMITTED entirely (honestly-absent), never a fabricated engine
+ * (T-127-06).
  */
 function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provider?: string }) {
   const mm = Math.floor(elapsedSec / 60)
   const ss = elapsedSec % 60
   const clock = mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`
+  // The resolved provider brand mark (null for unmapped/undefined → Bot fallback).
+  // Resolved at the component top, mirroring RunCard's HeaderMark pattern verbatim
+  // (providerLogo is total over undefined → null). providerLogo returns a STABLE
+  // module-level component reference from the `MARKS` map — it does NOT create a
+  // new component per render, so static-components is a false positive here (same
+  // pattern as RunCard.tsx:256/311, which the rule does not flag in its larger body).
+  const EngineMark = providerLogo(provider)
   return (
     <div className="gauntlet-hero-glow relative overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
       <div className="flex items-center justify-between gap-2">
@@ -416,7 +408,11 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
       {provider && (
         <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
           <span>Engine:</span>
-          <EngineChip provider={provider} />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+            {/* eslint-disable-next-line react-hooks/static-components -- EngineMark is a stable module-level mark from providerLogo's MARKS map (false positive; mirrors RunCard.tsx:311). */}
+            {EngineMark ? <EngineMark size={14} /> : <Bot className="h-3.5 w-3.5" />}
+            <span>{provider}</span>
+          </span>
         </div>
       )}
       <p className="mt-2 leading-relaxed text-muted-foreground">
@@ -493,6 +489,19 @@ function GauntletContent({
   // A SUCCESS is exclusively published === true on a 200 verdict — server truth.
   const isSuccess = outcome?.kind === "verdict" && verdict?.published === true
   const isBlock = outcome != null && !isSuccess
+
+  // Phase 127-02 Task 2 (WUX-03, sketch 051-A): the plain-worded headline that LEADS
+  // the resolved block — DERIVED from server truth (verdict.published / blocked_stage),
+  // it NEVER re-derives pass/block (T-127-03). Lead-with-words: a business user reads a
+  // pass/block in ~3 seconds; the verbatim 5-field grid is demoted behind the <details>
+  // below (one click away, never removed).
+  const wordedHeadline = verdict
+    ? isSuccess
+      ? `🎉 Published — v${verdict.version ?? "—"} is live`
+      : verdict.blocked_stage === "judge"
+        ? "⚖️ Blocked by the grader — the run finished, but the independent grader would not pass the result"
+        : `⛔ Blocked early — ${verdict.blocked_stage ?? "unknown"}`
+    : ""
 
   return (
     <div className="w-full">
@@ -589,15 +598,13 @@ function GauntletContent({
                 isSuccess ? "border-success/40 bg-success/10" : "border-destructive/40 bg-destructive/10"
               }`}
             >
-              <div className={`flex items-center gap-2 font-semibold ${isSuccess ? "text-success" : "text-destructive"}`}>
+              {/* Lead-with-words: the plain-worded verdict headline (server-truth-derived). */}
+              <div
+                data-testid="verdict-headline"
+                className={`flex items-center gap-2 text-[14px] font-semibold ${isSuccess ? "text-success" : "text-destructive"}`}
+              >
                 <span aria-hidden>{isSuccess ? "✓" : "✕"}</span>
-                {isSuccess ? (
-                  <span>Published v{verdict.version ?? "—"}</span>
-                ) : (
-                  <span>
-                    Blocked at <span className="font-mono">{verdict.blocked_stage ?? "unknown"}</span>
-                  </span>
-                )}
+                <span>{wordedHeadline}</span>
               </div>
               {isBlock && (
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -607,8 +614,17 @@ function GauntletContent({
                 </p>
               )}
 
-              {/* The verbatim 5-field verdict grid. */}
-              <VerdictFields verdict={verdict} />
+              {/* The verbatim 5-field verdict grid — DEMOTED behind a disclosure so the
+                  resolved block LEADS with words. The verbatim render + the `▦ rendered
+                  verbatim` provenance cap stay INSIDE the <details> (VerdictFields kept
+                  whole), so the honesty is one click away, not removed (T-127-03). The
+                  per-criterion judge rows + RunLink + HardWall below stay FIRST-CLASS. */}
+              <details data-testid="raw-verdict" className="rawbox mt-4">
+                <summary className="font-mono text-[11px] text-accent-violet">
+                  Show raw verdict — the 5 server fields, verbatim
+                </summary>
+                <VerdictFields verdict={verdict} />
+              </details>
 
               {/* named_failures rendered by KEY-DETECTION (any string/unknown → block). */}
               {verdict.named_failures.length > 0 && (
