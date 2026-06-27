@@ -17,6 +17,7 @@
  * run-surface live phase-timeline / phase-card.
  */
 import { PHASE_GLYPHS, type DefShape } from "@/components/workflows/soulData"
+import { phaseGlyph } from "@/lib/phaseGlyph"
 
 export type SoulScale = "card" | "run" | "pub"
 
@@ -56,7 +57,7 @@ export function PhaseSpine({ def, scale }: PhaseSpineProps) {
     >
       {ordered.map((p, i) => {
         const type = p.config?.phase_type ?? "?"
-        const glyph = PHASE_GLYPHS[type] ?? "•"
+        const Glyph = phaseGlyph(type)
         const isEmit = type === "llm_emit"
         const name = p.name?.trim() || p.slug || ""
 
@@ -83,7 +84,9 @@ export function PhaseSpine({ def, scale }: PhaseSpineProps) {
                     : "border-border text-foreground",
                 ].join(" ")}
               >
-                <span aria-hidden="true">{glyph}</span>
+                <span aria-hidden="true">
+                  {Glyph ? <Glyph /> : (PHASE_GLYPHS[type] ?? "•")}
+                </span>
               </span>
               {showNames && name && (
                 <span className="max-w-[140px] truncate text-[11px] text-muted-foreground">
