@@ -45,7 +45,9 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 **Seeds consumed / planted:** SEED-051 (NL→workflow authoring) realized. Planted/active: SEED-082 (emit-gate policy + model-fit routing), SEED-084 (starter workflow library), SEED-069 (living-document output re-ingestion). SEED-005 (Enhanced Document Structure) = operator-confirmed next milestone. Prior milestone v2.8 (Harness Engine & Workflow Mode) shipped 2026-06-07 — see `milestones/v2.8-ROADMAP.md`.
 
-## Current Milestone: v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers
+## Last Shipped: v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers
+
+**Shipped:** 2026-06-28 (9 phases, 40 plans, 324 commits, 569 files +61,830/−914 LOC, 7 days; git tag v3.1). Full archive: `.planning/milestones/v3.1-ROADMAP.md`.
 
 **Started:** 2026-06-21 (Option A — scope LOCKED + operator-approved via 2 research waves + a live DB forensic → `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`).
 
@@ -67,8 +69,8 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v3.0 (Document Management) — 2026-06-21 (11 phases [110, 111, 111.1, 112–119], 46 plans, 410 commits, +99,800 / −627 LOC over 7 days; git tag v3.0)
-**Current:** **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers — CORE COMPLETE 2026-06-26** (Option A; scope locked in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`). All 5 CORE phases shipped: 120 (collision-fix + context-isolation), 121 (one front door / IA), 122 (cross-provider trust & honesty parity), 123 + 123.1 (skill-triggering quality + Trigger Tuner UX polish), 124 (Workflow Studio UX — soul + strict↔loose). STRETCH 125–131 gated behind CORE (ship only if budget remains). v3.0 closed 2026-06-21 — 24/24 functional requirements delivered; all 11 phases cleared verify + secure + validate (per-phase rigor; no formal milestone audit, 37 open artifacts triaged as zero CORE blockers + acknowledged → STATE.md Deferred Items). Re-sequenced v3.x map: `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.
+**Shipped:** v3.1 (Workflow & Skill Studio) — 2026-06-28 (9 phases, 40 plans, 324 commits, +61,830/−914 LOC over 7 days; git tag v3.1)
+**Current:** **Planning v3.2** — run `/gsd:new-milestone` to define scope. Candidates: STRETCH carry-forwards (125/SI-02, 126/TRIG-02, 130/COLL-02, 131/SRH-01) + v3.2 PRD (Skill Eval Studio full + Self-Improving). Deferred STRETCH phases and v2.9 STRETCH 105–109 are backlog carry-forwards. (Option A; scope locked in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`). All 5 CORE phases shipped: 120 (collision-fix + context-isolation), 121 (one front door / IA), 122 (cross-provider trust & honesty parity), 123 + 123.1 (skill-triggering quality + Trigger Tuner UX polish), 124 (Workflow Studio UX — soul + strict↔loose). STRETCH 125–131 gated behind CORE (ship only if budget remains). v3.0 closed 2026-06-21 — 24/24 functional requirements delivered; all 11 phases cleared verify + secure + validate (per-phase rigor; no formal milestone audit, 37 open artifacts triaged as zero CORE blockers + acknowledged → STATE.md Deferred Items). Re-sequenced v3.x map: `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.
 **Phase 124 complete (2026-06-26):** Workflow Studio UX — Soul + Strict↔Loose (WUX-01, WUX-02). 3 plans / 2 waves, pure-frontend re-skin (no migration, no backend, no new API). Wave 0 extracted the duplicated tier-derivation + 3 copies of the phase-glyph map into ONE shared `soulData.ts` (the consistency invariant — the three soul sizes can never disagree) + two net-new components: `WorkflowSoul` (the scale-keyed 5-atom soul: purpose hero · needs · glyph-dot spine · ONE tier chip glyph+WORD · honest output) and `PhaseSpine` (ribbon/index-free glyph-dot row). Wave 2 mounted the soul at card scale on every library card + the two-door `WorkflowDoorSwitch` ("Describe & run" loose / "Author & govern" strict, nothing removed, advanced one click away — D-01/D-05), and at run scale (additive harness-gated `PanelSection` in `WorkspacePanel`, Deep Mode byte-identical) + publish scale (soul block prepended above the untouched gauntlet ladder, D-06). **G-5 red line held:** `PhaseTimeline.tsx`/`PhaseCard.tsx` byte-identical (pinned blob hashes unchanged). Code review found 1 blocker (CR-01: the loose describe door silently dropped the user's typed requirement → dead-ended on an empty Builder; the plan's `onDescribeDraft` wiring was missed) — FIXED in `d60d04b9` by seeding the govern-door Builder with the typed text (`initialDescribe`) + auto-running the existing generate→draft flow once (`autoDraft`); plus WR-01 (live soul preview) + WR-02 (React key). Verify 4/4 must-haves + operator UAT 7/7 (sketch-match 046-A/047-A, A1 label, Deep-Mode byte-identical, SC#10 cross-provider smoke, mobile 375px). Frontend suite 326/326 in touched areas; the only full-suite failures are pre-existing rot (SEED-056), none in 124's surface.
 **v3.0 Document Management — SHIPPED (2026-06-21):** Phases 110 (DM foundations) → 111/111.1 (metadata enrichment + configurable multi-provider embeddings) → 112 (doc detail panel + manual edit) → 113/114/115 (virtual folders — filter compiler, range/date + no-DSL builder + Views sidebar, agent tool) → 116/117 (document relationships — leak-safe backend + agent tool, panel UI) → 118 (auto-classification — suggest-then-confirm) → 119 (governance health). Net-new substrate: a closed-registry filter-AST → parameterized-jsonb compiler + two leak-safe share-don't-fork service cores (`document_view_resolver.py`, `document_relationship_service.py`). `threads.py` untouched across the whole milestone (G-5); near-zero new deps.
 **Phase 069 complete (2026-05-14):** PdfExtractor abstraction scaffold shipped — `PdfExtractor` ABC + `LegacyExtractor` (today's pypdf + pdfplumber + python-docx pipeline rewrapped) + `get_extractor(mime)` dispatcher live in `backend/app/services/extraction_service.py`; `documents.py` upload + re-ingest paths routed through the seam; binding golden-fixture gate live (synthetic PDF + DOCX). Zero observable behavior change confirmed via golden gate; Q-v2.6-06 closed via D-PRD-07 appendix (PyMuPDF AGPL-3.0 fallback license posture locked). Phase 071 will plug Docling primary + PyMuPDF (subprocess-fenced) fallback behind the same dispatcher.
@@ -290,9 +292,30 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ DGOV-01 / DGOV-02: Light governance-health view (broken relationships / unclassified / low-confidence) with per-signal link-to-fix — Phase 119
 - ✓ UX-01 / UX-02: Deep Midnight + mobile + WCAG 2.1 AA on all DM surfaces via reused primitives; the 3 highest-risk net-new surfaces G-2-sketched + operator-approved — cross-cutting (112/114/117/118/119)
 
+### Validated (v3.1 — Workflow & Skill Studio — Trust, Clarity & Triggers)
+
+12/12 CORE REQ-IDs + STRETCH TDP-02/CTC-01..04/WUX-03/MP-04 delivered (2026-06-28).
+
+- ✓ COLL-01: Run-scoped sandbox-output harvest baseline — closes the 2-files live collision (Mechanism A) — Phase 120
+- ✓ CTX-01: messages.origin tag + asymmetric history filter — Deep/Harness never replay each other — Phase 120
+- ✓ IA-01: 2-pill composer (General/Explorer), Workflows-page-only launch, lock/409/reconcile preserved — Phase 121
+- ✓ MP-01: force→coerce→fail retry ladder in forced_emit (all 4 consumers) — Phase 122
+- ✓ MP-02: emit_tier doc-verified per provider (55-model registry); inert DeepSeek strict removed — Phase 122
+- ✓ MP-03: per-provider scoreboard (EASY+HARD × native-7, PASS/FAIL/DOCUMENTED) gates any tier flip — Phase 122
+- ✓ TDP-01: ungated execute_code.description SYSTEM_PROMPT nudge + frontend label floor — Phase 122
+- ✓ TRIG-01: Skill Trigger Tuner (held-out 60/40 benchmark, background job, N-column scoreboard, durable results, CandidateCard confirm) — Phases 123+123.1
+- ✓ TRIG-03: save-time description-quality lint (warn-never-block, 3 hook points) — Phase 123
+- ✓ CTX-03: load_skill trim-pin (third protected class, 1/3 budget, LRU evict + marker) — Phase 123
+- ✓ WUX-01: WorkflowSoul in 3 sizes (card/run-header/publish) from shared soulData.ts — Phase 124
+- ✓ WUX-02: WorkflowDoorSwitch strict↔loose ("Describe & run" / "Author & govern") — Phase 124
+- ✓ WUX-03: Gauntlet pip-strip + worded verdict + raw-on-demand; quiet idle PhaseCards (code-verified; UAT partial) — Phase 127
+- ✓ TDP-02: Live tool description before tool_start in ToolCallPanel — Phase 128
+- ✓ CTC-01/02/03/04: Provider logos in RunCard; unified tool-card; StickyTimerBar removed; long-prompt Read-more — Phase 128
+- ✓ MP-04: MiniMax arg-repair guard + OpenRouter require_parameters — Phase 129
+
 ### Active (next milestone — not yet started)
 
-*No milestone is active. Start the next with `/gsd:new-milestone` (which defines fresh requirements). SEED-005 (Enhanced Document Structure) shipped as v3.0; per the re-sequenced PRD map (`.planning/PRDs/SEQUENCE.md`), the next candidate is **v3.1 Skill Studio** — re-scoped as a **Workflow + Skill Eval Studio**. Backlog carry-forwards: v2.9 STRETCH 105-109; SEED-013/014 connectors (v3.3/v3.4); SEED-082 emit-gate policy; SEED-084 starter workflow library; open `surface: Agentic-RAG` run-honesty/provider polish reports (BUG-260609-02/-04, -260610-01, -260615-01, silent-send-drop, minimax-400, setting-up-agent).*
+*v3.1 SHIPPED. Start next milestone with `/gsd:new-milestone`. Candidates per `.planning/PRDs/SEQUENCE.md`: **v3.2 Skill Eval Studio (full) + Self-Improving** (SI-01/STD-01/DISC-01) + v3.1 STRETCH carry-forwards (125/SI-02, 126/TRIG-02, 130/COLL-02, 131/SRH-01). Backlog: v2.9 STRETCH 105-109; SEED-013/014 connectors; SEED-082 emit-gate; open run-honesty/provider-polish bug reports.*
 
 ### Out of Scope
 

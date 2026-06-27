@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v3.1
-milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: executing
-last_updated: "2026-06-27T17:33:20.262Z"
-last_activity: 2026-06-27 -- Phase 127 executed + code-verified (manual UAT pending)
+milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — ✅ SHIPPED
+status: complete
+last_updated: "2026-06-28T00:00:00.000Z"
+last_activity: 2026-06-28 -- v3.1 milestone closed + archived (git tag v3.1)
 progress:
-  total_phases: 13
+  total_phases: 9
   completed_phases: 9
   total_plans: 40
   completed_plans: 40
-  percent: 69
+  percent: 100
 ---
 
 # Project State

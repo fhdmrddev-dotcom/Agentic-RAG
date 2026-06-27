@@ -14,13 +14,13 @@
 - ✅ **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (shipped 2026-06-07)
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
-- 📋 **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — IN PROGRESS. CORE Phases 120-124 + STRETCH Phases 125-130. Workflow↔skill collision fix (sandbox-harvest run-scope, root-caused live) + cross-provider trust/honesty (force→coerce retry ladder, per-provider eval scoreboard, task-label parity) + Skill **Trigger Tuner** + Workflow Studio UX (soul card + strict↔loose) + bounded human-in-loop self-improve (STRETCH). Decided scope: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
+- ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
 - 📋 **v3.2 Skill Eval Studio (full) + Self-Improving** — the net-new eval+versioning backend (`skill_versions` + eval harness + grader/comparator/analyzer + review viewer + skill publish gate; the v3.1-PRD spine, not yet built). Brief: `PRDs/v3.1-skill-studio-eval.md`.
 - 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
 
 ---
 
-## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
+## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers — ✅ SHIPPED 2026-06-28
 
 **Started:** 2026-06-21 (Option A — scope LOCKED + operator-approved). Numbering continues from v3.0's last phase (119) → **CORE Phases 120-124**, then **STRETCH Phases 125-131** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent). *Phase 131 (SRH-01, non-Python skill-script honesty) folded in 2026-06-22 after a JS-skill-import investigation — SEED-044 Layer 1; the full Node-execution capability stays v3.2 DISC-01.*
 
@@ -351,6 +351,23 @@ CORE phases 097–104 (9 phases incl. inserted 101.1, 57 plans) shipped + valida
 ## Shipped Milestones
 
 <details>
+<summary>v3.1 Workflow &amp; Skill Studio — Trust, Clarity &amp; Triggers (Phases 120-129) — SHIPPED 2026-06-28</summary>
+
+CORE (6 phases + inserted 123.1): 120 Collision Fix + Context Isolation · 121 One Front Door · 122 Cross-Provider Trust & Honesty · 123 Skill Triggering Quality · 123.1 Trigger Tuner UX Polish · 124 Workflow Studio UX Soul + Strict↔Loose. STRETCH shipped: 127 Gauntlet Pip-Strip (code-verified/UAT partial) · 128 Chat Tool-Card Unification + Provider Logos · 129 MiniMax/OpenRouter Arg Repair. STRETCH deferred: 125/126/130/131. 40 plans total. Full details: `.planning/milestones/v3.1-ROADMAP.md`.
+
+- [x] Phase 120: Collision Fix + Context Isolation (3/3 plans) — completed 2026-06-22
+- [x] Phase 121: One Front Door for Workflows (IA) (2/2 plans) — completed 2026-06-23
+- [x] Phase 122: Cross-Provider Trust & Honesty Parity (4/4 plans) — completed 2026-06-23
+- [x] Phase 123: Skill Triggering Quality (6/6 plans) — completed 2026-06-26
+- [x] Phase 123.1: Skill Trigger Tuner — Design Fidelity & UX Polish (10/10 plans) — completed 2026-06-25
+- [x] Phase 124: Workflow Studio UX — Soul + Strict↔Loose (3/3 plans) — completed 2026-06-26
+- [x] Phase 127: Gauntlet Pip-Strip + Quiet Idle Cards (3/3 plans) — code-verified 2026-06-27
+- [x] Phase 128: Chat Tool-Card Unification + Chat-Area Reclaim (6/6 plans) — completed 2026-06-27
+- [x] Phase 129: MiniMax/OpenRouter Arg Repair (3/3 plans) — completed 2026-06-27
+
+</details>
+
+<details>
 <summary>v3.0 Document Management (Phases 110-119) -- SHIPPED 2026-06-21</summary>
 
 - [x] Phase 110: DM Foundations (2/2 plans) -- completed 2026-06-15
@@ -483,4 +500,4 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 ---
 
-*Milestones v1.0–v3.0 shipped and archived under `.planning/milestones/`. **Active milestone: v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** (started 2026-06-21 — CORE Phases 120-124 + STRETCH Phases 125-130; scope locked in `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`). Re-sequenced PRD roadmap: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards.*
+*Milestones v1.0–v3.1 shipped and archived under `.planning/milestones/`. **Next milestone: v3.2** — run `/gsd:new-milestone` to define scope. Re-sequenced PRD roadmap: see `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 + v3.1 STRETCH 125/126/130/131 remain backlog carry-forwards.*

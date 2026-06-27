@@ -1,5 +1,32 @@
 # Milestones
 
+## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (Shipped: 2026-06-28)
+
+**Phases completed:** 9 shipped phases (CORE: 120, 121, 122, 123, 123.1, 124; STRETCH: 127, 128, 129), 40 plans. STRETCH phases 125, 126, 130, 131 gated/not started → deferred to backlog.
+**Timeline:** 2026-06-21 → 2026-06-28 (7 days, 324 commits)
+**Files changed:** 569 files (+61,830 / −914 lines)
+**Requirements:** 12/12 CORE REQ-IDs delivered (COLL-01, CTX-01, IA-01, MP-01..03, TDP-01, TRIG-01, TRIG-03, CTX-03, WUX-01, WUX-02). STRETCH shipped: TDP-02, CTC-01..04, WUX-03 (code-verified/partial UAT), MP-04. Per-phase rigor substituted for formal audit (v2.9/v3.0 precedent — every CORE phase cleared verify + secure + validate with live evidence).
+
+**Key accomplishments:**
+
+- **Collision fix + context isolation (120)** — run-scoped the sandbox-output harvest baseline (closes the confirmed 2-files bug, Mechanism A); `messages.origin` column + asymmetric history filter so Deep/Harness never replay each other (migration 076)
+- **One front door (121)** — removed the composer Harness pill + in-chat workflow selector → clean 2-pill General/Explorer; workflows launch from Workflows page only; lock/409/reconcile preserved byte-identical
+- **Cross-provider trust & honesty parity (122)** — force→coerce→fail retry ladder in `forced_emit` (all 4 consumers); `emit_tier` doc-verified per provider (55 models, 14/2/34/5 tiers); per-provider scoreboard gates any tier flip; task labels concrete on all providers (ungated prompt nudge + frontend floor)
+- **Skill Trigger Tuner (123 + 123.1)** — held-out should/should-not benchmark (60/40 split, 3-repeat, background job over run-buffer/SSE); N-column ProviderScoreboard (server-derived, no fabricated providers); durable latest-result upsert (migration 077); seeded-case visibility + CandidateCard confirm flow; builder-model from configured models; description-quality lint at save_skill (warn-never-block); CTX-03 trim-pin keeps loaded skill in context
+- **Workflow Studio UX soul + strict↔loose (124)** — shared `soulData.ts` single source for tier-derivation + phase glyphs + soul atoms; `WorkflowSoul` in 3 sizes (card/run-header/publish all read the same object); two-door `WorkflowDoorSwitch` ("Describe & run" / "Author & govern") — nothing removed, advanced one click away
+- **Chat tool-card unification + provider logos (128)** — `@lobehub/icons` single-source logo map; RunCard shows live provider logo; ToolCallPanel carries live description before tool_start; StickyTimerBar removed (reclaims chat-area space); long prompts collapse to clamped Read-more
+- **MiniMax/OpenRouter arg repair (129)** — MiniMax-gated single-shot re-ask at adapter boundary (recover or honest-fail); OpenRouter `require_parameters` in quality strategy; BUG-260607-03 folded
+
+**Architectural decisions locked:**
+
+- **D-14 red line held:** every provider fix at the gateway/adapter boundary; shared Deep path byte-identical; no new runtime
+- **Icon convention (RDD-43):** provider/model = single-source `@lobehub/icons`; phase-type = shared 3D `PHASE_GLYPHS`
+- **Per-phase rigor suffices for audit:** SC#10 4-axis scoreboard on every streaming/provider/agent-loop phase
+
+**Known deferred items at close:** STRETCH phases 125 (SI-02), 126 (TRIG-02), 130 (COLL-02), 131 (SRH-01) — gated, never started, roll to backlog. Phase 127 UAT partial (2 BLOCKED by env, no regressions). threads.py extraction still due. LangSmith tracing still off (429 flood silenced).
+
+---
+
 ## v3.0 Document Management (Shipped: 2026-06-21)
 
 **Phases completed:** 11 phases (110, 111, 111.1, 112–119; incl. inserted embeddings phase 111.1), 46 plans, 88 tasks.
