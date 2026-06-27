@@ -42,6 +42,10 @@ Tracked in the roadmap as STRETCH phases, gated behind CORE completion (v2.9 105
 - [ ] **TRIG-02**: A smart-dispatch relevance pre-filter + catalog token budget, so only plausibly-relevant skills are surfaced to the model and the catalog stays within budget.
 - [ ] **WUX-03**: The publish gauntlet renders as a pip-strip + worded verdict with raw-on-demand, and idle PhaseCards stay quiet.
 - [ ] **TDP-02**: A tool's `description` streams live before `tool_start` (the preparing-window honesty improvement).
+- [ ] **CTC-01**: The tool-card header shows the actual provider's logo (per-provider) in place of the generic brand-pulse "spot" avatar.
+- [ ] **CTC-02**: The tool card carries a unified content/layout across ALL providers — it is the single canonical, complete surface for live run info (status, elapsed, step/file counts, tool description), with no per-provider gaps. (Provider-docs-first / SC#10: verify uniform coverage before relying on it.)
+- [ ] **CTC-03**: The redundant sticky elapsed timer above the composer (`ChatArea.tsx` 076.1 D-03 — elapsed + steps + files + description, all already in the tool card; today inconsistent across providers — shows for some, vanishes for others) is removed, reclaiming chat-area vertical space. Removal is gated on CTC-02 (the tool card must carry that info uniformly first).
+- [ ] **CTC-04**: Long user prompts in the chat collapse to a clamped preview with a "Read more" expander instead of rendering full-height, reclaiming chat-area space.
 - [ ] **MP-04**: MiniMax malformed-args boundary repair + OpenRouter `require_parameters` for broader provider robustness.
 - [ ] **COLL-02**: The `template_input` resolver is run-scoped too — defense-in-depth for the `render_template` path alongside COLL-01.
 - [ ] **SRH-01**: When a user imports or runs a skill that bundles a non-Python script the Python-only sandbox can't execute (e.g. `.js`), the system is honest about it — a clear message at import ("this skill includes a JavaScript step the sandbox doesn't run yet; its instructions still work") and a clean, specific failure at execution instead of silently running JS as Python. Optionally widen `read_skill_file` so the model can at least *read* the bundled JS as reference text. (SEED-044 Layer 1 — the honesty precursor to v3.2's DISC-01; additive, kept OFF the COLL-01 sandbox-injection seam. Folded into v3.1 2026-06-22 by operator after a JS-skill-import investigation.)
@@ -95,15 +99,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRIG-02 (STRETCH) | Phase 126 | Pending (gated) |
 | WUX-03 (STRETCH) | Phase 127 | Pending (gated) |
 | TDP-02 (STRETCH) | Phase 128 | Pending (gated) |
-| MP-04 (STRETCH) | Phase 129 | Pending (gated) |
+| CTC-01 (STRETCH) | Phase 128 | Pending (gated) |
+| CTC-02 (STRETCH) | Phase 128 | Pending (gated) |
+| CTC-03 (STRETCH) | Phase 128 | Pending (gated) |
+| CTC-04 (STRETCH) | Phase 128 | Pending (gated) |
+| MP-04 (STRETCH) | Phase 129 | **Complete** ✓ 2026-06-27 |
 | COLL-02 (STRETCH) | Phase 130 | Pending (gated) |
 | SRH-01 (STRETCH) | Phase 131 | Pending (gated) |
 
 **Coverage:**
 
 - v1 (CORE) requirements: 12 total — **12 mapped** (Phases 120-124)
-- STRETCH requirements: 7 (gated, in-roadmap) — **7 mapped** (Phases 125-131)
-- Mapped to phases: **19 / 19** ✓
+- STRETCH requirements: 11 (gated, in-roadmap) — **11 mapped** (Phases 125-131; 128 reframed → TDP-02 + CTC-01..04)
+- Mapped to phases: **23 / 23** ✓
 - Unmapped: **0** ✓
 
 **Phase map (CORE 120-124 · STRETCH 125-130):**
@@ -116,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Phase 125 (STRETCH) — Self-Improve Proposer (description-only): SI-02
 - Phase 126 (STRETCH) — Smart-Dispatch Relevance Pre-Filter: TRIG-02
 - Phase 127 (STRETCH) — Gauntlet Pip-Strip + Quiet Idle Cards: WUX-03
-- Phase 128 (STRETCH) — Live Description Before tool_start: TDP-02
+- Phase 128 (STRETCH) — Chat Tool-Card Unification + Chat-Area Reclaim: TDP-02, CTC-01, CTC-02, CTC-03, CTC-04
 - Phase 129 (STRETCH) — MiniMax/OpenRouter Arg Repair: MP-04
 - Phase 130 (STRETCH) — template_input Resolver Run-Scope: COLL-02
 - Phase 131 (STRETCH) — Non-Python Skill-Script Honesty: SRH-01
