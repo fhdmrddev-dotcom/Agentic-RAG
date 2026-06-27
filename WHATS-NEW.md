@@ -22,6 +22,15 @@ The current chapter — **Document Management (v3.0)** — is about making the a
 
 ---
 
+## 🟢 Latest — a cleaner, clearer chat (v3.1, in progress)
+
+- **Every tool now shows the real provider's logo.** When the assistant runs a step, its card shows the actual AI provider's brand mark (OpenAI, Anthropic, Google, DeepSeek, and more) on a clean white badge — so you can tell at a glance which model is doing the work. It reads well in both light and dark mode, and even your local models (Ollama, LM Studio) get their own logo.
+- **It tells you what it's about to do.** The instant the assistant starts a step, a short description appears during the brief "preparing" beat — no more staring at a blank pause.
+- **Long pasted prompts stay tidy.** A very long message now collapses to a short preview with a "Read more" link instead of filling the whole screen.
+- **One timer, not three.** Removed a redundant elapsed-time bar that used to sit above the message box; the run's status and timer now live in one consistent place — giving you back screen space.
+
+---
+
 ## 🟢 What you can actually see and use right now (this chapter)
 
 - **Open any document's info card.** Click a document in your library and a side panel slides open showing every detail the system pulled out of it — title, author, topics, dates, and more.

@@ -4,14 +4,14 @@ milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
 status: ready_to_plan
 last_updated: 2026-06-27T08:56:11.168Z
-last_activity: 2026-06-27 -- Phase 128 execution started
+last_activity: 2026-06-27 -- Phase 128 COMPLETE (6/6)
 progress:
   total_phases: 7
   completed_phases: 7
   total_plans: 31
   completed_plans: 37
   percent: 100
-stopped_at: Phase 128 complete (6/6) — ready to discuss Phase 129
+stopped_at: Phase 128 COMPLETE (6/6) — next per operator order: /gsd:sketch 127 (G-2) then build; Phase 129 already COMPLETE; then /gsd:complete-milestone (tag v3.1)
 ---
 
 # Project State
@@ -23,13 +23,13 @@ stopped_at: Phase 128 complete (6/6) — ready to discuss Phase 129
 See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 129 — minimax openrouter arg repair
+**Current focus:** Phase 128 COMPLETE (6/6, 2026-06-27). Next per operator order (2026-06-27): **Phase 127** (Gauntlet Pip-Strip + Quiet Idle Cards) — **G-2 sketch-gated**, run `/gsd:sketch 127` BEFORE planning. Phase 129 already COMPLETE. After 127 → `/gsd:complete-milestone` (tag v3.1).
 
 ## Current Position
 
-Phase: 129
-Plan: Not started
-Status: Ready to plan
+Phase: 127 (next — Gauntlet Pip-Strip + Quiet Idle Cards; G-2 sketch-gated). Phase 128 COMPLETE (6/6, 2026-06-27); Phase 129 already COMPLETE.
+Plan: Not started — run `/gsd:sketch 127` first (G-2 acceptance bar), then `/gsd:plan-phase 127`.
+Status: Phase 128 complete; ready for 127 sketch
 Last activity: 2026-06-27
 
 ### Quick Tasks Completed

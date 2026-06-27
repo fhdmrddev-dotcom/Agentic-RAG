@@ -311,7 +311,7 @@ Plans:
 | 125 (STRETCH). Self-Improve Proposer (description-only) | 0/? | Gated (behind CORE) | - |
 | 126 (STRETCH). Smart-Dispatch Relevance Pre-Filter | 0/? | Gated (behind CORE) | - |
 | 127 (STRETCH). Gauntlet Pip-Strip + Quiet Idle Cards | 0/? | Gated (behind CORE) | - |
-| 128 (STRETCH). Chat Tool-Card Unification + Chat-Area Reclaim | 0/6 | Planned (6 plans, 5 waves) | - |
+| 128 (STRETCH). Chat Tool-Card Unification + Chat-Area Reclaim | 6/6 | Complete (verify 5/6 code truths · D-06 scoreboard PARTIAL — logos confirmed live both themes, exhaustive sweep deferred · 3 live-UAT carried · white-chip + lmstudio logo fixes) | 2026-06-27 |
 | 129 (STRETCH). MiniMax/OpenRouter Arg Repair | 0/? | Gated (behind CORE) | - |
 | 130 (STRETCH). template_input Resolver Run-Scope | 0/? | Gated (behind CORE) | - |
 | 131 (STRETCH). Non-Python Skill-Script Honesty | 0/? | Gated (behind CORE) | - |
