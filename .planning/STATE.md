@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.1
 milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — 📋 IN PROGRESS
-status: in_progress
-last_updated: "2026-06-27T00:00:00.000Z"
-last_activity: 2026-06-27
+status: executing
+last_updated: "2026-06-27T05:53:55.414Z"
+last_activity: 2026-06-27 -- Phase 128 planning complete
 progress:
-  total_phases: 8
+  total_phases: 7
   completed_phases: 7
   total_plans: 31
   completed_plans: 31
-  percent: 88
+  percent: 100
 ---
 
 # Project State
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 Phase: 128 (Chat Tool-Card Unification + Chat-Area Reclaim) — **context gathered, ready to plan**. 129 COMPLETE.
 Plan: Not started — `128-CONTEXT.md` committed (`0e3608fa`); G-2 sketch (048/049/050, all A) is the acceptance bar; 8 decisions locked (D-01..D-08). Next: `/gsd:plan-phase 128` (scope in ROADMAP Phase Details + REQUIREMENTS TDP-02/CTC-01..04).
-Status: Phase 129 closed (verify 11/11; nyquist false-with-caveat — trigger dormant). 128 discuss-phase done — G-5 audit = PROCEED (surgical/subtractive); reported-bugs routed (setting-up-agent partial/TDP-02, BUG-260610-01 conditional reseed, BUG-260609-02 open); CTC-03 gated on live native-7+OR proof.
-Last activity: 2026-06-27
+Status: Ready to execute
+Last activity: 2026-06-27 -- Phase 128 planning complete
 
 ### Quick Tasks Completed
 
