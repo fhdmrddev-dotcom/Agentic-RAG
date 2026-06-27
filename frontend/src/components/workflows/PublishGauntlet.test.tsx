@@ -421,3 +421,87 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toHaveTextContent(/elapsed/i))
   })
 })
+
+// --- Phase 127-02 Task 2 (WUX-03, sketch 051-A) — worded verdict leads, raw grid on-demand ---
+//
+// The resolved gauntlet must LEAD with a plain-worded verdict; the verbatim 5-field
+// PublishVerdict grid + the `▦ rendered verbatim` provenance cap are DEMOTED behind a
+// <details data-testid="raw-verdict"> disclosure (honesty preserved, just not leading).
+// The judge per-criterion rows stay FIRST-CLASS (outside the disclosure). Every existing
+// honesty assertion above is unchanged — these are ADDITIVE.
+describe("PublishGauntlet — worded verdict leads + raw 5-field grid on-demand (Phase 127-02)", () => {
+  /** A 200 judge BLOCK with a per-criterion row + a server summary. */
+  const judgeBlock: PublishOutcome = {
+    kind: "verdict",
+    verdict: {
+      published: false,
+      version: null,
+      golden_run_id: "a7f3c1d2-run",
+      blocked_stage: "judge",
+      named_failures: [
+        { criterion: "grounded_in_evidence", score: 0.42, evidence: "3 of 12 figures are uncited." },
+        { summary: "a quarter of its quantitative claims are not grounded in a cited source" },
+      ],
+    },
+  }
+
+  it("(a) leads a resolved block with a plain-worded headline that PRECEDES the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+    // The worded headline conveys "blocked by the grader / hard wall" — not the bare grid.
+    const headline = screen.getByTestId("verdict-headline")
+    expect(headline).toHaveTextContent(/blocked by the grader/i)
+    // DOM order: the worded headline precedes the raw-verdict disclosure.
+    const raw = screen.getByTestId("raw-verdict")
+    expect(headline.compareDocumentPosition(raw) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("(a') leads a success with a worded 'Published … is live' headline (server-truth version)", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: { published: true, version: 3, golden_run_id: "r3", blocked_stage: null, named_failures: [] },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-success")).toBeInTheDocument())
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent(/published.*v3.*is live/i)
+  })
+
+  it("(b) demotes the raw 5-field grid INSIDE <details data-testid=raw-verdict> — all 5 verdict-* rows are descendants", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    expect(raw.tagName).toBe("DETAILS")
+    // All 5 verbatim verdict rows live inside the disclosure.
+    for (const field of ["published", "version", "golden_run_id", "blocked_stage", "named_failures"]) {
+      expect(within(raw).getByTestId(`verdict-${field}`)).toBeInTheDocument()
+    }
+  })
+
+  it("(c) keeps the ▦ 'rendered verbatim' provenance cap INSIDE the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    expect(within(raw).getByText(/rendered verbatim from the server — not re-derived/i)).toBeInTheDocument()
+  })
+
+  it("(d) keeps the judge per-criterion rows FIRST-CLASS — OUTSIDE the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    // The per-criterion row is the worded "why" — it must NOT be demoted into the grid.
+    expect(within(raw).queryByText(/grounded_in_evidence/)).not.toBeInTheDocument()
+    // It is still present, first-class, in the block.
+    expect(screen.getByText(/grounded_in_evidence/)).toBeInTheDocument()
+  })
+})

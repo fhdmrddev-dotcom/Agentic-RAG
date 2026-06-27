@@ -414,6 +414,109 @@
   padding-bottom: 4px; /* leaves vertical room for the absolute bottom shimmer */
 }
 
+/* Phase 127-02 (WUX-03, sketch 051-A) — the publish-gauntlet energy language.
+   The golden-run node pulses an amber aura while an energy comet travels along
+   the connector INTO it; the resolved-verdict raw grid sits behind a rotating-
+   caret <details>. ALL motion is gated behind prefers-reduced-motion — the
+   static tone (colour + glyph + ✓ badge) always carries the state, so a
+   reduced-motion user loses nothing. Tokens: --panel-status-active is the amber
+   family; --accent-violet is the disclosure caret. (Lives here with every other
+   @keyframes; the sketch-only --neon-cyan / --grad-energy are NOT used.) */
+@keyframes gauntletAura {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+@keyframes gauntletComet {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+@keyframes gauntletHeroGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--panel-status-active) / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px 2px hsl(var(--panel-status-active) / 0.18);
+  }
+}
+/* the amber aura ring on the running golden-run node */
+.gauntlet-node-run::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--panel-status-active));
+  animation: gauntletAura 1.5s ease-out infinite;
+  pointer-events: none;
+}
+/* the energy comet travelling along the connector into the running node */
+.gauntlet-comet {
+  position: absolute;
+  top: 50%;
+  height: 6px;
+  width: 6px;
+  margin-top: -3px;
+  border-radius: 9999px;
+  background: hsl(var(--panel-status-active));
+  box-shadow: 0 0 8px 2px hsl(var(--panel-status-active) / 0.8);
+  animation: gauntletComet 1.15s linear infinite;
+}
+/* the golden-run hero panel's breathing amber glow */
+.gauntlet-hero-glow {
+  animation: gauntletHeroGlow 2.4s ease-in-out infinite;
+}
+/* raw-on-demand disclosure — verbatim verdict preserved, just not leading */
+.rawbox > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.rawbox > summary::-webkit-details-marker {
+  display: none;
+}
+.rawbox > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: hsl(var(--accent-violet));
+  transition: transform 150ms ease;
+}
+.rawbox[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gauntlet-node-run::before {
+    animation: none;
+  }
+  .gauntlet-comet {
+    animation: none;
+    display: none;
+  }
+  .gauntlet-hero-glow {
+    animation: none;
+  }
+  .rawbox > summary::before {
+    transition: none;
+  }
+}
+
 /* ─── Markdown rendered output ─── */
 .markdown {
   line-height: 1.75;

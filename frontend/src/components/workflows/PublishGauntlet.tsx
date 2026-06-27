@@ -39,6 +39,7 @@
  * otherwise an explicit no-run note. Lint codes render the LOWERCASE literals.
  */
 import { useEffect, useRef, useState } from "react"
+import type { ComponentType, SVGProps } from "react"
 import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
 // Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
 // block. PREPEND ONLY: <WorkflowSoul scale="pub"> sits ABOVE the existing 8-stage
@@ -46,6 +47,26 @@ import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib
 // is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import type { DefShape } from "@/components/workflows/soulData"
+// Phase 127-02 Task 1 (WUX-03, sketch 051-A) — the engized gauntlet re-skin.
+// The engine chip mirrors RunCard's providerLogo()→Bot fallback (icon-convention
+// §1); the 8 stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3).
+import { Bot } from "lucide-react"
+import { providerLogo } from "@/lib/providerLogo"
+// The 8 gauntlet-stage 3D glyphs, bundled at build time by unplugin-icons. Only
+// API-verified-present fluent-emoji slugs are used (icon-convention §3 / RESEARCH
+// §Pitfall 2; aligned 1:1 with the STAGES order below). The empty-render traps
+// (`direct-hit` / `no-entry-sign`) are NEVER referenced.
+import Shield from "~icons/fluent-emoji/shield"
+import CheckMarkButton from "~icons/fluent-emoji/check-mark-button"
+import Bullseye from "~icons/fluent-emoji/bullseye"
+import MagnifyingGlassTiltedLeft from "~icons/fluent-emoji/magnifying-glass-tilted-left"
+import RaisedHand from "~icons/fluent-emoji/raised-hand"
+import Rocket from "~icons/fluent-emoji/rocket"
+import Locked from "~icons/fluent-emoji/locked"
+import BalanceScale from "~icons/fluent-emoji/balance-scale"
+
+/** An unplugin-icons bundled 3D SVG component (accepts standard SVG attrs + size). */
+type StageIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>
 
 export interface PublishGauntletProps {
   /** The draft definition id to publish (POST /workflows/{id}/publish). */
@@ -66,15 +87,15 @@ export interface PublishGauntletProps {
  * highlight (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK
  * truth comes from the server verdict, never re-computed here.
  */
-const STAGES: { label: string; what: string; codes: string[] }[] = [
-  { label: "Owner check", what: "RLS-resolve + you own it", codes: ["not_found"] },
-  { label: "Definition valid", what: "re-validates as a WorkflowDefinition", codes: ["definition_invalid"] },
-  { label: "business_requirement", what: "exactly one declared", codes: ["business_requirement"] },
-  { label: "Structural lint", what: "reachable · terminal · inputs satisfied · no orphans", codes: ["lint"] },
-  { label: "Interactive-phase check", what: "human-pause phases can't validate synchronously", codes: ["interactive_phase"] },
-  { label: "Golden run on your KB", what: "a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"] },
-  { label: "Structural gate", what: "citations / integrity checked during the run", codes: ["structural_gate"] },
-  { label: "Independent judge", what: "an independent model grades the deliverable", codes: ["judge"] },
+const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[] = [
+  { label: "Owner check", what: "RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
+  { label: "Definition valid", what: "re-validates as a WorkflowDefinition", codes: ["definition_invalid"], Icon: CheckMarkButton },
+  { label: "business_requirement", what: "exactly one declared", codes: ["business_requirement"], Icon: Bullseye },
+  { label: "Structural lint", what: "reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
+  { label: "Interactive-phase check", what: "human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
+  { label: "Golden run on your KB", what: "a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
+  { label: "Structural gate", what: "citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
+  { label: "Independent judge", what: "an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
 ]
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
@@ -271,28 +292,72 @@ function HardWall({ onFix }: { onFix: () => void }) {
   )
 }
 
-/** The 8-stage progress-spine. `blockedStage` (server-truth) drives the highlight. */
+/**
+ * The 8-stage energy-spine. `blockedStage` (server-truth) drives the highlight.
+ *
+ * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the eight wrapping boxes become a
+ * compact horizontal spine of 3D icon nodes joined by energy connectors — passed
+ * nodes glow green with a ✓ badge, the running golden-run node (i===5) pulses an
+ * amber aura with an energy comet flowing into it, a blocked node turns red. The
+ * pass/block TRUTH is unchanged: `blockedIndex` / `isPassed` / `running && i===5`
+ * are byte-identical to the shipped derivation — this is markup + tone only, never
+ * a recompute of pass/block. All motion is gated behind prefers-reduced-motion
+ * (colour + glyph + ✓ badge carry the state without any animation).
+ */
 function GauntletSpine({ blockedStage, running }: { blockedStage: string | null; running: boolean }) {
   // Find the FIRST stage whose codes contain the server's blocked_stage (visual only).
   const blockedIndex = blockedStage
     ? STAGES.findIndex((s) => s.codes.includes(blockedStage))
     : -1
   return (
-    <div data-testid="gauntlet-spine" className="flex flex-wrap items-stretch gap-2 py-3">
+    <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-4">
       {STAGES.map((stage, i) => {
         const isBlocked = blockedIndex === i
         const isPassed = blockedIndex === -1 ? !running : i < blockedIndex
-        const tone = isBlocked
-          ? "border-destructive/50 text-destructive bg-destructive/10"
+        const isRunning = running && i === 5
+        const Icon = stage.Icon
+        // The connector LEADING INTO this node is "reached" up to (and incl.) the block.
+        const connReached = blockedIndex === -1 ? !running : i <= blockedIndex
+        const nodeTone = isBlocked
+          ? "border-destructive/60 bg-destructive/10"
           : isPassed
-            ? "border-success/40 text-success"
-            : running && i === 5
-              ? "border-amber-500 text-amber-600 dark:text-amber-400"
-              : "border-border text-muted-foreground"
+            ? "border-success/50 bg-success/10"
+            : isRunning
+              ? "border-amber-500 bg-amber-500/10"
+              : "border-border bg-card"
+        const labelTone = isBlocked
+          ? "text-destructive"
+          : isPassed
+            ? "text-success"
+            : isRunning
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-muted-foreground"
         return (
-          <div key={stage.label} className={`rounded border px-2.5 py-1 ${tone}`}>
-            <div className="font-mono text-[10px]">{stage.label}</div>
-            <div className="text-[9px] text-muted-foreground">{stage.what}</div>
+          <div key={stage.label} className="flex items-start" title={stage.what}>
+            {i > 0 && (
+              <div className={`relative mt-[18px] h-0.5 w-4 shrink-0 sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
+                {/* The energy comet flows along the connector INTO the running golden-run node. */}
+                {running && i === 5 && <span className="gauntlet-comet" aria-hidden />}
+              </div>
+            )}
+            <div className="flex w-[60px] shrink-0 flex-col items-center gap-1">
+              <div
+                className={`relative grid h-9 w-9 place-items-center rounded-full border ${nodeTone} ${
+                  isRunning ? "gauntlet-node-run" : ""
+                }`}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+                {isPassed && (
+                  <span
+                    className="absolute -right-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
+                    aria-hidden
+                  >
+                    ✓
+                  </span>
+                )}
+              </div>
+              <div className={`text-center font-mono text-[9px] leading-tight ${labelTone}`}>{stage.label}</div>
+            </div>
           </div>
         )
       })}
@@ -301,26 +366,55 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
 }
 
 /**
- * The in-progress notice while the golden run blocks the request. Phase 103-ux:
- * a calm message + a live elapsed-seconds timer so the user can SEE it's still
- * alive (the publish runs the WHOLE workflow for real on the KB — minutes is
- * normal). Live per-phase progress needs backend streaming → OUT OF SCOPE.
+ * The golden-run HERO while the gauntlet blocks the request. Phase 127-02 Task 1
+ * (WUX-03, sketch 051-A): the calm notice becomes the hero moment — a glowing
+ * amber panel (breathing aura, reduced-motion-gated) around the rocket node + a
+ * live elapsed-seconds clock, so the synchronous golden-run wait reads as "your
+ * workflow is running for real," not a dead spinner. The `publish-elapsed` testid
+ * + the live mm/ss clock are unchanged. The optional `provider` drives the engine
+ * chip via the shared `providerLogo()`→`Bot` pattern (mirrors RunCard.tsx:256/310,
+ * icon-convention §1) — when no honest provider value is available on this surface
+ * the chip is OMITTED entirely (honestly-absent), never a fabricated engine
+ * (T-127-06).
  */
-function PublishingNotice({ elapsedSec }: { elapsedSec: number }) {
+function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provider?: string }) {
   const mm = Math.floor(elapsedSec / 60)
   const ss = elapsedSec % 60
   const clock = mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`
+  // The resolved provider brand mark (null for unmapped/undefined → Bot fallback).
+  // Resolved at the component top, mirroring RunCard's HeaderMark pattern verbatim
+  // (providerLogo is total over undefined → null). providerLogo returns a STABLE
+  // module-level component reference from the `MARKS` map — it does NOT create a
+  // new component per render, so static-components is a false positive here (same
+  // pattern as RunCard.tsx:256/311, which the rule does not flag in its larger body).
+  const EngineMark = providerLogo(provider)
   return (
-    <div className="rounded border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
+    <div className="gauntlet-hero-glow relative overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 font-semibold">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden /> Publishing… running
-          the golden run on your KB
+          <span
+            className="gauntlet-node-run relative grid h-7 w-7 shrink-0 place-items-center rounded-full border border-amber-500 bg-amber-500/10"
+            aria-hidden
+          >
+            <Rocket className="h-4 w-4" />
+          </span>
+          Publishing… running the golden run on your KB
         </div>
         <span data-testid="publish-elapsed" className="font-mono text-[12px] tabular-nums text-amber-600 dark:text-amber-400">
           {clock} elapsed
         </span>
       </div>
+      {/* Engine chip — honest provider only; omitted entirely when unknown (T-127-06). */}
+      {provider && (
+        <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span>Engine:</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+            {/* eslint-disable-next-line react-hooks/static-components -- EngineMark is a stable module-level mark from providerLogo's MARKS map (false positive; mirrors RunCard.tsx:311). */}
+            {EngineMark ? <EngineMark size={14} /> : <Bot className="h-3.5 w-3.5" />}
+            <span>{provider}</span>
+          </span>
+        </div>
+      )}
       <p className="mt-2 leading-relaxed text-muted-foreground">
         Publish runs your <b>whole workflow for real</b> against your knowledge base, then an independent judge grades the
         result — so a multi-step workflow can take a <b>few minutes</b>. Same harness, same tools, same model, so the judge
@@ -395,6 +489,19 @@ function GauntletContent({
   // A SUCCESS is exclusively published === true on a 200 verdict — server truth.
   const isSuccess = outcome?.kind === "verdict" && verdict?.published === true
   const isBlock = outcome != null && !isSuccess
+
+  // Phase 127-02 Task 2 (WUX-03, sketch 051-A): the plain-worded headline that LEADS
+  // the resolved block — DERIVED from server truth (verdict.published / blocked_stage),
+  // it NEVER re-derives pass/block (T-127-03). Lead-with-words: a business user reads a
+  // pass/block in ~3 seconds; the verbatim 5-field grid is demoted behind the <details>
+  // below (one click away, never removed).
+  const wordedHeadline = verdict
+    ? isSuccess
+      ? `🎉 Published — v${verdict.version ?? "—"} is live`
+      : verdict.blocked_stage === "judge"
+        ? "⚖️ Blocked by the grader — the run finished, but the independent grader would not pass the result"
+        : `⛔ Blocked early — ${verdict.blocked_stage ?? "unknown"}`
+    : ""
 
   return (
     <div className="w-full">
@@ -491,15 +598,13 @@ function GauntletContent({
                 isSuccess ? "border-success/40 bg-success/10" : "border-destructive/40 bg-destructive/10"
               }`}
             >
-              <div className={`flex items-center gap-2 font-semibold ${isSuccess ? "text-success" : "text-destructive"}`}>
+              {/* Lead-with-words: the plain-worded verdict headline (server-truth-derived). */}
+              <div
+                data-testid="verdict-headline"
+                className={`flex items-center gap-2 text-[14px] font-semibold ${isSuccess ? "text-success" : "text-destructive"}`}
+              >
                 <span aria-hidden>{isSuccess ? "✓" : "✕"}</span>
-                {isSuccess ? (
-                  <span>Published v{verdict.version ?? "—"}</span>
-                ) : (
-                  <span>
-                    Blocked at <span className="font-mono">{verdict.blocked_stage ?? "unknown"}</span>
-                  </span>
-                )}
+                <span>{wordedHeadline}</span>
               </div>
               {isBlock && (
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
@@ -509,8 +614,17 @@ function GauntletContent({
                 </p>
               )}
 
-              {/* The verbatim 5-field verdict grid. */}
-              <VerdictFields verdict={verdict} />
+              {/* The verbatim 5-field verdict grid — DEMOTED behind a disclosure so the
+                  resolved block LEADS with words. The verbatim render + the `▦ rendered
+                  verbatim` provenance cap stay INSIDE the <details> (VerdictFields kept
+                  whole), so the honesty is one click away, not removed (T-127-03). The
+                  per-criterion judge rows + RunLink + HardWall below stay FIRST-CLASS. */}
+              <details data-testid="raw-verdict" className="rawbox mt-4">
+                <summary className="font-mono text-[11px] text-accent-violet">
+                  Show raw verdict — the 5 server fields, verbatim
+                </summary>
+                <VerdictFields verdict={verdict} />
+              </details>
 
               {/* named_failures rendered by KEY-DETECTION (any string/unknown → block). */}
               {verdict.named_failures.length > 0 && (
