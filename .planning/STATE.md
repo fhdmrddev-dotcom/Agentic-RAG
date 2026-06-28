@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: Workflow & Skill Studio — Trust, Clarity & Triggers — ✅ SHIPPED
-status: complete
+milestone: v3.2
+milestone_name: Skill Eval Studio + Self-Improving
+status: planning
 last_updated: "2026-06-28T00:00:00.000Z"
-last_activity: 2026-06-28 -- v3.1 milestone closed + archived (git tag v3.1)
+last_activity: 2026-06-28 -- Milestone v3.2 started
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 40
-  completed_plans: 40
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -26,12 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 D
 
 ## Current Position
 
-Phase: 127 (gauntlet-pip-strip-quiet-idle-cards) — EXECUTED + CODE-VERIFIED (manual UAT pending)
-Plan: 3 of 3 complete
-Status: Phase 127 code-verified (11/11 truths PASS); 5 operator-owned manual UAT items remain
-Last activity: 2026-06-27 -- Phase 127 executed + code-verified
-
-**Next:** Manual UAT for Phase 127 via `/gsd:verify-work 127` — 5 operator items: (1) SC#2 perceptual density read vs sketch 052-A, (2) gauntlet 5-state walkthrough vs sketch 051-A, (3) all 4 HTTP outcomes render distinctly, (4) cross-provider engine-chip logo via live run (real `subAgents[0].provider`), (5) 4-axis SC#10 scoreboard (cross-provider × multi-tool × parallel-thread × long-message). Also re-run the full `cd frontend && npm test` suite in a working env (main checkout `node_modules` is an incomplete install). Then `/gsd:complete-milestone` (tag v3.1) per the git branching model.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-28 — Milestone v3.2 started
 
 ### Quick Tasks Completed
 
