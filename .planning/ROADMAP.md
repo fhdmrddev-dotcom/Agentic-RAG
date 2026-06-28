@@ -15,8 +15,214 @@
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
 - ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
-- 📋 **v3.2 Skill Eval Studio (full) + Self-Improving** — the net-new eval+versioning backend (`skill_versions` + eval harness + grader/comparator/analyzer + review viewer + skill publish gate; the v3.1-PRD spine, not yet built). Brief: `PRDs/v3.1-skill-studio-eval.md`.
+- 🔨 **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-143 (CORE 132-137; STRETCH 138-143), started 2026-06-28. The net-new eval+versioning backend: immutable skill version snapshots + eval test-case persistence + with-skill-vs-without eval runner (SSE) + honest per-provider results + inline ratings + the full self-improvement loop (SI-01) + a skill publish gate, surfaced in a sketch-gated Skill Evals panel. Brief: `PRDs/v3.1-skill-studio-eval.md`.
 - 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
+
+---
+
+## v3.2 Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS (started 2026-06-28)
+
+**Started:** 2026-06-28. Numbering continues from v3.1's last phase (131) → **CORE Phases 132-137**, then **STRETCH Phases 138-143** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent).
+
+**Goal:** Give users a real iterative environment to test, compare, and improve their skills — see exactly how a skill change affects real outputs across providers, and let the system suggest improvements automatically (human always in the loop). This turns the v3.1 Skill Trigger Tuner into a full improvement cycle.
+
+**Red line (every phase):** never fork the shared Deep/agent-loop/provider path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; **no new eval runtime** — evals re-use the existing agent loop + provider gateway (with-skill vs without-skill on the same provider).
+
+**Scope source:** `.planning/REQUIREMENTS.md` (v3.2 — 8 CORE + 6 STRETCH); brief `.planning/PRDs/v3.1-skill-studio-eval.md`. SEED-002 pre-work: catalog-injection cost (full vs target-only inject during eval) resolved in EVAL-02 (Phase 133) planning; Skills-tab scope = PANEL-01 (Evals panel addition, not a full redesign).
+
+### Phase Table (CORE)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 132 | Skill Versioning + Eval Test-Case Persistence | Every skill-instructions save captures an immutable version snapshot; a user builds a persistent, editable set of eval test cases traceable to that version | VER-01, EVAL-01 | 4 | Schema/RLS foundation (~5 new tables); owner-scoped (skills RLS precedent); no agent-loop/provider touch |
+| 133 | Eval Runner — With-Skill vs Without-Skill | A user launches an eval that runs each case with-skill and without-skill, watches per-case progress stream, and finds the full result set after reload | EVAL-02 | 4 | **SC#10**; G-5 (do NOT grow `threads.py` — net-new eval router, `skill_tuner.py` precedent; consume `agent_loop.py`/gateway READ-ONLY); red line (no new runtime) |
+| 134 | Eval Results, Honest Verdict + Ratings | A user reads an honest per-provider pass/fail verdict + side-by-side with/without comparison and rates individual outputs into a human preference signal | EVAL-03, EVAL-04 | 4 | SC#10 (per-provider verdict honesty, MP-03 precedent); UI hint (functional read/rate — polished panel = PANEL-01) |
+| 135 | Self-Improvement Loop (SI-01) | Eval + Tuner signal → proposed instruction-body diff → human approves → new immutable version → auto-re-eval gate; never auto-applies | SI-01 | 4 | **SC#10**; UI hint (diff review/approve); G-5 (consume `agent_loop.py`/gateway READ-ONLY); human-in-the-loop mandatory |
+| 136 | Skill Publish Gate (GATE-01) | A skill can be published (global/shareable) only after ≥1 eval has run and passed; the publish flow surfaces the gate with a clear status | GATE-01 | 3 | UI hint (publish-flow gate status); future-publish-only (no retroactive gating) |
+| 137 | Skill Evals Panel UI (PANEL-01) | The Skills UI gains a sketch-gated Skill Evals panel: case editor, run history, run detail (side-by-side + pass/fail), inline ratings, diff-viewable version history | PANEL-01 | 4 | **G-2 sketch-gated**; UI hint; SC#10 (UI state surfacing per-provider results + live run); additive (no full Skills-tab redesign) |
+
+### Phase Table (STRETCH — gated behind CORE)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 138 | Run-End Honesty | A run ends honestly — baseline-seeded files aren't dead "Download unavailable" cards, and open todos are marked "ended with open todos" not silently auto-completed | RUN-01 | 3 | SEED-094 (closes BUG-260626-02/-03); G-5 (`agent_loop.py` finalizer/terminal path); backend-only, small — can go early |
+| 139 | Self-Improve Proposer — Description-Only | A bounded description-only proposer drafts a description diff → human approves → new immutable version; no instruction-body edits | SI-02 | 3 | SC#10; UI hint; depends on 135 (SI-01 substrate) |
+| 140 | Smart-Dispatch Relevance Pre-Filter | Only plausibly-relevant skills are surfaced to the model, keeping the active catalog within a configurable token budget | TRIG-02 | 3 | **SC#10**; G-5 (catalog injection in `agent_loop.py` + token budget `context_window.py`); depends on Phase 123 CTX-03 (shipped) |
+| 141 | template_input Resolver Run-Scope | The `template_input` resolver is run-scoped — a template uploaded in one run is not visible/accessible in another | COLL-02 | 2 | depends on Phase 120 COLL-01 run-scope seam (shipped); defense-in-depth |
+| 142 | Non-Python Skill-Script Honesty | A skill bundling a non-Python script yields an honest "cannot execute this skill type" signal instead of silent failure / fake narration | SRH-01 | 3 | DISC-01 Layer 1 / SEED-044; additive, OFF the Phase 120 COLL-01 seam; precursor to v3.3+ full Node execution |
+| 143 | Starter Workflow Library | A curated is_global shelf of fork-able starter workflows on the Workflows page; users fork a starter into a personal draft | WF-01 | 3 | SEED-084; UI hint; no new runtime — one shelf section + content authoring |
+
+### Phase Checklist
+
+- [ ] **Phase 132: Skill Versioning + Eval Test-Case Persistence** — immutable version snapshots on save + persistent, editable eval test cases (VER-01, EVAL-01)
+- [ ] **Phase 133: Eval Runner — With-Skill vs Without-Skill** — SSE-streamed eval run, two completions per case, persisted results (EVAL-02)
+- [ ] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04)
+- [ ] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01)
+- [ ] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01)
+- [ ] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01)
+- [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
+- [ ] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02)
+- [ ] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02)
+- [ ] **Phase 141: template_input Resolver Run-Scope (STRETCH)** — run-scoped template_input resolution (COLL-02)
+- [ ] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01)
+- [ ] **Phase 143: Starter Workflow Library (STRETCH)** — fork-able is_global starter-workflow shelf (WF-01)
+
+### Phase Details
+
+#### Phase 132: Skill Versioning + Eval Test-Case Persistence
+**Goal**: A skill author can build a persistent, editable set of eval test cases for a skill, and every save of a skill's instructions captures an immutable version snapshot so eval history is traceable to the exact instruction state.
+**Depends on**: Nothing (first v3.2 phase — the schema / persistence foundation)
+**Requirements**: VER-01, EVAL-01
+**Success Criteria** (what must be TRUE):
+  1. Creating or updating a skill's instructions automatically captures an immutable version snapshot — the prior instruction state is preserved and a later edit never overwrites earlier version history (VER-01).
+  2. A user can define a set of test cases for a skill (prompt + expected-behavior description) and save them, and the cases persist across sessions / survive reload (EVAL-01).
+  3. A user can edit or delete a saved test case before any eval run, and the change persists (EVAL-01).
+  4. Every test case and version snapshot is owner-scoped (same RLS model as skills) and an eval run is traceable to the exact skill version that produced it — a user never sees another user's cases (VER-01 + EVAL-01).
+**Plans**: TBD
+
+#### Phase 133: Eval Runner — With-Skill vs Without-Skill
+**Goal**: A user can launch an eval run that executes each test case both with the skill and without it, watch per-case progress stream live, and find the complete result set still there after reload.
+**Depends on**: Phase 132 (test cases + version snapshots must exist to run an eval against)
+**Requirements**: EVAL-02
+**Success Criteria** (what must be TRUE):
+  1. A user can start an eval run for a skill, and each test case is executed twice — once with the skill active and once without — producing two comparable completions per case (EVAL-02).
+  2. Per-case progress streams live over SSE as the run executes, so the user watches the run advance case-by-case instead of waiting for one final result (EVAL-02).
+  3. The full result set (per-case outputs, per provider) is persisted and remains readable after a page reload or restart (EVAL-02).
+  4. The eval reuses the existing agent loop + provider gateway (no new runtime) and holds across providers, multi-tool prompts, parallel threads, and long histories — Deep Mode stays byte-identical (SC#10).
+**Plans**: TBD
+
+#### Phase 134: Eval Results, Honest Verdict + Ratings
+**Goal**: After an eval run, the user can read an honest per-provider pass/fail verdict and a side-by-side with-skill vs without-skill comparison, and rate individual outputs to create a human preference signal.
+**Depends on**: Phase 133 (results come from a run)
+**Requirements**: EVAL-03, EVAL-04
+**Success Criteria** (what must be TRUE):
+  1. An eval run produces a per-provider pass/fail verdict the user can read, and a provider that errored shows an honest "errored / not measured" state — never a fabricated score (EVAL-03).
+  2. The user can read a side-by-side comparison of the with-skill vs without-skill output for each test case (EVAL-03).
+  3. The user can rate individual eval outputs with thumbs up/down, and the rating persists as a human preference signal (EVAL-04).
+  4. The accumulated ratings are queryable as a signal the self-improvement loop (Phase 135) can consume (EVAL-04).
+**Plans**: TBD
+**UI hint**: yes — functional read/rate surfaces; the consolidated, sketch-gated Evals panel is PANEL-01 (Phase 137).
+
+#### Phase 135: Self-Improvement Loop (SI-01)
+**Goal**: The system closes the loop — it proposes instruction-body edits from eval results + Tuner signal, the user reviews the diff and approves, a new immutable version is created and automatically re-evaled before promotion; the system never auto-applies.
+**Depends on**: Phases 132, 133, 134 (needs versioning + runner + results + ratings)
+**Requirements**: SI-01
+**Success Criteria** (what must be TRUE):
+  1. From an eval result + Tuner signal, the system proposes a concrete instruction-body edit as a reviewable diff — it never edits the live skill and never auto-applies (SI-01).
+  2. The user reviews the proposed diff and explicitly approves or rejects it; on approval a new immutable skill version is created, on rejection nothing changes (SI-01 — human always in the loop).
+  3. An approved new version is automatically re-evaled and the result gates promotion — a version that fails re-eval is surfaced as not-promoted with honest evidence (SI-01 auto-re-eval gate).
+  4. The proposer + re-eval behavior holds across providers (reuses the existing gateway; SC#10) with no shared-path fork.
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 136: Skill Publish Gate (GATE-01)
+**Goal**: A skill can only be published (made global / shareable) after at least one eval has run and passed; the publish flow surfaces this gate clearly and blocks (or warns with evidence) when unmet.
+**Depends on**: Phase 134 (the gate consumes the eval pass/fail verdict)
+**Requirements**: GATE-01
+**Success Criteria** (what must be TRUE):
+  1. Attempting to publish (make global / shareable) a skill with no passing eval surfaces the unmet gate with a clear status and blocks (or warns with evidence) (GATE-01).
+  2. After at least one eval has run and passed, the same skill can be published and the publish flow shows the gate satisfied (GATE-01).
+  3. The gate applies only to future publish actions — already-published skills are not retroactively gated (GATE-01 scope).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 137: Skill Evals Panel UI (PANEL-01)
+**Goal**: The Skills UI gains a Skill Evals panel that consolidates the whole eval experience — test case editor, run history, run detail (side-by-side + pass/fail), inline ratings, and diff-viewable version history — without redesigning the rest of the Skills tab.
+**Depends on**: Phases 132-136 (consolidates the full eval experience; PANEL-01 minimally needs EVAL-01..04 + VER-01, and lands last so it can also surface SI-01 version history + the publish-gate status)
+**Requirements**: PANEL-01
+**Success Criteria** (what must be TRUE):
+  1. From the Skills UI, a user opens a Skill Evals panel for a skill that surfaces the test case editor (add/edit/delete cases), the eval run history list, and the per-run detail (per-case side-by-side outputs + pass/fail) (PANEL-01).
+  2. The panel offers inline rating controls (thumbs up/down) on eval outputs in context (PANEL-01 + EVAL-04).
+  3. The panel shows diff-viewable version history so a user can compare instruction versions (PANEL-01 + VER-01).
+  4. The existing Skills tab layout is otherwise unchanged (the panel is an addition, not a redesign) and the panel matches the operator-approved sketch — the G-2 acceptance bar (PANEL-01).
+**Plans**: TBD
+**UI hint**: yes — **G-2 sketch-gated** (run `/gsd:sketch 137` before planning).
+
+#### Phase 138: Run-End Honesty (STRETCH)
+**Goal**: A run ends honestly — baseline files seeded at run start don't appear as dead "Download unavailable" cards, and open todos are marked "ended with open todos" instead of silently auto-completed.
+**Depends on**: Nothing hard (backend-only, small — the safest STRETCH to pull forward; touches the `agent_loop.py` finalizer). Gated behind CORE.
+**Requirements**: RUN-01
+**Success Criteria** (what must be TRUE):
+  1. Baseline files seeded at run start no longer appear as dead "Download unavailable" cards in the run's final output files (RUN-01a).
+  2. When a run ends with open todos, a run-end reconciler marks them "ended with open todos" — never silently auto-completed (RUN-01b).
+  3. The change is additive and shared-path-safe — Deep Mode stays byte-identical (red line).
+**Plans**: TBD
+
+#### Phase 139: Self-Improve Proposer — Description-Only (STRETCH)
+**Goal**: A bounded, human-in-the-loop description-only proposer drafts a description diff → human approves → new immutable version; no instruction-body edits.
+**Depends on**: Phase 135 (SI-01 eval/versioning substrate). Gated behind CORE.
+**Requirements**: SI-02
+**Success Criteria** (what must be TRUE):
+  1. The proposer drafts a description-only diff (no instruction-body edits) as a DRAFT — it never auto-publishes and never edits a live skill description (SI-02).
+  2. A human reviews and approves the description diff; on approval a new immutable version is created, on rejection nothing changes (SI-02).
+  3. The proposal reuses the SI-01 substrate and the cross-provider scoreboard, holding across providers (SC#10) (SI-02).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)
+**Goal**: Only plausibly-relevant skills are surfaced to the model for a given query, keeping the active skill catalog within a configurable token budget.
+**Depends on**: Phase 123 CTX-03 pin substrate (shipped in v3.1). Gated behind CORE.
+**Requirements**: TRIG-02
+**Success Criteria** (what must be TRUE):
+  1. For a given user turn, only skills that pass a relevance pre-filter are surfaced to the model — clearly-irrelevant skills are not injected (TRIG-02).
+  2. The injected skill catalog stays within a configurable token budget even as the user's skill count grows (TRIG-02).
+  3. A genuinely-relevant skill is never starved (a should-trigger skill still reaches the model), verified cross-provider (SC#10) (TRIG-02).
+**Plans**: TBD
+
+#### Phase 141: template_input Resolver Run-Scope (STRETCH)
+**Goal**: The `template_input` resolver is scoped to the current run — a template uploaded in one run is not visible or accessible in another.
+**Depends on**: Phase 120 COLL-01 run-scope seam (shipped in v3.1). Gated behind CORE.
+**Requirements**: COLL-02
+**Success Criteria** (what must be TRUE):
+  1. The `template_input` resolver only resolves inputs scoped to the current run — a template uploaded in one run is never visible or accessible in another run's `render_template` (COLL-02).
+  2. The `render_template` happy path is unchanged for in-scope inputs — no regression (COLL-02).
+**Plans**: TBD
+
+#### Phase 142: Non-Python Skill-Script Honesty (STRETCH)
+**Goal**: When a skill's script is non-Python, the agent surfaces an honest "cannot execute this skill type" signal instead of silently failing or narrating the code as if it ran.
+**Depends on**: Phase 120 (off the COLL-01 seam, shipped in v3.1); DISC-01 Layer 1 / SEED-044. Gated behind CORE.
+**Requirements**: SRH-01
+**Success Criteria** (what must be TRUE):
+  1. Importing a skill that bundles a non-Python script (e.g. `.js`) still succeeds, and the user sees an honest message that the skill includes a step the sandbox can't run yet while its instructions still work (SRH-01).
+  2. When the agent would run a non-Python skill script, it fails cleanly with a specific message instead of silently running it as Python or narrating it as if it executed (SRH-01).
+  3. (Optional) `read_skill_file` can return a bundled non-Python file as reference text without implying it can be executed (SRH-01).
+**Plans**: TBD
+
+#### Phase 143: Starter Workflow Library (STRETCH)
+**Goal**: A curated set of fork-able starter workflows is available on the Workflows page as an `is_global` published shelf — users fork a starter into a personal draft instead of starting from a blank description.
+**Depends on**: Nothing hard (the Workflows page + workflow primitives already exist); SEED-084. Gated behind CORE.
+**Requirements**: WF-01
+**Success Criteria** (what must be TRUE):
+  1. The Workflows page shows a curated shelf of `is_global` published starter workflows (WF-01).
+  2. A user can fork a starter into a personal draft and edit it without affecting the published starter (WF-01).
+  3. The starters are authored on the existing generic primitives — no new runtime (red line) (WF-01).
+**Plans**: TBD
+**UI hint**: yes
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 132. Skill Versioning + Eval Test-Case Persistence | 0/TBD | Not started | - |
+| 133. Eval Runner — With-Skill vs Without-Skill | 0/TBD | Not started | - |
+| 134. Eval Results, Honest Verdict + Ratings | 0/TBD | Not started | - |
+| 135. Self-Improvement Loop (SI-01) | 0/TBD | Not started | - |
+| 136. Skill Publish Gate (GATE-01) | 0/TBD | Not started | - |
+| 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
+| 138. Run-End Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 139. Self-Improve Proposer — Description-Only (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 141. template_input Resolver Run-Scope (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 142. Non-Python Skill-Script Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+
+### Guardrails firing (v3.2)
+
+- **G-2 sketch-first — Phase 137 (PANEL-01).** Live Skill Evals panel / "feels like" surface → `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`; the operator-approved mockup is the acceptance bar. The `sketch-findings-agentic-rag` skill already names the Skills surfaces — extend it for the Evals panel.
+- **G-5 hot files (audit at discuss-phase).** `backend/app/api/threads.py` (firing → extraction STILL due — do NOT grow it; the eval runner (133) + SI-01 (135) must be net-new routers, `skill_tuner.py` precedent, consuming `agent_loop.py` + the provider gateway READ-ONLY). `backend/app/services/agent_loop.py` (RUN-01 / 138 touches the finalizer/terminal path; TRIG-02 / 140 touches the catalog-injection path; 133/135 consume it read-only). The catalog injection path + `context_window.py` token budget (TRIG-02 / 140).
+- **SC#10 cross-provider mandate.** Flagged on every phase touching streaming / agent loop / provider routing / UI state — headline three EVAL-02 (133), SI-01 (135), TRIG-02 (140), plus the per-provider-display / UI-state phases 134, 137, 139. UAT rows = cross-provider × multi-tool × parallel-thread × long-message, authored under VALIDATION.md.
+- **Red line (D-14).** Never fork the shared path — provider differences stay at the gateway/adapter/sanitizer boundary. Deep Mode byte-identical; no new eval runtime (evals reuse the agent loop + provider gateway).
+- **Reported-bugs.** RUN-01 (138) closes SEED-094 (BUG-260626-02 baseline leak into live final-emit + BUG-260626-03 run-end todo finalizer), the two run-honesty items deferred from Phase 123.
 
 ---
 

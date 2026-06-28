@@ -68,17 +68,17 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| EVAL-01 | TBD | Pending roadmap |
-| EVAL-02 | TBD | Pending roadmap |
-| EVAL-03 | TBD | Pending roadmap |
-| EVAL-04 | TBD | Pending roadmap |
-| VER-01 | TBD | Pending roadmap |
-| SI-01 | TBD | Pending roadmap |
-| GATE-01 | TBD | Pending roadmap |
-| PANEL-01 | TBD | Pending roadmap |
-| SI-02 (STRETCH) | TBD | Pending roadmap |
-| TRIG-02 (STRETCH) | TBD | Pending roadmap |
-| COLL-02 (STRETCH) | TBD | Pending roadmap |
-| SRH-01 (STRETCH) | TBD | Pending roadmap |
-| RUN-01 (STRETCH) | TBD | Pending roadmap |
-| WF-01 (STRETCH) | TBD | Pending roadmap |
+| EVAL-01 | Phase 132 | Pending |
+| EVAL-02 | Phase 133 | Pending |
+| EVAL-03 | Phase 134 | Pending |
+| EVAL-04 | Phase 134 | Pending |
+| VER-01 | Phase 132 | Pending |
+| SI-01 | Phase 135 | Pending |
+| GATE-01 | Phase 136 | Pending |
+| PANEL-01 | Phase 137 | Pending |
+| SI-02 (STRETCH) | Phase 139 | Pending (gated) |
+| TRIG-02 (STRETCH) | Phase 140 | Pending (gated) |
+| COLL-02 (STRETCH) | Phase 141 | Pending (gated) |
+| SRH-01 (STRETCH) | Phase 142 | Pending (gated) |
+| RUN-01 (STRETCH) | Phase 138 | Pending (gated) |
+| WF-01 (STRETCH) | Phase 143 | Pending (gated) |

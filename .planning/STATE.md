@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving
-status: planning
-last_updated: "2026-06-28T00:00:00.000Z"
-last_activity: 2026-06-28 -- Milestone v3.2 started
+status: Planning
+last_updated: "2026-06-28T14:30:00.000Z"
+last_activity: 2026-06-28 — v3.2 roadmap created (Phases 132-143)
 progress:
-  total_phases: 0
+  total_phases: 12
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,21 +15,21 @@ progress:
 
 # Project State
 
-> **Scope note:** **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers STARTED 2026-06-21 (Option A — scope LOCKED + operator-approved).** Roadmap created: CORE Phases 120-124 + STRETCH Phases 125-130 (gated behind CORE). Numbering continues from v3.0's last phase (119). Scope source: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`; operator pressures: `.planning/research/v3.1-skills-eval/OPERATOR-INPUTS.md`. **v3.0 Document Management SHIPPED + archived 2026-06-21** (last phase 119; SEED-005 Tier A — metadata enrichment → metadata-driven views/"virtual folders" → document relationships → auto-classification → governance health; full close-out in `.planning/milestones/` + `MILESTONES.md` + `RETROSPECTIVE.md`). The v3.x PRD roadmap was re-sequenced 2026-06-15 — authoritative map: `.planning/PRDs/SEQUENCE.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards. **Everything below the "Roadmap shape (v3.1...)" block is v3.0-and-earlier accumulated context, retained per the milestone-transition convention.**
+> **Scope note:** **v3.2 Skill Eval Studio + Self-Improving STARTED 2026-06-28.** Roadmap created: CORE Phases 132-137 + STRETCH Phases 138-143 (gated behind CORE — v2.9 105-109 / v3.1 125-131 precedent). Numbering continues from v3.1's last phase (131). Scope source: `.planning/REQUIREMENTS.md` (8 CORE + 6 STRETCH); brief `.planning/PRDs/v3.1-skill-studio-eval.md`. **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers SHIPPED + archived 2026-06-28** (CORE 120-124+123.1; STRETCH 127/128/129 shipped, 125/126/130/131 deferred as carry-forwards now folded into v3.2 STRETCH; close-out in `.planning/milestones/v3.1-ROADMAP.md` + `MILESTONES.md`). The v3.x PRD roadmap (authoritative map: `.planning/PRDs/SEQUENCE.md`) is unchanged. **Everything below the "Roadmap shape (v3.2...)" block is v3.1-and-earlier accumulated context, retained per the milestone-transition convention.**
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-21 — v3.1 milestone started; v3.0 Document Management COMPLETE + archived)
+See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 127 — gauntlet-pip-strip-quiet-idle-cards
+**Current focus:** Phase 132 — Skill Versioning + Eval Test-Case Persistence (v3.2 roadmap created; next: `/gsd:plan-phase 132`)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-28 — Milestone v3.2 started
+Phase: 132 — Skill Versioning + Eval Test-Case Persistence (CORE, first of 12)
+Plan: — (not yet planned)
+Status: Planning — v3.2 roadmap created (12 phases: CORE 132-137 + STRETCH 138-143). Next: `/gsd:plan-phase 132`
+Last activity: 2026-06-28 — v3.2 roadmap created (Phases 132-143; 14/14 requirements mapped)
 
 ### Quick Tasks Completed
 
@@ -99,6 +99,41 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 **v2.9 STRETCH phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01)** remain backlog carry-forwards (next-milestone candidates).
 
 **Open `surface: Agentic-RAG` reports (roll forward into the v3.1 UAT blast radius):** the carried v2.9 run-honesty / provider-polish reports (BUG-260609-02/-04, BUG-260610-01, BUG-260615-01, `general-chat-intermittent-silent-send-drop`, `minimax-m3-invalid-tool-args-400`, `setting-up-agent-hides-model-activity`). **v3.1 routing note:** `minimax-m3-invalid-tool-args-400` is the re-open trigger for STRETCH Phase 129 (MP-04 MiniMax arg repair); `setting-up-agent-hides-model-activity` + `non-anthropic-generic-code-task-descriptions` are addressed by Phase 122 (TDP-01 task-label parity) + STRETCH Phase 128 (TDP-02). Cross-check these at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.2, created 2026-06-28)
+
+**CORE (committed) — Phases 132-137:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 132 | Skill Versioning + Eval Test-Case Persistence | VER-01, EVAL-01 | 4 | Schema/RLS foundation (~5 new tables); owner-scoped (skills precedent); no agent-loop/provider touch |
+| 133 | Eval Runner — With-Skill vs Without-Skill | EVAL-02 | 4 | SC#10; G-5 (net-new eval router — do NOT grow `threads.py`; consume `agent_loop.py`/gateway read-only); no new runtime |
+| 134 | Eval Results, Honest Verdict + Ratings | EVAL-03, EVAL-04 | 4 | SC#10 (per-provider verdict honesty, MP-03 precedent); UI hint (polished panel = 137) |
+| 135 | Self-Improvement Loop (SI-01) | SI-01 | 4 | SC#10; UI hint (diff review); human-in-the-loop; G-5 (consume agent_loop/gateway read-only) |
+| 136 | Skill Publish Gate (GATE-01) | GATE-01 | 3 | UI hint (publish-flow gate); future-publish-only |
+| 137 | Skill Evals Panel UI (PANEL-01) | PANEL-01 | 4 | **G-2 sketch**; UI hint; SC#10 (UI state); additive (no Skills-tab redesign) |
+
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent) — Phases 138-143:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 138 | Run-End Honesty | RUN-01 | 3 | — (backend-only, small, can go early); G-5 (`agent_loop.py` finalizer); SEED-094 |
+| 139 | Self-Improve Proposer (description-only) | SI-02 | 3 | 135 |
+| 140 | Smart-Dispatch Relevance Pre-Filter | TRIG-02 | 3 | 123 (shipped); G-5 (catalog injection); SC#10 |
+| 141 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 (shipped) |
+| 142 | Non-Python Skill-Script Honesty | SRH-01 | 3 | 120 (off COLL-01 seam, shipped); DISC-01 Layer 1 |
+| 143 | Starter Workflow Library | WF-01 | 3 | — (Workflows page exists); SEED-084; UI hint |
+
+- **Coverage:** 14/14 requirements mapped (8 CORE + 6 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Sequencing rationale:** VER-01 paired WITH EVAL-01 in the foundation (132) — test cases reference an immutable skill version. Strict eval chain 132 → 133 → 134 (persistence → runner → results). SI-01 (135) needs the full eval substrate (EVAL-02 + EVAL-03 + VER-01 + EVAL-04 ratings). GATE-01 (136) consumes the pass/fail verdict. PANEL-01 (137) lands LAST as the sketch-gated consolidation of the whole eval experience (depends EVAL-01..04 + VER-01). RUN-01 (138) is backend-only/small — the safest STRETCH to pull forward; it closes SEED-094.
+- **SC#10 (cross-provider mandate):** flagged on every phase touching streaming / agent loop / provider routing / UI state — headline three EVAL-02 (133), SI-01 (135), TRIG-02 (140), plus per-provider-display / UI-state phases 134, 137, 139.
+- **UI hint:** 134, 135, 136, 137 (CORE) + 139, 143 (STRETCH).
+- **G-2 sketch-gated:** 137 (PANEL-01). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **G-5 hot files (audit at discuss-phase):** `backend/app/api/threads.py` (firing → extraction STILL due — do NOT grow it; eval runner 133 + SI-01 135 = net-new routers, `skill_tuner.py` precedent), `backend/app/services/agent_loop.py` (RUN-01 138 finalizer/terminal; TRIG-02 140 catalog-injection; 133/135 consume read-only), catalog injection + `context_window.py` token budget (140).
+- **Red line:** never fork the shared path — provider differences at the gateway/adapter/sanitizer boundary (D-14). Deep Mode byte-identical; no new eval runtime (evals reuse the agent loop + provider gateway).
+- **Reported-bugs:** RUN-01 (138) closes SEED-094 (BUG-260626-02 baseline leak into final-emit + BUG-260626-03 run-end todo finalizer).
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.2 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Scope source: `.planning/PRDs/v3.1-skill-studio-eval.md`.
 
 ## Roadmap shape (v3.1, created 2026-06-21)
 
