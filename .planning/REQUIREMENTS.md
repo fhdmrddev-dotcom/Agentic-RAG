@@ -1,134 +1,84 @@
-# Requirements: Agentic RAG — v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers
+# Requirements: Agentic RAG — v3.2 Skill Eval Studio + Self-Improving
 
-**Defined:** 2026-06-21
+**Defined:** 2026-06-28
 **Core Value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Scope source:** `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md` (Option A — LOCKED + operator-approved 2026-06-21 via 2 research waves + a live DB forensic). Operator pressures: `.planning/research/v3.1-skills-eval/OPERATOR-INPUTS.md`.
+**Scope:** Eval persistence + self-improvement loop + skill publish gate — the net-new eval+versioning backend that turns the Skill Trigger Tuner into a full iterative improvement cycle.
 
-> **Red line (applies to every requirement):** never fork the shared Deep/agent-loop/provider path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime. **Guardrails:** G-2 sketch-first on IA-01 + all WUX-* (live UI); G-5 hot files (`threads.py` firing, `context_window.py`/`agent_loop.py` trim path, `PhaseTimeline.tsx`/`PhaseCard.tsx`).
+> **Red line (applies to every requirement):** never fork the shared Deep/agent-loop/provider path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime. **SEED-002 pre-work note:** catalog-injection-cost decision (full vs target-only inject during eval) is resolved in EVAL-02 planning; skills tab redesign scope is confirmed as PANEL-01 (Evals panel addition, not full redesign). **SC#10 mandate applies to every phase touching streaming, agent loop, provider routing, or UI state.**
 
 ## v1 Requirements (CORE — committed to this milestone)
 
 Each maps to exactly one roadmap phase.
 
-### Collision & Context Isolation
+### Skill Eval Persistence
 
-- [x] **COLL-01**: A skill that saves one file in a thread that previously ran a workflow emits exactly that one file — the sandbox-output harvest is run-scoped to its own run's baseline, so a prior workflow's leftover `/sandbox/output/` artifacts are never re-emitted (the confirmed live 2-files bug, Mechanism A).
-- [x] **CTX-01**: When Deep chat and a workflow share a thread, each mode's history reconstruction replays only its own messages — `messages.origin` (`deep` | `harness`) is recorded and filtered in `_reconstruct_history`, so workflow context never bleeds into a subsequent Deep turn.
-- [x] **IA-01**: A user launches workflows from one front door (the Workflows page) — the chat composer's Harness pill + in-chat workflow selector are removed, leaving a 2-pill General/Explorer composer, while the Harness↔Deep lock / 409 / reconcile behavior is preserved. (G-2 sketch-gated.)
+- [ ] **EVAL-01**: User can define a set of test cases (prompt + expected-behavior description) for a skill and save them persistently — test cases survive session and are editable before any run.
+- [ ] **EVAL-02**: An eval run executes each test case with-skill vs without-skill (two completions per case), streams per-case progress over SSE, and persists the full result set (per-case outputs per provider) so results are readable after reload.
+- [ ] **EVAL-03**: Eval results include a per-provider pass/fail verdict and side-by-side output comparison the user can read in the UI — the comparison is honest (no fabricated scores when a provider errored).
+- [ ] **EVAL-04**: User can rate individual eval outputs (thumbs up/down) to create a human preference signal that informs the self-improvement loop.
 
-### Cross-Provider Trust & Honesty
+### Skill Versions
 
-- [x] **MP-01**: A model that silently fails a forced structured emit (e.g. the default model's no-metadata 400) is recovered by a force→coerce retry ladder in `forced_emit`, so a typed-artifact phase produces its emission instead of a silent empty result.
-- [x] **MP-02**: Provider forcing/strict behavior is doc-verified and honest per provider — an explicit `emit_tier` field replaces guesswork, the inert DeepSeek function-level `strict` is dropped, and GLM forcing is kept (intentional, live-verified) so each provider uses the emission path it actually supports.
-- [x] **MP-03**: Cross-provider reliability is measured, not assumed — the eval treats provider as a first-class axis with a per-provider scoreboard (trigger / force / recovery / honest-fail), pass-OR-documented, which gates any MP-02 tier change.
-- [x] **TDP-01**: Task/todo/workflow-step labels are concrete and honest on every provider (OpenAI-parity), not the bare tool name — an ungated prompt nudge fills `execute_code.description` and a deterministic frontend summarizer floor backstops providers that don't, without regressing providers that already do.
+- [ ] **VER-01**: When a skill's instructions are saved (create or update), an immutable version snapshot is created — so eval run history is traceable to the exact instruction state that produced it and prior versions are viewable.
 
-### Skill Triggering Quality
+### Self-Improvement Loop
 
-- [x] **TRIG-01**: A skill author can tune a skill's description against a held-out should-trigger / should-not-trigger benchmark (Skill Trigger Tuner) and pick the winning description by held-out score, measured cross-provider on production model-ids.
-- [x] **TRIG-03**: At `save_skill` (and in the skill-creator loop) a description-quality lint flags weak/ambiguous trigger descriptions before the skill is saved, so new skills start with descriptions that actually fire.
-- [x] **CTX-03**: A loaded skill's instructions stay available for the rest of the session — they are pinned out of the rolling trim window so a skill doesn't silently fall out of context mid-conversation.
+- [ ] **SI-01**: The system proposes instruction-body edits based on eval results + Tuner signal → user reviews the diff and approves → a new immutable skill version is created and auto-re-evaled before promotion — the human is always in the loop, the system never auto-applies.
 
-### Workflow Studio UX
+### Skill Publish Gate
 
-- [x] **WUX-01**: A user sees the "soul" of a workflow at a glance in three sizes (library card / run header / publish summary): its purpose (`business_requirement`), what it needs, a glyph-dot phase spine (no type ribbons/index noise), one tier chip, and its output line. (G-2 sketch-gated.)
-- [x] **WUX-02**: Authoring and running expose a strict↔loose disclosure keyed off `deriveTier` — two clear doors ("Describe & run" vs "Author & govern") — where nothing is removed, advanced controls are demoted one click, and accuracy + control are preserved. (G-2 sketch-gated.)
+- [ ] **GATE-01**: A skill can only be published (made global / shareable) after at least one eval has run and passed — the publish flow surfaces this gate with a clear status, and blocks (or warns with evidence) if the eval requirement is unmet.
 
-## Stretch Requirements (this milestone — ship only if CORE lands clean and budget remains)
+### Skill Evals UI
 
-Tracked in the roadmap as STRETCH phases, gated behind CORE completion (v2.9 105–109 precedent). Not part of the CORE acceptance bar.
+- [ ] **PANEL-01**: The Skills UI has a Skill Evals panel that surfaces: test case editor (add/edit/delete cases), eval run history list, run detail view (per-case side-by-side outputs + pass/fail), inline rating controls, and version history (diff-viewable). (G-2 sketch-gated.)
 
-- [ ] **SI-02**: A bounded, human-in-the-loop, **description-only** self-improvement proposer — eval → propose a description diff → DRAFT → human approves → new immutable version; never auto-publishes, uses held-out selection and the Phase-102 judge as a gate. (Anthropic stance: direction yes, autonomy no.)
-- [ ] **TRIG-02**: A smart-dispatch relevance pre-filter + catalog token budget, so only plausibly-relevant skills are surfaced to the model and the catalog stays within budget.
-- [ ] **WUX-03**: The publish gauntlet renders as a pip-strip + worded verdict with raw-on-demand, and idle PhaseCards stay quiet.
-- [x] **TDP-02**: A tool's `description` streams live before `tool_start` (the preparing-window honesty improvement).
-- [x] **CTC-01**: The tool-card header shows the actual provider's logo (per-provider) in place of the generic brand-pulse "spot" avatar.
-- [x] **CTC-02**: The tool card carries a unified content/layout across ALL providers — it is the single canonical, complete surface for live run info (status, elapsed, step/file counts, tool description), with no per-provider gaps. (Provider-docs-first / SC#10: verify uniform coverage before relying on it.)
-- [x] **CTC-03**: The redundant sticky elapsed timer above the composer (`ChatArea.tsx` 076.1 D-03 — elapsed + steps + files + description, all already in the tool card; today inconsistent across providers — shows for some, vanishes for others) is removed, reclaiming chat-area vertical space. Removal is gated on CTC-02 (the tool card must carry that info uniformly first).
-- [x] **CTC-04**: Long user prompts in the chat collapse to a clamped preview with a "Read more" expander instead of rendering full-height, reclaiming chat-area space.
-- [ ] **MP-04**: MiniMax malformed-args boundary repair + OpenRouter `require_parameters` for broader provider robustness.
-- [ ] **COLL-02**: The `template_input` resolver is run-scoped too — defense-in-depth for the `render_template` path alongside COLL-01.
-- [ ] **SRH-01**: When a user imports or runs a skill that bundles a non-Python script the Python-only sandbox can't execute (e.g. `.js`), the system is honest about it — a clear message at import ("this skill includes a JavaScript step the sandbox doesn't run yet; its instructions still work") and a clean, specific failure at execution instead of silently running JS as Python. Optionally widen `read_skill_file` so the model can at least *read* the bundled JS as reference text. (SEED-044 Layer 1 — the honesty precursor to v3.2's DISC-01; additive, kept OFF the COLL-01 sandbox-injection seam. Folded into v3.1 2026-06-22 by operator after a JS-skill-import investigation.)
+## v1 Requirements (STRETCH — gated behind CORE)
 
-## Deferred (not in this milestone)
+Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 
-### → v3.2 "Skill Eval Studio (full) + Self-Improving"
+- [ ] **SI-02**: A description-only self-improve proposer drafts a description diff → human approves → a new immutable version is created. No instruction-body edits (description only). (v3.1 STRETCH carry-forward; depends on SI-01 eval substrate.)
+- [ ] **TRIG-02**: Only plausibly-relevant skills are surfaced to the model for a given query, keeping the active catalog within a configurable token budget. (v3.1 STRETCH carry-forward; depends on Phase 123 CTX-03 pin substrate; G-5 catalog injection path; SC#10.)
+- [ ] **COLL-02**: The `template_input` resolver is scoped to the current run — a template uploaded in one run is not visible or accessible in another. (v3.1 STRETCH carry-forward; depends on Phase 120 COLL-01 run-scope seam.)
+- [ ] **SRH-01**: When a skill's script is non-Python (JS, shell, etc.), the agent surfaces an honest "cannot execute this skill type" signal rather than silently failing or narrating the code as if it ran. (v3.1 STRETCH carry-forward; DISC-01 Layer 1; SEED-044.)
+- [ ] **RUN-01**: Run-end honesty — (a) baseline files seeded at run start no longer appear as dead "Download unavailable" cards in the final_output_files emit; (b) a run-end reconciler marks open todos as "ended with open todos" (never silently auto-completes). (SEED-094; backend agent_loop.py finalizer pair; additive, shared-path-safe.)
+- [ ] **WF-01**: A curated set of fork-able starter workflows is available on the Workflows page as an is_global published shelf — users fork a starter into a personal draft instead of starting from a blank description. (SEED-084; no new runtime, one shelf section + content authoring.)
 
-- **SI-01**: `skill_versions` table + immutability trigger + eval tables (`eval_cases`/`runs`/`run_outputs`/`feedback`) + `run_skill_eval` + grader/comparator/analyzer roles + with-skill-vs-snapshot baseline + review viewer + skill publish gate. The PRD's net-new eval+versioning spine — large enough to be most of a milestone on its own.
-- **STD-01**: agentskills.io frontmatter enforcement (name rules, description ≤1024, optional `metadata.version`).
-- **DISC-01**: executable skill bundle / "run skill script" primitive — the FULL multi-language capability (Node in the sandbox image + un-hardcode `lang` + route `execute_code` by language; the ignored `language` arg at `tool_dispatcher.py:1175` + llm_sandbox's native `lang="javascript"` are the wiring points). Sequence AFTER COLL-01 (touches the same sandbox-injection seam). v3.1 ships only the honesty precursor **SRH-01**; this is the real execution layer. Note: even Anthropic's own docx/pptx skills document a Node create-from-scratch path — but our app's Python emission layer (Phases 100/101) already generates those documents, so JS execution is for running market skills' bundled scripts verbatim, not a document-generation blocker.
+## Future Requirements (deferred beyond v3.2)
 
-### Own-slot / backlog
+- DM Tier B (retention / check-in-out / approvals) → v3.5
+- v2.9 STRETCH 105–109 (SCHED-01/GRID-01/GOV-02/PLUG-01/ROLE-01) → backlog
+- Full Node.js / multi-language skill execution (DISC-01 full) → v3.3+
+- Scheduled/automated skill eval runs (cron-triggered) → v3.3+
+- Operator/admin role tier (ROLE-01) → v3.3+
+- Public benchmark scoreboard (SEED-068) → TBD
+- Conversation compaction (CTX-02 / SEED-041) → TBD
+- SEED-093 tuner scoring honesty residuals (WR-04/05/06) → fold into TRIG-02 or dedicated tuner-polish phase
 
-- **CTX-02**: SEED-041 rolling conversation compaction (summarize the trim-head instead of deleting). Engine work — own slot.
-- **CTX-04 / CTX-05**: `read_document` cap + per-provider token estimation; relevance-ranked recall.
+## Out of Scope (explicit exclusions)
 
-## Out of Scope
+- **No automatic skill improvement without human approval** — SI-01 is always human-in-the-loop; the system proposes, never applies
+- **No eval enforced on existing published skills** — the publish gate applies to future publish actions only
+- **No full skills tab redesign** — PANEL-01 adds the Evals panel; the existing Skills tab layout is otherwise unchanged (full redesign deferred)
+- **No new eval runtime / eval provider** — evals re-use the existing agent loop + provider gateway (CORE eval pattern: with-skill vs without-skill on the same provider)
+- **No public/team-shared eval cases** — test cases are per-user-scoped (same RLS model as skills)
+- **No connectors or automated ingestion** (SEED-013/014) → v3.3/v3.4
 
-Explicitly excluded. Documented to prevent scope creep.
+## Requirement Traceability
 
-| Feature | Reason |
-|---------|--------|
-| Fully autonomous skill self-improvement (auto-publish, no human gate) | Anthropic's stance is direction-yes/autonomy-no; the v3.1 PRD already marks auto-improvement via meta-eval out of scope. Only the bounded human-in-the-loop **description-only** proposer (SI-02) is even a STRETCH. |
-| Full instruction-body self-improvement loop | Depends on the v3.2 eval+versioning spine (SI-01); description-only is the v3.1 ceiling. |
-| Provider-native skill loaders (per-provider activation mechanisms) | Routing activation through a normal `load_skill` tool call is the only mechanism that works identically across all providers; chasing provider-native loaders forks the shared path. |
-| Drag-to-build visual workflow node editor | Anti-feature for the domain-expert buyer (confirmed v2.9 / Phase 103); WUX-01/02 stay describe + form + read-only graph. |
-| Raw end-user filter/query DSL | Injection + UX hazard (D-v3.0-COMPILER); not reopened. |
-| The eval+versioning backend (SI-01) | Deferred → v3.2; v3.1's TRIG-01 Trigger Tuner delivers skill-quality value without it. |
-| Removing "launch-in-context" entirely | IA-01 keeps launch-in-context as an explicit action; the requirement is run↔chat **context isolation**, not removing the capability. |
-
-## Traceability
-
-Which phases cover which requirements. Updated during roadmap creation.
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| COLL-01 | Phase 120 | Complete |
-| CTX-01 | Phase 120 | Complete |
-| IA-01 | Phase 121 | Complete |
-| MP-01 | Phase 122 | Complete |
-| MP-02 | Phase 122 | Complete |
-| MP-03 | Phase 122 | Complete |
-| TDP-01 | Phase 122 | Complete |
-| TRIG-01 | Phase 123 | In Progress (foundation in 123-01: D-01 + shared LOAD_SKILL_POLICY; tuner delivered in 123-03/04/05) |
-| TRIG-03 | Phase 123 | Complete |
-| CTX-03 | Phase 123 | Complete |
-| WUX-01 | Phase 124 | Complete |
-| WUX-02 | Phase 124 | Complete |
-| SI-02 (STRETCH) | Phase 125 | Pending (gated) |
-| TRIG-02 (STRETCH) | Phase 126 | Pending (gated) |
-| WUX-03 (STRETCH) | Phase 127 | Pending (gated) |
-| TDP-02 (STRETCH) | Phase 128 | Pending (gated) |
-| CTC-01 (STRETCH) | Phase 128 | Pending (gated) |
-| CTC-02 (STRETCH) | Phase 128 | Pending (gated) |
-| CTC-03 (STRETCH) | Phase 128 | Pending (gated) |
-| CTC-04 (STRETCH) | Phase 128 | Pending (gated) |
-| MP-04 (STRETCH) | Phase 129 | **Complete** ✓ 2026-06-27 |
-| COLL-02 (STRETCH) | Phase 130 | Pending (gated) |
-| SRH-01 (STRETCH) | Phase 131 | Pending (gated) |
-
-**Coverage:**
-
-- v1 (CORE) requirements: 12 total — **12 mapped** (Phases 120-124)
-- STRETCH requirements: 11 (gated, in-roadmap) — **11 mapped** (Phases 125-131; 128 reframed → TDP-02 + CTC-01..04)
-- Mapped to phases: **23 / 23** ✓
-- Unmapped: **0** ✓
-
-**Phase map (CORE 120-124 · STRETCH 125-130):**
-
-- Phase 120 — Collision Fix + Context Isolation: COLL-01, CTX-01
-- Phase 121 — One Front Door for Workflows (IA): IA-01
-- Phase 122 — Cross-Provider Trust & Honesty Parity: MP-01, MP-02, MP-03, TDP-01
-- Phase 123 — Skill Triggering Quality: TRIG-01, TRIG-03, CTX-03
-- Phase 124 — Workflow Studio UX — Soul + Strict↔Loose: WUX-01, WUX-02
-- Phase 125 (STRETCH) — Self-Improve Proposer (description-only): SI-02
-- Phase 126 (STRETCH) — Smart-Dispatch Relevance Pre-Filter: TRIG-02
-- Phase 127 (STRETCH) — Gauntlet Pip-Strip + Quiet Idle Cards: WUX-03
-- Phase 128 (STRETCH) — Chat Tool-Card Unification + Chat-Area Reclaim: TDP-02, CTC-01, CTC-02, CTC-03, CTC-04
-- Phase 129 (STRETCH) — MiniMax/OpenRouter Arg Repair: MP-04
-- Phase 130 (STRETCH) — template_input Resolver Run-Scope: COLL-02
-- Phase 131 (STRETCH) — Non-Python Skill-Script Honesty: SRH-01
-
----
-*Requirements defined: 2026-06-21*
-*Last updated: 2026-06-22 — folded SRH-01 (non-Python skill-script honesty; SEED-044 Layer 1) into v3.1 as STRETCH Phase 131 after a JS-skill-import investigation; full Node execution stays v3.2 DISC-01 (19/19 mapped — CORE 120-124, STRETCH 125-131)*
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| EVAL-01 | TBD | Pending roadmap |
+| EVAL-02 | TBD | Pending roadmap |
+| EVAL-03 | TBD | Pending roadmap |
+| EVAL-04 | TBD | Pending roadmap |
+| VER-01 | TBD | Pending roadmap |
+| SI-01 | TBD | Pending roadmap |
+| GATE-01 | TBD | Pending roadmap |
+| PANEL-01 | TBD | Pending roadmap |
+| SI-02 (STRETCH) | TBD | Pending roadmap |
+| TRIG-02 (STRETCH) | TBD | Pending roadmap |
+| COLL-02 (STRETCH) | TBD | Pending roadmap |
+| SRH-01 (STRETCH) | TBD | Pending roadmap |
+| RUN-01 (STRETCH) | TBD | Pending roadmap |
+| WF-01 (STRETCH) | TBD | Pending roadmap |
