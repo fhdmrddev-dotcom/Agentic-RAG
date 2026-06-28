@@ -1697,6 +1697,15 @@ def ingest_document(
                     user_settings=app_settings,
                 ))
                 emitted = result.get("emitted")
+                if not emitted:
+                    # Never let a metadata extraction silently yield None — surface the
+                    # forced-emit failure reason (model_failed_to_emit vs provider_error)
+                    # plus the resolved model/provider so the cause is diagnosable.
+                    log.warning(
+                        "metadata extraction produced no emission "
+                        "(model=%s provider=%s failure=%s) -> metadata=None",
+                        model, provider, result.get("failure"),
+                    )
                 # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
                 # `confidence` field out of the dump and renames it to the nested
                 # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
