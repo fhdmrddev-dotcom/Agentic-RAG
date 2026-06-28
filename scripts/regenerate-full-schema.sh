@@ -19,7 +19,13 @@
 # What this does:
 #   [1] (--reset only) Resets local Supabase DB and applies all migrations
 #   [2] Dumps schema-only snapshot via pg_dump inside the Supabase Postgres container
-#   [3] Prepends the bootstrap header banner
+#   [3] Post-processes the dump so it pastes cleanly into a fresh Supabase project
+#       (strips psql \restrict meta-commands, makes CREATE SCHEMA idempotent,
+#        comments the schema COMMENT, injects CREATE EXTENSION vector)
+#   [4] Writes header banner + dump + the cross-schema supplement
+#       (scripts/full-schema-supplement.sql: storage buckets/policies, the auth
+#        signup trigger, realtime publication) so the artifact is a TRUE one-paste
+#        bootstrap — no manual storage/auth/realtime follow-up needed.
 #
 # Usage:
 #   bash scripts/regenerate-full-schema.sh           # default: no reset, dump live DB
@@ -47,6 +53,7 @@ done
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${REPO_ROOT}/supabase/full-schema.sql"
 HEADER="${REPO_ROOT}/scripts/full-schema-header.sql"
+SUPPLEMENT="${REPO_ROOT}/scripts/full-schema-supplement.sql"
 
 cd "${REPO_ROOT}"
 
@@ -82,14 +89,14 @@ if [ -n "${NONSTANDARD}" ]; then
 fi
 
 if [ "${RESET_DB}" = "true" ]; then
-  echo "[1/3] --reset specified: resetting local Supabase DB and replaying all migrations..."
+  echo "[1/4] --reset specified: resetting local Supabase DB and replaying all migrations..."
   supabase db reset --no-seed
 else
-  echo "[1/3] No reset (default): dumping live DB schema as-is."
+  echo "[1/4] No reset (default): dumping live DB schema as-is."
   echo "       If you just added a migration, apply it via the Supabase SQL editor before running this."
 fi
 
-echo "[2/3] Dumping schema-only snapshot via pg_dump inside ${DB_CONTAINER}..."
+echo "[2/4] Dumping schema-only snapshot via pg_dump inside ${DB_CONTAINER}..."
 TMP="$(mktemp)"
 docker exec -i "${DB_CONTAINER}" pg_dump \
   --schema-only \
@@ -105,13 +112,43 @@ if [ ! -s "${TMP}" ]; then
   exit 1
 fi
 
-echo "[3/3] Prepending header banner and writing to ${TARGET}..."
+# Post-process the raw dump so the artifact is a clean, self-contained one-paste
+# bootstrap for a FRESH Supabase project (cloud or local). pg_dump 17 + the
+# public-only scope leave four things that break a naive paste:
+#   1. \restrict / \unrestrict  — psql client meta-commands, invalid as SQL
+#   2. CREATE SCHEMA public;     — fails: Supabase already has a public schema
+#   3. COMMENT ON SCHEMA public  — fails: paste role isn't the schema owner
+#   4. (missing) CREATE EXTENSION vector — pgvector is referenced (public.vector)
+#      but pg_dump omits it; inject it right after the schema so it precedes use.
+echo "[3/4] Post-processing dump (strip psql meta-commands, idempotent schema, inject pgvector)..."
+TMP2="$(mktemp)"
+awk '
+  /^\\restrict/ || /^\\unrestrict/ { next }
+  /^CREATE SCHEMA public;/ {
+    print "CREATE SCHEMA IF NOT EXISTS public;"
+    print "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;"
+    next
+  }
+  /^COMMENT ON SCHEMA public/ { print "-- " $0; next }
+  { print }
+' "${TMP}" > "${TMP2}"
+rm -f "${TMP}"
+
+echo "[4/4] Writing header + dump + cross-schema supplement to ${TARGET}..."
 {
   cat "${HEADER}"
   echo
-  cat "${TMP}"
+  cat "${TMP2}"
+  echo
+  echo "-- ============================================================"
+  echo "-- CROSS-SCHEMA SUPPLEMENT (storage buckets/policies, auth trigger,"
+  echo "-- realtime publication) — appended by regenerate-full-schema.sh from"
+  echo "-- scripts/full-schema-supplement.sql. See that file for maintenance notes."
+  echo "-- ============================================================"
+  echo
+  cat "${SUPPLEMENT}"
 } > "${TARGET}"
-rm -f "${TMP}"
+rm -f "${TMP2}"
 
 LATEST_MIGRATION="$(ls supabase/migrations | grep -E '^[0-9]+_' | sort | tail -1)"
 LINE_COUNT="$(wc -l < "${TARGET}")"
