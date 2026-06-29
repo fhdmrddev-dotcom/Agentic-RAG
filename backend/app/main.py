@@ -384,9 +384,15 @@ async def lifespan(app_instance):
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
+# FRONTEND_URL may hold one origin or a comma-separated list (e.g.
+# "https://superrag.cloud,https://agentic-rag-rho.vercel.app"). Split + strip
+# so multiple production origins can be allowed without a code change; a single
+# value stays valid (one-element list).
+_allowed_origins = [o.strip() for o in settings.frontend_url.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=_allowed_origins,
     allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
