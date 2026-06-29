@@ -425,11 +425,13 @@ All canonical patterns are inline above (Patterns 1–3, table DDL, backfill). S
 | A4 | pytest is the backend test framework with an integration harness that can reach the test DB | Validation Architecture | If integration tests can't apply/reach `079`, VER-01 trigger behavior can only be verified manually. |
 | A5 | `delete_skill` should cascade-clean versions/cases (matches `skill_files` cascade) | Write-paths table | Confirmed pattern, low risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`source` provenance fidelity (C-1).** Recommendation: collapse to `manual`/`backfill` in 132; defer finer provenance. Needs operator confirmation.
-2. **Version retention on skill delete (C-2).** Recommendation: CASCADE + UPDATE-only immutability. Needs operator confirmation.
-3. **Where do the thin UI surfaces live?** Operator said "thin, non-designed." Planner to decide: a minimal section in the existing skill edit view vs a standalone debug page. Must not constrain Phase 137 design (G-2). Low risk — keep it functional/ugly on purpose.
+> All three resolved by operator 2026-06-29 during plan-phase; recorded in `132-CONTEXT.md` (`<decisions>` D-03-R1/R2/R3 + the RESOLVED Claude's-Discretion thin-UI note). Plans honor each.
+
+1. **`source` provenance fidelity (C-1).** **RESOLVED — D-03-R1:** trigger stamps `source='manual'`, migration backfill stamps `'backfill'`; keep the full 5-value CHECK enum for forward-compat; do NOT distinguish import/tuner/self_improve in 132 (preserves the zero-app-code trigger, D-01).
+2. **Version retention on skill delete (C-2).** **RESOLVED — D-03-R2:** UPDATE-only immutability (067 block-trigger pattern); DELETE allowed via FK `ON DELETE CASCADE`; NO BEFORE DELETE block trigger.
+3. **Where do the thin UI surfaces live?** **RESOLVED — CONTEXT.md Discretion (2026-06-29):** a minimal, non-designed test-case section + version-history read inside the existing skill edit surface (`SkillDetailPanel`/`SkillFormDialog`) — no panel chrome/tabs/new design-system structure. Must not pre-empt or constrain the sketch-gated Phase 137 panel (G-2).
 
 ## Environment Availability
 
