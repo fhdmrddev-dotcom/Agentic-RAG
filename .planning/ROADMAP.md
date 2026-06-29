@@ -80,7 +80,7 @@
   4. Every test case and version snapshot is owner-scoped (same RLS model as skills) and an eval run is traceable to the exact skill version that produced it — a user never sees another user's cases (VER-01 + EVAL-01).
 **Plans**: 3 plans
 - [x] 132-01-PLAN.md — Migration 079: skill_versions + skill_test_cases tables, version-capture trigger, append-only + owner-only RLS, v1 backfill + live-DB apply (VER-01, EVAL-01)
-- [ ] 132-02-PLAN.md — Owner-scoped test-case CRUD router + read-only version-history GET + Pydantic models (EVAL-01, VER-01)
+- [x] 132-02-PLAN.md — Owner-scoped test-case CRUD router + read-only version-history GET + Pydantic models (EVAL-01, VER-01)
 - [ ] 132-03-PLAN.md — Thin non-designed test-case editor + version-history read mounted in skill detail panel (EVAL-01, VER-01)
 
 #### Phase 133: Eval Runner — With-Skill vs Without-Skill
@@ -207,7 +207,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 132. Skill Versioning + Eval Test-Case Persistence | 1/3 | In progress | - |
+| 132. Skill Versioning + Eval Test-Case Persistence | 2/3 | In progress | - |
 | 133. Eval Runner — With-Skill vs Without-Skill | 0/TBD | Not started | - |
 | 134. Eval Results, Honest Verdict + Ratings | 0/TBD | Not started | - |
 | 135. Self-Improvement Loop (SI-01) | 0/TBD | Not started | - |

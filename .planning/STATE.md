@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: executing
-last_updated: "2026-06-29T20:05:17.278Z"
-last_activity: 2026-06-29 -- Phase 132 execution started
+last_updated: "2026-06-30T00:00:00.000Z"
+last_activity: 2026-06-30 -- Phase 132 Plan 02 complete (test-case CRUD + version API)
 progress:
   total_phases: 25
   completed_phases: 9
   total_plans: 43
-  completed_plans: 41
-  percent: 37
+  completed_plans: 42
+  percent: 38
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 132 (skill-versioning-eval-test-case-persistence) — EXECUTING
-Plan: 2 of 3 (Plan 01 COMPLETE)
-Status: Executing Phase 132 — Plan 01 done (migration 079 applied live; 6/6 VER-01 tests pass)
-Last activity: 2026-06-30 -- Phase 132 Plan 01 complete (skill_versions + skill_test_cases live)
+Plan: 3 of 3 (Plans 01 + 02 COMPLETE)
+Status: Executing Phase 132 — Plan 02 done (owner-scoped test-case CRUD EVAL-01 + read-only version history VER-01 API; 5 new route tests + 51 incl. adjacent green). Next: Plan 03 (THIN SkillDetailPanel editor, --skip-ui; panel=P137).
+Last activity: 2026-06-30 -- Phase 132 Plan 02 complete (skill_test_cases.py router registered; .eq(user_id) owner gate on every route)
 
 ### Quick Tasks Completed
 
