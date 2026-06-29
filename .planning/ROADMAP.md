@@ -92,7 +92,12 @@
   2. Per-case progress streams live over SSE as the run executes, so the user watches the run advance case-by-case instead of waiting for one final result (EVAL-02).
   3. The full result set (per-case outputs, per provider) is persisted and remains readable after a page reload or restart (EVAL-02).
   4. The eval reuses the existing agent loop + provider gateway (no new runtime) and holds across providers, multi-tool prompts, parallel threads, and long histories — Deep Mode stays byte-identical (SC#10).
-**Plans**: TBD
+**Plans**: 5 plans (waves 1-4)
+- [ ] 133-01-PLAN.md — Migration 080 (eval_runs + eval_results) + Pydantic models [wave 1]
+- [ ] 133-02-PLAN.md — RunContext.skill_catalog_override additive field + Deep-byte-identical guard [wave 1]
+- [ ] 133-03-PLAN.md — eval_runner_service engine (drive run_agent_loop 2xN, no-op emit) + Wave 0 tests [wave 2]
+- [ ] 133-04-PLAN.md — evals.py router + companion runs row + main.py mount + integration tests [wave 3]
+- [ ] 133-05-PLAN.md — thin --skip-ui eval surface (reused run-stream client) [wave 4]
 
 #### Phase 134: Eval Results, Honest Verdict + Ratings
 **Goal**: After an eval run, the user can read an honest per-provider pass/fail verdict and a side-by-side with-skill vs without-skill comparison, and rate individual outputs to create a human preference signal.
