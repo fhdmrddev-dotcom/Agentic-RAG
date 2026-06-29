@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: verifying
+status: verified
 last_updated: "2026-06-30T00:00:00.000Z"
-last_activity: 2026-06-30 -- Phase 132 Plan 03 complete (thin test-case editor + version-history UI; EVAL-01/VER-01 observable end-to-end; phase ready_for_verification)
+last_activity: 2026-06-30 -- Phase 132 VERIFICATION PASSED 4/4 (VER-01 + EVAL-01 goal-backward verified; 11/11 integration tests; operator G-4 UAT confirmed)
 progress:
   total_phases: 25
   completed_phases: 10
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE (ready for verification)
+Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE + VERIFIED (4/4)
 Plan: 3 of 3 (Plans 01 + 02 + 03 COMPLETE)
-Status: Phase complete — all 3 plans done. Plan 03 shipped the THIN test-case editor + read-only version-history UI (--skip-ui; designed Evals panel = Phase 137/PANEL-01/G-2). EVAL-01 + VER-01 now observable end-to-end; operator G-4 UAT verified (add/edit/delete persist across reload; version increments on instructions change, NOT on enabled/global toggle — D-02). Next: `/gsd:verify-work 132`.
-Last activity: 2026-06-30 -- Phase 132 Plan 03 complete (SkillTestCasesSection mounted in SkillDetailPanel; 24c2dfed / 00a36a58 / b529af46)
+Status: Phase complete + verification PASSED 4/4 (`132-VERIFICATION.md`). VER-01 (SC#1): capture trigger fires on content trifecta, skips toggles (D-02), append-only block (23514), v1 backfill — 6 live-DB tests pass. EVAL-01 (SC#2/#3): owner-scoped CRUD persists, edit/delete work — 5 route tests pass. SC#4: `.eq(user_id)` on all 5 routes + owner-only RLS (no is_global). Operator G-4 UAT confirmed live + orchestrator independently exercised the live HTTP API + DB trigger (rolled back). Post-UAT polish: transient "Saved ✓" confirmation (`b529af46`). Pre-existing rot (29 tsc-b / 124 backend) excluded — none reference the new tables. Next: Phase 133 (eval runner) — or `/gsd:secure-phase 132` / `/gsd:complete-milestone` later.
+Last activity: 2026-06-30 -- Phase 132 VERIFICATION PASSED 4/4 (`132-VERIFICATION.md`); migration 079 applied live; cloud-migration helper `scripts/pending-cloud-migrations.sh` added (b716caad)
 
 ### Quick Tasks Completed
 
