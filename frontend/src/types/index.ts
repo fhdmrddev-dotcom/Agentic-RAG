@@ -517,6 +517,54 @@ export interface SkillFile {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Phase 132 Plan 03 (EVAL-01 / VER-01) — eval test-case + version-history wire
+// mirrors. Mirror the backend Pydantic shapes BYTE-FOR-BYTE (snake_case):
+//   skill_test_case.py → TestCaseCreate / TestCaseUpdate / TestCaseResponse
+//   skill_version.py   → SkillVersionResponse (read-only — trigger-created)
+// `expected_behavior` is free text (D-06); there are NO provider/model fields
+// (D-08). These back the THIN 132 foundation surface; the designed Evals panel
+// is Phase 137 (PANEL-01, G-2).
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface TestCase {
+  id: string
+  skill_id: string
+  user_id: string
+  prompt: string
+  expected_behavior: string
+  order_index: number
+  name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TestCaseCreate {
+  prompt: string
+  expected_behavior?: string
+  order_index?: number
+  name?: string | null
+}
+
+export interface TestCaseUpdate {
+  prompt?: string
+  expected_behavior?: string
+  order_index?: number
+  name?: string | null
+}
+
+export interface SkillVersion {
+  id: string
+  skill_id: string
+  user_id: string
+  version_number: number
+  name: string
+  description: string
+  instructions: string
+  source: string
+  created_at: string
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Phase 086 Plan 01 — agent-panel wire-mirror interfaces.
 //
 // These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there

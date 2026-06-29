@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1109,6 +1109,7 @@ export interface WorkflowPhaseState {
   slug: string
   phase_index: number
   status: string
+  phase_type?: string
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py
@@ -1524,6 +1525,60 @@ export async function toggleSkillGlobal(id: string): Promise<Skill> {
     throw new Error("Failed to update skill.")
   }
   return res.json() as Promise<Skill>
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 132 Plan 03 (EVAL-01 / VER-01) — eval test-case CRUD + read-only version
+// history client. Mirrors the listSkills/createSkill/updateSkill/deleteSkill
+// pattern above (getAuthHeaders → fetch → typed json cast). Owner-scoping is
+// enforced SERVER-SIDE on every route (Plan 02 `.eq("user_id", …)`); this is a
+// thin client and not itself a security boundary. Backs the THIN 132 foundation
+// surface — the designed Evals panel is Phase 137 (PANEL-01, G-2).
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function listTestCases(skillId: string): Promise<TestCase[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/test-cases`, { headers })
+  if (!res.ok) throw new Error("Failed to load test cases.")
+  return res.json() as Promise<TestCase[]>
+}
+
+export async function createTestCase(skillId: string, body: TestCaseCreate): Promise<TestCase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/test-cases`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to create test case.")
+  return res.json() as Promise<TestCase>
+}
+
+export async function updateTestCase(caseId: string, body: TestCaseUpdate): Promise<TestCase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/test-cases/${caseId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update test case.")
+  return res.json() as Promise<TestCase>
+}
+
+export async function deleteTestCase(caseId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/test-cases/${caseId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete test case.")
+}
+
+export async function listSkillVersions(skillId: string): Promise<SkillVersion[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/versions`, { headers })
+  if (!res.ok) throw new Error("Failed to load version history.")
+  return res.json() as Promise<SkillVersion[]>
 }
 
 export interface ProviderInfo {
