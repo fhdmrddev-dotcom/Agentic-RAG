@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: executing
-last_updated: "2026-06-29T19:55:42.999Z"
-last_activity: 2026-06-29 -- Phase 132 planning complete
+last_updated: "2026-06-29T20:05:17.278Z"
+last_activity: 2026-06-29 -- Phase 132 execution started
 progress:
   total_phases: 25
   completed_phases: 9
   total_plans: 43
-  completed_plans: 40
-  percent: 36
+  completed_plans: 41
+  percent: 37
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 132 — Skill Versioning + Eval Test-Case Persistence (v3.2 roadmap created; next: `/gsd:plan-phase 132`)
+**Current focus:** Phase 132 — skill-versioning-eval-test-case-persistence
 
 ## Current Position
 
-Phase: 132 — Skill Versioning + Eval Test-Case Persistence (CORE, first of 12)
-Plan: — (not yet planned)
-Status: Ready to execute
-Last activity: 2026-06-29 -- Phase 132 planning complete
+Phase: 132 (skill-versioning-eval-test-case-persistence) — EXECUTING
+Plan: 2 of 3 (Plan 01 COMPLETE)
+Status: Executing Phase 132 — Plan 01 done (migration 079 applied live; 6/6 VER-01 tests pass)
+Last activity: 2026-06-30 -- Phase 132 Plan 01 complete (skill_versions + skill_test_cases live)
 
 ### Quick Tasks Completed
 
