@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Play } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -26,7 +26,7 @@ import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 // show quiet pointers / a paused cue; reloaded history resolves to self-contained
 // cards. These mount as NEW siblings only — they never touch RunCard /
 // ToolCallPanel internals (G-5; BUG-260529-02 stays a separate phase).
-import { SeamPointer, type SeamKind } from "@/components/panel/SeamPointer"
+import { type SeamKind } from "@/components/panel/SeamPointer"
 import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
 import { PausedRunCue } from "@/components/panel/PausedRunCue"
 // Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
@@ -346,23 +346,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // window for THIS message after another concurrent run completed, the
   // label keeps showing without the spinner — the correct UX per
   // B-260519-07 indicator-portion scope.
-  const stickyLabelRef = useRef<string | null>(null)
+  // SEED-098 Change 2: the bottom italic `Preparing code…/Analyzing document…`
+  // echo (stickyLabelRef / computedLabel / stickyBottomLabel) is GONE — the
+  // RunCard header strip already carries the live verb + timer, so the loose
+  // duplicate below the run card was pure noise. Terminal-state copy
+  // (timed_out / stopped) still renders from the Square block below; the
+  // no-tools-yet thinking indicator renders from its own branch (both untouched).
   const isMessageStreaming = message.runStatus === "streaming"
-  const computedLabel = isMessageStreaming
-    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false, workflowLock != null)
-    : null
-  if (isMessageStreaming && computedLabel !== null) {
-    stickyLabelRef.current = computedLabel
-  } else if (!isMessageStreaming) {
-    stickyLabelRef.current = null
-  }
-  const stickyBottomLabel: string | null = isMessageStreaming
-    ? (computedLabel ?? stickyLabelRef.current)
-    : message.runStatus === "timed_out"
-      ? "Agent reached time limit"
-      : message.runStatus === "cancelled" || message.stopped
-        ? "Response stopped"
-        : null
 
   return (
     <div
@@ -412,27 +402,19 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             ask_user additionally surfaces the paused cue (pending-question.md
             D2). Rendered as NEW siblings next to RunCard — no RunCard internals
             touched. When not live, nothing extra renders here. */}
+        {/* SEED-098 Change 2: the loose write_todos/workspace_write `→ see panel`
+            pointers are GONE — todos live only in the right Workspace panel.
+            The ask_user PausedRunCue is load-bearing (not duplicated) and stays. */}
         {isMessageStreaming && message.tool_calls && message.tool_calls.length > 0 && (
           <div className="mt-1 flex flex-col gap-0.5">
-            {message.tool_calls
-              .filter((tc) => seamKindFor(tc.name) !== null && tc.name !== "ask_user")
-              .map((tc, i) => (
-                <SeamPointer
-                  key={tc.clientKey ?? tc.id ?? `seam-live-${i}`}
-                  kind={seamKindFor(tc.name) as SeamKind}
-                  label={tc.args.path ?? tc.args.file_path}
-                  onSeePanel={requestOpenPanel}
-                />
-              ))}
             {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
           </div>
         )}
-        {message.activatedSkill && (
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-primary animate-fadeSlideUp">
-            <Zap className="h-3 w-3" />
-            <span>Skill activated: {message.activatedSkill}</span>
-          </div>
-        )}
+        {/* SEED-098 Change 2/3: the loose `Skill activated: docx` line is GONE —
+            the in-card `Loading skill` SkillRow (ToolCallPanel, from the
+            activated-skills array) already covers it. The legacy single-skill
+            field is no longer READ in this render path; it stays intact in
+            types + StreamsProvider for DB-loaded-message compat. */}
         {message.content ? (
           <div className="text-sm text-foreground">
             <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
@@ -554,26 +536,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
             </span>
           </span>
-        ) : hasAnyTools ? (
-          // Tools ran but no text yet — show whether we're still working or waiting
-          // Shown regardless of isStreaming so SSE drops don't cause a blank
-          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
-            {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
-            {/* Phase 075 D-075-14 / BUG-260514-03: stickyBottomLabel retains the
-                last non-null label across silent windows inside long tool calls
-                (matplotlib renders, sandbox time.sleep, etc.) so the bottom
-                indicator no longer goes blank. Computed above the JSX —
-                see stickyLabelRef comment block. */}
-            <span className="italic">{stickyBottomLabel}</span>
-            {isStreaming && (
-              <span className="flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
-              </span>
-            )}
-          </span>
         ) : null}
+        {/* SEED-098 Change 2: the `hasAnyTools` bottom italic echo
+            (`Preparing code…/Synthesizing answer…` + dots) is GONE — the RunCard
+            header strip (RunStatusStrip) already carries the live verb + timer,
+            so this was a duplicate. Terminal-state copy renders from the Square
+            block below; the no-tools thinking indicator stays in its own arm. */}
         {/* Phase 066 D-066-10: stopped/timed-out indicator — shown after content
             when the run ended without completing. Banner copy mirrors the
             in-content banner switch (lines 130-145): runStatus === 'timed_out'

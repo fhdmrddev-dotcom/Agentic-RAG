@@ -1,37 +1,24 @@
 /**
- * Phase 075.1 Plan 03 Task 2 — MessageItem sticky bottom-indicator cache reset.
+ * SEED-098 Change 2 — bottom-of-run-card de-duplication.
  *
- * Phase 075 D-075-14 introduced a per-component `stickyLabelRef` that retains
- * the last non-null `outerBannerLabel(...)` value across silent windows inside
- * long tool calls (matplotlib renders, sandbox time.sleep, etc.) so the bottom
- * indicator doesn't go blank.
+ * This suite previously guarded the per-message `stickyBottomLabel` cache that
+ * powered the loose bottom italic `Preparing code…/Synthesizing answer…` echo
+ * below the run card (Phase 075 D-075-14). SEED-098 Change 2 DELETES that echo:
+ * the RunCard header strip (RunStatusStrip) already carries the live verb +
+ * timer, so the bottom echo was a pure duplicate. The `stickyLabelRef /
+ * computedLabel / stickyBottomLabel` computation is gone with it.
  *
- * Phase 075 used the provider-level `isStreaming` prop as the cache reset
- * trigger. That breaks under parallel runs on the same surface (B-260519-07
- * indicator portion): when ANY run completes, `isStreaming` flips false and
- * the sticky cache resets for THIS message — even when this message's own
- * `runStatus` is still "streaming".
+ * What this suite now asserts:
+ *   (i)  NO loose bottom italic echo renders during a streaming run with tools
+ *        (the duplicate is gone) — for both the normal and the parallel-run
+ *        silent-window case.
+ *   (ii) Terminal-state copy still renders, but now ONLY from the Square block
+ *        (`timed_out` → "Agent reached time limit"; stopped → "Response
+ *        stopped"). The Square block's italic lives inside a `<div>`; the
+ *        removed echo lived inside a `<span>` — so the two helpers below
+ *        disambiguate on the parent tag without brittle position selectors.
  *
- * Plan 03 changes the reset trigger to per-message `runStatus`. The literal
- * codebase enum values (frontend/src/types/index.ts:113) are:
- *   "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
- *
- * Decision matrix locked by these tests (per PLAN.md Tests 1-4 + bonus
- * regression checks for the terminal-banner branches that Plan 03 does NOT
- * touch but which sit immediately downstream of stickyBottomLabel):
- *
- *   | isStreaming | runStatus    | Sticky label rendered? | Test |
- *   | ----------- | ------------ | ---------------------- | ---- |
- *   | false       | "streaming"  | YES (parallel-run)     | 1    |
- *   | true        | "completed"  | NO (reset)             | 2    |
- *   | true        | "streaming"  | YES (D-075-14 classic) | 3    |
- *   | true        | undefined    | NO (legacy → terminal) | 4    |
- *
- * We scope all queries inside `data-testid="assistant-message"` to avoid
- * collisions with duplicate copies of the same string elsewhere in the JSX
- * (e.g., "Agent reached time limit" appears in both stickyBottomLabel and the
- * post-content Square block; "Running code…" appears in both stickyBottomLabel
- * and the active-tool indicator when message.content is non-empty).
+ * Queries are scoped inside `data-testid="assistant-message"`.
  */
 import { describe, it, expect } from "vitest"
 import { render, screen, within } from "@testing-library/react"
@@ -69,123 +56,73 @@ function renderWithTooltip(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>)
 }
 
-/** Locate the stickyBottomLabel `<span class="italic">{stickyBottomLabel}</span>`
- *  rendered inside the hasAnyTools branch (lines ~177-196 of MessageItem.tsx).
- *
- *  The terminal-banner post-content block (lines 205-212) ALSO renders an
- *  italic span with the same text for runStatus="timed_out" / "cancelled" —
- *  but it lives inside a `<div>` wrapper, whereas the stickyBottomLabel span
- *  lives inside a `<span>` wrapper (line 180). We filter on the parent's tag
- *  to disambiguate without coupling to brittle position selectors.
- *
- *  Returns the textContent of the sticky span, or null if the span doesn't
- *  exist or contains an empty string. */
-function stickyLabelText(): string | null {
+/** The SEED-098-removed bottom echo lived in `<span class="italic">` whose
+ *  PARENT was a `<span>`. After the deletion no such span-parent italic echo
+ *  should render for a streaming run with tools — this helper must return null.
+ *  Joins any survivors so a regression surfaces the offending text. */
+function stickyEchoText(): string | null {
   const msg = screen.getByTestId("assistant-message")
   const italics = within(msg).queryAllByText((_, el) =>
     Boolean(el?.classList.contains("italic")),
   )
-  // Keep only italic spans whose parent is a <span> (the stickyBottomLabel
-  // location) — drops the post-content Square block (parent is a <div>).
   const stickySpans = italics.filter((el) => el.parentElement?.tagName === "SPAN")
   const texts = stickySpans.map((el) => el.textContent?.trim() ?? "").filter((t) => t.length > 0)
+  return texts.length ? texts.join(" | ") : null
+}
+
+/** The terminal Square block renders `<span class="italic">` inside a `<div>`. */
+function terminalBlockText(): string | null {
+  const msg = screen.getByTestId("assistant-message")
+  const italics = within(msg).queryAllByText((_, el) =>
+    Boolean(el?.classList.contains("italic")),
+  )
+  const divSpans = italics.filter((el) => el.parentElement?.tagName === "DIV")
+  const texts = divSpans.map((el) => el.textContent?.trim() ?? "").filter((t) => t.length > 0)
   if (texts.length === 0) return null
-  if (texts.length > 1) throw new Error(`stickyLabelText: multiple sticky-position italic labels found: ${JSON.stringify(texts)}`)
+  if (texts.length > 1)
+    throw new Error(`terminalBlockText: multiple terminal italic labels: ${JSON.stringify(texts)}`)
   return texts[0]
 }
 
-describe("MessageItem sticky bottom-indicator (Plan 03 Task 2 — runStatus-driven reset)", () => {
-  it("Test 1 (parallel-run repro): isStreaming=false + runStatus='streaming' → sticky retains label across silent windows", () => {
-    // Initial render: a single execute_code tool is running → label is
-    // "Running code…" via outerBannerLabel. The Plan 03 fix gates retention
-    // on runStatus==='streaming' (not isStreaming), so even with
-    // isStreaming=false the message-level streaming state keeps the label.
-    const messageWithTool = makeMessage({
+describe("MessageItem — SEED-098 Change 2: loose bottom echo removed; terminal copy preserved", () => {
+  it("no bottom italic echo renders during a streaming run with tools (the duplicate is gone)", () => {
+    const message = makeMessage({
       runStatus: "streaming",
       tool_calls: [runningTool("execute_code")],
     })
-    const { rerender } = renderWithTooltip(
-      <MessageItem message={messageWithTool} isStreaming={false} />,
-    )
-    expect(stickyLabelText()).toBe("Running code…")
+    renderWithTooltip(<MessageItem message={message} isStreaming={true} />)
+    // RunCard header strip carries the live verb + timer now — no loose echo.
+    expect(stickyEchoText()).toBeNull()
+  })
 
-    // Silent window: tool flips to "done" so outerBannerLabel transitions to
-    // "Synthesizing answer…" (hasAnyTools && !activeTool branch). Message
-    // runStatus is still "streaming"; sticky cache MUST keep updating and
-    // never reset to empty.
-    const messageInSilentWindow = makeMessage({
+  it("no bottom echo in the parallel-run silent window (isStreaming=false, runStatus='streaming')", () => {
+    // The case the old sticky cache existed for. There is simply no bottom echo
+    // to retain anymore — the panel header owns the live state.
+    const message = makeMessage({
       runStatus: "streaming",
       tool_calls: [{ ...runningTool("execute_code"), status: "done" }],
     })
-    rerender(
-      <TooltipProvider>
-        <MessageItem message={messageInSilentWindow} isStreaming={false} />
-      </TooltipProvider>,
-    )
-    expect(stickyLabelText()).toBe("Synthesizing answer…")
+    renderWithTooltip(<MessageItem message={message} isStreaming={false} />)
+    expect(stickyEchoText()).toBeNull()
   })
 
-  it("Test 2: isStreaming=true + runStatus='completed' → sticky resets (no italic label rendered)", () => {
-    // This message is terminally completed even though the surface still
-    // streams. Plan 03 resets the sticky cache on runStatus terminal — so
-    // no italic label should render in the bottom-indicator branch.
-    // (content: "" prevents the active-tool / planning branches that also
-    // render italic spans from triggering.)
-    const message = makeMessage({
-      runStatus: "completed",
-      tool_calls: [{ ...runningTool("execute_code"), status: "done" }],
-    })
-    renderWithTooltip(<MessageItem message={message} isStreaming={true} />)
-    // hasAnyTools=true, content="", isMessageStreaming=false (post-Plan-03)
-    // → computedLabel=null and stickyLabelRef.current=null → stickyBottomLabel
-    // falls through both branches and renders null inside the italic span,
-    // which produces an empty span (no text). stickyLabelText() returns null.
-    expect(stickyLabelText()).toBeNull()
-  })
-
-  it("Test 3 (classic D-075-14): isStreaming=true + runStatus='streaming' + tool running → sticky retains", () => {
-    const message = makeMessage({
-      runStatus: "streaming",
-      tool_calls: [runningTool("execute_code")],
-    })
-    renderWithTooltip(<MessageItem message={message} isStreaming={true} />)
-    expect(stickyLabelText()).toBe("Running code…")
-  })
-
-  it("Test 4: isStreaming=true + runStatus=undefined (legacy DB-loaded row) → treated as terminal (no sticky)", () => {
-    // Legacy row loaded from DB before runStatus was added (Phase 063
-    // D-063-04 backfilled DB rows, but undefined is still observable for
-    // historical messages without run metadata). Plan 03 treats undefined as
-    // terminal (matches Phase 075's isStreaming==false branch behavior).
-    const message = makeMessage({
-      // runStatus intentionally omitted (undefined)
-      tool_calls: [runningTool("execute_code")],
-    })
-    renderWithTooltip(<MessageItem message={message} isStreaming={true} />)
-    expect(stickyLabelText()).toBeNull()
-  })
-
-  it("Regression: runStatus='timed_out' + content empty → bottom indicator shows 'Agent reached time limit'", () => {
-    // Plan 03 does NOT modify the timed_out / cancelled / stopped branches at
-    // lines 87-91 of MessageItem.tsx — but it does swap the gating signal
-    // there from `isStreaming` to `isMessageStreaming`. This regression check
-    // ensures the terminal branches still fire for the matching runStatus
-    // values when isStreaming=false (matches the post-D-075-14 behavior).
-    // content empty so only the hasAnyTools branch's italic span renders.
+  it("terminal 'Agent reached time limit' still renders in the Square block (timed_out)", () => {
     const message = makeMessage({
       runStatus: "timed_out",
       tool_calls: [{ ...runningTool("execute_code"), status: "done" }],
     })
     renderWithTooltip(<MessageItem message={message} isStreaming={false} />)
-    expect(stickyLabelText()).toBe("Agent reached time limit")
+    expect(terminalBlockText()).toBe("Agent reached time limit")
+    // And no span-parent echo duplicate of it.
+    expect(stickyEchoText()).toBeNull()
   })
 
-  it("Regression: runStatus='cancelled' + content empty → bottom indicator shows 'Response stopped'", () => {
+  it("terminal 'Response stopped' still renders in the Square block (stopped)", () => {
     const message = makeMessage({
-      runStatus: "cancelled",
+      stopped: true,
       tool_calls: [{ ...runningTool("execute_code"), status: "done" }],
     })
     renderWithTooltip(<MessageItem message={message} isStreaming={false} />)
-    expect(stickyLabelText()).toBe("Response stopped")
+    expect(terminalBlockText()).toBe("Response stopped")
   })
 })
