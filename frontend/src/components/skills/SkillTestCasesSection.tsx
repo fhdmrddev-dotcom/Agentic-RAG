@@ -36,6 +36,9 @@ export function SkillTestCasesSection({ skillId }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Id of the case that just saved — drives a transient "Saved ✓" confirmation so a
+  // successful save reads as success, not as a stuck/disabled button.
+  const [savedId, setSavedId] = useState<string | null>(null)
   // Local edit buffers keyed by case id so inline edits don't refetch on each keystroke.
   const [edits, setEdits] = useState<Record<string, { prompt: string; expected_behavior: string }>>({})
 
@@ -84,6 +87,8 @@ export function SkillTestCasesSection({ skillId }: Props) {
     try {
       await updateTestCase(id, { prompt: buf.prompt, expected_behavior: buf.expected_behavior })
       await reload()
+      setSavedId(id)
+      setTimeout(() => setSavedId((cur) => (cur === id ? null : cur)), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save test case.")
     } finally {
@@ -161,6 +166,9 @@ export function SkillTestCasesSection({ skillId }: Props) {
                     }
                   />
                   <div className="flex items-center justify-end gap-2">
+                    {savedId === tc.id && !dirty && (
+                      <span className="text-xs text-emerald-500">Saved ✓</span>
+                    )}
                     <Button
                       type="button"
                       size="sm"
