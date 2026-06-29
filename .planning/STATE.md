@@ -29,13 +29,14 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE + VERIFIED (4/4)
 Plan: 3 of 3 (Plans 01 + 02 + 03 COMPLETE)
 Status: Phase complete + verification PASSED 4/4 (`132-VERIFICATION.md`). VER-01 (SC#1): capture trigger fires on content trifecta, skips toggles (D-02), append-only block (23514), v1 backfill — 6 live-DB tests pass. EVAL-01 (SC#2/#3): owner-scoped CRUD persists, edit/delete work — 5 route tests pass. SC#4: `.eq(user_id)` on all 5 routes + owner-only RLS (no is_global). Operator G-4 UAT confirmed live + orchestrator independently exercised the live HTTP API + DB trigger (rolled back). Post-UAT polish: transient "Saved ✓" confirmation (`b529af46`). Pre-existing rot (29 tsc-b / 124 backend) excluded — none reference the new tables. Next: Phase 133 (eval runner) — or `/gsd:secure-phase 132` / `/gsd:complete-milestone` later.
-Last activity: 2026-06-30 -- Phase 132 VERIFICATION PASSED 4/4 (`132-VERIFICATION.md`); migration 079 applied live; cloud-migration helper `scripts/pending-cloud-migrations.sh` added (b716caad)
+Last activity: 2026-06-30 -- Quick task 260630-226 executed (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT pending. [Phase 132 VERIFIED 4/4 prior]
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260611-irx | Per-process log filename — fix Windows multi-worker RotatingFileHandler rollover crash (WinError 32) | 2026-06-11 | `b5e916e2` | [260611-irx-worker-log-rotation-pid](./quick/260611-irx-worker-log-rotation-pid/) |
+| 260630-226 | Chat tool-card live-state de-duplication — active tools rest as the unified essence line (Variant B merged pill, body click-to-expand) + remove 3 loose duplicate lines below the run card (SEED-098) | 2026-06-30 | `e3ff8623` | [260630-226-chat-tool-card-live-state-de-duplication](./quick/260630-226-chat-tool-card-live-state-de-duplication/) |
 
 ### Recent Completed Phases
 
