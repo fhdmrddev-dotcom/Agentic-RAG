@@ -36,6 +36,16 @@ interface; document ingestion is a manual file-upload flow.
 - **Run-buffer key conventions** (Phase 061+): `run:{run_id}` (Redis Stream — per-run event buffer), `runs_by_thread:{thread_id}` (sorted set — active runs per thread), `runs:active` (sorted set — all currently-streaming run_ids for global cleanup). Defined in code, not in any migration script.
 - **Setup guides**: `supabase/SETUP.md` for Supabase (local + cloud + migrations), `REDIS-SETUP.md` for Redis (local + cloud + key conventions). Read these when connecting a new environment or onboarding a contributor.
 
+## Deployment (cloud) — operator-gated
+
+Live deploys are **always operator-triggered**. The branch + promotion model and the local↔cloud parity rules live in `docs/DEPLOYMENT-WORKFLOW.md`; recurring failure modes + their fixes live in `docs/DEPLOYMENT-LESSONS.md` (read both before any cloud-touching work). Architecture/accounts: `docs/DEPLOYMENT-PIPELINE.md`.
+
+- **Branches:** `develop` (dev trunk — commit freely here) → `master` (staging / release-candidate) → `production` (LIVE — Vercel frontend + Coolify backend both auto-build from it).
+- **NEVER push to `master` or `production` without an explicit operator "deploy" instruction.** When work is ready, *propose* the deploy and wait for a clear yes. Committing to `develop` during normal work is fine; promoting to a deploy branch is not, until asked.
+- **Promote surgically** (see workflow doc): fast-forward `git push origin <sha>:production` when the fix's parent == production tip, else a throwaway-worktree cherry-pick — never drag unfinished `develop` work into live, never develop directly on `master`/`production`.
+- **Code deploying ≠ cloud configured.** Every cloud-touching change has a non-code half — env vars (Coolify/Vercel), migrations (paste into cloud Supabase SQL editor), seed/settings rows (`app_settings`), provider keys/models. Apply the parity checklist in the workflow doc; cloud config drifts from local and is the #1 gotcha.
+- **The local setup must never break** — local vs cloud is a pure env-var switch; no hardcoded URLs/paths/keys/models/ports.
+
 ## Planning workflow
 Planning is managed by **GSD** under `.planning/`, not ad-hoc plan files.
 
