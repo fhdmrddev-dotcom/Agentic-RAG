@@ -1,7 +1,8 @@
 ---
 id: SEED-098
-status: planted
+status: done
 planted: 2026-06-30
+shipped: 2026-06-30 (quick task 260630-226; commits e3ff8623 + 37bd6d5c; G-4 lived UAT PASSED cross-provider DeepSeek+Anthropic, both themes)
 planted_during: v3.2 Phase 132 execution (separate investigation — operator-recorded a DeepSeek run, asked to unify the chat tool-call surface)
 trigger_when: After Phase 132 ships, OR any phase that touches the chat live-execution surface (ToolCallPanel / MessageItem / RunCard), OR a dedicated chat-UX cleanup pass
 scope: Small-Medium (2 files: MessageItem.tsx + ToolCallPanel.tsx; one StreamsProvider field read)

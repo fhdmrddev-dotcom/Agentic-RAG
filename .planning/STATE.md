@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE + VERIFIED (4/4)
 Plan: 3 of 3 (Plans 01 + 02 + 03 COMPLETE)
 Status: Phase complete + verification PASSED 4/4 (`132-VERIFICATION.md`). VER-01 (SC#1): capture trigger fires on content trifecta, skips toggles (D-02), append-only block (23514), v1 backfill — 6 live-DB tests pass. EVAL-01 (SC#2/#3): owner-scoped CRUD persists, edit/delete work — 5 route tests pass. SC#4: `.eq(user_id)` on all 5 routes + owner-only RLS (no is_global). Operator G-4 UAT confirmed live + orchestrator independently exercised the live HTTP API + DB trigger (rolled back). Post-UAT polish: transient "Saved ✓" confirmation (`b529af46`). Pre-existing rot (29 tsc-b / 124 backend) excluded — none reference the new tables. Next: Phase 133 (eval runner) — or `/gsd:secure-phase 132` / `/gsd:complete-milestone` later.
-Last activity: 2026-06-30 -- Quick task 260630-226 executed (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT pending. [Phase 132 VERIFIED 4/4 prior]
+Last activity: 2026-06-30 -- Quick task 260630-226 DONE (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT PASSED via Chrome MCP (DeepSeek+Anthropic, both themes): active tool rests as essence line, merged RUNNING·Ns pill, click-to-expand body, no loose lines, todos only in right panel. [Phase 132 VERIFIED 4/4 prior]
 
 ### Quick Tasks Completed
 
