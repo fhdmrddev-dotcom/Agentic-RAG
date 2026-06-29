@@ -48,6 +48,49 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
+-- Name: capture_skill_version(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.capture_skill_version() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  next_num integer;
+BEGIN
+  -- D-02: on UPDATE, capture a version ONLY when the content trifecta changes. A
+  -- toggle-only flip (is_enabled / is_global) MUST NOT version.
+  IF TG_OP = 'UPDATE' THEN
+    IF NOT (
+         NEW.name         IS DISTINCT FROM OLD.name
+      OR NEW.description  IS DISTINCT FROM OLD.description
+      OR NEW.instructions IS DISTINCT FROM OLD.instructions
+    ) THEN
+      RETURN NEW;  -- toggle-only / no content change → no version
+    END IF;
+  END IF;
+
+  -- COALESCE(MAX)+1 per skill; the UNIQUE(skill_id, version_number) constraint turns any
+  -- concurrent collision into a benign retryable 23505 (D-03-R3 / T-132-04).
+  SELECT COALESCE(MAX(version_number), 0) + 1
+    INTO next_num
+    FROM public.skill_versions
+   WHERE skill_id = NEW.id;
+
+  INSERT INTO public.skill_versions
+    (skill_id, user_id, version_number, name, description, instructions, source)
+  VALUES
+    (NEW.id, NEW.user_id, next_num, NEW.name, NEW.description, NEW.instructions, 'manual');
+    -- user_id = NEW.user_id (NOT auth.uid() — NULL under service-role, D-03-R3 / T-132-03).
+    -- source 'manual': the trigger cannot distinguish write paths (D-03-R1); the 5-value enum
+    -- stays for forward-compat (import/tuner/self_improve/backfill set by other paths).
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: folder_is_globally_visible(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -202,6 +245,22 @@ CREATE FUNCTION public.set_updated_at() RETURNS trigger
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: skill_versions_block_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.skill_versions_block_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION
+    'skill_versions row % is append-only and immutable; insert a new version instead',
+    OLD.id
+    USING ERRCODE = 'check_violation';   -- SQLSTATE 23514, distinguishable in tests
 END;
 $$;
 
@@ -772,6 +831,55 @@ CREATE TABLE public.skill_files (
 
 
 --
+-- Name: skill_test_cases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_test_cases (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    prompt text NOT NULL,
+    expected_behavior text DEFAULT ''::text NOT NULL,
+    order_index integer DEFAULT 0 NOT NULL,
+    name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_test_cases; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_test_cases IS 'Editable eval test cases (EVAL-01, D-05). Bind to the SKILL via skill_id (NOT a version) so cases stay freely editable/deletable before any run (D-07). expected_behavior is free text, NOT an assertion (D-06); NO provider/model columns (D-08). Owner-only RLS (D-12). Stable id is the Phase 133 results FK target (D-10).';
+
+
+--
+-- Name: skill_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    version_number integer NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    instructions text DEFAULT ''::text NOT NULL,
+    source text DEFAULT 'manual'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT skill_versions_source_check CHECK ((source = ANY (ARRAY['manual'::text, 'import'::text, 'tuner'::text, 'self_improve'::text, 'backfill'::text])))
+);
+
+
+--
+-- Name: TABLE skill_versions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills — toggles (is_enabled/is_global) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+
+
+--
 -- Name: skills; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1236,6 +1344,30 @@ ALTER TABLE ONLY public.skill_files
 
 
 --
+-- Name: skill_test_cases skill_test_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_versions skill_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_versions skill_versions_skill_num_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_skill_num_unique UNIQUE (skill_id, version_number);
+
+
+--
 -- Name: skills skills_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1610,6 +1742,34 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_skill_test_cases_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_test_cases_skill_id ON public.skill_test_cases USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_test_cases_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_test_cases_user_id ON public.skill_test_cases USING btree (user_id);
+
+
+--
+-- Name: idx_skill_versions_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_versions_skill_id ON public.skill_versions USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_versions_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (user_id);
+
+
+--
 -- Name: idx_threads_active_workflow_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1754,6 +1914,27 @@ CREATE TRIGGER set_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH
 --
 
 CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_test_cases skill_test_cases_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_test_cases_set_updated_at BEFORE UPDATE ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_versions skill_versions_no_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_versions_no_update BEFORE UPDATE ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.skill_versions_block_mutation();
+
+
+--
+-- Name: skills skills_capture_version; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skills_capture_version AFTER INSERT OR UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.capture_skill_version();
 
 
 --
@@ -2102,6 +2283,38 @@ ALTER TABLE ONLY public.skill_files
 
 
 --
+-- Name: skill_test_cases skill_test_cases_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_test_cases skill_test_cases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_versions skill_versions_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_versions skill_versions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: skills skills_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2271,6 +2484,13 @@ CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELET
 
 
 --
+-- Name: skill_test_cases Users can delete own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
 -- Name: skills Users can delete own skills; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2397,6 +2617,13 @@ CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSER
 
 
 --
+-- Name: skill_test_cases Users can insert own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: skills Users can insert own skills; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2513,6 +2740,13 @@ CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE USI
 --
 
 CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+
+
+--
+-- Name: skill_test_cases Users can update own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE USING ((auth.uid() = user_id));
 
 
 --
@@ -2648,6 +2882,27 @@ CREATE POLICY "Users can view own or global-folder documents" ON public.document
 --
 
 CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: skill_test_cases Users can view own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: skill_versions Users can view own skill versions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill versions" ON skill_versions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill versions" ON public.skill_versions IS 'Owner-only (NO is_global branch, D-12). Defense-in-depth: the service-role writer bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (077 precedent, D-03-R3).';
 
 
 --
@@ -2827,6 +3082,18 @@ ALTER TABLE public.sandbox_files ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.skill_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_test_cases; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_test_cases ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_versions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_versions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: skills; Type: ROW SECURITY; Schema: public; Owner: -
