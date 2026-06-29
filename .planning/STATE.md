@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: verified
-last_updated: "2026-06-30T00:00:00.000Z"
-last_activity: 2026-06-30 -- Phase 132 VERIFICATION PASSED 4/4 (VER-01 + EVAL-01 goal-backward verified; 11/11 integration tests; operator G-4 UAT confirmed)
+status: verifying
+last_updated: "2026-06-29T22:23:03.653Z"
+last_activity: "2026-06-30 -- Quick task 260630-226 DONE (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT PASSED via Chrome MCP (DeepSeek+Anthropic, both themes): active tool rests as essence line, merged RUNNING·Ns pill, click-to-expand body, no loose lines, todos only in right panel. [Phase 132 VERIFIED 4/4 prior]"
 progress:
   total_phases: 25
   completed_phases: 10
