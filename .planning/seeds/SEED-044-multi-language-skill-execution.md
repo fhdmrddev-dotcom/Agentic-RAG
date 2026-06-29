@@ -11,6 +11,8 @@ re_open_trigger: v3.2 planning (Layers 2-4 = DISC-01 + STD-01 — Node runtime, 
 
 # SEED-044: Multi-Language Skill Execution — Sandbox Runtimes Beyond Python
 
+> **CROSS-REF 2026-06-29 ([[SEED-096]]):** A docx-skill execution audit found the dominant blocker for Anthropic's `docx` skill is NOT language — its edit path is all-Python — but **bundle file-tree fidelity** (import flattens `scripts/office/*.py`; sandbox injects flat at `/sandbox/{basename}` while user code is chdir'd to `/sandbox/output`) + **missing system binaries** (pandoc/LibreOffice/Poppler). SEED-044 owns the LANGUAGE slice (docx-js create path / Node); [[SEED-096]] owns tree-fidelity + tooling. The SRH-01 honesty gate should cover all three.
+>
 > **STATUS 2026-06-22 — partially folded.** A JS-skill-import investigation (workflow `wf_8f8177ba-805`) re-confirmed all three Python-only pins below against live code AND surfaced an important nuance: Anthropic's own docx/pptx skills document a **Node** create-from-scratch path (`docx` npm / `pptxgenjs`), so JS is **not** purely long-tail for documents — though our app's Python emission layer (Phases 100/101) already generates those documents, so this is about running market skills' bundled scripts verbatim, not document generation. **Layer 1 (graceful degradation / honest message) folded into v3.1 as STRETCH Phase 131 (SRH-01)**, kept OFF the COLL-01 sandbox seam. **Layers 2-4 (skill-declared runtime, Node in the image, language routing) remain deferred → v3.2 DISC-01 + STD-01** (DISC-01 must sequence strictly AFTER COLL-01 — same sandbox-injection seam).
 
 ## Why This Matters

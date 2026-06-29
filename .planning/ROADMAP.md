@@ -187,6 +187,7 @@
   2. When the agent would run a non-Python skill script, it fails cleanly with a specific message instead of silently running it as Python or narrating it as if it executed (SRH-01).
   3. (Optional) `read_skill_file` can return a bundled non-Python file as reference text without implying it can be executed (SRH-01).
 **Plans**: TBD
+**Scope note (operator, 2026-06-29 — SEED-096):** broaden the honest "can't execute this" signal to fire on ALL "runtime can't do this" cases — **missing bundled file (G-A: bundle-tree flatten)** and **missing system binary (G-C: pandoc/LibreOffice/Poppler)** — not only non-Python scripts (G-B). Worked example: Anthropic's `docx` skill triggers but is inert (its all-Python edit path can't resolve `scripts/office/*.py` because import + sandbox injection flatten the nested tree). The CAPABILITY fix (real tree-fidelity + Node + binaries) is OUT of 142 → DISC-01 / v3.3+. Pull SEED-096 into discuss-phase 142.
 
 #### Phase 143: Starter Workflow Library (STRETCH)
 **Goal**: A curated set of fork-able starter workflows is available on the Workflows page as an `is_global` published shelf — users fork a starter into a personal draft instead of starting from a blank description.
