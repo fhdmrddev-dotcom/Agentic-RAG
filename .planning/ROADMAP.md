@@ -78,7 +78,10 @@
   2. A user can define a set of test cases for a skill (prompt + expected-behavior description) and save them, and the cases persist across sessions / survive reload (EVAL-01).
   3. A user can edit or delete a saved test case before any eval run, and the change persists (EVAL-01).
   4. Every test case and version snapshot is owner-scoped (same RLS model as skills) and an eval run is traceable to the exact skill version that produced it — a user never sees another user's cases (VER-01 + EVAL-01).
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 132-01-PLAN.md — Migration 079: skill_versions + skill_test_cases tables, version-capture trigger, append-only + owner-only RLS, v1 backfill + live-DB apply (VER-01, EVAL-01)
+- [ ] 132-02-PLAN.md — Owner-scoped test-case CRUD router + read-only version-history GET + Pydantic models (EVAL-01, VER-01)
+- [ ] 132-03-PLAN.md — Thin non-designed test-case editor + version-history read mounted in skill detail panel (EVAL-01, VER-01)
 
 #### Phase 133: Eval Runner — With-Skill vs Without-Skill
 **Goal**: A user can launch an eval run that executes each test case both with the skill and without it, watch per-case progress stream live, and find the complete result set still there after reload.
