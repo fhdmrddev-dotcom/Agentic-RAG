@@ -494,6 +494,16 @@ def extract_and_store_images(
             if descriptions:
                 texts = [d[1] for d in descriptions]
                 embeddings = embed_texts(texts, user_settings=app_settings)
+                # D-10 parity with the text-chunk path (documents.py): tag image
+                # chunks with the embedding model + dims they were produced under.
+                # Without this they land with embedding_model=NULL, which (a) strands
+                # them in the re-embed "catching up" counter forever and (b) excludes
+                # them from match_document_chunks (filtered on p_embedding_model) so
+                # image descriptions become invisible to vector search.
+                _img_embedding_model = (
+                    getattr(app_settings, "embedding_model", None) or "text-embedding-3-small"
+                )
+                _img_embedding_dimensions = getattr(app_settings, "embedding_dimensions", None)
                 chunk_rows = [
                     {
                         "document_id": document_id,
@@ -501,6 +511,8 @@ def extract_and_store_images(
                         "content": content,
                         "chunk_index": base_idx + i,
                         "embedding": embedding,
+                        "embedding_model": _img_embedding_model,
+                        "embedding_dimensions": _img_embedding_dimensions,
                     }
                     for (i, content), embedding in zip(descriptions, embeddings)
                 ]
