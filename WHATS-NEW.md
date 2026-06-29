@@ -24,6 +24,8 @@ The current chapter — **Document Management (v3.0)** — is about making the a
 
 ## 🟢 Latest — a cleaner, clearer chat (v3.1, in progress)
 
+- **Watching the assistant work is calmer now.** While it runs, each step stays as one tidy line that lights up as it's working and turns green when it's done — no more cards flickering open and snapping shut. A running step shows a live timer right on its status tag. Curious what a step is doing? Click it to expand the live code or output; click again to tuck it away.
+- **Less clutter under each run.** The repeated "to-dos updated · see panel" links, the duplicate "skill activated" note, and an extra "preparing…" status line that used to pile up beneath a run are gone. Your to-do list now lives in exactly one place — the workspace panel on the right — so there's only one of everything to look at. Same clean look across every AI provider, in both light and dark mode.
 - **Every tool now shows the real provider's logo.** When the assistant runs a step, its card shows the actual AI provider's brand mark (OpenAI, Anthropic, Google, DeepSeek, and more) on a clean white badge — so you can tell at a glance which model is doing the work. It reads well in both light and dark mode, and even your local models (Ollama, LM Studio) get their own logo.
 - **It tells you what it's about to do.** The instant the assistant starts a step, a short description appears during the brief "preparing" beat — no more staring at a blank pause.
 - **Long pasted prompts stay tidy.** A very long message now collapses to a short preview with a "Read more" link instead of filling the whole screen.
