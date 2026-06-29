@@ -420,7 +420,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -443,6 +443,7 @@ app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typ
 app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
 app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Skill Trigger Tuner (bounded background run over the run-buffer + tuner_* SSE + held-out scoreboard)
+app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
