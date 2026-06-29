@@ -209,6 +209,93 @@ describe("ToolCallPanel — 095 Plan 06 Task 2: single essence line for finished
   })
 })
 
+describe("ToolCallPanel — SEED-098 Change 1: active tools rest as the unified essence line", () => {
+  it("active running tool rests as one essence line by default — heavy body collapsed, reveals on click", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "execute_code",
+        id: "run1",
+        args: { code: "print(2)" },
+        argsCodeText: "print(2)",
+        status: "running",
+        startedAt: 1_700_000_000_000,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // The running merged pill is present at rest (data-status="running").
+    const pill = container.querySelector("[data-testid='status-pill'][data-status='running']")
+    expect(pill).toBeTruthy()
+
+    // The heavy live body (the Shiki editor inset) is NOT rendered at rest —
+    // the active tool folds to the calm one-line essence (no flicker).
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(0)
+
+    // Clicking the active essence row reveals the live streaming body, exactly
+    // like clicking a finished row reveals its result.
+    const btn = pill!.closest("button") as HTMLButtonElement | null
+    expect(btn).toBeTruthy()
+    fireEvent.click(btn!)
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(1)
+  })
+
+  it("running essence shows the Variant B merged live pill (verb + live duration in ONE chip)", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "search_documents",
+        id: "run2",
+        args: { query: "x" },
+        status: "running",
+        startedAt: Date.now() - 3200,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    const pill = container.querySelector("[data-testid='status-pill'][data-status='running']")
+    expect(pill).toBeTruthy()
+    // verb + live duration merged into ONE chip.
+    expect(pill!.textContent).toMatch(/running/i)
+    expect(pill!.textContent).toMatch(/·/)
+    expect(pill!.textContent).toMatch(/3\.\ds/)
+  })
+
+  it("preparing tool rests as an essence line with the merged preparing pill (KB when argsBytesStreamed > 0)", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "search_documents",
+        id: "prep1",
+        args: {},
+        status: "preparing",
+        argsBytesStreamed: 2048,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    const pill = container.querySelector("[data-testid='status-pill'][data-status='preparing']")
+    expect(pill).toBeTruthy()
+    expect(pill!.textContent).toMatch(/preparing/i)
+    expect(pill!.textContent).toMatch(/2\.0 KB/)
+  })
+
+  it("preparing tool with no argsBytesStreamed: pill shows just the preparing verb", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "search_documents",
+        id: "prep2",
+        args: {},
+        status: "preparing",
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    const pill = container.querySelector("[data-testid='status-pill'][data-status='preparing']")
+    expect(pill).toBeTruthy()
+    expect(pill!.textContent).toMatch(/preparing/i)
+    expect(pill!.textContent).not.toMatch(/KB/)
+  })
+})
+
 describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider", () => {
   it("renders the divider as 'Round N', never 'Step N' (D-04 relabel)", () => {
     // 3 done across iter-0 + 1 done in iter-1 + active iter-2 → 2 dividers

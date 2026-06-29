@@ -331,6 +331,15 @@ type NodeState = "done" | "active" | "queued"
 // non-execute_code finished tool; execute_code reuses it for its done resting
 // line so a done code card shows ONE result-bearing line, not args + a
 // separate result row.
+// SEED-098 Change 1: the essence line is now the resting shape for ACTIVE
+// (running/preparing) tools too, not just finished ones — so an active tool
+// rests as the SAME calm one-line shape (no auto-expanded heavy body, no
+// show→collapse flicker), with its live body one click behind the chevron.
+//   • running   → `Running {tool}` (primary) + optional ` "{summary}"`; right
+//     pill = the Variant B merged live chip (verb · live duration in ONE chip).
+//   • preparing → `Preparing {tool}…` + preparingDescription suffix; right pill
+//     = `preparing` (or `preparing · X.X KB` when argsBytesStreamed > 0).
+//   • done/interrupted → UNCHANGED: `{tool} → {result}` + done pill w/ duration.
 function ToolEssenceLine({
   tc,
   onExpand,
@@ -338,12 +347,18 @@ function ToolEssenceLine({
   tc: ToolCall
   onExpand: () => void
 }) {
+  const isRunning = tc.status === "running"
+  const isPreparing = tc.status === "preparing"
+  const isActive = isRunning || isPreparing
   const result = summarizeToolCall(tc) || "View results"
+  const summary = toolSummary(tc)
   return (
     <button
       type="button"
       onClick={onExpand}
-      data-testid="tool-result-summary"
+      // Finished essence keeps the historical testid; the active essence is
+      // reachable via its inner StatusPill (data-testid="status-pill").
+      data-testid={isActive ? undefined : "tool-result-summary"}
       aria-label="Expand this step"
       className="w-full flex items-center gap-2.5 text-left group"
     >
@@ -351,21 +366,58 @@ function ToolEssenceLine({
         className={cn(
           "flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300",
           toolIconColor(tc.name, tc.status),
+          isPreparing && "opacity-50",
         )}
       >
         {toolIcon(tc.name)}
       </span>
       <span className="flex-1 min-w-0 text-xs truncate">
-        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-        <span className="mx-1 text-muted-foreground/50">→</span>
-        <span className="text-muted-foreground">{result}</span>
+        {isPreparing ? (
+          <span className="font-semibold text-foreground/50 italic">
+            Preparing {toolLabel(tc.name)}…
+            {(() => {
+              const prepDesc = preparingDescription(tc)
+              return prepDesc ? (
+                <span className="ml-1 font-normal text-foreground/60 not-italic">
+                  {" "}— {prepDesc}
+                </span>
+              ) : null
+            })()}
+          </span>
+        ) : isRunning ? (
+          <>
+            <span className="font-semibold text-primary">Running {toolLabel(tc.name)}</span>
+            {summary && <span className="ml-1.5 opacity-50">"{summary}"</span>}
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+            <span className="mx-1 text-muted-foreground/50">→</span>
+            <span className="text-muted-foreground">{result}</span>
+          </>
+        )}
       </span>
-      <StatusPill
-        status={pillStatus(tc.status)}
-        duration={
-          tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
-        }
-      />
+      {isPreparing ? (
+        <StatusPill
+          status="preparing"
+          runningLabel={
+            tc.argsBytesStreamed != null && tc.argsBytesStreamed > 0
+              ? `preparing · ${(tc.argsBytesStreamed / 1024).toFixed(1)} KB`
+              : undefined
+          }
+        />
+      ) : isRunning ? (
+        // The Variant B merged live chip — verb + live ticking duration in ONE
+        // chip; no separate ElapsedTimer span on the active essence row.
+        <StatusPill status="running" liveStartedAt={tc.startedAt ?? undefined} />
+      ) : (
+        <StatusPill
+          status={pillStatus(tc.status)}
+          duration={
+            tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
+          }
+        />
+      )}
       <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
     </button>
   )
@@ -710,8 +762,16 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
             // branch above. Active/preparing tools never collapse (the live
             // head + streaming body always render). Mutually exclusive with
             // isExpandedEarlierStep (that requires the key IN expandedSteps).
+            // SEED-098 Change 1: the DEFAULT visibility for ACTIVE
+            // (running/preparing) tools now flips to the essence line too — the
+            // active tool rests collapsed to its one-line essence (no
+            // auto-expanded heavy body / flicker) and reveals the live streaming
+            // body one click behind the chevron (its stepKey joins expandedSteps,
+            // falling through UNCHANGED to the execute_code / generic body below).
+            // Finished-tool behavior is identical to before.
             const isFinished = tc.status === "done" || tc.status === "interrupted"
-            const isFinishedCollapsed = isFinished && !expandedSteps.has(stepKey)
+            const isActive = tc.status === "running" || tc.status === "preparing"
+            const isCollapsedToEssence = (isFinished || isActive) && !expandedSteps.has(stepKey)
 
             return (
               <div
@@ -770,7 +830,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     <span>Hide</span>
                   </button>
                 )}
-                {isFinishedCollapsed ? (
+                {isCollapsedToEssence ? (
                   /* Phase 095 Plan 06 (GAP-095-03 essence): the single
                      essence line for a finished, not-expanded tool. Clicking
                      it expands this card's full body (adds its key to
