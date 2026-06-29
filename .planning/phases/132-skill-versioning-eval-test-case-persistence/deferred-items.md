@@ -15,3 +15,13 @@ The full backend suite (`venv/Scripts/python -m pytest tests/ -q`) reports **124
 
 **Plan 02 evidence of green where it counts:**
 `pytest tests/integration/test_132_test_cases.py tests/integration/test_skill_tuner_routes.py tests/integration/test_132_skill_versions.py -q` → **51 passed**.
+
+## Pre-existing frontend build rot (NOT introduced by Plan 03)
+
+`npm run build` (`tsc -b && vite build`) reports **29 pre-existing `tsc -b` errors** across 16 unrelated files as of Plan 03 execution (2026-06-30). Verified pre-existing by stashing the Plan 03 changes and re-running the build at HEAD — the error count is **identical (29) with and without Plan 03's changes**, and Plan 03's own files add **zero** new errors:
+
+- `src/stores/streamsStore.ts` — zustand `StateCreator` / `viewedThreadId: string | null` vs `null` typing mismatch (root rot).
+- `src/components/skills/SkillFormDialog.tsx(369/520)` — `fileInputRef` `RefObject<HTMLInputElement | null>` vs `RefObject<HTMLInputElement>` (React 19 / `@types/react` ref-typing). On the EXISTING `fileInputRef={fileInputRef}` prop lines (the Phase 123 `useRef<HTMLInputElement>(null)` pattern) — NOT the Plan 03 mount block.
+- Plus pre-existing errors in `src/pages/SettingsPage.tsx`, `src/components/layout/NavPanel.tsx`, `src/components/chat/MessageSkeleton.tsx`, `src/components/settings/MemorySection.tsx`, `src/providers/StreamsProvider.tsx`, and ~9 `__tests__`/`*.test.ts(x)` files.
+
+**Rationale for deferral (SCOPE BOUNDARY rule):** Plan 03 is purely additive — one new component (`SkillTestCasesSection.tsx`), four client funcs + four types, and a 7-line mount block in `SkillFormDialog.tsx`. Plan 03's own files typecheck clean: Task 1 `npx tsc --noEmit` (root config) passed with no output, and the `tsc -b` build error count is unchanged at 29 with Plan 03's changes stashed vs applied. This matches the project's `CLAUDE.md` note that `vercel.json`'s `vite build` deliberately skips `tsc` because local `tsc -b` is known-red (SEED-056 frontend rot). These errors are NOT Plan 03 regressions and are out of this plan's scope to fix.

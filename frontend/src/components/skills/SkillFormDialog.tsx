@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { listSkillFiles, uploadSkillFile, deleteSkillFile } from "@/lib/api"
+import { SkillTestCasesSection } from "./SkillTestCasesSection"
 import type { Skill, SkillCreate, SkillUpdate, SkillFile, SkillLintWarning } from "@/types"
 
 // ---------------------------------------------------------------------------
@@ -525,6 +526,16 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
               : undefined
           }
         />
+
+        {/* Phase 132 Plan 03 (EVAL-01 / VER-01) — THIN test-case editor +
+            version-history read, mounted ONLY for an existing/saved skill (an id
+            exists). Deliberately non-designed (operator scope fence); the
+            designed Evals panel is Phase 137 (PANEL-01, G-2). */}
+        {savedSkillId && (
+          <div className="mt-6 pt-6 border-t border-border/10">
+            <SkillTestCasesSection skillId={savedSkillId} />
+          </div>
+        )}
       </div>
 
       {/* Footer */}
