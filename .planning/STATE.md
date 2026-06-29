@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: verifying
-last_updated: "2026-06-29T22:23:03.653Z"
-last_activity: "2026-06-30 -- Quick task 260630-226 DONE (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT PASSED via Chrome MCP (DeepSeek+Anthropic, both themes): active tool rests as essence line, merged RUNNING·Ns pill, click-to-expand body, no loose lines, todos only in right panel. [Phase 132 VERIFIED 4/4 prior]"
+last_updated: "2026-06-30T12:00:00.000Z"
+last_activity: "2026-06-30 -- Phase 133 (eval-runner-with-skill-vs-without-skill) PLANNED. Research + VALIDATION (SC#10 4-axis authored) + PATTERNS (8/8 analogs) + 5 PLANs written & committed; plan-checker PASS (0 blockers; 2 doc/tooling warnings fixed inline). 5 plans / 4 waves: {01 migration 080 eval_runs+eval_results + Pydantic models (autonomous:false — SQL-editor/psycopg2 apply, NOT db push), 02 additive default-off RunContext.skill_catalog_override (Phase 092 precedent) + Deep-byte-identical regression guard — the one G-5 agent_loop.py touch} → 03 eval_runner_service no-op-emit engine → 04 evals.py router + companion public.runs row (free reattach/cancel) → 05 thin --skip-ui surface. Next: /gsd:execute-phase 133. [Quick 260630-226 SEED-098 done prior]"
 progress:
   total_phases: 25
   completed_phases: 10
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 132 — skill-versioning-eval-test-case-persistence
+**Current focus:** Phase 133 — eval-runner-with-skill-vs-without-skill (PLANNED — ready to execute)
 
 ## Current Position
 
-Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE + VERIFIED (4/4)
-Plan: 3 of 3 (Plans 01 + 02 + 03 COMPLETE)
-Status: Phase complete + verification PASSED 4/4 (`132-VERIFICATION.md`). VER-01 (SC#1): capture trigger fires on content trifecta, skips toggles (D-02), append-only block (23514), v1 backfill — 6 live-DB tests pass. EVAL-01 (SC#2/#3): owner-scoped CRUD persists, edit/delete work — 5 route tests pass. SC#4: `.eq(user_id)` on all 5 routes + owner-only RLS (no is_global). Operator G-4 UAT confirmed live + orchestrator independently exercised the live HTTP API + DB trigger (rolled back). Post-UAT polish: transient "Saved ✓" confirmation (`b529af46`). Pre-existing rot (29 tsc-b / 124 backend) excluded — none reference the new tables. Next: Phase 133 (eval runner) — or `/gsd:secure-phase 132` / `/gsd:complete-milestone` later.
-Last activity: 2026-06-30 -- Quick task 260630-226 DONE (`e3ff8623`+`37bd6d5c`): chat tool-card live-state de-dup (SEED-098) — active tools rest as unified essence line + 3 loose lines removed; 47/1 tests, 0 new tsc-b. G-4 lived UAT PASSED via Chrome MCP (DeepSeek+Anthropic, both themes): active tool rests as essence line, merged RUNNING·Ns pill, click-to-expand body, no loose lines, todos only in right panel. [Phase 132 VERIFIED 4/4 prior]
+Phase: 133 (eval-runner-with-skill-vs-without-skill) — PLANNED (ready for /gsd:execute-phase)
+Plan: 0 of 5 (5 PLANs written; plan-checker PASS)
+Status: Planning complete. EVAL-02. Research + VALIDATION (SC#10 4-axis UAT authored — cross-provider OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-history + Deep-byte-identical backstop) + PATTERNS (8/8 analogs; Phase 092 `resume_dropped_tool_calls` confirmed as the additive-field template) + 5 PLANs committed. Plan-checker: PASS, 0 blockers, 2 doc/tooling warnings (fixed inline — fail-fast tsc verify in Plan 05; RESEARCH Open-Qs marked RESOLVED). **The one D-14 tension:** the honest single-variable A/B (D-03 WITH=target-only / D-04 WITHOUT=empty) cannot be read-only — Plan 02 adds ONE additive default-off `RunContext.skill_catalog_override` field (off at every existing call site → Deep byte-identical) with a `test_deep_mode_unchanged` regression guard (the SC#4 truth); `agent_loop.py` (G-5 hot file) is in Plan 02 `files_modified`. Migration 080 apply is `autonomous: false` (SQL-editor/psycopg2, NOT db push — Phase 132 precedent). Waves: {01,02}→03→04→05. Next: /gsd:execute-phase 133 (/clear first for a fresh context window).
+Last activity: 2026-06-30 -- Phase 133 PLANNED (5 plans / 4 waves; plan-checker PASS). [Quick 260630-226 SEED-098 done prior]
 
 ### Quick Tasks Completed
 
