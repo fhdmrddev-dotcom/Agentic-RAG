@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: executing
+status: verifying
 last_updated: "2026-06-30T00:00:00.000Z"
-last_activity: 2026-06-30 -- Phase 132 Plan 02 complete (test-case CRUD + version API)
+last_activity: 2026-06-30 -- Phase 132 Plan 03 complete (thin test-case editor + version-history UI; EVAL-01/VER-01 observable end-to-end; phase ready_for_verification)
 progress:
   total_phases: 25
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 43
-  completed_plans: 42
-  percent: 38
+  completed_plans: 43
+  percent: 40
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 132 (skill-versioning-eval-test-case-persistence) — EXECUTING
-Plan: 3 of 3 (Plans 01 + 02 COMPLETE)
-Status: Executing Phase 132 — Plan 02 done (owner-scoped test-case CRUD EVAL-01 + read-only version history VER-01 API; 5 new route tests + 51 incl. adjacent green). Next: Plan 03 (THIN SkillDetailPanel editor, --skip-ui; panel=P137).
-Last activity: 2026-06-30 -- Phase 132 Plan 02 complete (skill_test_cases.py router registered; .eq(user_id) owner gate on every route)
+Phase: 132 (skill-versioning-eval-test-case-persistence) — COMPLETE (ready for verification)
+Plan: 3 of 3 (Plans 01 + 02 + 03 COMPLETE)
+Status: Phase complete — all 3 plans done. Plan 03 shipped the THIN test-case editor + read-only version-history UI (--skip-ui; designed Evals panel = Phase 137/PANEL-01/G-2). EVAL-01 + VER-01 now observable end-to-end; operator G-4 UAT verified (add/edit/delete persist across reload; version increments on instructions change, NOT on enabled/global toggle — D-02). Next: `/gsd:verify-work 132`.
+Last activity: 2026-06-30 -- Phase 132 Plan 03 complete (SkillTestCasesSection mounted in SkillDetailPanel; 24c2dfed / 00a36a58 / b529af46)
 
 ### Quick Tasks Completed
 
@@ -284,6 +284,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 123.1 P07 | ~12min | 2 tasks | 4 files |
 | Phase 123.1 P08 | ~10min | 2 tasks | 6 files |
 | Phase 123.1 P09 | ~6min | 1 tasks | 2 files |
+| Phase 132 P03 | ~30min | 3 tasks (1 human-verify gate) | 4 files |
 
 ## Decisions
 
@@ -324,6 +325,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 123-03 (TRIG-01): pure scoring = deterministic 60/40 split + 3-repeat aggregate + pick_winner BY HELD-OUT (never train); every cell carries BOTH fires/no_false (042-A). configured_targets = presence-only probe, OpenRouter distinct from native deepseek/zhipu, N=1 clean baseline, local first-class. auto_seed does no I/O; fetch_owner_scoped_siblings carries the .or_(user_id.eq,is_global.eq.true) leak gate. ZERO migration/package.
 - [Phase ?]: Phase 123-04 (TRIG-01): net-new owner-scoped skill_tuner.py router (start/stream/results) over the Phase-061+ run-buffer; service-role + .or_(own,global) sole leak gate, 404 on cross-user; tuner_progress/tuner_provider_done/tuner_complete vocab never overloads chat events.
 - [Phase ?]: Phase 123-04 (TRIG-01): background run bounded on every axis (MAX_CASES=40/MAX_TARGETS=8/MAX_ITERATIONS<=5 + per-call get_per_call_timeout + one job per skill via _INFLIGHT_SKILLS->409); calls ONLY Plan-03 forced_emit service fns (D-14 red line); cases+scoreboard ephemeral at tuner_result:{run_id} run-buffer key, no DB schema change.
+- [Phase 132]: Phase 132-03 (EVAL-01/VER-01): thin SkillTestCasesSection mounted in SkillDetailPanel gated on savedSkillId — deliberately non-designed (--skip-ui scope fence; reuses Input/Textarea/Button, no tabs/panel chrome) so it does NOT pre-empt the Phase 137/PANEL-01/G-2 sketch-gated Evals panel. 4 wire-mirror TS types + 5 fetch-client funcs mirror the existing skill funcs (getAuthHeaders→fetch→typed cast); owner-scoping enforced server-side (Plan 02 .eq(user_id)). createTestCase seeds an empty row filled inline+Saved. Operator G-4 UAT verified: add/edit/delete persist across reload, version increments on instructions change but NOT on enabled/global toggle (D-02). Pre-existing tsc -b rot (29 errors, unchanged by this plan) deferred per SEED-056.
 - [Phase 123]: Phase 123-05 (TRIG-01): Trigger Tuner React surface + the reachability triad in ONE plan (App ActiveView 'skill-tuner' + tunerSkillId + onTuneSkill, ChatLayout skill-tuner mount branch, SkillsPage 'Tune triggers' entry action on the selected skill) — the Phase-118 built-but-unreachable lesson; SkillTunerPage is a focused full-surface entered WITH a skillId (GovernancePage/publish-gauntlet ActiveView no-router precedent).
 - [Phase 123]: Phase 123-05 (TRIG-01): ProviderScoreboard (no-analog, 042-A) derives its N columns PURELY from the server-returned cells — a provider the org doesn't run is simply absent so it never renders (a score you can't act on is fabricated); N=1 is the clean baseline (no degraded affordance), OpenRouter≠native zhipu/z-ai, EVERY cell shows BOTH fires (recall) + no-false (the false-fire rail), never a hidden aggregate (T-123-05-01).
 - [Phase 123]: Phase 123-05 (TRIG-01): author-confirm-not-auto-apply (042-A/D-03) — CandidateCard's Use→reveal-diff is NOT the write; updateSkill (PATCH /skills, re-lints) fires ONLY on explicit confirm. LiveRunCard: queued≠running (no fake percent, 043-A) + never-vanishing elapsed timer derived from a stable start-ts (the 095 lesson, frozen on terminal) + reconcile-on-return (terminal 'done' re-reads GET results, SSE tuner_complete a best-effort hint per D-v2.5-03). CaseEditor 60/40 split bar mirrors backend split_held_out. ZERO package/migration; chat subscribeToRun untouched (purpose-built streamTunerRun tuner_* reader). 14/14 vitest, tsc clean.

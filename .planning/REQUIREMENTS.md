@@ -12,14 +12,14 @@ Each maps to exactly one roadmap phase.
 
 ### Skill Eval Persistence
 
-- [ ] **EVAL-01**: User can define a set of test cases (prompt + expected-behavior description) for a skill and save them persistently — test cases survive session and are editable before any run.
+- [x] **EVAL-01**: User can define a set of test cases (prompt + expected-behavior description) for a skill and save them persistently — test cases survive session and are editable before any run.
 - [ ] **EVAL-02**: An eval run executes each test case with-skill vs without-skill (two completions per case), streams per-case progress over SSE, and persists the full result set (per-case outputs per provider) so results are readable after reload.
 - [ ] **EVAL-03**: Eval results include a per-provider pass/fail verdict and side-by-side output comparison the user can read in the UI — the comparison is honest (no fabricated scores when a provider errored).
 - [ ] **EVAL-04**: User can rate individual eval outputs (thumbs up/down) to create a human preference signal that informs the self-improvement loop.
 
 ### Skill Versions
 
-- [ ] **VER-01**: When a skill's instructions are saved (create or update), an immutable version snapshot is created — so eval run history is traceable to the exact instruction state that produced it and prior versions are viewable.
+- [x] **VER-01**: When a skill's instructions are saved (create or update), an immutable version snapshot is created — so eval run history is traceable to the exact instruction state that produced it and prior versions are viewable.
 
 ### Self-Improvement Loop
 
@@ -68,11 +68,11 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| EVAL-01 | Phase 132 | Pending |
+| EVAL-01 | Phase 132 | Complete |
 | EVAL-02 | Phase 133 | Pending |
 | EVAL-03 | Phase 134 | Pending |
 | EVAL-04 | Phase 134 | Pending |
-| VER-01 | Phase 132 | Pending |
+| VER-01 | Phase 132 | Complete |
 | SI-01 | Phase 135 | Pending |
 | GATE-01 | Phase 136 | Pending |
 | PANEL-01 | Phase 137 | Pending |

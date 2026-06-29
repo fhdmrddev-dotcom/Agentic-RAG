@@ -81,7 +81,7 @@
 **Plans**: 3 plans
 - [x] 132-01-PLAN.md — Migration 079: skill_versions + skill_test_cases tables, version-capture trigger, append-only + owner-only RLS, v1 backfill + live-DB apply (VER-01, EVAL-01)
 - [x] 132-02-PLAN.md — Owner-scoped test-case CRUD router + read-only version-history GET + Pydantic models (EVAL-01, VER-01)
-- [ ] 132-03-PLAN.md — Thin non-designed test-case editor + version-history read mounted in skill detail panel (EVAL-01, VER-01)
+- [x] 132-03-PLAN.md — Thin non-designed test-case editor + version-history read mounted in skill detail panel (EVAL-01, VER-01)
 
 #### Phase 133: Eval Runner — With-Skill vs Without-Skill
 **Goal**: A user can launch an eval run that executes each test case both with the skill and without it, watch per-case progress stream live, and find the complete result set still there after reload.
