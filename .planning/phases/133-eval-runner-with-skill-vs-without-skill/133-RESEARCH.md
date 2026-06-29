@@ -370,16 +370,15 @@ This phase touches streaming + agent loop + provider routing + UI state, so VALI
 | A3 | One reused ephemeral thread + sequential arms + prompt-only history yields clean single-turn isolation | Pattern 4 | MEDIUM — if origin/history filtering leaks a prior case, switch to fresh-thread-per-completion | 
 | A4 | `interrupted` backend-died terminal can be set by a startup sweep or lazy read without new worker infra | Persistence | LOW — worst case a stranded `running` eval_run shows stale; partials still readable |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should eval threads be hidden from `list_threads`?**
+1. **RESOLVED (deferred to Phase 137):** Should eval threads be hidden from `list_threads`?
    - Known: `list_threads` returns all threads by `user_id` (threads.py:204-216); ephemeral eval threads would appear.
-   - Unclear: whether the thin --skip-ui surface tolerates this or needs a filter now.
-   - Recommendation: leave visible for the thin surface OR add a minimal title-prefix/marker filter (additive, off the agent-loop path); defer proper hiding to Phase 137.
+   - Resolution: leave visible for the thin --skip-ui surface (D-07); proper hiding deferred to Phase 137. No filter task in Phase 133 scope.
 
-2. **`skill_catalog_override` exact shape** — tuple of `{"name","description"}` dicts is enough for the WITH arm (the injection block only reads `s['name']`/`s['description']`, agent_loop.py:1186-1187). Confirm no downstream code needs the full skill row.
+2. **RESOLVED (self-answered):** `skill_catalog_override` exact shape — tuple of `{"name","description"}` dicts is enough for the WITH arm (the injection block only reads `s['name']`/`s['description']`, agent_loop.py:1186-1187). No downstream code needs the full skill row.
 
-3. **Which `skill_version_id` does a run record?** — D-10 says "the exact instruction state." Recommend: the **latest** version at launch time (read max `version_number` for the skill, owner-scoped). The WITH arm's injected description should come from that **version snapshot** (not the live `skills` row) for true traceability — confirm with the planner whether the injected name/description must be the versioned snapshot or the live row (recommend snapshot).
+3. **RESOLVED (Plan 03 — version snapshot):** Which `skill_version_id` does a run record? — the **latest** version at launch time (max `version_number` for the skill, owner-scoped). The WITH arm's injected name/description comes from that **version snapshot** (not the live `skills` row) for true traceability per D-10. Implemented in Plan 03 must_haves.
 
 ## Environment Availability
 
