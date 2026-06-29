@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 098 — Unified Tool-Card Essence Line (live + finished, one shape)</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  body {
+    background:
+      radial-gradient(1000px 520px at 78% -12%, hsl(239 100% 82% / .06), transparent),
+      radial-gradient(760px 480px at 4% 112%, hsl(266 90% 66% / .05), transparent),
+      var(--color-bg);
+    background-attachment: fixed; padding-bottom: 80px;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 30px 22px 40px; }
+  .page-h { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-2xl); margin: 6px 0 2px; }
+  .page-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 8px; max-width: 70ch; }
+  .sec { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-text-dim); margin: 30px 0 11px; display: flex; align-items: center; gap: 9px; }
+  .sec::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+  .note { font-size: var(--text-sm); color: var(--color-text-muted); margin: 8px 2px 0; max-width: 74ch; line-height: 1.55; }
+  .note b { color: var(--color-text); font-weight: 600; }
+  .pick { color: var(--color-success); font-weight: 700; }
+  .kill { color: var(--color-danger); }
+
+  /* ───────────────────── RUN CARD (mirrors RunCard.tsx) ───────────────────── */
+  .runcard { border: 1px solid hsl(239 100% 82% / .35); border-radius: var(--radius-lg); background: hsl(239 84% 67% / .05); box-shadow: var(--shadow-glow-primary); overflow: hidden; }
+  .runcard.calm { border-color: var(--color-border); background: hsl(220 30% 7% / .8); box-shadow: none; }
+  .rc-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); background: hsl(220 30% 8% / .92); }
+  .rc-av { width: 32px; height: 32px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 0 0 1px rgba(0,0,0,.1); }
+  .rc-av iconify-icon { font-size: 18px; color: #4d6bfe; }
+  .rc-title { font-weight: 600; font-size: var(--text-sm); }
+  .rc-sub { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .rc-strip { display: inline-flex; align-items: center; gap: 7px; margin-top: 3px; font-family: var(--font-mono); font-size: 10.5px; }
+  .rc-strip .chip { background: hsl(142 71% 45% / .14); color: var(--color-success); border-radius: var(--radius-full); padding: 2px 8px; }
+  .rc-strip .chip.live { background: var(--color-primary-dim); color: var(--color-primary); }
+  .rc-spin { margin-left: auto; color: var(--color-primary); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .rc-files { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+  .rc-body { padding: 12px 14px; }
+  .shimmer { height: 2px; background: linear-gradient(90deg, transparent, var(--color-primary-glow), transparent); background-size: 200% 100%; animation: sh 1.4s linear infinite; }
+  @keyframes sh { to { background-position: -200% 0; } }
+
+  /* ───────────────────── STEP ROW (rail + essence line) ───────────────────── */
+  .step { display: grid; grid-template-columns: 28px 1fr; min-width: 0; }
+  .rail { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .rail .line { position: absolute; top: 20px; bottom: -10px; width: 1px; left: 50%; transform: translateX(-50%); background: hsl(142 71% 45% / .6); }
+  .rail .line.queued { background: var(--color-border); }
+  .rail .line.toactive { background: linear-gradient(to bottom, hsl(142 71% 45% / .6), var(--color-primary)); }
+  .node { position: relative; z-index: 1; margin-top: 10px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid; box-sizing: border-box; }
+  .node.done { background: var(--color-success); border-color: var(--color-success); }
+  .node.active { background: var(--color-surface); border-color: var(--color-primary); box-shadow: 0 0 0 3px hsl(239 100% 82% / .15); animation: pulseGlow 1.6s ease-in-out infinite; }
+  .node.queued { background: var(--color-surface); border-color: var(--color-border); }
+  @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 0 0 var(--color-primary-glow); } 50% { box-shadow: 0 0 0 4px hsl(239 100% 82% / .08); } }
+  .snum { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; line-height: 1; color: hsl(142 71% 45% / .8); }
+  .snum.active { color: var(--color-primary); font-weight: 700; }
+  .snum.queued { color: var(--color-text-dim); }
+
+  .ess { display: flex; align-items: center; gap: 10px; padding: 8px 4px; cursor: pointer; border-radius: var(--radius-sm); }
+  .ess:hover { background: hsl(220 30% 11% / .4); }
+  .ess .ico { flex: none; width: 22px; height: 22px; border-radius: var(--radius-sm); background: hsl(220 30% 11% / .5); display: grid; place-items: center; }
+  .ess .ico iconify-icon { font-size: 13px; }
+  .ico.search { color: var(--color-primary); }
+  .ico.doc { color: var(--color-accent-violet); }
+  .ico.skill { color: var(--color-accent-violet); }
+  .ico.code { color: hsl(212 90% 62%); }
+  .ess .txt { flex: 1; min-width: 0; font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ess .txt .nm { font-weight: 600; color: hsl(226 60% 97% / .82); }
+  .ess .txt .nm.run { color: var(--color-primary); }
+  .ess .txt .arr { margin: 0 6px; color: var(--color-text-dim); }
+  .ess .txt .res { color: var(--color-text-muted); }
+  .ess .timer { flex: none; display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 10px; color: hsl(239 100% 82% / .7); }
+
+  /* pill — the right-side status badge, the design decision point */
+  .pill { flex: none; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-weight: 600; font-size: 10px; letter-spacing: .03em; text-transform: uppercase; border-radius: var(--radius-full); padding: 3px 9px; }
+  .pill .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .pill.done { background: hsl(142 71% 45% / .14); color: var(--color-success); } .pill.done .dot { background: var(--color-success); }
+  .pill.run { background: var(--color-primary-dim); color: var(--color-primary); } .pill.run .dot { background: var(--color-primary); animation: blink 1.2s ease-in-out infinite; }
+  .pill.prep { background: hsl(38 92% 60% / .14); color: var(--color-warning); } .pill.prep .dot { background: var(--color-warning); animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+  .chev { flex: none; color: hsl(226 60% 97% / .4); font-size: 13px; transition: transform .15s; }
+  .ess:hover .chev { transform: translateX(2px); }
+  .chev.open { transform: rotate(90deg); }
+
+  /* expanded live body (only when chevron clicked) */
+  .body { margin: 2px 0 6px 32px; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--color-border); }
+  .body-head { display: flex; align-items: center; gap: 8px; padding: 6px 11px; background: hsl(220 30% 11% / .5); font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
+  .body-head .kb { margin-left: auto; color: var(--color-text-dim); }
+  .body pre { margin: 0; padding: 11px 13px; background: hsl(216 45% 4%); font-family: var(--font-mono); font-size: 11px; line-height: 1.65; color: hsl(226 60% 90%); overflow-x: auto; }
+  .body pre .k { color: hsl(266 90% 76%); } .body pre .s { color: hsl(142 60% 62%); } .body pre .c { color: var(--color-text-dim); }
+  .caret { display: inline-block; width: 7px; height: 13px; background: var(--color-primary); vertical-align: text-bottom; animation: blink 1s step-end infinite; }
+
+  /* before/after split */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+  .col-h { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+  .col-h.bad { color: var(--color-danger); } .col-h.good { color: var(--color-success); }
+
+  /* loose-line junk (the BEFORE noise we delete) */
+  .junk { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); padding: 4px 2px; display: flex; align-items: center; gap: 6px; }
+  .junk .a { color: var(--color-primary); }
+  .junk .lnk { color: var(--color-primary); border-bottom: 1px dashed hsl(239 100% 82% / .4); }
+  .junk.skill .a { color: var(--color-accent-violet); }
+  .strike { position: relative; }
+  .strike::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 1px; background: hsl(0 72% 51% / .55); }
+
+  /* interactive A/B segmented control */
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-full); background: hsl(220 30% 7% / .6); }
+  .seg-btn { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--color-text-muted); background: transparent; border: 0; border-radius: var(--radius-full); padding: 6px 13px; cursor: pointer; transition: all .15s; }
+  .seg-btn:hover { color: var(--color-text); }
+  .seg-btn.is-on { background: var(--color-primary-dim); color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary-glow); }
+  /* by default show B; JS toggles body.show-A. Wrappers own visibility so the
+     inner .pill/.timer display rules never fight the toggle (specificity-safe). */
+  .var { align-items: center; gap: 10px; }
+  .var-a { display: none !important; }
+  .var-b { display: inline-flex !important; }
+  body.show-A .var-a { display: inline-flex !important; }
+  body.show-A .var-b { display: none !important; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 2px 0; font-size: 11px; color: var(--color-text-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 26px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="page-h">Sketch 098 — <span class="grad-text" style="background:linear-gradient(100deg,var(--color-primary),var(--color-accent-violet));-webkit-background-clip:text;background-clip:text;color:transparent">One tool-card shape, live and finished</span></p>
+  <p class="page-sub">The approved essence line (operator screenshot, 2026-06-30) becomes the resting shape for <b style="color:var(--color-text)">active</b> tools too. A tool never changes <i>shape</i> as it runs — only its rail node and its right-side pill change by state. The heavy live body (streaming code / args) is one click away, never auto-blasted.</p>
+
+  <!-- ════════════════ THE DECISION: active-row right side ════════════════ -->
+  <div class="sec">The decision · what the active row shows on the right</div>
+  <div class="note" style="margin-bottom:14px">Two candidates for the live status pill — <b>click the toggle</b> to flip the live row below between them. The timer ticks so you can watch the difference. <b>Variant B</b> is recommended: it mirrors the finished <code style="font-family:var(--font-mono)">● DONE · 1.5s</code> pill byte-for-byte (state word + live duration in one chip), so the row is identical the whole lifecycle and only the <i>color + word</i> animate. Variant A splits the timer into a separate chip (closer to today's code, but two moving things, and the row width jitters as digits change).</div>
+
+  <!-- interactive A/B toggle -->
+  <div class="seg" role="tablist" aria-label="Variant">
+    <button id="tabA" class="seg-btn" role="tab" aria-selected="false" onclick="setVariant('A')">Variant A — pill + separate timer</button>
+    <button id="tabB" class="seg-btn is-on" role="tab" aria-selected="true" onclick="setVariant('B')">Variant B — merged pill ✦ recommended</button>
+  </div>
+
+  <div class="runcard" style="margin-top:12px">
+    <div class="shimmer"></div>
+    <div class="rc-body">
+      <div class="step">
+        <div class="rail"><div class="line toactive"></div><div class="node active"></div><div class="snum active">5</div></div>
+        <div class="ess">
+          <span class="ico code"><iconify-icon icon="lucide:terminal"></iconify-icon></span>
+          <span class="txt"><span class="nm run">Running Executing code</span></span>
+          <!-- Variant A: separate timer chip + word-only pill -->
+          <span class="var var-a">
+            <span class="timer"><iconify-icon icon="lucide:clock"></iconify-icon><span id="timerA">3.2s</span></span>
+            <span class="pill run"><span class="dot"></span>Running</span>
+          </span>
+          <!-- Variant B: merged pill (word + live duration) -->
+          <span class="var var-b">
+            <span class="pill run"><span class="dot"></span>Running · <span id="timerB">3.2s</span></span>
+          </span>
+          <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p id="vnote" class="note" style="margin-top:9px">Identical geometry to <code style="font-family:var(--font-mono)">● DONE · 1.5s</code> — the dot blinks, the word + timer live-update, the row never reflows.</p>
+
+  <!-- ════════════════ FULL LIFECYCLE on the rail ════════════════ -->
+  <div class="sec">The full run · every state, one shape (Variant B)</div>
+  <div class="runcard">
+    <div class="shimmer"></div>
+    <div class="rc-head">
+      <div class="rc-av"><iconify-icon icon="ri:robot-2-fill"></iconify-icon></div>
+      <div style="flex:1;min-width:0">
+        <div class="rc-title">Run · 7 steps</div>
+        <div class="rc-sub">deepseek · deepseek-v4-flash · turn 1</div>
+        <div class="rc-strip"><span class="chip live">6m 8s · Step 7</span></div>
+      </div>
+      <iconify-icon class="rc-spin" icon="lucide:loader-2"></iconify-icon>
+    </div>
+    <div class="rc-body">
+      <!-- 1 done -->
+      <div class="step">
+        <div class="rail"><div class="line"></div><div class="node done"></div><div class="snum">1</div></div>
+        <div class="ess">
+          <span class="ico search"><iconify-icon icon="lucide:search"></iconify-icon></span>
+          <span class="txt"><span class="nm">Searching documents</span><span class="arr">→</span><span class="res">View results</span></span>
+          <span class="pill done"><span class="dot"></span>Done · 1.5s</span>
+          <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+      <!-- 2 done -->
+      <div class="step">
+        <div class="rail"><div class="line"></div><div class="node done"></div><div class="snum">2</div></div>
+        <div class="ess">
+          <span class="ico doc"><iconify-icon icon="lucide:file-text"></iconify-icon></span>
+          <span class="txt"><span class="nm">Analyzing document</span><span class="arr">→</span><span class="res"># Complete Extraction of Research Hypotheses…</span></span>
+          <span class="pill done"><span class="dot"></span>Done · 53.0s</span>
+          <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+      <!-- 3 skill done (in-card — replaces the loose "Skill activated" line) -->
+      <div class="step">
+        <div class="rail"><div class="line"></div><div class="node done"></div><div class="snum">3</div></div>
+        <div class="ess">
+          <span class="ico skill"><iconify-icon icon="lucide:zap"></iconify-icon></span>
+          <span class="txt"><span class="nm">Loading skill</span><span class="arr">·</span><span class="res">"docx"</span></span>
+          <span class="pill done"><span class="dot"></span>Done</span>
+          <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+      <!-- 4 write_todos done (in-card — todos themselves stay in right panel) -->
+      <div class="step">
+        <div class="rail"><div class="line"></div><div class="node done"></div><div class="snum">4</div></div>
+        <div class="ess">
+          <span class="ico" style="color:var(--color-text-muted)"><iconify-icon icon="lucide:list-checks"></iconify-icon></span>
+          <span class="txt"><span class="nm">write_todos</span><span class="arr">→</span><span class="res">5 todos · see panel</span></span>
+          <span class="pill done"><span class="dot"></span>Done</span>
+          <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+      <!-- 5 PREPARING (expanded, showing the live body behind the chevron) -->
+      <div class="step">
+        <div class="rail"><div class="line toactive"></div><div class="node active"></div><div class="snum active">5</div></div>
+        <div class="ess">
+          <span class="ico code"><iconify-icon icon="lucide:terminal"></iconify-icon></span>
+          <span class="txt"><span class="nm run">Preparing Executing code</span><span class="arr">—</span><span class="res">Creating RPA Research Summary .docx</span></span>
+          <span class="pill prep"><span class="dot"></span>Preparing · 12.5 KB</span>
+          <iconify-icon class="chev open" icon="lucide:chevron-right"></iconify-icon>
+        </div>
+      </div>
+      <!-- expanded body for step 5 (this is what one click reveals) -->
+      <div class="body">
+        <div class="body-head"><iconify-icon icon="lucide:code-2"></iconify-icon> live · streaming args<span class="kb">12.5 KB</span></div>
+        <pre><span class="c"># write the docx with python-docx</span>
+<span class="k">from</span> docx <span class="k">import</span> Document
+doc = Document()
+doc.add_heading(<span class="s">'RPA Research Summary'</span>, level=0)
+<span class="k">for</span> rq <span class="k">in</span> research_questions:
+    doc.add_heading(rq.title, level=<span class="c">2</span>)<span class="caret"></span></pre>
+      </div>
+      <!-- 6 next / queued -->
+      <div class="step">
+        <div class="rail"><div class="line queued"></div><div class="node queued"></div><div class="snum queued">6</div></div>
+        <div class="ess" style="opacity:.55;cursor:default">
+          <span class="ico" style="color:var(--color-text-dim)"><iconify-icon icon="lucide:circle-dashed"></iconify-icon></span>
+          <span class="txt"><span class="res" style="font-style:italic">planning next step…</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:12px"><b>Reading the rail:</b> the active row (step 5) is the <i>only</i> one with a pulsing primary node + live pill. Everything above it is calm green. The body shown under step 5 appears <b>only because its chevron was clicked</b> — by default the active row is a single calm line like all the others.</p>
+  <div class="legend">
+    <span><span class="pill prep swatch"><span class="dot"></span></span> preparing — amber dot + <code style="font-family:var(--font-mono)">KB</code> counter</span>
+    <span><span class="pill run swatch"><span class="dot"></span></span> running — indigo dot + live timer</span>
+    <span><span class="pill done swatch"><span class="dot"></span></span> done — green dot + final duration</span>
+  </div>
+
+  <!-- ════════════════ BEFORE vs AFTER ════════════════ -->
+  <div class="sec">Why this is calmer · before vs after (same moment in the run)</div>
+  <div class="split">
+    <!-- BEFORE -->
+    <div>
+      <p class="col-h bad"><iconify-icon icon="lucide:x"></iconify-icon> Today — 4 places, auto-expanded body</p>
+      <div class="runcard">
+        <div class="shimmer"></div>
+        <div class="rc-body">
+          <div class="step">
+            <div class="rail"><div class="line toactive"></div><div class="node active"></div><div class="snum active">5</div></div>
+            <div style="min-width:0">
+              <div class="ess" style="cursor:default">
+                <span class="ico code"><iconify-icon icon="lucide:terminal"></iconify-icon></span>
+                <span class="txt"><span class="nm run" style="font-style:italic">Generating code…</span></span>
+                <span style="font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)">12.5 KB</span>
+              </div>
+              <div class="body" style="margin-left:0">
+                <div class="body-head">python · generating<span class="kb">12.5 KB</span></div>
+                <pre><span class="k">from</span> docx <span class="k">import</span> Document
+doc = Document()<span class="caret"></span></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- the loose junk below the card -->
+      <div style="margin-top:8px">
+        <div class="junk strike"><span class="a">→</span> updated todos <span class="lnk">see panel →</span></div>
+        <div class="junk strike"><span class="a">→</span> updated todos <span class="lnk">see panel →</span></div>
+        <div class="junk skill strike"><span class="a"><iconify-icon icon="lucide:zap"></iconify-icon></span> Skill activated: docx</div>
+        <div class="junk strike"><iconify-icon icon="lucide:loader-2" class="a"></iconify-icon> Preparing code… •••</div>
+      </div>
+      <p class="note" style="margin-top:8px"><span class="kill">Struck-through lines are deleted.</span> The auto-expanded body collapses on done → the flicker.</p>
+    </div>
+    <!-- AFTER -->
+    <div>
+      <p class="col-h good"><iconify-icon icon="lucide:check"></iconify-icon> Proposed — 1 line, body on click</p>
+      <div class="runcard">
+        <div class="shimmer"></div>
+        <div class="rc-body">
+          <div class="step">
+            <div class="rail"><div class="line toactive"></div><div class="node active"></div><div class="snum active">5</div></div>
+            <div class="ess">
+              <span class="ico code"><iconify-icon icon="lucide:terminal"></iconify-icon></span>
+              <span class="txt"><span class="nm run">Executing code</span><span class="arr">—</span><span class="res">Creating RPA Research Summary .docx</span></span>
+              <span class="pill prep"><span class="dot"></span>Preparing · 12.5 KB</span>
+              <iconify-icon class="chev" icon="lucide:chevron-right"></iconify-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note" style="margin-top:8px">Todos live <b>only</b> in the right Workspace panel. Skill + todos appear <b>once</b>, as their own in-card step rows. No bottom echo — the header strip already carries the live verb + timer.</p>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:26px;font-size:11px;color:var(--color-text-dim)">Throwaway mockup · Deep Midnight (dark). Maps to <code style="font-family:var(--font-mono)">ToolCallPanel.tsx</code> (essence line + rail) and <code style="font-family:var(--font-mono)">MessageItem.tsx</code> (loose-line removal). Acceptance bar for SEED-098.</p>
+</div>
+<script>
+  function setVariant(v) {
+    document.body.classList.toggle('show-A', v === 'A');
+    document.getElementById('tabA').classList.toggle('is-on', v === 'A');
+    document.getElementById('tabB').classList.toggle('is-on', v === 'B');
+    document.getElementById('tabA').setAttribute('aria-selected', v === 'A');
+    document.getElementById('tabB').setAttribute('aria-selected', v === 'B');
+    document.getElementById('vnote').innerHTML = v === 'A'
+      ? "Variant A — a standalone clock chip sits LEFT of the pill. Two separate live elements, and the row width nudges as the seconds digits change."
+      : "Variant B (recommended) — identical geometry to <code style='font-family:var(--font-mono)'>● DONE · 1.5s</code>. The dot blinks, the word + timer live-update inside ONE chip, the row never reflows.";
+  }
+  // live-ticking timer so the difference is visible in motion
+  let t = 3.2;
+  setInterval(() => {
+    t += 0.1;
+    const s = t.toFixed(1) + 's';
+    document.getElementById('timerA').textContent = s;
+    document.getElementById('timerB').textContent = s;
+  }, 100);
+</script>
+</body>
+</html>
