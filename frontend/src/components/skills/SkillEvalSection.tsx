@@ -109,6 +109,18 @@ export function SkillEvalSection({ skillId }: Props) {
   // analog) and reattaches via subscribeToRun verbatim — see SUMMARY deviation.
   useEffect(() => {
     let cancelled = false
+    // Switching skills: clear the previous skill's readout/live state BEFORE
+    // fetching the new skill's runs. Without this, a skill that has no eval runs
+    // keeps rendering the previously-viewed skill's results — the stale-state bug
+    // where the SAME eval appeared under every skill (the durable readout was
+    // never reset when listEvalRuns returned []). The provider/model picker
+    // selection is intentionally preserved across skills.
+    setRunId(null)
+    setRunning(false)
+    setLive({})
+    setEvalRun(null)
+    setResults([])
+    setError(null)
     async function init() {
       try {
         const p = await getProviders()
