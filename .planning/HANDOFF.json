@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-30T20:11:19.485Z",
+  "phase": "133",
+  "phase_name": "eval-runner-with-skill-vs-without-skill",
+  "phase_dir": ".planning/phases/133-eval-runner-with-skill-vs-without-skill",
+  "plan": 5,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "boundary": "clean-phase-boundary",
+  "completed_tasks": [
+    {"id": "133", "name": "Eval Runner (EVAL-02) — all 5 plans", "status": "done", "commit": "12bdd6ee"},
+    {"id": "133-verify", "name": "VERIFICATION passed + live SC#10 cross-provider UAT", "status": "done", "commit": "306dd2d4"},
+    {"id": "post-133-a", "name": "Register claude-sonnet-5 (live /models)", "status": "done", "commit": "362672fb"},
+    {"id": "post-133-b", "name": "Capture eval follow-up bugs BUG-260701-01 + SEED-100", "status": "done", "commit": "79b7a4ed"}
+  ],
+  "remaining_tasks": [
+    {"id": "next-1", "name": "/gsd:secure-phase 133 (retroactive threat verification)", "status": "not_started"},
+    {"id": "next-2", "name": "Phase 134 (EVAL-03/04)", "status": "not_started"},
+    {"id": "next-3", "name": "2 OPTIONAL operator lived-glances on Phase 133 (thin-UI live-progress render + parallel-thread feel)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Backend RESTART (not just --reload) to load claude-sonnet-5 into MODEL_CAPABILITIES", "context": "config.py change 362672fb only takes effect on a full restart", "blocking": false},
+    {"action": "2 optional operator lived-glances on Phase 133 thin UI", "context": "engine isolation already confirmed; these are non-blocking polish glances", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Pausing at a clean phase boundary, not mid-task", "rationale": "Phase 133 fully EXECUTED + VERIFIED passed; all phase work committed", "phase": "133"}
+  ],
+  "uncommitted_files": [
+    {"path": ".claude/agents/*, .claude/commands/gsd/*", "note": "Large GSD framework update (edits + deletions) — unrelated to phase work, NOT swept into WIP commit"},
+    {"path": "backend/app/api/threads.py (+28), backend/app/models/thread.py (+1)", "note": "Stray uncommitted source change — NOT Phase 133 (133 committed). Investigate provenance before committing or discarding."},
+    {"path": "frontend/src/components/workflows/PublishGauntlet.tsx (~167 lines), frontend/src/components/panel/PhaseCard.tsx (+21), frontend/src/providers/StreamsProvider.tsx (+2)", "note": "Stray uncommitted frontend changes — look like Phase 127-era (energized Workflow Studio) refinements left uncommitted. Investigate before committing/discarding."},
+    {"path": "backend/RUN-BACKEND.md, backend/scripts/115_*.json, backend/settings_override.json.migrated (untracked)", "note": "Untracked script/run artifacts — likely throwaway."}
+  ],
+  "next_action": "Decide between /gsd:secure-phase 133 (close out 133) or /gsd:complete-milestone later or Phase 134 (EVAL-03/04). FIRST: triage the stray uncommitted source changes in threads.py / thread.py / PublishGauntlet.tsx / PhaseCard.tsx — determine if they are wanted work or should be discarded.",
+  "context_notes": "Session was /clear'd then /gsd:pause-work invoked at a clean boundary. No mid-task state. The real attention item on resume is the set of uncommitted source changes that are NOT part of Phase 133 — their provenance is unknown and they should be triaged (kept+committed to the right phase, or reverted) before starting new work. Two eval follow-up bugs are open: BUG-260630-01 (DeepSeek reasoning_content 400) + BUG-260701-01 (assistant-prefill 400 on sonnet-5/4.6+ family); both folded into SEED-100 (dedicated production-clean eval phase)."
+}
