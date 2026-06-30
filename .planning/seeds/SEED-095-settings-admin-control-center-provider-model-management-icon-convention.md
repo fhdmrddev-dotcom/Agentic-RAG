@@ -97,3 +97,13 @@ single **default model per provider** (newest-first = default), and keep
 
 **Sharper re-open trigger:** any time a configured model 404s in chat OR in an eval
 run (the eval picker offering a dead model is the most visible failure).
+
+## Validation-pass results (2026-06-30, read-only probe)
+
+Ran a live `/models` + run-history probe per provider (proposed-only; no settings changed). Findings to carry into the curation phase:
+
+- **Live `/models` worked for 6 providers** and every configured model was served: Google (50 served), DeepSeek (2), Moonshot (11), GLM/zhipu (8), MiniMax (8), OpenRouter (338).
+- **Probe gaps (need a better per-provider served-check):** OpenAI's provider `base_url` is empty (SDK default) → naive `{base}/models` had nothing to hit; Anthropic `GET /v1/models` returned 404. So a robust probe must special-case these (OpenAI default base; Anthropic models endpoint/headers) or use a cheap 1-token test-call.
+- **Run-history is NOT a reliable "served-today" signal:** Anthropic `claude-sonnet-4-6` had 10 historical `completed` runs but **404s now** (proven live in the Phase 133 eval UAT). Curation MUST validate live, not trust history.
+- **Registry/picker drift (eval-specific, the load-bearing part):** models served + used in chat but ABSENT from `MODEL_CAPABILITIES` (so the eval router rejects them): `glm-5.2` (proven ×6), `kimi-k2.7-code`, and 6 OpenRouter slugs incl. `meta-llama/llama-3.3-70b-instruct` (proven ×8), `nvidia/nemotron-*`, `google/gemma-*`. The curation pass must KEEP the registry and the picker lists in sync, and add a default-model-per-provider (newest-first).
+- **Confirmed-dead (drop candidates), live-proven:** Anthropic `claude-sonnet-4-6`, `claude-haiku-4-5` (no dated suffix) — both 404 on this account.
