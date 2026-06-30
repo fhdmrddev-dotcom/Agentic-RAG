@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: verifying
-last_updated: "2026-06-30T12:00:00.000Z"
-last_activity: "2026-06-30 -- Phase 133 (eval-runner-with-skill-vs-without-skill) PLANNED. Research + VALIDATION (SC#10 4-axis authored) + PATTERNS (8/8 analogs) + 5 PLANs written & committed; plan-checker PASS (0 blockers; 2 doc/tooling warnings fixed inline). 5 plans / 4 waves: {01 migration 080 eval_runs+eval_results + Pydantic models (autonomous:false — SQL-editor/psycopg2 apply, NOT db push), 02 additive default-off RunContext.skill_catalog_override (Phase 092 precedent) + Deep-byte-identical regression guard — the one G-5 agent_loop.py touch} → 03 eval_runner_service no-op-emit engine → 04 evals.py router + companion public.runs row (free reattach/cancel) → 05 thin --skip-ui surface. Next: /gsd:execute-phase 133. [Quick 260630-226 SEED-098 done prior]"
+last_updated: "2026-06-30T18:00:00.000Z"
+last_activity: 2026-06-30 -- Phase 133 EXECUTED (5/5 plans) + VERIFIED 4/4 automatable (8/8 tests green); SC#10 live UAT pending
 progress:
   total_phases: 25
   completed_phases: 10
-  total_plans: 43
-  completed_plans: 43
-  percent: 40
+  total_plans: 48
+  completed_plans: 48
+  percent: 44
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 133 — eval-runner-with-skill-vs-without-skill (PLANNED — ready to execute)
+**Current focus:** Phase 133 — eval-runner-with-skill-vs-without-skill (EXECUTED + VERIFIED 4/4 automatable; SC#10 live UAT pending)
 
 ## Current Position
 
-Phase: 133 (eval-runner-with-skill-vs-without-skill) — PLANNED (ready for /gsd:execute-phase)
-Plan: 0 of 5 (5 PLANs written; plan-checker PASS)
-Status: Planning complete. EVAL-02. Research + VALIDATION (SC#10 4-axis UAT authored — cross-provider OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-history + Deep-byte-identical backstop) + PATTERNS (8/8 analogs; Phase 092 `resume_dropped_tool_calls` confirmed as the additive-field template) + 5 PLANs committed. Plan-checker: PASS, 0 blockers, 2 doc/tooling warnings (fixed inline — fail-fast tsc verify in Plan 05; RESEARCH Open-Qs marked RESOLVED). **The one D-14 tension:** the honest single-variable A/B (D-03 WITH=target-only / D-04 WITHOUT=empty) cannot be read-only — Plan 02 adds ONE additive default-off `RunContext.skill_catalog_override` field (off at every existing call site → Deep byte-identical) with a `test_deep_mode_unchanged` regression guard (the SC#4 truth); `agent_loop.py` (G-5 hot file) is in Plan 02 `files_modified`. Migration 080 apply is `autonomous: false` (SQL-editor/psycopg2, NOT db push — Phase 132 precedent). Waves: {01,02}→03→04→05. Next: /gsd:execute-phase 133 (/clear first for a fresh context window).
-Last activity: 2026-06-30 -- Phase 133 PLANNED (5 plans / 4 waves; plan-checker PASS). [Quick 260630-226 SEED-098 done prior]
+Phase: 133 (eval-runner-with-skill-vs-without-skill) — EXECUTED + VERIFIED (4/4 automatable; human_needed for SC#10 live UAT)
+Plan: 5 of 5 (all plans COMPLETE)
+Status: All 5 plans executed + committed; `133-VERIFICATION.md` = human_needed (4/4 automatable SC truths PASS, 8/8 backend tests green — `test_eval_runner.py` 5 + `test_agent_loop_catalog_override.py` 3). EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322 — NOT db push) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` PASS → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty) with NO-OP emit so inner done/error never hit the shared `run:{run_id}` buffer · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row → free reattach/cancel; cross-user 404) · thin `--skip-ui` SkillEvalSection (reuses `subscribeToRun`, zero new EventSource). **Remaining gate = SC#10 4-axis live UAT (8 manual scenarios: cross-provider OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-history + Deep-unchanged live backstop) — needs live keys + operator.** Pre-existing rot (SEED-056 frontend / 075.4 backend) excluded — none reference the eval tables. Next: operator SC#10 UAT → flip VERIFICATION to passed; then `/gsd:secure-phase 133` / Phase 134.
+Last activity: 2026-06-30 -- Phase 133 EXECUTED (5/5 plans) + VERIFIED 4/4 automatable (8/8 tests green); SC#10 live UAT pending. Commits 13256ffa/4b33e3ae (02), 1a7eedee/594ed328 (01+migration), e228afb7/ff8ba4c6 (03), 0dabb3eb/7be9b066 (04), 12bdd6ee (05).
 
 ### Quick Tasks Completed
 
