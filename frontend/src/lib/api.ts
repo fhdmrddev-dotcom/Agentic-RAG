@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -410,6 +410,16 @@ export interface StreamCallbacks {
    *  payload {phase, phase_index, status?, failure?}. Panel-only (writes
    *  phasesByThread); the branch carries NO return (cursor still advances). */
   onPhaseSubstep?: (p: { phase: string; phaseIndex: number; status?: EmitSubStep; failure?: EmitFailure }) => void
+  /** Phase 133 Plan 05 (EVAL-02) — eval-runner progress events on the reused
+   *  run-stream client (Pattern 3 — the eval run wrote a companion public.runs
+   *  row, so the existing chat-run reattach machinery carries these). NON-terminal
+   *  progress (no `return`); the run still closes with a single chat terminal
+   *  AFTER eval_complete. Payloads are FLAT (eval_runner_service.py:
+   *  {test_case_id, variant} / {test_case_id, variant, status} / {status}).
+   *  Panel-only, provider-agnostic — the Deep dispatch above is byte-identical. */
+  onEvalCaseStarted?: (p: { testCaseId: string; variant: string }) => void
+  onEvalCaseDone?: (p: { testCaseId: string; variant: string; status: string }) => void
+  onEvalComplete?: (p: { status: string }) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -803,6 +813,24 @@ export async function subscribeToRun(
             status: parsed.status as EmitSubStep | undefined,
             failure: parsed.failure as EmitFailure | undefined,
           })
+        // Phase 133 Plan 05 (EVAL-02) — eval-runner progress branches. They sit
+        // with the other additive panel-event branches (NO return → cursor still
+        // advances) and read the FLAT eval_runner_service payloads verbatim. The
+        // Deep/harness dispatch above is untouched (Pattern 3 — these ride the
+        // reused run-stream client for free via the companion runs row).
+        else if (t === "eval_case_started" && callbacks.onEvalCaseStarted)
+          callbacks.onEvalCaseStarted({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+          })
+        else if (t === "eval_case_done" && callbacks.onEvalCaseDone)
+          callbacks.onEvalCaseDone({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+            status: parsed.status as string,
+          })
+        else if (t === "eval_complete" && callbacks.onEvalComplete)
+          callbacks.onEvalComplete({ status: parsed.status as string })
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
         // type-specific callback so the consumer's lastSeenOffsetRef only
@@ -1579,6 +1607,62 @@ export async function listSkillVersions(skillId: string): Promise<SkillVersion[]
   const res = await fetch(`${API_BASE}/skills/${skillId}/versions`, { headers })
   if (!res.ok) throw new Error("Failed to load version history.")
   return res.json() as Promise<SkillVersion[]>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 133 Plan 05 (EVAL-02) — eval-runner client. These mirror the existing
+// fetch + getAuthHeaders() shape; the eval run writes a companion public.runs row
+// (Plan 04, Pattern 3) so the chat-run stream client (subscribeToRun) reattaches
+// with ZERO new stream code. The DURABLE readout always comes from getEvalRun
+// (the DB) so it renders after the Redis buffer TTL expires (D-06 / SC#3).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/runs — kick off a bounded with/without eval run.
+ *  Returns the run_id immediately (202, non-blocking — D-06); the run_id doubles
+ *  as the stream run_id you pass to subscribeToRun. Model validation is the
+ *  backend's job (registry check — Plan 04). */
+export async function startEvalRun(
+  skillId: string,
+  body: { provider: string; model: string },
+): Promise<EvalRunKickoff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let detail = `Failed to start eval run (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<EvalRunKickoff>
+}
+
+/** GET /skills/{id}/evals/runs/{runId} — the DURABLE owner-scoped readout
+ *  (eval_run row + the per-(case × variant) eval_results rows). */
+export async function getEvalRun(skillId: string, runId: string): Promise<EvalRunReadout> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs/${runId}`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval run.")
+  return res.json() as Promise<EvalRunReadout>
+}
+
+/** GET /skills/{id}/evals/runs — owner-scoped eval runs, newest-first. The
+ *  skill-scoped analog of getActiveRuns for reattach discovery: a row whose
+ *  status is still 'running' is a live run to reattach to via subscribeToRun
+ *  (the thin client has no ephemeral eval thread_id to feed getActiveRuns —
+ *  see SUMMARY deviation). */
+export async function listEvalRuns(skillId: string): Promise<EvalRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval runs.")
+  return res.json() as Promise<EvalRun[]>
 }
 
 export interface ProviderInfo {

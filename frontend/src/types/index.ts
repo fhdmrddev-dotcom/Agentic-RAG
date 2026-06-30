@@ -565,6 +565,59 @@ export interface SkillVersion {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Phase 133 Plan 05 (EVAL-02) — eval-runner wire mirrors (snake_case, no reshape).
+// Mirror migration 080 (eval_runs / eval_results) + the Plan 04 route payloads.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/runs response (202 kickoff — D-06). */
+export interface EvalRunKickoff {
+  run_id: string
+  skill_id: string
+  skill_version_id: string
+  provider: string
+  model: string
+  case_count: number
+}
+
+/** A durable eval_runs row (migration 080). status mirrors the run-audit enum. */
+export interface EvalRun {
+  id: string
+  skill_id: string
+  skill_version_id: string
+  user_id: string
+  provider: string
+  model: string
+  status: "running" | "completed" | "failed" | "cancelled" | "interrupted"
+  case_count: number
+  error: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+/** A durable eval_results row — one per (test_case × variant) (migration 080). */
+export interface EvalResult {
+  id: string
+  eval_run_id: string
+  test_case_id: string
+  user_id: string
+  variant: "with_skill" | "without_skill"
+  provider: string
+  model: string
+  output: string
+  status: "completed" | "failed" | "timed_out" | "cancelled"
+  error: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  created_at: string
+}
+
+/** GET /skills/{id}/evals/runs/{runId} response — the durable readout. */
+export interface EvalRunReadout {
+  eval_run: EvalRun
+  eval_results: EvalResult[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Phase 086 Plan 01 — agent-panel wire-mirror interfaces.
 //
 // These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there

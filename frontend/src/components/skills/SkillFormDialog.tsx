@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { listSkillFiles, uploadSkillFile, deleteSkillFile } from "@/lib/api"
 import { SkillTestCasesSection } from "./SkillTestCasesSection"
+import { SkillEvalSection } from "./SkillEvalSection"
 import type { Skill, SkillCreate, SkillUpdate, SkillFile, SkillLintWarning } from "@/types"
 
 // ---------------------------------------------------------------------------
@@ -534,6 +535,17 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
         {savedSkillId && (
           <div className="mt-6 pt-6 border-t border-border/10">
             <SkillTestCasesSection skillId={savedSkillId} />
+          </div>
+        )}
+
+        {/* Phase 133 Plan 05 (EVAL-02) — THIN with/without eval runner, mounted as
+            a sibling of the test-case editor for an existing/saved skill. Reuses
+            the chat-run stream client (Pattern 3); deliberately non-designed
+            (operator scope fence) — the designed Evals panel is Phase 137
+            (PANEL-01, G-2). */}
+        {savedSkillId && (
+          <div className="mt-6 pt-6 border-t border-border/10">
+            <SkillEvalSection skillId={savedSkillId} />
           </div>
         )}
       </div>
