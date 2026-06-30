@@ -601,6 +601,63 @@ CREATE TABLE public.documents (
 
 
 --
+-- Name: eval_results; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_results (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    eval_run_id uuid NOT NULL,
+    test_case_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    variant text NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    output text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'completed'::text NOT NULL,
+    error text,
+    input_tokens integer,
+    output_tokens integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
+    CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text])))
+);
+
+
+--
+-- Name: TABLE eval_results; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_results IS 'One row per (test_case × variant) for an eval run (EVAL-02, D-08). variant is a CHECK-constrained with_skill/without_skill discriminator (D-04). Carries provider+model (D-02 — provider-keyed even though the run is single-provider, so multi-provider fan-out is additive). output holds the full final content; survives Redis TTL + a backend restart (D-06 / SC#3). test_case_id FKs skill_test_cases.id for exact case traceability (Phase-132 D-10); Phase 134 ratings FK eval_results.id (keep PK stable). Owner-only RLS SELECT defense-in-depth; service-role writes (bypasses RLS), app-code .eq("user_id") is the real gate (T-133-01). NO write policies (T-133-EoP).';
+
+
+--
+-- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    skill_version_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    status text DEFAULT 'running'::text NOT NULL,
+    case_count integer DEFAULT 0 NOT NULL,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
+);
+
+
+--
+-- Name: TABLE eval_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_runs IS 'One durable row per eval run (EVAL-02, D-08). Single provider/model per run (D-01) — provider/model live here. status is a durable run-audit enum (035 precedent): a backend that dies mid-run leaves a recoverable running/interrupted row (D-06 / SC#3). id doubles as the stream run_id (companion public.runs row uses the same UUID). skill_version_id FKs skill_versions.id for exact instruction-snapshot traceability (Phase-132 D-10). Owner-only RLS SELECT is defense-in-depth; the service-role eval task writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-133-01). NO write policies — only the service-role task writes (T-133-EoP).';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1248,6 +1305,22 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: eval_results eval_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_runs eval_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: folders folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1676,6 +1749,48 @@ CREATE INDEX idx_documents_date_typed ON public.documents USING btree (date_type
 --
 
 CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (document_type_norm);
+
+
+--
+-- Name: idx_eval_results_case_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_case_id ON public.eval_results USING btree (test_case_id);
+
+
+--
+-- Name: idx_eval_results_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_run_id ON public.eval_results USING btree (eval_run_id);
+
+
+--
+-- Name: idx_eval_results_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_user_id ON public.eval_results USING btree (user_id);
+
+
+--
+-- Name: idx_eval_runs_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_skill_id ON public.eval_runs USING btree (skill_id);
+
+
+--
+-- Name: idx_eval_runs_skill_version_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_skill_version_id ON public.eval_runs USING btree (skill_version_id);
+
+
+--
+-- Name: idx_eval_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_user_id ON public.eval_runs USING btree (user_id);
 
 
 --
@@ -2128,6 +2243,54 @@ ALTER TABLE ONLY public.documents
 
 ALTER TABLE ONLY public.documents
     ADD CONSTRAINT documents_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_eval_run_id_fkey FOREIGN KEY (eval_run_id) REFERENCES public.eval_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_test_case_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_test_case_id_fkey FOREIGN KEY (test_case_id) REFERENCES public.skill_test_cases(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.skill_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2857,6 +3020,34 @@ CREATE POLICY "Users can view own document_relationships" ON public.document_rel
 
 
 --
+-- Name: eval_results Users can view own eval results; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval results" ON eval_results; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval results" ON public.eval_results IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+
+
+--
+-- Name: eval_runs Users can view own eval runs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval runs" ON eval_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval runs" ON public.eval_runs IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+
+
+--
 -- Name: code_executions Users can view own executions; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2995,6 +3186,18 @@ ALTER TABLE public.document_views ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_results; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_results ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_runs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
