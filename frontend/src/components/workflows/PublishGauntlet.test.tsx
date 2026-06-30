@@ -275,16 +275,17 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     const spine = screen.getByTestId("gauntlet-spine")
-    // Match the exact server-fixed stage LABELS (8 ordered stages, sketch 020-B D2).
+    // Match the short human-readable stage labels (sketch 051-A UX labels — full
+    // technical descriptions live in the node title= tooltip, not the visible text).
     for (const label of [
-      "Owner check",
-      "Definition valid",
-      "business_requirement",
-      "Structural lint",
-      "Interactive-phase check",
-      "Golden run on your KB",
-      "Structural gate",
-      "Independent judge",
+      "Owner",
+      "Valid",
+      "Goal",
+      "Structure",
+      "Pause",
+      "Golden run",
+      "Citations",
+      "Judge",
     ]) {
       expect(within(spine).getByText(label)).toBeInTheDocument()
     }

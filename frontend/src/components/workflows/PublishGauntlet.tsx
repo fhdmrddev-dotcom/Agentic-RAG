@@ -88,14 +88,14 @@ export interface PublishGauntletProps {
  * truth comes from the server verdict, never re-computed here.
  */
 const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[] = [
-  { label: "Owner check", what: "RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
-  { label: "Definition valid", what: "re-validates as a WorkflowDefinition", codes: ["definition_invalid"], Icon: CheckMarkButton },
-  { label: "business_requirement", what: "exactly one declared", codes: ["business_requirement"], Icon: Bullseye },
-  { label: "Structural lint", what: "reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
-  { label: "Interactive-phase check", what: "human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
-  { label: "Golden run on your KB", what: "a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
-  { label: "Structural gate", what: "citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
-  { label: "Independent judge", what: "an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
+  { label: "Owner", what: "Owner check — RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
+  { label: "Valid", what: "Definition valid — re-validates as a WorkflowDefinition", codes: ["definition_invalid"], Icon: CheckMarkButton },
+  { label: "Goal", what: "business_requirement — exactly one must be declared", codes: ["business_requirement"], Icon: Bullseye },
+  { label: "Structure", what: "Structural lint — reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
+  { label: "Pause", what: "Interactive-phase check — human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
+  { label: "Golden run", what: "Golden run — a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
+  { label: "Citations", what: "Structural gate — citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
+  { label: "Judge", what: "Independent judge — an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
 ]
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
@@ -335,21 +335,21 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
         return (
           <div key={stage.label} className="flex items-start" title={stage.what}>
             {i > 0 && (
-              <div className={`relative mt-[18px] h-0.5 w-4 shrink-0 sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
+              <div className={`relative mt-[20px] h-[3px] w-4 shrink-0 rounded-full sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
                 {/* The energy comet flows along the connector INTO the running golden-run node. */}
                 {running && i === 5 && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
-            <div className="flex w-[60px] shrink-0 flex-col items-center gap-1">
+            <div className="flex w-[64px] shrink-0 flex-col items-center gap-1">
               <div
-                className={`relative grid h-9 w-9 place-items-center rounded-full border ${nodeTone} ${
+                className={`relative grid h-10 w-10 place-items-center rounded-xl border-2 ${nodeTone} ${
                   isRunning ? "gauntlet-node-run" : ""
                 }`}
               >
                 <Icon className="h-5 w-5" aria-hidden />
                 {isPassed && (
                   <span
-                    className="absolute -right-1 -top-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
+                    className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
                     aria-hidden
                   >
                     ✓
@@ -389,18 +389,18 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
   // pattern as RunCard.tsx:256/311, which the rule does not flag in its larger body).
   const EngineMark = providerLogo(provider)
   return (
-    <div className="gauntlet-hero-glow relative overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 font-semibold">
+    <div className="gauntlet-hero-glow relative mt-2 overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-[12px] text-amber-600 dark:text-amber-400">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 font-semibold">
           <span
-            className="gauntlet-node-run relative grid h-7 w-7 shrink-0 place-items-center rounded-full border border-amber-500 bg-amber-500/10"
+            className="gauntlet-node-run relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border-2 border-amber-500 bg-amber-500/20"
             aria-hidden
           >
-            <Rocket className="h-4 w-4" />
+            <Rocket className="h-5 w-5" />
           </span>
-          Publishing… running the golden run on your KB
+          Running the golden run on your KB…
         </div>
-        <span data-testid="publish-elapsed" className="font-mono text-[12px] tabular-nums text-amber-600 dark:text-amber-400">
+        <span data-testid="publish-elapsed" className="flex-none font-mono text-[13px] font-bold tabular-nums text-amber-600 dark:text-amber-400">
           {clock} elapsed
         </span>
       </div>
@@ -418,7 +418,7 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
       <p className="mt-2 leading-relaxed text-muted-foreground">
         Publish runs your <b>whole workflow for real</b> against your knowledge base, then an independent judge grades the
         result — so a multi-step workflow can take a <b>few minutes</b>. Same harness, same tools, same model, so the judge
-        grades a <b>real</b> deliverable, not a dry-run. It blocks until the verdict is ready — please <b>don’t close the
+        grades a <b>real</b> deliverable, not a dry-run. It blocks until the verdict is ready — please <b>don't close the
         tab</b>; the verdict comes back inline when the run + judge finish.
       </p>
     </div>
@@ -497,58 +497,63 @@ function GauntletContent({
   // below (one click away, never removed).
   const wordedHeadline = verdict
     ? isSuccess
-      ? `🎉 Published — v${verdict.version ?? "—"} is live`
+      ? `Published — v${verdict.version ?? "—"} is live`
       : verdict.blocked_stage === "judge"
-        ? "⚖️ Blocked by the grader — the run finished, but the independent grader would not pass the result"
-        : `⛔ Blocked early — ${verdict.blocked_stage ?? "unknown"}`
+        ? "Blocked by the grader — the run finished, but the independent grader would not pass the result"
+        : `Blocked early — ${verdict.blocked_stage ?? "unknown"}`
     : ""
 
   return (
     <div className="w-full">
       {/* Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③): the PREPENDED pub-scale
           soul block — purpose · needs · glyph-dot spine · tier chip · output — ABOVE
-          the resting publish form. The 8-stage ladder + verdict below stay UNCHANGED
-          (the ladder re-skin is WUX-03 / Phase 127). When `definition` is absent the
-          soul renders its honest draft empty-states. */}
-      <div data-testid="publish-soul" className="mb-4 rounded-lg border border-border bg-card p-4">
+          the resting publish form. When `definition` is absent the soul renders its
+          honest draft empty-states. */}
+      <div data-testid="publish-soul" className="mb-3 rounded-lg border border-border bg-card p-4">
         <WorkflowSoul def={definition} scale="pub" />
       </div>
 
-      {/* D1 — the resting publish form: ONE golden_input textarea + Publish. */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
-        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-          Publishing runs the full <b>8-stage gauntlet</b> — including a <b>real golden run</b> of this workflow against
-          your project KB and an <b>independent judge</b> of the result. It can honestly block.
-        </p>
-        <label
-          htmlFor="golden_input"
-          className="mt-4 mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-        >
-          golden_input
-        </label>
-        <textarea
-          id="golden_input"
-          ref={goldenInputRef}
-          value={goldenInput}
-          onChange={(e) => setGoldenInput(e.target.value)}
-          placeholder="A representative kickoff prompt — choose something typical, not a corner case."
-          className="min-h-[88px] w-full resize-y rounded border border-border bg-background px-3 py-2 text-[13px] leading-relaxed text-foreground focus:border-primary focus:outline-none"
-        />
-        <div className="mt-3 flex items-center justify-end">
-          <button
-            type="button"
-            disabled={!canPublish}
-            onClick={runGauntlet}
-            className="rounded bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {loading ? "Publishing…" : "Publish ▸ run the gauntlet"}
-          </button>
-        </div>
-      </div>
-
-      {/* The 8-stage spine + the golden-run hero while the gauntlet blocks the request. */}
+      {/* D0 — 8-stage energy-spine: ABOVE the form (sketch 051-A). The spine is the
+          centrepiece of the gauntlet — always visible once the modal opens so the user
+          can see the 8 checks at a glance before and after clicking Publish. */}
       <GauntletSpine blockedStage={verdict?.blocked_stage ?? null} running={loading} />
+
+      {/* D1 — the resting publish form: hidden once a verdict arrives (the HardWall's
+          "Fix & re-publish" clears the verdict and re-shows the form). For 404/409
+          (no verdict body) the form stays visible so the user can still try again. */}
+      {!verdict && (
+        <div className="mt-2 rounded-lg border border-border bg-card p-4">
+          <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Publishing runs the full <b>8-stage gauntlet</b> — including a <b>real golden run</b> of this workflow against
+            your project KB and an <b>independent judge</b> of the result. It can honestly block.
+          </p>
+          <label
+            htmlFor="golden_input"
+            className="mt-4 mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+          >
+            golden_input — a representative kickoff prompt
+          </label>
+          <textarea
+            id="golden_input"
+            ref={goldenInputRef}
+            value={goldenInput}
+            onChange={(e) => setGoldenInput(e.target.value)}
+            placeholder="Choose something typical, not a corner case — this is the prompt the judge grades."
+            className="min-h-[88px] w-full resize-y rounded border border-border bg-background px-3 py-2 text-[13px] leading-relaxed text-foreground focus:border-primary focus:outline-none"
+          />
+          <div className="mt-3 flex items-center justify-end">
+            <button
+              type="button"
+              disabled={!canPublish}
+              onClick={runGauntlet}
+              className="rounded bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {loading ? "Publishing…" : "Publish ▸ run the gauntlet"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && <PublishingNotice elapsedSec={elapsedSec} />}
 
@@ -575,7 +580,7 @@ function GauntletContent({
             <div data-testid="publish-block" className="rounded border border-destructive/40 bg-destructive/10 p-4">
               <div className="font-semibold text-destructive">Workflow not found</div>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                You don’t own it, or it doesn’t exist (a cross-user attempt collapses to the same 404 — no existence
+                You don't own it, or it doesn't exist (a cross-user attempt collapses to the same 404 — no existence
                 leak).
               </p>
             </div>
@@ -594,25 +599,33 @@ function GauntletContent({
           {verdict && (
             <div
               data-testid={isSuccess ? "publish-success" : "publish-block"}
-              className={`rounded border p-4 ${
+              className={`rounded-lg border p-4 ${
                 isSuccess ? "border-success/40 bg-success/10" : "border-destructive/40 bg-destructive/10"
               }`}
             >
-              {/* Lead-with-words: the plain-worded verdict headline (server-truth-derived). */}
-              <div
-                data-testid="verdict-headline"
-                className={`flex items-center gap-2 text-[14px] font-semibold ${isSuccess ? "text-success" : "text-destructive"}`}
-              >
-                <span aria-hidden>{isSuccess ? "✓" : "✕"}</span>
-                <span>{wordedHeadline}</span>
+              {/* Lead-with-words: big emoji icon + enlarged worded headline (sketch 051-A).
+                  The icon is aria-hidden; the headline text carries the meaning (server-truth
+                  derived, T-127-03). The verbatim 5-field grid stays demoted behind <details>. */}
+              <div className="mb-3 flex items-start gap-3">
+                <span className="flex-none text-4xl leading-none" aria-hidden>
+                  {isSuccess ? "🎉" : verdict.blocked_stage === "judge" ? "⚖️" : "⛔"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div
+                    data-testid="verdict-headline"
+                    className={`text-[17px] font-bold leading-snug ${isSuccess ? "text-success" : "text-destructive"}`}
+                  >
+                    {wordedHeadline}
+                  </div>
+                  {isBlock && (
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                      {verdict.blocked_stage === "judge"
+                        ? 'The golden run succeeded — but the independent judge would not pass its result. This is a hard wall — there is no "publish anyway."'
+                        : "The gauntlet honestly blocked this publish. Fix the cause and re-publish."}
+                    </p>
+                  )}
+                </div>
               </div>
-              {isBlock && (
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  {verdict.blocked_stage === "judge"
-                    ? "The golden run succeeded — but the independent judge would not pass its result. This is a hard wall — there is no “publish anyway.”"
-                    : "The gauntlet honestly blocked this publish. Fix the cause and re-publish."}
-                </p>
-              )}
 
               {/* The verbatim 5-field verdict grid — DEMOTED behind a disclosure so the
                   resolved block LEADS with words. The verbatim render + the `▦ rendered
@@ -749,7 +762,7 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
                 onClick={requestClose}
                 disabled={loading}
                 aria-label="Close"
-                title={loading ? "Can’t close while the gauntlet is running" : "Close"}
+                title={loading ? "Can't close while the gauntlet is running" : "Close"}
                 className="rounded-md border border-border px-2 py-0.5 text-[15px] leading-none text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 ✕

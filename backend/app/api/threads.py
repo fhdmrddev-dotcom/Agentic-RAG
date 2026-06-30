@@ -1973,9 +1973,35 @@ async def get_thread_workflow(
             UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
         )
         if phase_rows:
+            # Derive slug → phase_type from the definition JSON so the frontend
+            # timeline can render the correct 3D icon for completed/historical runs
+            # (the workflow_phases table doesn't store phase_type).
+            slug_to_type: dict[str, str] = {}
+            def_row = await pool.fetchrow(
+                "SELECT wd.definition FROM workflow_runs wr "
+                "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
+                "WHERE wr.id = $1",
+                UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
+            )
+            if def_row is not None:
+                try:
+                    defn = def_row["definition"]
+                    if isinstance(defn, str):
+                        import json as _json
+                        defn = _json.loads(defn)
+                    for p in (defn or {}).get("phases", []):
+                        slug = p.get("slug", "")
+                        ptype = (p.get("config") or {}).get("phase_type", "")
+                        if slug and ptype:
+                            slug_to_type[slug] = ptype
+                except Exception:
+                    pass
             phases_list = [
                 WorkflowPhaseState(
-                    slug=r["slug"], phase_index=r["phase_index"], status=r["status"]
+                    slug=r["slug"],
+                    phase_index=r["phase_index"],
+                    status=r["status"],
+                    phase_type=slug_to_type.get(r["slug"]),
                 )
                 for r in phase_rows
             ]

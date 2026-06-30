@@ -2784,7 +2784,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
     .map((r): Phase => ({
       slug: r.slug,
       phaseIndex: r.phase_index,
-      phaseType: "unknown",
+      phaseType: r.phase_type ?? "unknown",
       status: DB_PHASE_STATUS[r.status] ?? "done",
       subAgents: [],
       pendingAsk: null,

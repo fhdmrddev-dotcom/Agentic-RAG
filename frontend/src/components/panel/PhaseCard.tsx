@@ -343,14 +343,17 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
             {Glyph ? <Glyph className="h-4 w-4" /> : <span className="text-[13px]">{meta.glyph}</span>}
           </span>
 
-          {/* Phase identity: the honest ordinal + the slug (plain text children). */}
+          {/* Phase identity: ordinal + type context for the ACTIVE step only; idle and
+              done fold to a single quiet slug line (SC#2 density-by-status). */}
           <span className="flex min-w-0 flex-col">
-            <span className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-panel-muted-foreground">
-                Phase {position + 1}
+            {isActive && (
+              <span className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-panel-muted-foreground">
+                  Phase {position + 1}
+                </span>
+                <span className="text-[11px] text-panel-muted-foreground">· {meta.label}</span>
               </span>
-              <span className="text-[11px] text-panel-muted-foreground">· {meta.label}</span>
-            </span>
+            )}
             <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{phase.slug}</span>
           </span>
 
@@ -367,6 +370,12 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
                 className="h-1 w-8 overflow-hidden rounded-full bg-[hsl(var(--panel-status-active)/0.25)]"
               >
                 <span className="block h-full w-1/3 animate-pulse rounded-full bg-[hsl(var(--panel-status-active))]" />
+              </span>
+            )}
+            {/* Expand / collapse hint for terminal phases — quiet, aria-hidden */}
+            {canToggle && (
+              <span className="ml-0.5 flex-none text-[10px] text-muted-foreground/50" aria-hidden="true">
+                {open ? "▾" : "▸"}
               </span>
             )}
           </span>
