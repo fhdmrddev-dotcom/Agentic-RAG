@@ -97,7 +97,7 @@
 - [x] 133-02-PLAN.md — RunContext.skill_catalog_override additive field + Deep-byte-identical guard [wave 1]
 - [x] 133-03-PLAN.md — eval_runner_service engine (drive run_agent_loop 2xN, no-op emit) + Wave 0 tests [wave 2]
 - [x] 133-04-PLAN.md — evals.py router + companion runs row + main.py mount + integration tests [wave 3]
-- [ ] 133-05-PLAN.md — thin --skip-ui eval surface (reused run-stream client) [wave 4]
+- [x] 133-05-PLAN.md — thin --skip-ui eval surface (reused run-stream client) [wave 4]
 
 #### Phase 134: Eval Results, Honest Verdict + Ratings
 **Goal**: After an eval run, the user can read an honest per-provider pass/fail verdict and a side-by-side with-skill vs without-skill comparison, and rate individual outputs to create a human preference signal.
