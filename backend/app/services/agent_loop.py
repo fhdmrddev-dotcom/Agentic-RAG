@@ -192,6 +192,14 @@ class RunContext:
     # hashable/immutable; the loop reads it as the first dispatch round.
     resume_dropped_tool_calls: bool = False
     dropped_tool_calls: tuple = ()
+    # Phase 133 (133-02 / EVAL-02) — ADDITIVE skill-catalog override for the
+    # honest eval A/B. OFF by default (None) at EVERY existing call site → Deep
+    # Mode byte-identical (the 092 default-off precedent above). None = query the
+    # DB (current behavior, D-14 red line); () = inject NOTHING (WITHOUT arm,
+    # D-04 — the `if enabled_skills:` guard short-circuits); (skill, ...) = inject
+    # EXACTLY these skills (WITH arm, D-03), no DB query. A frozen tuple keeps the
+    # dataclass hashable/immutable; each dict needs only `name` + `description`.
+    skill_catalog_override: tuple[dict, ...] | None = None
 
 
 @dataclass
@@ -1092,6 +1100,9 @@ async def run_agent_loop(
     supabase = ctx.supabase
     _resolved_model = ctx.resolved_model
     _resolved_provider = ctx.resolved_provider
+    # Phase 133 (EVAL-02) — additive default-off skill-catalog override (None =
+    # DB query / Deep byte-identical; () = inject nothing; (skill,) = inject only).
+    skill_catalog_override = ctx.skill_catalog_override
     # --- Category C callables (passed, not imported) ---
     # The moved body calls _emit / _spawn by those names; alias the params.
     _emit = emit
@@ -1173,14 +1184,21 @@ async def run_agent_loop(
 
     # Inject enabled skills catalog (General Mode only) — SKIL-09
     if body.agent_mode != "explorer":
-        _skills_resp = await aexec(
-            supabase.table("skills")
-            .select("name, description")
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-            .eq("is_enabled", True)
-            .order("name")
-        )
-        enabled_skills = _skills_resp.data or []
+        # Phase 133 (EVAL-02): change ONLY the data source. None = the existing
+        # DB query (Deep Mode byte-identical, SC#4 / D-14); a tuple = the eval
+        # arms drive exactly these skills (D-03 WITH = target-only; D-04 WITHOUT
+        # = empty → the `if enabled_skills:` guard below short-circuits).
+        if skill_catalog_override is None:
+            _skills_resp = await aexec(
+                supabase.table("skills")
+                .select("name, description")
+                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .eq("is_enabled", True)
+                .order("name")
+            )
+            enabled_skills = _skills_resp.data or []
+        else:
+            enabled_skills = list(skill_catalog_override)
 
         if enabled_skills:
             catalog_lines = "\n".join(
