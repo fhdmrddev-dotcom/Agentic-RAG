@@ -606,3 +606,72 @@ async def test_cross_user_404(redis, pool):
     assert post.status_code == 404, f"POST expected 404; got {post.status_code} body={post.text}"
     assert get_results.status_code == 404, f"GET results expected 404; got {get_results.status_code}"
     assert get_list.status_code == 404, f"GET list expected 404; got {get_list.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_post_applies_provider_override_to_user_settings(redis, pool):
+    """SC#4 cross-provider routing regression (found in live UAT 2026-06-30):
+
+    The gateway dispatch inside ``run_agent_loop`` routes on
+    ``user_settings.active_provider`` (+ its credentials), NOT ``ctx.resolved_provider``.
+    The POST MUST therefore apply the eval's chosen provider/model as a per-run
+    override onto the effective settings (mirrors threads.py:1059-1096 /
+    Phase 075.3 D-075.3-08). Before the fix, a non-default provider's model was sent
+    to the DEFAULT provider's SDK -> 404 ("model does not exist"). This asserts the
+    job receives user_settings whose active_provider / llm_model / credentials are the
+    eval's anthropic target, NOT the openai default. (The mock-provider service tests
+    never exercised real routing, so this gap was invisible to them.)
+    """
+    from app.main import app
+    from app.models.user_settings import LLMProvider, UserEffectiveSettings
+
+    store = {
+        "skills": [{"id": SKILL_ID, "name": "pdf-builder", "description": "d",
+                    "user_id": OWNER["id"]}],
+        "skill_versions": [SKILL_VERSION_ROW],
+        "skill_test_cases": [{"id": CASES[0]["id"], "skill_id": SKILL_ID,
+                              "user_id": OWNER["id"], "prompt": "p", "order_index": 0}],
+    }
+    sb = _FilterSupabase(store)
+
+    # Default effective settings: active_provider=openai, BUT an anthropic provider
+    # (with its own key/base_url) is available in the providers list — exactly the
+    # shape override_provider needs to switch credentials.
+    default_settings = UserEffectiveSettings.model_construct(
+        llm_api_key="sk-openai-default",
+        llm_base_url="https://api.openai.com/v1",
+        llm_model="gpt-5.4-mini",
+        available_models=["gpt-5.4-mini"],
+        active_provider="openai",
+        providers=[
+            LLMProvider(id="anthropic", name="Anthropic",
+                        base_url="https://api.anthropic.com/v1",
+                        api_key="sk-ant-test", models=["claude-haiku-4-5-20251001"]),
+        ],
+    )
+
+    # AsyncMock records call_args at CALL time (when create_task builds the coro),
+    # so the captured kwargs are available even before the spawned task runs its body.
+    job_mock = AsyncMock()
+
+    _override(app, user=OWNER, supabase=sb, redis_obj=redis, pool=pool)
+    with patch("app.models.user_settings.load_user_settings", return_value=default_settings), \
+         patch("app.api.evals.eval_runner_service.run_eval_job", new=job_mock):
+        try:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                resp = await c.post(
+                    f"/skills/{SKILL_ID}/evals/runs",
+                    json={"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
+                    headers={"Authorization": "Bearer test"},
+                )
+        finally:
+            _clear_overrides(app)
+
+    assert resp.status_code == 202, f"POST expected 202; got {resp.status_code} body={resp.text}"
+    assert job_mock.call_args is not None, "run_eval_job was not spawned"
+    us = job_mock.call_args.kwargs.get("user_settings")
+    assert us is not None, "run_eval_job was not spawned with user_settings"
+    # The override switched the ACTIVE provider + its credentials to anthropic (the bug fix).
+    assert us.active_provider == "anthropic", f"active_provider not overridden: {us.active_provider}"
+    assert us.llm_model == "claude-haiku-4-5-20251001", f"llm_model not pinned: {us.llm_model}"
+    assert us.llm_api_key == "sk-ant-test", "credentials not switched to the anthropic provider"

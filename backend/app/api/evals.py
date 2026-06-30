@@ -275,9 +275,19 @@ async def start_eval_run(
             logger.exception("eval ZADD failed for run %s; continuing", run_id)
 
         # 11. Load the caller's effective settings (the job needs them to route the provider).
-        from app.models.user_settings import load_user_settings  # function-local (avoid import cycle)
+        from app.models.user_settings import load_user_settings, override_provider  # function-local (avoid import cycle)
 
         user_settings = await run_in_threadpool(load_user_settings, user_id)
+        # Apply the eval's chosen provider/model as a per-run override onto the
+        # effective settings — the gateway dispatch inside run_agent_loop routes on
+        # user_settings.active_provider (+ its credentials), NOT ctx.resolved_provider.
+        # Without this, a non-default provider's model is sent to the default
+        # provider's SDK → 404 (the threads.py:1059-1096 / Phase 075.3 D-075.3-08
+        # trap; the chat path applies the same override_provider). body.provider was
+        # already validated to match the model's registry provider above (D-01 / V5).
+        if body.provider and body.provider != user_settings.active_provider:
+            user_settings = override_provider(user_settings, body.provider)
+        user_settings = user_settings.model_copy(update={"llm_model": body.model})
 
         # 12. Spawn the bounded background job (non-blocking — D-06) and register it in
         # threads.RUN_TASKS[run_id] so the reused DELETE /runs/{id} happy-path can task.cancel()
