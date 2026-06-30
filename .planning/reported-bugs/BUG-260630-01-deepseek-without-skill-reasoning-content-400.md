@@ -4,12 +4,12 @@ title: DeepSeek without-skill eval arm fails with reasoning_content 400
 reported: 2026-06-30
 surface: Agentic-RAG
 severity: minor
-status: open
+status: deferred
 affected_areas: [backend/provider-gateway, cross-provider/deepseek, skills/eval]
 folded_into: null
 verified_closed_by: null
-related_seeds: []
-re_open_trigger: null
+related_seeds: [SEED-100]
+re_open_trigger: "Routed at Phase 134 discuss (2026-07-01): 134 surfaces this HONESTLY as 'baseline errored — not measured' but does NOT fix it (the fix belongs at the DeepSeek adapter/sanitizer boundary = D-14 red line). Re-open when SEED-100 (cross-provider eval-hardening phase) enters planning — fix the DeepSeek reasoning_content message-shape on the empty-catalog baseline arm at the adapter boundary."
 reproduces_on:
   branch: develop
   commit: 306dd2d4
