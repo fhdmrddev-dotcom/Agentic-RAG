@@ -83,6 +83,7 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "claude-opus-4-8":                      200_000,  # actual 1M — 200K practical cap (mirrors opus-4-7; live /models 2026-06-07, 096 D-05 curation)
     "claude-opus-4-7":                      200_000,  # actual 1M — 200K practical cap
     "claude-opus-4-6":                      200_000,  # actual 1M — superseded by 4.7
+    "claude-sonnet-5":                      200_000,  # actual 1M — 200K practical cap (newest sonnet; live /models 2026-06-30)
     "claude-sonnet-4-6":                    200_000,  # actual 1M — 200K practical cap
     "claude-sonnet-4-5-20250929":           200_000,  # actual 1M — 200K practical cap (dated ID — undated alias not served live; 096 D-05 curation 2026-06-07)
     "claude-haiku-4-5-20251001":            200_000,  # actual 1M — 200K practical cap
@@ -257,6 +258,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # forcing ERRORS under extended thinking, so the emit call runs thinking OFF
     # (already the resting state — no thinking param in anthropic_service.py). NO
     # strict_json_schema (forcing is built on forced tool use, not a token-level schema).
+    "claude-sonnet-5":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # newest sonnet — live /models 2026-06-30 (1M ctx, 128K out, vision+adaptive+effort+structured)
     "claude-opus-4-8":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation)
     "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # extended thinking — Issue #51568
     "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
