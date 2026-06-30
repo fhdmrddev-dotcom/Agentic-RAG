@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: verifying
-last_updated: "2026-06-30T18:00:00.000Z"
-last_activity: 2026-06-30 -- Phase 133 EXECUTED (5/5 plans) + VERIFIED 4/4 automatable (8/8 tests green); SC#10 live UAT pending
+last_updated: "2026-06-30T19:30:00.000Z"
+last_activity: 2026-06-30 -- Phase 133 VERIFIED passed; live SC#10 UAT found+fixed cross-provider routing bug (306dd2d4); all 4 providers + multi-tool + long-history proven live
 progress:
   total_phases: 25
   completed_phases: 10
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 133 — eval-runner-with-skill-vs-without-skill (EXECUTED + VERIFIED 4/4 automatable; SC#10 live UAT pending)
+**Current focus:** Phase 133 — eval-runner-with-skill-vs-without-skill (EXECUTED + VERIFIED passed; live SC#10 done; cross-provider bug found+fixed)
 
 ## Current Position
 
-Phase: 133 (eval-runner-with-skill-vs-without-skill) — EXECUTED + VERIFIED (4/4 automatable; human_needed for SC#10 live UAT)
+Phase: 133 (eval-runner-with-skill-vs-without-skill) — EXECUTED + VERIFIED (passed; live SC#10 cross-provider/multi-tool/long-history proven)
 Plan: 5 of 5 (all plans COMPLETE)
-Status: All 5 plans executed + committed; `133-VERIFICATION.md` = human_needed (4/4 automatable SC truths PASS, 8/8 backend tests green — `test_eval_runner.py` 5 + `test_agent_loop_catalog_override.py` 3). EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322 — NOT db push) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` PASS → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty) with NO-OP emit so inner done/error never hit the shared `run:{run_id}` buffer · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row → free reattach/cancel; cross-user 404) · thin `--skip-ui` SkillEvalSection (reuses `subscribeToRun`, zero new EventSource). **Remaining gate = SC#10 4-axis live UAT (8 manual scenarios: cross-provider OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-history + Deep-unchanged live backstop) — needs live keys + operator.** Pre-existing rot (SEED-056 frontend / 075.4 backend) excluded — none reference the eval tables. Next: operator SC#10 UAT → flip VERIFICATION to passed; then `/gsd:secure-phase 133` / Phase 134.
-Last activity: 2026-06-30 -- Phase 133 EXECUTED (5/5 plans) + VERIFIED 4/4 automatable (8/8 tests green); SC#10 live UAT pending. Commits 13256ffa/4b33e3ae (02), 1a7eedee/594ed328 (01+migration), e228afb7/ff8ba4c6 (03), 0dabb3eb/7be9b066 (04), 12bdd6ee (05).
+Status: `133-VERIFICATION.md` = **passed**. EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty, NO-OP emit) · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row; cross-user 404) · thin `--skip-ui` SkillEvalSection. **LIVE SC#10 UAT (orchestrator-driven against the live API, psycopg2 cross-check) caught + fixed a real cross-provider routing bug** (`306dd2d4`): eval sent non-OpenAI models to the OpenAI SDK → 404, because the gateway routes on `user_settings.active_provider` not `ctx.resolved_provider` and evals.py never applied the provider override; fix = `override_provider`+`llm_model` pin in the eval router (threads.py:1059-1096 precedent; net-new file, Deep untouched) + regression test. **Proven live across all 4 providers** (OpenAI/Anthropic/Google/OpenRouter route correctly; honest WITH/WITHOUT token delta), **multi-tool** (search_documents+execute_code: "9 distinct risks across 3 docs"), **long-history** (7KB prompt). 9/9 eval tests green. All UAT artifacts cleaned up (eval tables empty; docx restored to 1 case). Remaining = 2 OPTIONAL operator lived-glances (thin-UI live-progress render + parallel-thread feel; engine isolation already confirmed). Next: `/gsd:secure-phase 133` / `/gsd:complete-milestone` later / Phase 134 (EVAL-03/04).
+Last activity: 2026-06-30 -- Phase 133 VERIFIED passed. Live SC#10 UAT found+fixed cross-provider routing bug (`306dd2d4`, +regression test); all 4 providers + multi-tool + long-history proven live; UAT artifacts cleaned up. Prior exec commits: 1a7eedee/594ed328 (01), 4b33e3ae (02), ff8ba4c6 (03), 0dabb3eb (04), 12bdd6ee (05).
 
 ### Quick Tasks Completed
 

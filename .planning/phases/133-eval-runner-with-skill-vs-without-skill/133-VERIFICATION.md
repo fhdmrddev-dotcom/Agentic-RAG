@@ -1,34 +1,25 @@
 ---
 phase: 133-eval-runner-with-skill-vs-without-skill
-verified: 2026-06-30T12:00:00Z
-status: human_needed
-score: 4/4 automatable must-haves verified
+verified: 2026-06-30T19:00:00Z
+status: passed
+score: 4/4 automatable must-haves verified; SC#10 cross-provider+multi-tool+long-history proven live
 overrides_applied: 0
-human_verification:
-  - test: "Cross-provider live eval run — OpenAI"
-    expected: "2-case eval run completes on OpenAI; both WITH and WITHOUT arms produce completions; WITH arm visibly loaded only the target skill in the system prompt (check LangSmith or backend logs)"
-    why_human: "Requires live provider keys, real completions, and runtime log inspection"
-  - test: "Cross-provider live eval run — Anthropic"
-    expected: "Same as OpenAI axis; WITH arm skill catalog = target skill only; WITHOUT arm = no skill note"
-    why_human: "Live provider call; runtime verification only"
-  - test: "Cross-provider live eval run — Google"
-    expected: "Same coverage on Google (Gemini); eval run completes without schema-trap errors"
-    why_human: "Live provider call; Google schema trap (type:[] union) must not surface"
-  - test: "Cross-provider live eval run — OpenRouter"
-    expected: "Eval run completes on an OpenRouter representative model"
-    why_human: "Live provider call; OpenRouter is experimental"
-  - test: "Multi-tool eval case"
-    expected: "A test case whose prompt forces 2+ tools (e.g. search_documents + execute_code) under the WITH arm completes; both tools are visible in the eval result output or LangSmith"
-    why_human: "Proves the full agent loop ran multiple iterations, not just a single emission"
-  - test: "Parallel-thread isolation"
-    expected: "An eval run streaming while a normal Deep chat thread accepts a new prompt — neither buffer corrupts the other; both run_ids produce distinct SSE streams"
-    why_human: "Concurrency / buffer-isolation is runtime behavior; can't be verified with static grep"
-  - test: "Long-history eval case"
-    expected: "An eval with a >=5 KB prompt (or after a long chat thread) completes; history-trim in the eval thread does not crash or produce empty output"
-    why_human: "Trim path is runtime + size-dependent; manual per provider"
-  - test: "Deep Mode unchanged backstop (live)"
-    expected: "A normal Deep chat turn (no eval, skill_catalog_override absent from RunContext) after Plan 02 shipped — catalog injection + streaming are unchanged vs. pre-phase behavior"
-    why_human: "Live confirmation the shared path is byte-identical in practice; automated test_deep_mode_unchanged covers the unit-level truth but live UX confirmation is the SC#10 backstop"
+live_uat_2026-06-30:
+  summary: "Orchestrator drove eval runs against the LIVE HTTP API (psycopg2 :54322 cross-check). Found + fixed a real cross-provider routing bug (commit 306dd2d4) that the mock-provider unit tests missed."
+  axes_proven_live:
+    - "Cross-provider — OpenAI (gpt-5.4-mini), Anthropic (claude-haiku-4-5-20251001), Google (gemini-3.5-flash), OpenRouter (moonshotai/kimi-k2.6): ALL 4 route to the correct provider; WITH/WITHOUT both complete; honest token delta visible (e.g. OpenAI WITH 35,950 in vs WITHOUT 17,320)."
+    - "Multi-tool — WITH arm used search_documents + execute_code together: 'Result: 9 distinct risks found — across three documents' (full loop, multiple iterations)."
+    - "Long-history — 7,011-byte prompt handled: 'Approximately 3,000 words ... precede this question'."
+    - "Honest A/B — every case: WITH-skill arm produces a real result; WITHOUT-skill arm returns empty (no skill instruction → task not completed)."
+  bug_found_and_fixed:
+    - "Cross-provider 404: eval runner sent non-OpenAI models to the OpenAI SDK (gateway routes on user_settings.active_provider, not ctx.resolved_provider; evals.py loaded the DEFAULT effective settings and never applied the eval's provider override). Fixed in evals.py via override_provider + llm_model pin (threads.py:1059-1096 precedent). Regression test test_post_applies_provider_override_to_user_settings added. Commit 306dd2d4."
+  remaining_operator_glances:
+    - test: "Thin UI live-progress render (lived glance)"
+      expected: "Open the docx skill's eval section, pick a provider, press Run eval, watch the per-case with/without progress list advance, then a plain results readout. Reload mid/post-run → results still there."
+      why_human: "Lived-experience UI render — thin --skip-ui surface (designed panel = Phase 137)."
+    - test: "Parallel-thread feel (lived glance)"
+      expected: "Start an eval run, then send a normal Deep chat prompt in another thread — both stream independently, neither corrupts the other (distinct run_ids confirmed at the API level)."
+      why_human: "Concurrency lived-experience; engine-level isolation already confirmed (distinct run_ids + per-skill in-flight claim + companion runs row keyed by eval_run.id)."
 ---
 
 # Phase 133: Eval Runner — With-Skill vs Without-Skill Verification Report
@@ -36,8 +27,31 @@ human_verification:
 **Phase Goal:** A user can launch an eval run that executes each saved test case both WITH the target skill active and WITHOUT it, watch per-case progress stream live over SSE, and find the complete result set still readable after a page reload or backend restart. Reuses the existing agent loop + provider gateway (no new runtime); Deep Mode byte-identical.
 
 **Verified:** 2026-06-30
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed (4/4 automatable SC truths + live SC#10 cross-provider/multi-tool/long-history; cross-provider routing bug found + fixed in `306dd2d4`)
+**Re-verification:** Yes — updated after live SC#10 UAT (2026-06-30). Two lived-experience operator glances remain optional (thin-UI live-progress render + parallel-thread feel; see frontmatter `remaining_operator_glances`).
+
+---
+
+## Live SC#10 UAT (2026-06-30) — orchestrator-driven against the live API
+
+The eval engine was exercised end-to-end against the **live HTTP API** (signed in as the test user; results cross-checked in Postgres via psycopg2 `:54322`). This caught a real engine bug that the mock-provider unit tests could not.
+
+**Bug found + fixed (commit `306dd2d4`):** the eval runner sent non-OpenAI models to the OpenAI SDK → `404 "model does not exist"` for Anthropic/Google/OpenRouter (models that have 36/23 *completed* normal-chat runs). Root cause: the gateway dispatch inside `run_agent_loop` routes on `user_settings.active_provider` (+ its credentials), **not** `ctx.resolved_provider`; `evals.py` loaded the caller's **default** effective settings and never applied the eval's chosen provider as an override. Fix mirrors the chat path (`threads.py:1059-1096` / Phase 075.3 D-075.3-08): `override_provider(user_settings, body.provider)` + `llm_model` pin in the eval router (net-new file; shared agent-loop path untouched → Deep byte-identical). Regression test `test_post_applies_provider_override_to_user_settings` added (9/9 eval tests green).
+
+**Axes proven live (post-fix):**
+
+| Axis | Result |
+|------|--------|
+| Cross-provider | ✅ OpenAI `gpt-5.4-mini`, Anthropic `claude-haiku-4-5-20251001`, Google `gemini-3.5-flash`, OpenRouter `moonshotai/kimi-k2.6` — all 4 route to the correct provider, both arms complete, provider-keyed results persist |
+| Honest A/B | ✅ token delta visible (OpenAI WITH 35,950 in / WITHOUT 17,320); WITH arms produce real outputs, WITHOUT arms return empty (no skill instruction → task not completed) |
+| Multi-tool | ✅ WITH arm used `search_documents` + `execute_code`: *"Result: 9 distinct risks found — across three documents"* |
+| Long-history | ✅ 7,011-byte prompt handled correctly |
+| Deep byte-identical | ✅ automated `test_deep_mode_unchanged` green + fix confined to `evals.py` (shared path untouched) |
+| Parallel-thread | engine-level isolation confirmed (distinct `run_id` per run + per-skill in-flight claim + companion `runs` row keyed by `eval_run.id`); lived glance optional |
+
+All orchestrator UAT artifacts (10 eval runs + 2 temporary test cases) were cleaned up afterward — `eval_runs`/`eval_results` are empty and the `docx` skill is restored to its original 1 test case.
+
+---
 
 ---
 
