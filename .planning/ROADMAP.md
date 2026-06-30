@@ -95,7 +95,7 @@
 **Plans**: 5 plans (waves 1-4)
 - [x] 133-01-PLAN.md — Migration 080 (eval_runs + eval_results) + Pydantic models [wave 1]
 - [x] 133-02-PLAN.md — RunContext.skill_catalog_override additive field + Deep-byte-identical guard [wave 1]
-- [ ] 133-03-PLAN.md — eval_runner_service engine (drive run_agent_loop 2xN, no-op emit) + Wave 0 tests [wave 2]
+- [x] 133-03-PLAN.md — eval_runner_service engine (drive run_agent_loop 2xN, no-op emit) + Wave 0 tests [wave 2]
 - [ ] 133-04-PLAN.md — evals.py router + companion runs row + main.py mount + integration tests [wave 3]
 - [ ] 133-05-PLAN.md — thin --skip-ui eval surface (reused run-stream client) [wave 4]
 
