@@ -72,3 +72,28 @@ This is operator/admin-facing scope that maps to the **v3.2 Operator UX** slot
 (admin shell, operator role tier) per the PRD sequence — explicitly NOT the v3.1
 Workflow & Skill Studio milestone (which 127 closes). Planted so it surfaces at
 `/gsd:new-milestone` with its bundled seeds and a concrete re-open trigger.
+
+## Evidence + sharpened trigger (2026-06-30, Phase 133 eval UAT)
+
+Phase 133 live cross-provider eval UAT produced concrete proof the curation pass
+is needed — and that it is now **load-bearing for the eval feature**, not just chat:
+
+- The provider model lists contain **aspirational / unserved ids** that 404 on the
+  live account (e.g. `claude-sonnet-4-6`, `claude-haiku-4-5` without the dated
+  suffix). Working ids were identified only by cross-referencing the `runs` table
+  for models with real `status='completed'` history.
+- The **eval router requires the model to be in `MODEL_CAPABILITIES`** (stricter
+  than chat, which is more permissive for OpenRouter). So a curated registry that
+  stays in sync with the picker lists is required for the eval picker to never
+  offer a model that 404s. `meta-llama/llama-3.3-70b-instruct` works in chat but
+  is absent from the registry → an eval can't use it today.
+
+**Concrete curation-pass shape** (when this seed is promoted): per provider,
+validate served models (live `/models` endpoint where available, else a cheap
+1-token ping), trim `app_settings.provider_model_lists` to the proven set, pick a
+single **default model per provider** (newest-first = default), and keep
+`MODEL_CAPABILITIES` aligned with the picker. Keep ALL providers — curate the
+*model lists*, not the roster.
+
+**Sharper re-open trigger:** any time a configured model 404s in chat OR in an eval
+run (the eval picker offering a dead model is the most visible failure).
