@@ -109,6 +109,27 @@ class _FakeRedis:
     async def expire(self, key, ttl):
         return True
 
+    async def exists(self, key):
+        """1 if a stream/kv key is present (the stream route's buffer-present probe)."""
+        return 1 if (key in self.streams or key in self.kv) else 0
+
+    async def xread(self, streams, count=None, block=None):
+        """Non-destructive XREAD over the in-memory streams. Entry ids are positional
+        ('1-0','2-0',...); ``last_id`` '0' returns the whole backlog, an advanced id returns
+        only newer entries. The replay_tail_consumer returns at the first terminal in the
+        backlog (so the live-tail BLOCK path is never reached in these tests)."""
+        out = []
+        for key, last in (streams or {}).items():
+            entries = self.streams.get(key, [])
+            try:
+                last_idx = int(str(last).split("-")[0])
+            except (ValueError, IndexError):
+                last_idx = 0
+            new = [(f"{i + 1}-0", fields) for i, fields in enumerate(entries) if (i + 1) > last_idx]
+            if new:
+                out.append((key, new))
+        return out
+
     def events_on(self, stream_key):
         """Return the parsed payloads (dicts) XADD'd to a stream, in order."""
         return [json.loads(f["data"]) for f in self.streams.get(stream_key, [])]
@@ -318,3 +339,270 @@ async def test_sse_vocabulary(redis, supabase, pool, fake_loop_result):
     terminals = [t for t in types if t in ("done", "error")]
     assert terminals == ["done"]
     assert types[-1] == "done"
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Plan 04 — ROUTE / integration tests (evals.py): cross-user 404, durable readout
+# after the Redis buffer expires, and reattach via the companion public.runs row.
+# ════════════════════════════════════════════════════════════════════════════════
+import httpx  # noqa: E402
+import pytest  # noqa: E402,F811
+from httpx import ASGITransport  # noqa: E402
+
+from app.dependencies import (  # noqa: E402
+    get_current_user,
+    get_pg_pool,
+    get_redis,
+    get_supabase,
+)
+
+SKILL_VERSION_ROW = {
+    "id": SKILL_VERSION_ID,
+    "skill_id": SKILL_ID,
+    "user_id": OWNER["id"],
+    "name": SKILL_VERSION["name"],
+    "description": SKILL_VERSION["description"],
+    "version_number": 3,
+}
+
+
+# ── A filtering in-memory supabase that honors .eq() chains (route reads need real
+#    owner-scoping so the 404 / durable-readout assertions are meaningful) ─────────
+class _FilterTable:
+    def __init__(self, store, name):
+        self.store = store
+        self.name = name
+        self._op = "select"
+        self._payload = None
+        self._filters = []
+        self._order = None
+        self._desc = False
+        self._limit = None
+        self._single = False
+
+    def select(self, *a, **k):
+        self._op = "select"
+        return self
+
+    def insert(self, payload, *a, **k):
+        self._op = "insert"
+        self._payload = payload
+        return self
+
+    def update(self, payload, *a, **k):
+        self._op = "update"
+        self._payload = payload
+        return self
+
+    def delete(self, *a, **k):
+        self._op = "delete"
+        return self
+
+    def eq(self, col, val):
+        self._filters.append((col, str(val)))
+        return self
+
+    def order(self, col, desc=False, **k):
+        self._order = col
+        self._desc = desc
+        return self
+
+    def limit(self, n, *a, **k):
+        self._limit = n
+        return self
+
+    def maybe_single(self, *a, **k):
+        self._single = True
+        return self
+
+    def single(self, *a, **k):
+        self._single = True
+        return self
+
+    def _matched(self):
+        out = []
+        for r in self.store.get(self.name, []):
+            if all(str(r.get(c)) == v for c, v in self._filters):
+                out.append(r)
+        return out
+
+    def execute(self, *a, **k):
+        if self._op == "insert":
+            rows = self._payload if isinstance(self._payload, list) else [self._payload]
+            self.store.setdefault(self.name, []).extend(rows)
+            return _Result(rows)
+        if self._op == "update":
+            rows = self._matched()
+            for r in rows:
+                r.update(self._payload)
+            return _Result(rows)
+        if self._op == "delete":
+            rows = self._matched()
+            self.store[self.name] = [r for r in self.store.get(self.name, []) if r not in rows]
+            return _Result(rows)
+        # select
+        out = self._matched()
+        if self._order:
+            out = sorted(out, key=lambda r: r.get(self._order) or 0, reverse=self._desc)
+        if self._limit is not None:
+            out = out[: self._limit]
+        if self._single:
+            return _Result(out[0] if out else None)
+        return _Result(out)
+
+
+class _FilterSupabase:
+    def __init__(self, store=None):
+        self.store = store if store is not None else {}
+
+    def table(self, name):
+        return _FilterTable(self.store, name)
+
+
+def _override(app, *, user, supabase, redis_obj, pool=None):
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_supabase] = lambda: supabase
+    app.dependency_overrides[get_redis] = lambda: redis_obj
+    if pool is not None:
+        app.dependency_overrides[get_pg_pool] = lambda: pool
+
+
+def _clear_overrides(app):
+    for dep in (get_current_user, get_supabase, get_redis, get_pg_pool):
+        app.dependency_overrides.pop(dep, None)
+
+
+@pytest.mark.asyncio
+async def test_results_persist_after_buffer_expiry(redis, pool):
+    """SC#3: after a run completes, with the ``run:{run_id}`` Redis buffer GONE/expired, GET
+    /skills/{id}/evals/runs/{run_id} STILL returns the full eval_results set — the readout is
+    a durable DB read, independent of the ephemeral buffer."""
+    from app.main import app
+
+    run_id = str(uuid4())
+    # A completed run + its 4 persisted results, owner-stamped — already in the DB.
+    store = {
+        "eval_runs": [{
+            "id": run_id, "skill_id": SKILL_ID, "skill_version_id": SKILL_VERSION_ID,
+            "user_id": OWNER["id"], "provider": "anthropic",
+            "model": "claude-haiku-4-5-20251001", "status": "completed",
+            "case_count": 2, "error": None, "created_at": "2026-06-30T00:00:00Z",
+            "completed_at": "2026-06-30T00:01:00Z",
+        }],
+        "eval_results": [
+            {"id": str(uuid4()), "eval_run_id": run_id, "test_case_id": CASES[0]["id"],
+             "user_id": OWNER["id"], "variant": v, "provider": "anthropic",
+             "model": "claude-haiku-4-5-20251001", "output": "x", "status": "completed",
+             "error": None, "input_tokens": 1, "output_tokens": 2,
+             "created_at": f"2026-06-30T00:00:0{i}Z"}
+            for i, v in enumerate(["with_skill", "without_skill", "with_skill", "without_skill"])
+        ],
+    }
+    sb = _FilterSupabase(store)
+
+    # The Redis buffer for this run is ABSENT (TTL-expired) — nothing in redis.streams.
+    assert f"run:{run_id}" not in redis.streams
+
+    _override(app, user=OWNER, supabase=sb, redis_obj=redis, pool=pool)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/skills/{SKILL_ID}/evals/runs/{run_id}",
+                headers={"Authorization": "Bearer test"},
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"got {resp.status_code} body={resp.text}"
+    body = resp.json()
+    assert body["eval_run"]["status"] == "completed"
+    # The durable readout is NON-EMPTY despite the buffer being gone (SC#3).
+    assert len(body["eval_results"]) == 4
+    assert {r["variant"] for r in body["eval_results"]} == {"with_skill", "without_skill"}
+
+
+@pytest.mark.asyncio
+async def test_reattach_via_runs_row(redis, pool):
+    """SC#3: the companion ``public.runs`` row (same run_id) makes the eval run reattachable
+    through the EXISTING ``GET /runs/{run_id}/stream`` (runs.py) — it owner-checks the runs
+    row and replays the buffered ``eval_*`` events from since=0, zero new stream code."""
+    from app.main import app
+
+    run_id = str(uuid4())
+    thread_id = str(uuid4())
+    # The companion runs row the POST inserts (here pre-seeded to represent the live insert).
+    store = {
+        "runs": [{
+            "run_id": run_id, "thread_id": thread_id, "user_id": OWNER["id"],
+            "status": "completed", "error": None,
+        }],
+    }
+    sb = _FilterSupabase(store)
+
+    # Pre-fill the shared run buffer with the eval_* progress + the single closing terminal,
+    # exactly as the background job would have (the events survive in the buffer until TTL).
+    await redis.xadd(f"run:{run_id}", {"data": json.dumps({"type": "eval_case_started", "variant": "with_skill"})})
+    await redis.xadd(f"run:{run_id}", {"data": json.dumps({"type": "eval_case_done", "variant": "with_skill", "status": "completed"})})
+    await redis.xadd(f"run:{run_id}", {"data": json.dumps({"type": "eval_complete", "status": "completed"})})
+    await redis.xadd(f"run:{run_id}", {"data": json.dumps({"type": "done"})})
+
+    _override(app, user=OWNER, supabase=sb, redis_obj=redis, pool=pool)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/runs/{run_id}/stream?since=0",
+                headers={"Authorization": "Bearer test"},
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"got {resp.status_code} body={resp.text}"
+    # The replayed SSE body carries the buffered eval_* vocabulary (reattach replays since=0).
+    assert "eval_case_started" in resp.text
+    assert "eval_complete" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_cross_user_404(redis, pool):
+    """SC#4: OTHER_USER calling POST / GET-results / GET-list against OWNER's skill or run
+    gets 404 (never 403) — every eval route gates on app-code .eq(user_id) + 404-not-403."""
+    from app.main import app
+
+    run_id = str(uuid4())
+    # The skill + run belong to OWNER; OTHER_USER owns nothing here.
+    store = {
+        "skills": [{"id": SKILL_ID, "name": "pdf-builder", "description": "d",
+                    "user_id": OWNER["id"]}],
+        "skill_versions": [SKILL_VERSION_ROW],
+        "skill_test_cases": [{"id": CASES[0]["id"], "skill_id": SKILL_ID,
+                              "user_id": OWNER["id"], "prompt": "p", "order_index": 0}],
+        "eval_runs": [{"id": run_id, "skill_id": SKILL_ID, "user_id": OWNER["id"],
+                       "status": "completed"}],
+    }
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OTHER_USER, supabase=sb, redis_obj=redis, pool=pool)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            # 1. POST kickoff — owner gate 404s before any in-flight claim / spawn.
+            post = await c.post(
+                f"/skills/{SKILL_ID}/evals/runs",
+                json={"provider": "anthropic", "model": "claude-haiku-4-5-20251001"},
+                headers={"Authorization": "Bearer test"},
+            )
+            # 2. GET results — eval_runs read is owner-scoped → no row → 404.
+            get_results = await c.get(
+                f"/skills/{SKILL_ID}/evals/runs/{run_id}",
+                headers={"Authorization": "Bearer test"},
+            )
+            # 3. GET list — owner-verify the skill first → 404.
+            get_list = await c.get(
+                f"/skills/{SKILL_ID}/evals/runs",
+                headers={"Authorization": "Bearer test"},
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert post.status_code == 404, f"POST expected 404; got {post.status_code} body={post.text}"
+    assert get_results.status_code == 404, f"GET results expected 404; got {get_results.status_code}"
+    assert get_list.status_code == 404, f"GET list expected 404; got {get_list.status_code}"

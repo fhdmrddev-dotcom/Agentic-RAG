@@ -377,9 +377,11 @@ async def list_eval_runs(
 ):
     """List a skill's eval runs (owner-scoped, newest-first).
 
-    Owner-scoped on the read (.eq user_id) — a cross-user caller gets an empty list (they own
-    none of this skill's runs), never the owner's history (T-133-01)."""
+    Owner-verify the skill FIRST (404 cross-user — T-133-01) so a non-owner can't even probe a
+    skill's existence, then read owner-scoped (.eq user_id) newest-first."""
     user_id = current_user["id"]
+
+    await _verify_owned_skill(supabase, skill_id, user_id)
 
     def _read():
         return (
