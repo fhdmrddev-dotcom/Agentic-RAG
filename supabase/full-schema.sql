@@ -1009,7 +1009,8 @@ CREATE TABLE public.threads (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     folder_id uuid,
-    active_workflow_run_id uuid
+    active_workflow_run_id uuid,
+    is_eval boolean DEFAULT false NOT NULL
 );
 
 
@@ -1964,6 +1965,13 @@ CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (us
 --
 
 CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (active_workflow_run_id) WHERE (active_workflow_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_threads_user_visible; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_threads_user_visible ON public.threads USING btree (user_id, updated_at DESC) WHERE (is_eval = false);
 
 
 --
