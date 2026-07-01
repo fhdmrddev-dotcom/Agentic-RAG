@@ -584,6 +584,7 @@ class _FilterTable:
         self._op = "select"
         self._payload = None
         self._filters = []
+        self._in_filters = []
         self._order = None
         self._desc = False
         self._limit = None
@@ -611,6 +612,12 @@ class _FilterTable:
         self._filters.append((col, str(val)))
         return self
 
+    def in_(self, col, values):
+        # Membership filter — mirrors PostgREST/supabase-py .in_(col, [...]): a row
+        # matches when its stringified column value is in the provided value set.
+        self._in_filters.append((col, [str(v) for v in values]))
+        return self
+
     def order(self, col, desc=False, **k):
         self._order = col
         self._desc = desc
@@ -631,8 +638,11 @@ class _FilterTable:
     def _matched(self):
         out = []
         for r in self.store.get(self.name, []):
-            if all(str(r.get(c)) == v for c, v in self._filters):
-                out.append(r)
+            if not all(str(r.get(c)) == v for c, v in self._filters):
+                continue
+            if not all(str(r.get(c)) in vals for c, vals in self._in_filters):
+                continue
+            out.append(r)
         return out
 
     def execute(self, *a, **k):

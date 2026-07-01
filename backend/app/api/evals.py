@@ -376,10 +376,14 @@ async def get_eval_run(
     results = list(results_resp.data or [])
 
     # Attach the CALLER's own thumbs rating to each result (EVAL-04 / D-09 readout) so the
-    # frontend can render current thumb state. A SECOND owner-scoped read (.eq user_id) —
-    # mirrors the two-read owner-scoping above; the rating row is keyed by the globally-unique
-    # eval_results.id so there is no cross-run bleed. Merged in Python onto this run's results;
-    # None when the caller hasn't rated that answer. Do NOT change the run/results scoping.
+    # frontend can render current thumb state. A SECOND owner-scoped read (.eq user_id),
+    # additionally BOUND to THIS run's result ids (.in_ eval_result_id) — so the query never
+    # over-fetches the caller's lifetime ratings, and (WR-01) can never be truncated
+    # server-side by a PostgREST db-max-rows cap into silently dropping this run's ratings
+    # (which would report a genuinely-rated answer as rating:null). The rating row is keyed by
+    # the globally-unique eval_results.id, so the .in_ bound is exact — no cross-run bleed.
+    # Merged in Python onto this run's results; None when the caller hasn't rated that answer.
+    # Do NOT change the run/results scoping, and do NOT weaken the .eq(user_id) owner gate.
     result_ids = {r["id"] for r in results}
     if result_ids:
         def _read_ratings():
@@ -387,6 +391,7 @@ async def get_eval_run(
                 supabase.table("eval_ratings")
                 .select("eval_result_id, rating")
                 .eq("user_id", user_id)
+                .in_("eval_result_id", list(result_ids))
                 .execute()
             )
 
@@ -394,7 +399,6 @@ async def get_eval_run(
         rating_map = {
             row["eval_result_id"]: row["rating"]
             for row in (ratings_resp.data or [])
-            if row.get("eval_result_id") in result_ids
         }
         for r in results:
             r["rating"] = rating_map.get(r["id"])
