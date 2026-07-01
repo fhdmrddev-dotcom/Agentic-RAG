@@ -55,7 +55,7 @@ from supabase import Client
 from app.config import get_model_capability
 from app.db.runs import insert_run
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
-from app.models.eval_run import StartEvalRunBody
+from app.models.eval_run import RateResultBody, StartEvalRunBody
 from app.services import eval_runner_service
 
 logger = logging.getLogger(__name__)
@@ -375,6 +375,30 @@ async def get_eval_run(
     results_resp = await run_in_threadpool(_read_results)
     results = list(results_resp.data or [])
 
+    # Attach the CALLER's own thumbs rating to each result (EVAL-04 / D-09 readout) so the
+    # frontend can render current thumb state. A SECOND owner-scoped read (.eq user_id) —
+    # mirrors the two-read owner-scoping above; the rating row is keyed by the globally-unique
+    # eval_results.id so there is no cross-run bleed. Merged in Python onto this run's results;
+    # None when the caller hasn't rated that answer. Do NOT change the run/results scoping.
+    result_ids = {r["id"] for r in results}
+    if result_ids:
+        def _read_ratings():
+            return (
+                supabase.table("eval_ratings")
+                .select("eval_result_id, rating")
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+        ratings_resp = await run_in_threadpool(_read_ratings)
+        rating_map = {
+            row["eval_result_id"]: row["rating"]
+            for row in (ratings_resp.data or [])
+            if row.get("eval_result_id") in result_ids
+        }
+        for r in results:
+            r["rating"] = rating_map.get(r["id"])
+
     return {"eval_run": eval_run, "eval_results": results}
 
 
@@ -405,3 +429,94 @@ async def list_eval_runs(
 
     resp = await run_in_threadpool(_read)
     return resp.data or []
+
+
+# ── PUT rating — the caller's thumbs on ONE answer (EVAL-04; the FIRST user write here) ──
+@router.put("/{skill_id}/evals/results/{result_id}/rating")
+async def rate_eval_result(
+    skill_id: str,
+    result_id: UUID,
+    body: RateResultBody,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Record (or clear) the caller's thumbs up/down on ONE eval_results answer (EVAL-04).
+
+    The FIRST user-initiated write in the eval domain, so the IDOR gate is load-bearing:
+
+      1. OWNER-VERIFY the target ``eval_results`` row on BOTH ``id`` AND ``user_id`` before any
+         write. ``get_supabase`` is the SERVICE-ROLE client (RLS bypassed), so this
+         ``.eq("user_id", …)`` IS the access control. A cross-user (or unknown) ``result_id``
+         returns 404 — NEVER 403 — so another user's result existence is not leaked (T-134-01;
+         the ``_verify_owned_skill`` 404-not-403 precedent).
+      2. WRITE via the service-role client. ``rating is None`` → DELETE the ``eval_ratings`` row
+         for ``(eval_result_id, user_id)`` (clear — D-08 re-ratable). Else reject anything but
+         ``"up"``/``"down"`` with 400 (T-134-09; the DB CHECK is the second gate) and UPSERT on
+         the ``(eval_result_id, user_id)`` UNIQUE constraint (idempotent toggle — one thumb per
+         (user, answer), D-08). ``user_id`` comes from ``current_user``, NEVER the body
+         (T-134-03). ``RateResultBody`` carries only ``rating``.
+
+    Every blocking supabase-py call is wrapped in ``run_in_threadpool`` (D-v2.5-01). ``skill_id``
+    is the RESTful path anchor; the owner gate is the result-row ownership, matching the minimal
+    ``eval_ratings`` row (no skill_id column — D-09)."""
+    user_id = current_user["id"]
+
+    # 1. Owner-verify the eval_result (404 cross-user — never 403; T-134-01 IDOR gate).
+    def _verify_result():
+        return (
+            supabase.table("eval_results")
+            .select("id")
+            .eq("id", str(result_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        verify_resp = await run_in_threadpool(_verify_result)
+    except Exception:
+        # A malformed result_id (not a UUID) makes PostgREST raise — treat as a miss (404),
+        # never leak the error shape (mirrors _verify_owned_skill).
+        logger.debug("eval result ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Eval result not found")
+    if not list(verify_resp.data or []):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Eval result not found")
+
+    # 2a. Clear — rating None DELETEs the row (D-08). user_id from the caller (T-134-03).
+    if body.rating is None:
+        def _clear():
+            return (
+                supabase.table("eval_ratings")
+                .delete()
+                .eq("eval_result_id", str(result_id))
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+        await run_in_threadpool(_clear)
+        return {"eval_result_id": str(result_id), "rating": None}
+
+    # 2b. Set — reject an invalid value (T-134-09, the DB CHECK is the second gate), then upsert
+    # on the UNIQUE (eval_result_id, user_id) constraint so a re-rate TOGGLES the one row.
+    if body.rating not in ("up", "down"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="rating must be 'up', 'down', or null",
+        )
+
+    def _upsert():
+        return (
+            supabase.table("eval_ratings")
+            .upsert(
+                {
+                    "eval_result_id": str(result_id),
+                    "user_id": user_id,
+                    "rating": body.rating,
+                },
+                on_conflict="eval_result_id,user_id",
+            )
+            .execute()
+        )
+
+    await run_in_threadpool(_upsert)
+    return {"eval_result_id": str(result_id), "rating": body.rating}

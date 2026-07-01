@@ -28,6 +28,19 @@ class StartEvalRunBody(BaseModel):
     model: str
 
 
+class RateResultBody(BaseModel):
+    """PUT body — set or clear the caller's thumbs rating on ONE eval_results answer (EVAL-04).
+
+    Carries ONLY ``rating`` — ``user_id`` is sourced from the authenticated caller in the
+    endpoint, NEVER this body (T-134-03 forged-owner; the ratings endpoint has no client write
+    path). Single-typed ``str | None`` (never a multi-type list union — the Gemini JSON-Schema
+    ``type: [...]`` trap): ``"up"``/``"down"`` sets the thumb, ``None`` clears it (DELETE the
+    row — D-08 re-ratable). The endpoint rejects any other value with 400; the DB
+    ``CHECK (rating IN ('up','down'))`` is the second gate (T-134-09)."""
+
+    rating: str | None
+
+
 class EvalRunResponse(BaseModel):
     """Full ``public.eval_runs`` row shape returned by the run routes."""
 
@@ -75,4 +88,9 @@ class EvalResultResponse(BaseModel):
     verdict_score: int | None
     verdict_reason: str | None
     judge_model: str | None
+    # Phase 134 (EVAL-04 / D-09) — the CALLER's own thumbs rating on this answer, attached by
+    # ``get_eval_run`` from an owner-scoped ``eval_ratings`` read (``"up"``/``"down"``, or None
+    # when the caller hasn't rated it). Single-typed (Gemini ``type: [...]`` array trap). Not a
+    # stored ``eval_results`` column — a per-caller readout merge.
+    rating: str | None
     created_at: datetime
