@@ -362,6 +362,195 @@ async def test_sse_vocabulary(redis, supabase, pool, fake_loop_result):
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# Phase 134 Plan 02 (EVAL-03) — the HONEST verdict engine: inline grading of both arms
+# against expected_behavior, an honest not_measured / judge_error state, the with-skill
+# rollup, and the load-bearing judge-provider-independence + Deep-byte-identical guards.
+# The judge is mocked in every unit test (no live provider call — the suite is hermetic).
+# ════════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_completed_arm_graded(redis, supabase, pool, fake_loop_result):
+    """EVAL-03: a completed, non-empty arm is graded inline — persisted with
+    verdict_state=='graded' and non-null verdict_passed/score/reason/judge_model, in the
+    SAME insert (D-05/D-06). The judge fn is mocked (no live forced_emit shot)."""
+    from app.services import eval_runner_service
+
+    run_id = uuid4()
+
+    async def _completed_loop(ctx, **kwargs):
+        return fake_loop_result
+
+    judge = AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))
+    with patch.object(eval_runner_service, "run_agent_loop", _completed_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer", judge):
+        await eval_runner_service.run_eval_job(
+            run_id=run_id, skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    completed = [r for r in results if r["status"] == "completed"]
+    assert completed, "expected at least one completed arm to grade"
+    for r in completed:
+        assert r["verdict_state"] == "graded", f"completed arm not graded: {r['verdict_state']}"
+        assert r["verdict_passed"] is not None
+        assert r["verdict_score"] is not None
+        assert r["verdict_reason"] is not None
+        assert r["judge_model"] is not None  # resolve_judge_model recorded the judge (D-03)
+    # Every completed arm was graded EXACTLY once (both arms of both cases — D-02).
+    assert judge.await_count == len(completed)
+
+
+@pytest.mark.asyncio
+async def test_errored_arm_not_measured(redis, supabase, pool):
+    """EVAL-03 SC#1 / D-04: an arm whose completion RAISES (status='failed', empty output)
+    is persisted with verdict_state=='not_measured' + verdict_passed IS NULL, and the judge
+    fn is NEVER called — the honesty gate, not just the persisted state. This is exactly how
+    the deferred cross-provider baseline bugs (BUG-260701-01 / -260630-01) surface honestly
+    (D-11) instead of as a fabricated score."""
+    from app.services import eval_runner_service
+
+    run_id = uuid4()
+
+    async def _raising_loop(ctx, **kwargs):
+        raise RuntimeError("provider 400 — the baseline arm broke on a newer model")
+
+    judge = AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))
+    with patch.object(eval_runner_service, "run_agent_loop", _raising_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer", judge):
+        await eval_runner_service.run_eval_job(
+            run_id=run_id, skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    # All 4 arms (2 cases × 2 arms) still persist despite the raise (D-06 — partials readable).
+    assert len(results) == 4, f"expected 4 persisted rows, got {len(results)}"
+    for r in results:
+        assert r["verdict_state"] == "not_measured", f"errored arm mis-stated: {r['verdict_state']}"
+        assert r["verdict_passed"] is None, "an errored arm must carry a NULL verdict_passed"
+        assert r["verdict_score"] is None
+    # THE honesty gate: the judge is NEVER called for an errored/empty arm (D-04).
+    assert judge.await_count == 0, "the judge must not run on an errored/empty arm (D-04)"
+
+
+@pytest.mark.asyncio
+async def test_rollup_counts(redis, supabase, pool, fake_loop_result):
+    """EVAL-03 / D-07 / OQ3: over a 2-case run where the two WITH-skill arms grade 1 pass /
+    1 fail, the eval_runs rollup is passed_count==1, measured_count==2 — the without-skill
+    verdicts do NOT count toward the denominator. verdict_summary is the non-authoritative
+    default (not all measured passed → 'fail'; Phase 136 owns the real threshold)."""
+    from app.services import eval_runner_service
+
+    run_id = uuid4()
+
+    async def _completed_loop(ctx, **kwargs):
+        return fake_loop_result
+
+    async def _fake_judge(*, answer, expected_behavior, user_settings):
+        # Branch on the case (both arms of a case share expected_behavior; only the WITH
+        # arm counts): case 1 → pass, case 2 → fail.
+        v = dict(_FAKE_VERDICT_PASS)
+        v["overall_passed"] = expected_behavior == CASES[0]["expected_behavior"]
+        return v
+
+    upd = AsyncMock()
+    with patch.object(eval_runner_service, "run_agent_loop", _completed_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer", _fake_judge), \
+         patch.object(eval_runner_service, "_update_eval_run_status", upd):
+        await eval_runner_service.run_eval_job(
+            run_id=run_id, skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    assert upd.await_count >= 1, "the finalize rollup update never ran"
+    kw = upd.await_args.kwargs  # the LAST call is the success finalize
+    assert kw["measured_count"] == 2, f"with-skill measured; got {kw.get('measured_count')}"
+    assert kw["passed_count"] == 1, f"one with-skill pass; got {kw.get('passed_count')}"
+    # Non-authoritative default (OQ2): not every measured with-skill case passed → 'fail'.
+    assert kw["verdict_summary"] == "fail"
+
+
+@pytest.mark.asyncio
+async def test_judge_provider_independent(redis, supabase, pool, fake_loop_result):
+    """EVAL-03 / D-03 / T-134-07 / Pitfall 1 (the 133 306dd2d4 bug class): the judge shot is
+    routed with an EXPLICIT provider= equal to the JUDGE model's registry provider (the
+    independent resolve_judge_model model), NOT user_settings.active_provider (the
+    provider-under-test). ``forced_emit`` is patched at its SOURCE module
+    (app.services.forced_emit.forced_emit) because _judge_eval_answer imports it
+    function-locally — patching eval_runner_service.forced_emit would AttributeError."""
+    from app.config import get_model_capability, settings as app_settings
+    from app.services import eval_runner_service
+    from app.services.harness.validator_kinds import JudgeVerdict, resolve_judge_model
+
+    run_id = uuid4()
+
+    async def _completed_loop(ctx, **kwargs):
+        return fake_loop_result
+
+    fake_emitted = JudgeVerdict(
+        overall_passed=True, overall_score=88, grounded_in_evidence=True,
+        answers_business_requirement=True, did_the_work_not_delegated=True,
+        criteria=[], summary="ok",
+    )
+    forced = AsyncMock(return_value={"emitted": fake_emitted, "failure": None})
+
+    # The INDEPENDENT judge provider we EXPECT (derived from resolve_judge_model, not the run).
+    expected_judge_provider = (get_model_capability(resolve_judge_model(app_settings)) or {}).get("provider")
+
+    # provider-under-test = openai; its active_provider differs from the judge provider.
+    us = SimpleNamespace(active_provider="openai")
+
+    with patch.object(eval_runner_service, "run_agent_loop", _completed_loop), \
+         patch("app.services.forced_emit.forced_emit", forced):  # SOURCE module (function-local import)
+        await eval_runner_service.run_eval_job(
+            run_id=run_id, skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="openai", model="gpt-5",
+            current_user=OWNER, user_settings=us,
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    assert forced.await_count >= 1, "the judge forced_emit shot never ran"
+    for call in forced.await_args_list:
+        prov = call.kwargs.get("provider")
+        assert prov == expected_judge_provider, \
+            f"judge routed to {prov!r}, not the independent judge provider {expected_judge_provider!r}"
+        assert prov != us.active_provider, "judge must NEVER route to the provider-under-test (D-03)"
+
+
+def test_deep_mode_byte_identical_guard():
+    """D-13: Phase 134 reuses the judge READ-ONLY via a forced_emit call — NO agent_loop.py
+    edit, Deep Mode stays byte-identical, and RunContext.skill_catalog_override stays an
+    additive default-OFF field (None = the DB-query path). The dedicated catalog-override
+    coverage lives in test_agent_loop_catalog_override.py (133); this re-affirms the red line."""
+    import dataclasses
+    import subprocess
+    from pathlib import Path
+
+    from app.services.agent_loop import RunContext
+
+    # (1) skill_catalog_override remains additive + default-off (None → Deep byte-identical).
+    fields = {f.name: f for f in dataclasses.fields(RunContext)}
+    assert "skill_catalog_override" in fields, "the additive override field vanished"
+    assert fields["skill_catalog_override"].default is None, "skill_catalog_override must default OFF (None)"
+
+    # (2) agent_loop.py is byte-unchanged — the judge is a forced_emit call, not a loop edit.
+    repo_root = Path(__file__).resolve().parents[2]  # backend/tests/ -> repo root
+    r = subprocess.run(
+        ["git", "diff", "--quiet", "backend/app/services/agent_loop.py"],
+        cwd=str(repo_root),
+    )
+    assert r.returncode == 0, "agent_loop.py must stay byte-identical this phase (D-13)"
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # Plan 04 — ROUTE / integration tests (evals.py): cross-user 404, durable readout
 # after the Redis buffer expires, and reattach via the companion public.runs row.
 # ════════════════════════════════════════════════════════════════════════════════
