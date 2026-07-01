@@ -601,6 +601,28 @@ CREATE TABLE public.documents (
 
 
 --
+-- Name: eval_ratings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_ratings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    eval_result_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    rating text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT eval_ratings_rating_check CHECK ((rating = ANY (ARRAY['up'::text, 'down'::text])))
+);
+
+
+--
+-- Name: TABLE eval_ratings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_ratings IS 'Owner-scoped human-preference thumbs (EVAL-04, D-08/D-09). One thumbs up/down per (user, answer = an eval_results row), re-ratable (clear = DELETE the row). Minimal shape (id, eval_result_id, user_id, rating, created_at, updated_at) so Phase 135 can join verdict <-> rating for human-judge disagreement (D-09). Written via the service-role ratings endpoint (Plan 03) with an .eq("user_id") IDOR gate; owner-only RLS SELECT is defense-in-depth (T-134-01). NO client write policies (T-134-04). Both FKs ON DELETE CASCADE — no orphaned rating survives its parent (T-134-05).';
+
+
+--
 -- Name: eval_results; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -618,8 +640,14 @@ CREATE TABLE public.eval_results (
     input_tokens integer,
     output_tokens integer,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    verdict_state text DEFAULT 'not_measured'::text NOT NULL,
+    verdict_passed boolean,
+    verdict_score integer,
+    verdict_reason text,
+    judge_model text,
     CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
-    CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text])))
+    CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text]))),
+    CONSTRAINT eval_results_verdict_state_check CHECK ((verdict_state = ANY (ARRAY['graded'::text, 'not_measured'::text, 'judge_error'::text])))
 );
 
 
@@ -628,6 +656,13 @@ CREATE TABLE public.eval_results (
 --
 
 COMMENT ON TABLE public.eval_results IS 'One row per (test_case × variant) for an eval run (EVAL-02, D-08). variant is a CHECK-constrained with_skill/without_skill discriminator (D-04). Carries provider+model (D-02 — provider-keyed even though the run is single-provider, so multi-provider fan-out is additive). output holds the full final content; survives Redis TTL + a backend restart (D-06 / SC#3). test_case_id FKs skill_test_cases.id for exact case traceability (Phase-132 D-10); Phase 134 ratings FK eval_results.id (keep PK stable). Owner-only RLS SELECT defense-in-depth; service-role writes (bypasses RLS), app-code .eq("user_id") is the real gate (T-133-01). NO write policies (T-133-EoP).';
+
+
+--
+-- Name: COLUMN eval_results.verdict_state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.verdict_state IS 'OQ1 3-value verdict discriminator (D-06). graded = the judge ran and returned a verdict; not_measured = the arm errored/was empty and the judge was NEVER called (D-04); judge_error = the arm completed but the judge call itself failed. NOT NULL DEFAULT ''not_measured'' backfills the old Phase 133 rows to not_measured — accurate, they were never graded. verdict_passed/score are NULL unless graded (a not_measured/judge_error arm carrying a non-NULL verdict_passed is a bug).';
 
 
 --
@@ -646,6 +681,9 @@ CREATE TABLE public.eval_runs (
     error text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     completed_at timestamp with time zone,
+    passed_count integer,
+    measured_count integer,
+    verdict_summary text,
     CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
 );
 
@@ -655,6 +693,13 @@ CREATE TABLE public.eval_runs (
 --
 
 COMMENT ON TABLE public.eval_runs IS 'One durable row per eval run (EVAL-02, D-08). Single provider/model per run (D-01) — provider/model live here. status is a durable run-audit enum (035 precedent): a backend that dies mid-run leaves a recoverable running/interrupted row (D-06 / SC#3). id doubles as the stream run_id (companion public.runs row uses the same UUID). skill_version_id FKs skill_versions.id for exact instruction-snapshot traceability (Phase-132 D-10). Owner-only RLS SELECT is defense-in-depth; the service-role eval task writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-133-01). NO write policies — only the service-role task writes (T-133-EoP).';
+
+
+--
+-- Name: COLUMN eval_runs.verdict_summary; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.verdict_summary IS 'NON-AUTHORITATIVE default rollup (OQ2, D-07). Default rule: "pass" iff measured_count >= 1 AND passed_count == measured_count, else "fail". This is DERIVED TEXT, not a hard constraint — Phase 136 (GATE-01) owns the real publish threshold and MUST be able to override it WITHOUT a new migration. passed_count/measured_count count WITH-SKILL arms only (D-02/D-07); the without-skill verdict is stored per-arm for the A/B story + SI-01, not as a rollup denominator.';
 
 
 --
@@ -1305,6 +1350,22 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: eval_ratings eval_ratings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_ratings eval_ratings_result_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_result_user_unique UNIQUE (eval_result_id, user_id);
+
+
+--
 -- Name: eval_results eval_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1752,6 +1813,20 @@ CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (d
 
 
 --
+-- Name: idx_eval_ratings_result_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_ratings_result_id ON public.eval_ratings USING btree (eval_result_id);
+
+
+--
+-- Name: idx_eval_ratings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_ratings_user_id ON public.eval_ratings USING btree (user_id);
+
+
+--
 -- Name: idx_eval_results_case_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2004,6 +2079,13 @@ CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (use
 
 
 --
+-- Name: eval_ratings eval_ratings_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_ratings_set_updated_at BEFORE UPDATE ON public.eval_ratings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: folders folders_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2243,6 +2325,22 @@ ALTER TABLE ONLY public.documents
 
 ALTER TABLE ONLY public.documents
     ADD CONSTRAINT documents_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_ratings eval_ratings_eval_result_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_eval_result_id_fkey FOREIGN KEY (eval_result_id) REFERENCES public.eval_results(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_ratings eval_ratings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -3020,6 +3118,20 @@ CREATE POLICY "Users can view own document_relationships" ON public.document_rel
 
 
 --
+-- Name: eval_ratings Users can view own eval ratings; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval ratings" ON eval_ratings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval ratings" ON public.eval_ratings IS 'Owner-only (D-08). Defense-in-depth: the service-role ratings endpoint bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080 precedent, T-134-01).';
+
+
+--
 -- Name: eval_results Users can view own eval results; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -3186,6 +3298,12 @@ ALTER TABLE public.document_views ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_ratings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_ratings ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: eval_results; Type: ROW SECURITY; Schema: public; Owner: -
