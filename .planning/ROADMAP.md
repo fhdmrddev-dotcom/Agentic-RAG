@@ -56,7 +56,7 @@
 
 - [ ] **Phase 132: Skill Versioning + Eval Test-Case Persistence** — immutable version snapshots on save + persistent, editable eval test cases (VER-01, EVAL-01)
 - [ ] **Phase 133: Eval Runner — With-Skill vs Without-Skill** — SSE-streamed eval run, two completions per case, persisted results (EVAL-02)
-- [ ] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04)
+- [x] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04) — verified 2026-07-02 (8/8 truths + 9/9 live SC#10 UAT; secure-phase pending)
 - [x] **Phase 134.1: Evals Run Silently (bug fix)** — hide eval-execution threads from the chat sidebar; eval outputs stay DB-only in the eval panel (BUG-260702-01)
 - [ ] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01)
 - [ ] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01)

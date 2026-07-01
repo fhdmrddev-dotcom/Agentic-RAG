@@ -1,7 +1,13 @@
 ---
 phase: 134-eval-results-honest-verdict-ratings
 verified: 2026-07-02T09:00:00Z
-status: human_needed
+status: passed
+human_verification_executed: 2026-07-02 — all 9 SC#10 rows (U1–U9) PASSED live, self-driven by
+  Claude (Chrome MCP + psycopg2 + Redis + backend logs) per operator instruction; results in
+  134-HUMAN-UAT.md. One major live-surface defect (eval SSE died at open/mid-run → spurious
+  error + stale readout) was found, root-caused (open race + silent-arm XREAD socket timeout),
+  fixed eval-scoped (commit d0c0c10a — seed event, heartbeat, client self-heal; shared chat path
+  untouched) and re-verified live on a 9-minute OpenRouter run within the session.
 score: 8/8 must-haves verified
 overrides_applied: 0
 human_verification:
