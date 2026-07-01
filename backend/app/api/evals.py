@@ -224,6 +224,11 @@ async def start_eval_run(
                     "user_id": user_id,
                     "title": "[eval] skill A/B run",
                     "folder_id": None,
+                    # BUG-260702-01 / Phase 134.1 (mig 082): this POST-side anchor thread
+                    # (it exists only so the companion runs row has a thread_id FK — the
+                    # job creates its OWN execution thread) is eval exhaust too. Without
+                    # the flag it leaked into the sidebar as the "empty" twin of every run.
+                    "is_eval": True,
                 })
                 .execute()
             )
@@ -273,6 +278,18 @@ async def start_eval_run(
             await redis.zadd("runs:active", {str(run_id): _started_score})
         except Exception:
             logger.exception("eval ZADD failed for run %s; continuing", run_id)
+
+        # 10b. Seed the run buffer BEFORE the client can subscribe (BUG-260702-03 (a)).
+        # GET /runs/{id}/stream treats a MISSING run:{run_id} key as TTL-expired and
+        # synthesizes a terminal error (runs.py Step 3b, 'buffer_expired_while_streaming').
+        # The eval job's first XADD (eval_case_started) lands only after 3 DB round-trips,
+        # so a fast subscriber raced that window and got a dead stream at open. Chat's
+        # POST /messages guarantees the key exists before the client learns the run_id —
+        # this restores that invariant for evals. _emit_eval is best-effort (never raises);
+        # the frontend demux ignores unknown eval_* types.
+        await eval_runner_service._emit_eval(
+            redis, run_id, eval_runner_service.EVENT_RUN_STARTED
+        )
 
         # 11. Load the caller's effective settings (the job needs them to route the provider).
         from app.models.user_settings import load_user_settings, override_provider  # function-local (avoid import cycle)

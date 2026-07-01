@@ -52,6 +52,17 @@ EVENT_CASE_STARTED = "eval_case_started"
 EVENT_CASE_DONE = "eval_case_done"
 EVENT_VERDICT = "eval_verdict"  # Phase 134 (EVAL-03 / D-05) — additive per-arm verdict event
 EVENT_COMPLETE = "eval_complete"
+# BUG-260702-03: two liveness invariants the CHAT stream guarantees but evals violated.
+# (a) eval_run_started — seeded by the POST router BEFORE it returns the run_id, so the
+#     run:{run_id} key exists before any client can subscribe (GET /runs/{id}/stream
+#     treats a missing key as TTL-expired and synthesizes a terminal error — the open race).
+# (b) eval_heartbeat — emitted every EVAL_HEARTBEAT_SECONDS while an arm executes. An arm
+#     is otherwise SILENT on the buffer for its whole 40-70s duration (the NO-OP emit
+#     swallows the loop's deltas), which trips the replay-tail consumer's ~30s Redis XREAD
+#     socket timeout mid-run. The frontend demux ignores both types (unknown eval_* no-op).
+EVENT_RUN_STARTED = "eval_run_started"
+EVENT_HEARTBEAT = "eval_heartbeat"
+EVAL_HEARTBEAT_SECONDS = 15.0
 
 # Terminal sentinel types the SHARED replay_tail_consumer breaks on
 # (threads.TERMINAL_TYPES). The eval_* events above are NON-terminal progress; the
@@ -376,6 +387,47 @@ async def _run_arm(
     test_case_id = case["id"]
     await _emit_eval(redis, run_id, EVENT_CASE_STARTED, test_case_id=str(test_case_id), variant=variant)
 
+    # BUG-260702-03 (b): keep the run buffer warm while this arm executes. The agent
+    # loop + judge call are driven with NO-OP emits, so without a pulse the stream is
+    # silent for the arm's entire duration and the replay-tail consumer's Redis XREAD
+    # BLOCK hits its socket timeout (~30s) → the live client gets a synthetic error
+    # terminal mid-run. _emit_eval is best-effort (never raises).
+    async def _pulse() -> None:
+        while True:
+            await asyncio.sleep(EVAL_HEARTBEAT_SECONDS)
+            await _emit_eval(redis, run_id, EVENT_HEARTBEAT)
+
+    pulse = asyncio.create_task(_pulse())
+    try:
+        return await _run_arm_body(
+            redis=redis, supabase=supabase, run_id=run_id, thread_id=thread_id,
+            case=case, variant=variant, catalog_override=catalog_override,
+            provider=provider, model=model, current_user=current_user,
+            user_settings=user_settings, user_id=user_id, test_case_id=test_case_id,
+        )
+    finally:
+        pulse.cancel()
+
+
+async def _run_arm_body(
+    *,
+    redis,
+    supabase,
+    run_id: UUID,
+    thread_id: str,
+    case: dict,
+    variant: str,
+    catalog_override: tuple[dict, ...],
+    provider: str,
+    model: str,
+    current_user: dict,
+    user_settings,
+    user_id: str,
+    test_case_id,
+) -> tuple[str, str, bool | None]:
+    """The original ``_run_arm`` body (loop → D-04 grading gate → persist → emits),
+    extracted verbatim so the heartbeat pulse can wrap it with try/finally without
+    re-indenting the load-bearing logic. Called ONLY by ``_run_arm``."""
     body = MessageCreate(
         content=case.get("prompt", ""),
         model=model,

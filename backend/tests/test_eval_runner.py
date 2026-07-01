@@ -316,6 +316,53 @@ async def test_two_results_per_case(redis, supabase, pool, fake_loop_result):
 
 
 @pytest.mark.asyncio
+async def test_arm_heartbeat_keeps_buffer_warm(redis, supabase, pool, fake_loop_result):
+    """BUG-260702-03 (b): a slow arm pulses eval_heartbeat onto the run buffer while
+    run_agent_loop is in flight — the NO-OP emit otherwise leaves the stream silent for
+    the arm's whole 40-70s duration, tripping the replay-tail consumer's ~30s Redis
+    XREAD socket timeout and killing the live client mid-run. Interval patched tiny;
+    the pulse must also STOP with the arm (cancelled in the finally) — no heartbeat
+    may land after the closing terminal."""
+    import asyncio as _asyncio
+
+    from app.services import eval_runner_service
+
+    run_id = uuid4()
+
+    async def _slow_loop(ctx, **kwargs):
+        await _asyncio.sleep(0.08)
+        return fake_loop_result
+
+    with patch.object(eval_runner_service, "EVAL_HEARTBEAT_SECONDS", 0.01), \
+         patch.object(eval_runner_service, "run_agent_loop", _slow_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))):
+        await eval_runner_service.run_eval_job(
+            run_id=run_id,
+            skill_id=SKILL_ID,
+            skill_version=SKILL_VERSION,
+            cases=CASES[:1],
+            provider="anthropic",
+            model="claude-haiku-4-5-20251001",
+            current_user=OWNER,
+            user_settings=MagicMock(),
+            redis=redis,
+            supabase=supabase,
+            pool=pool,
+        )
+
+    events = [json.loads(f["data"]) for f in redis.streams.get(f"run:{run_id}", [])]
+    types = [e["type"] for e in events]
+    beats = [t for t in types if t == "eval_heartbeat"]
+    assert len(beats) >= 2, f"expected >=2 heartbeats from the slow arm, got {len(beats)} ({types})"
+    # Pulse stops with the arm: nothing lands after the single closing terminal.
+    assert "done" in types, f"missing closing terminal in {types}"
+    assert "eval_heartbeat" not in types[types.index("done"):], (
+        f"heartbeat leaked past the terminal: {types}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_sse_vocabulary(redis, supabase, pool, fake_loop_result):
     """SC#2/D-05: the run buffer carries ONLY eval_* progress (eval_case_started /
     eval_case_done / eval_complete) until the single closing terminal — NO chat

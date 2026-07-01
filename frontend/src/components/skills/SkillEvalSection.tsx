@@ -83,6 +83,12 @@ export function SkillEvalSection({ skillId }: Props) {
   // an already-dispatched getEvalRun. Updated at the top of the [skillId] effect below.
   const currentSkillRef = useRef(skillId)
 
+  // BUG-260702-03 self-heal: bounded re-attach counter for TRANSIENT stream drops
+  // (buffer_expired_* open race, redis_timeout on a silent arm). Reset per fresh run
+  // and per skill switch. The eval job keeps computing server-side across a drop, so
+  // the client re-subscribes instead of painting a dead "error" end-state.
+  const reattachRef = useRef(0)
+
   // Pull the durable readout from the DB (survives the Redis TTL — SC#3). Guarded
   // against a skill switch (WR-02 / BUG-260701-02): capture the skill this fetch is for
   // and bail before ANY setState if the active skill changed while it was in flight, so
@@ -137,7 +143,41 @@ export function SkillEvalSection({ skillId }: Props) {
           // Durable readout is authoritative; refresh from the DB.
           void loadReadout(rid)
         },
-        onTerminal: (kind) => {
+        onTerminal: async (kind, err) => {
+          // BUG-260702-03 self-heal: a transient stream drop is NOT a run failure —
+          // the eval job keeps computing server-side. Probe the durable readout; if
+          // the run is still live, re-attach (bounded) instead of painting a dead
+          // "error" end-state with a stale 'running' readout.
+          const transient =
+            kind === "error" && /buffer_expired|redis_timeout|redis_error/.test(err ?? "")
+          if (
+            transient &&
+            reattachRef.current < 20 &&
+            !ctrl.signal.aborted &&
+            currentSkillRef.current === skillId
+          ) {
+            reattachRef.current += 1
+            try {
+              const { eval_run, eval_results } = await getEvalRun(skillId, rid)
+              if (currentSkillRef.current !== skillId) return
+              setEvalRun(eval_run)
+              setResults(eval_results)
+              if (eval_run?.status === "running") {
+                window.setTimeout(() => {
+                  if (!ctrl.signal.aborted && currentSkillRef.current === skillId) {
+                    attach(rid)
+                  }
+                }, 1000)
+                return
+              }
+              // Run already terminal — the durable readout above is the honest final
+              // state; no error banner for a drop the run itself outlived.
+              setRunning(false)
+              return
+            } catch {
+              /* probe failed — fall through to the standard terminal handling */
+            }
+          }
           setRunning(false)
           if (kind === "error") setError("Eval run ended with an error.")
           // Always re-fetch the durable readout on any terminal (covers reattach
@@ -170,6 +210,7 @@ export function SkillEvalSection({ skillId }: Props) {
     setEvalRun(null)
     setResults([])
     setError(null)
+    reattachRef.current = 0
     async function init() {
       try {
         const p = await getProviders()
@@ -211,6 +252,7 @@ export function SkillEvalSection({ skillId }: Props) {
     setResults([])
     setEvalRun(null)
     setRunning(true)
+    reattachRef.current = 0
     try {
       const { run_id } = await startEvalRun(skillId, { provider, model })
       attach(run_id)
