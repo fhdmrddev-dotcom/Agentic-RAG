@@ -8,7 +8,9 @@ updated: "2026-07-02"
 
 ## Current Test
 
-[awaiting human testing]
+[PAUSED at Test 1 — user prioritized fixing BUG-260702-01 (evals pollute the chat
+sidebar) as its own phase first, so the remaining UAT runs don't add more clutter.
+Resume U1–U9 clean after that fix ships.]
 
 ## Tests
 
@@ -58,3 +60,15 @@ skipped: 0
 blocked: 0
 
 ## Gaps
+
+<!-- Cross-cutting observations surfaced during UAT (not a single-U-test failure) -->
+- observation: "Eval runs create real, visible chat threads that pollute the sidebar (34 = 10% of threads; 17 empty / 17 populated). Eval should run silently, DB-only."
+  status: logged
+  routed_to: "BUG-260702-01 (major) → SEED-100 / small dedicated phase (touches threads.py G-5 hot file + a migration)"
+  severity: major
+  during_test: 1
+- observation: "Judge model (claude-opus-4-8 default) is settings-backed (harness_judge_model) but has NO Settings UI; single-provider/local-model orgs need it configurable."
+  status: logged
+  routed_to: "enhancement → SEED-100 / admin-panel plan (project_admin_panel_plan)"
+  severity: minor
+  during_test: 1

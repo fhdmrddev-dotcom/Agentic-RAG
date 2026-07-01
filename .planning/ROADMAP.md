@@ -57,6 +57,7 @@
 - [ ] **Phase 132: Skill Versioning + Eval Test-Case Persistence** — immutable version snapshots on save + persistent, editable eval test cases (VER-01, EVAL-01)
 - [ ] **Phase 133: Eval Runner — With-Skill vs Without-Skill** — SSE-streamed eval run, two completions per case, persisted results (EVAL-02)
 - [ ] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04)
+- [x] **Phase 134.1: Evals Run Silently (bug fix)** — hide eval-execution threads from the chat sidebar; eval outputs stay DB-only in the eval panel (BUG-260702-01)
 - [ ] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01)
 - [ ] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01)
 - [ ] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01)
@@ -114,6 +115,19 @@
 - [x] 134-03-PLAN.md — Ratings endpoint (owner-verify IDOR gate + upsert/clear) + rating merge in get_eval_run [wave 3]
 - [x] 134-04-PLAN.md — Thin read/rate surface: verdict line + side-by-side pass/fail + one-line reason + thumbs [wave 4]
 **UI hint**: yes — functional read/rate surfaces; the consolidated, sketch-gated Evals panel is PANEL-01 (Phase 137).
+
+#### Phase 134.1: Evals Run Silently (bug fix — inserted during 134 UAT)
+**Goal**: Eval runs execute silently — the agent-loop execution thread they require is hidden from the chat sidebar, so evals never pollute the user's conversation list; the eval's user-visible outputs stay in the eval panel (eval_results), retrieved per run.
+**Depends on**: Phase 133 (the eval runner that creates the execution thread)
+**Requirements**: BUG-260702-01 (surfaced during Phase 134 UAT)
+**Success Criteria** (what must be TRUE):
+  1. An eval run's execution thread never appears in the chat sidebar (GET /threads excludes is_eval=true) — verified live: 303 returned, 0 [eval].
+  2. Existing leaked eval threads are hidden (flagged, not deleted — transcript preserved for debugging).
+  3. Real chat threads are unaffected (is_eval defaults false; additive narrowing filter on the G-5 hot file, no widened rows / no IDOR).
+**Plans**: shipped inline (quick-style, GSD guarantees) — migration 082 + 2 one-line code edits + guard test
+- [x] Migration 082 (threads.is_eval flag + backfill + partial index) — `b073cced`
+- [x] `_create_eval_thread` marks is_eval + `list_threads` filter + guard test — `58ec1da6`
+**Verification**: 14/14 eval tests pass; live GET /threads = 303 (was 337), 0 [eval]. See `.planning/phases/134.1-evals-run-silently/134.1-SUMMARY.md`.
 
 #### Phase 135: Self-Improvement Loop (SI-01)
 **Goal**: The system closes the loop — it proposes instruction-body edits from eval results + Tuner signal, the user reviews the diff and approves, a new immutable version is created and automatically re-evaled before promotion; the system never auto-applies.
