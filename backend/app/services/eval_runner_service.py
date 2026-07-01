@@ -257,13 +257,19 @@ async def _judge_eval_answer(*, answer: str, expected_behavior: str, user_settin
 async def _create_eval_thread(supabase, user_id: str) -> str:
     """Create ONE ephemeral eval thread per run (a real threads row — run_agent_loop
     reads folder_id + history from the DB; there is no in-memory path). Returns the
-    new thread id. Wrapped in run_in_threadpool (blocking supabase-py)."""
+    new thread id. Wrapped in run_in_threadpool (blocking supabase-py).
+
+    is_eval=True (mig 082 / BUG-260702-01 / Phase 134.1): this thread is pure execution
+    exhaust — the user-visible eval outputs live in eval_results + the eval panel, never
+    the chat sidebar. The marker lets list_threads (threads.py) exclude it so evals run
+    silently instead of polluting the user's conversation list."""
     thread_id = str(uuid4())
     payload = {
         "id": thread_id,
         "user_id": user_id,
         "title": "[eval] skill A/B run",
         "folder_id": None,
+        "is_eval": True,
     }
 
     def _insert():

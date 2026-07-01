@@ -246,6 +246,23 @@ def fake_loop_result():
 
 
 @pytest.mark.asyncio
+async def test_eval_thread_marked_is_eval(supabase):
+    """Phase 134.1 / BUG-260702-01: the ephemeral eval-execution thread is created with
+    is_eval=True so list_threads (threads.py) hides it from the chat sidebar — evals run
+    silently instead of polluting the user's conversation list. Guards the upstream contract
+    the sidebar's .eq('is_eval', False) filter keys off."""
+    from app.services import eval_runner_service
+
+    tid = await eval_runner_service._create_eval_thread(supabase, OWNER["id"])
+    threads = supabase.store.get("threads", [])
+    assert len(threads) == 1, "exactly one eval-execution thread row is created per run"
+    payload = threads[0]
+    assert payload["id"] == tid
+    assert payload["user_id"] == OWNER["id"]
+    assert payload["is_eval"] is True
+
+
+@pytest.mark.asyncio
 async def test_two_results_per_case(redis, supabase, pool, fake_loop_result):
     """SC#1: 2 cases → exactly 4 eval_results rows (with_skill + without_skill each),
     and the WITH arm's catalog override comes from the version snapshot, the WITHOUT

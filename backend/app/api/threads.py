@@ -206,10 +206,16 @@ async def list_threads(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
+    # BUG-260702-01 / Phase 134.1 (mig 082): exclude eval-execution threads (is_eval=true).
+    # They are pure agent-loop exhaust — the eval's user-visible outputs live in eval_results +
+    # the eval panel, so they must never appear in the chat sidebar. ADDITIVE narrowing filter on
+    # this G-5 hot file: it only SHRINKS the result set for the same user (no widened rows, no
+    # IDOR); real chat threads default is_eval=false and are unaffected.
     response = (
         supabase.table("threads")
         .select("*")
         .eq("user_id", current_user["id"])
+        .eq("is_eval", False)
         .order("updated_at", desc=True)
         .execute()
     )
