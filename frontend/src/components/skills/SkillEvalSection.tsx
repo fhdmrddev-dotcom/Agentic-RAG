@@ -17,7 +17,7 @@
 // every route (Plan 04 `.eq("user_id")`); this client only renders what they return.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Play } from "lucide-react"
+import { Loader2, Play, ThumbsUp, ThumbsDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   getProviders,
@@ -25,6 +25,7 @@ import {
   getEvalRun,
   listEvalRuns,
   subscribeToRun,
+  rateEvalResult,
 } from "@/lib/api"
 import type { EvalResult, EvalRun } from "@/types"
 
@@ -38,6 +39,25 @@ interface Props {
 type LiveStatus = Record<string, string>
 
 const VARIANTS = ["with_skill", "without_skill"] as const
+
+// Phase 134 (EVAL-03) — the thin per-arm verdict badge text, derived from the
+// DURABLE readout's verdict_state (D-04 honesty): a completed+non-empty arm reads
+// PASS/FAIL; an errored/empty arm reads "not measured" (NEVER a fabricated pass/
+// fail — EVAL-03 SC#1); a completed arm whose independent-judge shot failed reads
+// "judge error". null → no badge (old pre-081 rows / verdict absent). Undesigned
+// per D-10 — plain text, no design-system chrome.
+function verdictBadge(r: EvalResult): string | null {
+  switch (r.verdict_state) {
+    case "graded":
+      return r.verdict_passed ? "PASS" : "FAIL"
+    case "not_measured":
+      return "not measured"
+    case "judge_error":
+      return "judge error"
+    default:
+      return null
+  }
+}
 
 export function SkillEvalSection({ skillId }: Props) {
   const [providers, setProviders] = useState<
@@ -87,6 +107,19 @@ export function SkillEvalSection({ skillId }: Props) {
           setLive((prev) => ({ ...prev, [`${testCaseId}:${variant}`]: "running" })),
         onEvalCaseDone: ({ testCaseId, variant, status }) =>
           setLive((prev) => ({ ...prev, [`${testCaseId}:${variant}`]: status })),
+        // Phase 134 (EVAL-03) — additive live verdict reflection. Merges the pass/
+        // fail into the EXISTING `live` map (already reset in both the skill-switch
+        // block and handleRun — no new state that could leak stale across skills).
+        // Idempotent: strips any prior verdict before re-appending. The durable
+        // readout (loadReadout on onEvalComplete/terminal) stays authoritative.
+        onEvalVerdict: ({ testCaseId, variant, verdictState, verdictPassed }) =>
+          setLive((prev) => {
+            const key = `${testCaseId}:${variant}`
+            const badge =
+              verdictState === "graded" ? (verdictPassed ? "PASS" : "FAIL") : verdictState
+            const base = (prev[key] ?? "done").split(" · ")[0]
+            return { ...prev, [key]: `${base} · ${badge}` }
+          }),
         onEvalComplete: () => {
           // Durable readout is authoritative; refresh from the DB.
           void loadReadout(rid)
@@ -171,6 +204,23 @@ export function SkillEvalSection({ skillId }: Props) {
     }
   }
 
+  // Phase 134 (EVAL-04) — thumbs rating. Toggles or clears through the owner-gated
+  // endpoint, then RE-LOADS the durable readout so the thumbs state is derived from
+  // the DB (single source of truth — never a separate store; this is what respects
+  // the BUG-260701-02 skill-switch reset). Reload keys off the displayed run
+  // (evalRun.id) with runId as the live fallback, so it also fires for a completed
+  // run loaded on mount (when runId is null) — the guard also satisfies tsc-b since
+  // loadReadout(rid: string) is non-nullable.
+  async function handleRate(r: EvalResult, choice: "up" | "down") {
+    try {
+      await rateEvalResult(skillId, r.id, r.rating === choice ? null : choice)
+      const rid = runId ?? evalRun?.id
+      if (rid) await loadReadout(rid)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save rating.")
+    }
+  }
+
   const activeProvider = providers.find((p) => p.id === provider)
 
   // Group durable results by test case for the readout.
@@ -245,6 +295,19 @@ export function SkillEvalSection({ skillId }: Props) {
         </p>
       )}
 
+      {/* Phase 134 (EVAL-03) — per-run honest verdict line. Reads the rollup
+          (passed_count / measured_count, written at run-finalize) and appends an
+          honest "N not measured" note when fewer with-skill cases were measured
+          than exist (errored/empty arms — D-04/D-07). Gated on measured_count so it
+          only appears once the durable rollup lands (never mid-stream). */}
+      {evalRun && evalRun.measured_count != null && (
+        <p className="text-xs font-medium text-foreground">
+          {evalRun.passed_count ?? 0}/{evalRun.measured_count} with-skill cases passed
+          {evalRun.measured_count < evalRun.case_count &&
+            ` · ${evalRun.case_count - evalRun.measured_count} not measured`}
+        </p>
+      )}
+
       {/* Live per-arm progress (driven by eval_* events while streaming). */}
       {running && Object.keys(live).length > 0 && (
         <ul className="flex flex-col gap-1">
@@ -266,12 +329,68 @@ export function SkillEvalSection({ skillId }: Props) {
                 <p className="text-xs font-medium text-foreground">Case {cid.slice(0, 8)}</p>
                 {VARIANTS.map((v) => {
                   const r = entry[v]
+                  const badge = r ? verdictBadge(r) : null
                   return (
                     <div key={v} className="flex flex-col gap-1">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {v === "with_skill" ? "With skill" : "Without skill"}
-                        {r ? ` · ${r.status}` : " · —"}
-                      </p>
+                      {/* Arm header: label · status · verdict badge · thumbs. */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {v === "with_skill" ? "With skill" : "Without skill"}
+                          {r ? ` · ${r.status}` : " · —"}
+                        </p>
+                        {badge && (
+                          <span
+                            className={
+                              badge === "PASS"
+                                ? "text-xs font-semibold text-emerald-500"
+                                : badge === "FAIL"
+                                  ? "text-xs font-semibold text-destructive"
+                                  : "text-xs font-medium text-muted-foreground"
+                            }
+                          >
+                            {badge}
+                          </span>
+                        )}
+                        {r && (
+                          <span className="ml-auto flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label="Thumbs up"
+                              aria-pressed={r.rating === "up"}
+                              onClick={() => void handleRate(r, "up")}
+                              className={
+                                r.rating === "up"
+                                  ? "text-emerald-500"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Thumbs down"
+                              aria-pressed={r.rating === "down"}
+                              onClick={() => void handleRate(r, "down")}
+                              className={
+                                r.rating === "down"
+                                  ? "text-destructive"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                      {/* One-line judge reason (muted, truncated; full text on hover). */}
+                      {r?.verdict_reason && (
+                        <p
+                          className="truncate text-xs text-muted-foreground"
+                          title={r.verdict_reason}
+                        >
+                          {r.verdict_reason}
+                        </p>
+                      )}
                       {r?.output && (
                         <pre className="whitespace-pre-wrap break-words text-xs text-foreground/80">
                           {r.output}
