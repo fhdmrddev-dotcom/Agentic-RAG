@@ -311,9 +311,17 @@ async def _persist_result(
     error: str | None,
     input_tokens: int | None,
     output_tokens: int | None,
+    verdict_state: str = "not_measured",
+    verdict_passed: bool | None = None,
+    verdict_score: int | None = None,
+    verdict_reason: str | None = None,
+    judge_model: str | None = None,
 ) -> None:
     """Persist ONE eval_results row the instant an arm finishes (D-06 — partials stay
-    readable). Owner-stamped from ``current_user`` (never a body — T-133-03)."""
+    readable), with the per-arm verdict INCLUDED in the SAME insert (D-06 — never a
+    follow-up UPDATE; eval_results has no client/UPDATE policy anyway). Owner-stamped from
+    ``current_user`` (never a body — T-133-03). Verdict params default to the honest
+    ``not_measured`` shape so an un-graded arm carries a NULL verdict_passed, never a fake."""
     payload = {
         "eval_run_id": str(run_id),
         "test_case_id": str(test_case_id),
@@ -326,6 +334,11 @@ async def _persist_result(
         "error": error,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
+        "verdict_state": verdict_state,
+        "verdict_passed": verdict_passed,
+        "verdict_score": verdict_score,
+        "verdict_reason": verdict_reason,
+        "judge_model": judge_model,
     }
 
     def _insert():
@@ -347,10 +360,12 @@ async def _run_arm(
     model: str,
     current_user: dict,
     user_settings,
-) -> None:
-    """Drive ONE completion (WITH or WITHOUT arm) for one case, then persist its
-    eval_results row + emit progress. A per-arm exception records status=failed /
-    timed_out + a truncated error and RETURNS (the job continues — D-06)."""
+) -> tuple[str, str, bool | None]:
+    """Drive ONE completion (WITH or WITHOUT arm) for one case, grade it, then persist its
+    eval_results row (verdict in the SAME insert) + emit progress. A per-arm exception
+    records status=failed / timed_out + a truncated error and continues (the job continues
+    — D-06). RETURNS ``(variant, verdict_state, verdict_passed)`` so the caller can
+    accumulate the with-skill rollup with NO module-global run state (D-PRD-12)."""
     user_id = current_user["id"]
     test_case_id = case["id"]
     await _emit_eval(redis, run_id, EVENT_CASE_STARTED, test_case_id=str(test_case_id), variant=variant)
@@ -396,6 +411,37 @@ async def _run_arm(
         error = _truncate_error(exc)
         logger.exception("eval arm failed (run %s, case %s, %s)", run_id, test_case_id, variant)
 
+    # ── D-04 honest-verdict gate ──────────────────────────────────────────────────────
+    # Grade ONLY a completed, non-empty arm. An errored / empty arm stays not_measured
+    # with the judge NEVER called (a provider-errored baseline surfaces honestly — D-11,
+    # EVAL-03 SC#1), and carries a NULL verdict_passed — never a fabricated pass/fail.
+    verdict_state = "not_measured"
+    verdict_passed: bool | None = None
+    verdict_score: int | None = None
+    verdict_reason: str | None = None
+    judge_model: str | None = None
+    if status == "completed" and output.strip():
+        verdict = await _judge_eval_answer(
+            answer=output,
+            expected_behavior=case.get("expected_behavior", ""),
+            user_settings=user_settings,
+        )
+        if verdict.get("failure"):
+            # A completed arm the judge could NOT grade (transient / no key / coerced
+            # emission) → honest judge_error (OQ1) with a truncated reason, NEVER a
+            # fabricated pass (T-134-03 / T-134-06). Distinct from not_measured so the
+            # rollup denominator doesn't silently drop a real provider hiccup.
+            verdict_state = "judge_error"
+            verdict_reason = str(verdict["failure"])[:200]
+        else:
+            from app.config import settings  # function-local
+            from app.services.harness.validator_kinds import resolve_judge_model  # READ-ONLY reuse
+            verdict_state = "graded"
+            verdict_passed = bool(verdict.get("overall_passed"))
+            verdict_score = verdict.get("overall_score")
+            verdict_reason = (verdict.get("summary") or "")[:2000]
+            judge_model = resolve_judge_model(settings)
+
     await _persist_result(
         supabase,
         run_id=run_id,
@@ -409,22 +455,45 @@ async def _run_arm(
         error=error,
         input_tokens=in_tok,
         output_tokens=out_tok,
+        verdict_state=verdict_state,
+        verdict_passed=verdict_passed,
+        verdict_score=verdict_score,
+        verdict_reason=verdict_reason,
+        judge_model=judge_model,
     )
     await _emit_eval(
         redis, run_id, EVENT_CASE_DONE,
         test_case_id=str(test_case_id), variant=variant, status=status,
     )
+    # Additive per-arm verdict event (D-05) — flat payload, consistent with the eval_* vocab.
+    await _emit_eval(
+        redis, run_id, EVENT_VERDICT,
+        test_case_id=str(test_case_id), variant=variant,
+        verdict_state=verdict_state, verdict_passed=verdict_passed,
+    )
+    return (variant, verdict_state, verdict_passed)
 
 
 async def _update_eval_run_status(
-    supabase, *, run_id: UUID, user_id: str, status: str, error: str | None
+    supabase, *, run_id: UUID, user_id: str, status: str, error: str | None,
+    passed_count: int | None = None,
+    measured_count: int | None = None,
+    verdict_summary: str | None = None,
 ) -> None:
-    """Update the durable eval_runs row's terminal status + completed_at (owner-scoped)."""
+    """Update the durable eval_runs row's terminal status + completed_at (owner-scoped).
+    The Phase 134 rollup params are added to the payload ONLY when not None — a cancelled /
+    interrupted / crashed run leaves them untouched (NULL), never a misleading partial count."""
     payload = {
         "status": status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "error": error,
     }
+    if passed_count is not None:
+        payload["passed_count"] = passed_count
+    if measured_count is not None:
+        payload["measured_count"] = measured_count
+    if verdict_summary is not None:
+        payload["verdict_summary"] = verdict_summary
 
     def _update():
         return (
@@ -493,6 +562,11 @@ async def run_eval_job(
 
         eval_thread_id = await _create_eval_thread(supabase, user_id)
 
+        # Run-LOCAL rollup accumulator (D-PRD-12 / WORKER_COUNT=2 — NO module-global run
+        # state). Only WITH-skill arm outcomes count toward the rollup denominator (OQ3);
+        # the without-skill verdict is persisted for the A/B story + SI-01, not counted here.
+        with_outcomes: list[tuple[str, str, bool | None]] = []
+
         for case in cases:
             # Cooperative cancel checkpoint at the top of each case (T-133-02).
             if await redis.get(_cancel_key(run_id)):
@@ -503,12 +577,15 @@ async def run_eval_job(
                 supabase, eval_thread_id, user_id, case.get("prompt", ""),
             )
 
-            # WITH arm — inject ONLY the target skill (version snapshot).
-            await _run_arm(
-                redis=redis, supabase=supabase, run_id=run_id, thread_id=eval_thread_id,
-                case=case, variant=VARIANT_WITH, catalog_override=with_override,
-                provider=provider, model=model, current_user=current_user,
-                user_settings=user_settings,
+            # WITH arm — inject ONLY the target skill (version snapshot). Capture its
+            # verdict outcome for the with-skill rollup.
+            with_outcomes.append(
+                await _run_arm(
+                    redis=redis, supabase=supabase, run_id=run_id, thread_id=eval_thread_id,
+                    case=case, variant=VARIANT_WITH, catalog_override=with_override,
+                    provider=provider, model=model, current_user=current_user,
+                    user_settings=user_settings,
+                )
             )
 
             # Cancel checkpoint between arms — stop before another (paid) completion.
@@ -516,7 +593,8 @@ async def run_eval_job(
                 final_status = "cancelled"
                 break
 
-            # WITHOUT arm — inject NOTHING (empty catalog).
+            # WITHOUT arm — inject NOTHING (empty catalog). Its verdict is persisted +
+            # streamed but does NOT count toward the rollup (OQ3) — return intentionally ignored.
             await _run_arm(
                 redis=redis, supabase=supabase, run_id=run_id, thread_id=eval_thread_id,
                 case=case, variant=VARIANT_WITHOUT, catalog_override=(),
@@ -524,9 +602,23 @@ async def run_eval_job(
                 user_settings=user_settings,
             )
 
+        # With-skill rollup (D-07 / OQ3), written ONLY on a clean completion. A cancelled /
+        # interrupted run falls through to this SAME finalize call site, so guard the rollup
+        # with ``final_status == "completed"`` — a partial run must read NULL rollup (never a
+        # misleading count). ``verdict_summary`` is a NON-authoritative default; Phase 136
+        # (GATE-01) owns the real publish threshold (OQ2).
+        passed_count: int | None = None
+        measured_count: int | None = None
+        verdict_summary: str | None = None
+        if final_status == "completed":
+            measured_count = sum(1 for _v, st, _p in with_outcomes if st == "graded")
+            passed_count = sum(1 for _v, _st, p in with_outcomes if p is True)
+            verdict_summary = "pass" if (measured_count >= 1 and passed_count == measured_count) else "fail"
+
         await _emit_eval(redis, run_id, EVENT_COMPLETE, status=final_status)
         await _update_eval_run_status(
             supabase, run_id=run_id, user_id=user_id, status=final_status, error=run_error,
+            passed_count=passed_count, measured_count=measured_count, verdict_summary=verdict_summary,
         )
         await _emit_terminal(redis, run_id, TERMINAL_DONE, status=final_status)
     except Exception:

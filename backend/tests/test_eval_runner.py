@@ -45,9 +45,25 @@ SKILL_VERSION = {
 }
 
 CASES = [
-    {"id": str(uuid4()), "prompt": "Make me a one-page PDF summary."},
-    {"id": str(uuid4()), "prompt": "Turn this table into a PDF."},
+    {"id": str(uuid4()), "prompt": "Make me a one-page PDF summary.",
+     "expected_behavior": "Produces a one-page PDF summary of the input."},
+    {"id": str(uuid4()), "prompt": "Turn this table into a PDF.",
+     "expected_behavior": "Renders the given table as a PDF."},
 ]
+
+# A fake graded ``JudgeVerdict.model_dump()`` (Phase 134) — the shape ``_judge_eval_answer``
+# returns on a real verdict. The existing SC#1/SC#2 tests drive COMPLETED arms, which now
+# hit the D-04 grading gate; mocking ``_judge_eval_answer`` keeps them hermetic (no live
+# judge / forced_emit call — the whole suite is "no live LLM / no live DB").
+_FAKE_VERDICT_PASS = {
+    "overall_passed": True,
+    "overall_score": 90,
+    "grounded_in_evidence": True,
+    "answers_business_requirement": True,
+    "did_the_work_not_delegated": True,
+    "criteria": [],
+    "summary": "The answer meets the expected behavior.",
+}
 
 
 # ── A tiny in-memory async fake Redis (copied from the tuner route tests) ─────────
@@ -243,7 +259,9 @@ async def test_two_results_per_case(redis, supabase, pool, fake_loop_result):
         captured_overrides.append(ctx.skill_catalog_override)
         return fake_loop_result
 
-    with patch.object(eval_runner_service, "run_agent_loop", _fake_run_agent_loop):
+    with patch.object(eval_runner_service, "run_agent_loop", _fake_run_agent_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))):
         await eval_runner_service.run_eval_job(
             run_id=run_id,
             skill_id=SKILL_ID,
@@ -301,7 +319,9 @@ async def test_sse_vocabulary(redis, supabase, pool, fake_loop_result):
             await emit_terminal("done")
         return fake_loop_result
 
-    with patch.object(eval_runner_service, "run_agent_loop", _fake_run_agent_loop):
+    with patch.object(eval_runner_service, "run_agent_loop", _fake_run_agent_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))):
         await eval_runner_service.run_eval_job(
             run_id=run_id,
             skill_id=SKILL_ID,
