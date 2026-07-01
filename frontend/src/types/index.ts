@@ -592,6 +592,13 @@ export interface EvalRun {
   error: string | null
   created_at: string
   completed_at: string | null
+  // Phase 134 (EVAL-03 / D-07) — additive verdict rollup columns (migration 081).
+  // Honest count: passed_count of measured_count with-skill cases passed. NULL on
+  // old (pre-081) runs and on error/cancel paths. verdict_summary is the optional
+  // default rollup label; Phase 136 (GATE-01) owns the real publish threshold.
+  passed_count: number | null
+  measured_count: number | null
+  verdict_summary: string | null
 }
 
 /** A durable eval_results row — one per (test_case × variant) (migration 080). */
@@ -609,6 +616,20 @@ export interface EvalResult {
   input_tokens: number | null
   output_tokens: number | null
   created_at: string
+  // Phase 134 (EVAL-03 / D-04, D-06) — additive per-arm verdict columns (migration
+  // 081), written in the SAME insert by the independent LLM judge. verdict_state is
+  // "graded" only for a completed/non-empty arm; an errored/empty arm is honestly
+  // "not_measured" (NEVER a fabricated pass/fail — EVAL-03 SC#1), and a completed
+  // arm whose judge shot failed is "judge_error". verdict_passed/score are NULL
+  // unless graded. All fields NULL on old (pre-081) rows.
+  verdict_state: "graded" | "not_measured" | "judge_error" | null
+  verdict_passed: boolean | null
+  verdict_score: number | null
+  verdict_reason: string | null
+  judge_model: string | null
+  // Phase 134 (EVAL-04 / D-09) — the CALLER's own thumbs rating on this answer,
+  // attached by get_eval_run from an owner-scoped eval_ratings read. null = unrated.
+  rating: "up" | "down" | null
 }
 
 /** GET /skills/{id}/evals/runs/{runId} response — the durable readout. */

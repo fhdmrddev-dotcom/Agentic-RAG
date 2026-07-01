@@ -420,6 +420,18 @@ export interface StreamCallbacks {
   onEvalCaseStarted?: (p: { testCaseId: string; variant: string }) => void
   onEvalCaseDone?: (p: { testCaseId: string; variant: string; status: string }) => void
   onEvalComplete?: (p: { status: string }) => void
+  /** Phase 134 Plan 04 (EVAL-03) — additive live verdict event, emitted after the
+   *  independent judge grades an arm (D-05). FLAT payload {test_case_id, variant,
+   *  verdict_state, verdict_passed}. Optional live reflection only — the durable
+   *  readout (getEvalRun on onEvalComplete/terminal) stays authoritative. Sits with
+   *  the other additive eval branches: NON-terminal (no `return`, cursor advances),
+   *  Deep/harness dispatch untouched (Pattern 3). */
+  onEvalVerdict?: (p: {
+    testCaseId: string
+    variant: string
+    verdictState: string
+    verdictPassed: boolean | null
+  }) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -831,6 +843,18 @@ export async function subscribeToRun(
           })
         else if (t === "eval_complete" && callbacks.onEvalComplete)
           callbacks.onEvalComplete({ status: parsed.status as string })
+        // Phase 134 Plan 04 (EVAL-03) — additive live verdict branch. Reads the FLAT
+        // eval_runner_service payload verbatim (parsed.test_case_id / variant /
+        // verdict_state / verdict_passed). NON-terminal → NO return (cursor still
+        // advances, exactly like eval_case_done above); the Deep/harness dispatch is
+        // untouched. Durable readout remains authoritative (T-134-13).
+        else if (t === "eval_verdict" && callbacks.onEvalVerdict)
+          callbacks.onEvalVerdict({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+            verdictState: parsed.verdict_state as string,
+            verdictPassed: parsed.verdict_passed as boolean | null,
+          })
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
         // type-specific callback so the consumer's lastSeenOffsetRef only
@@ -1663,6 +1687,40 @@ export async function listEvalRuns(skillId: string): Promise<EvalRun[]> {
   const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs`, { headers })
   if (!res.ok) throw new Error("Failed to load eval runs.")
   return res.json() as Promise<EvalRun[]>
+}
+
+/** PUT /skills/{id}/evals/results/{resultId}/rating — set or CLEAR the caller's
+ *  thumbs rating on ONE eval answer (EVAL-04). Owner-gated server-side (.eq(user_id)
+ *  → 404 cross-user, T-134-11); the client cannot forge another user's rating. Pass
+ *  null to clear (re-ratable — D-08). Mirrors startEvalRun's fetch + getAuthHeaders()
+ *  + error-detail extraction shape. Returns the persisted rating; the caller should
+ *  re-load the durable readout (getEvalRun) so thumbs state stays derived from the DB,
+ *  never a separate stale store (respects the BUG-260701-02 skill-switch reset). */
+export async function rateEvalResult(
+  skillId: string,
+  resultId: string,
+  rating: "up" | "down" | null,
+): Promise<{ eval_result_id: string; rating: string | null }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/evals/results/${resultId}/rating`,
+    {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ rating }),
+    },
+  )
+  if (!res.ok) {
+    let detail = `Failed to rate eval answer (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<{ eval_result_id: string; rating: string | null }>
 }
 
 export interface ProviderInfo {
