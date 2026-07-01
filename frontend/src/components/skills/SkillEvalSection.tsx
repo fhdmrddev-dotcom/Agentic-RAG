@@ -77,13 +77,26 @@ export function SkillEvalSection({ skillId }: Props) {
   // a reader (subscribeToRun returns silently on AbortError).
   const abortRef = useRef<AbortController | null>(null)
 
-  // Pull the durable readout from the DB (survives the Redis TTL — SC#3).
+  // The live active skill, tracked in a ref so an in-flight loadReadout can detect a
+  // skill switch that happened while its fetch (or a terminal/complete callback) was
+  // pending and DROP the stale result — abortRef stops the SSE reader but cannot cancel
+  // an already-dispatched getEvalRun. Updated at the top of the [skillId] effect below.
+  const currentSkillRef = useRef(skillId)
+
+  // Pull the durable readout from the DB (survives the Redis TTL — SC#3). Guarded
+  // against a skill switch (WR-02 / BUG-260701-02): capture the skill this fetch is for
+  // and bail before ANY setState if the active skill changed while it was in flight, so
+  // a stale response (or a terminal/complete callback for the previous run) never lands
+  // the old skill's results into the new skill's view.
   async function loadReadout(rid: string) {
+    const requestedSkill = skillId
     try {
-      const { eval_run, eval_results } = await getEvalRun(skillId, rid)
+      const { eval_run, eval_results } = await getEvalRun(requestedSkill, rid)
+      if (currentSkillRef.current !== requestedSkill) return
       setEvalRun(eval_run)
       setResults(eval_results)
     } catch (err) {
+      if (currentSkillRef.current !== requestedSkill) return
       setError(err instanceof Error ? err.message : "Failed to load eval results.")
     }
   }
@@ -142,6 +155,9 @@ export function SkillEvalSection({ skillId }: Props) {
   // analog) and reattaches via subscribeToRun verbatim — see SUMMARY deviation.
   useEffect(() => {
     let cancelled = false
+    // WR-02: publish the now-active skill so any still-pending loadReadout from the
+    // PREVIOUS skill sees the switch and drops its stale result before setState.
+    currentSkillRef.current = skillId
     // Switching skills: clear the previous skill's readout/live state BEFORE
     // fetching the new skill's runs. Without this, a skill that has no eval runs
     // keeps rendering the previously-viewed skill's results — the stale-state bug
