@@ -138,7 +138,15 @@
   2. The user reviews the proposed diff and explicitly approves or rejects it; on approval a new immutable skill version is created, on rejection nothing changes (SI-01 — human always in the loop).
   3. An approved new version is automatically re-evaled and the result gates promotion — a version that fails re-eval is surfaced as not-promoted with honest evidence (SI-01 auto-re-eval gate).
   4. The proposer + re-eval behavior holds across providers (reuses the existing gateway; SC#10) with no shared-path fork.
-**Plans**: TBD
+**Plans**: 7 plans across 3 waves
+Plans:
+- [ ] 135-01-PLAN.md — Migration 083: owner-scoped skill_proposals table (schema foundation) [wave 1]
+- [ ] 135-02-PLAN.md — Instructions-override seam (Pitfall #1 fix; Deep byte-identical) [wave 1]
+- [ ] 135-03-PLAN.md — Proposer service + evidence bundle (disagreement-first forced emission) [wave 1]
+- [ ] 135-04-PLAN.md — Propose/get/reject routes + proposal models [wave 2]
+- [ ] 135-05-PLAN.md — Approve → re-eval → promotion gate + resilience (interrupted/force-promote) [wave 3]
+- [ ] 135-06-PLAN.md — Frontend contracts: unified line-diff util + types + api helpers [wave 1]
+- [ ] 135-07-PLAN.md — Proposal card in SkillEvalSection (thin, 137-fenced) [wave 2]
 **UI hint**: yes
 
 #### Phase 136: Skill Publish Gate (GATE-01)
