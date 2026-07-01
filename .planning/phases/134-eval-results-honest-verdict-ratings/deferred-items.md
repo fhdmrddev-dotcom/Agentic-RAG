@@ -41,3 +41,36 @@ wires cleanly.
 These are the classic conftest-mock / API-signature drift rot (same class as the documented
 frontend vitest rot and Playwright E2E rot). None touch `evals.py`, `eval_run.py`,
 `eval_runner_service.py`, or any eval test. No action taken in 134-03.
+
+## Pre-existing frontend `tsc -b` rot (discovered during Plan 134-04 build gate)
+
+**Discovered:** 2026-07-01 (Plan 134-04 execution, running the plan's `cd frontend && npm run build` gate)
+**Status:** pre-existing — NOT a regression from Plan 134-04
+**Disposition:** out of scope (do NOT fix in 134); frontend analog of the backend test-rot above
+(sibling to the frontend vitest rot SEED-056 / E2E rot SEED-049). Deploy is unaffected — the
+production Vercel build runs `vite build` only (skips `tsc`, per the documented vercel.json note).
+
+`npm run build` is `tsc -b && vite build`. At **HEAD (before any 134-04 change)** `tsc -b`
+already exits **2** with **29 errors** across unrelated files/tests; `vite build` exits **0**.
+
+**Proof these are pre-existing, not caused by 134-04:** captured the full `tsc -b` error set
+(a) with my three files reverted to HEAD and (b) with my changes applied — **both sets contain
+exactly 29 errors**, and `comm -23` of the two sets is empty except for ONE cosmetic message-text
+drift: the pre-existing `src/lib/api.test.ts(131,5)` `StreamCallbacks` mismatch (a rotted test
+file) shifted its counter from "…42 more" → "…43 more" purely because I added one *optional*
+`onEvalVerdict` callback to `SubscribeCallbacks`. **Zero** errors reference my actual source files
+(`api.ts`, `types/index.ts`, `SkillEvalSection.tsx`). My changes are type-clean.
+
+**Gate substitution used for 134-04 (documented in 134-04-SUMMARY):** because the `tsc -b`
+baseline is pre-existing-broken, the plan's "`npm run build` exits 0" gate is met in its
+verifiable intent by (1) the error-set diff proving **zero new `tsc` errors** from my files and
+(2) `vite build` (the real deploy gate) exiting **0**. No unrelated rot was fixed (SCOPE BOUNDARY).
+
+**Failing files (29 `tsc` errors, all unrelated to the eval domain):** `src/__tests__/**`
+(IngestionPage / useDocuments / useFolders / useMessages), `components/chat/__tests__/ChatAreaMode`,
+`components/chat/MessageSkeleton.tsx` (`JSX` namespace), `components/layout/__tests__/ChatLayoutLaunch`,
+`components/layout/NavPanel.tsx` (unused `Button`), `components/panel/__tests__/FilesSection`,
+`components/panel/FilePreview.test.tsx`, `components/settings/MemorySection.tsx`,
+`components/skills/SkillFormDialog.tsx` (`RefObject` nullability), `lib/api.test.ts`,
+`pages/SettingsPage.tsx`, `providers/StreamsProvider.tsx` (unused `getActiveRuns`),
+`stores/streamsStore.ts` (zustand `StateCreator` variance). No action taken in 134-04.
