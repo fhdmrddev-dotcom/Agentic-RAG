@@ -60,3 +60,32 @@ The engine is done; what's left is (a) provider hardening that touches the share
 gateway boundary (needs its own careful, D-14-respecting pass with full-roster UAT) and
 (b) a designed, role-gated, legible surface (sketch-gated, pairs with 134/137). Bundling
 both as one "production-clean" phase keeps the eval feature from shipping half-trustable.
+
+## Update 2026-07-02 — full-native-roster confirmation + fresh operator design input (Phase 134 UAT)
+
+**Native-4 verdict-honesty confirmed live** (one docx eval run each, DB-verified, browser
+spot-checked): DeepSeek `deepseek-v4-flash` (with=graded FAIL·30; baseline=BUG-260630-01
+400 → honest `not_measured`), GLM `glm-5.1` (both arms graded), MiniMax `MiniMax-M3`
+(both arms graded), Moonshot `kimi-k2.6` (both arms graded). No crashes, no fabricated
+scores — the Phase-134 honest-verdict contract holds on all 8 providers. The BASELINE-ARM
+fixes (this seed's half 1) remain open for DeepSeek + Claude-4.6+/5.
+
+**NEW finding — picker↔registry drift:** the Settings provider list offers models the
+`MODEL_CAPABILITIES` registry doesn't know (`glm-5.2`, `kimi-k2.7-code`), so the eval
+router's D-01 validation rejects them with "Unknown model" — the picker can offer a model
+the Run button then refuses. Fix belongs to the dynamic-model-registry work
+(SEED-088/SEED-095): one source of truth for "models we can actually run".
+
+**Operator design input (2026-07-02, for the Phase 137 sketch — treat as acceptance-bar
+material):**
+- *"The results are not representative, not user friendly … as a user I did not
+  understand what that means."* Specifically: the "2/3 with-skill cases passed" line, the
+  FAIL badge, and the raw prompt/response dumps did not communicate. The panel must lead
+  with a plain-language outcome sentence (e.g. "This skill made the answers better in 2
+  of 3 tests") — scores/arms/judge-reasons behind progressive disclosure.
+- **This is a general theme, not eval-only:** the operator names the Tuner (Tune
+  triggers) and Workflows as surfaces that "look amazing but have too much information,
+  which is confusing." Phase 137's sketch should establish the less-is-more pattern
+  (headline first, detail on demand) as the house style these other surfaces later adopt.
+- Confirmed to the operator that Phase 137 (PANEL-01, G-2 sketch-gated) is the planned
+  designed panel — the operator approves the mockup before build.

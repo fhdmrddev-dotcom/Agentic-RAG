@@ -127,19 +127,37 @@ evidence: |
   eval_ratings row (UNIQUE upsert — never duplicated). Phase-135 disagreement query
   (verdict_passed IS TRUE AND rating='down') returns 1 row — signal captured + queryable.
 
+### 10. U10 — Full native roster confirmation (operator mandate: cross-provider = ALL 8, not big-4)
+expected: The honest-verdict contract holds on the 4 independent native providers beyond the SC#10 big-4 — DeepSeek, GLM/Zhipu, MiniMax, Moonshot — light-touch confirmation (one run each), no crashes, no fabricated scores.
+result: pass
+evidence: |
+  Added 2026-07-02 after operator correction (feedback_cross_provider_full_native_roster —
+  the SC#10 big-4 table is NOT the full obligation). One docx eval run per provider via the
+  live API, DB-verified, latest run browser spot-checked:
+  - deepseek/deepseek-v4-flash (40cd978a): with=graded FAIL·30; baseline=known BUG-260630-01
+    reasoning_content 400 → honest not_measured, rollup excludes it.
+  - zhipu/glm-5.1 (d242197b): BOTH arms graded (FAIL·25 / FAIL·5).
+  - minimax/MiniMax-M3 (7b57e40a): BOTH arms graded (FAIL·15 / FAIL·15).
+  - moonshot/kimi-k2.6 (c6733785): BOTH arms graded (FAIL·15 / FAIL·15); renders in UI.
+  All 8 providers now proven on the verdict engine. NEW finding: picker↔registry drift —
+  Settings offers glm-5.2 / kimi-k2.7-code but MODEL_CAPABILITIES doesn't know them, so the
+  eval router 400s "Unknown model" (picker offers what Run refuses) → logged to SEED-100 /
+  SEED-088/095 (dynamic model registry).
+
 ## Summary
 
-total: 9
-passed: 9
+total: 10
+passed: 10
 issues: 0 open (1 major found mid-UAT → diagnosed → fixed → re-verified live, commit d0c0c10a)
 pending: 0
 skipped: 0
 blocked: 0
 
-runs_executed: 7 live eval runs (b5c7c005 openai/gpt-5.4-mini · 2f9af975 anthropic/opus-4-8 ·
+runs_executed: 11 live eval runs (b5c7c005 openai/gpt-5.4-mini · 2f9af975 anthropic/opus-4-8 ·
   ee7d81b0 google/gemini-3.5-flash · ef1b938e openrouter/kimi-k2.6 [orphaned by --reload restart,
   cleaned] · 23b584be openrouter/kimi-k2.6 · d96e9a50 anthropic/claude-sonnet-5 · 787dedd5
-  openai/gpt-5.5 3-case) + 1 parallel chat thread
+  openai/gpt-5.5 3-case · 40cd978a deepseek/v4-flash · d242197b zhipu/glm-5.1 · 7b57e40a
+  minimax/M3 · c6733785 moonshot/kimi-k2.6) + 1 parallel chat thread — ALL 8 providers exercised
 
 ## Gaps
 
