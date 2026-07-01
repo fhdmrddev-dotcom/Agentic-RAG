@@ -1,8 +1,8 @@
 ---
 phase: 134
 slug: eval-results-honest-verdict-ratings
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-01
 ---
@@ -39,19 +39,19 @@ created: 2026-07-01
 
 ## Per-Task Verification Map
 
-> Task IDs finalized after `/gsd:plan-phase` writes PLAN.md files; rows below key the
+> Task IDs finalized after `/gsd:plan-phase` wrote the PLAN.md files. Rows below key the
 > automated tests to requirements. Judge is mocked in all unit tests
-> (`patch("...eval_runner_service._judge_eval_answer")` or `patch("...forced_emit")`).
+> (`patch.object(eval_runner_service, "_judge_eval_answer", ...)` or `patch("app.services.forced_emit.forced_emit", ...)`).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | 1 | EVAL-03 | — | Completed with-skill arm → `verdict_state='graded'`, verdict fields persisted | unit | `pytest tests/test_eval_runner.py::test_completed_arm_graded -x` | ❌ W0 (extend) | ⬜ pending |
-| TBD | TBD | 1 | EVAL-03 SC#1 | — | Errored/empty arm → `verdict_state='not_measured'`, `verdict_passed IS NULL`, judge fn NOT called | unit | `pytest tests/test_eval_runner.py::test_errored_arm_not_measured -x` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 1 | EVAL-03 | — | Rollup: 1 pass / 1 fail → `passed_count=1`, `measured_count=2` | unit | `pytest tests/test_eval_runner.py::test_rollup_counts -x` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 1 | EVAL-03 | T-134 (judge indep.) | Judge routed with explicit `provider=` (never `user_settings.active_provider`) | unit | `pytest tests/test_eval_runner.py::test_judge_provider_independent -x` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 2 | EVAL-04 | — | `PUT up`→`GET` shows `up`; `PUT down`→`down`; `PUT null`→cleared (re-ratable round-trip) | integration | `pytest tests/test_evals_router.py::test_rating_round_trip -x` | ❌ W0 (new file) | ⬜ pending |
-| TBD | TBD | 2 | EVAL-04 | T-134 (IDOR) | Cross-user `PUT rating` on another user's result → 404 (owner gate) | integration | `pytest tests/test_evals_router.py::test_rating_cross_user_404 -x` | ❌ W0 | ⬜ pending |
-| TBD | TBD | — | D-13/D-14 | — | Deep Mode byte-identical — `RunContext.skill_catalog_override` default-off; no agent_loop edits | grep guard | `pytest tests/ -k skill_catalog_override` + no-diff assert on `agent_loop.py` | ✅ (133) re-affirm | ⬜ pending |
+| 134-02-03 | 134-02 | 2 | EVAL-03 | — | Completed with-skill arm → `verdict_state='graded'`, verdict fields persisted | unit | `pytest tests/test_eval_runner.py::test_completed_arm_graded -x` | ❌ W0 (extend) | ⬜ pending |
+| 134-02-03 | 134-02 | 2 | EVAL-03 SC#1 | — | Errored/empty arm → `verdict_state='not_measured'`, `verdict_passed IS NULL`, judge fn NOT called (`await_count==0`) | unit | `pytest tests/test_eval_runner.py::test_errored_arm_not_measured -x` | ❌ W0 | ⬜ pending |
+| 134-02-03 | 134-02 | 2 | EVAL-03 | — | Rollup: 1 pass / 1 fail → `passed_count=1`, `measured_count=2` (with-skill only) | unit | `pytest tests/test_eval_runner.py::test_rollup_counts -x` | ❌ W0 | ⬜ pending |
+| 134-02-03 | 134-02 | 2 | EVAL-03 | T-134-02 (judge indep.) | Judge routed with explicit `provider=` (never `user_settings.active_provider`) | unit | `pytest tests/test_eval_runner.py::test_judge_provider_independent -x` | ❌ W0 | ⬜ pending |
+| 134-03-02 | 134-03 | 3 | EVAL-04 | — | `PUT up`→`GET` shows `up`; `PUT down`→`down`; `PUT null`→cleared (re-ratable round-trip) | integration | `pytest tests/test_evals_router.py::test_rating_round_trip -x` | ❌ W0 (new file) | ⬜ pending |
+| 134-03-02 | 134-03 | 3 | EVAL-04 | T-134-01 (IDOR) | Cross-user `PUT rating` on another user's result → 404 (owner gate) | integration | `pytest tests/test_evals_router.py::test_rating_cross_user_404 -x` | ❌ W0 | ⬜ pending |
+| 134-02-03 | 134-02 | 2 | D-13/D-14 | — | Deep Mode byte-identical — `RunContext.skill_catalog_override` default-off; no agent_loop edits | grep guard | `git diff --quiet backend/app/services/agent_loop.py` + `pytest tests/ -k skill_catalog_override` | ✅ (133) re-affirm | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -90,12 +90,12 @@ created: 2026-07-01
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`test_eval_runner.py` extend + `test_evals_router.py` new)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] SC#10 4-axis UAT (U1–U9) executed live before phase close (D-12)
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (`test_eval_runner.py` extend + `test_evals_router.py` new)
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [ ] SC#10 4-axis UAT (U1–U9) executed live before phase close (D-12) — *pending `/gsd:verify-work`*
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** plan-time structural sign-off 2026-07-01 (plan-checker: Nyquist 8a–8d pass). Live SC#10 UAT (U1–U9) pending at `/gsd:verify-work`.

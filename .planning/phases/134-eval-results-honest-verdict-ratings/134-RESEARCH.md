@@ -580,20 +580,22 @@ U8 doubles as the concrete proof of EVAL-03 SC#1 + D-04 + D-11 (the deferred bug
 
 **If the planner adopts the recommendations above, A1–A4 are the only user-confirmable choices; all are low-risk and fall inside Claude's Discretion (D-06/D-08 + SSE shape).**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Judge-failure on a *completed* arm — 2-value vs 3-value `verdict_state`.**
-   - What we know: D-06 named the enum `graded`/`not_measured`. A completed arm whose judge shot fails (transient / missing judge key) is neither cleanly "graded" nor "provider-not-measured."
-   - What's unclear: whether to (a) add a 3rd value `judge_error`, or (b) fold into `not_measured` with a distinct `verdict_reason` prefix.
-   - Recommendation: **prefer `judge_error` (3-value)** for honest rollup accounting (distinguishes "provider errored" from "we couldn't grade"); if minimizing enum churn, (b) is acceptable and the UI treats both as "not measured." Surface to the user at plan/discuss — it is a small, honest-reporting decision. The DDL above ships 2-value with a comment; flip to 3-value if chosen.
+> All three resolved at plan-time (2026-07-01) by orchestrator directive, consistent with each
+> recommendation below, and baked into the plans (verified by plan-checker): OQ1 → 3-value enum in
+> `134-01` migration + `134-02` + `134-04` TS union; OQ2 → non-authoritative default in `134-02`;
+> OQ3 → with-skill-only denominator in `134-02`.
 
-2. **Rollup default boolean rule (`verdict_summary`).**
-   - What we know: D-07 defers the *publish* threshold to Phase 136; 134 needs a placeholder default.
-   - Recommendation: `pass` iff `measured_count >= 1 AND passed_count == measured_count`; label it clearly as a non-authoritative default so Phase 136 can override without a migration (it's just text/derived).
+1. **RESOLVED (OQ1): Judge-failure on a *completed* arm — 3-value `verdict_state`.**
+   - **RESOLVED → 3-value:** `verdict_state ∈ ('graded','not_measured','judge_error')`. Provider-errored/empty arm = `not_measured` (judge NOT called, D-04); a *completed* arm whose judge shot fails = `judge_error`. Distinguishes "provider errored" from "we couldn't grade" for honest rollup accounting. Migration 081 (`134-01`) ships the 3-value CHECK; `134-02` sets `judge_error` on judge failure; `134-04`'s TS union includes `"judge_error"`. Rollup counts neither as passed.
+   - Original rec (retained): prefer `judge_error` (3-value); folding into `not_measured` with a `verdict_reason` prefix was the acceptable-but-rejected minimal alternative.
 
-3. **Do we grade the WITHOUT arm's verdict for the rollup, or only WITH?**
-   - What we know: D-02 grades BOTH arms (persist both verdicts); D-07 rollup counts WITH-skill (X = passed with-skill, N = measured).
-   - Recommendation: persist both per-arm verdicts (D-02) but compute `passed_count`/`measured_count` from **with-skill** arms only (D-07). The without-skill verdict is stored for the A/B story + SI-01, not the rollup denominator. (This is consistent with both decisions — flagged only to make the planner's counting explicit.)
+2. **RESOLVED (OQ2): Rollup default boolean rule (`verdict_summary`).**
+   - **RESOLVED → non-authoritative default:** `verdict_summary = "pass"` iff `measured_count >= 1 AND passed_count == measured_count`, else `"fail"`. Shipped as a derived/text column with a comment marking it NON-AUTHORITATIVE so Phase 136 (GATE-01) can override the real publish threshold WITHOUT a new migration. Implemented in `134-02` per the Pattern 2 code example. D-07 defers the true threshold to Phase 136.
+
+3. **RESOLVED (OQ3): Grade both arms, but count only WITH-skill for the rollup.**
+   - **RESOLVED → both persisted, with-skill-only denominator:** persist both per-arm verdicts (D-02) but compute `passed_count`/`measured_count` from **with-skill** arms only (D-07). The without-skill verdict is stored for the A/B story + SI-01 (Phase 135), not the rollup denominator. Implemented in `134-02` (the run-local accumulator counts with-skill arms only). Consistent with both D-02 and D-07.
 
 ## Sources
 
