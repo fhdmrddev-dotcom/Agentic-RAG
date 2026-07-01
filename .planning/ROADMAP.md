@@ -109,7 +109,7 @@
   3. The user can rate individual eval outputs with thumbs up/down, and the rating persists as a human preference signal (EVAL-04).
   4. The accumulated ratings are queryable as a signal the self-improvement loop (Phase 135) can consume (EVAL-04).
 **Plans**: 4 plans
-- [ ] 134-01-PLAN.md — Migration 081: verdict columns + rollup columns + owner-scoped eval_ratings table [wave 1]
+- [x] 134-01-PLAN.md — Migration 081: verdict columns + rollup columns + owner-scoped eval_ratings table [wave 1]
 - [ ] 134-02-PLAN.md — Verdict engine: reuse-judge grading of both arms vs expected_behavior, honest not_measured/judge_error, with-skill rollup, verdict SSE [wave 2]
 - [ ] 134-03-PLAN.md — Ratings endpoint (owner-verify IDOR gate + upsert/clear) + rating merge in get_eval_run [wave 3]
 - [ ] 134-04-PLAN.md — Thin read/rate surface: verdict line + side-by-side pass/fail + one-line reason + thumbs [wave 4]

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: planned
-last_updated: "2026-07-01T14:58:09.102Z"
-last_activity: 2026-07-01 -- Phase 134 planning complete
+last_updated: "2026-07-01T15:04:58.184Z"
+last_activity: 2026-07-01 -- Phase 134 execution started
 progress:
   total_phases: 25
   completed_phases: 11
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 134 — eval-results-honest-verdict-ratings (PLANNED 2026-07-01 — 4 plans / 4 waves; ready for `/gsd:execute-phase 134`)
+**Current focus:** Phase 134 — eval-results-honest-verdict-ratings
 
 ## Current Position
 
-Phase: 134 (eval-results-honest-verdict-ratings) — PLANNED 2026-07-01 (ready for `/gsd:execute-phase 134`). Prior: Phase 133 (eval runner, EVAL-02) EXECUTED + VERIFIED + SECURED (threats_open: 0).
-Plan: 4 plans / 4 waves (committed `4cbecde7` + checker-fix `docs(134): apply plan-checker fixes`), linear chain 1→4. **W1 134-01** migration 081 (BLOCKING, non-autonomous DB apply via psycopg2 :54322 + regen-full-schema, D-14): 3-value `verdict_state` (graded/not_measured/judge_error, OQ1) + rollup cols on eval_runs + owner-scoped `eval_ratings` table (FK eval_results.id). **W2 134-02** reuse-judge verdict engine — grade BOTH arms vs free-text `expected_behavior` (D-01/02) via independent-model `resolve_judge_model`+forced `JudgeVerdict` routed with explicit `provider=` (D-03), honest not_measured/judge_error (D-04), same-insert verdict + `eval_verdict` SSE (D-05/06), with-skill-only rollup (D-07/OQ3) + Deep byte-identical guard (D-13). **W3 134-03** owner-gated `PUT .../rating` (IDOR 404 T-134-01) + `get_eval_run` rating merge (D-08/09). **W4 134-04** thin `SkillEvalSection` (D-10) — verdict line + side-by-side pass/fail + reason + thumbs. Research + VALIDATION (SC#10 U1–U9, D-12) committed `2ba291b0`. Plan-checker: 0 blockers, 5 warnings all fixed. Gates: reqs 2/2, decisions 14/14. Cross-provider baseline bugs BUG-260701-01/-260630-01 stay deferred→SEED-100 (surfaced honestly as not_measured, D-11).
+Phase: 134 (eval-results-honest-verdict-ratings) — EXECUTING
+Plan: 1 of 4
 Status (prior — Phase 133, complete): `133-VERIFICATION.md` = **passed**; `133-SECURITY.md` = **verified** (threats_open: 0 — gsd-security-auditor verify-mitigations mode confirmed all 11 mitigate-threats present in code + 1 accepted risk AR-133-01 logged for the zero-new-deps supply-chain accept). EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty, NO-OP emit) · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row; cross-user 404) · thin `--skip-ui` SkillEvalSection. **LIVE SC#10 UAT (orchestrator-driven against the live API, psycopg2 cross-check) caught + fixed a real cross-provider routing bug** (`306dd2d4`): eval sent non-OpenAI models to the OpenAI SDK → 404, because the gateway routes on `user_settings.active_provider` not `ctx.resolved_provider` and evals.py never applied the provider override; fix = `override_provider`+`llm_model` pin in the eval router (threads.py:1059-1096 precedent; net-new file, Deep untouched) + regression test. **Proven live across all 4 providers** (OpenAI/Anthropic/Google/OpenRouter route correctly; honest WITH/WITHOUT token delta), **multi-tool** (search_documents+execute_code: "9 distinct risks across 3 docs"), **long-history** (7KB prompt). 9/9 eval tests green. All UAT artifacts cleaned up (eval tables empty; docx restored to 1 case). Remaining = 2 OPTIONAL operator lived-glances (thin-UI live-progress render + parallel-thread feel; engine isolation already confirmed). **Secure-phase DONE 2026-07-01** (`133-SECURITY.md`, threats_open: 0). Next: Phase 134 (EVAL-03/04) / `/gsd:complete-milestone` later.
-Last activity: 2026-07-01 -- Phase 134 planning complete
+Last activity: 2026-07-01 -- Phase 134 execution started
 
 ### Quick Tasks Completed
 
