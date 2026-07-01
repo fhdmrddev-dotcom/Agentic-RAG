@@ -42,6 +42,13 @@ class EvalRunResponse(BaseModel):
     error: str | None
     created_at: datetime
     completed_at: datetime | None
+    # Phase 134 (EVAL-03 / D-07) — with-skill run rollup written at finalize. All
+    # single-typed (Gemini ``type: [...]`` array trap). NULL on old runs + on a
+    # cancelled/interrupted/errored run (never a misleading partial count). The pass
+    # threshold is a NON-authoritative default here — Phase 136 (GATE-01) owns the real one.
+    passed_count: int | None
+    measured_count: int | None
+    verdict_summary: str | None
 
 
 class EvalResultResponse(BaseModel):
@@ -59,4 +66,13 @@ class EvalResultResponse(BaseModel):
     error: str | None
     input_tokens: int | None
     output_tokens: int | None
+    # Phase 134 (EVAL-03 / D-06) — per-arm automated-judge verdict, written in the SAME
+    # insert. All single-typed (Gemini ``type: [...]`` array trap). ``verdict_state`` ∈
+    # graded / not_measured / judge_error; ``verdict_passed``/``verdict_score`` are NULL
+    # unless graded (an errored/empty arm is honestly ``not_measured``, never fabricated).
+    verdict_state: str | None
+    verdict_passed: bool | None
+    verdict_score: int | None
+    verdict_reason: str | None
+    judge_model: str | None
     created_at: datetime
