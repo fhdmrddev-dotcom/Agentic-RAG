@@ -813,3 +813,136 @@ async def propose_skill_improvement(
     # the floor when a non-echoing test fake returns only what was sent.
     row = {**insert_payload, **inserted}
     return _proposal_response(row, base_instructions=base_instructions, gate=None)
+
+
+# ── GET list — a skill's proposals, owner-scoped, newest-first ────────────────────
+@router.get("/{skill_id}/proposals", response_model=list[SkillProposalResponse])
+async def list_skill_proposals(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """List a skill's proposals (owner-scoped, newest-first).
+
+    Owner-verify the skill FIRST (404 cross-user — T-135-01) so a non-owner can't probe a skill's
+    existence, then read owner-scoped (``.eq user_id``) newest-first and hydrate each row's
+    ``base_instructions`` from its base version (id-bounded owner-scoped read — T-135-07). ``gate``
+    serializes straight from the stored value (None on not-yet-reconciled proposals — Plan 05 wires
+    reconcile-on-read)."""
+    user_id = current_user["id"]
+
+    await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    base_map = await _base_instructions_map(
+        supabase, [r.get("base_skill_version_id") for r in rows], user_id
+    )
+    return [
+        _proposal_response(
+            r,
+            base_instructions=base_map.get(str(r.get("base_skill_version_id")), ""),
+            gate=None,
+        )
+        for r in rows
+    ]
+
+
+# ── GET one — a single proposal, owner-scoped, 404-not-403 ───────────────────────
+@router.get("/{skill_id}/proposals/{proposal_id}", response_model=SkillProposalResponse)
+async def get_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return ONE proposal (owner-scoped).
+
+    Owner-verify the proposal row on ``id`` AND ``user_id`` AND ``skill_id``; 404 (NEVER 403) on a
+    cross-user / unknown miss so existence isn't leaked (T-135-01). Hydrate ``base_instructions``
+    from the base version (owner-scoped)."""
+    user_id = current_user["id"]
+
+    def _read():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    row = rows[0]
+    base_instructions = await _read_base_instructions(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _proposal_response(row, base_instructions=base_instructions, gate=None)
+
+
+# ── POST reject — a pure-audit status flip (NO version / skills write — D-10) ─────
+@router.post("/{skill_id}/proposals/{proposal_id}/reject", response_model=SkillProposalResponse)
+async def reject_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Reject a proposal — a PURE AUDIT status flip (D-10).
+
+    Copies ``rate_eval_result``'s IDOR gate (evals.py:485-504): owner-verify the proposal row on
+    ``id`` AND ``user_id`` BEFORE the write; 404 (NEVER 403) on a cross-user / unknown miss. Then a
+    SINGLE ``.update({"status": "rejected"})`` — NO ``skill_versions`` INSERT, NO ``skills`` write
+    (rejection keeps its audit trail here with ``new_skill_version_id`` NULL; re-drafting is a fresh
+    propose — D-10). Every call is threadpool-wrapped (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner-verify the proposal row (404 cross-user — never 403; T-135-01 IDOR gate).
+    def _verify():
+        return (
+            supabase.table("skill_proposals")
+            .select("id, base_skill_version_id")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        verify_rows = list((await run_in_threadpool(_verify)).data or [])
+    except Exception:
+        logger.debug("proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not verify_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+
+    # 2. Pure-audit flip — ONE update, owner-scoped. No version row, no skills write (D-10).
+    def _reject():
+        return (
+            supabase.table("skill_proposals")
+            .update({"status": "rejected"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    updated_rows = list((await run_in_threadpool(_reject)).data or [])
+    row = updated_rows[0] if updated_rows else {**verify_rows[0], "status": "rejected"}
+    base_instructions = await _read_base_instructions(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _proposal_response(row, base_instructions=base_instructions, gate=None)
