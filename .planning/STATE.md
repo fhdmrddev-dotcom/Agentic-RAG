@@ -4,7 +4,7 @@ milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: planned
 last_updated: "2026-07-02T15:02:11.488Z"
-last_activity: 2026-07-02 -- Phase 135 execution started
+last_activity: 2026-07-02 -- Phase 135 re-verified after gap wave: human_needed (4/5) — U1-U11 live UAT pending
 progress:
   total_phases: 26
   completed_phases: 12
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 135 (self-improvement-loop-si-01) — GAPS EXECUTED, RE-VERIFYING (2026-07-02)
+Phase: 135 (self-improvement-loop-si-01) — RE-VERIFIED: **human_needed, 4/5** (2026-07-02T15:35Z). All 3 prior BLOCKERs (CR-01/02/03) + WR-02 flipped to VERIFIED with fresh code+test evidence (43 backend tests green re-run in-session; tsc clean; mig 083 confirmed live via psycopg2). Remaining: Truth 5 = SC#10 live UAT U1–U11, persisted to `135-HUMAN-UAT.md` (11 pending) → run `/gsd:verify-work 135`; then `/gsd:secure-phase 135` (SECURITY.md absent).
 Plan: 9 of 9 executed. Gap wave (135-08 backend `36bdbf60`/`959ab873`/`13d718dc`, 135-09 frontend `d4a06223`/`14347160`) merged to develop (`bfc3f25e`+`b70dbe2b`); post-merge gate green (43 backend tests incl. 4 new regression tests + Deep-mode guard; tsc clean on touched files). CR-01/02/03 + WR-02/04 fixes shipped. Next: re-verify → live SC#10 UAT (U1–U11) → `/gsd:secure-phase 135`
 Status (prior — Phase 134, complete + secured): **COMPLETE 2026-07-02** (134-VERIFICATION.md = **passed**: 8/8 truths + **9/9 live SC#10 UAT (U1–U9) PASSED**, self-driven via Chrome MCP + psycopg2 + Redis + logs; EVAL-03/04 Complete). **SECURED 2026-07-02** (`134-SECURITY.md` = verified, threats_open: 0 — 15/15 threats closed: 13 mitigations verified at code locations + 2 accepted risks AR-134-01/-02; commit `a5661845`). Plan: 4 of 4 executed.
 **UAT found + fixed a major live-surface defect in-session** (`d0c0c10a`): every live eval view died with a spurious "ended with an error" + stale 'running' readout — root causes (a) POST returned run_id before the job's first XADD → subscribe race hit runs.py Step-3b synthetic `buffer_expired_while_streaming`; (b) eval arms silent 40-70s (NO-OP emit) → replay-tail consumer's ~30s Redis XREAD socket timeout closed the stream mid-run; (c) client painted any error terminal as fatal + froze on a mid-run readout. Fix (eval-scoped, chat path untouched): seed `eval_run_started` before 202 + `eval_heartbeat` every 15s wrapping `_run_arm` + bounded client re-attach self-heal. Re-verified live on a 9-min OpenRouter run (live per-arm verdict badges → auto-final readout, zero errors). Also fixed during UAT: the POST-side anchor thread (the "empty twin") was a second uncovered `is_eval` creation site — both threads/run now flagged. U8 proved D-04 honesty against the REAL BUG-260701-01 prefill 400 (sonnet-5 baseline → `not_measured` render, rollup 1/1 excludes it); U9 captured the judge-PASS+human-DOWN disagreement row (Phase-135 query returns it).
