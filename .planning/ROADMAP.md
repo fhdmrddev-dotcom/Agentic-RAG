@@ -170,8 +170,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 135-04-PLAN.md — Propose/get/reject routes + proposal models [wave 2]
-- [ ] 135-07-PLAN.md — Proposal card in SkillEvalSection (thin, 137-fenced) [wave 2]
+- [x] 135-04-PLAN.md — Propose/get/reject routes + proposal models [wave 2]
+- [x] 135-07-PLAN.md — Proposal card in SkillEvalSection (thin, 137-fenced) [wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
