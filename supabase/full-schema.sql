@@ -933,6 +933,36 @@ CREATE TABLE public.skill_files (
 
 
 --
+-- Name: skill_proposals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_proposals (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    base_skill_version_id uuid NOT NULL,
+    new_skill_version_id uuid,
+    re_eval_run_id uuid,
+    source_eval_run_id uuid,
+    user_id uuid NOT NULL,
+    proposed_instructions text NOT NULL,
+    rationale text DEFAULT ''::text NOT NULL,
+    evidence_summary text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'proposed'::text NOT NULL,
+    override_forced boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT skill_proposals_status_check CHECK ((status = ANY (ARRAY['proposed'::text, 'rejected'::text, 'approved'::text, 're_evaling'::text, 'promoted'::text, 'not_promoted'::text, 'interrupted'::text])))
+);
+
+
+--
+-- Name: TABLE skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_proposals IS 'One durable row per proposed skill-instruction edit (SI-01, D-07). proposed_instructions + rationale + evidence_summary + the 7-value lifecycle status (proposed/rejected/approved/re_evaling/promoted/not_promoted/interrupted). base_skill_version_id (NOT NULL) is what the diff is against; new_skill_version_id is INSERTed ONLY on approval (source=''self_improve'', Plan 05) so skill_versions history stays clean of unapproved drafts; rejections keep their audit trail here with new_skill_version_id NULL. source_eval_run_id = the run whose evidence drove the proposal (D-13 baseline); re_eval_run_id = the auto re-eval (D-12, Phase 136 can consume). override_forced records a D-06 force-promote-with-evidence. Owner-only RLS SELECT is defense-in-depth; the service-role SI-01 router writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-135-07). NO write policies — only the service-role router writes (T-135-01).';
+
+
+--
 -- Name: skill_test_cases; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1479,6 +1509,14 @@ ALTER TABLE ONLY public.skill_files
 
 
 --
+-- Name: skill_proposals skill_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: skill_test_cases skill_test_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1933,6 +1971,20 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_skill_proposals_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_proposals_skill_id ON public.skill_proposals USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_proposals_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_proposals_user_id ON public.skill_proposals USING btree (user_id);
+
+
+--
 -- Name: idx_skill_test_cases_skill_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2119,6 +2171,13 @@ CREATE TRIGGER set_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH
 --
 
 CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_proposals skill_proposals_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_proposals_set_updated_at BEFORE UPDATE ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -2549,6 +2608,54 @@ ALTER TABLE ONLY public.skill_files
 
 ALTER TABLE ONLY public.skill_files
     ADD CONSTRAINT skill_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_base_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_base_skill_version_id_fkey FOREIGN KEY (base_skill_version_id) REFERENCES public.skill_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_new_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_new_skill_version_id_fkey FOREIGN KEY (new_skill_version_id) REFERENCES public.skill_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_re_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_re_eval_run_id_fkey FOREIGN KEY (re_eval_run_id) REFERENCES public.eval_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_source_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_source_eval_run_id_fkey FOREIGN KEY (source_eval_run_id) REFERENCES public.eval_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -3196,6 +3303,20 @@ CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SEL
 
 
 --
+-- Name: skill_proposals Users can view own skill proposals; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill proposals" ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill proposals" ON public.skill_proposals IS 'Owner-only (D-07). Defense-in-depth: the service-role SI-01 router bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081 precedent, T-135-07).';
+
+
+--
 -- Name: skill_test_cases Users can view own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -3411,6 +3532,12 @@ ALTER TABLE public.sandbox_files ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.skill_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_proposals; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_proposals ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: skill_test_cases; Type: ROW SECURITY; Schema: public; Owner: -
