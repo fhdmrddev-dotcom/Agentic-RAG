@@ -175,7 +175,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 135-05-PLAN.md — Approve → re-eval → promotion gate + resilience (interrupted/force-promote) [wave 3]
+- [x] 135-05-PLAN.md — Approve → re-eval → promotion gate + resilience (interrupted/force-promote) [wave 3]
 
 **UI hint**: yes
 
