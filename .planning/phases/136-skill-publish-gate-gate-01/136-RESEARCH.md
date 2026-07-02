@@ -343,17 +343,19 @@ CREATE POLICY "Users can view own publish overrides"
 
 **All other claims in this research are VERIFIED against live code/migrations or CITED from CONTEXT.md/CLAUDE.md.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Override-record shape: audit table vs columns on `skills`.**
    - What we know: D-09 gates every share action (overrides are repeatable); the eval domain has a strong 5-table append-only/service-role/owner-only-RLS precedent; toggle-only column writes do NOT fire the 079 version trigger (`079:112-119` — trigger versions only on name/description/instructions change), so columns-on-skills is version-safe.
    - What's unclear: whether the owner wants full override history or only the latest state.
    - Recommendation: append-only `skill_publish_overrides` (migration 084) for honest history; note columns-on-skills as the smaller alternative in the plan and let discuss/plan pick.
+   - **RESOLVED (planning, 2026-07-03): audit table — `supabase/migrations/084_skill_publish_overrides.sql` (Plan 01 Task 2; append-only, owner-only SELECT RLS, no client write policies).**
 
 2. **GET publish-gate as its own route vs folding status into the 409 payload only.**
    - What we know: D-05 wants "confirm dialog always" showing status at open; the PATCH 409 only fires on a click attempt.
    - What's unclear: whether the team wants the extra read route.
    - Recommendation: ship the tiny `GET /skills/{id}/publish-gate` (server-computed, reuses the one helper) so the dialog renders satisfied/unmet BEFORE the user commits — cleaner than a speculative PATCH-to-probe.
+   - **RESOLVED (planning, 2026-07-03): ship `GET /skills/{id}/publish-gate` as its own owner-scoped route (Plan 02 Task 1).**
 
 ## Environment Availability
 
