@@ -107,6 +107,10 @@ None - plan executed exactly as written.
 - The override seam is the correctness precondition for the D-05 draft-version-first re-eval and the entire promotion gate. Plan 04 (`PromotionGate`) can now drive a re-eval that measures the DRAFT instructions without touching the live skill.
 - SC#10 UAT U5 (135-VALIDATION.md) remains the end-to-end proof that the build-site threading (not just the handler branch) works on the live path.
 
+## Self-Check: PASSED
+
+All 5 created/modified files present on disk; all 4 commits (`e1252d33`, `f141a4de`, `2d381897`, `ce6bf0d3`) present in git log; working tree clean.
+
 ---
 *Phase: 135-self-improvement-loop-si-01*
 *Completed: 2026-07-02*
