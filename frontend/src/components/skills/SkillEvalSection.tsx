@@ -17,7 +17,7 @@
 // every route (Plan 04 `.eq("user_id")`); this client only renders what they return.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Play, ThumbsUp, ThumbsDown } from "lucide-react"
+import { Loader2, Play, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   getProviders,
@@ -26,8 +26,11 @@ import {
   listEvalRuns,
   subscribeToRun,
   rateEvalResult,
+  proposeImprovement,
+  listProposals,
 } from "@/lib/api"
-import type { EvalResult, EvalRun } from "@/types"
+import { lineDiff } from "@/lib/lineDiff"
+import type { EvalResult, EvalRun, SkillProposal } from "@/types"
 
 interface Props {
   skillId: string
@@ -59,6 +62,18 @@ function verdictBadge(r: EvalResult): string | null {
   }
 }
 
+// Phase 135 (SI-01) — pick the proposal to surface: the most-recently-updated one
+// that the user hasn't rejected. A `rejected` latest ⇒ no card (dismissed), which
+// also re-enables "Propose improvement" for a fresh attempt. Terminal promoted /
+// not_promoted rows stay visible so the honest gate verdict persists (D-13).
+function pickActiveProposal(list: SkillProposal[]): SkillProposal | null {
+  if (list.length === 0) return null
+  const latest = [...list].sort((a, b) =>
+    (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at),
+  )[0]
+  return latest.status === "rejected" ? null : latest
+}
+
 export function SkillEvalSection({ skillId }: Props) {
   const [providers, setProviders] = useState<
     { id: string; name: string; models: string[] }[]
@@ -72,6 +87,13 @@ export function SkillEvalSection({ skillId }: Props) {
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null)
   const [results, setResults] = useState<EvalResult[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Phase 135 (SI-01) — the self-improvement proposal card lives under the eval
+  // readout (D-08). State is the DB row (never optimistic — T-135-04): hydrated on
+  // mount, re-fetched after every action, reset on skill switch like the eval state.
+  const [proposal, setProposal] = useState<SkillProposal | null>(null)
+  const [proposalLoading, setProposalLoading] = useState(false)
+  const [proposalError, setProposalError] = useState<string | null>(null)
 
   // Abort the in-flight stream subscription on unmount / re-run so we never leak
   // a reader (subscribeToRun returns silently on AbortError).
@@ -211,6 +233,10 @@ export function SkillEvalSection({ skillId }: Props) {
     setResults([])
     setError(null)
     reattachRef.current = 0
+    // 135 (SI-01): reset the proposal card the SAME way (skill-switch safe).
+    setProposal(null)
+    setProposalLoading(false)
+    setProposalError(null)
     async function init() {
       try {
         const p = await getProviders()
@@ -232,6 +258,16 @@ export function SkillEvalSection({ skillId }: Props) {
         }
       } catch {
         /* no prior runs / load failure — start clean */
+      }
+      // 135 (SI-01): hydrate the latest non-rejected proposal for this skill from
+      // the DB (survives reload/skill-switch; DB is source of truth). A still-live
+      // re-eval reattaches to the shared readout in the reattach block below.
+      try {
+        const proposals = await listProposals(skillId)
+        if (cancelled || currentSkillRef.current !== skillId) return
+        setProposal(pickActiveProposal(proposals))
+      } catch {
+        /* no proposals / load failure — no card */
       }
     }
     void init()
@@ -279,7 +315,34 @@ export function SkillEvalSection({ skillId }: Props) {
     }
   }
 
+  // 135 (SI-01) — propose an improved instructions revision from the current eval
+  // run's evidence (D-01: only once the run has results). The fresh `proposed`
+  // proposal comes straight back from the DB via the POST (never optimistic).
+  async function handlePropose() {
+    const rid = evalRun?.id ?? runId
+    if (!rid) return
+    setProposalError(null)
+    setProposalLoading(true)
+    try {
+      const p = await proposeImprovement(skillId, rid)
+      if (currentSkillRef.current !== skillId) return
+      setProposal(p)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to propose improvement.")
+    } finally {
+      setProposalLoading(false)
+    }
+  }
+
   const activeProvider = providers.find((p) => p.id === provider)
+
+  // 135 (SI-01) — Propose is enabled once the eval run has landed durable results
+  // (D-01) and there is no active proposal already in flight for this skill.
+  const evalHasResults = !!evalRun && results.length > 0 && !running
+  const proposalActive =
+    !!proposal && ["proposed", "approved", "re_evaling"].includes(proposal.status)
+  const canPropose = evalHasResults && !proposalActive && !proposalLoading
 
   // Group durable results by test case for the readout.
   const byCase = new Map<string, Partial<Record<string, EvalResult>>>()
@@ -375,6 +438,82 @@ export function SkillEvalSection({ skillId }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Phase 135 (SI-01) — self-improvement proposal card (thin, 137-fenced).
+          Sits under the eval readout (D-08): "Propose improvement" (D-01) then the
+          unified line diff (D-09) + rationale + which-evidence-drove-it (D-10); the
+          status-driven approve/reject/re-eval action row + honest gate counts (D-13)
+          render below the diff. */}
+      {evalHasResults && (
+        <div className="flex flex-col gap-3 border-t border-border/30 pt-3">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1"
+              onClick={() => void handlePropose()}
+              disabled={!canPropose}
+            >
+              {proposalLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              Propose improvement
+            </Button>
+          </div>
+
+          {proposalError && <p className="text-xs text-destructive">{proposalError}</p>}
+
+          {proposal && proposal.status !== "rejected" && (
+            <div className="flex flex-col gap-3 rounded border border-border/30 p-3">
+              {/* Unified line diff of base vs proposed instructions (D-09). */}
+              <p className="text-xs font-medium text-foreground">
+                Proposed instructions change
+              </p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-2 font-mono text-xs">
+                {lineDiff(
+                  proposal.base_instructions,
+                  proposal.proposed_instructions,
+                ).map((row, i) => (
+                  <span
+                    key={i}
+                    className={
+                      row.type === "add"
+                        ? "block bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : row.type === "remove"
+                          ? "block bg-destructive/10 text-destructive"
+                          : "block text-foreground/70"
+                    }
+                  >
+                    {row.type === "add" ? "+ " : row.type === "remove" ? "- " : "  "}
+                    {row.text || " "}
+                  </span>
+                ))}
+              </pre>
+
+              {/* Rationale + which evidence drove it (D-10). */}
+              {proposal.rationale && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-muted-foreground">Why this change</p>
+                  <p className="whitespace-pre-wrap text-xs text-foreground/80">
+                    {proposal.rationale}
+                  </p>
+                </div>
+              )}
+              {proposal.evidence_summary && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-muted-foreground">Evidence</p>
+                  <p className="whitespace-pre-wrap text-xs text-foreground/80">
+                    {proposal.evidence_summary}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Durable per-case with/without readout (re-fetched from the DB). */}
