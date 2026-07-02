@@ -17,7 +17,17 @@
 // every route (Plan 04 `.eq("user_id")`); this client only renders what they return.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Play, ThumbsUp, ThumbsDown } from "lucide-react"
+import {
+  Loader2,
+  Play,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles,
+  Check,
+  X,
+  RotateCw,
+  ArrowUpCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   getProviders,
@@ -26,8 +36,16 @@ import {
   listEvalRuns,
   subscribeToRun,
   rateEvalResult,
+  proposeImprovement,
+  listProposals,
+  getProposal,
+  approveProposal,
+  rejectProposal,
+  rerunProposalReeval,
+  forcePromoteProposal,
 } from "@/lib/api"
-import type { EvalResult, EvalRun } from "@/types"
+import { lineDiff } from "@/lib/lineDiff"
+import type { EvalResult, EvalRun, SkillProposal, PromotionGate } from "@/types"
 
 interface Props {
   skillId: string
@@ -59,6 +77,39 @@ function verdictBadge(r: EvalResult): string | null {
   }
 }
 
+// Phase 135 (SI-01) — pick the proposal to surface: the most-recently-updated one
+// that the user hasn't rejected. A `rejected` latest ⇒ no card (dismissed), which
+// also re-enables "Propose improvement" for a fresh attempt. Terminal promoted /
+// not_promoted rows stay visible so the honest gate verdict persists (D-13).
+function pickActiveProposal(list: SkillProposal[]): SkillProposal | null {
+  if (list.length === 0) return null
+  const latest = [...list].sort((a, b) =>
+    (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at),
+  )[0]
+  return latest.status === "rejected" ? null : latest
+}
+
+// Phase 135 (SI-01) — the honest case-matched promotion-gate counts (D-13). The
+// SAME renderer is called from BOTH the `promoted` and `not_promoted` branches so
+// the counts are "always displayed alongside the verdict", not only on failure. A
+// null gate (interrupted / not-yet-reconciled) renders nothing (no fabricated pass).
+function renderGateCounts(gate: PromotionGate | null | undefined) {
+  if (!gate) return null
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      <p className="font-medium text-foreground">
+        {gate.passed ? "Gate passed" : "Gate not passed"} — no-regression:{" "}
+        {gate.no_regression ? "yes" : "no"} · improved: {gate.improved ? "yes" : "no"}
+      </p>
+      <p>
+        prev pass {gate.prev_pass} · prev fail {gate.prev_fail} · still pass{" "}
+        {gate.still_pass} · newly pass {gate.newly_pass} · not measured{" "}
+        {gate.excluded_not_measured}
+      </p>
+    </div>
+  )
+}
+
 export function SkillEvalSection({ skillId }: Props) {
   const [providers, setProviders] = useState<
     { id: string; name: string; models: string[] }[]
@@ -72,6 +123,13 @@ export function SkillEvalSection({ skillId }: Props) {
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null)
   const [results, setResults] = useState<EvalResult[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Phase 135 (SI-01) — the self-improvement proposal card lives under the eval
+  // readout (D-08). State is the DB row (never optimistic — T-135-04): hydrated on
+  // mount, re-fetched after every action, reset on skill switch like the eval state.
+  const [proposal, setProposal] = useState<SkillProposal | null>(null)
+  const [proposalLoading, setProposalLoading] = useState(false)
+  const [proposalError, setProposalError] = useState<string | null>(null)
 
   // Abort the in-flight stream subscription on unmount / re-run so we never leak
   // a reader (subscribeToRun returns silently on AbortError).
@@ -89,6 +147,11 @@ export function SkillEvalSection({ skillId }: Props) {
   // the client re-subscribes instead of painting a dead "error" end-state.
   const reattachRef = useRef(0)
 
+  // Phase 135 (SI-01) — when non-null, the currently-attached eval readout belongs
+  // to a proposal's re-eval; loadReadout then reconciles the proposal (status + gate)
+  // from the DB on every readout (Pattern 3). Reset per fresh eval run + skill switch.
+  const reEvalProposalIdRef = useRef<string | null>(null)
+
   // Pull the durable readout from the DB (survives the Redis TTL — SC#3). Guarded
   // against a skill switch (WR-02 / BUG-260701-02): capture the skill this fetch is for
   // and bail before ANY setState if the active skill changed while it was in flight, so
@@ -101,6 +164,10 @@ export function SkillEvalSection({ skillId }: Props) {
       if (currentSkillRef.current !== requestedSkill) return
       setEvalRun(eval_run)
       setResults(eval_results)
+      // 135 (SI-01): if this readout is for a proposal's re-eval, reconcile the
+      // proposal (status + honest gate counts) from the DB too — never optimistic.
+      const pid = reEvalProposalIdRef.current
+      if (pid) void refetchProposal(pid)
     } catch (err) {
       if (currentSkillRef.current !== requestedSkill) return
       setError(err instanceof Error ? err.message : "Failed to load eval results.")
@@ -189,6 +256,31 @@ export function SkillEvalSection({ skillId }: Props) {
     )
   }
 
+  // 135 (SI-01) — reconcile a proposal from the DB (status + honest gate counts).
+  // Never optimistic (T-135-04): the card can't show "promoted" unless the server
+  // reconciled it. A `rejected` result clears the card (re-enables Propose). Guarded
+  // against a skill switch exactly like loadReadout.
+  async function refetchProposal(pid: string) {
+    const requestedSkill = skillId
+    try {
+      const p = await getProposal(requestedSkill, pid)
+      if (currentSkillRef.current !== requestedSkill) return
+      setProposal(p.status === "rejected" ? null : p)
+    } catch {
+      /* keep the last known card; the next action re-fetches from the DB */
+    }
+  }
+
+  // 135 (SI-01) — if the proposal is mid-re-eval, reattach the shared eval live
+  // readout to its companion run (Pattern 3) so progress keeps streaming + heartbeats;
+  // the run's terminal reconciles the proposal via loadReadout. Idempotent.
+  function reattachProposalReeval(p: SkillProposal | null) {
+    if (p && p.status === "re_evaling" && p.re_eval_run_id) {
+      reEvalProposalIdRef.current = p.id
+      attach(p.re_eval_run_id)
+    }
+  }
+
   // On mount: load the provider list + reattach to a still-live run (D-06).
   // The thin client has no ephemeral eval thread_id to feed getActiveRuns, so it
   // discovers a live run via the owner-scoped listEvalRuns (the skill-scoped
@@ -211,6 +303,11 @@ export function SkillEvalSection({ skillId }: Props) {
     setResults([])
     setError(null)
     reattachRef.current = 0
+    // 135 (SI-01): reset the proposal card the SAME way (skill-switch safe).
+    setProposal(null)
+    setProposalLoading(false)
+    setProposalError(null)
+    reEvalProposalIdRef.current = null
     async function init() {
       try {
         const p = await getProviders()
@@ -233,6 +330,19 @@ export function SkillEvalSection({ skillId }: Props) {
       } catch {
         /* no prior runs / load failure — start clean */
       }
+      // 135 (SI-01): hydrate the latest non-rejected proposal for this skill from
+      // the DB (survives reload/skill-switch; DB is source of truth). A still-live
+      // re-eval reattaches to the shared readout in the reattach block below.
+      try {
+        const proposals = await listProposals(skillId)
+        if (cancelled || currentSkillRef.current !== skillId) return
+        const active = pickActiveProposal(proposals)
+        setProposal(active)
+        // A reload mid-re-eval keeps streaming instead of freezing (Pattern 3).
+        reattachProposalReeval(active)
+      } catch {
+        /* no proposals / load failure — no card */
+      }
     }
     void init()
     return () => {
@@ -253,6 +363,8 @@ export function SkillEvalSection({ skillId }: Props) {
     setEvalRun(null)
     setRunning(true)
     reattachRef.current = 0
+    // A fresh eval run is NOT a proposal re-eval — detach the reconcile hook.
+    reEvalProposalIdRef.current = null
     try {
       const { run_id } = await startEvalRun(skillId, { provider, model })
       attach(run_id)
@@ -279,7 +391,100 @@ export function SkillEvalSection({ skillId }: Props) {
     }
   }
 
+  // 135 (SI-01) — propose an improved instructions revision from the current eval
+  // run's evidence (D-01: only once the run has results). The fresh `proposed`
+  // proposal comes straight back from the DB via the POST (never optimistic).
+  async function handlePropose() {
+    const rid = evalRun?.id ?? runId
+    if (!rid) return
+    setProposalError(null)
+    setProposalLoading(true)
+    try {
+      const p = await proposeImprovement(skillId, rid)
+      if (currentSkillRef.current !== skillId) return
+      setProposal(p)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to propose improvement.")
+    } finally {
+      setProposalLoading(false)
+    }
+  }
+
+  // 135 (SI-01) — proposal lifecycle handlers. Each mirrors handleRate: call the
+  // owner-gated endpoint, THEN re-fetch the proposal from the DB (never optimistic —
+  // T-135-04). Approve/rerun additionally reattach the shared eval live readout to the
+  // companion re-eval run (Pattern 3); the run's terminal reconciles status + gate.
+  async function handleApprove() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      const { re_eval_run_id } = await approveProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+      setLive({})
+      reEvalProposalIdRef.current = pid
+      attach(re_eval_run_id)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to approve proposal.")
+    }
+  }
+
+  async function handleReject() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      await rejectProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to reject proposal.")
+    }
+  }
+
+  async function handleRerun() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      const { re_eval_run_id } = await rerunProposalReeval(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+      setLive({})
+      reEvalProposalIdRef.current = pid
+      attach(re_eval_run_id)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to re-run the re-eval.")
+    }
+  }
+
+  async function handleForcePromote() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      await forcePromoteProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to force-promote proposal.")
+    }
+  }
+
   const activeProvider = providers.find((p) => p.id === provider)
+
+  // 135 (SI-01) — Propose is enabled once the eval run has landed durable results
+  // (D-01) and there is no active proposal already in flight for this skill.
+  const evalHasResults = !!evalRun && results.length > 0 && !running
+  const proposalActive =
+    !!proposal && ["proposed", "approved", "re_evaling"].includes(proposal.status)
+  const canPropose = evalHasResults && !proposalActive && !proposalLoading
 
   // Group durable results by test case for the readout.
   const byCase = new Map<string, Partial<Record<string, EvalResult>>>()
@@ -375,6 +580,167 @@ export function SkillEvalSection({ skillId }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Phase 135 (SI-01) — self-improvement proposal card (thin, 137-fenced).
+          Sits under the eval readout (D-08): "Propose improvement" (D-01) then the
+          unified line diff (D-09) + rationale + which-evidence-drove-it (D-10); the
+          status-driven approve/reject/re-eval action row + honest gate counts (D-13)
+          render below the diff. */}
+      {(evalHasResults || (proposal && proposal.status !== "rejected")) && (
+        <div className="flex flex-col gap-3 border-t border-border/30 pt-3">
+          {/* Propose button hidden while a re-eval streams (evalHasResults gates on
+              !running); the card itself stays mounted so it never vanishes mid-run. */}
+          {evalHasResults && (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs gap-1"
+                onClick={() => void handlePropose()}
+                disabled={!canPropose}
+              >
+                {proposalLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Propose improvement
+              </Button>
+            </div>
+          )}
+
+          {proposalError && <p className="text-xs text-destructive">{proposalError}</p>}
+
+          {proposal && proposal.status !== "rejected" && (
+            <div className="flex flex-col gap-3 rounded border border-border/30 p-3">
+              {/* Unified line diff of base vs proposed instructions (D-09). */}
+              <p className="text-xs font-medium text-foreground">
+                Proposed instructions change
+              </p>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/30 p-2 font-mono text-xs">
+                {lineDiff(
+                  proposal.base_instructions,
+                  proposal.proposed_instructions,
+                ).map((row, i) => (
+                  <span
+                    key={i}
+                    className={
+                      row.type === "add"
+                        ? "block bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : row.type === "remove"
+                          ? "block bg-destructive/10 text-destructive"
+                          : "block text-foreground/70"
+                    }
+                  >
+                    {row.type === "add" ? "+ " : row.type === "remove" ? "- " : "  "}
+                    {row.text || " "}
+                  </span>
+                ))}
+              </pre>
+
+              {/* Rationale + which evidence drove it (D-10). */}
+              {proposal.rationale && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-muted-foreground">Why this change</p>
+                  <p className="whitespace-pre-wrap text-xs text-foreground/80">
+                    {proposal.rationale}
+                  </p>
+                </div>
+              )}
+              {proposal.evidence_summary && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-muted-foreground">Evidence</p>
+                  <p className="whitespace-pre-wrap text-xs text-foreground/80">
+                    {proposal.evidence_summary}
+                  </p>
+                </div>
+              )}
+
+              {/* Status-driven action row + honest terminal verdict (D-06/D-13/D-14).
+                  State is always the reconciled DB row (refetch-not-optimistic). */}
+              {proposal.status === "proposed" && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="text-xs gap-1"
+                    onClick={() => void handleApprove()}
+                  >
+                    <Check className="h-3 w-3" /> Approve &amp; re-eval
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1"
+                    onClick={() => void handleReject()}
+                  >
+                    <X className="h-3 w-3" /> Reject
+                  </Button>
+                </div>
+              )}
+
+              {(proposal.status === "approved" || proposal.status === "re_evaling") && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Re-evaluating the proposed skill — live progress shows above.
+                </p>
+              )}
+
+              {proposal.status === "promoted" && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold text-emerald-500">
+                    Promoted to the live skill
+                    {proposal.override_forced ? " (forced override)" : ""}.
+                  </p>
+                  {renderGateCounts(proposal.gate)}
+                </div>
+              )}
+
+              {proposal.status === "not_promoted" && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-destructive">
+                    Not promoted — the re-eval gate did not pass (failing cases in the
+                    results above).
+                  </p>
+                  {renderGateCounts(proposal.gate)}
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1"
+                      onClick={() => void handleForcePromote()}
+                    >
+                      <ArrowUpCircle className="h-3 w-3" /> Force promote anyway
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {proposal.status === "interrupted" && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Interrupted — not promoted. The re-eval did not finish.
+                  </p>
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1"
+                      onClick={() => void handleRerun()}
+                    >
+                      <RotateCw className="h-3 w-3" /> Re-run re-eval
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Durable per-case with/without readout (re-fetched from the DB). */}
