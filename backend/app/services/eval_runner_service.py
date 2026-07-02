@@ -377,6 +377,7 @@ async def _run_arm(
     model: str,
     current_user: dict,
     user_settings,
+    skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
 ) -> tuple[str, str, bool | None]:
     """Drive ONE completion (WITH or WITHOUT arm) for one case, grade it, then persist its
     eval_results row (verdict in the SAME insert) + emit progress. A per-arm exception
@@ -404,6 +405,7 @@ async def _run_arm(
             case=case, variant=variant, catalog_override=catalog_override,
             provider=provider, model=model, current_user=current_user,
             user_settings=user_settings, user_id=user_id, test_case_id=test_case_id,
+            skill_instructions_override=skill_instructions_override,
         )
     finally:
         pulse.cancel()
@@ -424,6 +426,7 @@ async def _run_arm_body(
     user_settings,
     user_id: str,
     test_case_id,
+    skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
 ) -> tuple[str, str, bool | None]:
     """The original ``_run_arm`` body (loop → D-04 grading gate → persist → emits),
     extracted verbatim so the heartbeat pulse can wrap it with try/finally without
@@ -448,6 +451,11 @@ async def _run_arm_body(
         resolved_model=model,
         resolved_provider=provider,
         skill_catalog_override=catalog_override,
+        # Phase 135 (135-02 / SI-01) — additive default-off DRAFT instructions
+        # override (Pitfall #1). None on 133/134 => _handle_load_skill queries the
+        # live DB (unchanged); the WITH arm of a re-eval passes {skill_name:
+        # proposed_instructions} so the loop measures the DRAFT, not the live skill.
+        skill_instructions_override=skill_instructions_override,
     )
 
     status = "completed"
@@ -581,6 +589,11 @@ async def run_eval_job(
     redis,
     supabase,
     pool,
+    # Phase 135 (135-02 / SI-01) — Pitfall #1 carrier: additive default-off map
+    # {skill_name: proposed_instructions} for the DRAFT re-eval's WITH arm. None on
+    # every 133/134 caller => the WITH/WITHOUT/judge/heartbeat/terminal/rollup logic
+    # is byte-identical; the re-eval passes the draft body for the WITH arm ONLY.
+    skill_instructions_override: dict[str, str] | None = None,
 ) -> None:
     """The bounded background eval job (EVAL-02).
 
@@ -643,6 +656,9 @@ async def run_eval_job(
                     case=case, variant=VARIANT_WITH, catalog_override=with_override,
                     provider=provider, model=model, current_user=current_user,
                     user_settings=user_settings,
+                    # Phase 135 (SI-01) — WITH arm ONLY: the DRAFT re-eval measures the
+                    # proposed instructions (Pitfall #1). None on 133/134 => unchanged.
+                    skill_instructions_override=skill_instructions_override,
                 )
             )
 
