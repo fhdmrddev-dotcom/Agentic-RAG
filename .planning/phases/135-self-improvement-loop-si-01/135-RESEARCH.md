@@ -483,7 +483,13 @@ CREATE TRIGGER skill_proposals_set_updated_at
 | A4 | `slopcheck` unavailability makes `diff` `[ASSUMED]` for gating despite strong registry signals | Package Legitimacy Audit | Low — the recommended path adds no package. |
 | A5 | The re-eval's provider/model = the source run's `provider`/`model` columns on `eval_runs` (D-11) | Re-eval reuse | Low — verified those columns exist on `eval_runs` (mig 080). |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+**Resolution pointers (all four resolved during 135 planning):**
+- **Q1 (BLOCKER — how the re-eval loads the DRAFT instructions):** RESOLVED — the additive default-off `skill_instructions_override` seam was pre-approved (orchestrator note) and is implemented in Plan 02: RunContext field + unpack at agent_loop.py:1105 + BOTH ToolContext builds (:2279 primary, :1501 resume) + the task_service.py sub-agent copy + the `_handle_load_skill` branch. `None` on every existing caller ⇒ Deep byte-identical.
+- **Q2 (concurrent-proposal policy, Discretion):** RESOLVED — one OPEN proposal per skill; a lingering `proposed` draft is superseded, a `re_evaling` one blocks with 409 (Plan 04, D-04).
+- **Q3 (changed case set, D-13 Discretion):** RESOLVED — intersection-only case-match; added/deleted cases counted as `excluded_not_measured` in the honest counts (Plan 05 `promotion_gate`, D-13).
+- **Q4 (WITHOUT-arm outputs):** RESOLVED — include BOTH arms, labelled `with_skill` vs `without_skill` in the DATA block (Plan 03 evidence render, D-02).
 
 1. **How does the re-eval load the DRAFT version's instructions without touching the live skill? (BLOCKER — must resolve before planning tasks)**
    - What we know: `_handle_load_skill` reads instructions from the live `skills` table by name; the 133 catalog override carries only name+description; D-05 forbids touching the live skill pre-promotion.
