@@ -682,11 +682,36 @@ export function SkillEvalSection({ skillId }: Props) {
                 </div>
               )}
 
-              {(proposal.status === "approved" || proposal.status === "re_evaling") && (
+              {proposal.status === "re_evaling" && (
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Re-evaluating the proposed skill — live progress shows above.
                 </p>
+              )}
+
+              {/* CR-03 (frontend) — `approved` is transient in the happy path
+                  (it flips to `re_evaling` in the same approve response); a
+                  persistent `approved` on refetch means the re-eval launch failed
+                  and the loop is wedged. Offer a Reject escape so the human stays
+                  in the loop (rejectProposal accepts ANY status server-side). */}
+              {proposal.status === "approved" && (
+                <div className="flex flex-col gap-2">
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Re-evaluating the proposed skill — live progress shows above.
+                  </p>
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1"
+                      onClick={() => void handleReject()}
+                    >
+                      <X className="h-3 w-3" /> Reject
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {proposal.status === "promoted" && (
