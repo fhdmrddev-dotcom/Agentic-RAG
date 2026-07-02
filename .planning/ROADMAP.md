@@ -179,8 +179,8 @@ Plans:
 
 **Gap closure** *(from 135-VERIFICATION.md — closes CR-01/CR-02/CR-03/WR-02 blocking gaps; runs in parallel, no file overlap)*
 
-- [ ] 135-08-PLAN.md — Backend: force-promote optional body (CR-01) + reconcile cross-worker liveness (CR-02) + approve except/revert & stale-approved self-heal (CR-03) + override draft-name key (WR-02) + tests [gap]
-- [ ] 135-09-PLAN.md — Frontend: force-promote empty body (CR-01) + string-guarded error detail (WR-04) + approved-status Reject escape (CR-03) [gap]
+- [x] 135-08-PLAN.md — Backend: force-promote optional body (CR-01) + reconcile cross-worker liveness (CR-02) + approve except/revert & stale-approved self-heal (CR-03) + override draft-name key (WR-02) + tests [gap]
+- [x] 135-09-PLAN.md — Frontend: force-promote empty body (CR-01) + string-guarded error detail (WR-04) + approved-status Reject escape (CR-03) [gap]
 
 **UI hint**: yes
 
