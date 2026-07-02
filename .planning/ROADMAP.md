@@ -195,7 +195,12 @@ Plans:
   2. After at least one eval has run and passed, the same skill can be published and the publish flow shows the gate satisfied (GATE-01).
   3. The gate applies only to future publish actions — already-published skills are not retroactively gated (GATE-01 scope).
 
-**Plans**: TBD
+**Plans**: 4 plans across 3 waves
+Plans:
+- [ ] 136-01-PLAN.md — Migration 084 (skill_publish_overrides) + gate read-model compute_publish_gate (D-03 rule / D-04 content-equality) + PublishGate/TogglePublishBody contracts [wave 1]
+- [ ] 136-02-PLAN.md — Server-side enforcement: gated toggle (409 + recorded override) + closed born-global create door (D-08) + GET publish-gate [wave 2]
+- [ ] 136-03-PLAN.md — Thin publish dialog + client contracts (getPublishGate / override toggle) + SkillCard share-intercept [wave 2]
+- [ ] 136-04-PLAN.md — SkillEvalSection gate-status line + owner-visible override record (D-06/D-02) [wave 3]
 **UI hint**: yes
 
 #### Phase 137: Skill Evals Panel UI (PANEL-01)
