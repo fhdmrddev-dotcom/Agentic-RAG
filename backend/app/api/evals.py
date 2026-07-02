@@ -55,8 +55,13 @@ from supabase import Client
 from app.config import get_model_capability
 from app.db.runs import insert_run
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
-from app.models.eval_run import RateResultBody, StartEvalRunBody
-from app.services import eval_runner_service
+from app.models.eval_run import (
+    ProposeBody,
+    RateResultBody,
+    SkillProposalResponse,
+    StartEvalRunBody,
+)
+from app.services import eval_runner_service, skill_proposer_service
 
 logger = logging.getLogger(__name__)
 
@@ -541,3 +546,403 @@ async def rate_eval_result(
 
     await run_in_threadpool(_upsert)
     return {"eval_result_id": str(result_id), "rating": body.rating}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Phase 135 (SI-01) — the self-improvement PROPOSAL control surface.
+#
+# Four routes on this SAME ``/skills`` router (the smaller diff per RESEARCH Alternatives):
+#   POST   /skills/{skill_id}/proposals                       -> draft ONE proposal (D-01/D-04)
+#   GET    /skills/{skill_id}/proposals                       -> list, owner-scoped, newest-first
+#   GET    /skills/{skill_id}/proposals/{proposal_id}         -> one, 404-not-403 (D-07)
+#   POST   /skills/{skill_id}/proposals/{proposal_id}/reject  -> pure-audit status flip (D-10)
+#
+# OWNER-SCOPING IS THE SOLE RUNTIME GATE (T-135-01 / T-135-07): ``get_supabase()`` is the
+# SERVICE-ROLE client (RLS bypassed), so the app-code ``.eq("user_id", …)`` on EVERY read/write
+# is the only thing standing between user A and user B's proposals. A cross-user miss returns 404
+# (never 403 — don't leak existence). ``user_id``/``skill_id`` come from the caller + the path,
+# NEVER the request body (T-135-02). The nullable ``gate`` (D-13 honest counts) is None at this
+# stage — no re-eval has reconciled yet (Plan 05 populates it; declared on the response model so
+# FastAPI does not strip it).
+# ═══════════════════════════════════════════════════════════════════════════════════
+
+# The OPEN-proposal statuses (D-04 concurrency — "one open proposal per skill at a time"). A
+# ``proposed`` draft the user never acted on is superseded by a new propose; an ``approved`` or
+# ``re_evaling`` proposal is genuinely in-flight (a re-eval is imminent or running) and BLOCKS a
+# new propose (409) — clobbering it would orphan a running/committed re-eval.
+_OPEN_PROPOSAL_STATUSES = ("proposed", "approved", "re_evaling")
+_INFLIGHT_PROPOSAL_STATUSES = ("approved", "re_evaling")
+
+
+async def _read_base_instructions(supabase: Client, version_id: str, user_id: str) -> str:
+    """Return one base ``skill_versions.instructions`` body, owner-scoped (T-135-07). Empty
+    string when the version is missing (a deleted base version) — honest, never faked."""
+
+    def _read():
+        return (
+            supabase.table("skill_versions")
+            .select("id, instructions")
+            .eq("id", str(version_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    return (rows[0].get("instructions") or "") if rows else ""
+
+
+async def _base_instructions_map(
+    supabase: Client, version_ids: list[str], user_id: str
+) -> dict[str, str]:
+    """Bounded (``.in_``) owner-scoped read of many base versions' instructions for list
+    hydration — never over/under-fetches beyond the caller's own referenced version rows
+    (T-135-07 / the evals.py:404-421 id-bounded precedent)."""
+    ids = [str(v) for v in {vid for vid in version_ids if vid}]
+    if not ids:
+        return {}
+
+    def _read():
+        return (
+            supabase.table("skill_versions")
+            .select("id, instructions")
+            .in_("id", ids)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    return {str(r["id"]): (r.get("instructions") or "") for r in rows}
+
+
+def _proposal_response(row: dict, *, base_instructions: str, gate=None) -> SkillProposalResponse:
+    """Assemble the LOCKED ``SkillProposalResponse`` from a stored ``skill_proposals`` row plus the
+    hydrated ``base_instructions`` and the D-13 ``gate`` (None until a re-eval reconciles — Plan 05
+    computes it; NOT a stored column, so it is always None at this plan's stage)."""
+    return SkillProposalResponse(
+        id=row["id"],
+        skill_id=row["skill_id"],
+        base_skill_version_id=row["base_skill_version_id"],
+        new_skill_version_id=row.get("new_skill_version_id"),
+        re_eval_run_id=row.get("re_eval_run_id"),
+        source_eval_run_id=row.get("source_eval_run_id"),
+        proposed_instructions=row.get("proposed_instructions", "") or "",
+        base_instructions=base_instructions,
+        rationale=row.get("rationale", "") or "",
+        evidence_summary=row.get("evidence_summary", "") or "",
+        status=row.get("status", "proposed"),
+        override_forced=bool(row.get("override_forced", False)),
+        gate=gate,
+        created_at=row.get("created_at"),
+        updated_at=row.get("updated_at"),
+    )
+
+
+# ── POST — draft ONE proposal on demand from a source eval run (D-01 / D-04) ──────
+@router.post("/{skill_id}/proposals", response_model=SkillProposalResponse)
+async def propose_skill_improvement(
+    skill_id: str,
+    body: ProposeBody,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Draft ONE improvement from a SOURCE eval run's evidence, on demand (D-01).
+
+    Owner-verify the skill FIRST (404 cross-user — T-135-01), read the SOURCE eval run
+    owner-scoped to resolve the evaluated version (the diff BASE), read that base version's
+    instructions, guard D-01 (400 if the source run has no results), enforce D-04 (one open
+    proposal — supersede a lingering ``proposed`` draft; 409 on an in-flight ``approved``/
+    ``re_evaling`` one), assemble the D-02 evidence, force ONE ``SkillProposal`` on the resolved
+    builder model (honest 424 if none resolves — never a fabricated proposal), and INSERT a
+    ``status='proposed'`` row. Returns the locked ``SkillProposalResponse`` with ``base_instructions``
+    set and ``gate=None`` (no re-eval yet). Every supabase-py call is threadpool-wrapped (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner gate FIRST — 404 cross-user before any evidence is touched (T-135-01).
+    skill = await _verify_owned_skill(supabase, skill_id, user_id)
+
+    # 2. Read the SOURCE eval run owner-scoped (and scoped to this skill) — its evaluated
+    #    ``skill_version_id`` is the diff BASE (``base_skill_version_id``). 404 on a cross-user /
+    #    unknown / wrong-skill run (never 403 — T-135-01).
+    source_run_id = body.source_eval_run_id
+
+    def _read_source_run():
+        return (
+            supabase.table("eval_runs")
+            .select("id, skill_id, skill_version_id, user_id")
+            .eq("id", str(source_run_id))
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        run_rows = list((await run_in_threadpool(_read_source_run)).data or [])
+    except Exception:
+        # A malformed source_eval_run_id (not a UUID) makes PostgREST raise — treat as a miss
+        # (404), never leak the error shape (mirrors _verify_owned_skill).
+        logger.debug("eval source-run read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source eval run not found")
+    if not run_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source eval run not found")
+    base_skill_version_id = run_rows[0]["skill_version_id"]
+
+    # 3. Read the BASE version's instructions (owner-scoped) — the body being edited + the diff base.
+    def _read_base_version():
+        return (
+            supabase.table("skill_versions")
+            .select("id, instructions, name, description")
+            .eq("id", str(base_skill_version_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    base_rows = list((await run_in_threadpool(_read_base_version)).data or [])
+    if not base_rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Base skill version not found for the source run",
+        )
+    base_version = base_rows[0]
+    base_instructions = base_version.get("instructions") or ""
+
+    # 4. D-01 guard: propose is enabled ONLY once the source run has >=1 result — a bounded
+    #    (limit 1) owner-scoped existence probe (never over-fetch). No results -> 400.
+    def _has_results():
+        return (
+            supabase.table("eval_results")
+            .select("id")
+            .eq("eval_run_id", str(source_run_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    if not list((await run_in_threadpool(_has_results)).data or []):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The source eval run has no results to propose from",
+        )
+
+    # 5. D-04 concurrency — one OPEN proposal per skill. Read the open set owner-scoped: BLOCK
+    #    (409) on an in-flight ``approved``/``re_evaling`` proposal (a re-eval is committed/running
+    #    — a new draft must not clobber it); SUPERSEDE any lingering ``proposed`` draft to
+    #    ``rejected`` (the user never acted on it). This is the documented supersede-proposed +
+    #    block-on-in-flight policy.
+    def _read_open():
+        return (
+            supabase.table("skill_proposals")
+            .select("id, status")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .in_("status", list(_OPEN_PROPOSAL_STATUSES))
+            .execute()
+        )
+
+    open_rows = list((await run_in_threadpool(_read_open)).data or [])
+    if any(r.get("status") in _INFLIGHT_PROPOSAL_STATUSES for r in open_rows):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A proposal for this skill is already approved or re-evaluating",
+        )
+    superseded_ids = [r["id"] for r in open_rows if r.get("status") == "proposed"]
+    if superseded_ids:
+        def _supersede():
+            return (
+                supabase.table("skill_proposals")
+                .update({"status": "rejected"})
+                .in_("id", superseded_ids)
+                .eq("user_id", user_id)
+                .execute()
+            )
+
+        await run_in_threadpool(_supersede)
+
+    # 6. Assemble the D-02 evidence bundle (owner-scoped, disagreement-first) and force ONE
+    #    proposal on the resolved builder model. Load the caller's settings for provider routing.
+    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
+
+    user_settings = await run_in_threadpool(load_user_settings, user_id)
+    evidence = await skill_proposer_service.assemble_evidence(
+        supabase,
+        skill_id=skill_id,
+        source_run_id=source_run_id,
+        user_id=user_id,
+        current_instructions=base_instructions,
+    )
+    proposal = await skill_proposer_service.propose(
+        skill=skill,
+        base_version=base_version,
+        source_run_id=source_run_id,
+        evidence=evidence,
+        user_settings=user_settings,
+    )
+    if proposal is None:
+        # Honest floor (D-03): no builder model resolved -> a real dependency failure, never a
+        # fabricated proposal. 424 Failed Dependency carries the honest detail.
+        raise HTTPException(
+            status_code=status.HTTP_424_FAILED_DEPENDENCY,
+            detail="No skill-builder model resolved — cannot draft a proposal",
+        )
+
+    # 7. Service-role INSERT the durable ``proposed`` row. id is minted app-side (mirrors
+    #    start_eval_run's run_id); user_id/skill_id from the caller + path (NEVER the body —
+    #    T-135-02). new_skill_version_id / re_eval_run_id stay NULL until Plan 05 approves.
+    proposal_id = uuid4()
+    insert_payload = {
+        "id": str(proposal_id),
+        "skill_id": skill_id,
+        "base_skill_version_id": base_skill_version_id,
+        "source_eval_run_id": str(source_run_id),
+        "user_id": user_id,
+        "proposed_instructions": proposal.proposed_instructions,
+        "rationale": proposal.rationale,
+        "evidence_summary": proposal.evidence_cited,
+        "status": "proposed",
+    }
+
+    def _insert():
+        return supabase.table("skill_proposals").insert(insert_payload).execute()
+
+    insert_resp = await run_in_threadpool(_insert)
+    inserted = (list(insert_resp.data or []) or [{}])[0]
+    # Overlay the app-known payload with the DB echo (id/created_at/updated_at/override_forced
+    # defaults) so the response carries the DB-authoritative values in production; the payload is
+    # the floor when a non-echoing test fake returns only what was sent.
+    row = {**insert_payload, **inserted}
+    return _proposal_response(row, base_instructions=base_instructions, gate=None)
+
+
+# ── GET list — a skill's proposals, owner-scoped, newest-first ────────────────────
+@router.get("/{skill_id}/proposals", response_model=list[SkillProposalResponse])
+async def list_skill_proposals(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """List a skill's proposals (owner-scoped, newest-first).
+
+    Owner-verify the skill FIRST (404 cross-user — T-135-01) so a non-owner can't probe a skill's
+    existence, then read owner-scoped (``.eq user_id``) newest-first and hydrate each row's
+    ``base_instructions`` from its base version (id-bounded owner-scoped read — T-135-07). ``gate``
+    serializes straight from the stored value (None on not-yet-reconciled proposals — Plan 05 wires
+    reconcile-on-read)."""
+    user_id = current_user["id"]
+
+    await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    base_map = await _base_instructions_map(
+        supabase, [r.get("base_skill_version_id") for r in rows], user_id
+    )
+    return [
+        _proposal_response(
+            r,
+            base_instructions=base_map.get(str(r.get("base_skill_version_id")), ""),
+            gate=None,
+        )
+        for r in rows
+    ]
+
+
+# ── GET one — a single proposal, owner-scoped, 404-not-403 ───────────────────────
+@router.get("/{skill_id}/proposals/{proposal_id}", response_model=SkillProposalResponse)
+async def get_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return ONE proposal (owner-scoped).
+
+    Owner-verify the proposal row on ``id`` AND ``user_id`` AND ``skill_id``; 404 (NEVER 403) on a
+    cross-user / unknown miss so existence isn't leaked (T-135-01). Hydrate ``base_instructions``
+    from the base version (owner-scoped)."""
+    user_id = current_user["id"]
+
+    def _read():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    row = rows[0]
+    base_instructions = await _read_base_instructions(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _proposal_response(row, base_instructions=base_instructions, gate=None)
+
+
+# ── POST reject — a pure-audit status flip (NO version / skills write — D-10) ─────
+@router.post("/{skill_id}/proposals/{proposal_id}/reject", response_model=SkillProposalResponse)
+async def reject_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Reject a proposal — a PURE AUDIT status flip (D-10).
+
+    Copies ``rate_eval_result``'s IDOR gate (evals.py:485-504): owner-verify the proposal row on
+    ``id`` AND ``user_id`` BEFORE the write; 404 (NEVER 403) on a cross-user / unknown miss. Then a
+    SINGLE ``.update({"status": "rejected"})`` — NO ``skill_versions`` INSERT, NO ``skills`` write
+    (rejection keeps its audit trail here with ``new_skill_version_id`` NULL; re-drafting is a fresh
+    propose — D-10). Every call is threadpool-wrapped (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner-verify the proposal row (404 cross-user — never 403; T-135-01 IDOR gate).
+    def _verify():
+        return (
+            supabase.table("skill_proposals")
+            .select("id, base_skill_version_id")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        verify_rows = list((await run_in_threadpool(_verify)).data or [])
+    except Exception:
+        logger.debug("proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not verify_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+
+    # 2. Pure-audit flip — ONE update, owner-scoped. No version row, no skills write (D-10).
+    def _reject():
+        return (
+            supabase.table("skill_proposals")
+            .update({"status": "rejected"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    updated_rows = list((await run_in_threadpool(_reject)).data or [])
+    row = updated_rows[0] if updated_rows else {**verify_rows[0], "status": "rejected"}
+    base_instructions = await _read_base_instructions(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _proposal_response(row, base_instructions=base_instructions, gate=None)
