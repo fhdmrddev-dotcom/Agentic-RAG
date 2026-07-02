@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1721,6 +1721,129 @@ export async function rateEvalResult(
     throw new Error(detail)
   }
   return res.json() as Promise<{ eval_result_id: string; rating: string | null }>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 135 (SI-01) — self-improvement proposal lifecycle helpers.
+//
+// The whole propose → review → approve → re-eval → promote/not-promote loop.
+// All authorization is enforced server-side (owner gate, 404-not-403 for cross-
+// user — Plans 04/05, T-135-01); these helpers only carry getAuthHeaders() and
+// never trust client state for authorization. The re-eval rides the EXISTING
+// eval_* SSE via the companion `re_eval_run_id` — subscribe with subscribeToRun,
+// no new demux branch. Each helper copies the startEvalRun fetch + getAuthHeaders
+// + error-detail-extraction shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Shared detail-extracting error for the proposal helpers (mirrors startEvalRun). */
+async function proposalError(res: Response, fallback: string): Promise<Error> {
+  let detail = `${fallback} (status ${res.status}).`
+  try {
+    const j = (await res.json()) as { detail?: string }
+    if (j?.detail) detail = j.detail
+  } catch {
+    /* non-JSON body — keep the generic message */
+  }
+  return new Error(detail)
+}
+
+/** POST /skills/{id}/proposals — propose an improved instructions revision from
+ *  a source eval run. Returns the fresh `proposed` SkillProposal. */
+export async function proposeImprovement(
+  skillId: string,
+  sourceEvalRunId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/proposals`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ source_eval_run_id: sourceEvalRunId }),
+  })
+  if (!res.ok) throw await proposalError(res, "Failed to propose improvement")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** GET /skills/{id}/proposals — owner-scoped proposals for the skill. */
+export async function listProposals(skillId: string): Promise<SkillProposal[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/proposals`, { headers })
+  if (!res.ok) throw await proposalError(res, "Failed to load proposals")
+  return res.json() as Promise<SkillProposal[]>
+}
+
+/** GET /skills/{id}/proposals/{proposalId} — one proposal (durable readout). */
+export async function getProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}`,
+    { headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to load proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/approve — accept the proposal and
+ *  kick off the companion re-eval. Returns the updated proposal + the
+ *  `re_eval_run_id` to subscribe to (rides the existing eval_* SSE). */
+export async function approveProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<ProposalApproveResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/approve`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to approve proposal")
+  return res.json() as Promise<ProposalApproveResult>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/rerun — re-run the re-eval (e.g.
+ *  after an interrupted run). Returns the updated proposal + a fresh
+ *  `re_eval_run_id`. */
+export async function rerunProposalReeval(
+  skillId: string,
+  proposalId: string,
+): Promise<ProposalApproveResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/rerun`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to re-run proposal re-eval")
+  return res.json() as Promise<ProposalApproveResult>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/reject — dismiss the proposal. */
+export async function rejectProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/reject`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to reject proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/force-promote — operator override
+ *  that promotes despite a failed gate (`override_forced` is recorded). */
+export async function forcePromoteProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/force-promote`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to force-promote proposal")
+  return res.json() as Promise<SkillProposal>
 }
 
 export interface ProviderInfo {

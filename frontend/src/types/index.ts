@@ -639,6 +639,68 @@ export interface EvalRunReadout {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Phase 135 (SI-01) — self-improvement proposal lifecycle. Mirrors the LOCKED
+// backend response contract (Plans 04/05): a proposal captures the base vs the
+// LLM-proposed skill instructions plus its rationale, then rides an approve →
+// re-eval → promote/not-promote gate. FLAT interface + status-union + nullable
+// style deliberately mirrors EvalRun above.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The promotion-gate honest counts + pass conditions (D-13). Owned by the
+ *  backend `PromotionGate` model (Plan 04's eval_run.py); Plan 05 populates it on
+ *  the terminal promoted / not_promoted transition. `passed` is the overall
+ *  verdict; `no_regression`/`improved` are its two conditions; the five counts
+ *  are the honest with-skill tallies (never fabricated — cases whose judge could
+ *  not measure land in `excluded_not_measured`, not in a pass/fail bucket). */
+export interface PromotionGate {
+  passed: boolean
+  no_regression: boolean
+  improved: boolean
+  prev_pass: number
+  prev_fail: number
+  still_pass: number
+  newly_pass: number
+  excluded_not_measured: number
+}
+
+/** A durable skill_proposals row (migration 083). Mirrors the LOCKED backend
+ *  response shape; the client computes the base→proposed diff itself (lineDiff).
+ *  Nullable ids are set as the proposal advances (new version + re-eval run
+ *  appear on approve/promote); `gate` is null until the terminal gate verdict. */
+export interface SkillProposal {
+  id: string
+  skill_id: string
+  base_skill_version_id: string
+  new_skill_version_id: string | null
+  re_eval_run_id: string | null
+  source_eval_run_id: string | null
+  proposed_instructions: string
+  base_instructions: string
+  rationale: string
+  evidence_summary: string
+  status:
+    | "proposed"
+    | "rejected"
+    | "approved"
+    | "re_evaling"
+    | "promoted"
+    | "not_promoted"
+    | "interrupted"
+  override_forced: boolean
+  // Populated by Plan 05 on promoted / not_promoted (D-13); null otherwise.
+  gate?: PromotionGate | null
+  created_at: string
+  updated_at: string
+}
+
+/** POST approve / rerun response — the updated proposal plus the companion
+ *  re-eval run_id the client subscribes to (rides the existing eval_* SSE). */
+export interface ProposalApproveResult {
+  proposal: SkillProposal
+  re_eval_run_id: string
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Phase 086 Plan 01 — agent-panel wire-mirror interfaces.
 //
 // These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there
