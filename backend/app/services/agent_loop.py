@@ -200,6 +200,14 @@ class RunContext:
     # EXACTLY these skills (WITH arm, D-03), no DB query. A frozen tuple keeps the
     # dataclass hashable/immutable; each dict needs only `name` + `description`.
     skill_catalog_override: tuple[dict, ...] | None = None
+    # Phase 135 (135-02 / SI-01) — ADDITIVE default-off skill-INSTRUCTIONS override
+    # for the honest DRAFT re-eval (RESEARCH Pitfall #1). OFF by default (None) at
+    # EVERY existing call site → Deep Mode byte-identical (the skill_catalog_override
+    # default-off discipline above). None => _handle_load_skill queries the DB live
+    # (current behavior, D-14/D-16 red line); a map {skill_name: instructions} =>
+    # _handle_load_skill returns the DRAFT instructions for that skill (for the
+    # re-eval) instead of the live skills-row body, WITHOUT touching the live skill.
+    skill_instructions_override: dict[str, str] | None = None
 
 
 @dataclass
@@ -1103,6 +1111,10 @@ async def run_agent_loop(
     # Phase 133 (EVAL-02) — additive default-off skill-catalog override (None =
     # DB query / Deep byte-identical; () = inject nothing; (skill,) = inject only).
     skill_catalog_override = ctx.skill_catalog_override
+    # Phase 135 (SI-01) — additive default-off skill-INSTRUCTIONS override (None =
+    # DB live / Deep byte-identical; {skill_name: instructions} = the DRAFT re-eval,
+    # Pitfall #1). Passed into BOTH ToolContext builds below (primary + resume).
+    skill_instructions_override = ctx.skill_instructions_override
     # --- Category C callables (passed, not imported) ---
     # The moved body calls _emit / _spawn by those names; alias the params.
     _emit = emit
@@ -1516,6 +1528,10 @@ async def run_agent_loop(
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
                 available_tools=[rc["name"] for rc in _resume_calls],
+                # Phase 135 (SI-01) — a RESUMED re-eval must keep measuring the
+                # DRAFT, not silently revert to the live skill (Pitfall #1 / D-05).
+                # None on every Deep/normal resume => byte-identical load_skill.
+                skill_instructions_override=skill_instructions_override,
             )
             for _ti, rc in enumerate(_resume_calls):
                 _tool_name = rc["name"]
@@ -2304,6 +2320,10 @@ async def run_agent_loop(
                     t["function"]["name"]
                     for t in (active_tools or get_tools(user_settings))
                 ],
+                # Phase 135 (SI-01) — carry the DRAFT instructions override so the
+                # re-eval WITH arm measures the draft's instructions (Pitfall #1).
+                # None on every Deep/normal caller => byte-identical load_skill.
+                skill_instructions_override=skill_instructions_override,
             )
 
             for tool_index, tc in enumerate(tool_calls):

@@ -130,6 +130,15 @@ class ToolContext:
     # per_run_task_semaphore) to avoid importing the harness model on the
     # dispatcher hot path.
     skill_snapshot: Any = None  # SkillSnapshot | None — kept Any to avoid a model import on the dispatcher hot path
+    # Phase 135 (135-02 / SI-01) — ADDITIVE default-off skill-INSTRUCTIONS override
+    # for the honest DRAFT re-eval (RESEARCH Pitfall #1). None on EVERY Deep-mode /
+    # normal caller => _handle_load_skill returns row["instructions"] byte-identical.
+    # A map {skill_name: instructions} (set ONLY by the re-eval WITH-arm RunContext,
+    # threaded through both agent_loop ToolContext builds + the task_service sub_ctx)
+    # => _handle_load_skill returns the DRAFT instructions for that skill WITHOUT
+    # touching the live skills row. Same additive-default-off discipline as
+    # phase_whitelist / workflow_run_id / skill_snapshot above.
+    skill_instructions_override: dict[str, str] | None = None
 
 
 @dataclass
@@ -696,9 +705,18 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     )
     files_data = _files_resp.data or []
     file_names = [f["filename"] for f in files_data]
+    # Phase 135 (135-02 / SI-01) — Pitfall #1 fix: return the DRAFT instructions
+    # when the re-eval passed a skill_instructions_override map containing THIS
+    # skill's name; else the live DB row's body (byte-identical Deep). getattr so a
+    # duck-typed ctx stub predating the field still works (096 workflow_run_id
+    # precedent). Keyed on skill_name — the SAME value `.eq("name", ...)` looked up.
+    override = getattr(ctx, "skill_instructions_override", None)
+    instructions = row["instructions"]
+    if override is not None and skill_name in override:
+        instructions = override[skill_name]
     return ToolResult(result=json.dumps({
         "name": row["name"],
-        "instructions": row["instructions"],
+        "instructions": instructions,
         "files": file_names,
     }))
 
