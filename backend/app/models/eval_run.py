@@ -94,3 +94,90 @@ class EvalResultResponse(BaseModel):
     # stored ``eval_results`` column — a per-caller readout merge.
     rating: str | None
     created_at: datetime
+
+
+# ── Phase 135 (SI-01) — the self-improvement PROPOSAL contract (Plan 04 OWNS eval_run.py) ──
+# This is the LOCKED response contract for the WHOLE self-improvement loop (Plans 04/05/06/07).
+# It lives HERE (not in a Plan-05 module) so eval_run.py stays owned by ONE plan, and — critically
+# — so the nullable ``gate`` honest-counts field is DECLARED on the response model: FastAPI strips
+# any field absent from the declared response model, so a field Plan 05 WRITES (at reconcile) and
+# Plan 07 DISPLAYS must be born here or it would be silently dropped from every serialized response.
+# All fields FLAT single-typed (never a multi-type list union — the Gemini ``type: [...]`` trap),
+# and ``user_id``/``skill_id`` come from the caller + path, NEVER a request body (T-135-02).
+
+
+class ProposeBody(BaseModel):
+    """POST body — draft ONE proposal from a SOURCE eval run (D-01 on-demand).
+
+    Carries ONLY ``source_eval_run_id`` — the run whose evidence drives the edit. ``user_id``
+    comes from the authenticated caller and ``skill_id`` from the path, NEVER this body (T-135-02
+    — a forged owner/skill id is ignored)."""
+
+    source_eval_run_id: str
+
+
+class ForcePromoteBody(BaseModel):
+    """POST body — force-promote a proposal despite a non-improving gate (D-06).
+
+    Deliberately EMPTY: the server derives everything (the reconciled gate, the proposal row) —
+    the client supplies no fields, so there is nothing to forge. Defined HERE (not the Plan-05
+    module) so eval_run.py stays owned by ONE plan; Plan 05 imports this shape for its
+    force-promote route."""
+
+
+class PromotionGate(BaseModel):
+    """The D-13 honest promotion-gate counts — case-matched prev-vs-re-eval tallies shown
+    ALONGSIDE the verdict (never a bare pass/fail). Plan 05's ``promotion_gate()`` returns EXACTLY
+    these 8 keys; Plan 07 renders them. All FLAT single-typed (Gemini ``type: [...]`` trap):
+
+      * ``passed`` — the re-eval's overall pass verdict.
+      * ``no_regression`` — no previously-passing case regressed (still_pass covers prev_pass).
+      * ``improved`` — at least one previously-failing case now passes (newly_pass > 0).
+      * ``prev_pass`` / ``prev_fail`` — the SOURCE run's case-matched pass/fail tallies.
+      * ``still_pass`` — prev-passing cases that still pass on the re-eval.
+      * ``newly_pass`` — prev-failing cases that now pass on the re-eval.
+      * ``excluded_not_measured`` — cases dropped from the gate math because an arm was
+        ``not_measured`` (honestly excluded, never counted as a pass or fail)."""
+
+    passed: bool
+    no_regression: bool
+    improved: bool
+    prev_pass: int
+    prev_fail: int
+    still_pass: int
+    newly_pass: int
+    excluded_not_measured: int
+
+
+class SkillProposalResponse(BaseModel):
+    """Full ``public.skill_proposals`` row (mig 083) returned by the proposal routes, PLUS two
+    derived fields the frontend needs:
+
+      * ``base_instructions`` — the BASE version's instruction body (``skill_versions.instructions``
+        for ``base_skill_version_id``), hydrated so the frontend can render the proposed-vs-base
+        diff. NOT a stored ``skill_proposals`` column — a per-response hydration merge.
+      * ``gate`` — the D-13 honest counts (``PromotionGate``), ``None`` until a re-eval reconciles.
+        Plan 05 WRITES it (at reconcile-on-read), Plan 07 DISPLAYS it. Declared here so FastAPI
+        does not strip it from the serialized response.
+
+    ``created_at``/``updated_at`` are nullable because the response is assembled in-app (the id is
+    minted app-side, mirroring ``start_eval_run``'s ``run_id``); they are hydrated from the DB
+    insert/update echo when present (always, in production) and are ``None`` only under a
+    non-echoing test fake. ``user_id`` is intentionally omitted (the caller's own id — not part of
+    the frontend contract)."""
+
+    id: UUID
+    skill_id: UUID
+    base_skill_version_id: UUID
+    new_skill_version_id: UUID | None = None
+    re_eval_run_id: UUID | None = None
+    source_eval_run_id: UUID | None = None
+    proposed_instructions: str
+    base_instructions: str
+    rationale: str
+    evidence_summary: str
+    status: str
+    override_forced: bool = False
+    gate: PromotionGate | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
