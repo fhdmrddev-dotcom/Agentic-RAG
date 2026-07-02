@@ -23,7 +23,7 @@ Each maps to exactly one roadmap phase.
 
 ### Self-Improvement Loop
 
-- [ ] **SI-01**: The system proposes instruction-body edits based on eval results + Tuner signal → user reviews the diff and approves → a new immutable skill version is created and auto-re-evaled before promotion — the human is always in the loop, the system never auto-applies.
+- [x] **SI-01**: The system proposes instruction-body edits based on eval results + Tuner signal → user reviews the diff and approves → a new immutable skill version is created and auto-re-evaled before promotion — the human is always in the loop, the system never auto-applies.
 
 ### Skill Publish Gate
 
@@ -73,7 +73,7 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 | EVAL-03 | Phase 134 | Complete |
 | EVAL-04 | Phase 134 | Complete |
 | VER-01 | Phase 132 | Complete |
-| SI-01 | Phase 135 | Pending |
+| SI-01 | Phase 135 | Complete |
 | GATE-01 | Phase 136 | Pending |
 | PANEL-01 | Phase 137 | Pending |
 | SI-02 (STRETCH) | Phase 139 | Pending (gated) |

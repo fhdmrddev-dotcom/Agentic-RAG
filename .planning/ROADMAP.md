@@ -54,11 +54,11 @@
 
 ### Phase Checklist
 
-- [ ] **Phase 132: Skill Versioning + Eval Test-Case Persistence** — immutable version snapshots on save + persistent, editable eval test cases (VER-01, EVAL-01)
-- [ ] **Phase 133: Eval Runner — With-Skill vs Without-Skill** — SSE-streamed eval run, two completions per case, persisted results (EVAL-02)
+- [x] **Phase 132: Skill Versioning + Eval Test-Case Persistence** — immutable version snapshots on save + persistent, editable eval test cases (VER-01, EVAL-01) — verified 2026-06-30
+- [x] **Phase 133: Eval Runner — With-Skill vs Without-Skill** — SSE-streamed eval run, two completions per case, persisted results (EVAL-02) — verified 2026-06-30 (secured 2026-07-01, threats_open 0)
 - [x] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04) — verified 2026-07-02 (8/8 truths + 9/9 live SC#10 UAT; secure-phase pending)
 - [x] **Phase 134.1: Evals Run Silently (bug fix)** — hide eval-execution threads from the chat sidebar; eval outputs stay DB-only in the eval panel (BUG-260702-01)
-- [ ] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01)
+- [x] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01) — verified 2026-07-02 (5/5 truths + live SC#10 UAT U1-U11: 10 passed, 1 blocked third-party; secure-phase pending)
 - [ ] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01)
 - [ ] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01)
 - [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
@@ -297,10 +297,10 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 132. Skill Versioning + Eval Test-Case Persistence | 2/3 | In progress | - |
-| 133. Eval Runner — With-Skill vs Without-Skill | 0/TBD | Not started | - |
-| 134. Eval Results, Honest Verdict + Ratings | 0/TBD | Not started | - |
-| 135. Self-Improvement Loop (SI-01) | 0/TBD | Not started | - |
+| 132. Skill Versioning + Eval Test-Case Persistence | 3/3 | Complete | 2026-06-30 |
+| 133. Eval Runner — With-Skill vs Without-Skill | 5/5 | Complete | 2026-06-30 |
+| 134. Eval Results, Honest Verdict + Ratings | 4/4 | Complete | 2026-07-02 |
+| 135. Self-Improvement Loop (SI-01) | 9/9 | Complete | 2026-07-02 |
 | 136. Skill Publish Gate (GATE-01) | 0/TBD | Not started | - |
 | 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
 | 138. Run-End Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |

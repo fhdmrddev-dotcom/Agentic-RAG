@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: planned
-last_updated: "2026-07-02T15:02:11.488Z"
-last_activity: 2026-07-02 -- Phase 135 re-verified after gap wave: human_needed (4/5) — U1-U11 live UAT pending
+status: ready_to_plan
+last_updated: 2026-07-02T20:51:52.132Z
+last_activity: 2026-07-02 -- Phase 135 COMPLETE: verification passed (5/5) after live SC#10 UAT U1-U11 (10 passed, 1 blocked third-party); secure-phase 135 pending
 progress:
   total_phases: 26
   completed_phases: 12
   total_plans: 61
-  completed_plans: 60
+  completed_plans: 62
   percent: 46
+stopped_at: Phase 135 complete (9/9) — ready to discuss Phase 136
 ---
 
 # Project State
@@ -22,17 +23,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 135 — self-improvement-loop-si-01
+**Current focus:** Phase 136 — skill publish gate (gate 01)
 
 ## Current Position
 
-Phase: 135 (self-improvement-loop-si-01) — RE-VERIFIED human_needed 4/5 (2026-07-02T15:35Z, all 3 BLOCKERs fixed+verified) → **SC#10 LIVE UAT U1–U11 COMPLETE 2026-07-02 (`49ebea67`): 10 pass / 1 blocked-third-party (U4 OpenRouter upstream 404s; native-safe held)**. Full graded loops proven on OpenAI+Anthropic+Google; Pitfall #1 draft-loaded proven live; U9 kill→honest interrupted→rerun ✓; U10 force-promote 200+override ✓. 2 minor root-caused findings in `135-HUMAN-UAT.md` Gaps (gate 'not measured' undercount both-sides-unmeasured edge; OpenRouter dropdown↔registry drift → SEED-100/137 candidates) + operator UX finding: skill panel overloaded → FIRST DESIGN INPUT FOR PHASE 137 (PANEL-01). UAT artifacts cleaned (skill body+cases restored); 3 historical unflagged [eval] threads await operator-OK'd one-line UPDATE. Next: re-run verifier to flip VERIFICATION → `/gsd:secure-phase 135`.
-Plan: 9 of 9 executed. Gap wave (135-08 backend `36bdbf60`/`959ab873`/`13d718dc`, 135-09 frontend `d4a06223`/`14347160`) merged to develop (`bfc3f25e`+`b70dbe2b`); post-merge gate green (43 backend tests incl. 4 new regression tests + Deep-mode guard; tsc clean on touched files). CR-01/02/03 + WR-02/04 fixes shipped. Next: re-verify → live SC#10 UAT (U1–U11) → `/gsd:secure-phase 135`
+Phase: 136
+Plan: Not started
+Status (prior — Phase 135, complete): **COMPLETE 2026-07-02** (135-VERIFICATION.md = **passed**: 5/5 truths; third pass flipped human_needed→passed on the live SC#10 UAT U1-U11 evidence in 135-HUMAN-UAT.md — **10 passed / 0 issues / 1 blocked** (U4 OpenRouter third-party upstream 404; cross-provider axis satisfied live on OpenAI + Anthropic + Google). Full graded loops propose→diff→approve→auto-re-eval→promote/not-promote proven live; U9 interrupted-run honesty (CR-02 fix) + U10 failed-gate force-promote with `override_forced=true` (CR-01 fix) live-passed; Pitfall #1 draft-instructions seam proven in the re-eval thread. 9/9 plans (7 original + 2 gap-closure). **secure-phase 135 PENDING** (no 135-SECURITY.md). 2 minor non-blocking UAT findings root-caused in 135-HUMAN-UAT.md Gaps (promotion_gate "not measured" display undercount in the rare total-provider-outage edge case; eval-runner model dropdown drifts from MODEL_CAPABILITIES — pre-existing debt) → SEED/backlog candidates; U11 panel-density finding routed to Phase 137 (PANEL-01) as design input.
 Status (prior — Phase 134, complete + secured): **COMPLETE 2026-07-02** (134-VERIFICATION.md = **passed**: 8/8 truths + **9/9 live SC#10 UAT (U1–U9) PASSED**, self-driven via Chrome MCP + psycopg2 + Redis + logs; EVAL-03/04 Complete). **SECURED 2026-07-02** (`134-SECURITY.md` = verified, threats_open: 0 — 15/15 threats closed: 13 mitigations verified at code locations + 2 accepted risks AR-134-01/-02; commit `a5661845`). Plan: 4 of 4 executed.
 **UAT found + fixed a major live-surface defect in-session** (`d0c0c10a`): every live eval view died with a spurious "ended with an error" + stale 'running' readout — root causes (a) POST returned run_id before the job's first XADD → subscribe race hit runs.py Step-3b synthetic `buffer_expired_while_streaming`; (b) eval arms silent 40-70s (NO-OP emit) → replay-tail consumer's ~30s Redis XREAD socket timeout closed the stream mid-run; (c) client painted any error terminal as fatal + froze on a mid-run readout. Fix (eval-scoped, chat path untouched): seed `eval_run_started` before 202 + `eval_heartbeat` every 15s wrapping `_run_arm` + bounded client re-attach self-heal. Re-verified live on a 9-min OpenRouter run (live per-arm verdict badges → auto-final readout, zero errors). Also fixed during UAT: the POST-side anchor thread (the "empty twin") was a second uncovered `is_eval` creation site — both threads/run now flagged. U8 proved D-04 honesty against the REAL BUG-260701-01 prefill 400 (sonnet-5 baseline → `not_measured` render, rollup 1/1 excludes it); U9 captured the judge-PASS+human-DOWN disagreement row (Phase-135 query returns it).
 **Inserted — Phase 134.1 (Evals Run Silently) SHIPPED + live-verified 2026-07-02** (BUG-260702-01; commits `b073cced` + `58ec1da6`). During 134 UAT the user flagged eval runs polluting the chat sidebar (34 `[eval]` threads = 10% of 338, half empty). Root cause: the eval runner creates a REAL `threads` row per run to drive `run_agent_loop` (no in-memory path). Fix (quick-style): mig 082 `threads.is_eval` flag + backfill + partial index (applied live :54322, full-schema regen) · `_create_eval_thread` sets is_eval=True · `list_threads` `.eq("is_eval", False)`. Live proof: `GET /threads` = **303 (was 337), 0 `[eval]`**; 14/14 eval tests. No FE change. Also, while investigating a "15-min stuck eval," found in-flight runs are **orphaned on backend restart** (no reconciliation) → cleaned up (1 eval→`interrupted`, 15 chat runs→`failed`, stale Redis stream dropped) + filed **BUG-260702-02** (→ run-reconciliation phase / SEED-100). Judge model (`harness_judge_model`, settings-backed but no UI, defaults `claude-opus-4-8`) needs a Settings knob for single-provider/local-model orgs → SEED-100. **Next: resume `/gsd:verify-work 134` (U1–U9) with a clean sidebar.**
 Status (prior — Phase 133, complete): `133-VERIFICATION.md` = **passed**; `133-SECURITY.md` = **verified** (threats_open: 0 — gsd-security-auditor verify-mitigations mode confirmed all 11 mitigate-threats present in code + 1 accepted risk AR-133-01 logged for the zero-new-deps supply-chain accept). EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty, NO-OP emit) · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row; cross-user 404) · thin `--skip-ui` SkillEvalSection. **LIVE SC#10 UAT (orchestrator-driven against the live API, psycopg2 cross-check) caught + fixed a real cross-provider routing bug** (`306dd2d4`): eval sent non-OpenAI models to the OpenAI SDK → 404, because the gateway routes on `user_settings.active_provider` not `ctx.resolved_provider` and evals.py never applied the provider override; fix = `override_provider`+`llm_model` pin in the eval router (threads.py:1059-1096 precedent; net-new file, Deep untouched) + regression test. **Proven live across all 4 providers** (OpenAI/Anthropic/Google/OpenRouter route correctly; honest WITH/WITHOUT token delta), **multi-tool** (search_documents+execute_code: "9 distinct risks across 3 docs"), **long-history** (7KB prompt). 9/9 eval tests green. All UAT artifacts cleaned up (eval tables empty; docx restored to 1 case). Remaining = 2 OPTIONAL operator lived-glances (thin-UI live-progress render + parallel-thread feel; engine isolation already confirmed). **Secure-phase DONE 2026-07-01** (`133-SECURITY.md`, threats_open: 0). Next: Phase 134 (EVAL-03/04) / `/gsd:complete-milestone` later.
-Last activity: 2026-07-02 -- Phase 135 execution started
+Last activity: 2026-07-02
 
 ### Quick Tasks Completed
 
