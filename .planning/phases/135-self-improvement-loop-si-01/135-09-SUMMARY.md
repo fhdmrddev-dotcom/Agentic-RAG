@@ -94,6 +94,13 @@ None — both edits wire real behavior (real request body / real DB-backed rejec
 - Truths 2 and 4 of `135-VERIFICATION.md` are now re-verifiable from the UI (frontend halves closed). Backend halves of CR-01/CR-03 ship in the parallel plan `135-08` (no file overlap).
 - Live confirmation of the button click (U10 force-promote path) is covered by the SC#10 4-axis UAT in `135-VALIDATION.md`, run via `/gsd:verify-work` after both gap plans ship — not part of this plan.
 
+## Self-Check: PASSED
+
+- Files exist: `frontend/src/lib/api.ts`, `frontend/src/components/skills/SkillEvalSection.tsx`, `135-09-SUMMARY.md`
+- Commits exist: `d4a06223` (Task 1), `14347160` (Task 2), `74c99a31` (metadata)
+- Source assertions: `body: JSON.stringify({})` present; `typeof j?.detail === "string"` guard present; `proposal.status === "approved"` branch present
+- `npx tsc --noEmit` produces no error lines mentioning `src/lib/api` or `SkillEvalSection`
+
 ---
 *Phase: 135-self-improvement-loop-si-01*
 *Completed: 2026-07-02*
