@@ -56,6 +56,8 @@ from app.config import get_model_capability
 from app.db.runs import insert_run
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
 from app.models.eval_run import (
+    ForcePromoteBody,
+    PromotionGate,
     ProposeBody,
     RateResultBody,
     SkillProposalResponse,
@@ -573,6 +575,28 @@ async def rate_eval_result(
 _OPEN_PROPOSAL_STATUSES = ("proposed", "approved", "re_evaling")
 _INFLIGHT_PROPOSAL_STATUSES = ("approved", "re_evaling")
 
+# Strong references to the in-process reconcile tasks a re-eval's done-callback spawns, so a
+# fire-and-forget ``asyncio.create_task`` is never garbage-collected mid-flight (the sanctioned
+# retention pattern — mirrors eval_runner_service._BACKGROUND_TASKS). NOT run state.
+_RECONCILE_TASKS: set[asyncio.Task] = set()
+
+
+async def _read_skill_cases(supabase: Client, skill_id: str, user_id: str) -> list[dict]:
+    """Read the owner-scoped test cases for a skill (the re-eval corpus), ordered — the SAME
+    read ``start_eval_run`` does. Owner-scoped (``.eq user_id``); threadpool-wrapped (D-v2.5-01)."""
+
+    def _read():
+        return (
+            supabase.table("skill_test_cases")
+            .select("id, prompt, expected_behavior, order_index")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("order_index")
+            .execute()
+        )
+
+    return list((await run_in_threadpool(_read)).data or [])
+
 
 async def _read_base_instructions(supabase: Client, version_id: str, user_id: str) -> str:
     """Return one base ``skill_versions.instructions`` body, owner-scoped (T-135-07). Empty
@@ -821,14 +845,16 @@ async def list_skill_proposals(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """List a skill's proposals (owner-scoped, newest-first).
 
     Owner-verify the skill FIRST (404 cross-user — T-135-01) so a non-owner can't probe a skill's
     existence, then read owner-scoped (``.eq user_id``) newest-first and hydrate each row's
-    ``base_instructions`` from its base version (id-bounded owner-scoped read — T-135-07). ``gate``
-    serializes straight from the stored value (None on not-yet-reconciled proposals — Plan 05 wires
-    reconcile-on-read)."""
+    ``base_instructions`` from its base version (id-bounded owner-scoped read — T-135-07). Plan 05
+    self-heals: any ``re_evaling`` proposal is reconciled first (a terminal/orphaned re-eval
+    finalizes — D-14), and every proposal with a completed re-eval carries the D-13 honest ``gate``
+    counts (recompute-on-read so ``promoted`` AND ``not_promoted`` always display them)."""
     user_id = current_user["id"]
 
     await _verify_owned_skill(supabase, skill_id, user_id)
@@ -844,17 +870,36 @@ async def list_skill_proposals(
         )
 
     rows = list((await run_in_threadpool(_read)).data or [])
+    # Self-heal any 're_evaling' proposal (terminal/orphaned re-eval finalizes here — D-14) before
+    # the base-instructions batch read, so the returned rows reflect the true terminal state.
+    for i, r in enumerate(rows):
+        if r.get("status") == "re_evaling":
+            reconciled = await reconcile_proposal(
+                supabase, redis, proposal_id=r.get("id"), user_id=user_id
+            )
+            if reconciled is not None:
+                rows[i] = reconciled
+
     base_map = await _base_instructions_map(
         supabase, [r.get("base_skill_version_id") for r in rows], user_id
     )
-    return [
-        _proposal_response(
-            r,
-            base_instructions=base_map.get(str(r.get("base_skill_version_id")), ""),
-            gate=None,
+    out = []
+    for r in rows:
+        # Attach the D-13 counts for any proposal with a completed re-eval (None otherwise — honest).
+        gate = await _compute_gate(
+            supabase,
+            source_eval_run_id=r.get("source_eval_run_id"),
+            re_eval_run_id=r.get("re_eval_run_id"),
+            user_id=user_id,
         )
-        for r in rows
-    ]
+        out.append(
+            _proposal_response(
+                r,
+                base_instructions=base_map.get(str(r.get("base_skill_version_id")), ""),
+                gate=gate,
+            )
+        )
+    return out
 
 
 # ── GET one — a single proposal, owner-scoped, 404-not-403 ───────────────────────
@@ -864,12 +909,16 @@ async def get_skill_proposal(
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """Return ONE proposal (owner-scoped).
 
     Owner-verify the proposal row on ``id`` AND ``user_id`` AND ``skill_id``; 404 (NEVER 403) on a
     cross-user / unknown miss so existence isn't leaked (T-135-01). Hydrate ``base_instructions``
-    from the base version (owner-scoped)."""
+    from the base version (owner-scoped). Plan 05 self-heals: a ``re_evaling`` proposal is reconciled
+    first (a terminal/orphaned re-eval finalizes — D-14 — so the state never sticks after a backend
+    restart lost the in-process task), and a proposal with a completed re-eval carries the D-13 honest
+    ``gate`` counts (recompute-on-read — ``promoted`` AND ``not_promoted`` always display them)."""
     user_id = current_user["id"]
 
     def _read():
@@ -887,10 +936,22 @@ async def get_skill_proposal(
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     row = rows[0]
+    if row.get("status") == "re_evaling":
+        reconciled = await reconcile_proposal(
+            supabase, redis, proposal_id=proposal_id, user_id=user_id
+        )
+        if reconciled is not None:
+            row = reconciled
+    gate = await _compute_gate(
+        supabase,
+        source_eval_run_id=row.get("source_eval_run_id"),
+        re_eval_run_id=row.get("re_eval_run_id"),
+        user_id=user_id,
+    )
     base_instructions = await _read_base_instructions(
         supabase, row.get("base_skill_version_id"), user_id
     )
-    return _proposal_response(row, base_instructions=base_instructions, gate=None)
+    return _proposal_response(row, base_instructions=base_instructions, gate=gate)
 
 
 # ── POST reject — a pure-audit status flip (NO version / skills write — D-10) ─────
@@ -946,3 +1007,823 @@ async def reject_skill_proposal(
         supabase, row.get("base_skill_version_id"), user_id
     )
     return _proposal_response(row, base_instructions=base_instructions, gate=None)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Phase 135 Plan 05 (SI-01) — approval + auto re-eval + the honest promotion gate.
+#
+#   POST /skills/{skill_id}/proposals/{proposal_id}/approve        -> {proposal, re_eval_run_id}
+#   POST /skills/{skill_id}/proposals/{proposal_id}/rerun          -> {proposal, re_eval_run_id} (D-14)
+#   POST /skills/{skill_id}/proposals/{proposal_id}/force-promote  -> SkillProposalResponse (D-06)
+#
+# Approve INSERTs an immutable ``skill_versions(source='self_improve')`` draft WITHOUT touching the
+# live skill (D-05), then launches a both-arms re-eval REUSING the ``start_eval_run`` companion
+# machinery + ``run_eval_job`` on the SOURCE run's provider/model (D-11/D-12) with the Plan-02
+# ``skill_instructions_override`` seam so the WITH arm measures the DRAFT (Pitfall #1). When the
+# re-eval terminates, ``promotion_gate()`` (D-13, case-matched no-regression + improvement) decides:
+# PASS -> promote (the SINGLE ``skills.instructions`` UPDATE, accepting the 079 trigger's benign
+# ``manual`` dup version per Pitfall #2) + status='promoted'; FAIL -> status='not_promoted' with the
+# honest counts (force-promotable, D-06); orphaned/stale -> status='interrupted' + rerun (D-14). The
+# D-13 honest counts are RECOMPUTED-ON-READ onto the locked ``SkillProposalResponse.gate`` (owned by
+# Plan 04's eval_run.py — NOT touched here) so they render on BOTH ``promoted`` AND ``not_promoted``
+# and survive reloads (D-13 "always displayed"), with no schema change.
+# ═══════════════════════════════════════════════════════════════════════════════════
+
+
+def promotion_gate(source_rows: list[dict], reeval_rows: list[dict]) -> dict:
+    """The D-13 case-matched no-regression + improvement gate (RESEARCH § Code Examples — verbatim).
+
+    Join the SOURCE run × the RE-EVAL run on ``test_case_id``, ``with_skill`` arm only, over the
+    INTERSECTION of test_case_ids GRADED in BOTH runs (Open-Q3 — a case added or deleted since the
+    source run is honestly ``excluded_not_measured``, never counted as a pass OR a fail).
+    ``not_measured`` (``verdict_state != 'graded'``) rows are excluded from BOTH sides. Returns
+    EXACTLY the 8 keys of ``PromotionGate.model_fields`` (asserted in test_promotion_gate.py so the
+    field can never silently drift from the model)."""
+
+    def graded_map(rows: list[dict]) -> dict:
+        # test_case_id -> verdict_passed(bool), only GRADED with_skill rows.
+        return {
+            r["test_case_id"]: r["verdict_passed"]
+            for r in rows
+            if r.get("variant") == "with_skill" and r.get("verdict_state") == "graded"
+        }
+
+    src, new = graded_map(source_rows), graded_map(reeval_rows)
+    shared = src.keys() & new.keys()
+    prev_pass = {c for c in shared if src[c] is True}
+    prev_fail = {c for c in shared if src[c] is False}
+    no_regression = all(new[c] is True for c in prev_pass)   # every prev-PASS still PASS
+    improved = any(new[c] is True for c in prev_fail)         # >=1 prev-FAIL now PASS
+    passed = no_regression and improved
+    return {  # honest counts ALWAYS displayed alongside the verdict (D-13)
+        "passed": passed,
+        "no_regression": no_regression,
+        "improved": improved,
+        "prev_pass": len(prev_pass),
+        "prev_fail": len(prev_fail),
+        "still_pass": sum(1 for c in prev_pass if new[c]),
+        "newly_pass": sum(1 for c in prev_fail if new[c]),
+        "excluded_not_measured": len([c for c in (src.keys() | new.keys()) if c not in shared]),
+    }
+
+
+async def _read_arm_results(supabase: Client, run_id, user_id: str) -> list[dict]:
+    """Read the gate-relevant ``eval_results`` columns for one run, owner-scoped (T-135-07)."""
+
+    def _read():
+        return (
+            supabase.table("eval_results")
+            .select("test_case_id, variant, verdict_state, verdict_passed")
+            .eq("eval_run_id", str(run_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    return list((await run_in_threadpool(_read)).data or [])
+
+
+async def _compute_gate(
+    supabase: Client, *, source_eval_run_id, re_eval_run_id, user_id: str
+) -> PromotionGate | None:
+    """Recompute the D-13 honest gate from the SOURCE + RE-EVAL runs' ``eval_results`` (owner-scoped).
+
+    Returns ``None`` — honestly nothing to display — when either run id is missing, the re-eval run
+    is not ``completed``, or it has no results yet (in-flight / interrupted). Else returns
+    ``PromotionGate(**promotion_gate(source_rows, reeval_rows))``. Recompute-on-read (no schema
+    change) so ``promoted`` AND ``not_promoted`` proposals carry the counts and survive reloads
+    (D-13 "always displayed"). All blocking calls threadpool-wrapped (D-v2.5-01)."""
+    if not source_eval_run_id or not re_eval_run_id:
+        return None
+
+    # The re-eval must be a COMPLETED run for the gate to be meaningful (an in-flight / interrupted
+    # re-eval has nothing honest to show).
+    def _read_reeval_meta():
+        return (
+            supabase.table("eval_runs")
+            .select("id, status")
+            .eq("id", str(re_eval_run_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    meta = list((await run_in_threadpool(_read_reeval_meta)).data or [])
+    if not meta or meta[0].get("status") != "completed":
+        return None
+
+    source_rows = await _read_arm_results(supabase, source_eval_run_id, user_id)
+    reeval_rows = await _read_arm_results(supabase, re_eval_run_id, user_id)
+    if not reeval_rows:
+        return None
+    return PromotionGate(**promotion_gate(source_rows, reeval_rows))
+
+
+async def reconcile_proposal(
+    supabase: Client, redis, *, proposal_id, user_id: str
+) -> dict | None:
+    """Self-heal a ``re_evaling`` proposal to its terminal state + apply the promotion write (D-13/D-14).
+
+    Reads the proposal owner-scoped. If it is NOT ``re_evaling``, returns it UNCHANGED (the route
+    attaches the gate for display via ``_compute_gate``). Else reads the linked re-eval run and branches:
+
+      (a) run ``completed``     -> ``gate = _compute_gate(...)``; ``gate.passed`` -> PROMOTE: the SINGLE
+          ``skills.instructions`` UPDATE = proposed (fires the 079 trigger's benign ``manual`` dup
+          version — ACCEPT it, Pitfall #2; the ``self_improve`` draft remains the anchor) + status
+          ``promoted``; else status ``not_promoted``.
+      (b) run terminal-but-not-completed (``failed``/``cancelled``/``interrupted``) OR running-but-orphaned
+          (status ``running`` AND the run is not in ``RUN_TASKS`` — a backend restart lost the task) ->
+          status ``interrupted`` (D-14 — never stuck ``re_evaling``; nothing to display honestly).
+
+    Persists the transition (service-role UPDATE, owner-scoped) and returns the updated row (or the
+    unchanged row when the run is genuinely in-flight). Returns ``None`` when the proposal is missing.
+    All blocking calls threadpool-wrapped (D-v2.5-01)."""
+
+    def _read_proposal():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read_proposal)).data or [])
+    if not rows:
+        return None
+    proposal = rows[0]
+    if proposal.get("status") != "re_evaling":
+        return proposal
+
+    re_eval_run_id = proposal.get("re_eval_run_id")
+    new_status: str | None = None
+
+    if not re_eval_run_id:
+        # Approved but no re-eval linked (a crash between the version INSERT and the launch) —
+        # honestly interrupted (D-14).
+        new_status = "interrupted"
+    else:
+        def _read_run():
+            return (
+                supabase.table("eval_runs")
+                .select("id, status")
+                .eq("id", str(re_eval_run_id))
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+
+        run_rows = list((await run_in_threadpool(_read_run)).data or [])
+        run_status = run_rows[0].get("status") if run_rows else None
+
+        if run_status == "completed":
+            gate = await _compute_gate(
+                supabase,
+                source_eval_run_id=proposal.get("source_eval_run_id"),
+                re_eval_run_id=re_eval_run_id,
+                user_id=user_id,
+            )
+            if gate is not None and gate.passed:
+                # PROMOTE — the SINGLE live-skill write, ONLY on a passing gate (T-135-04). This is
+                # the only place the loop touches ``skills``; it fires the 079 capture trigger -> a
+                # benign source='manual' dup version we ACCEPT (Pitfall #2, trigger untouched).
+                proposed = proposal.get("proposed_instructions") or ""
+                skill_id = proposal["skill_id"]
+
+                def _promote():
+                    return (
+                        supabase.table("skills")
+                        .update({"instructions": proposed})
+                        .eq("id", skill_id)
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+
+                await run_in_threadpool(_promote)
+                new_status = "promoted"
+            else:
+                new_status = "not_promoted"
+        elif run_status in ("failed", "cancelled", "interrupted"):
+            new_status = "interrupted"
+        elif run_status == "running":
+            # Orphan check: a ``running`` re-eval whose task is gone from ``RUN_TASKS`` (a backend
+            # restart lost it) is orphaned -> interrupted (D-14). A genuinely in-flight run (still in
+            # RUN_TASKS) is LEFT ``re_evaling`` (nothing to finalize yet).
+            from app.api.threads import RUN_TASKS  # function-local (avoid circular import)
+
+            try:
+                run_key = UUID(str(re_eval_run_id))
+            except (ValueError, TypeError):
+                run_key = re_eval_run_id
+            if run_key not in RUN_TASKS:
+                new_status = "interrupted"
+        else:
+            # Unknown / missing run row -> honestly interrupted (never stuck ``re_evaling``).
+            new_status = "interrupted"
+
+    if new_status is None:
+        return proposal  # genuinely in-flight — no transition
+
+    def _persist():
+        return (
+            supabase.table("skill_proposals")
+            .update({"status": new_status})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    updated = list((await run_in_threadpool(_persist)).data or [])
+    return updated[0] if updated else {**proposal, "status": new_status}
+
+
+async def _launch_reeval(
+    *,
+    skill: dict,
+    draft_version: dict,
+    proposed_instructions: str,
+    cases: list[dict],
+    provider: str,
+    model: str,
+    proposal_id,
+    user_id: str,
+    current_user: dict,
+    supabase: Client,
+    redis: aioredis.Redis,
+    pool: asyncpg.Pool,
+) -> UUID:
+    """Launch a both-arms re-eval measuring the DRAFT (Pitfall #1), REUSING the ``start_eval_run``
+    companion machinery verbatim (mint run_id -> Redis SET NX inflight claim -> INSERT eval_runs +
+    companion ``public.runs`` row -> ZADD -> seed the buffer BEFORE returning -> provider/model
+    override -> spawn ``run_eval_job`` -> register in RUN_TASKS). The WITH arm reads the draft body
+    via ``skill_instructions_override={skill.name: proposed_instructions}`` (Plan 02 seam). Registers
+    a done-callback that reconciles the proposal so the gate finalizes in-process. Returns the re-eval
+    ``run_id``. Does NOT fork ``run_eval_job`` (D-12). On a pre-spawn failure the inflight claim is
+    CAS-released so a transient error can't wedge the skill for the full TTL."""
+    skill_id = skill["id"]
+    run_id = uuid4()
+
+    # ONE eval per skill (T-135-06 DoS bound) — the SAME atomic SET NX claim ``start_eval_run`` takes;
+    # the spawned ``run_eval_job`` CAS-releases it in its ``finally``. 409 on contention.
+    claimed = await redis.set(
+        _inflight_key(skill_id), str(run_id), nx=True, ex=_INFLIGHT_TTL_S
+    )
+    if not claimed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An eval run is already in progress for this skill",
+        )
+
+    try:
+        # Anchor thread so the companion runs row has a valid (NOT NULL FK) thread_id; is_eval=True
+        # keeps it out of the sidebar (Phase 134.1 / BUG-260702-01).
+        eval_thread_id = uuid4()
+
+        def _insert_thread():
+            return (
+                supabase.table("threads")
+                .insert({
+                    "id": str(eval_thread_id),
+                    "user_id": user_id,
+                    "title": "[eval] skill re-eval (self-improve)",
+                    "folder_id": None,
+                    "is_eval": True,
+                })
+                .execute()
+            )
+
+        await run_in_threadpool(_insert_thread)
+
+        # Durable eval_runs row — skill_version_id = the DRAFT (self_improve) version + provider/model
+        # = the SOURCE run's (D-11). user_id/skill_id from the caller + path (NEVER a body — T-135-02).
+        def _insert_eval_run():
+            return (
+                supabase.table("eval_runs")
+                .insert({
+                    "id": str(run_id),
+                    "skill_id": skill_id,
+                    "skill_version_id": draft_version["id"],
+                    "user_id": user_id,
+                    "provider": provider,
+                    "model": model,
+                    "status": "running",
+                    "case_count": len(cases),
+                })
+                .execute()
+            )
+
+        await run_in_threadpool(_insert_eval_run)
+
+        # Companion public.runs row keyed by the SAME run_id (Pattern 3 — reattach/cancel for free).
+        await insert_run(
+            pool,
+            run_id=run_id,
+            thread_id=eval_thread_id,
+            user_id=UUID(user_id),
+            status="streaming",
+            model=model,
+            provider=provider,
+        )
+
+        # Run-buffer ZADD + seed the buffer BEFORE returning (the d0c0c10a race fix — a fast
+        # subscriber must not hit a missing run:{id} key and synthesize a terminal error).
+        _score = time_mod.time()
+        try:
+            await redis.zadd(f"runs_by_thread:eval:{skill_id}", {str(run_id): _score})
+            await redis.zadd("runs:active", {str(run_id): _score})
+        except Exception:
+            logger.exception("re-eval ZADD failed for run %s; continuing", run_id)
+        await eval_runner_service._emit_eval(
+            redis, run_id, eval_runner_service.EVENT_RUN_STARTED
+        )
+
+        # Route the re-eval to the SOURCE run's provider/model (D-11) — the gateway routes on
+        # user_settings.active_provider, so apply the SAME override_provider + model pin the chat +
+        # start_eval_run paths use (no fork — the 306dd2d4 trap).
+        from app.models.user_settings import load_user_settings, override_provider  # function-local
+
+        user_settings = await run_in_threadpool(load_user_settings, user_id)
+        if provider and provider != user_settings.active_provider:
+            user_settings = override_provider(user_settings, provider)
+        user_settings = user_settings.model_copy(update={"llm_model": model})
+
+        # Spawn the bounded re-eval job (non-blocking). Pitfall #1: the WITH arm measures the DRAFT
+        # via ``skill_instructions_override`` keyed on the skill NAME (Plan 02 seam). Register in
+        # RUN_TASKS for cancel parity + a done-callback that reconciles the proposal in-process so
+        # the gate finalizes without waiting for a GET (the GET path is the restart backstop).
+        from app.api.threads import RUN_TASKS  # function-local (avoid circular import)
+
+        task = asyncio.create_task(
+            eval_runner_service.run_eval_job(
+                run_id=run_id,
+                skill_id=skill_id,
+                skill_version=draft_version,
+                cases=cases,
+                provider=provider,
+                model=model,
+                current_user=current_user,
+                user_settings=user_settings,
+                redis=redis,
+                supabase=supabase,
+                pool=pool,
+                skill_instructions_override={(skill.get("name") or ""): proposed_instructions},
+            )
+        )
+        RUN_TASKS[run_id] = task
+
+        def _on_reeval_done(_t, _rid=run_id, _pid=str(proposal_id), _uid=user_id):
+            RUN_TASKS.pop(_rid, None)
+            rec = asyncio.create_task(
+                reconcile_proposal(supabase, redis, proposal_id=_pid, user_id=_uid)
+            )
+            _RECONCILE_TASKS.add(rec)
+            rec.add_done_callback(_RECONCILE_TASKS.discard)
+
+        task.add_done_callback(_on_reeval_done)
+    except Exception:
+        # The job never spawned — release the claim NOW (its owner-on-finally never starts) so a
+        # transient error doesn't wedge the skill for the full TTL. CAS-release (only our OWN claim).
+        await eval_runner_service._release_inflight_if_owned(redis, skill_id, run_id)
+        raise
+
+    return run_id
+
+
+# ── POST approve — self_improve draft INSERT (no live-skill write) + launch the re-eval ──
+@router.post("/{skill_id}/proposals/{proposal_id}/approve")
+async def approve_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+):
+    """Approve a proposal: INSERT the immutable ``self_improve`` draft version WITHOUT touching the
+    live skill (D-05), then launch a both-arms re-eval that measures the DRAFT (Pitfall #1).
+
+    Owner-verify the skill (404 cross-user) + the proposal on ``id`` AND ``user_id`` AND ``skill_id``
+    (404 not 403 — T-135-01); require ``status=='proposed'`` (409 otherwise). Read the base version
+    (name/description carried onto the draft) + the SOURCE run's provider/model (D-11). Compute
+    ``next_num = COALESCE(MAX(version_number),0)+1`` and service-role INSERT a ``skill_versions`` row
+    (``source='self_improve'`` — a DIRECT INSERT bypasses the 079 append-only trigger; only UPDATE is
+    blocked) with ``instructions=proposed``. Link ``new_skill_version_id`` + mark ``approved``, launch
+    the re-eval reusing the ``start_eval_run`` machinery on the source provider/model with the draft
+    override, then link ``re_eval_run_id`` + ``status='re_evaling'``. Returns ``{proposal,
+    re_eval_run_id}``. Every supabase-py call is threadpool-wrapped (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner-verify the skill (404 cross-user) + read the proposal (id AND user_id AND skill_id).
+    skill = await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read_proposal():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        prop_rows = list((await run_in_threadpool(_read_proposal)).data or [])
+    except Exception:
+        logger.debug("proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not prop_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    proposal = prop_rows[0]
+
+    # 2. State guard — only a ``proposed`` draft can be approved (409 otherwise — T-135-01).
+    if proposal.get("status") != "proposed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal is not proposable (status={proposal.get('status')})",
+        )
+
+    base_version_id = proposal["base_skill_version_id"]
+    source_eval_run_id = proposal.get("source_eval_run_id")
+    proposed_instructions = proposal.get("proposed_instructions") or ""
+
+    # 3. Read the base version (name/description carried onto the draft) — owner-scoped.
+    def _read_base_version():
+        return (
+            supabase.table("skill_versions")
+            .select("id, name, description")
+            .eq("id", str(base_version_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    base_rows = list((await run_in_threadpool(_read_base_version)).data or [])
+    if not base_rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Base skill version not found",
+        )
+    base_version = base_rows[0]
+
+    # 4. Read the SOURCE run's provider/model (D-11 — the re-eval routes to the SAME provider/model).
+    source_provider = None
+    source_model = None
+    if source_eval_run_id:
+        def _read_source_run():
+            return (
+                supabase.table("eval_runs")
+                .select("id, provider, model")
+                .eq("id", str(source_eval_run_id))
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+
+        src_rows = list((await run_in_threadpool(_read_source_run)).data or [])
+        if src_rows:
+            source_provider = src_rows[0].get("provider")
+            source_model = src_rows[0].get("model")
+    if not source_provider or not source_model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Source eval run provider/model unavailable — cannot re-eval",
+        )
+
+    # 5. Read the owner's test cases (the re-eval corpus). Reject an empty fan-out (T-133-02 parity).
+    cases = await _read_skill_cases(supabase, skill_id, user_id)
+    if not cases:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This skill has no test cases to re-evaluate",
+        )
+
+    # 6. INSERT the immutable self_improve DRAFT version WITHOUT touching the live skill (D-05). A
+    # DIRECT service-role INSERT (source='self_improve') bypasses the 079 trigger (only UPDATE is
+    # blocked); next_num = COALESCE(MAX(version_number),0)+1 for the skill.
+    def _read_max_version():
+        return (
+            supabase.table("skill_versions")
+            .select("version_number")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("version_number", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    max_rows = list((await run_in_threadpool(_read_max_version)).data or [])
+    next_num = ((max_rows[0].get("version_number") if max_rows else 0) or 0) + 1
+
+    draft_version_id = uuid4()
+    draft_payload = {
+        "id": str(draft_version_id),
+        "skill_id": skill_id,
+        "user_id": user_id,
+        "version_number": next_num,
+        "name": base_version.get("name") or skill.get("name") or "",
+        "description": base_version.get("description") or "",
+        "instructions": proposed_instructions,
+        "source": "self_improve",
+    }
+
+    def _insert_draft():
+        return supabase.table("skill_versions").insert(draft_payload).execute()
+
+    draft_resp = await run_in_threadpool(_insert_draft)
+    draft_echo = (list(draft_resp.data or []) or [draft_payload])[0]
+    draft_version = {**draft_payload, **draft_echo}
+
+    # 7. Link the draft + mark ``approved`` (in-flight; blocks a new propose — D-04). ``re_evaling`` is
+    # set together with ``re_eval_run_id`` AFTER the launch succeeds (step 9) so a reconcile can never
+    # see ``re_evaling`` without a run id and race it to ``interrupted``.
+    def _mark_approved():
+        return (
+            supabase.table("skill_proposals")
+            .update({
+                "new_skill_version_id": str(draft_version_id),
+                "status": "approved",
+            })
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    await run_in_threadpool(_mark_approved)
+
+    # 8. Launch the both-arms re-eval measuring the DRAFT (Pitfall #1), reusing start_eval_run's
+    # companion machinery (no fork of run_eval_job — D-12).
+    re_eval_run_id = await _launch_reeval(
+        skill=skill,
+        draft_version=draft_version,
+        proposed_instructions=proposed_instructions,
+        cases=cases,
+        provider=source_provider,
+        model=source_model,
+        proposal_id=proposal_id,
+        user_id=user_id,
+        current_user=current_user,
+        supabase=supabase,
+        redis=redis,
+        pool=pool,
+    )
+
+    # 9. Link the re_eval_run_id + transition to ``re_evaling`` in one write.
+    def _mark_reevaling():
+        return (
+            supabase.table("skill_proposals")
+            .update({"re_eval_run_id": str(re_eval_run_id), "status": "re_evaling"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    await run_in_threadpool(_mark_reevaling)
+
+    row = {
+        **proposal,
+        "new_skill_version_id": str(draft_version_id),
+        "re_eval_run_id": str(re_eval_run_id),
+        "status": "re_evaling",
+    }
+    base_instructions = await _read_base_instructions(supabase, base_version_id, user_id)
+    proposal_resp = _proposal_response(row, base_instructions=base_instructions, gate=None)
+    return {"proposal": proposal_resp, "re_eval_run_id": str(re_eval_run_id)}
+
+
+# ── POST rerun — re-launch a re-eval for an interrupted proposal (D-14 affordance) ───────
+@router.post("/{skill_id}/proposals/{proposal_id}/rerun")
+async def rerun_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+):
+    """Re-launch the re-eval for an ``interrupted`` proposal against its EXISTING draft version (D-14).
+
+    Owner-verify the skill + proposal (404 not 403). First ``reconcile_proposal`` so a stale
+    ``re_evaling`` settles to its true terminal state; then require the effective status to be
+    ``interrupted`` (409 if genuinely in-flight ``re_evaling`` / not rerunnable). Reuse the Task-1
+    launch block against the EXISTING ``new_skill_version_id`` draft (same draft override, same source
+    provider/model), set ``re_eval_run_id`` + ``status='re_evaling'``. Returns ``{proposal,
+    re_eval_run_id}``."""
+    user_id = current_user["id"]
+
+    skill = await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read_proposal():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        prop_rows = list((await run_in_threadpool(_read_proposal)).data or [])
+    except Exception:
+        logger.debug("proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not prop_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    proposal = prop_rows[0]
+
+    # Settle a stale ``re_evaling`` first (a terminal/orphaned run -> interrupted here — D-14).
+    if proposal.get("status") == "re_evaling":
+        reconciled = await reconcile_proposal(
+            supabase, redis, proposal_id=proposal_id, user_id=user_id
+        )
+        if reconciled is not None:
+            proposal = reconciled
+
+    if proposal.get("status") != "interrupted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal is not rerunnable (status={proposal.get('status')})",
+        )
+
+    draft_version_id = proposal.get("new_skill_version_id")
+    if not draft_version_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Proposal has no draft version to re-evaluate",
+        )
+    proposed_instructions = proposal.get("proposed_instructions") or ""
+    source_eval_run_id = proposal.get("source_eval_run_id")
+
+    # Read the EXISTING draft version (name/description/instructions) — owner-scoped.
+    def _read_draft():
+        return (
+            supabase.table("skill_versions")
+            .select("id, name, description, instructions")
+            .eq("id", str(draft_version_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    draft_rows = list((await run_in_threadpool(_read_draft)).data or [])
+    if not draft_rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Draft skill version not found",
+        )
+    draft_version = draft_rows[0]
+
+    # Source provider/model (D-11).
+    source_provider = None
+    source_model = None
+    if source_eval_run_id:
+        def _read_source_run():
+            return (
+                supabase.table("eval_runs")
+                .select("id, provider, model")
+                .eq("id", str(source_eval_run_id))
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+
+        src_rows = list((await run_in_threadpool(_read_source_run)).data or [])
+        if src_rows:
+            source_provider = src_rows[0].get("provider")
+            source_model = src_rows[0].get("model")
+    if not source_provider or not source_model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Source eval run provider/model unavailable — cannot re-eval",
+        )
+
+    cases = await _read_skill_cases(supabase, skill_id, user_id)
+    if not cases:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This skill has no test cases to re-evaluate",
+        )
+
+    re_eval_run_id = await _launch_reeval(
+        skill=skill,
+        draft_version=draft_version,
+        proposed_instructions=proposed_instructions,
+        cases=cases,
+        provider=source_provider,
+        model=source_model,
+        proposal_id=proposal_id,
+        user_id=user_id,
+        current_user=current_user,
+        supabase=supabase,
+        redis=redis,
+        pool=pool,
+    )
+
+    def _mark_reevaling():
+        return (
+            supabase.table("skill_proposals")
+            .update({"re_eval_run_id": str(re_eval_run_id), "status": "re_evaling"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    await run_in_threadpool(_mark_reevaling)
+
+    row = {**proposal, "re_eval_run_id": str(re_eval_run_id), "status": "re_evaling"}
+    base_instructions = await _read_base_instructions(
+        supabase, proposal.get("base_skill_version_id"), user_id
+    )
+    proposal_resp = _proposal_response(row, base_instructions=base_instructions, gate=None)
+    return {"proposal": proposal_resp, "re_eval_run_id": str(re_eval_run_id)}
+
+
+# ── POST force-promote — human override of a failed gate, with evidence recorded (D-06) ──
+@router.post(
+    "/{skill_id}/proposals/{proposal_id}/force-promote",
+    response_model=SkillProposalResponse,
+)
+async def force_promote_skill_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    body: ForcePromoteBody,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Force-promote a ``not_promoted`` proposal despite a non-improving gate (D-06 — human override).
+
+    Owner-verify the skill + proposal (404 not 403); require ``status=='not_promoted'`` (409 otherwise
+    — a human may only override a proposal the gate already FAILED, with the failed evidence still
+    linked via ``re_eval_run_id``). Apply the promotion write (the SAME accept-the-079-trigger-dup
+    ``skills.instructions`` UPDATE as ``reconcile_proposal`` — Pitfall #2), set ``override_forced=true``
+    + ``status='promoted'``, and attach ``gate=_compute_gate(...)`` so the FAILED honest counts render
+    at the moment of override (D-13 always displayed + D-06 override-with-evidence). ``ForcePromoteBody``
+    is empty — the server derives everything, nothing to forge (T-135-02)."""
+    user_id = current_user["id"]
+
+    skill = await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read_proposal():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        prop_rows = list((await run_in_threadpool(_read_proposal)).data or [])
+    except Exception:
+        logger.debug("proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not prop_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    proposal = prop_rows[0]
+
+    if proposal.get("status") != "not_promoted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Only a not_promoted proposal can be force-promoted (status={proposal.get('status')})",
+        )
+
+    proposed_instructions = proposal.get("proposed_instructions") or ""
+
+    # The promotion write — the SINGLE live-skill UPDATE (accept the 079 trigger dup, Pitfall #2).
+    def _promote():
+        return (
+            supabase.table("skills")
+            .update({"instructions": proposed_instructions})
+            .eq("id", skill_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    await run_in_threadpool(_promote)
+
+    def _mark_promoted():
+        return (
+            supabase.table("skill_proposals")
+            .update({"override_forced": True, "status": "promoted"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    updated = list((await run_in_threadpool(_mark_promoted)).data or [])
+    row = updated[0] if updated else {
+        **proposal, "override_forced": True, "status": "promoted",
+    }
+    # Attach the FAILED honest counts at the moment of override (D-13 + D-06 override-with-evidence).
+    gate = await _compute_gate(
+        supabase,
+        source_eval_run_id=row.get("source_eval_run_id"),
+        re_eval_run_id=row.get("re_eval_run_id"),
+        user_id=user_id,
+    )
+    base_instructions = await _read_base_instructions(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _proposal_response(row, base_instructions=base_instructions, gate=gate)
