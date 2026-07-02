@@ -1739,8 +1739,11 @@ export async function rateEvalResult(
 async function proposalError(res: Response, fallback: string): Promise<Error> {
   let detail = `${fallback} (status ${res.status}).`
   try {
-    const j = (await res.json()) as { detail?: string }
-    if (j?.detail) detail = j.detail
+    // FastAPI 422 responses return `detail` as an ARRAY of objects, not a
+    // string — assign only when it's actually a string, else keep the generic
+    // fallback so validation errors never render as "[object Object]" (WR-04).
+    const j = (await res.json()) as { detail?: unknown }
+    if (typeof j?.detail === "string") detail = j.detail
   } catch {
     /* non-JSON body — keep the generic message */
   }
@@ -1840,7 +1843,10 @@ export async function forcePromoteProposal(
   const headers = await getAuthHeaders()
   const res = await fetch(
     `${API_BASE}/skills/${skillId}/proposals/${proposalId}/force-promote`,
-    { method: "POST", headers },
+    // Send an explicit empty JSON body — a body-less POST 422s against the
+    // force-promote route (CR-01, belt-and-suspenders per REVIEW.md). Content-Type
+    // is already application/json via getAuthHeaders().
+    { method: "POST", headers, body: JSON.stringify({}) },
   )
   if (!res.ok) throw await proposalError(res, "Failed to force-promote proposal")
   return res.json() as Promise<SkillProposal>
