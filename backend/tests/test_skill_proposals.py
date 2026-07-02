@@ -295,3 +295,115 @@ async def test_interrupted_state(monkeypatch):
     # rerun launched against the EXISTING draft (no NEW version insert).
     assert launch.await_args.kwargs["draft_version"]["id"] == ids.draft_version_id
     assert len([v for v in store["skill_versions"] if v.get("source") == "self_improve"]) == 1
+
+
+class _ClaimRedis:
+    """Minimal async redis fake exposing get(key) — the surface reconcile's CR-02 running-branch
+    liveness check touches (modeled on ``test_eval_runner._FakeRedis``)."""
+
+    def __init__(self, kv=None):
+        self.kv = kv or {}
+
+    async def get(self, key):
+        return self.kv.get(key)
+
+
+@pytest.mark.asyncio
+async def test_reconcile_running_cross_worker():
+    """CR-02 (135-08 / IN-05): a ``running`` re-eval ABSENT from the per-process ``RUN_TASKS`` is NOT
+    falsely ``interrupted`` while the shared ``eval_inflight:{skill_id}`` claim still NAMES its run_id
+    (a healthy in-flight re-eval on the OTHER worker under WORKER_COUNT=2); a claim-absent orphan IS
+    ``interrupted``. RUN_TASKS is left empty in BOTH cases (the multi-worker "other-worker" condition
+    — a fresh run_id is never registered in this process's dict)."""
+    from app.api import evals
+
+    # (i) claim still names this run_id -> healthy in-flight on the other worker -> stays re_evaling.
+    store, ids = _make(proposal_status="re_evaling", draft=True, re_eval_status="running")
+    sb = _FilterSupabase(store)
+    redis_alive = _ClaimRedis({f"eval_inflight:{ids.skill_id}": ids.re_eval_run_id})
+    resp = await evals.get_skill_proposal(
+        ids.skill_id, UUID(ids.proposal_id), current_user=OWNER, supabase=sb, redis=redis_alive,
+    )
+    assert resp.status == "re_evaling"  # NOT prematurely interrupted (claim proves liveness)
+    assert resp.gate is None  # a running re-eval has no completed gate to apply
+    assert store["skill_proposals"][0]["status"] == "re_evaling"
+
+    # (ii) no claim (released / expired) + RUN_TASKS empty -> a true orphan -> interrupted.
+    store2, ids2 = _make(proposal_status="re_evaling", draft=True, re_eval_status="running")
+    sb2 = _FilterSupabase(store2)
+    redis_gone = _ClaimRedis({})  # get(...) -> None for every key
+    resp2 = await evals.get_skill_proposal(
+        ids2.skill_id, UUID(ids2.proposal_id), current_user=OWNER, supabase=sb2, redis=redis_gone,
+    )
+    assert resp2.status == "interrupted"
+    assert store2["skill_proposals"][0]["status"] == "interrupted"
+
+
+@pytest.mark.asyncio
+async def test_approve_reverts_on_launch_failure(monkeypatch):
+    """CR-03 (135-08): when step-8 ``_launch_reeval`` raises AFTER step 7 committed status='approved'
+    (the reachable case is the shared ``eval_inflight:{skill_id}`` 409 when a normal eval is already
+    running for the skill), approve reverts the proposal to an actionable ``proposed`` state (NOT a
+    wedged ``approved``) with a CAS-guarded UPDATE and re-raises the original exception."""
+    from app.api import evals
+
+    store, ids = _make(proposal_status="proposed")
+    sb = _FilterSupabase(store)
+    monkeypatch.setattr(
+        evals,
+        "_launch_reeval",
+        AsyncMock(side_effect=HTTPException(
+            status_code=409, detail="An eval run is already in progress for this skill",
+        )),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await evals.approve_skill_proposal(
+            ids.skill_id, UUID(ids.proposal_id),
+            current_user=OWNER, supabase=sb, redis=object(), pool=object(),
+        )
+    assert exc.value.status_code == 409  # the original launch error is re-raised
+
+    prop = store["skill_proposals"][0]
+    assert prop["status"] == "proposed"  # reverted — NOT left wedged 'approved'
+    assert prop["new_skill_version_id"] is None  # the draft was unlinked on revert
+    # The inserted self_improve draft version row is harmless and may remain (unlinked, not deleted).
+    assert len([v for v in store["skill_versions"] if v.get("source") == "self_improve"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_reconcile_self_heals_stale_approved():
+    """CR-03 (135-08 / Truth 2b): a STALE ``approved`` row (no re_eval_run_id, ``updated_at`` older
+    than ``_APPROVED_STALE_GRACE_S``, Z-suffix ISO) self-heals to ``interrupted`` on read; a FRESH
+    ``approved`` row inside the grace window stays ``approved`` (the grace guard never clobbers a
+    just-approved proposal whose launch is legitimately in flight). No redis claim is needed — an
+    ``approved`` row has no run yet, so this path must not depend on the claim (``redis=object()``)."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.api import evals
+
+    # (i) STALE — updated_at older than the grace window (the Z-suffix ISO parsing path Task 2c owns).
+    store, ids = _make(proposal_status="approved")
+    stale_ts = (
+        datetime.now(timezone.utc) - timedelta(seconds=evals._APPROVED_STALE_GRACE_S + 60)
+    ).isoformat().replace("+00:00", "Z")
+    store["skill_proposals"][0]["updated_at"] = stale_ts
+    store["skill_proposals"][0]["re_eval_run_id"] = None
+    sb = _FilterSupabase(store)
+    resp = await evals.get_skill_proposal(
+        ids.skill_id, UUID(ids.proposal_id), current_user=OWNER, supabase=sb, redis=object(),
+    )
+    assert resp.status == "interrupted"  # self-healed on read
+    assert store["skill_proposals"][0]["status"] == "interrupted"
+
+    # (ii) FRESH — updated_at = now (within the grace window) -> stays approved (never clobbered).
+    store2, ids2 = _make(proposal_status="approved")
+    fresh_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    store2["skill_proposals"][0]["updated_at"] = fresh_ts
+    store2["skill_proposals"][0]["re_eval_run_id"] = None
+    sb2 = _FilterSupabase(store2)
+    resp2 = await evals.get_skill_proposal(
+        ids2.skill_id, UUID(ids2.proposal_id), current_user=OWNER, supabase=sb2, redis=object(),
+    )
+    assert resp2.status == "approved"  # grace-window guard prevents clobbering the in-flight approve
+    assert store2["skill_proposals"][0]["status"] == "approved"

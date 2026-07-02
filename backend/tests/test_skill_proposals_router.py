@@ -243,3 +243,44 @@ async def test_reject_is_pure_audit_via_route(monkeypatch):
     # No version row was written and skills was not touched (D-10).
     assert len(sb.store.get("skill_versions", [])) == versions_before, "reject must NOT add a version"
     assert [dict(s) for s in sb.store.get("skills", [])] == skills_before, "reject must NOT write skills"
+
+
+@pytest.mark.asyncio
+async def test_force_promote_over_http():
+    """CR-01 (135-08): a body-less HTTP ``POST .../force-promote`` returns 200 (explicitly NOT the
+    422 the shipped frontend hit) and records ``override_forced=true`` + ``status='promoted'`` +
+    applies the live-skill write — the wire contract the direct-call ``test_force_promote_records_
+    override`` cannot exercise (the shipped FE sent NO request body)."""
+    from app.main import app
+
+    from tests.test_skill_proposals import _make
+
+    tc1 = str(uuid4())
+    # A not_promoted proposal with a completed (FAILING) re-eval so _compute_gate has rows to attach.
+    store, ids = _make(
+        proposal_status="not_promoted", draft=True, re_eval_status="completed",
+        source_verdicts=[(tc1, True)], reeval_verdicts=[(tc1, False)],
+    )
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            # NO json= argument — the exact body-less shape the shipped frontend POSTed.
+            resp = await c.post(
+                f"/skills/{ids.skill_id}/proposals/{ids.proposal_id}/force-promote",
+                headers=_H,
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"body-less force-promote must be 200, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert body["override_forced"] is True
+    assert body["status"] == "promoted"
+    # The live skills row instructions were updated to the proposed body (the override applied the write).
+    assert store["skills"][0]["instructions"] == "PROPOSED BODY"
+    # The FAILED honest counts still render at the moment of override (D-06 + D-13 always displayed).
+    assert body["gate"] is not None and body["gate"]["passed"] is False

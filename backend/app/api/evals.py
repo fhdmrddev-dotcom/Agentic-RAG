@@ -44,6 +44,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time as time_mod
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -74,11 +75,32 @@ router = APIRouter(prefix="/skills", tags=["skill-evals"])
 # (mirrors skill_tuner._INFLIGHT_TTL_S).
 _INFLIGHT_TTL_S = 1800
 
+# CR-03 (135-08) — grace window before a wedged ``approved`` proposal (approve committed
+# status='approved' in step 7 but ``_launch_reeval`` never linked a re_eval_run_id) is honestly
+# self-healed to ``interrupted`` on read. ~2 min is comfortably beyond a normal approve request, so
+# a fresh ``approved`` row whose launch is legitimately in flight is never clobbered.
+_APPROVED_STALE_GRACE_S = 120
+
 
 def _inflight_key(skill_id: str) -> str:
     """The atomic per-skill in-flight claim key (mirror eval_runner_service._inflight_key —
     the job ``finally`` CAS-releases this exact key)."""
     return f"eval_inflight:{skill_id}"
+
+
+def _approved_is_stale(updated_at) -> bool:
+    """True when an ``approved`` proposal's ``updated_at`` is older than ``_APPROVED_STALE_GRACE_S``
+    (CR-03 self-heal). Parses the stored ISO ``updated_at`` (may end in ``Z``) against current UTC;
+    a missing/unparseable timestamp is treated as stale so a wedged row is never left forever."""
+    if not updated_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - parsed).total_seconds() > _APPROVED_STALE_GRACE_S
 
 
 async def _verify_owned_skill(supabase: Client, skill_id: str, user_id: str) -> dict:
@@ -873,7 +895,9 @@ async def list_skill_proposals(
     # Self-heal any 're_evaling' proposal (terminal/orphaned re-eval finalizes here — D-14) before
     # the base-instructions batch read, so the returned rows reflect the true terminal state.
     for i, r in enumerate(rows):
-        if r.get("status") == "re_evaling":
+        # CR-03: reconcile ``approved`` rows too, so a wedged ``approved`` proposal (launch never
+        # linked a run) self-heals to ``interrupted`` on read (not only ``re_evaling`` rows).
+        if r.get("status") in ("re_evaling", "approved"):
             reconciled = await reconcile_proposal(
                 supabase, redis, proposal_id=r.get("id"), user_id=user_id
             )
@@ -936,7 +960,9 @@ async def get_skill_proposal(
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     row = rows[0]
-    if row.get("status") == "re_evaling":
+    # CR-03: reconcile ``approved`` rows too, so a wedged ``approved`` proposal (launch never linked
+    # a run) self-heals to ``interrupted`` on read (not only ``re_evaling`` rows).
+    if row.get("status") in ("re_evaling", "approved"):
         reconciled = await reconcile_proposal(
             supabase, redis, proposal_id=proposal_id, user_id=user_id
         )
@@ -1152,14 +1178,29 @@ async def reconcile_proposal(
     if not rows:
         return None
     proposal = rows[0]
-    if proposal.get("status") != "re_evaling":
-        return proposal
-
     re_eval_run_id = proposal.get("re_eval_run_id")
+    status_val = proposal.get("status")
     new_status: str | None = None
 
-    if not re_eval_run_id:
-        # Approved but no re-eval linked (a crash between the version INSERT and the launch) —
+    if (
+        status_val == "approved"
+        and not re_eval_run_id
+        and _approved_is_stale(proposal.get("updated_at"))
+    ):
+        # CR-03 self-heal (D-14): approve commits status='approved' (step 7) BEFORE ``_launch_reeval``
+        # links a re_eval_run_id; if the request died there (crash, or a launch failure whose revert
+        # also failed) the row is wedged ``approved`` with no run. A STALE ``approved`` row (updated_at
+        # older than ``_APPROVED_STALE_GRACE_S``, or missing/unparseable) is honestly ``interrupted`` —
+        # this function's own "approved but no re-eval linked -> interrupted" contract. A FRESH
+        # ``approved`` row still inside the grace window is a normal in-flight approve request and is
+        # left UNTOUCHED (the elif below returns it unchanged).
+        new_status = "interrupted"
+    elif status_val != "re_evaling":
+        # Not a re-eval in progress (and not a stale approved row) -> unchanged; the route attaches
+        # the gate for display via ``_compute_gate``.
+        return proposal
+    elif not re_eval_run_id:
+        # ``re_evaling`` but no re-eval linked (a crash between the version INSERT and the launch) —
         # honestly interrupted (D-14).
         new_status = "interrupted"
     else:
@@ -1206,16 +1247,25 @@ async def reconcile_proposal(
         elif run_status in ("failed", "cancelled", "interrupted"):
             new_status = "interrupted"
         elif run_status == "running":
-            # Orphan check: a ``running`` re-eval whose task is gone from ``RUN_TASKS`` (a backend
-            # restart lost it) is orphaned -> interrupted (D-14). A genuinely in-flight run (still in
-            # RUN_TASKS) is LEFT ``re_evaling`` (nothing to finalize yet).
+            # Orphan check (CR-02): a ``running`` re-eval whose task is gone from ``RUN_TASKS`` MIGHT
+            # be orphaned — but the per-process ``RUN_TASKS`` dict is defeated by the WORKER_COUNT=2
+            # default (the task can be alive on the OTHER worker). Cross-check the shared
+            # ``eval_inflight:{skill_id}`` Redis claim ``_launch_reeval`` SET-NX'd with value
+            # ``str(re_eval_run_id)`` (CAS-released in ``run_eval_job``'s finally): while the claim
+            # still NAMES this run it is a healthy in-flight re-eval on another worker -> LEAVE
+            # ``re_evaling`` (no transition). Only when the task is absent HERE AND the claim no longer
+            # names this run (released / expired) is it a true orphan -> interrupted (D-14). This stops
+            # the false ``interrupted`` that silently skips the promotion gate under multi-worker.
             from app.api.threads import RUN_TASKS  # function-local (avoid circular import)
 
             try:
                 run_key = UUID(str(re_eval_run_id))
             except (ValueError, TypeError):
                 run_key = re_eval_run_id
-            if run_key not in RUN_TASKS:
+
+            claim = await redis.get(_inflight_key(proposal["skill_id"]))
+            claim_val = claim.decode() if isinstance(claim, bytes) else claim
+            if run_key not in RUN_TASKS and claim_val != str(re_eval_run_id):
                 new_status = "interrupted"
         else:
             # Unknown / missing run row -> honestly interrupted (never stuck ``re_evaling``).
@@ -1366,7 +1416,16 @@ async def _launch_reeval(
                 redis=redis,
                 supabase=supabase,
                 pool=pool,
-                skill_instructions_override={(skill.get("name") or ""): proposed_instructions},
+                # WR-02: key the override on BOTH the live skill name AND the DRAFT version name.
+                # The WITH-arm catalog (eval_runner_service.py) injects ``skill_version["name"]`` =
+                # the draft version's name, and ``_handle_load_skill`` looks the override up by that
+                # catalog name — so keying only on the live ``skill.name`` silently misses when the
+                # skill was renamed between propose and approve (Pitfall #1's "silent no-op gate").
+                skill_instructions_override={
+                    name: proposed_instructions
+                    for name in {skill.get("name") or "", draft_version.get("name") or ""}
+                    if name
+                },
             )
         )
         RUN_TASKS[run_id] = task
@@ -1551,21 +1610,41 @@ async def approve_skill_proposal(
     await run_in_threadpool(_mark_approved)
 
     # 8. Launch the both-arms re-eval measuring the DRAFT (Pitfall #1), reusing start_eval_run's
-    # companion machinery (no fork of run_eval_job — D-12).
-    re_eval_run_id = await _launch_reeval(
-        skill=skill,
-        draft_version=draft_version,
-        proposed_instructions=proposed_instructions,
-        cases=cases,
-        provider=source_provider,
-        model=source_model,
-        proposal_id=proposal_id,
-        user_id=user_id,
-        current_user=current_user,
-        supabase=supabase,
-        redis=redis,
-        pool=pool,
-    )
+    # companion machinery (no fork of run_eval_job — D-12). CR-03: step 7 already committed
+    # status='approved', so a launch failure here (the reachable case is the shared
+    # ``eval_inflight:{skill_id}`` 409 raised when a normal eval is already running for this skill)
+    # must NOT wedge the proposal in ``approved``. Revert to an actionable ``proposed`` state with a
+    # CAS-guarded owner-scoped UPDATE (``.eq('status','approved')`` is the compare-and-swap so a
+    # concurrent transition is not clobbered), then re-raise. The already-inserted ``self_improve``
+    # draft version row is harmless; unlink it (``new_skill_version_id=None``) so the row is clean.
+    try:
+        re_eval_run_id = await _launch_reeval(
+            skill=skill,
+            draft_version=draft_version,
+            proposed_instructions=proposed_instructions,
+            cases=cases,
+            provider=source_provider,
+            model=source_model,
+            proposal_id=proposal_id,
+            user_id=user_id,
+            current_user=current_user,
+            supabase=supabase,
+            redis=redis,
+            pool=pool,
+        )
+    except Exception:
+        def _revert_approved():
+            return (
+                supabase.table("skill_proposals")
+                .update({"status": "proposed", "new_skill_version_id": None})
+                .eq("id", str(proposal_id))
+                .eq("user_id", user_id)
+                .eq("status", "approved")
+                .execute()
+            )
+
+        await run_in_threadpool(_revert_approved)
+        raise
 
     # 9. Link the re_eval_run_id + transition to ``re_evaling`` in one write.
     def _mark_reevaling():
@@ -1746,7 +1825,7 @@ async def rerun_skill_proposal(
 async def force_promote_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
-    body: ForcePromoteBody,
+    body: ForcePromoteBody | None = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
