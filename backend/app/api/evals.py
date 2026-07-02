@@ -44,6 +44,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time as time_mod
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -74,11 +75,32 @@ router = APIRouter(prefix="/skills", tags=["skill-evals"])
 # (mirrors skill_tuner._INFLIGHT_TTL_S).
 _INFLIGHT_TTL_S = 1800
 
+# CR-03 (135-08) — grace window before a wedged ``approved`` proposal (approve committed
+# status='approved' in step 7 but ``_launch_reeval`` never linked a re_eval_run_id) is honestly
+# self-healed to ``interrupted`` on read. ~2 min is comfortably beyond a normal approve request, so
+# a fresh ``approved`` row whose launch is legitimately in flight is never clobbered.
+_APPROVED_STALE_GRACE_S = 120
+
 
 def _inflight_key(skill_id: str) -> str:
     """The atomic per-skill in-flight claim key (mirror eval_runner_service._inflight_key —
     the job ``finally`` CAS-releases this exact key)."""
     return f"eval_inflight:{skill_id}"
+
+
+def _approved_is_stale(updated_at) -> bool:
+    """True when an ``approved`` proposal's ``updated_at`` is older than ``_APPROVED_STALE_GRACE_S``
+    (CR-03 self-heal). Parses the stored ISO ``updated_at`` (may end in ``Z``) against current UTC;
+    a missing/unparseable timestamp is treated as stale so a wedged row is never left forever."""
+    if not updated_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - parsed).total_seconds() > _APPROVED_STALE_GRACE_S
 
 
 async def _verify_owned_skill(supabase: Client, skill_id: str, user_id: str) -> dict:
@@ -1366,7 +1388,16 @@ async def _launch_reeval(
                 redis=redis,
                 supabase=supabase,
                 pool=pool,
-                skill_instructions_override={(skill.get("name") or ""): proposed_instructions},
+                # WR-02: key the override on BOTH the live skill name AND the DRAFT version name.
+                # The WITH-arm catalog (eval_runner_service.py) injects ``skill_version["name"]`` =
+                # the draft version's name, and ``_handle_load_skill`` looks the override up by that
+                # catalog name — so keying only on the live ``skill.name`` silently misses when the
+                # skill was renamed between propose and approve (Pitfall #1's "silent no-op gate").
+                skill_instructions_override={
+                    name: proposed_instructions
+                    for name in {skill.get("name") or "", draft_version.get("name") or ""}
+                    if name
+                },
             )
         )
         RUN_TASKS[run_id] = task
@@ -1746,7 +1777,7 @@ async def rerun_skill_proposal(
 async def force_promote_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
-    body: ForcePromoteBody,
+    body: ForcePromoteBody | None = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
