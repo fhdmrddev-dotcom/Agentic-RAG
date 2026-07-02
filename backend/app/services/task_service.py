@@ -634,6 +634,14 @@ async def run_task_sub_agent(
         # caller — the dataclass default) keeps the gate a literal no-op =>
         # byte-identical Deep dispatch.
         skill_snapshot=parent_ctx.skill_snapshot,
+        # Phase 135 (135-02 / SI-01) — propagate the DRAFT instructions override onto
+        # the SUB-agent ctx (the SAME structural-unreachability class as the 096-02
+        # phase_whitelist + 099 skill_snapshot fixes above): a re-eval whose WITH arm
+        # dispatches the `task` tool must keep measuring the DRAFT inside the sub-agent,
+        # not silently revert to the LIVE skill (Pitfall #1). None (every Deep-Mode /
+        # tasks caller — the dataclass default) keeps it a literal no-op => byte-identical
+        # Deep dispatch.
+        skill_instructions_override=parent_ctx.skill_instructions_override,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).
