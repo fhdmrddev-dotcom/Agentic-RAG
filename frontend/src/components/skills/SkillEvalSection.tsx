@@ -17,7 +17,17 @@
 // every route (Plan 04 `.eq("user_id")`); this client only renders what they return.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from "react"
-import { Loader2, Play, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react"
+import {
+  Loader2,
+  Play,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles,
+  Check,
+  X,
+  RotateCw,
+  ArrowUpCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   getProviders,
@@ -28,9 +38,14 @@ import {
   rateEvalResult,
   proposeImprovement,
   listProposals,
+  getProposal,
+  approveProposal,
+  rejectProposal,
+  rerunProposalReeval,
+  forcePromoteProposal,
 } from "@/lib/api"
 import { lineDiff } from "@/lib/lineDiff"
-import type { EvalResult, EvalRun, SkillProposal } from "@/types"
+import type { EvalResult, EvalRun, SkillProposal, PromotionGate } from "@/types"
 
 interface Props {
   skillId: string
@@ -74,6 +89,27 @@ function pickActiveProposal(list: SkillProposal[]): SkillProposal | null {
   return latest.status === "rejected" ? null : latest
 }
 
+// Phase 135 (SI-01) — the honest case-matched promotion-gate counts (D-13). The
+// SAME renderer is called from BOTH the `promoted` and `not_promoted` branches so
+// the counts are "always displayed alongside the verdict", not only on failure. A
+// null gate (interrupted / not-yet-reconciled) renders nothing (no fabricated pass).
+function renderGateCounts(gate: PromotionGate | null | undefined) {
+  if (!gate) return null
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      <p className="font-medium text-foreground">
+        {gate.passed ? "Gate passed" : "Gate not passed"} — no-regression:{" "}
+        {gate.no_regression ? "yes" : "no"} · improved: {gate.improved ? "yes" : "no"}
+      </p>
+      <p>
+        prev pass {gate.prev_pass} · prev fail {gate.prev_fail} · still pass{" "}
+        {gate.still_pass} · newly pass {gate.newly_pass} · not measured{" "}
+        {gate.excluded_not_measured}
+      </p>
+    </div>
+  )
+}
+
 export function SkillEvalSection({ skillId }: Props) {
   const [providers, setProviders] = useState<
     { id: string; name: string; models: string[] }[]
@@ -111,6 +147,11 @@ export function SkillEvalSection({ skillId }: Props) {
   // the client re-subscribes instead of painting a dead "error" end-state.
   const reattachRef = useRef(0)
 
+  // Phase 135 (SI-01) — when non-null, the currently-attached eval readout belongs
+  // to a proposal's re-eval; loadReadout then reconciles the proposal (status + gate)
+  // from the DB on every readout (Pattern 3). Reset per fresh eval run + skill switch.
+  const reEvalProposalIdRef = useRef<string | null>(null)
+
   // Pull the durable readout from the DB (survives the Redis TTL — SC#3). Guarded
   // against a skill switch (WR-02 / BUG-260701-02): capture the skill this fetch is for
   // and bail before ANY setState if the active skill changed while it was in flight, so
@@ -123,6 +164,10 @@ export function SkillEvalSection({ skillId }: Props) {
       if (currentSkillRef.current !== requestedSkill) return
       setEvalRun(eval_run)
       setResults(eval_results)
+      // 135 (SI-01): if this readout is for a proposal's re-eval, reconcile the
+      // proposal (status + honest gate counts) from the DB too — never optimistic.
+      const pid = reEvalProposalIdRef.current
+      if (pid) void refetchProposal(pid)
     } catch (err) {
       if (currentSkillRef.current !== requestedSkill) return
       setError(err instanceof Error ? err.message : "Failed to load eval results.")
@@ -211,6 +256,31 @@ export function SkillEvalSection({ skillId }: Props) {
     )
   }
 
+  // 135 (SI-01) — reconcile a proposal from the DB (status + honest gate counts).
+  // Never optimistic (T-135-04): the card can't show "promoted" unless the server
+  // reconciled it. A `rejected` result clears the card (re-enables Propose). Guarded
+  // against a skill switch exactly like loadReadout.
+  async function refetchProposal(pid: string) {
+    const requestedSkill = skillId
+    try {
+      const p = await getProposal(requestedSkill, pid)
+      if (currentSkillRef.current !== requestedSkill) return
+      setProposal(p.status === "rejected" ? null : p)
+    } catch {
+      /* keep the last known card; the next action re-fetches from the DB */
+    }
+  }
+
+  // 135 (SI-01) — if the proposal is mid-re-eval, reattach the shared eval live
+  // readout to its companion run (Pattern 3) so progress keeps streaming + heartbeats;
+  // the run's terminal reconciles the proposal via loadReadout. Idempotent.
+  function reattachProposalReeval(p: SkillProposal | null) {
+    if (p && p.status === "re_evaling" && p.re_eval_run_id) {
+      reEvalProposalIdRef.current = p.id
+      attach(p.re_eval_run_id)
+    }
+  }
+
   // On mount: load the provider list + reattach to a still-live run (D-06).
   // The thin client has no ephemeral eval thread_id to feed getActiveRuns, so it
   // discovers a live run via the owner-scoped listEvalRuns (the skill-scoped
@@ -237,6 +307,7 @@ export function SkillEvalSection({ skillId }: Props) {
     setProposal(null)
     setProposalLoading(false)
     setProposalError(null)
+    reEvalProposalIdRef.current = null
     async function init() {
       try {
         const p = await getProviders()
@@ -265,7 +336,10 @@ export function SkillEvalSection({ skillId }: Props) {
       try {
         const proposals = await listProposals(skillId)
         if (cancelled || currentSkillRef.current !== skillId) return
-        setProposal(pickActiveProposal(proposals))
+        const active = pickActiveProposal(proposals)
+        setProposal(active)
+        // A reload mid-re-eval keeps streaming instead of freezing (Pattern 3).
+        reattachProposalReeval(active)
       } catch {
         /* no proposals / load failure — no card */
       }
@@ -289,6 +363,8 @@ export function SkillEvalSection({ skillId }: Props) {
     setEvalRun(null)
     setRunning(true)
     reattachRef.current = 0
+    // A fresh eval run is NOT a proposal re-eval — detach the reconcile hook.
+    reEvalProposalIdRef.current = null
     try {
       const { run_id } = await startEvalRun(skillId, { provider, model })
       attach(run_id)
@@ -332,6 +408,72 @@ export function SkillEvalSection({ skillId }: Props) {
       setProposalError(err instanceof Error ? err.message : "Failed to propose improvement.")
     } finally {
       setProposalLoading(false)
+    }
+  }
+
+  // 135 (SI-01) — proposal lifecycle handlers. Each mirrors handleRate: call the
+  // owner-gated endpoint, THEN re-fetch the proposal from the DB (never optimistic —
+  // T-135-04). Approve/rerun additionally reattach the shared eval live readout to the
+  // companion re-eval run (Pattern 3); the run's terminal reconciles status + gate.
+  async function handleApprove() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      const { re_eval_run_id } = await approveProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+      setLive({})
+      reEvalProposalIdRef.current = pid
+      attach(re_eval_run_id)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to approve proposal.")
+    }
+  }
+
+  async function handleReject() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      await rejectProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to reject proposal.")
+    }
+  }
+
+  async function handleRerun() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      const { re_eval_run_id } = await rerunProposalReeval(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+      setLive({})
+      reEvalProposalIdRef.current = pid
+      attach(re_eval_run_id)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to re-run the re-eval.")
+    }
+  }
+
+  async function handleForcePromote() {
+    if (!proposal) return
+    const pid = proposal.id
+    setProposalError(null)
+    try {
+      await forcePromoteProposal(skillId, pid)
+      if (currentSkillRef.current !== skillId) return
+      await refetchProposal(pid)
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setProposalError(err instanceof Error ? err.message : "Failed to force-promote proposal.")
     }
   }
 
@@ -445,25 +587,29 @@ export function SkillEvalSection({ skillId }: Props) {
           unified line diff (D-09) + rationale + which-evidence-drove-it (D-10); the
           status-driven approve/reject/re-eval action row + honest gate counts (D-13)
           render below the diff. */}
-      {evalHasResults && (
+      {(evalHasResults || (proposal && proposal.status !== "rejected")) && (
         <div className="flex flex-col gap-3 border-t border-border/30 pt-3">
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="text-xs gap-1"
-              onClick={() => void handlePropose()}
-              disabled={!canPropose}
-            >
-              {proposalLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3" />
-              )}
-              Propose improvement
-            </Button>
-          </div>
+          {/* Propose button hidden while a re-eval streams (evalHasResults gates on
+              !running); the card itself stays mounted so it never vanishes mid-run. */}
+          {evalHasResults && (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs gap-1"
+                onClick={() => void handlePropose()}
+                disabled={!canPropose}
+              >
+                {proposalLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Propose improvement
+              </Button>
+            </div>
+          )}
 
           {proposalError && <p className="text-xs text-destructive">{proposalError}</p>}
 
@@ -509,6 +655,87 @@ export function SkillEvalSection({ skillId }: Props) {
                   <p className="whitespace-pre-wrap text-xs text-foreground/80">
                     {proposal.evidence_summary}
                   </p>
+                </div>
+              )}
+
+              {/* Status-driven action row + honest terminal verdict (D-06/D-13/D-14).
+                  State is always the reconciled DB row (refetch-not-optimistic). */}
+              {proposal.status === "proposed" && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="text-xs gap-1"
+                    onClick={() => void handleApprove()}
+                  >
+                    <Check className="h-3 w-3" /> Approve &amp; re-eval
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs gap-1"
+                    onClick={() => void handleReject()}
+                  >
+                    <X className="h-3 w-3" /> Reject
+                  </Button>
+                </div>
+              )}
+
+              {(proposal.status === "approved" || proposal.status === "re_evaling") && (
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Re-evaluating the proposed skill — live progress shows above.
+                </p>
+              )}
+
+              {proposal.status === "promoted" && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold text-emerald-500">
+                    Promoted to the live skill
+                    {proposal.override_forced ? " (forced override)" : ""}.
+                  </p>
+                  {renderGateCounts(proposal.gate)}
+                </div>
+              )}
+
+              {proposal.status === "not_promoted" && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-destructive">
+                    Not promoted — the re-eval gate did not pass (failing cases in the
+                    results above).
+                  </p>
+                  {renderGateCounts(proposal.gate)}
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1"
+                      onClick={() => void handleForcePromote()}
+                    >
+                      <ArrowUpCircle className="h-3 w-3" /> Force promote anyway
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {proposal.status === "interrupted" && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Interrupted — not promoted. The re-eval did not finish.
+                  </p>
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1"
+                      onClick={() => void handleRerun()}
+                    >
+                      <RotateCw className="h-3 w-3" /> Re-run re-eval
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
