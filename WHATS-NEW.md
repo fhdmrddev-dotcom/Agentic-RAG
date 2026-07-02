@@ -16,13 +16,27 @@
 
 ## The app today, in one breath
 
-You have an AI assistant that **knows your uploaded knowledge base**, can **run code in a safe sandbox**, can be **taught new skills that stick**, and can **run multi-step workflows** for you. Chat is the main way you talk to it; you add documents by uploading files. (That's everything shipped through v2.9.)
+You have an AI assistant that **knows your uploaded knowledge base**, can **run code in a safe sandbox**, can be **taught new skills that stick**, can **run multi-step workflows** for you, and **genuinely understands your documents** (smart folders, linked documents, auto-sorting). Chat is the main way you talk to it; you add documents by uploading files. (That's everything shipped through v3.1.)
 
-The current chapter — **Document Management (v3.0)** — is about making the app genuinely *understand your documents*: pulling out the key facts, letting you organize them into self-updating smart folders, linking related documents together, and auto-sorting new uploads.
+The current chapter — **Skill Eval Studio + Self-Improving (v3.2)** — is about trusting your skills: test them against real prompts, see honest with-vs-without proof that they help, and let the app *suggest* improvements that you approve — never applied behind your back.
 
 ---
 
-## 🟢 Latest — a cleaner, clearer chat (v3.1, in progress)
+## 🟢 Latest — your skills can now improve themselves (with your approval) (v3.2, in progress)
+
+This chapter turns the Skills feature into a proper test-and-improve studio. Shipped so far:
+
+- **Skills now keep a version history.** Every time you save a skill, the app snapshots it as a frozen version — so you can always see exactly what a skill said at any point in time, and nothing you do later can quietly rewrite the past. 🔧 *Groundwork today; a browsable version-history view arrives with the upcoming Evals panel.*
+- **You can build a test suite for a skill.** Write test prompts for a skill once and they stick around — edit them, add more, reuse them on every future check. ⚙️ *Lives in the skill's eval section for now.*
+- **Prove a skill actually helps.** Run an evaluation and the app answers the question you actually care about: *does this skill make the assistant better?* It runs each test prompt twice — once with the skill, once without — side by side, on the real AI providers you use. Eval runs happen quietly in the background without cluttering your chat list.
+- **An honest verdict, not a vibe.** Each eval ends with a clear per-provider pass/fail readout, and you can thumbs-up/down individual outputs to teach the system your taste. When something couldn't be measured (say, a provider was down), it says "not measured" instead of pretending.
+- **The skill can now propose its own improvement — but you're always the boss.** New in this drop: based on eval results and trigger tuning signals, the app can draft a suggested edit to a skill's instructions and show it to you as a plain before/after diff. You read it, then approve or reject. Approve, and it becomes a new frozen version that is **automatically re-tested before it's promoted** — if the re-test fails, the app tells you honestly and holds it back (you can still force it through, and that override is recorded). Reject, and nothing changes. The system never, ever edits a skill behind your back. 🟢 **Use it now** — verified live on OpenAI, Anthropic, and Google.
+
+Still coming in this chapter: a publish gate (a skill must pass an eval before it can be shared) and a polished Skill Evals panel to see all of this in one place.
+
+---
+
+## 🟢 A cleaner, clearer chat (v3.1)
 
 - **Watching the assistant work is calmer now.** While it runs, each step stays as one tidy line that lights up as it's working and turns green when it's done — no more cards flickering open and snapping shut. A running step shows a live timer right on its status tag. Curious what a step is doing? Click it to expand the live code or output; click again to tuck it away.
 - **Less clutter under each run.** The repeated "to-dos updated · see panel" links, the duplicate "skill activated" note, and an extra "preparing…" status line that used to pile up beneath a run are gone. Your to-do list now lives in exactly one place — the workspace panel on the right — so there's only one of everything to look at. Same clean look across every AI provider, in both light and dark mode.
