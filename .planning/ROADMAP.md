@@ -163,10 +163,10 @@
 Plans:
 **Wave 1**
 
-- [ ] 135-01-PLAN.md — Migration 083: owner-scoped skill_proposals table (schema foundation) [wave 1]
-- [ ] 135-02-PLAN.md — Instructions-override seam (Pitfall #1 fix; Deep byte-identical) [wave 1]
-- [ ] 135-03-PLAN.md — Proposer service + evidence bundle (disagreement-first forced emission) [wave 1]
-- [ ] 135-06-PLAN.md — Frontend contracts: unified line-diff util + types + api helpers [wave 1]
+- [x] 135-01-PLAN.md — Migration 083: owner-scoped skill_proposals table (schema foundation) [wave 1]
+- [x] 135-02-PLAN.md — Instructions-override seam (Pitfall #1 fix; Deep byte-identical) [wave 1]
+- [x] 135-03-PLAN.md — Proposer service + evidence bundle (disagreement-first forced emission) [wave 1]
+- [x] 135-06-PLAN.md — Frontend contracts: unified line-diff util + types + api helpers [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
