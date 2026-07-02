@@ -197,10 +197,19 @@ Plans:
 
 **Plans**: 4 plans across 3 waves
 Plans:
+**Wave 1**
+
 - [ ] 136-01-PLAN.md — Migration 084 (skill_publish_overrides) + gate read-model compute_publish_gate (D-03 rule / D-04 content-equality) + PublishGate/TogglePublishBody contracts [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 136-02-PLAN.md — Server-side enforcement: gated toggle (409 + recorded override) + closed born-global create door (D-08) + GET publish-gate [wave 2]
 - [ ] 136-03-PLAN.md — Thin publish dialog + client contracts (getPublishGate / override toggle) + SkillCard share-intercept [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 136-04-PLAN.md — SkillEvalSection gate-status line + owner-visible override record (D-06/D-02) [wave 3]
+
 **UI hint**: yes
 
 #### Phase 137: Skill Evals Panel UI (PANEL-01)
