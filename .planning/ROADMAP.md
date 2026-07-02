@@ -159,7 +159,7 @@
   3. An approved new version is automatically re-evaled and the result gates promotion — a version that fails re-eval is surfaced as not-promoted with honest evidence (SI-01 auto-re-eval gate).
   4. The proposer + re-eval behavior holds across providers (reuses the existing gateway; SC#10) with no shared-path fork.
 
-**Plans**: 7 plans across 3 waves
+**Plans**: 9 plans across 4 waves (7 original + 2 gap-closure from 135-VERIFICATION.md)
 Plans:
 **Wave 1**
 
@@ -176,6 +176,11 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 135-05-PLAN.md — Approve → re-eval → promotion gate + resilience (interrupted/force-promote) [wave 3]
+
+**Gap closure** *(from 135-VERIFICATION.md — closes CR-01/CR-02/CR-03/WR-02 blocking gaps; runs in parallel, no file overlap)*
+
+- [ ] 135-08-PLAN.md — Backend: force-promote optional body (CR-01) + reconcile cross-worker liveness (CR-02) + approve except/revert & stale-approved self-heal (CR-03) + override draft-name key (WR-02) + tests [gap]
+- [ ] 135-09-PLAN.md — Frontend: force-promote empty body (CR-01) + string-guarded error detail (WR-04) + approved-status Reject escape (CR-03) [gap]
 
 **UI hint**: yes
 
