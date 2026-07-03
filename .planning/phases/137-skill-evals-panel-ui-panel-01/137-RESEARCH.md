@@ -406,16 +406,15 @@ proposeImprovement / listProposals / getProposal / approveProposal / rerunPropos
 
 **Note:** All backend endpoint shapes, enum values, and client-fn signatures in this document are `[VERIFIED]` by direct file read, not assumed. The Assumptions Log is short because this is an in-repo consolidation, not an ecosystem-discovery phase.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the stepper's Eval node show a "running" sub-state mid-run?**
+1. **Does the stepper's Eval node show a "running" sub-state mid-run?** — **RESOLVED (Plan 01 + Plan 03).** Plan 01 builds the LifecycleStepper as a pure `PublishGate` renderer that stays calm (a *status* read, one truth-teller, no mid-run animation); Plan 03 (RunHistory) owns the running top-row live per-arm progress with NO mid-run verdicts (D-04/D-12).
    - What we know: the live run streams per-arm progress; verdicts land at finalize (D-04). CONTEXT lists this under Claude's Discretion.
-   - What's unclear: whether the stepper node itself animates during a run or only the run-history top row does.
-   - Recommendation: Keep the stepper calm (it is a *status* read, one truth-teller); let the live per-arm progress live in the 055-B running row (D-12). Confirm against the 054/055 `index.html` mockups at plan time.
+   - Recommendation (settled): Keep the stepper calm; live progress lives in the 055-B running row.
 
-2. **Evals-tab vertical ordering at Studio width (stepper / run-bar / history / proposal).**
+2. **Evals-tab vertical ordering at Studio width (stepper / run-bar / history / proposal).** — **RESOLVED (Plan 05).** EvalsTab composes: LifecycleStepper (top) → CaseEditor → RunBar (directly above history) → RunHistory (live run = top row) → ProposalCard (below history) (D-08/D-12).
    - What we know: #45 puts the stepper top; 053-A intended a two-column layout, but Versions became its own tab (057-A), freeing the Evals tab.
-   - Recommendation: stepper → run-bar (D-12, directly above history) → run-history (with the proposal card below it, D-08). Build against the 053-A + 057-A `index.html`, not from memory.
+   - Recommendation (settled): stepper → CaseEditor → run-bar → run-history → proposal card.
 
 ## Environment Availability
 
