@@ -89,3 +89,46 @@ material):**
   (headline first, detail on demand) as the house style these other surfaces later adopt.
 - Confirmed to the operator that Phase 137 (PANEL-01, G-2 sketch-gated) is the planned
   designed panel — the operator approves the mockup before build.
+
+## Update 2026-07-04 — BASELINE ROOT CAUSE FOUND + FIXED; four new operator asks
+
+**Root cause of the baseline-arm failures (half 1) found and fixed** (`f47d6736`):
+`run_eval_job` reset the shared eval thread ONLY before the WITH arm, so every
+WITHOUT arm ran with the with-skill conversation still in history. That one bug
+produced the whole baseline symptom family:
+- DeepSeek thinking mode 400 "`reasoning_content` must be passed back" on the
+  replayed assistant turn → **BUG-260630-01's likely root cause** (re-verify live,
+  then close);
+- Gemini/GPT "empty response after 2 iterations" baselines (model sees the question
+  already answered above it);
+- contaminated A/B (an answering baseline could crib from the with-skill output).
+Fix = reset before EACH arm; regression test `test_thread_reset_before_each_arm`.
+BUG-260701-01 (Claude 4.6+/5 prefill 400) may be a genuinely separate request-shape
+trap — re-test after this fix before assuming it's closed.
+
+**Also fixed live the same day:** orphaned `running` eval run (gemini, 2026-07-02)
+manually flipped to `interrupted` — BUG-260702-02 (restart reconciliation) remains
+this seed's ops item.
+
+**New operator asks (2026-07-04) — fold into the production-clean phase:**
+1. **Automated cross-provider ENGINE smoke sweep** — one representative model per
+   provider × all 8 (native-7 + OpenRouter; exclude local), one case, asserting
+   engine health per arm (arm completes; verdict `graded` or honest `not_measured`
+   with a REAL provider error — never an engine-shaped error), NOT model pass/fail.
+   ~24 LLM calls/sweep. This is the operator's trust bar: "how do I know it reflects
+   reality for each model without hand-running all 8."
+2. **Judge evidence channel** — the judge grades ONLY `full_content_final`; a model
+   that genuinely creates the file (deepseek docx: real tool_calls, real file) but
+   writes a one-line prose answer fails as "unverifiable claim". Feed the judge a
+   bounded tool-trace/evidence digest alongside the answer so honest-but-terse runs
+   grade on what actually happened.
+3. **Determinate run progress** — Run button currently greys with a spinner; the
+   live per-case list is sparse for 1-case runs. Cheap determinate bar: total units
+   = cases × 2 arms (+ judge step), events already stream per arm.
+4. **Parallel / provider-matrix runs** — the one-eval-per-SKILL 409 guard is
+   deliberate (publish gate reads the LATEST run; panel attaches to a single live
+   stream; proposer source-run semantics). Different skills already run in parallel.
+   The wanted feature is a matrix run: one click fans out N providers as N run rows
+   in parallel (providers are independent APIs — operator is right), with explicit
+   gate semantics (which run feeds the gate) + multi-run live UI. Pairs naturally
+   with ask #1.
