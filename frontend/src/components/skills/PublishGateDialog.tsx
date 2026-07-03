@@ -18,6 +18,11 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: (override: boolean) => Promise<void>
+  /** Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06): the net-new "Review evals →"
+   *  navigator on the UNMET branch — opens the Studio's Evals tab for this skill so
+   *  the gate is discoverable from the publish flow (closes the "gate only in the
+   *  dialog" gap). Threaded App → ChatLayout → SkillsPage → SkillCard → here. */
+  onReviewEvals?: (skillId: string) => void
 }
 
 /**
@@ -40,7 +45,7 @@ const UNMET_COPY: Record<PublishGate["state"], string> = {
   passed: "",
 }
 
-export function PublishGateDialog({ skillId, open, onOpenChange, onConfirm }: Props) {
+export function PublishGateDialog({ skillId, open, onOpenChange, onConfirm, onReviewEvals }: Props) {
   const [gate, setGate] = useState<PublishGate | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -122,6 +127,18 @@ export function PublishGateDialog({ skillId, open, onOpenChange, onConfirm }: Pr
               Run an eval from this skill's Evals section, then try again — or force
               publish anyway below.
             </p>
+
+            {/* Phase 137-07 (sketch 057 MAP / D-06): the one net-new discoverability
+                link — jump straight to the Studio's Evals tab. UNMET branch only. */}
+            {onReviewEvals && (
+              <button
+                type="button"
+                className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded"
+                onClick={() => onReviewEvals(skillId)}
+              >
+                Review evals →
+              </button>
+            )}
           </div>
         )}
 

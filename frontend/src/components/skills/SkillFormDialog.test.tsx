@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { Skill, SkillCreate, SkillUpdate } from "@/types"
+import type { Skill, SkillCreate, SkillUpdate, PublishGate } from "@/types"
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
@@ -31,6 +31,11 @@ vi.mock("@/lib/supabase", () => ({
 const listSkillFiles = vi.fn().mockResolvedValue([])
 const uploadSkillFile = vi.fn()
 const deleteSkillFile = vi.fn()
+// Phase 137-07 (PANEL-01): the slim panel fetches the SAME gate/case/version data
+// the shared LifecycleStepper consumes. Mock them so the panel renders offline.
+const getPublishGate = vi.fn()
+const listTestCases = vi.fn().mockResolvedValue([])
+const listSkillVersions = vi.fn().mockResolvedValue([])
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
   return {
@@ -38,8 +43,24 @@ vi.mock("@/lib/api", async () => {
     listSkillFiles: (...a: unknown[]) => listSkillFiles(...(a as [])),
     uploadSkillFile: (...a: unknown[]) => uploadSkillFile(...(a as [])),
     deleteSkillFile: (...a: unknown[]) => deleteSkillFile(...(a as [])),
+    getPublishGate: (...a: unknown[]) => getPublishGate(...(a as [string])),
+    listTestCases: (...a: unknown[]) => listTestCases(...(a as [string])),
+    listSkillVersions: (...a: unknown[]) => listSkillVersions(...(a as [string])),
   }
 })
+
+function mkGate(overrides: Partial<PublishGate> = {}): PublishGate {
+  return {
+    met: false,
+    state: "never_evaled",
+    measured: null,
+    passed: null,
+    passing_run_id: null,
+    reason: "This skill has never had a completed eval.",
+    last_override: null,
+    ...overrides,
+  }
+}
 
 import { SkillFormDialog, SkillDetailPanel } from "./SkillFormDialog"
 
@@ -183,6 +204,14 @@ describe("SkillDetailPanel — Expand full-size instructions editor (sketch 046-
   beforeEach(() => {
     listSkillFiles.mockClear()
     listSkillFiles.mockResolvedValue([])
+    // Phase 137-07: the panel now fetches gate/case/version on mount — stub them so
+    // this pre-existing Expand test renders offline.
+    getPublishGate.mockReset()
+    getPublishGate.mockResolvedValue(mkGate())
+    listTestCases.mockReset()
+    listTestCases.mockResolvedValue([])
+    listSkillVersions.mockReset()
+    listSkillVersions.mockResolvedValue([])
   })
 
   it("opens a focused editor bound to the same instructions value and keeps edits on close", async () => {
@@ -216,5 +245,76 @@ describe("SkillDetailPanel — Expand full-size instructions editor (sketch 046-
     expect(screen.getByPlaceholderText(/step-by-step instructions/i)).toHaveValue(
       "rewritten in the big editor",
     )
+  })
+})
+
+describe("SkillDetailPanel — slimmed panel: shared stepper + Open studio, sections removed (137-07)", () => {
+  beforeEach(() => {
+    listSkillFiles.mockClear()
+    listSkillFiles.mockResolvedValue([])
+    getPublishGate.mockReset()
+    getPublishGate.mockResolvedValue(mkGate())
+    listTestCases.mockReset()
+    listTestCases.mockResolvedValue([])
+    listSkillVersions.mockReset()
+    listSkillVersions.mockResolvedValue([])
+  })
+
+  it("removes the heavy SkillTestCasesSection + SkillEvalSection and renders the shared LifecycleStepper", async () => {
+    const skill = mkSkill()
+    render(
+      <SkillDetailPanel
+        skill={skill}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+        onOpenStudio={vi.fn()}
+      />,
+    )
+
+    // The shared full-variant stepper is mounted (its 4 stage names render).
+    await waitFor(() => expect(screen.getByText("Published")).toBeInTheDocument())
+    expect(screen.getByText("Gate")).toBeInTheDocument()
+    expect(screen.getByText("Cases")).toBeInTheDocument()
+
+    // The two heavy sections are gone (their distinctive controls are absent).
+    expect(screen.queryByText(/eval test cases/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^run eval$/i })).not.toBeInTheDocument()
+  })
+
+  it("renders an honest 'not evaled yet' counts line when the gate has no measured run", async () => {
+    listTestCases.mockResolvedValue([{ id: "c1" }, { id: "c2" }])
+    const skill = mkSkill()
+    render(
+      <SkillDetailPanel
+        skill={skill}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+        onOpenStudio={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByText(/not evaled yet/i)).toBeInTheDocument())
+  })
+
+  it("Open studio button calls onOpenStudio with (skillId, 'evals') — the sole studio entry", async () => {
+    const user = userEvent.setup()
+    const onOpenStudio = vi.fn()
+    const skill = mkSkill({ id: "skill-77" })
+    render(
+      <SkillDetailPanel
+        skill={skill}
+        onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
+        onDiscard={vi.fn()}
+        currentUserId="user-1"
+        onOpenStudio={onOpenStudio}
+      />,
+    )
+
+    const btn = await screen.findByRole("button", { name: /open studio/i })
+    await user.click(btn)
+
+    expect(onOpenStudio).toHaveBeenCalledWith("skill-77", "evals")
   })
 })
