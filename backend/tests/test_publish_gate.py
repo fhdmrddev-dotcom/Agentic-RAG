@@ -37,7 +37,9 @@ Test inventory (RESEARCH Requirements → Test Map — 11 rows):
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
 import pytest
+from httpx import ASGITransport
 
 from tests.test_evals_router import _FilterSupabase, _clear_overrides, _override  # noqa: F401
 
@@ -280,24 +282,92 @@ async def test_interrupted_run_does_not_satisfy():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_toggle_global_blocked_when_no_passing_eval():
     """Private→global toggle with no passing eval → 409 {'error': 'publish_gate_unmet',
-    'gate': {...}}; skills.is_global stays False (GATE-01 SC#1)."""
+    'gate': {...}}; skills.is_global stays False (GATE-01 SC#1 / D-07)."""
+    from app.main import app
+
+    store, ids = _seed(is_global=False)  # no eval_runs → gate unmet (never_evaled)
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 409, f"expected 409, got {resp.status_code}: {resp.text}"
+    detail = resp.json()["detail"]
+    assert detail["error"] == "publish_gate_unmet"
+    # The server-computed gate travels in the refusal payload (server→client only, T-136-03).
+    assert "gate" in detail and detail["gate"]["met"] is False
+    # The is_global UPDATE never ran — the skill stays private.
+    assert sb.store["skills"][0]["is_global"] is False
+    # A plain (non-override) refusal records nothing.
+    assert sb.store["skill_publish_overrides"] == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_toggle_global_allowed_after_passing_eval():
-    """After a passing eval on the current version, the toggle succeeds (200) and the gate
-    reads satisfied X/N (GATE-01 SC#2)."""
+    """After a completed passing run on the CURRENT version, the toggle succeeds (200) and
+    flips is_global true — the gate was MET, so NO override row is recorded (GATE-01 SC#2)."""
+    from app.main import app
+
+    store, ids = _seed(
+        is_global=False,
+        runs=[{"version": 0, "passed": 2, "measured": 2}],  # D-03 full pass on the current version
+    )
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json()["is_global"] is True
+    assert sb.store["skills"][0]["is_global"] is True
+    # Met gate → a straight publish, no owner-visible override row.
+    assert sb.store["skill_publish_overrides"] == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_force_publish_records_override():
-    """override=true publishes AND appends a skill_publish_overrides row carrying gate_state +
-    gate_snapshot at the moment of override — owner-visible, non-repudiable (D-01/D-02)."""
+    """override=true on an UNMET gate publishes AND appends exactly ONE skill_publish_overrides
+    row carrying gate_state + gate_snapshot AT THE MOMENT OF OVERRIDE, with skill_version_id ==
+    the LATEST skill_versions.id — owner-visible, non-repudiable (D-01/D-02)."""
+    from app.main import app
+
+    # Two versions, no runs → gate unmet (never_evaled); the latest version is index 1
+    # (version_number 2 — resolved via order("version_number", desc).limit(1)).
+    store, ids = _seed(is_global=False, instructions="V2", versions=["V1", "V2"])
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(
+                f"/skills/{ids.skill_id}/toggle-global", json={"override": True}, headers=_H
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json()["is_global"] is True
+    assert sb.store["skills"][0]["is_global"] is True
+
+    overrides = sb.store["skill_publish_overrides"]
+    assert len(overrides) == 1, "force-publish records exactly one owner-visible override row"
+    row = overrides[0]
+    assert row["user_id"] == OWNER["id"]
+    assert row["gate_state"] == "never_evaled"           # the honest state at the moment of override
+    assert row["skill_version_id"] == ids.version_ids[1]  # the LATEST version (version_number desc)
+    snap = row["gate_snapshot"]
+    assert "measured_count" in snap and "passed_count" in snap
+    assert snap.get("reason"), "the gate snapshot carries a human-readable reason"
 
 
 @pytest.mark.asyncio
@@ -315,7 +385,29 @@ async def test_import_and_save_skill_stay_private():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_unshare_never_gated_reshare_regated():
-    """Global→private (unshare) is never gated; a subsequent private→global re-share IS
-    re-gated (D-07/D-09)."""
+    """Global→private (unshare) is NEVER gated (200, no override); a subsequent private→global
+    re-share with an unmet gate IS re-gated (409) — no was-ever-published grandfathering
+    (D-07/D-09). The gate call lives ONLY inside the ``new_value is True`` branch, so the
+    ungated unshare returning 200 proves it is not invoked on the global→private direction."""
+    from app.main import app
+
+    store, ids = _seed(is_global=True)  # already global, but no passing eval
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            unshare = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+            reshare = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    # Unshare: an ungated straight UPDATE (no gate, no override).
+    assert unshare.status_code == 200, f"unshare expected 200, got {unshare.status_code}: {unshare.text}"
+    assert unshare.json()["is_global"] is False
+    assert sb.store["skill_publish_overrides"] == [], "unshare must NOT record an override"
+    # Re-share: the gate runs fresh — unmet → 409 (no grandfathering).
+    assert reshare.status_code == 409, f"reshare expected 409, got {reshare.status_code}: {reshare.text}"
+    assert reshare.json()["detail"]["error"] == "publish_gate_unmet"
+    assert sb.store["skills"][0]["is_global"] is False, "the blocked re-share left the skill private"
