@@ -315,7 +315,7 @@ Plans:
 | 133. Eval Runner — With-Skill vs Without-Skill | 5/5 | Complete | 2026-06-30 |
 | 134. Eval Results, Honest Verdict + Ratings | 4/4 | Complete | 2026-07-02 |
 | 135. Self-Improvement Loop (SI-01) | 9/9 | Complete | 2026-07-02 |
-| 136. Skill Publish Gate (GATE-01) | 0/TBD | Not started | - |
+| 136. Skill Publish Gate (GATE-01) | 4/4 | Complete | 2026-07-03 |
 | 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
 | 138. Run-End Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 139. Self-Improve Proposer — Description-Only (STRETCH) | 0/TBD | Gated (behind CORE) | - |

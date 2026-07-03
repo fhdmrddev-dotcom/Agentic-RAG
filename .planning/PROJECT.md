@@ -335,12 +335,13 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ EVAL-03: Honest per-provider pass/fail verdict + side-by-side with/without comparison — Phase 134 (2026-07-02; secured)
 - ✓ EVAL-04: Inline thumbs up/down ratings accumulate a queryable human preference signal — Phase 134 (2026-07-02)
 - ✓ SI-01: Self-improvement loop — eval + Tuner signal → proposed instruction-body diff → human reviews & approves → new immutable version → auto-re-eval gate before promotion; never auto-applies; failed gate is honest + force-promotable with recorded override — Phase 135 (2026-07-02; verified 5/5 + live SC#10 UAT U1-U11 on OpenAI/Anthropic/Google; secure-phase pending)
+- ✓ GATE-01: Skill publish gate — server-side gate on global sharing (409 unless ≥1 eval passed on the current version); force-publish records an owner-visible override; unshare never gated, re-share re-gates; born-global side door closed — Phase 136 (2026-07-03; verified 16/16 + live UAT 4/4 via Chrome MCP; secured 8/8)
 
-Remaining CORE: GATE-01 (Phase 136 skill publish gate), PANEL-01 (Phase 137 Skill Evals panel UI). STRETCH gated behind CORE: Phases 138-143.
+Remaining CORE: PANEL-01 (Phase 137 Skill Evals panel UI). STRETCH gated behind CORE: Phases 138-143.
 
 ### Active (current milestone)
 
-*v3.2 Skill Eval Studio + Self-Improving in progress (started 2026-06-28). CORE 132-135 shipped; next: Phase 136 (GATE-01) → 137 (PANEL-01). Backlog: v2.9 STRETCH 105-109; SEED-013/014 connectors; SEED-082 emit-gate; SEED-100 production-clean eval; open run-honesty/provider-polish bug reports.*
+*v3.2 Skill Eval Studio + Self-Improving in progress (started 2026-06-28). CORE 132-136 shipped; next: Phase 137 (PANEL-01) — operator UX feedback from 136 UAT (gate status buried in a dense panel, adjacent conflicting metrics) is direct design input. Backlog: v2.9 STRETCH 105-109; SEED-013/014 connectors; SEED-082 emit-gate; SEED-100 production-clean eval; open run-honesty/provider-polish bug reports.*
 
 ### Out of Scope
 

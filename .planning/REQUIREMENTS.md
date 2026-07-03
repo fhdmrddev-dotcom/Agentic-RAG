@@ -27,7 +27,7 @@ Each maps to exactly one roadmap phase.
 
 ### Skill Publish Gate
 
-- [ ] **GATE-01**: A skill can only be published (made global / shareable) after at least one eval has run and passed — the publish flow surfaces this gate with a clear status, and blocks (or warns with evidence) if the eval requirement is unmet.
+- [x] **GATE-01**: A skill can only be published (made global / shareable) after at least one eval has run and passed — the publish flow surfaces this gate with a clear status, and blocks (or warns with evidence) if the eval requirement is unmet.
 
 ### Skill Evals UI
 
@@ -74,7 +74,7 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 | EVAL-04 | Phase 134 | Complete |
 | VER-01 | Phase 132 | Complete |
 | SI-01 | Phase 135 | Complete |
-| GATE-01 | Phase 136 | Pending |
+| GATE-01 | Phase 136 | Complete |
 | PANEL-01 | Phase 137 | Pending |
 | SI-02 (STRETCH) | Phase 139 | Pending (gated) |
 | TRIG-02 (STRETCH) | Phase 140 | Pending (gated) |
