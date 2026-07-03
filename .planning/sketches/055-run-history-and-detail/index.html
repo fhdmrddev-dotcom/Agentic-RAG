@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 055 — Run History & Side-by-Side Detail</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body{ padding-top:52px; }
+  .wrap{ max-width:1160px; margin:0 auto; padding:24px 28px 80px; }
+  .vhead h2{ font-family:var(--font-headline); font-weight:700; font-size:var(--text-xl); margin:0; }
+  .vhead p{ color:var(--color-text-muted); font-size:var(--text-sm); margin:6px 0 18px; max-width:860px; line-height:1.55; }
+  .mono{ font-family:var(--font-mono); }
+  .callout{ border-left:3px solid var(--color-primary); background:var(--color-primary-dim); padding:11px 14px; border-radius:0 var(--radius-md) var(--radius-md) 0; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.55; margin-bottom:18px; max-width:860px; }
+  .callout b{ color:var(--color-primary); }
+
+  .frame{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-bg); padding:16px 18px; max-width:880px; min-height:420px; box-shadow:var(--shadow-md); }
+  .fh{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .fh .t{ font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--color-text-dim); font-weight:700; }
+  .btn{ font-family:var(--font-sans); font-size:var(--text-xs); font-weight:500; border-radius:var(--radius-md); padding:6px 12px; cursor:pointer; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); display:inline-flex; align-items:center; gap:6px; }
+  .btn:hover{ background:var(--color-accent); }
+  .btn.primary{ background:var(--color-primary-strong); border-color:var(--color-primary-strong); color:#fff; }
+
+  /* run rows */
+  .runrow{ display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-bg-elev1); margin-bottom:8px; cursor:pointer; transition:border-color .15s; }
+  .runrow:hover{ border-color:var(--color-primary-glow); }
+  .runrow.sel{ border-color:var(--color-primary); background:hsl(239 100% 82% / 0.05); }
+  .runrow img{ width:16px; height:16px; flex-shrink:0; }
+  .runrow .m{ font-size:var(--text-xs); font-weight:600; }
+  .runrow .w{ font-size:10px; color:var(--color-text-dim); font-family:var(--font-mono); }
+  .runrow .vd{ margin-left:auto; font-size:10px; font-weight:600; flex-shrink:0; text-align:right; }
+  .vd.pass{ color:var(--color-success); } .vd.fail{ color:var(--color-danger); }
+  .vd.mixed{ color:var(--color-warning); } .vd.intr{ color:var(--color-text-dim); }
+  .vd.live{ color:var(--color-primary); }
+  .livedot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--color-primary); margin-right:5px; animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* run detail */
+  .rdetail{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:14px 16px; }
+  .rdetail .rh{ display:flex; align-items:center; gap:9px; font-size:var(--text-sm); font-weight:600; }
+  .rdetail .rh img{ width:16px; height:16px; }
+  .rdetail .rsub{ font-size:10px; color:var(--color-text-dim); font-family:var(--font-mono); margin:3px 0 6px; }
+  .backlnk{ color:var(--color-text-muted); font-size:var(--text-xs); cursor:pointer; display:inline-flex; gap:5px; align-items:center; }
+  .backlnk:hover{ color:var(--color-text); }
+
+  .casedet{ border-top:1px solid var(--color-border-soft); padding-top:12px; margin-top:12px; }
+  .casedet .cn{ font-size:var(--text-xs); font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .verdict-chip{ font-size:9px; border-radius:var(--radius-full); padding:2px 8px; font-weight:700; }
+  .verdict-chip.pass{ background:var(--color-success-dim); color:var(--color-success); }
+  .verdict-chip.fail{ background:var(--color-danger-dim); color:var(--color-danger); }
+  .verdict-chip.nm{ background:var(--color-muted); color:var(--color-text-dim); }
+  .verdict-chip.je{ background:var(--color-warning-dim); color:var(--color-warning); }
+  .judge{ font-size:10px; color:var(--color-text-muted); margin:5px 0 8px; line-height:1.5; }
+  .judge b{ color:var(--color-text); font-weight:600; }
+  .arms{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .arm{ border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-bg-elev1); padding:9px 11px; }
+  .arm .al{ font-size:9px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:5px; display:flex; align-items:center; gap:7px; }
+  .arm.with .al{ color:var(--color-primary); }
+  .arm.without .al{ color:var(--color-text-dim); }
+  .arm .out{ font-size:10px; color:var(--color-text-muted); line-height:1.5; }
+  .arm .tok{ font-size:9px; color:var(--color-text-dim); font-family:var(--font-mono); margin-top:6px; }
+  .arm.errored{ border-color:hsl(0 72% 51% / 0.3); }
+  .arm.errored .out{ color:var(--color-danger); font-family:var(--font-mono); font-size:9px; }
+  .thumbs{ margin-left:auto; display:flex; gap:5px; align-items:center; }
+  .thumbs .tl{ font-size:9px; color:var(--color-text-dim); margin-right:2px; }
+  .thumbs button{ background:none; border:1px solid var(--color-border-soft); border-radius:var(--radius-sm); color:var(--color-text-dim); font-size:10px; padding:1px 7px; cursor:pointer; }
+  .thumbs button.on{ border-color:var(--color-success); color:var(--color-success); background:var(--color-success-dim); }
+  .thumbs button.on.down{ border-color:var(--color-danger); color:var(--color-danger); background:var(--color-danger-dim); }
+
+  .intrbox{ display:flex; align-items:flex-start; gap:10px; border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-muted); padding:12px 14px; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.55; margin-top:12px; }
+  .livebox{ border:1px solid hsl(239 100% 82% / 0.3); border-radius:var(--radius-md); background:var(--color-primary-dim); padding:12px 14px; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.7; margin-top:12px; font-family:var(--font-mono); }
+
+  /* B: expandable rows */
+  .exp .rdetail{ border-radius:0 0 var(--radius-md) var(--radius-md); border-top:none; margin:-9px 0 8px; }
+  .exp .runrow.open{ border-radius:var(--radius-md) var(--radius-md) 0 0; margin-bottom:0; border-color:var(--color-primary-glow); }
+
+  /* C: master-detail */
+  .mdgrid{ display:grid; grid-template-columns:290px 1fr; gap:14px; align-items:start; }
+  .mdgrid .runrow{ padding:9px 10px; }
+  .mdgrid .runrow .m{ font-size:10px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
+  <span class="label">055 · Run history &amp; detail</span>
+  <button class="variant-tab active" onclick="showVariant('a',event)">A: Full-replace drill-in</button>
+  <button class="variant-tab" onclick="showVariant('b',event)">B: Expandable rows</button>
+  <button class="variant-tab" onclick="showVariant('c',event)">C: Master-detail split</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ===================== VARIANT A ===================== -->
+  <div id="variant-a" class="variant">
+    <div class="vhead">
+      <h2>A — Full-replace drill-in (005-A)</h2>
+      <p>The run list is the resting view. Clicking a run <b>replaces</b> it with that run's detail —
+        <span class="mono">‹ Runs</span> returns. One thing on screen at a time; the detail gets the full width for
+        its side-by-side arms. Every run in the list is clickable — including the honest ones (interrupted, running).</p>
+    </div>
+    <div class="callout"><b>Try it:</b> open each run — the verdicts differ honestly per run: all-pass, pass-with-a
+      <span class="mono">not_measured</span> arm, a fail + a <span class="mono">judge_error</span>, an interrupted
+      run, and a live one. "Your rating" thumbs are separate from the judge's verdict — two different truths, labeled.</div>
+    <div class="frame" id="aFrame"></div>
+  </div>
+
+  <!-- ===================== VARIANT B ===================== -->
+  <div id="variant-b" class="variant" style="display:none">
+    <div class="vhead">
+      <h2>B — Expandable rows</h2>
+      <p>The run row <b>expands in place</b> — the detail unfolds under it while the other runs stay visible above and
+        below. No navigation state at all; scanning multiple runs is one scroll. The cost: a long detail pushes the
+        other rows far down, and two expanded runs make the page very tall.</p>
+    </div>
+    <div class="callout"><b>Try it:</b> expand the gemini run (1/2 + judge error) and then the claude 3/3 above it —
+      compare how it feels to flick between two runs' details versus A's back-and-forth.</div>
+    <div class="frame exp" id="bFrame"></div>
+  </div>
+
+  <!-- ===================== VARIANT C ===================== -->
+  <div id="variant-c" class="variant" style="display:none">
+    <div class="vhead">
+      <h2>C — Master-detail split</h2>
+      <p>Runs stay as a persistent left rail; the detail owns the right. Selection is always visible — you never lose
+        your place in history while reading a run. The natural shape <b>if the shell winner gives the studio real
+        width</b> (053-A or 053-C); impossible inside a 384px panel.</p>
+    </div>
+    <div class="callout"><b>Try it:</b> click through all five runs in a row — this is the fastest run-to-run
+      comparison of the three. Note the side-by-side arms compress slightly to pay for the rail.</div>
+    <div class="frame" style="max-width:1020px;">
+      <div class="fh"><span class="t">Eval runs · Risk Register Builder</span><button class="btn primary" style="margin-left:auto;">▶ Run eval</button></div>
+      <div class="mdgrid">
+        <div id="cList"></div>
+        <div id="cDetail"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(v=>v.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  ev.target.classList.add('active');
+}
+
+/* ── shared run data (real EvalRun / EvalResult semantics) ── */
+const LOGO = p => `../048-cross-provider-tool-card/logos/${p}-color.svg`;
+const RUNS = [
+  { id:'b2e7a0', prov:'anthropic', model:'claude-haiku-4-5', v:'v7', when:'now', dur:'', status:'running',
+    roll:{cls:'live', txt:'<span class="livedot"></span>case 2/3 · with_skill…'},
+    cases:null },
+  { id:'8f3a21', prov:'anthropic', model:'claude-haiku-4-5', v:'v7', when:'2h ago', dur:'2m 40s', status:'completed',
+    roll:{cls:'pass', txt:'3/3 passed'},
+    judge:'claude-opus-4-8',
+    cases:[
+      { name:'Quarterly risk summary', vs:'graded', pass:true, score:0.92,
+        reason:'With-skill produced the structured register with likelihood × impact and cited both workshop docs; without-skill answered in prose with no ratings.',
+        withOut:'| Risk | L | I | Score |<br>| Vendor lock-in | High | High | 9 |<br>| Data migration slip | Med | High | 6 |<br>…cited: risk-workshop-q3.docx §2, §4', withTok:'1.2k → 640',
+        without:'The main risks this quarter appear to be vendor lock-in and the data migration timeline. I\'d suggest keeping an eye on both…', woTok:'1.1k → 210' },
+      { name:'New mitigation row', vs:'graded', pass:true, score:0.88,
+        reason:'Appended exactly one register row with owner + due date; did not invent unrelated risks.',
+        withOut:'| Vendor lock-in | Mitigation: dual-vendor pilot | Owner: J. Park | Due: Aug 15 |', withTok:'980 → 310',
+        without:'You could consider a dual-vendor strategy to reduce lock-in. Some teams also negotiate exit clauses…', woTok:'920 → 260' },
+      { name:'Off-topic guard', vs:'graded', pass:true, score:0.81,
+        reason:'Did NOT engage the register format on an off-topic prompt — answered plainly, as expected_behavior requires.',
+        withOut:'I don\'t have live weather data, but Berlin in early July is typically mild, 18–25°C…', withTok:'840 → 120',
+        without:'I don\'t have live weather data, but Berlin in early July is typically mild…', woTok:'790 → 115' },
+    ]},
+  { id:'c47d91', prov:'openai', model:'gpt-5.4-mini', v:'v7', when:'yesterday', dur:'3m 05s', status:'completed',
+    roll:{cls:'mixed', txt:'2/2 passed · 1 not measured'},
+    judge:'claude-opus-4-8',
+    cases:[
+      { name:'Quarterly risk summary', vs:'graded', pass:true, score:0.90,
+        reason:'Structured register with citations; clear delta over the without-skill prose answer.',
+        withOut:'| Risk | L | I | Score |<br>| Vendor lock-in | High | High | 9 |<br>…cited: risk-workshop-q3.docx §2', withTok:'1.3k → 700',
+        without:'Key risks include vendor lock-in and migration timing…', woTok:'1.2k → 240' },
+      { name:'New mitigation row', vs:'graded', pass:true, score:0.86,
+        reason:'One well-formed row; no invented risks.',
+        withOut:'| Vendor lock-in | Mitigation: dual-vendor pilot | Owner: J. Park | Due: Aug 15 |', withTok:'1.0k → 330',
+        without:'A dual-vendor approach could help here…', woTok:'950 → 270' },
+      { name:'Off-topic guard', vs:'not_measured',
+        reason:'The with-skill arm errored (provider 400: invalid tool arguments) — this case was NOT counted in the rollup. No verdict was fabricated.',
+        err:'provider 400 · invalid_tool_arguments (with_skill arm)',
+        without:'I don\'t have live weather data, but Berlin in early July…', woTok:'790 → 118' },
+    ]},
+  { id:'77b2ce', prov:'google', model:'gemini-3.5-flash', v:'v6', when:'Jun 30', dur:'2m 12s', status:'completed',
+    roll:{cls:'fail', txt:'1/2 passed · 1 judge error'},
+    judge:'claude-opus-4-8',
+    cases:[
+      { name:'Quarterly risk summary', vs:'graded', pass:true, score:0.78,
+        reason:'Register produced with citations; slightly thinner impact analysis than expected but within the expected behavior.',
+        withOut:'| Risk | L | I |<br>| Vendor lock-in | High | High |<br>…cited: risk-workshop-q3.docx §2', withTok:'1.1k → 520',
+        without:'The top risks are vendor lock-in and migration timing…', woTok:'1.0k → 230' },
+      { name:'New mitigation row', vs:'graded', pass:false, score:0.35,
+        reason:'The with-skill answer was equivalent to the without-skill answer — prose, no register row, no owner/due-date. The skill added nothing on this case.',
+        withOut:'To mitigate vendor lock-in you could pilot a second vendor and negotiate exit clauses…', withTok:'990 → 280',
+        without:'A dual-vendor pilot and exit clauses would reduce lock-in exposure…', woTok:'940 → 265' },
+      { name:'Off-topic guard', vs:'judge_error',
+        reason:'Both arms completed, but the judge call itself errored — this case is NOT counted as pass or fail.',
+        withOut:'I don\'t have live weather data, but Berlin in early July…', withTok:'850 → 122',
+        without:'Berlin in July is usually mild…', woTok:'800 → 110' },
+    ]},
+  { id:'e901d4', prov:'anthropic', model:'claude-haiku-4-5', v:'v6', when:'Jun 30', dur:'', status:'interrupted',
+    roll:{cls:'intr', txt:'interrupted'},
+    cases:'interrupted' },
+];
+
+function chip(c){
+  if(c.vs==='graded') return c.pass
+    ? `<span class="verdict-chip pass">✓ pass · ${c.score.toFixed(2)}</span>`
+    : `<span class="verdict-chip fail">✕ fail · ${c.score.toFixed(2)}</span>`;
+  if(c.vs==='not_measured') return `<span class="verdict-chip nm">— not measured</span>`;
+  return `<span class="verdict-chip je">⚠ judge error</span>`;
+}
+function thumbsHtml(){
+  return `<span class="thumbs"><span class="tl">your rating</span><button onclick="thumb(this,event)">👍</button><button onclick="thumb(this,event,true)">👎</button></span>`;
+}
+function caseHtml(c){
+  const withArm = c.err
+    ? `<div class="arm with errored"><div class="al">WITH skill</div><div class="out">✕ ${c.err}</div></div>`
+    : `<div class="arm with"><div class="al">WITH skill ${thumbsHtml()}</div><div class="out">${c.withOut}</div><div class="tok">${c.withTok} tok</div></div>`;
+  const woArm = `<div class="arm without"><div class="al">WITHOUT skill</div><div class="out">${c.without}</div><div class="tok">${c.woTok||''} tok</div></div>`;
+  return `<div class="casedet">
+    <div class="cn">${c.name} ${chip(c)}</div>
+    <div class="judge"><b>Judge:</b> ${c.reason}</div>
+    <div class="arms">${withArm}${woArm}</div>
+  </div>`;
+}
+function detailHtml(r, backFn){
+  const back = backFn ? `<span class="backlnk" onclick="${backFn}">‹ Runs</span>` : '';
+  if(r.status==='running'){
+    return `<div class="rdetail">${back}
+      <div class="rh" style="margin-top:${back?'10px':'0'};"><img src="${LOGO(r.prov)}"> ${r.model} · <span style="color:var(--color-primary)">running</span></div>
+      <div class="rsub">run ${r.id} · ${r.v} · started just now</div>
+      <div class="livebox">
+        case 1 · with_skill → done<br>
+        case 1 · without_skill → done<br>
+        case 2 · with_skill → <span class="livedot"></span>streaming…<br>
+        case 2 · without_skill → queued
+      </div>
+      <div class="judge" style="margin-top:8px;">Verdicts land when the run finalizes — no mid-run pass/fail is ever shown.</div>
+    </div>`;
+  }
+  if(r.cases==='interrupted'){
+    return `<div class="rdetail">${back}
+      <div class="rh" style="margin-top:${back?'10px':'0'};"><img src="${LOGO(r.prov)}"> ${r.model} · <span style="color:var(--color-text-dim)">interrupted</span></div>
+      <div class="rsub">run ${r.id} · ${r.v} · Jun 30</div>
+      <div class="intrbox"><span>⏸</span><span><b>This run was interrupted</b> (backend restarted mid-run). No cases were measured — nothing was counted, nothing was fabricated.
+      <br><br><button class="btn">↻ Re-run on ${r.v}</button></span></div>
+    </div>`;
+  }
+  return `<div class="rdetail">${back}
+    <div class="rh" style="margin-top:${back?'10px':'0'};"><img src="${LOGO(r.prov)}"> ${r.model} · <span class="vd ${r.roll.cls}" style="margin-left:0;">${r.roll.txt}</span></div>
+    <div class="rsub">run ${r.id} · ${r.v} · judge ${r.judge} · ${r.when}${r.dur?' · '+r.dur:''}</div>
+    ${r.cases.map(caseHtml).join('')}
+  </div>`;
+}
+function rowHtml(r, onclick, sel){
+  return `<div class="runrow ${sel?'sel':''}" onclick="${onclick}">
+    <img src="${LOGO(r.prov)}"><span class="m">${r.model}</span>
+    <span class="w">${r.v} · ${r.when}</span>
+    <span class="vd ${r.roll.cls}">${r.roll.txt}</span>
+  </div>`;
+}
+
+/* A: full-replace */
+function aList(){
+  document.getElementById('aFrame').innerHTML =
+    `<div class="fh"><span class="t">Eval runs · Risk Register Builder</span><button class="btn primary" style="margin-left:auto;">▶ Run eval</button></div>`
+    + RUNS.map((r,i)=>rowHtml(r,`aOpen(${i})`)).join('');
+}
+function aOpen(i){ document.getElementById('aFrame').innerHTML = detailHtml(RUNS[i], 'aList()'); }
+aList();
+
+/* B: expandable rows */
+let bOpenIdx = null;
+function bRender(){
+  let h = `<div class="fh"><span class="t">Eval runs · Risk Register Builder</span><button class="btn primary" style="margin-left:auto;">▶ Run eval</button></div>`;
+  RUNS.forEach((r,i)=>{
+    const open = bOpenIdx===i;
+    h += `<div class="runrow ${open?'open':''}" onclick="bToggle(${i})">
+      <img src="${LOGO(r.prov)}"><span class="m">${r.model}</span>
+      <span class="w">${r.v} · ${r.when}</span>
+      <span class="vd ${r.roll.cls}">${r.roll.txt}</span>
+    </div>`;
+    if(open) h += detailHtml(r, null);
+  });
+  document.getElementById('bFrame').innerHTML = h;
+}
+function bToggle(i){ bOpenIdx = bOpenIdx===i ? null : i; bRender(); }
+bRender();
+
+/* C: master-detail */
+let cSel = 1;
+function cRender(){
+  document.getElementById('cList').innerHTML = RUNS.map((r,i)=>rowHtml(r,`cPick(${i})`, i===cSel)).join('');
+  document.getElementById('cDetail').innerHTML = detailHtml(RUNS[cSel], null);
+}
+function cPick(i){ cSel=i; cRender(); }
+cRender();
+
+/* shared thumbs */
+function thumb(btn, ev, down){
+  ev.stopPropagation();
+  const sib = btn.parentElement.querySelectorAll('button');
+  sib.forEach(b=>b.classList.remove('on','down'));
+  btn.classList.add('on'); if(down) btn.classList.add('down');
+}
+</script>
+</body>
+</html>
