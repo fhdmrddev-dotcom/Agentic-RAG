@@ -199,7 +199,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 136-01-PLAN.md — Migration 084 (skill_publish_overrides) + gate read-model compute_publish_gate (D-03 rule / D-04 content-equality) + PublishGate/TogglePublishBody contracts [wave 1]
+- [x] 136-01-PLAN.md — Migration 084 (skill_publish_overrides) + gate read-model compute_publish_gate (D-03 rule / D-04 content-equality) + PublishGate/TogglePublishBody contracts [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
