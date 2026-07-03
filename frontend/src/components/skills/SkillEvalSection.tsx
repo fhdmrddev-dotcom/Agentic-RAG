@@ -43,9 +43,10 @@ import {
   rejectProposal,
   rerunProposalReeval,
   forcePromoteProposal,
+  getPublishGate,
 } from "@/lib/api"
 import { lineDiff } from "@/lib/lineDiff"
-import type { EvalResult, EvalRun, SkillProposal, PromotionGate } from "@/types"
+import type { EvalResult, EvalRun, SkillProposal, PromotionGate, PublishGate } from "@/types"
 
 interface Props {
   skillId: string
@@ -110,6 +111,22 @@ function renderGateCounts(gate: PromotionGate | null | undefined) {
   )
 }
 
+// Phase 136 (GATE-01, D-06) — the honest per-state copy for the UNMET publish gate.
+// Plain text, no chrome (137 fence). "passed" never reaches here (the met branch
+// renders the satisfied X/N line instead). Renders server state only — no client-side
+// gate math (D-07).
+function unmetGateLine(state: PublishGate["state"]): string {
+  switch (state) {
+    case "latest_failed":
+      return "Not publishable — the latest eval on the current version failed"
+    case "passed_on_older_version":
+      return "Not publishable — the last passing eval was on an older version; re-eval to publish"
+    case "never_evaled":
+    default:
+      return "Not publishable yet — run an eval on the current version"
+  }
+}
+
 export function SkillEvalSection({ skillId }: Props) {
   const [providers, setProviders] = useState<
     { id: string; name: string; models: string[] }[]
@@ -130,6 +147,12 @@ export function SkillEvalSection({ skillId }: Props) {
   const [proposal, setProposal] = useState<SkillProposal | null>(null)
   const [proposalLoading, setProposalLoading] = useState(false)
   const [proposalError, setProposalError] = useState<string | null>(null)
+
+  // Phase 136 (GATE-01, D-06) — the server-computed publish gate (met/state +
+  // owner-visible last_override). Hydrated on mount from getPublishGate, reset on
+  // skill switch like the eval/proposal state. Rendered as a plain status line; the
+  // client NEVER recomputes `met` (D-07) — it only renders these server fields.
+  const [publishGate, setPublishGate] = useState<PublishGate | null>(null)
 
   // Abort the in-flight stream subscription on unmount / re-run so we never leak
   // a reader (subscribeToRun returns silently on AbortError).
@@ -308,6 +331,8 @@ export function SkillEvalSection({ skillId }: Props) {
     setProposalLoading(false)
     setProposalError(null)
     reEvalProposalIdRef.current = null
+    // 136 (GATE-01, D-06): reset the publish-gate line the SAME way (skill-switch safe).
+    setPublishGate(null)
     async function init() {
       try {
         const p = await getProviders()
@@ -342,6 +367,16 @@ export function SkillEvalSection({ skillId }: Props) {
         reattachProposalReeval(active)
       } catch {
         /* no proposals / load failure — no card */
+      }
+      // 136 (GATE-01, D-06): hydrate the server-computed publish gate for the plain
+      // gate-status line + owner-visible override record. Refetch-not-optimistic (the
+      // DB is source of truth); skill-switch guarded exactly like the proposal load.
+      try {
+        const gate = await getPublishGate(skillId)
+        if (cancelled || currentSkillRef.current !== skillId) return
+        setPublishGate(gate)
+      } catch {
+        /* no gate / load failure — no line */
       }
     }
     void init()
@@ -500,6 +535,36 @@ export function SkillEvalSection({ skillId }: Props) {
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-foreground">Eval runner</label>
       </div>
+
+      {/* Phase 136 (GATE-01, D-06) — plain publish-readiness gate line + owner-visible
+          override record, straight from the server getPublishGate (no client-side gate
+          math, D-07). Additive/undesigned, reusing the surface's honest-counts text
+          style — Phase 137 (PANEL-01, G-2) owns the designed panel (137 fence). */}
+      {publishGate && (
+        <div className="flex flex-col gap-0.5">
+          {publishGate.met ? (
+            <p className="text-xs font-medium text-foreground">
+              Publish ready — eval passed {publishGate.passed}/{publishGate.measured} on the
+              current version
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {unmetGateLine(publishGate.state)}
+              </p>
+              {publishGate.reason && (
+                <p className="text-xs text-muted-foreground/80">{publishGate.reason}</p>
+              )}
+            </>
+          )}
+          {publishGate.last_override && (
+            <p className="text-xs text-muted-foreground">
+              Published without a passing eval on{" "}
+              {new Date(publishGate.last_override.created_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Provider / model picker (convenience only — backend validates). */}
       <div className="flex flex-wrap items-center gap-2">
