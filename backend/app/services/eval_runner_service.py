@@ -667,6 +667,16 @@ async def run_eval_job(
                 final_status = "cancelled"
                 break
 
+            # Re-reset before the WITHOUT arm: run_agent_loop persists the WITH arm's
+            # messages to the shared eval thread, so without this reset the baseline
+            # arm reads the with-skill conversation as history — a contaminated A/B
+            # (models see the answer above them: DeepSeek thinking-mode 400s on the
+            # replayed assistant turn, Gemini/GPT often return an empty "already
+            # answered" response). Each arm must start from the bare case prompt.
+            await _reset_thread_to_prompt(
+                supabase, eval_thread_id, user_id, case.get("prompt", ""),
+            )
+
             # WITHOUT arm — inject NOTHING (empty catalog). Its verdict is persisted +
             # streamed but does NOT count toward the rollup (OQ3) — return intentionally ignored.
             await _run_arm(

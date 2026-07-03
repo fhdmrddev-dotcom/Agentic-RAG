@@ -316,6 +316,58 @@ async def test_two_results_per_case(redis, supabase, pool, fake_loop_result):
 
 
 @pytest.mark.asyncio
+async def test_thread_reset_before_each_arm(redis, supabase, pool, fake_loop_result):
+    """Baseline-contamination regression (found live 2026-07-04): run_agent_loop
+    persists the WITH arm's messages to the shared eval thread, so the WITHOUT arm
+    MUST get its own thread reset — otherwise the baseline reads the with-skill
+    conversation as history (DeepSeek thinking-mode 400s on the replayed assistant
+    turn; Gemini/GPT return an empty "already answered" response). Asserts the
+    per-case sequence is reset → WITH arm → reset → WITHOUT arm, with each reset
+    carrying that case's own prompt."""
+    from app.services import eval_runner_service
+
+    sequence: list[tuple[str, str]] = []
+    real_reset = eval_runner_service._reset_thread_to_prompt
+
+    async def _recording_reset(supabase_arg, thread_id, user_id, prompt):
+        sequence.append(("reset", prompt))
+        return await real_reset(supabase_arg, thread_id, user_id, prompt)
+
+    async def _fake_run_agent_loop(ctx, **kwargs):
+        arm = "with" if ctx.skill_catalog_override else "without"
+        sequence.append(("arm", arm))
+        return fake_loop_result
+
+    with patch.object(eval_runner_service, "_reset_thread_to_prompt", _recording_reset), \
+         patch.object(eval_runner_service, "run_agent_loop", _fake_run_agent_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))):
+        await eval_runner_service.run_eval_job(
+            run_id=uuid4(),
+            skill_id=SKILL_ID,
+            skill_version=SKILL_VERSION,
+            cases=CASES,
+            provider="anthropic",
+            model="claude-haiku-4-5-20251001",
+            current_user=OWNER,
+            user_settings=MagicMock(),
+            redis=redis,
+            supabase=supabase,
+            pool=pool,
+        )
+
+    expected = []
+    for case in CASES:
+        expected += [
+            ("reset", case["prompt"]), ("arm", "with"),
+            ("reset", case["prompt"]), ("arm", "without"),
+        ]
+    assert sequence == expected, (
+        f"each arm must start from a bare-prompt thread; got {sequence}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_arm_heartbeat_keeps_buffer_warm(redis, supabase, pool, fake_loop_result):
     """BUG-260702-03 (b): a slow arm pulses eval_heartbeat onto the run buffer while
     run_agent_loop is in flight — the NO-OP emit otherwise leaves the stream silent for
