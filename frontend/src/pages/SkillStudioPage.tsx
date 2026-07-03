@@ -19,7 +19,7 @@
 // getPublishGate response the EvalsTab stepper renders — a pure condensation, never a
 // second truth-teller (T-137-01: `met` is never recomputed here).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -91,6 +91,18 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
     return () => {
       cancelled = true
     }
+  }, [skillId])
+
+  // Re-pull the strip's gate on demand (skill-switch-guarded). EvalsTab calls this when
+  // a run finalizes so the header strip updates without a page reload (137-UAT gap).
+  const refreshGate = useCallback(() => {
+    const requested = skillId
+    if (!requested) return
+    getPublishGate(requested)
+      .then((g) => {
+        if (currentSkillRef.current === requested) setGate(g)
+      })
+      .catch(() => {})
   }, [skillId])
 
   // skillId null → a calm centered guard with a "‹ Skills" back (the SkillTunerPage pattern).
@@ -179,7 +191,11 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
       <div className="flex-1 overflow-y-auto">
         {tab === "evals" ? (
           <div className="px-8 py-6">
-            <EvalsTab skillId={skillId} skillVersion={liveVersionNumber} />
+            <EvalsTab
+              skillId={skillId}
+              skillVersion={liveVersionNumber}
+              onGateStale={refreshGate}
+            />
           </div>
         ) : tab === "triggering" ? (
           <TriggeringTab skillId={skillId} onBack={onBack} />

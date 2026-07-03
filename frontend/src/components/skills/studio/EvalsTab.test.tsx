@@ -220,6 +220,26 @@ describe("EvalsTab — lifted machinery + composed leaves (137-05 Task 3)", () =
     await waitFor(() => expect(getEvalRun).toHaveBeenCalledWith("skill-1", "run-1"))
   })
 
+  it("(2b) run finalize refetches the publish gate AND notifies the shell (137-UAT gap)", async () => {
+    const onGateStale = vi.fn()
+    render(<EvalsTab skillId="skill-1" skillVersion={2} onGateStale={onGateStale} />)
+    await screen.findByText("Summarize the doc")
+
+    fireEvent.click(screen.getByRole("button", { name: /run eval/i }))
+    await waitFor(() => expect(subscribeToRun).toHaveBeenCalled())
+
+    // The init effect fetched the gate once; the finalize edge must fetch it AGAIN so
+    // the stepper leaves "never_evaled" without a page reload — and ping the shell so
+    // the header strip (the other home of the one truth-teller) refreshes too.
+    getPublishGate.mockClear()
+    await act(async () => {
+      streamCbs!.onTerminal("done")
+    })
+
+    await waitFor(() => expect(getPublishGate).toHaveBeenCalledWith("skill-1"))
+    expect(onGateStale).toHaveBeenCalled()
+  })
+
   it("(3) switching skillId clears the prior readout AND the prior case list", async () => {
     listEvalRuns.mockImplementation(async (sid: string) => (sid === "skill-1" ? [mkRun()] : []))
     listTestCases.mockImplementation(async (sid: string) => (sid === "skill-1" ? [mkCase()] : []))

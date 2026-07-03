@@ -57,6 +57,9 @@ interface Props {
   skillVersion: number
   /** Deep-link scroll handler threaded into the LifecycleStepper stage nodes. */
   onNavigateStage?: (stage: Stage) => void
+  /** Notify the shell its header-strip gate is stale (a run just finalized) so both
+   *  homes of the one truth-teller (D-10) refresh without a page reload. */
+  onGateStale?: () => void
 }
 
 // Live per-arm status keyed by `${testCaseId}:${variant}` — driven off the eval_*
@@ -73,7 +76,7 @@ function pickActiveProposal(list: SkillProposal[]): SkillProposal | null {
   return latest.status === "rejected" ? null : latest
 }
 
-export function EvalsTab({ skillId, skillVersion, onNavigateStage }: Props) {
+export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }: Props) {
   // ── Picker state (kept HERE so selection persists across skills — D-12). ──
   const [providers, setProviders] = useState<
     { id: string; name: string; models: string[] }[]
@@ -199,6 +202,20 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage }: Props) {
     )
   }
 
+  // Re-pull the server publish gate (skill-switch-guarded). The gate changes when a
+  // run finalizes; without this the stepper/strip stay stale until a page reload
+  // (137-UAT gap, found live during U7).
+  async function refreshGate() {
+    const requestedSkill = skillId
+    try {
+      const gate = await getPublishGate(requestedSkill)
+      if (currentSkillRef.current !== requestedSkill) return
+      setPublishGate(gate)
+    } catch {
+      /* keep the last known gate; the next skill switch re-fetches */
+    }
+  }
+
   // Reconcile a proposal from the DB (never optimistic) — LIFTED VERBATIM :286-295.
   async function refetchProposal(pid: string) {
     const requestedSkill = skillId
@@ -309,7 +326,13 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage }: Props) {
   // just-finished run (and its honest rollup) persists in the list, not just in the
   // single-run readout.
   useEffect(() => {
-    if (prevRunningRef.current && !running) void refreshRuns()
+    if (prevRunningRef.current && !running) {
+      void refreshRuns()
+      // The finished run changed the server gate — refresh BOTH homes of the one
+      // truth-teller (this tab's stepper + the shell's header strip) without a reload.
+      void refreshGate()
+      onGateStale?.()
+    }
     prevRunningRef.current = running
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running])
