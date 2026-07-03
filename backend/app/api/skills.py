@@ -182,7 +182,7 @@ async def create_skill(
             "name": body.name.strip(),
             "description": body.description,
             "instructions": body.instructions,
-            "is_global": body.is_global,
+            "is_global": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
         })
         .execute()
     )
