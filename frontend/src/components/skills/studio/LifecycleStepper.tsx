@@ -207,9 +207,12 @@ export function LifecycleStepper({
           const clickable = nav !== null && !!onNavigateStage
           const content = (
             <>
+              {/* Connector runs edge-to-edge BETWEEN circles (13px radius + 4px gap
+                  each side) — the node backgrounds are translucent, so a full-width
+                  line would show through the circles. */}
               {i < stages.length - 1 && (
                 <span
-                  className={`absolute left-1/2 top-[13px] h-0.5 w-full ${done ? "bg-emerald-500/45" : "bg-border"}`}
+                  className={`absolute left-[calc(50%+17px)] top-[12px] h-0.5 w-[calc(100%-34px)] ${done ? "bg-emerald-500/45" : "bg-border"}`}
                   aria-hidden="true"
                 />
               )}
