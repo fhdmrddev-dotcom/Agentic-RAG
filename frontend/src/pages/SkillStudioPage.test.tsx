@@ -192,7 +192,8 @@ describe("SkillStudioPage — shell, header, gate strip, tabs (137-06 Task 1)", 
   it("clicking Triggering calls onTabChange and renders the tuner stub", async () => {
     render(<Harness />)
     await screen.findByTestId("evals-stub")
-    fireEvent.click(screen.getByRole("button", { name: "Triggering" }))
+    // The tabs carry role="tab" (proper tablist a11y), not the implicit button role.
+    fireEvent.click(screen.getByRole("tab", { name: "Triggering" }))
     expect(onTabChange).toHaveBeenCalledWith("triggering")
     expect(await screen.findByTestId("triggering-stub")).toBeInTheDocument()
   })
@@ -200,7 +201,7 @@ describe("SkillStudioPage — shell, header, gate strip, tabs (137-06 Task 1)", 
   it("clicking Versions renders the versions stub", async () => {
     render(<Harness />)
     await screen.findByTestId("evals-stub")
-    fireEvent.click(screen.getByRole("button", { name: "Versions" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Versions" }))
     expect(onTabChange).toHaveBeenCalledWith("versions")
     expect(await screen.findByTestId("versions-stub")).toBeInTheDocument()
   })

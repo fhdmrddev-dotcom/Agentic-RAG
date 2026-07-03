@@ -54,6 +54,13 @@ interface Props {
   skillId: string | null
   /** Return to the 3-pane Skills surface ("‹ Skills"). */
   onBack: () => void
+  /** Phase 137 Plan 06 (D-01/D-02): when mounted as the Studio "Triggering" tab, the
+   *  Studio's persistent header already carries the ‹ Skills back + skill identity, so
+   *  this page's own focused-surface header block is suppressed to avoid a doubled
+   *  header. This is the checker-sanctioned one-line render guard — it changes NO tuner
+   *  behavior/internals (the 041/042/043/045 winners stay intact, honoring D-02); when
+   *  unset the standalone page renders exactly as before. */
+  embedded?: boolean
 }
 
 // The provider ids the backend has a representative model for (the effective scored set
@@ -84,7 +91,7 @@ const MAX_TARGETS = 8
 // mounted (no empty-pane flash) and the scoreboard is not nulled.
 type RunPhase = "idle" | "running" | "reconciling" | "done" | "error"
 
-export function SkillTunerPage({ skillId, onBack }: Props) {
+export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
   // The Tuner reuses useSkills() so the author-confirm winner write goes through
   // the SAME updateSkill (PATCH /skills/{id}) the SkillsPage uses (042-A / D-03).
   const { skills, loading: skillsLoading, updateSkill } = useSkills()
@@ -534,26 +541,30 @@ export function SkillTunerPage({ skillId, onBack }: Props) {
   return (
     <div className="flex h-full overflow-hidden">
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Focused-surface header: ‹ Skills back + the skill name. */}
-        <div className="px-8 pt-6 pb-4 shrink-0 border-b border-border/10">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Skills
-          </button>
-          <div className="flex items-center gap-2.5">
-            <Target className="h-5 w-5 text-primary" aria-hidden="true" />
-            <h1 className="text-xl font-headline font-bold text-foreground">
-              Trigger Tuner{skill ? ` · ${skill.name}` : ""}
-            </h1>
+        {/* Focused-surface header: ‹ Skills back + the skill name. Phase 137-06:
+            suppressed when `embedded` (mounted as the Studio Triggering tab — the
+            Studio header already carries the back + identity; avoids a doubled header). */}
+        {!embedded && (
+          <div className="px-8 pt-6 pb-4 shrink-0 border-b border-border/10">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Skills
+            </button>
+            <div className="flex items-center gap-2.5">
+              <Target className="h-5 w-5 text-primary" aria-hidden="true" />
+              <h1 className="text-xl font-headline font-bold text-foreground">
+                Trigger Tuner{skill ? ` · ${skill.name}` : ""}
+              </h1>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Benchmark when this skill should — and should NOT — fire, score candidate
+              descriptions cross-provider, and confirm the winner.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Benchmark when this skill should — and should NOT — fire, score candidate
-            descriptions cross-provider, and confirm the winner.
-          </p>
-        </div>
+        )}
 
         {/* Full-width single-column stack (sketch 045-B "Full-width stack"). The pre-run
             360px config rail is GONE — the description, the CaseEditor (its two case columns
