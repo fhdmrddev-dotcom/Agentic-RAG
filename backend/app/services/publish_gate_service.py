@@ -140,10 +140,11 @@ async def compute_publish_gate(supabase, skill_id: str, user_id: str) -> Publish
             "created_at": override_rows[0].get("created_at"),
         }
 
-    # (4) Per-run predicate: D-03 numeric pass AND D-04 content-equality with the LIVE text.
+    # (4) Per-run predicate: D-03 numeric pass AND D-04 content-equality with the LIVE text
+    # (the run's pinned skill_versions.instructions == live skills.instructions).
     def _on_current_version(run: dict) -> bool:
-        pinned = instructions_by_version_id.get(str(run.get("skill_version_id")))
-        return pinned is not None and pinned == current_instructions
+        pinned_instructions = instructions_by_version_id.get(str(run.get("skill_version_id")))
+        return pinned_instructions is not None and pinned_instructions == current_instructions
 
     d03_passing = [r for r in completed if _passes_d03(r)]
     current_passing = [r for r in d03_passing if _on_current_version(r)]
