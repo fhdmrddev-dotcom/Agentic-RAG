@@ -963,6 +963,28 @@ COMMENT ON TABLE public.skill_proposals IS 'One durable row per proposed skill-i
 
 
 --
+-- Name: skill_publish_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_publish_overrides (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    skill_version_id uuid,
+    user_id uuid NOT NULL,
+    gate_state text NOT NULL,
+    gate_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_publish_overrides IS 'One APPEND-ONLY row per skill force-publish past an unmet publish gate (GATE-01, D-01/D-02). gate_state = what the gate read at the moment of override (never_evaled/latest_failed/passed_on_older_version); gate_snapshot = the honest counts jsonb; created_at = the when. skill_version_id (nullable, SET NULL) pins which version was live when overridden. The gate compute reads the most-recent row per skill as PublishGate.last_override so the eval surface shows an honest "published without passing eval" status (D-02/D-06). Owner-only RLS SELECT is defense-in-depth; the service-role toggle handler writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-136-04). NO write policies — clients can never forge, mutate, or delete an override record (035/079/080/081/083 precedent).';
+
+
+--
 -- Name: skill_test_cases; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1517,6 +1539,14 @@ ALTER TABLE ONLY public.skill_proposals
 
 
 --
+-- Name: skill_publish_overrides skill_publish_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: skill_test_cases skill_test_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1982,6 +2012,20 @@ CREATE INDEX idx_skill_proposals_skill_id ON public.skill_proposals USING btree 
 --
 
 CREATE INDEX idx_skill_proposals_user_id ON public.skill_proposals USING btree (user_id);
+
+
+--
+-- Name: idx_skill_publish_overrides_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_publish_overrides_skill_id ON public.skill_publish_overrides USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_publish_overrides_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_publish_overrides_user_id ON public.skill_publish_overrides USING btree (user_id);
 
 
 --
@@ -2659,6 +2703,30 @@ ALTER TABLE ONLY public.skill_proposals
 
 
 --
+-- Name: skill_publish_overrides skill_publish_overrides_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.skill_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: skill_test_cases skill_test_cases_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3296,6 +3364,20 @@ CREATE POLICY "Users can view own or global-folder documents" ON public.document
 
 
 --
+-- Name: skill_publish_overrides Users can view own publish overrides; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own publish overrides" ON skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own publish overrides" ON public.skill_publish_overrides IS 'Owner-only (D-02). Defense-in-depth: the service-role toggle handler bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081/083 precedent, T-136-04).';
+
+
+--
 -- Name: sandbox_files Users can view own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -3538,6 +3620,12 @@ ALTER TABLE public.skill_files ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.skill_proposals ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_publish_overrides; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_publish_overrides ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: skill_test_cases; Type: ROW SECURITY; Schema: public; Owner: -
