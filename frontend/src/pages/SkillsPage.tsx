@@ -12,11 +12,19 @@ import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
 interface Props {
   onTryInChat?: (skillName: string) => void
-  // Phase 123-05 (TRIG-01 / sketch 041-A): opens the focused Trigger Tuner
-  // surface for a skill (entered WITH a skillId). Threaded from ChatLayout to
-  // App's tunerSkillId setter + onNavigate('skill-tuner') — the reachability
-  // entry action that makes the Tuner reachable in-phase.
+  // Phase 123-05 (TRIG-01 / sketch 041-A): opens the focused Skill Studio for a skill
+  // (entered WITH a skillId). Threaded from ChatLayout → App's handleTuneSkill, which now
+  // REDIRECTS to Studio · Triggering (the Trigger Tuner is absorbed as the Triggering
+  // tab — no orphan surface). The existing "Tune triggers" button below is unchanged.
   onTuneSkill?: (skillId: string) => void
+  // Phase 137-06 (PANEL-01 / sketch 057 MAP): the Studio navigators, accepted here so
+  // ChatLayout's pass-through typechecks and Plan 07 can drill them to the slim detail
+  // panel that owns the sole studio-entry button. Deliberately NOT destructured or
+  // consumed in this plan (no duplicate entry button lives in SkillsPage — Plan 07 owns
+  // it); leaving them undestructured avoids a noUnusedLocals error while keeping the
+  // interface ready.
+  onOpenStudio?: (skillId: string, tab?: "evals" | "triggering" | "versions") => void
+  onReviewEvals?: (skillId: string) => void
 }
 
 export function SkillsPage({ onTryInChat, onTuneSkill }: Props) {
