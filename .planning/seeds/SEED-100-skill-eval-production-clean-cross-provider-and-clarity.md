@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-100
 title: Dedicated phase — make Skill Eval production-clean (cross-provider robustness for ALL providers + user-facing clarity)
-status: planted
+status: promoted
+promoted_to: "Phase 137.1 (EVAL-05) — 2026-07-04, operator decision; paired with Phase 137.2 (SEED-101 skill-creator)"
 planted: 2026-07-01
 phase_origin: "Operator note after running live evals across the full native roster during/after Phase 133 (2026-06-30 → 2026-07-01). The eval engine + thin --skip-ui surface shipped and verified, but two gaps remain before it's something an end user can trust: (1) the WITHOUT-skill baseline arm trips provider-specific request-shape rules on several providers, and (2) the surface is confusing to a non-expert — it lives in the sidebar with very detailed information and the user doesn't know what 'eval' even means."
 category: product + cross-provider robustness — close the Skill Eval feature cleanly, 100%, for every provider, with an end-user-legible surface
@@ -150,3 +151,29 @@ with/without delta is now a REAL skill-value measurement. Remaining asks 1/3/4
 phase. Note for the phase's secure pass: the evidence block is new judge-prompt
 surface (tool results can carry adversarial doc content) — mitigations = rubric
 data-posture + 4KB cap; formalize in the threat model.
+
+## Update 2026-07-04 (later) — PROMOTED to Phase 137.1 + skill-creator harvest folded in
+
+Operator decision: close this seed's full scope now (before the CORE-complete
+decision), paired with the skill-creator work ([SEED-101]). The full study of
+Anthropic's skill-creator zip (every file — see SEED-101's capability matrix)
+adds these engine-harvest items to THIS phase's scope, on top of the open asks
+above (#1 smoke sweep, #3 progress bar, #4 matrix runs, BUG-260701-01 re-test,
+BUG-260702-02 restart reconciliation, judge-model Settings knob, evidence-channel
+threat-model formalization):
+
+- **Judge `case_feedback`** — the judge critiques weak/non-discriminating test
+  cases (from grader.md Step 6: "an assertion a clearly wrong output would also
+  pass", "an important outcome no assertion covers"). Surfaced per-case in the
+  Studio, never blocking.
+- **Per-arm wall-clock duration** on `eval_results` (tokens already captured) —
+  feeds the time-cost half of the skill-value story.
+- **Matrix/N-run aggregation shape** — per-config mean ± stddev + delta
+  (benchmark.json `run_summary` prior art) + analyst-style annotations
+  (non-discriminating case / flaky variance / time-token tradeoff notes) once
+  matrix runs (#4) exist.
+- **Description-builder polish** — 1024-char cap + auto-shorten retry; optional
+  failure-feedback iteration mode for the Tuner builder (only if cheap; the
+  one-round N-candidate design stands).
+- **Additive lint** — kebab-case name + description-length portability warnings
+  (never blocking, D-09 posture).

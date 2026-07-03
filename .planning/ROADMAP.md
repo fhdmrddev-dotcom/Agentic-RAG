@@ -40,6 +40,8 @@
 | 135 | Self-Improvement Loop (SI-01) | Eval + Tuner signal → proposed instruction-body diff → human approves → new immutable version → auto-re-eval gate; never auto-applies | SI-01 | 4 | **SC#10**; UI hint (diff review/approve); G-5 (consume `agent_loop.py`/gateway READ-ONLY); human-in-the-loop mandatory |
 | 136 | Skill Publish Gate (GATE-01) | A skill can be published (global/shareable) only after ≥1 eval has run and passed; the publish flow surfaces the gate with a clear status | GATE-01 | 3 | UI hint (publish-flow gate status); future-publish-only (no retroactive gating) |
 | 137 | Skill Evals Panel UI (PANEL-01) | The Skills UI gains a sketch-gated Skill Evals panel: case editor, run history, run detail (side-by-side + pass/fail), inline ratings, diff-viewable version history | PANEL-01 | 4 | **G-2 sketch-gated**; UI hint; SC#10 (UI state surfacing per-provider results + live run); additive (no full Skills-tab redesign) |
+| 137.1 | Skill Eval Production-Clean (INSERTED 2026-07-04) | The eval engine is trustworthy for every provider: automated cross-provider smoke sweep, matrix runs (N providers in parallel + mean±stddev/delta aggregation + analyst notes), determinate progress, judge case_feedback, per-arm duration, judge-model Settings knob, BUG-260701-01/-260702-02 closed | EVAL-05 | 4 | **SC#10 full-roster**; SEED-100 promoted; G-2 for matrix-run/progress UI; D-14 red line (gateway-boundary fixes only) |
+| 137.2 | Skill Creator Reborn — Built-in + Protected (INSERTED 2026-07-04) | Every user (local + cloud) has a read-only, undeletable, "Built-in"-badged skill-creator whose platform-native instructions run our full loop: interview → RAG research → save_skill → eval cases → eval → proposals/tuner → publish gate | CREATE-01 | 3 | SEED-101 (full capability matrix from Anthropic's skill-creator zip); seed migration + deploy-parity entry; additive — never breaks 132–137 surfaces |
 
 ### Phase Table (STRETCH — gated behind CORE)
 
@@ -59,8 +61,10 @@
 - [x] **Phase 134: Eval Results, Honest Verdict + Ratings** — per-provider verdict + side-by-side comparison + thumbs up/down preference signal (EVAL-03, EVAL-04) — verified 2026-07-02 (8/8 truths + 9/9 live SC#10 UAT; secure-phase pending)
 - [x] **Phase 134.1: Evals Run Silently (bug fix)** — hide eval-execution threads from the chat sidebar; eval outputs stay DB-only in the eval panel (BUG-260702-01)
 - [x] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01) — verified 2026-07-02 (5/5 truths + live SC#10 UAT U1-U11: 10 passed, 1 blocked third-party); secured 2026-07-03 (threats_open 0)
-- [ ] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01)
-- [ ] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01)
+- [x] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01) — complete + secured 2026-07-03 (`d78e9778`)
+- [x] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01) — UAT 13/13 2026-07-04; secured 2026-07-04 (threats_open 0, `7850cf72`)
+- [ ] **Phase 137.1: Skill Eval Production-Clean (INSERTED)** — cross-provider smoke sweep + matrix runs + determinate progress + judge case_feedback + per-arm duration + judge-model knob + bug closures (EVAL-05 / SEED-100)
+- [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101)
 - [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
 - [ ] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02)
 - [ ] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02)
@@ -233,6 +237,39 @@ Plans:
 - [x] 137-06-PLAN.md — Studio shell + reachability: skill-studio ActiveView, header/3 tabs, tuner absorbed, Open studio [wave 3]
 - [x] 137-07-PLAN.md — Detail-panel slim-down + nav MAP: shared full stepper in panel, "Review evals →" [wave 4]
 **UI hint**: yes — **G-2 sketch-gated** (sketches 053–057 winners = the acceptance bar).
+
+#### Phase 137.1: Skill Eval Production-Clean (INSERTED 2026-07-04)
+
+**Goal**: The eval engine becomes something an operator can trust without hand-running all 8 providers — every arm completes honestly on every configured provider, results carry cost/variance context, and the run experience reads clearly while running.
+**Depends on**: Phases 133–137 (engine + Studio shipped); baseline-contamination root-cause fix `f47d6736` + judge evidence channel `dd694916` (shipped 2026-07-04).
+**Requirements**: EVAL-05 (SEED-100 promoted — full history + operator asks recorded there)
+**Success Criteria** (what must be TRUE):
+
+  1. An automated cross-provider engine smoke sweep runs one representative model per configured provider (native-7 + OpenRouter; exclude local) × one case, asserting per-arm ENGINE health: each arm completes with verdict `graded` or an honest `not_measured` carrying a REAL provider error — never an engine-shaped error (EVAL-05a; SEED-100 ask #1).
+  2. A matrix run fans one skill's eval across N providers as N parallel run rows with explicit gate semantics (which run feeds the publish gate) and a multi-run live UI; per-config aggregation reports mean ± stddev + delta where run counts allow, with analyst-style annotations (non-discriminating case / flaky variance / time-token tradeoffs) (EVAL-05b; SEED-100 ask #4 + SEED-101 harvest).
+  3. A running eval shows determinate progress (units = cases × 2 arms + judge step) instead of an indeterminate spinner (EVAL-05c; SEED-100 ask #3).
+  4. The judge can flag weak/non-discriminating test cases (`case_feedback`, surfaced per-case, never blocking) and per-arm wall-clock duration is captured alongside tokens (EVAL-05d/e; SEED-101 harvest).
+  5. The judge model is selectable in Settings (single-provider/local-model orgs unblocked); BUG-260701-01 is re-tested post-`f47d6736` (fix at the gateway/adapter boundary if still live — D-14); BUG-260702-02 restart reconciliation closes orphaned `running` runs honestly (EVAL-05f/g).
+  6. The judge evidence channel's new prompt surface (tool receipts as judge input) is formalized in the phase threat model — rubric data-posture + 4KB cap named as mitigations (EVAL-05h).
+
+**UI hint**: yes — matrix-run rows + determinate progress are new UI → **G-2 sketch proposed at discuss-phase** (extend the 053–057 Studio language; RunHistory/RunBar are the existing homes).
+**Guardrail note**: G-1 does not fire (first 137.x insert). D-14 red line: all provider fixes at the gateway/adapter/sanitizer boundary; the shared agent-loop path is never forked.
+
+#### Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED 2026-07-04)
+
+**Goal**: Every user, on every environment, has a built-in skill-creator that teaches the agent to run OUR skill lifecycle conversationally — and that skill is read-only, undeletable, and deploy-safe. Closes the operator's "match Claude.ai's skill-creator to our app" ask via SEED-101's full capability matrix (every zip file studied and dispositioned).
+**Depends on**: Phase 137.1 preferred first (the instructions reference matrix runs/progress being trustworthy) — soft dependency, can swap if 137.1 stalls; the 132–137 Studio (hard, shipped).
+**Requirements**: CREATE-01 (SEED-101 — capability matrix + red lines)
+**Success Criteria** (what must be TRUE):
+
+  1. An idempotent seed migration installs the `skill-creator` skill (system-user-owned, `is_global=true`), superseding the stale 018 content; the seed reaches cloud via a documented deploy-parity entry (data seeds are NOT in `full-schema.sql`) (CREATE-01).
+  2. The built-in skill is read-only and undeletable through all app paths for non-owners (existing owner-scoping verified end-to-end) and renders a "Built-in" badge in the Skills UI (CREATE-01).
+  3. Its instructions are platform-native per SEED-101: interview/intent-capture → RAG research (`search_documents`) → `save_skill` draft with writing-craft guidance (imperative, explain-the-why, pushy-but-honest description, generalize-don't-overfit) → propose eval cases → eval run + honest verdict → proposals loop + Trigger Tuner → publish gate; it never claims capabilities the runtime lacks (no subagents/browser/`claude -p`; Python-only sandbox — SEED-096 honesty) (CREATE-01).
+  4. A live conversational walkthrough ("help me create a skill for X") reaches a saved, eval-tested skill using only what the instructions teach — the lived-experience acceptance bar (G-4).
+  5. The shipped 132–137 surfaces and the shared agent-loop path are untouched (additive-only; D-14).
+
+**UI hint**: minimal (Built-in badge + any list ordering) — G-2 not expected to fire beyond a badge decision; confirm at discuss-phase.
+**Guardrail note**: operator's manual skill-creator copy is offered a cleanup/rename after the built-in lands — operator decision, never auto-deleted.
 
 #### Phase 138: Run-End Honesty (STRETCH)
 

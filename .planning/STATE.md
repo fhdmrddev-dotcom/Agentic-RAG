@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: executing
-last_updated: "2026-07-03T17:39:11.872Z"
-last_activity: 2026-07-03 -- Phase 137 execution started
+last_updated: "2026-07-04T00:00:00.000Z"
+last_activity: 2026-07-04 -- Phase 137 UAT complete + secured; Phases 137.1/137.2 inserted (SEED-100/SEED-101)
 progress:
-  total_phases: 26
-  completed_phases: 14
+  total_phases: 28
+  completed_phases: 15
   total_plans: 72
   completed_plans: 66
   percent: 54
@@ -22,13 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 137 — skill-evals-panel-ui-panel-01
+**Current focus:** Phase 137.1 — Skill Eval Production-Clean (next: `/gsd:discuss-phase 137.1`)
 
 ## Current Position
 
-Phase: 137 (skill-evals-panel-ui-panel-01) — EXECUTING
-Plan: 1 of 7
-Status: Executing Phase 137
+Phase: 137.1 (skill-eval-production-clean) — INSERTED 2026-07-04, not yet discussed
+Next action: `/gsd:discuss-phase 137.1` (fold SEED-100; G-2 sketch expected for the matrix-run rows + determinate progress UI), then Phase 137.2 (Skill Creator Reborn — CREATE-01 / SEED-101)
+Status (prior — Phase 137, COMPLETE + SECURED): **UAT 13/13 PASSED 2026-07-04** (137-UAT.md; the 1 gap — stepper stale after in-session eval — closed by `40e2f8a3`, live-verified `bce451d7`); **SECURED 2026-07-04** (`137-SECURITY.md` = verified, threats_open: 0 — 7/7 threats closed with file:line evidence, 1 accepted risk R-137-01 zero-new-deps; commit `7850cf72`). Same-day eval-trust wave: baseline-contamination root-cause fix (`f47d6736` — thread reset before EACH arm; BUG-260630-01 likely root cause), gate refetch on eval finalize (`40e2f8a3`), **judge evidence channel** (`dd694916` — runtime tool receipts reach the judge; live-proven FAIL·10 → WITH PASS·72 / WITHOUT FAIL·40 flip), stepper connector visual (`fa253174`).
+**Inserted 2026-07-04 (operator decision — fully close the skills topic before CORE-complete):** **Phase 137.1** (EVAL-05; SEED-100 promoted: cross-provider engine smoke sweep, matrix runs + mean±stddev/delta aggregation + analyst notes, determinate progress, judge case_feedback, per-arm duration, judge-model Settings knob, BUG-260701-01 re-test + BUG-260702-02 restart reconciliation, evidence-channel threat-model formalization) + **Phase 137.2** (CREATE-01; SEED-101: built-in read-only seeded platform-native skill-creator. Investigation findings: mig-018's thin seeded creator is GONE from the live DB and was never deploy-safe — data seeds are NOT in schema-only full-schema.sql; the operator's manual copy is user-owned/unprotected and runtime-inert [assumes subagents/`claude -p`/browser]; Anthropic's skill-creator.zip studied file-by-file — all 18 files dispositioned HAVE/HARVEST/ADAPT/SKIP in SEED-101's capability matrix; our 132–137 Studio already covers most of the loop, Tuner exceeds their optimizer [N-provider matrix, same 60/40 held-out math]).
 Status (prior — Phase 135, complete + secured): **COMPLETE 2026-07-02, SECURED 2026-07-03** (`135-SECURITY.md` = verified, threats_open: 0 — 14/14 distinct threats closed [29 plan-level register entries across 9 plans], never-auto-apply enforced by construction [live `skills.instructions` UPDATE exists in exactly 2 human-gated functions], 5 accepted risks AR-135-01..05, commit `36ea6ae1`. 135-VERIFICATION.md = **passed**: 5/5 truths; third pass flipped human_needed→passed on the live SC#10 UAT U1-U11 evidence in 135-HUMAN-UAT.md — **10 passed / 0 issues / 1 blocked** (U4 OpenRouter third-party upstream 404; cross-provider axis satisfied live on OpenAI + Anthropic + Google). Full graded loops propose→diff→approve→auto-re-eval→promote/not-promote proven live; U9 interrupted-run honesty (CR-02 fix) + U10 failed-gate force-promote with `override_forced=true` (CR-01 fix) live-passed; Pitfall #1 draft-instructions seam proven in the re-eval thread. 9/9 plans (7 original + 2 gap-closure). **secure-phase 135 PENDING** (no 135-SECURITY.md). 2 minor non-blocking UAT findings root-caused in 135-HUMAN-UAT.md Gaps (promotion_gate "not measured" display undercount in the rare total-provider-outage edge case; eval-runner model dropdown drifts from MODEL_CAPABILITIES — pre-existing debt) → SEED/backlog candidates; U11 panel-density finding routed to Phase 137 (PANEL-01) as design input.
 Status (prior — Phase 134, complete + secured): **COMPLETE 2026-07-02** (134-VERIFICATION.md = **passed**: 8/8 truths + **9/9 live SC#10 UAT (U1–U9) PASSED**, self-driven via Chrome MCP + psycopg2 + Redis + logs; EVAL-03/04 Complete). **SECURED 2026-07-02** (`134-SECURITY.md` = verified, threats_open: 0 — 15/15 threats closed: 13 mitigations verified at code locations + 2 accepted risks AR-134-01/-02; commit `a5661845`). Plan: 4 of 4 executed.
 **UAT found + fixed a major live-surface defect in-session** (`d0c0c10a`): every live eval view died with a spurious "ended with an error" + stale 'running' readout — root causes (a) POST returned run_id before the job's first XADD → subscribe race hit runs.py Step-3b synthetic `buffer_expired_while_streaming`; (b) eval arms silent 40-70s (NO-OP emit) → replay-tail consumer's ~30s Redis XREAD socket timeout closed the stream mid-run; (c) client painted any error terminal as fatal + froze on a mid-run readout. Fix (eval-scoped, chat path untouched): seed `eval_run_started` before 202 + `eval_heartbeat` every 15s wrapping `_run_arm` + bounded client re-attach self-heal. Re-verified live on a 9-min OpenRouter run (live per-arm verdict badges → auto-final readout, zero errors). Also fixed during UAT: the POST-side anchor thread (the "empty twin") was a second uncovered `is_eval` creation site — both threads/run now flagged. U8 proved D-04 honesty against the REAL BUG-260701-01 prefill 400 (sonnet-5 baseline → `not_measured` render, rollup 1/1 excludes it); U9 captured the judge-PASS+human-DOWN disagreement row (Phase-135 query returns it).
