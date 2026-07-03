@@ -9,7 +9,7 @@ affected_areas: [backend/eval-runner, backend/run-lifecycle, backend/threads, fr
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-100]
-re_open_trigger: null
+re_open_trigger: "Reviewed at /gsd:discuss-phase 137 (2026-07-03) — NOT folded: backend reconciliation stays SEED-100. 137 owes only the DISPLAY half per the 055-B sketch contract: an interrupted eval run renders an honest banner + re-run affordance in the Studio run history (never a silent failure / stuck 'running')."
 reproduces_on:
   branch: develop
   commit: 34834433
