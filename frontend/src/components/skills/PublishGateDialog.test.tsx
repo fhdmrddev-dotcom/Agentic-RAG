@@ -89,3 +89,49 @@ describe("PublishGateDialog — server gate status + force (136-03)", () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(true))
   })
 })
+
+describe("PublishGateDialog — 'Review evals →' link (137-07 / sketch 057 MAP)", () => {
+  beforeEach(() => {
+    getPublishGate.mockReset()
+  })
+
+  it("unmet → renders a 'Review evals →' link that calls onReviewEvals with the skill id", async () => {
+    getPublishGate.mockResolvedValue(
+      mkGate({ met: false, state: "latest_failed", measured: 2, passed: 0, passing_run_id: null }),
+    )
+    const onReviewEvals = vi.fn()
+
+    render(
+      <PublishGateDialog
+        skillId="skill-9"
+        open
+        onOpenChange={() => {}}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        onReviewEvals={onReviewEvals}
+      />,
+    )
+
+    const link = await screen.findByRole("button", { name: /review evals/i })
+    await user.click(link)
+
+    expect(onReviewEvals).toHaveBeenCalledWith("skill-9")
+  })
+
+  it("met → the 'Review evals →' link is absent (only the unmet branch offers it)", async () => {
+    getPublishGate.mockResolvedValue(mkGate({ met: true, state: "passed", measured: 3, passed: 3 }))
+
+    render(
+      <PublishGateDialog
+        skillId="skill-1"
+        open
+        onOpenChange={() => {}}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        onReviewEvals={vi.fn()}
+      />,
+    )
+
+    // Wait for the met status to render, then assert the link never appears.
+    expect(await screen.findByText(/passed 3\/3/i)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /review evals/i })).not.toBeInTheDocument()
+  })
+})
