@@ -639,6 +639,29 @@ export interface EvalRunReadout {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Phase 136 (GATE-01) — skill publish gate. Exact mirror of the backend
+// `PublishGate` Pydantic model (Plan 01 `app.models.skill`): a server-computed
+// read-model over eval_runs ⋈ skill_versions ⋈ skills. The client NEVER computes
+// `met` — it renders this and echoes `override` (D-07). Flat interface + nullable
+// fields + status-union deliberately mirrors EvalRun / PromotionGate above.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /skills/{id}/publish-gate response. `state` is the honest publish
+ *  readiness: "passed" (met), or one of three honest unmet reasons. `measured`/
+ *  `passed`/`passing_run_id` are the numeric evidence (NULL when nothing honest
+ *  to show); `reason` is the human-readable line; `last_override` carries the
+ *  most-recent owner-visible force-publish record (D-01/D-02) or null. */
+export interface PublishGate {
+  met: boolean
+  state: "never_evaled" | "latest_failed" | "passed_on_older_version" | "passed"
+  measured: number | null
+  passed: number | null
+  passing_run_id: string | null
+  reason: string
+  last_override: { gate_state: string; created_at: string } | null
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Phase 135 (SI-01) — self-improvement proposal lifecycle. Mirrors the LOCKED
 // backend response contract (Plans 04/05): a proposal captures the base vs the
 // LLM-proposed skill instructions plus its rationale, then rides an approve →

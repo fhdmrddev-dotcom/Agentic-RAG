@@ -17,7 +17,7 @@ interface UseSkills {
   updateSkill: (id: string, body: SkillUpdate) => Promise<Skill>
   deleteSkill: (id: string) => Promise<void>
   toggleEnabled: (id: string) => Promise<void>
-  toggleGlobal: (id: string) => Promise<void>
+  toggleGlobal: (id: string, override?: boolean) => Promise<void>
 }
 
 export function useSkills(): UseSkills {
@@ -60,8 +60,11 @@ export function useSkills(): UseSkills {
     setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, is_enabled: updated.is_enabled } : s)))
   }, [])
 
-  const toggleGlobal = useCallback(async (id: string): Promise<void> => {
-    const updated = await apiToggleSkillGlobal(id)
+  const toggleGlobal = useCallback(async (id: string, override?: boolean): Promise<void> => {
+    // `override` rides through to the publish-gate on the private→global direction
+    // (Phase 136 / D-07); the unshare direction passes nothing. A gate refusal
+    // (PublishGateError) or auth error propagates to the caller (the dialog).
+    const updated = await apiToggleSkillGlobal(id, override)
     setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, is_global: updated.is_global } : s)))
   }, [])
 

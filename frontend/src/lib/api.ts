@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult, PublishGate } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1566,17 +1566,58 @@ export async function toggleSkillEnabled(id: string): Promise<Skill> {
   return res.json() as Promise<Skill>
 }
 
-export async function toggleSkillGlobal(id: string): Promise<Skill> {
+/** Phase 136 (GATE-01): a typed carrier for the structured 409 publish-gate
+ *  refusal. Holds the server-computed `PublishGate` so the dialog can render the
+ *  SAME honest counts/reason the server used — the client never recomputes `met`
+ *  (D-07). Mirrors the ApiError idiom (a named Error with a typed field). */
+export class PublishGateError extends Error {
+  readonly gate: PublishGate
+  constructor(gate: PublishGate) {
+    super(gate.reason || "This skill can't be published yet — its eval gate isn't met.")
+    this.gate = gate
+    this.name = "PublishGateError"
+  }
+}
+
+export async function toggleSkillGlobal(id: string, override?: boolean): Promise<Skill> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/skills/${id}/toggle-global`, {
     method: "PATCH",
     headers,
+    // Only the private→global publish direction sends a body ({ override }); the
+    // ungated global→private unshare direction (no arg) sends none — unchanged.
+    ...(override !== undefined ? { body: JSON.stringify({ override }) } : {}),
   })
   if (!res.ok) {
     if (res.status === 403) throw new Error("Only the skill owner can toggle global status")
+    if (res.status === 409) {
+      // Structured publish-gate refusal — detail is an OBJECT { error, gate }, NOT
+      // a string (do NOT route through proposalError's string path). Surface the
+      // gate via a typed error so the dialog renders the server's honest evidence.
+      let gate: PublishGate | undefined
+      try {
+        const j = (await res.json()) as { detail?: { error?: string; gate?: PublishGate } }
+        gate = j?.detail?.gate
+      } catch {
+        /* non-JSON / malformed 409 body — fall through to the generic message */
+      }
+      if (gate) throw new PublishGateError(gate)
+      throw new Error("This skill can't be published yet — its eval gate isn't met.")
+    }
     throw new Error("Failed to update skill.")
   }
   return res.json() as Promise<Skill>
+}
+
+/** GET /skills/{id}/publish-gate — the server-computed publish read-model the
+ *  PublishGateDialog renders before a private→global share (D-05). Owner-scoped
+ *  server-side (404 cross-user). Mirrors getEvalRun's getAuthHeaders→fetch→typed
+ *  json cast; the client never computes `met` (D-07). */
+export async function getPublishGate(skillId: string): Promise<PublishGate> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/publish-gate`, { headers })
+  if (!res.ok) throw new Error("Failed to load publish gate.")
+  return res.json() as Promise<PublishGate>
 }
 
 // ────────────────────────────────────────────────────────────────────────────
