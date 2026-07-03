@@ -43,6 +43,37 @@ class SkillFileResponse(BaseModel):
     created_at: datetime
 
 
+class PublishGate(BaseModel):
+    """GATE-01 publish-gate read model (Phase 136, computed by publish_gate_service).
+
+    ``met`` is recomputed from the NUMERIC ``eval_runs.passed_count`` / ``measured_count``
+    columns (D-03 — never the ``verdict_summary`` display text) and bound to the skill's
+    CURRENT instructions by content-equality (D-04). ``last_override`` is the most-recent
+    owner-visible force-publish record for this skill (``{gate_state, created_at}``), or
+    None when never overridden (D-02/D-06).
+    """
+
+    met: bool
+    # Literal union: "never_evaled" | "latest_failed" | "passed_on_older_version" | "passed"
+    state: str
+    measured: int | None
+    passed: int | None
+    passing_run_id: str | None
+    reason: str
+    last_override: dict | None = None
+
+
+class TogglePublishBody(BaseModel):
+    """Optional body for the gated private→global toggle: an EXPLICIT force-publish flag.
+
+    The server ignores everything else — it recomputes the gate itself (a client can never
+    fabricate a passing eval, D-07); ``override=True`` only reaches the write path after
+    ownership + gate recompute, and is RECORDED in skill_publish_overrides (D-01/D-02).
+    """
+
+    override: bool = False
+
+
 class SkillImportError(BaseModel):
     skill: str
     error: str
