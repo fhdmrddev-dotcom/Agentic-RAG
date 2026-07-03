@@ -2,7 +2,7 @@
 sketch: 057
 name: skill-studio-linkage
 question: "With Tuner ⟷ Evals LOCKED as tabs of one unified Skill Studio (operator 2026-07-03), how do the tabs compose — and what is the complete every-button→destination navigation contract for the Skills surface?"
-winner: null
+winner: "A"
 tags: [phase-137, panel-01, skill-studio, tabs, ia, nav-map, linkage, tuner-absorption, reference]
 ---
 

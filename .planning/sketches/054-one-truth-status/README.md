@@ -2,7 +2,7 @@
 sketch: 054
 name: one-truth-status
 question: "How do publish gate + latest-run verdict + proposal state compose into ONE honest read that can't be misread as contradictory?"
-winner: null
+winner: "B"
 tags: [phase-137, panel-01, gate-01, status-hierarchy, honesty, version-bound, worded-verdict, contradiction-fix]
 ---
 

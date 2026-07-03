@@ -2,7 +2,7 @@
 sketch: 053
 name: eval-studio-shell
 question: "Where does the Skill Evals panel LIVE — focused full-surface, in-panel accordion, or expand-to-wide panel — given five subsurfaces and a side-by-side run detail that needs width?"
-winner: null
+winner: "A"
 tags: [phase-137, panel-01, shell, ia, skills-page, full-surface, accordion, push-split]
 ---
 

@@ -103,8 +103,8 @@
 
 <div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
   <span class="label">054 · One-truth status</span>
-  <button class="variant-tab active" onclick="showVariant('a',event)">A: Version-bound hero</button>
-  <button class="variant-tab" onclick="showVariant('b',event)">B: Lifecycle stepper</button>
+  <button class="variant-tab" onclick="showVariant('a',event)">A: Version-bound hero</button>
+  <button class="variant-tab active" onclick="showVariant('b',event)">B: Lifecycle stepper ★</button>
   <button class="variant-tab" onclick="showVariant('c',event)">C: Worded verdict + raw</button>
 </div>
 
@@ -130,7 +130,7 @@
   </div>
 
   <!-- ===================== VARIANT A ===================== -->
-  <div id="variant-a" class="variant">
+  <div id="variant-a" class="variant" style="display:none">
     <div class="vhead">
       <h2>A — Version-bound status hero</h2>
       <p>ONE headline, always derived from the server's <span class="mono">PublishGate.state</span> and always naming
@@ -161,7 +161,7 @@
   </div>
 
   <!-- ===================== VARIANT B ===================== -->
-  <div id="variant-b" class="variant" style="display:none">
+  <div id="variant-b" class="variant">
     <div class="vhead">
       <h2>B — Lifecycle stepper</h2>
       <p>The eval story becomes a <b>4-stage journey</b>: Cases → Eval → Gate → Published. Each node carries its own

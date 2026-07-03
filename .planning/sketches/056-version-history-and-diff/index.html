@@ -80,15 +80,15 @@
 
 <div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
   <span class="label">056 · Version history &amp; diff</span>
-  <button class="variant-tab active" onclick="showVariant('a',event)">A: Timeline + inline diff</button>
-  <button class="variant-tab" onclick="showVariant('b',event)">B: Table + compare picker</button>
+  <button class="variant-tab" onclick="showVariant('a',event)">A: Timeline + inline diff</button>
+  <button class="variant-tab active" onclick="showVariant('b',event)">B: Table + compare picker ★</button>
   <button class="variant-tab" onclick="showVariant('c',event)">C: Provenance story cards</button>
 </div>
 
 <div class="wrap">
 
   <!-- ===================== VARIANT A ===================== -->
-  <div id="variant-a" class="variant">
+  <div id="variant-a" class="variant" style="display:none">
     <div class="vhead">
       <h2>A — Timeline rail + inline unified diff</h2>
       <p>Versions as a vertical timeline, newest on top, LIVE badged. Each row carries its <b>provenance chip</b>
@@ -106,7 +106,7 @@
   </div>
 
   <!-- ===================== VARIANT B ===================== -->
-  <div id="variant-b" class="variant" style="display:none">
+  <div id="variant-b" class="variant">
     <div class="vhead">
       <h2>B — Table + compare picker</h2>
       <p>A compact scan-first table (version · origin · eval · date) with an explicit <b>Compare v[x] ↔ v[y]</b>

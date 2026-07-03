@@ -2,7 +2,7 @@
 sketch: 055
 name: run-history-and-detail
 question: "How does the eval run history read, and how does drilling into per-case side-by-side WITH/WITHOUT outputs + honest verdicts + inline thumbs ratings feel?"
-winner: null
+winner: "B"
 tags: [phase-137, panel-01, eval-03, eval-04, run-history, side-by-side, ratings, honest-verdicts, drill-in]
 ---
 

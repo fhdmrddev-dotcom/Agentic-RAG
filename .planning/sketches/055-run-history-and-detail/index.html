@@ -85,15 +85,15 @@
 
 <div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
   <span class="label">055 · Run history &amp; detail</span>
-  <button class="variant-tab active" onclick="showVariant('a',event)">A: Full-replace drill-in</button>
-  <button class="variant-tab" onclick="showVariant('b',event)">B: Expandable rows</button>
+  <button class="variant-tab" onclick="showVariant('a',event)">A: Full-replace drill-in</button>
+  <button class="variant-tab active" onclick="showVariant('b',event)">B: Expandable rows ★</button>
   <button class="variant-tab" onclick="showVariant('c',event)">C: Master-detail split</button>
 </div>
 
 <div class="wrap">
 
   <!-- ===================== VARIANT A ===================== -->
-  <div id="variant-a" class="variant">
+  <div id="variant-a" class="variant" style="display:none">
     <div class="vhead">
       <h2>A — Full-replace drill-in (005-A)</h2>
       <p>The run list is the resting view. Clicking a run <b>replaces</b> it with that run's detail —
@@ -107,7 +107,7 @@
   </div>
 
   <!-- ===================== VARIANT B ===================== -->
-  <div id="variant-b" class="variant" style="display:none">
+  <div id="variant-b" class="variant">
     <div class="vhead">
       <h2>B — Expandable rows</h2>
       <p>The run row <b>expands in place</b> — the detail unfolds under it while the other runs stay visible above and

@@ -2,7 +2,7 @@
 sketch: 056
 name: version-history-and-diff
 question: "How do immutable versions read — which is LIVE, diff between versions, provenance (manual / proposal-promoted / forced-override), per-version eval binding — and where does the 135 proposal card terminally rest?"
-winner: null
+winner: "B"
 tags: [phase-137, panel-01, ver-01, si-01, version-history, diff, provenance, promotion-gate]
 ---
 
