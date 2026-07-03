@@ -224,8 +224,15 @@ Plans:
   3. The panel shows diff-viewable version history so a user can compare instruction versions (PANEL-01 + VER-01).
   4. The existing Skills tab layout is otherwise unchanged (the panel is an addition, not a redesign) and the panel matches the operator-approved sketch — the G-2 acceptance bar (PANEL-01).
 
-**Plans**: TBD
-**UI hint**: yes — **G-2 sketch-gated** (run `/gsd:sketch 137` before planning).
+**Plans**: 7 plans in 4 waves (planned 2026-07-03)
+- [ ] 137-01-PLAN.md — Shared 054-B LifecycleStepper (one status truth-teller; ⚡ collision honesty) [wave 1]
+- [ ] 137-02-PLAN.md — Versions tab: 056-B table + any-to-any compare diff + client-side version↔eval/proposal joins [wave 1]
+- [ ] 137-03-PLAN.md — Run display trio: RunCaseDetail + RunHistory (055-B expandable) + RunBar (D-12) [wave 1]
+- [ ] 137-04-PLAN.md — ProposalCard re-skin (D-08 honesty locks + D-09 post-run nudge) [wave 1]
+- [ ] 137-05-PLAN.md — EvalsTab + CaseEditor: lift the SkillEvalSection machinery, compose the leaves [wave 2]
+- [ ] 137-06-PLAN.md — Studio shell + reachability: skill-studio ActiveView, header/3 tabs, tuner absorbed, Open studio [wave 3]
+- [ ] 137-07-PLAN.md — Detail-panel slim-down + nav MAP: shared full stepper in panel, "Review evals →" [wave 4]
+**UI hint**: yes — **G-2 sketch-gated** (sketches 053–057 winners = the acceptance bar).
 
 #### Phase 138: Run-End Honesty (STRETCH)
 
