@@ -148,45 +148,129 @@ def _seed(
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
-# Gate-compute service tests (Plan 01 Task 3 fills these — pure compute_publish_gate calls
-# against a seeded _FilterSupabase store; no HTTP needed).
+# Gate-compute service tests (pure compute_publish_gate calls against a seeded
+# _FilterSupabase store; no HTTP needed — the endpoint owner-verifies before compute).
 # ══════════════════════════════════════════════════════════════════════════════════════
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_gate_unmet_when_no_passing_eval():
     """No completed passing run → met=False, state='never_evaled', last_override=None."""
+    from app.services.publish_gate_service import compute_publish_gate
+
+    store, ids = _seed()  # no eval_runs at all
+    sb = _FilterSupabase(store)
+
+    gate = await compute_publish_gate(sb, ids.skill_id, OWNER["id"])
+
+    assert gate.met is False
+    assert gate.state == "never_evaled"
+    assert gate.measured is None and gate.passed is None
+    assert gate.passing_run_id is None
+    assert gate.last_override is None
+    assert gate.reason  # honest human-readable explanation, never empty
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_gate_met_after_passing_eval_current_version():
     """Completed run measured=2 passed=2 on a version whose instructions == live
-    skills.instructions → met=True, state='passed', counts + passing_run_id set (D-03+D-04)."""
+    skills.instructions → met=True, state='passed', counts + passing_run_id set (D-03+D-04).
+    Also proves last_override carries the MOST-RECENT override record (D-02)."""
+    from app.services.publish_gate_service import compute_publish_gate
+
+    store, ids = _seed(
+        runs=[{"version": 0, "passed": 2, "measured": 2}],
+        # Two historical force-publishes — last_override must be the NEWEST one (D-02).
+        overrides=[
+            {"gate_state": "never_evaled", "created_at": "2026-07-01T00:00:00Z"},
+            {"gate_state": "latest_failed", "created_at": "2026-07-02T00:00:00Z"},
+        ],
+    )
+    sb = _FilterSupabase(store)
+
+    gate = await compute_publish_gate(sb, ids.skill_id, OWNER["id"])
+
+    assert gate.met is True
+    assert gate.state == "passed"
+    assert gate.measured == 2 and gate.passed == 2
+    assert gate.passing_run_id == ids.run_ids[0]
+    assert gate.last_override is not None
+    assert gate.last_override["gate_state"] == "latest_failed"
+    assert gate.last_override["created_at"] == "2026-07-02T00:00:00Z"
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_edit_after_pass_resets_gate():
     """Same passing run, but live skills.instructions edited to differ → met=False,
-    state='passed_on_older_version' (D-04). ALSO seeds a failing completed run:
-    'passed_on_older_version' must win over 'latest_failed' (mixed-history precedence)."""
+    state='passed_on_older_version' (D-04). ALSO seeds a MORE-RECENT failing completed run:
+    'passed_on_older_version' must win over 'latest_failed' (mixed-history precedence — the
+    more actionable pointer is 're-eval the current version')."""
+    from app.services.publish_gate_service import compute_publish_gate
+
+    store, ids = _seed(
+        instructions="EDITED INSTRUCTIONS",       # live text no longer matches any version
+        versions=["ORIGINAL INSTRUCTIONS"],
+        runs=[
+            {"version": 0, "passed": 2, "measured": 2},   # D-03 pass — but stale content
+            {"version": 0, "passed": 1, "measured": 2},   # newer completed run FAILING D-03
+        ],
+    )
+    sb = _FilterSupabase(store)
+
+    gate = await compute_publish_gate(sb, ids.skill_id, OWNER["id"])
+
+    assert gate.met is False
+    # Precedence: the stale-content pass beats the newer numeric fail (D-04 mixed history).
+    assert gate.state == "passed_on_older_version"
+    assert gate.measured == 2 and gate.passed == 2  # counts of the stale-content passing run
+    assert gate.passing_run_id is None  # nothing satisfies the gate → no passing run id
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_promoted_near_dup_version_counts_as_current():
     """Passing run pins the OLDER skill_version_id; a NEWER version row exists with IDENTICAL
     instructions == live → content-equality yields met=True (id-equality would wrongly say
     unmet — the 135-promotion near-dup trap, D-04)."""
+    from app.services.publish_gate_service import compute_publish_gate
+
+    text = "PROMOTED INSTRUCTIONS"
+    store, ids = _seed(
+        instructions=text,
+        versions=[text, text],                      # near-dup: identical text, distinct ids
+        runs=[{"version": 0, "passed": 3, "measured": 3}],  # pass pinned to the OLDER id
+    )
+    sb = _FilterSupabase(store)
+    assert ids.version_ids[0] != ids.version_ids[1]  # the trap: ids differ, text does not
+
+    gate = await compute_publish_gate(sb, ids.skill_id, OWNER["id"])
+
+    assert gate.met is True, "content-equality must beat version-id equality (D-04)"
+    assert gate.state == "passed"
+    assert gate.measured == 3 and gate.passed == 3
+    assert gate.passing_run_id == ids.run_ids[0]
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_interrupted_run_does_not_satisfy():
-    """A run with status != 'completed' (NULL rollup) never satisfies the gate even if it
-    'would' pass → met=False (D-03 completed-only)."""
+    """A run with status != 'completed' never satisfies the gate — the honest NULL rollup
+    (D-03 finalize guard) AND, adversarially, even a non-completed row carrying counts that
+    'would' pass is excluded by the completed-only filter (D-03)."""
+    from app.services.publish_gate_service import compute_publish_gate
+
+    store, ids = _seed(
+        runs=[
+            {"version": 0, "status": "interrupted"},                # honest NULL rollup
+            {"version": 0, "status": "cancelled", "passed": 2, "measured": 2},  # adversarial
+        ],
+    )
+    sb = _FilterSupabase(store)
+
+    gate = await compute_publish_gate(sb, ids.skill_id, OWNER["id"])
+
+    assert gate.met is False
+    # No COMPLETED evidence exists at all → never_evaled (not latest_failed).
+    assert gate.state == "never_evaled"
+    assert gate.passing_run_id is None
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
