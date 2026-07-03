@@ -204,6 +204,14 @@ describe("SkillDetailPanel — Expand full-size instructions editor (sketch 046-
   beforeEach(() => {
     listSkillFiles.mockClear()
     listSkillFiles.mockResolvedValue([])
+    // Phase 137-07: the panel now fetches gate/case/version on mount — stub them so
+    // this pre-existing Expand test renders offline.
+    getPublishGate.mockReset()
+    getPublishGate.mockResolvedValue(mkGate())
+    listTestCases.mockReset()
+    listTestCases.mockResolvedValue([])
+    listSkillVersions.mockReset()
+    listSkillVersions.mockResolvedValue([])
   })
 
   it("opens a focused editor bound to the same instructions value and keeps edits on close", async () => {
