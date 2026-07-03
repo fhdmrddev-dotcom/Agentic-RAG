@@ -34,12 +34,21 @@ Test inventory (RESEARCH Requirements → Test Map — 11 rows):
     * test_import_and_save_skill_stay_private
     * test_unshare_never_gated_reshare_regated
 """
+import io
+import zipfile
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
 import pytest
+from httpx import ASGITransport
 
-from tests.test_evals_router import _FilterSupabase, _clear_overrides, _override  # noqa: F401
+from tests.test_evals_router import (  # noqa: F401
+    _FilterSupabase,
+    _FilterTable,
+    _clear_overrides,
+    _override,
+)
 
 OWNER = {"id": "00000000-0000-0000-0000-000000000001", "email": "owner@example.com"}
 OTHER_USER = {"id": "00000000-0000-0000-0000-000000000099", "email": "other@example.com"}
@@ -274,48 +283,221 @@ async def test_interrupted_run_does_not_satisfy():
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
-# Enforcement tests (Plan 02 fills these — real FastAPI app via
+# Enforcement tests (Plan 02 — real FastAPI app via
 # httpx.AsyncClient(transport=ASGITransport(app=app)) with _override/_clear_overrides).
 # ══════════════════════════════════════════════════════════════════════════════════════
 
 
+class _CreateSupabase(_FilterSupabase):
+    """``_FilterSupabase`` whose ``skills`` INSERT back-fills the DB-side defaults (id /
+    is_enabled / timestamps) a real Postgres row carries, so ``create_skill``'s
+    ``SkillResponse`` serialization succeeds through the fake store. ``is_global`` is
+    deliberately NOT back-filled — the endpoint must hard-set it (D-08), so whatever value it
+    inserts is exactly what the test reads back (a born-global bypass would surface as True)."""
+
+    def table(self, name):
+        t = _FilterTable(self.store, name)
+        if name == "skills":
+            _orig_insert = t.insert
+
+            def _insert(payload, *a, **k):
+                rows = payload if isinstance(payload, list) else [payload]
+                for r in rows:
+                    r.setdefault("id", str(uuid4()))
+                    r.setdefault("is_enabled", True)
+                    r.setdefault("created_at", "2026-07-03T00:00:00Z")
+                    r.setdefault("updated_at", "2026-07-03T00:00:00Z")
+                return _orig_insert(payload, *a, **k)
+
+            t.insert = _insert
+        return t
+
+
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_toggle_global_blocked_when_no_passing_eval():
     """Private→global toggle with no passing eval → 409 {'error': 'publish_gate_unmet',
-    'gate': {...}}; skills.is_global stays False (GATE-01 SC#1)."""
+    'gate': {...}}; skills.is_global stays False (GATE-01 SC#1 / D-07)."""
+    from app.main import app
+
+    store, ids = _seed(is_global=False)  # no eval_runs → gate unmet (never_evaled)
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 409, f"expected 409, got {resp.status_code}: {resp.text}"
+    detail = resp.json()["detail"]
+    assert detail["error"] == "publish_gate_unmet"
+    # The server-computed gate travels in the refusal payload (server→client only, T-136-03).
+    assert "gate" in detail and detail["gate"]["met"] is False
+    # The is_global UPDATE never ran — the skill stays private.
+    assert sb.store["skills"][0]["is_global"] is False
+    # A plain (non-override) refusal records nothing.
+    assert sb.store["skill_publish_overrides"] == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_toggle_global_allowed_after_passing_eval():
-    """After a passing eval on the current version, the toggle succeeds (200) and the gate
-    reads satisfied X/N (GATE-01 SC#2)."""
+    """After a completed passing run on the CURRENT version, the toggle succeeds (200) and
+    flips is_global true — the gate was MET, so NO override row is recorded (GATE-01 SC#2)."""
+    from app.main import app
+
+    store, ids = _seed(
+        is_global=False,
+        runs=[{"version": 0, "passed": 2, "measured": 2}],  # D-03 full pass on the current version
+    )
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json()["is_global"] is True
+    assert sb.store["skills"][0]["is_global"] is True
+    # Met gate → a straight publish, no owner-visible override row.
+    assert sb.store["skill_publish_overrides"] == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_force_publish_records_override():
-    """override=true publishes AND appends a skill_publish_overrides row carrying gate_state +
-    gate_snapshot at the moment of override — owner-visible, non-repudiable (D-01/D-02)."""
+    """override=true on an UNMET gate publishes AND appends exactly ONE skill_publish_overrides
+    row carrying gate_state + gate_snapshot AT THE MOMENT OF OVERRIDE, with skill_version_id ==
+    the LATEST skill_versions.id — owner-visible, non-repudiable (D-01/D-02)."""
+    from app.main import app
+
+    # Two versions, no runs → gate unmet (never_evaled); the latest version is index 1
+    # (version_number 2 — resolved via order("version_number", desc).limit(1)).
+    store, ids = _seed(is_global=False, instructions="V2", versions=["V1", "V2"])
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.patch(
+                f"/skills/{ids.skill_id}/toggle-global", json={"override": True}, headers=_H
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json()["is_global"] is True
+    assert sb.store["skills"][0]["is_global"] is True
+
+    overrides = sb.store["skill_publish_overrides"]
+    assert len(overrides) == 1, "force-publish records exactly one owner-visible override row"
+    row = overrides[0]
+    assert row["user_id"] == OWNER["id"]
+    assert row["gate_state"] == "never_evaled"           # the honest state at the moment of override
+    assert row["skill_version_id"] == ids.version_ids[1]  # the LATEST version (version_number desc)
+    snap = row["gate_snapshot"]
+    assert "measured_count" in snap and "passed_count" in snap
+    assert snap.get("reason"), "the gate snapshot carries a human-readable reason"
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_create_skill_ignores_body_is_global():
     """POST /skills with body is_global=true → the created row is is_global=False; the
     born-global side door is hard-closed server-side (D-08 / T-118-02-01)."""
+    from app.main import app
+
+    sb = _CreateSupabase({"skills": []})
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post(
+                "/skills",
+                json={"name": "Sneaky", "description": "d", "instructions": "i", "is_global": True},
+                headers=_H,
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code == 201, f"expected 201, got {resp.status_code}: {resp.text}"
+    assert resp.json()["is_global"] is False, "the server must ignore body.is_global (D-08)"
+    assert sb.store["skills"][0]["is_global"] is False
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_import_and_save_skill_stay_private():
-    """Skill import and the agent save_skill tool both produce is_global=False rows —
-    the D-08 regression guard on the two non-create write paths."""
+    """Skill import (ZIP → POST /skills/import) AND the agent save_skill tool both produce
+    is_global=False rows — the D-08 regression guard on the two non-create write paths."""
+    from app.main import app
+    from app.services.tool_dispatcher import _handle_save_skill
+
+    # ── import path: a minimal SKILL.md-only ZIP (no companion files → no storage calls) ──
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            "SKILL.md",
+            "---\nname: Imported Skill\ndescription: d\n---\n\nImported body instructions",
+        )
+    zip_bytes = buf.getvalue()
+
+    # _CreateSupabase back-fills the inserted skills row's ``id`` (the import path threads
+    # ``skill_row["id"]`` into the companion-file upload) while leaving is_global untouched.
+    sb = _CreateSupabase({"skills": []})
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post(
+                "/skills/import",
+                files={"file": ("skill.zip", zip_bytes, "application/zip")},
+                headers=_H,
+            )
+    finally:
+        _clear_overrides(app)
+
+    assert resp.status_code in (200, 201), f"import {resp.status_code}: {resp.text}"
+    created = resp.json()["created"]
+    assert len(created) == 1
+    assert created[0]["is_global"] is False, "import must land is_global=False (D-08)"
+    assert sb.store["skills"][0]["is_global"] is False
+
+    # ── save_skill tool path: the insert carries NO is_global key → the DB default (False)
+    #    applies; a caller can never make a born-global skill through the agent tool. ──
+    save_store = {"skills": []}
+    save_sb = _FilterSupabase(save_store)
+    ctx = SimpleNamespace(supabase=save_sb, current_user=OWNER)
+    await _handle_save_skill(
+        {"name": "Tool Skill", "description": "d", "instructions": "i"}, ctx
+    )
+    assert len(save_store["skills"]) == 1
+    assert save_store["skills"][0].get("is_global") is not True
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Wave 0 stub — implemented in Task 3 / Plan 02")
 async def test_unshare_never_gated_reshare_regated():
-    """Global→private (unshare) is never gated; a subsequent private→global re-share IS
-    re-gated (D-07/D-09)."""
+    """Global→private (unshare) is NEVER gated (200, no override); a subsequent private→global
+    re-share with an unmet gate IS re-gated (409) — no was-ever-published grandfathering
+    (D-07/D-09). The gate call lives ONLY inside the ``new_value is True`` branch, so the
+    ungated unshare returning 200 proves it is not invoked on the global→private direction."""
+    from app.main import app
+
+    store, ids = _seed(is_global=True)  # already global, but no passing eval
+    sb = _FilterSupabase(store)
+
+    _override(app, user=OWNER, supabase=sb)
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            unshare = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+            reshare = await c.patch(f"/skills/{ids.skill_id}/toggle-global", json={}, headers=_H)
+    finally:
+        _clear_overrides(app)
+
+    # Unshare: an ungated straight UPDATE (no gate, no override).
+    assert unshare.status_code == 200, f"unshare expected 200, got {unshare.status_code}: {unshare.text}"
+    assert unshare.json()["is_global"] is False
+    assert sb.store["skill_publish_overrides"] == [], "unshare must NOT record an override"
+    # Re-share: the gate runs fresh — unmet → 409 (no grandfathering).
+    assert reshare.status_code == 409, f"reshare expected 409, got {reshare.status_code}: {reshare.text}"
+    assert reshare.json()["detail"]["error"] == "publish_gate_unmet"
+    assert sb.store["skills"][0]["is_global"] is False, "the blocked re-share left the skill private"

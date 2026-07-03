@@ -5,18 +5,22 @@ import zipfile
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.skill import (
+    PublishGate,
     SkillCreate,
     SkillFileResponse,
     SkillImportError,
     SkillImportResult,
     SkillResponse,
     SkillUpdate,
+    TogglePublishBody,
 )
+from app.services.publish_gate_service import compute_publish_gate
 from app.services.skill_lint import lint_description
 
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -178,7 +182,7 @@ async def create_skill(
             "name": body.name.strip(),
             "description": body.description,
             "instructions": body.instructions,
-            "is_global": body.is_global,
+            "is_global": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
         })
         .execute()
     )
@@ -406,10 +410,20 @@ async def toggle_enabled(
 @router.patch("/{skill_id}/toggle-global", response_model=SkillResponse)
 async def toggle_global(
     skill_id: str,
+    body: TogglePublishBody | None = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Flip the is_global boolean on an owned skill. Only the owner can toggle."""
+    """Flip the is_global boolean on an owned skill. Only the owner can toggle.
+
+    GATE-01 (D-07): the private→global direction is GATED. The server recomputes the publish
+    gate from ``eval_runs`` (never trusting any client-supplied gate data) and REFUSES the flip
+    with a structured 409 unless the gate is met OR the request explicitly overrides
+    (``{"override": true}``). A force-publish (override on an unmet gate) is RECORDED as an
+    owner-visible ``skill_publish_overrides`` row with the gate snapshot AT THE MOMENT OF
+    OVERRIDE (D-01/D-02). The global→private direction (unshare) is NEVER gated, and a later
+    re-share re-runs the whole check fresh — no was-ever-published grandfathering (D-09).
+    """
     # Step 1: Fetch current state (owner-only)
     current = (
         supabase.table("skills")
@@ -425,10 +439,65 @@ async def toggle_global(
             detail="Skill not found or you are not the owner",
         )
 
-    # Step 2: Compute new value and update
+    # Step 2: Compute new value
     # current.data is a list (select returns list); maybe_single behaviour varies by client version
     skill_row = current.data[0] if isinstance(current.data, list) else current.data
     new_value = not skill_row["is_global"]
+
+    # Step 3 (GATE-01 / D-07): gate the private→global direction ONLY. Unshare (new_value is
+    # False) falls straight through to the UPDATE — never gated, and the NEXT re-share re-gates
+    # (D-09 — no grandfathering state is stored).
+    if new_value is True:
+        gate = await compute_publish_gate(supabase, skill_id, current_user["id"])
+        if not gate.met and not (body and body.override):
+            # Structured refusal — the client can never fabricate a passing eval (D-07). The
+            # dialog renders THIS server-computed gate; the 409 body is server→client only.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "publish_gate_unmet", "gate": gate.model_dump()},
+            )
+        if not gate.met and body and body.override:
+            # Force-publish (D-01/D-02): record an owner-visible audit row with the gate snapshot
+            # AT THE MOMENT OF OVERRIDE. Resolve the skill's LATEST version id FIRST (migration
+            # 079's UNIQUE(skill_id, version_number) makes version_number the ordering key); null
+            # only when the skill has no version rows. Both the read + the INSERT run off the
+            # event loop (D-v2.5-01 — the new hot path follows the evals.py wrap pattern even
+            # though the legacy skills handlers do not).
+            def _read_latest_version():
+                return (
+                    supabase.table("skill_versions")
+                    .select("id")
+                    .eq("skill_id", skill_id)
+                    .eq("user_id", current_user["id"])
+                    .order("version_number", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+
+            version_rows = list((await run_in_threadpool(_read_latest_version)).data or [])
+            resolved_version_id = version_rows[0]["id"] if version_rows else None
+
+            def _insert_override():
+                return (
+                    supabase.table("skill_publish_overrides")
+                    .insert({
+                        "skill_id": skill_id,
+                        "skill_version_id": resolved_version_id,
+                        "user_id": current_user["id"],
+                        "gate_state": gate.state,
+                        "gate_snapshot": {
+                            "measured_count": gate.measured,
+                            "passed_count": gate.passed,
+                            "reason": gate.reason,
+                        },
+                    })
+                    .execute()
+                )
+
+            await run_in_threadpool(_insert_override)
+        # gate.met is True → a straight publish, no override row.
+
+    # Step 4: Apply the is_global UPDATE (owner-scoped).
     result = (
         supabase.table("skills")
         .update({"is_global": new_value})
@@ -437,6 +506,38 @@ async def toggle_global(
         .execute()
     )
     return result.data[0]
+
+
+@router.get("/{skill_id}/publish-gate", response_model=PublishGate)
+async def get_publish_gate(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the server-computed publish gate for an owned skill (D-05).
+
+    The Plan 03 dialog renders THIS authoritative status before the user commits — the server
+    recomputes from ``eval_runs`` and IGNORES any client-supplied gate data (T-136-03).
+    Owner-verify with an endpoint-local 403 (consistent with ``toggle_global``); the gate
+    compute is a second owner-scoped backstop (T-136-04).
+    """
+    def _read_skill():
+        return (
+            supabase.table("skills")
+            .select("id")
+            .eq("id", skill_id)
+            .eq("user_id", current_user["id"])
+            .limit(1)
+            .execute()
+        )
+
+    skill_rows = list((await run_in_threadpool(_read_skill)).data or [])
+    if not skill_rows:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Skill not found or you are not the owner",
+        )
+    return await compute_publish_gate(supabase, skill_id, current_user["id"])
 
 
 @router.get("/{skill_id}/files", response_model=list[SkillFileResponse])

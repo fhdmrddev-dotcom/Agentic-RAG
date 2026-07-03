@@ -152,10 +152,27 @@ class TestToggleEnabled:
 
 class TestToggleGlobal:
     def test_toggle_global_flips_value(self, client, auth_headers, mock_builder):
-        """PATCH /skills/{id}/toggle-global flips is_global boolean. (SKIL-05, SKIL-06)"""
-        fetch_result = _make_result([_skill_row(is_global=False)])
-        update_result = _make_result([_skill_row(is_global=True)])
-        mock_builder.execute.side_effect = [fetch_result, update_result]
+        """PATCH /skills/{id}/toggle-global flips is_global True when the publish gate is MET.
+        GATE-01 (Phase 136): private→global now recomputes the gate from eval_runs FIRST — a
+        completed passing run on the CURRENT version satisfies it, so the flip succeeds.
+        (SKIL-05, SKIL-06)"""
+        instr = "Write valid SQL"
+        ver_id = str(uuid4())
+        run_id = str(uuid4())
+        # Execute-call order for a GATED private→global toggle:
+        #   1 owner-verify fetch → 2-5 compute_publish_gate reads
+        #   (skill / completed-runs / pinned-versions / last-override) → 6 the is_global UPDATE.
+        mock_builder.execute.side_effect = [
+            _make_result([_skill_row(is_global=False, instructions=instr)]),               # 1 fetch
+            _make_result([{"id": SKILL_ID, "instructions": instr, "is_global": False}]),    # 2 gate skill
+            _make_result([{                                                                 # 3 gate runs
+                "id": run_id, "status": "completed", "passed_count": 1,
+                "measured_count": 1, "skill_version_id": ver_id, "created_at": NOW,
+            }]),
+            _make_result([{"id": ver_id, "instructions": instr}]),                          # 4 gate versions
+            _make_result([]),                                                               # 5 gate override
+            _make_result([_skill_row(is_global=True)]),                                     # 6 update
+        ]
 
         response = client.patch(
             f"/skills/{SKILL_ID}/toggle-global",
