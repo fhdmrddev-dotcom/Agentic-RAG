@@ -296,3 +296,29 @@ with the live harness run — re-run replay tests.
 |---|------|----------------|--------|------|
 | 051 | gauntlet-pip-strip | How does the publish gauntlet read at a glance — an energized pip/energy-spine + plain-worded pass/block + raw-on-demand — without softening the verbatim-verdict / judge-hard-wall / 4-HTTP-outcome contracts (sitting under the 124 soul block)? | **A — Recipe-literal** ★ | phase-127, wux-03, publish-gauntlet, pip-strip, worded-verdict, raw-on-demand, energized, 3d-icons, provider-engine, honesty |
 | 052 | living-step-flow | How does an idle step stay quiet (no type-lecture, no placeholder, no animation) while the active step glows + flows + names its AI engine + "builds," done steps fold to essence — under the 124 soul header, within the shared G-5 harness+workflow card + a11y? | **A — Density-by-status** ★ | phase-127, wux-03, quiet-idle, phase-card, run-surface, living-flow, energized, 3d-icons, provider-engine, g5-hot-file, a11y |
+
+### Phase 137 session — Skill Evals Panel (PANEL-01) (2026-07-03)
+
+G-2 fired on Phase 137 (PANEL-01) — the sketch-gated consolidation of the whole v3.2 eval
+experience. **The brief is the operator's own 136-UAT feedback** (`136-HUMAN-UAT.md` Gaps):
+gate status discoverable only inside the confirm dialog + buried in a dense edit panel;
+"Publish ready — eval passed 1/1" adjacent to "0/2 with-skill cases passed" (different
+metrics — gate is CURRENT-VERSION-bound, verdict line is LATEST-RUN — no hierarchy) reads
+contradictory; verbatim *"messy UI, too much information."* The "before": everything (form +
+`SkillTestCasesSection` + the 924-line `SkillEvalSection` stack) lives inside the skill EDIT
+dialog in the ~384px resizable detail panel. PANEL-01 contract: test-case editor · run history
+· run detail (per-case side-by-side + pass/fail) · inline ratings · version history
+(diff-viewable); **additive — no Skills-tab redesign**. Grounded in the REAL wire shapes
+(`TestCase` / `EvalRun` rollup / `EvalResult` verdict_state incl. honest `not_measured` +
+`judge_error` / `PublishGate` 4-state + `last_override` / `SkillProposal` + `PromotionGate`
+counts) and the precedent stack: 041-A focused-full-surface (the Tuner hit the SAME 384px
+wall) + 045-B density lesson · 004-B/027-A stacked accordion · 005-A full-replace drill-in +
+in-column unified diff · 051-A worded-verdict + raw-on-demand · 048 provider marks (logo
+assets reused from `048/logos/`). Winners TBD (awaiting operator review).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 053 | eval-studio-shell | Where does the Skill Evals panel LIVE — focused full-surface (041-A mirror), in-panel stacked accordion + drill-ins (004-B/027-A), or panel-resident expand-to-wide (032-A rail-collapse) — given five subsurfaces and a side-by-side run detail that needs width? | TBD | phase-137, panel-01, shell, ia, skills-page, full-surface, accordion, push-split |
+| 054 | one-truth-status | How do publish gate + latest-run verdict + proposal state compose into ONE honest read that can't be misread as contradictory — version-bound status hero, lifecycle stepper, or worded verdict + raw-on-demand? | TBD | phase-137, panel-01, gate-01, status-hierarchy, honesty, version-bound, worded-verdict, contradiction-fix |
+| 055 | run-history-and-detail | How does the eval run history read, and how does drilling into per-case side-by-side WITH/WITHOUT outputs + honest verdicts (graded / not_measured / judge_error) + inline thumbs ratings feel? | TBD | phase-137, panel-01, eval-03, eval-04, run-history, side-by-side, ratings, honest-verdicts, drill-in |
+| 056 | version-history-and-diff | How do immutable versions read — which is LIVE, diff between versions, provenance (manual / proposal-promoted / forced-override), per-version eval binding — and where does the 135 proposal card terminally rest? | TBD | phase-137, panel-01, ver-01, si-01, version-history, diff, provenance, promotion-gate |
