@@ -203,8 +203,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 136-02-PLAN.md — Server-side enforcement: gated toggle (409 + recorded override) + closed born-global create door (D-08) + GET publish-gate [wave 2]
-- [ ] 136-03-PLAN.md — Thin publish dialog + client contracts (getPublishGate / override toggle) + SkillCard share-intercept [wave 2]
+- [x] 136-02-PLAN.md — Server-side enforcement: gated toggle (409 + recorded override) + closed born-global create door (D-08) + GET publish-gate [wave 2]
+- [x] 136-03-PLAN.md — Thin publish dialog + client contracts (getPublishGate / override toggle) + SkillCard share-intercept [wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
