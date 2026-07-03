@@ -367,6 +367,76 @@ async def test_thread_reset_before_each_arm(redis, supabase, pool, fake_loop_res
     )
 
 
+def test_format_tool_evidence_renders_execute_code_receipt():
+    """SEED-100 judge-evidence channel: a production-shaped messages.tool_calls entry
+    (execute_code with a JSON-string result carrying output_files) renders as a
+    receipts line naming the file + size + exit code — the ground truth the judge
+    needs to grade artifact-producing skills (the ~90%-fail blind spot)."""
+    from app.services.eval_runner_service import _format_tool_evidence
+
+    receipt = json.dumps({
+        "status": "completed", "exit_code": 0, "duration_ms": 121,
+        "output_files": [{"filename": "mock_page.docx", "url": "/x", "size": 36916}],
+        "stdout": "/sandbox/output/mock_page.docx\n", "stderr": "",
+    })
+    block = _format_tool_evidence([[{
+        "name": "execute_code", "args": {"code": "..."}, "result": receipt,
+        "status": "done", "tool_call_id": "call_1",
+    }]])
+    assert "execute_code" in block
+    assert "exit_code=0" in block
+    assert "mock_page.docx (36916 bytes)" in block
+
+    # Non-file tools surface a bounded result head; the whole block is capped.
+    block2 = _format_tool_evidence([[{"name": "search_documents", "result": "top chunk: " + "x" * 500}]])
+    assert block2.startswith("search_documents")
+    assert len(block2) < 400
+
+
+@pytest.mark.asyncio
+async def test_judge_receives_tool_evidence_block(redis, supabase, pool, fake_loop_result):
+    """The D-04 grading gate appends the arm's runtime tool receipts to what the judge
+    grades (answer + TOOL EVIDENCE block), while eval_results.output stays the PURE
+    model answer. Without evidence the judge previously saw ONLY full_content_final —
+    artifact-producing arms failed as 'unverifiable claims' on every provider."""
+    from app.services import eval_runner_service
+
+    judged_answers: list[str] = []
+
+    async def _fake_judge(*, answer, expected_behavior, user_settings):
+        judged_answers.append(answer)
+        return dict(_FAKE_VERDICT_PASS)
+
+    with patch.object(eval_runner_service, "run_agent_loop",
+                      new=AsyncMock(return_value=fake_loop_result)), \
+         patch.object(eval_runner_service, "_gather_tool_evidence",
+                      new=AsyncMock(return_value="execute_code #1: status=completed exit_code=0 files=[mock_page.docx (36916 bytes)]")), \
+         patch.object(eval_runner_service, "_judge_eval_answer", new=_fake_judge):
+        await eval_runner_service.run_eval_job(
+            run_id=uuid4(),
+            skill_id=SKILL_ID,
+            skill_version=SKILL_VERSION,
+            cases=[CASES[0]],
+            provider="anthropic",
+            model="claude-haiku-4-5-20251001",
+            current_user=OWNER,
+            user_settings=MagicMock(),
+            redis=redis,
+            supabase=supabase,
+            pool=pool,
+        )
+
+    assert len(judged_answers) == 2, "both arms graded"
+    for answer in judged_answers:
+        assert answer.startswith("A fake completion answer."), "the model answer leads"
+        assert "TOOL EVIDENCE" in answer, "runtime receipts reach the judge"
+        assert "mock_page.docx (36916 bytes)" in answer
+
+    # The persisted output is the PURE model answer — evidence never pollutes the row.
+    results = supabase.store.get("eval_results", [])
+    assert all(r["output"] == "A fake completion answer." for r in results)
+
+
 @pytest.mark.asyncio
 async def test_arm_heartbeat_keeps_buffer_warm(redis, supabase, pool, fake_loop_result):
     """BUG-260702-03 (b): a slow arm pulses eval_heartbeat onto the run buffer while
