@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target, Maximize2 } from "lucide-react"
+import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target, Maximize2, ExternalLink } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,10 +10,21 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { listSkillFiles, uploadSkillFile, deleteSkillFile } from "@/lib/api"
-import { SkillTestCasesSection } from "./SkillTestCasesSection"
-import { SkillEvalSection } from "./SkillEvalSection"
-import type { Skill, SkillCreate, SkillUpdate, SkillFile, SkillLintWarning } from "@/types"
+import {
+  listSkillFiles,
+  uploadSkillFile,
+  deleteSkillFile,
+  getPublishGate,
+  listTestCases,
+  listSkillVersions,
+} from "@/lib/api"
+// Phase 137-07 (PANEL-01 / D-07 / D-10): the slim panel's status section is the SHARED
+// full-variant lifecycle stepper — the SAME truth-teller the Studio header condenses.
+// The live version number comes from the SHARED deriveLiveVersion helper (W1: one rule,
+// one implementation, two homes) — never re-implemented inline.
+import { LifecycleStepper } from "./studio/LifecycleStepper"
+import { deriveLiveVersion } from "@/lib/skillVersion"
+import type { Skill, SkillCreate, SkillUpdate, SkillFile, SkillLintWarning, PublishGate } from "@/types"
 
 // ---------------------------------------------------------------------------
 // SkillForm — shared inner form component used by both SkillFormDialog and SkillDetailPanel
@@ -407,9 +418,14 @@ interface SkillDetailPanelProps {
    *  forked) that opens the Trigger Tuner for a skill. The inline lint's "Tune
    *  this" button fires it with the saved skill's id. */
   onTuneSkill?: (skillId: string) => void
+  /** Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06 / D-07): the SOLE "Open studio"
+   *  navigator. The panel's status section owns the app's single studio-entry button
+   *  (Plan 06 deliberately added no second one). Threaded App → ChatLayout →
+   *  SkillsPage → here. */
+  onOpenStudio?: (skillId: string, tab?: "evals" | "triggering" | "versions") => void
 }
 
-export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTuneSkill }: SkillDetailPanelProps) {
+export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTuneSkill, onOpenStudio }: SkillDetailPanelProps) {
   const isEdit = !!skill
   const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
 
@@ -426,6 +442,14 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
   const [savedSkillId, setSavedSkillId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Phase 137-07 (PANEL-01 / D-07): the slim status section's data — the SAME server
+  // gate the Studio header condenses (T-137-01: readiness is never recomputed here),
+  // the already-fetched case count (W2: the counts line reuses it — no new endpoint),
+  // and the live version derived via the SHARED helper (W1).
+  const [gate, setGate] = useState<PublishGate | null>(null)
+  const [caseCount, setCaseCount] = useState(0)
+  const [liveVersion, setLiveVersion] = useState(1)
+
   // Reset when selected skill changes
   useEffect(() => {
     setName(skill?.name ?? "")
@@ -441,6 +465,33 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
       listSkillFiles(skill.id)
         .then(setFiles)
         .catch(() => setFileError("Failed to load files."))
+    }
+  }, [skill])
+
+  // Phase 137-07: fetch the panel status data on skill switch. The `cancelled` guard
+  // (T-137-02) ensures a late fetch never renders under a different skill. The version
+  // derivation reads only the owner-scoped listSkillVersions rows via the shared helper.
+  useEffect(() => {
+    if (!skill) {
+      setGate(null)
+      setCaseCount(0)
+      setLiveVersion(1)
+      return
+    }
+    let cancelled = false
+    const sid = skill.id
+    Promise.all([
+      getPublishGate(sid).catch(() => null),
+      listTestCases(sid).catch(() => []),
+      listSkillVersions(sid).catch(() => []),
+    ]).then(([g, cases, versions]) => {
+      if (cancelled) return
+      setGate(g)
+      setCaseCount(cases.length)
+      setLiveVersion(deriveLiveVersion(skill, versions))
+    })
+    return () => {
+      cancelled = true
     }
   }, [skill])
 
@@ -528,24 +579,45 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
           }
         />
 
-        {/* Phase 132 Plan 03 (EVAL-01 / VER-01) — THIN test-case editor +
-            version-history read, mounted ONLY for an existing/saved skill (an id
-            exists). Deliberately non-designed (operator scope fence); the
-            designed Evals panel is Phase 137 (PANEL-01, G-2). */}
+        {/* Phase 137-07 (PANEL-01 / D-07 / D-10) — the SLIM status section. The two
+            heavy eval/test-case sections LEFT the panel for the designed Studio;
+            in their place the panel stays calm (closes the U11 density complaint)
+            with three things: the SHARED full-variant LifecycleStepper (the same
+            truth-teller the Studio header condenses — dissolving the "Publish ready
+            1/1 vs 0/2" contradiction where the operator first hit it), an honest
+            counts line reusing the already-fetched gate (no new endpoint), and the
+            SOLE "Open studio" entry button (Plan 06 added no second one). */}
         {savedSkillId && (
-          <div className="mt-6 pt-6 border-t border-border/10">
-            <SkillTestCasesSection skillId={savedSkillId} />
-          </div>
-        )}
+          <div className="mt-6 pt-6 border-t border-border/10 flex flex-col gap-3">
+            <LifecycleStepper
+              variant="full"
+              publishGate={gate}
+              caseCount={caseCount}
+              skillVersion={liveVersion}
+            />
 
-        {/* Phase 133 Plan 05 (EVAL-02) — THIN with/without eval runner, mounted as
-            a sibling of the test-case editor for an existing/saved skill. Reuses
-            the chat-run stream client (Pattern 3); deliberately non-designed
-            (operator scope fence) — the designed Evals panel is Phase 137
-            (PANEL-01, G-2). */}
-        {savedSkillId && (
-          <div className="mt-6 pt-6 border-t border-border/10">
-            <SkillEvalSection skillId={savedSkillId} />
+            {/* Counts line — cases + the latest run summary (gate.passed/gate.measured),
+                both honest: never-evaled → "not evaled yet", never a fabricated 0/0. */}
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {caseCount} test case{caseCount === 1 ? "" : "s"} ·{" "}
+              {gate && gate.passed !== null && gate.measured !== null
+                ? `latest eval ${gate.passed}/${gate.measured} on v${liveVersion}`
+                : "not evaled yet"}
+            </p>
+
+            {/* The app's SINGLE "Open studio" control (057 MAP) — opens the Studio's
+                Evals tab for this skill. */}
+            {onOpenStudio && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-center gap-2"
+                onClick={() => onOpenStudio(savedSkillId, "evals")}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open studio
+              </Button>
+            )}
           </div>
         )}
       </div>
