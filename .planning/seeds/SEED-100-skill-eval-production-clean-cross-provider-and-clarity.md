@@ -132,3 +132,21 @@ this seed's ops item.
    in parallel (providers are independent APIs — operator is right), with explicit
    gate semantics (which run feeds the gate) + multi-run live UI. Pairs naturally
    with ask #1.
+
+## Update 2026-07-04 (later) — judge evidence channel SHIPPED (`dd694916`)
+
+Operator-driven deep investigation proved the ~90% artifact-skill fail rate was the
+judge grading blind: the failing gpt-5.4-mini docx arm had a verified sandbox receipt
+(exit_code 0, mock_page.docx 36,916 bytes) while the judge received only the 67-char
+final sentence. Fix shipped same-day: `_gather_tool_evidence` + `_format_tool_evidence`
+in `eval_runner_service.py` append the arm's runtime tool receipts (files+sizes, exit
+codes, stdout tail; 4KB cap) to what the judge grades; rubric names them
+runtime-captured ground truth (receipts stay DATA — T-134-02 posture);
+`eval_results.output` stays the pure model answer. **Live proof:** the same
+gpt-5.4-mini docx eval flipped FAIL·10 → **WITH=PASS·72** ("per verified runtime
+receipts") while **WITHOUT=FAIL·40** (file created but no format conformance) — the
+with/without delta is now a REAL skill-value measurement. Remaining asks 1/3/4
+(smoke sweep, progress bar, matrix runs) + BUG-260701-01 re-test still open for the
+phase. Note for the phase's secure pass: the evidence block is new judge-prompt
+surface (tool results can carry adversarial doc content) — mitigations = rubric
+data-posture + 4KB cap; formalize in the threat model.
