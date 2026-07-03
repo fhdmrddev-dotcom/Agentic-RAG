@@ -208,7 +208,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 136-04-PLAN.md — SkillEvalSection gate-status line + owner-visible override record (D-06/D-02) [wave 3]
+- [x] 136-04-PLAN.md — SkillEvalSection gate-status line + owner-visible override record (D-06/D-02) [wave 3]
 
 **UI hint**: yes
 
