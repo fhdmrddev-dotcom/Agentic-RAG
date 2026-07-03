@@ -316,9 +316,22 @@ wall) + 045-B density lesson · 004-B/027-A stacked accordion · 005-A full-repl
 in-column unified diff · 051-A worded-verdict + raw-on-demand · 048 provider marks (logo
 assets reused from `048/logos/`). Winners TBD (awaiting operator review).
 
+**Operator verification question (2026-07-03) → LOCK + sketch 057.** Reviewing the session plan the
+operator asked whether (a) the full button-by-button navigation (every entry point → destination)
+and (b) where the shipped Trigger Tuner lives relative to the new Evals surface had been considered
+— both honest gaps (041-A was used as a *pattern*, not resolved as an *IA neighbor*; no 023-style
+linkage map existed). **Operator LOCKED: Tuner ⟷ Evals = tabs of ONE unified Skill Studio.** This
+effectively selects the focused-full-surface FORM for 053's shell (the Studio); sketch 057 refines
+the tab composition (A header+3-tabs / B Overview-landing / C two-tabs) and carries the complete
+every-button→destination MAP as a reference view: the SkillTunerPage is ABSORBED as the Triggering
+tab (internals untouched — a re-homing, not a rebuild), the 044-A lint "Tune this →" handoff
+re-points to Studio · Triggering, and the 136 PublishGateDialog gains ONE net-new "Review evals →"
+link on the unmet branch (closing the "gate only discoverable in the dialog" complaint).
+
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 053 | eval-studio-shell | Where does the Skill Evals panel LIVE — focused full-surface (041-A mirror), in-panel stacked accordion + drill-ins (004-B/027-A), or panel-resident expand-to-wide (032-A rail-collapse) — given five subsurfaces and a side-by-side run detail that needs width? | TBD | phase-137, panel-01, shell, ia, skills-page, full-surface, accordion, push-split |
+| 053 | eval-studio-shell | Where does the Skill Evals panel LIVE — focused full-surface (041-A mirror), in-panel stacked accordion + drill-ins (004-B/027-A), or panel-resident expand-to-wide (032-A rail-collapse) — given five subsurfaces and a side-by-side run detail that needs width? | TBD (full-surface form pre-selected by the 057 Studio lock) | phase-137, panel-01, shell, ia, skills-page, full-surface, accordion, push-split |
 | 054 | one-truth-status | How do publish gate + latest-run verdict + proposal state compose into ONE honest read that can't be misread as contradictory — version-bound status hero, lifecycle stepper, or worded verdict + raw-on-demand? | TBD | phase-137, panel-01, gate-01, status-hierarchy, honesty, version-bound, worded-verdict, contradiction-fix |
 | 055 | run-history-and-detail | How does the eval run history read, and how does drilling into per-case side-by-side WITH/WITHOUT outputs + honest verdicts (graded / not_measured / judge_error) + inline thumbs ratings feel? | TBD | phase-137, panel-01, eval-03, eval-04, run-history, side-by-side, ratings, honest-verdicts, drill-in |
 | 056 | version-history-and-diff | How do immutable versions read — which is LIVE, diff between versions, provenance (manual / proposal-promoted / forced-override), per-version eval binding — and where does the 135 proposal card terminally rest? | TBD | phase-137, panel-01, ver-01, si-01, version-history, diff, provenance, promotion-gate |
+| 057 | skill-studio-linkage | With Tuner ⟷ Evals LOCKED as unified Skill Studio tabs, how do the tabs compose (persistent-header+3-tabs / Overview-landing / two-tabs) — and what is the complete every-button→destination navigation contract (incl. Tuner absorption + the PublishGateDialog seam)? | TBD | phase-137, panel-01, skill-studio, tabs, ia, nav-map, linkage, tuner-absorption, reference |
