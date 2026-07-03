@@ -75,8 +75,11 @@ Each task followed the TDD RED → GREEN cycle:
 
 1. **Task 1 (RED): failing tests for slimmed panel** - `b68bf32b` (test)
 2. **Task 1 (GREEN): slim panel — shared stepper + sole Open studio** - `34f11ab6` (feat)
-3. **Task 2 (RED): failing test for 'Review evals' link** - `527b9f36` (test)
-4. **Task 2 (GREEN): 'Review evals' link + navigator drill** - `4fb9486f` (feat)
+3. **Task 1 (test fix): stub gate/case/version in Expand-editor test** - `40e2083d` (test)
+4. **Task 2 (RED): failing test for 'Review evals' link** - `527b9f36` (test)
+5. **Task 2 (GREEN): 'Review evals' link + navigator drill** - `4fb9486f` (feat)
+
+**Plan metadata:** `985215bf` (docs: complete plan)
 
 _TDD gate compliance: each task has its `test(...)` RED commit before its `feat(...)` GREEN commit._
 
@@ -103,7 +106,7 @@ _TDD gate compliance: each task has its `test(...)` RED commit before its `feat(
 - **Fix:** Added the three api mocks (default resolved values) to that describe's `beforeEach` so it renders offline. In-scope: the failure was directly caused by this task's change to `SkillDetailPanel`.
 - **Files modified:** frontend/src/components/skills/SkillFormDialog.test.tsx
 - **Verification:** `vitest run SkillFormDialog.test.tsx` → 8/8 pass.
-- **Committed in:** `34f11ab6` (Task 1 GREEN commit)
+- **Committed in:** `40e2083d` (Task 1 test fix — the stub edit landed after the GREEN source commit, so it got its own commit)
 
 ---
 
