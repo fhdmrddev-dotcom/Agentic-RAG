@@ -18,6 +18,10 @@ interface Props {
   onToggleGlobal: (id: string, override?: boolean) => Promise<void>
   onTryInChat: (skillName: string) => void
   onExport: (id: string, name: string) => Promise<void>
+  // Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06): passed through to the publish
+  // gate dialog's UNMET-branch "Review evals →" link (Studio · Evals). Optional so
+  // callers without a navigator simply render no link.
+  onReviewEvals?: (skillId: string) => void
 }
 
 export function SkillCard({
@@ -30,6 +34,7 @@ export function SkillCard({
   onToggleGlobal,
   onTryInChat,
   onExport,
+  onReviewEvals,
 }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
@@ -273,6 +278,7 @@ export function SkillCard({
         onConfirm={async (override) => {
           await onToggleGlobal(skill.id, override)
         }}
+        onReviewEvals={onReviewEvals}
       />
     </div>
   )

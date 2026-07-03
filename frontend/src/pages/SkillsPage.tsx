@@ -27,7 +27,7 @@ interface Props {
   onReviewEvals?: (skillId: string) => void
 }
 
-export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio }: Props) {
+export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEvals }: Props) {
   const { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal } = useSkills()
   const { user } = useAuth()
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
@@ -157,6 +157,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio }: Props) {
                   onToggleGlobal={toggleGlobal}
                   onTryInChat={onTryInChat ?? (() => {})}
                   onExport={exportSkill}
+                  onReviewEvals={onReviewEvals}
                 />
               ))}
             </div>
