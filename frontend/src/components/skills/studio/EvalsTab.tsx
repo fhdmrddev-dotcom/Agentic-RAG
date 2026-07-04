@@ -29,6 +29,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import {
   getProviders,
   startEvalRun,
+  startMatrixRun,
   getEvalRun,
   listEvalRuns,
   subscribeToRun,
@@ -83,11 +84,19 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
   >([])
   const [provider, setProvider] = useState<string>("")
   const [model, setModel] = useState<string>("")
+  // 137.1 (058-A / D-05): the designated gate-feeder for a matrix run. Preserved
+  // across skills like provider/model (D-12); hydrated to the active provider on mount.
+  const [gateProvider, setGateProvider] = useState<string>("")
 
   // ── Run / stream state (LIFTED from SkillEvalSection). ──
   const [runId, setRunId] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [live, setLive] = useState<LiveStatus>({})
+  // 137.1 (058-A): per-arm live maps for a matrix run — run_id → its own
+  // `${testCaseId}:${variant}` status map, so N parallel arms each render their own
+  // determinate progress (RunHistory reads liveByRun[run.id]). Separate from `live`
+  // (the single-run/re-eval map) so the battle-tested single-run path is untouched.
+  const [matrixLive, setMatrixLive] = useState<Record<string, LiveStatus>>({})
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null)
   const [results, setResults] = useState<EvalResult[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -112,6 +121,11 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
   const reEvalProposalIdRef = useRef<string | null>(null)
   // Tracks the running→false edge so we refresh the history when a run finalizes.
   const prevRunningRef = useRef(false)
+  // 137.1 (058-A / D-06): ONE abort for ALL matrix arm subscriptions + the set of arm
+  // run_ids still live. `running` stays true until the LAST arm settles (one claim per
+  // skill — the RunBar disables both launchers for the whole group).
+  const matrixAbortRef = useRef<AbortController | null>(null)
+  const matrixPendingRef = useRef<Set<string>>(new Set())
 
   // Pull the durable readout from the DB (survives the Redis TTL). Guarded against a
   // skill switch (BUG-260701-02) — LIFTED VERBATIM from SkillEvalSection :183-198.
@@ -259,6 +273,11 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
     setRunId(null)
     setRunning(false)
     setLive({})
+    // 137.1: tear down any in-flight matrix subscriptions + clear per-arm live maps so
+    // no prior skill's matrix progress leaks (gateProvider is preserved — D-12).
+    matrixAbortRef.current?.abort()
+    matrixPendingRef.current = new Set()
+    setMatrixLive({})
     setEvalRun(null)
     setResults([])
     setError(null)
@@ -282,6 +301,9 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
         // nothing is chosen yet (first mount).
         setProvider((cur) => cur || p.active || p.providers[0]?.id || "")
         setModel((cur) => cur || p.active_model || p.providers[0]?.models?.[0] || "")
+        // 137.1 (D-05): default the gate-feeder to the active provider (preserved across
+        // skills like the picker — D-12).
+        setGateProvider((cur) => cur || p.active || p.providers[0]?.id || "")
       } catch {
         /* picker is a convenience; backend validates — ignore load failure */
       }
@@ -318,6 +340,7 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
     return () => {
       cancelled = true
       abortRef.current?.abort()
+      matrixAbortRef.current?.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skillId])
@@ -356,6 +379,99 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
     } catch (err) {
       setRunning(false)
       setError(err instanceof Error ? err.message : "Failed to start eval run.")
+    }
+  }
+
+  // 137.1 (058-A): attach the EXISTING run-stream client to ONE matrix arm (Pattern 3,
+  // no bespoke matrix SSE) — N arms = N of these. Writes ONLY into that arm's bucket of
+  // matrixLive so parallel arms never collide; renders NO mid-run verdicts (the
+  // determinate bar counts units; verdicts load from the durable readout on expand,
+  // T-137-04). On finalize it refreshes the durable history, and the gate-feeder arm
+  // also refreshes the publish gate (the 40e2f8a3 path — a matrix finalize refreshes
+  // the gate just like a single run).
+  function attachMatrixArm(rid: string, ctrl: AbortController, isGateFeeder: boolean) {
+    void subscribeToRun(
+      rid,
+      "0",
+      {
+        onDelta: () => {},
+        onDone: () => {},
+        onEvalCaseStarted: ({ testCaseId, variant }) =>
+          setMatrixLive((prev) => ({
+            ...prev,
+            [rid]: { ...(prev[rid] ?? {}), [`${testCaseId}:${variant}`]: "running" },
+          })),
+        onEvalCaseDone: ({ testCaseId, variant, status }) =>
+          setMatrixLive((prev) => ({
+            ...prev,
+            [rid]: { ...(prev[rid] ?? {}), [`${testCaseId}:${variant}`]: status },
+          })),
+        // No mid-run verdicts on a matrix arm (T-137-04) — the durable readout is
+        // authoritative and loads on expand.
+        onEvalVerdict: () => {},
+        onEvalComplete: () => {
+          if (ctrl.signal.aborted) return
+          // Durable rollups are authoritative — refresh the history so this arm's honest
+          // rollup lands. The gate-feeder arm ALSO refreshes the gate (both homes of the
+          // one truth-teller) the moment it finalizes.
+          void refreshRuns()
+          if (isGateFeeder) {
+            void refreshGate()
+            onGateStale?.()
+          }
+        },
+        onTerminal: () => {
+          if (ctrl.signal.aborted) return
+          matrixPendingRef.current.delete(rid)
+          void refreshRuns()
+          // When the LAST arm settles, drop the claim → RunBar re-enables; the
+          // running→false effect refreshes the gate + history (backstop).
+          if (matrixPendingRef.current.size === 0) setRunning(false)
+        },
+      },
+      ctrl.signal,
+    )
+  }
+
+  // 137.1 (058-A / D-06): launch a matrix run — one click fans the skill's eval across
+  // all configured providers as N single-provider arms under ONE group claim. EvalsTab
+  // owns the call + the N subscriptions; RunBar stays dumb. The gate-feeder (D-05) is
+  // the controlled `gateProvider` (default = the active provider); its arm's rows feed
+  // the publish gate, the others are analysis-only.
+  async function handleRunMatrix() {
+    const gp = gateProvider || provider || providers[0]?.id || ""
+    setError(null)
+    setMatrixLive({})
+    setRunning(true)
+    reattachRef.current = 0
+    reEvalProposalIdRef.current = null
+    matrixAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    matrixAbortRef.current = ctrl
+    try {
+      const { arms } = await startMatrixRun(skillId, { gate_provider: gp })
+      if (currentSkillRef.current !== skillId || ctrl.signal.aborted) return
+      if (arms.length === 0) {
+        setRunning(false)
+        setError("No configured providers to run a matrix across.")
+        return
+      }
+      // Pull the durable arm rows (server matrix_group_id + feeds_gate — never
+      // client-computed, T-137.1-U1) into the history so the grouped card renders.
+      void refreshRuns()
+      // The gate-feeder arm = the one whose provider matches the requested gate provider
+      // (else the first arm — mirrors the server's D-05 fallback). Used only to refresh
+      // the gate EARLY on its finalize; the running→false effect is the backstop.
+      const gateFeederRunId =
+        arms.find((a) => a.provider === gp)?.run_id ?? arms[0].run_id
+      matrixPendingRef.current = new Set(arms.map((a) => a.run_id))
+      for (const arm of arms) {
+        attachMatrixArm(arm.run_id, ctrl, arm.run_id === gateFeederRunId)
+      }
+    } catch (err) {
+      if (currentSkillRef.current !== skillId) return
+      setRunning(false)
+      setError(err instanceof Error ? err.message : "Failed to start matrix run.")
     }
   }
 
@@ -496,6 +612,11 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
         passed_count: null,
         measured_count: null,
         verdict_summary: null,
+        // A single run carries no group + never feeds the gate (mig 085). The matrix
+        // arms come from the durable list (refreshRuns) with their SERVER flags — never
+        // synthesized/client-computed here (T-137.1-U1).
+        matrix_group_id: null,
+        feeds_gate: false,
       })
     }
     return Array.from(map.values()).sort((a, b) => b.created_at.localeCompare(a.created_at))
@@ -559,6 +680,10 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
           onModelChange={setModel}
           running={running}
           onRun={handleRun}
+          configuredProviders={providers}
+          gateProvider={gateProvider}
+          onGateProviderChange={setGateProvider}
+          onRunMatrix={handleRunMatrix}
         />
         {error && <p className="text-xs text-destructive">{error}</p>}
         <RunHistory
@@ -568,6 +693,7 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
           onToggleExpand={handleToggleExpand}
           resultsByRun={resultsByRun}
           liveByCase={live}
+          liveByRun={matrixLive}
           onRate={handleRate}
           onRerun={handleRun}
           onProposeFromRun={handlePropose}

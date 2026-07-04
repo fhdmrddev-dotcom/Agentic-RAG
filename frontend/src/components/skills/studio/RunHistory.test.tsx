@@ -85,6 +85,9 @@ function makeResult(
     verdict_reason: "reason",
     judge_model: "claude-opus-4-8",
     rating: null,
+    // Phase 137.1 (EVAL-05 / mig 085) — advisory-only fields (Plan 09 renders them).
+    duration_ms: null,
+    case_feedback: null,
     ...overrides,
   }
 }
