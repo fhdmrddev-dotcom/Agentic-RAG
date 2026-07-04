@@ -393,6 +393,7 @@ CREATE TABLE public.app_settings (
     confidence_bucket_high double precision DEFAULT 0.54,
     confidence_bucket_medium double precision DEFAULT 0.38,
     skill_builder_model text DEFAULT ''::text NOT NULL,
+    harness_judge_model text DEFAULT ''::text NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 

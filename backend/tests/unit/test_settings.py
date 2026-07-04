@@ -142,25 +142,30 @@ async def test_build_response_wires_shared_judge_resolver(monkeypatch):
     assert resp2.resolved_harness_judge_model == "claude-sonnet-5"
 
 
-async def test_build_response_survives_none_model_ids(monkeypatch):
-    """REGRESSION (137.1-05): the config defaults for harness_judge_model AND
-    skill_builder_model are None when unset (config.py:1006 / :1020), but the response
-    contract types both as non-nullable `str` (settings.py:88 / :78). Passing the bare
-    None raised a Pydantic ValidationError → GET /settings 500 → "failed to fetch" on the
-    whole Settings page for every real (unset) user. The prior tests only ever passed "",
-    masking it. _build_response must coerce None → "" (the documented unset sentinel)."""
+def test_user_effective_settings_declares_judge_and_builder_fields():
+    """REGRESSION (137.1-05): the runtime settings object _build_response reads is
+    UserEffectiveSettings — NOT the config.py Settings class. harness_judge_model was
+    added to config + the request/response models but NOT to UserEffectiveSettings, so
+    `s.harness_judge_model` raised AttributeError → GET /settings 500 ("failed to fetch")
+    for EVERY user. The prior test used a SimpleNamespace fake (any attribute resolves),
+    masking it. Assert the REAL model declares both app_settings-only model-id fields."""
+    from app.models.user_settings import UserEffectiveSettings
+    assert "harness_judge_model" in UserEffectiveSettings.model_fields
+    assert "skill_builder_model" in UserEffectiveSettings.model_fields
+
+
+async def test_build_response_from_real_settings_object():
+    """END-TO-END regression: build the response from a REAL UserEffectiveSettings
+    constructed from an empty DB row (the fresh-account / cold-cache state) — the exact
+    path that 500'd. Must not raise; the unset judge model surfaces "" with the resolved
+    default label. This exercises the true model shape, unlike the SimpleNamespace fake."""
     import app.api.settings as sm
+    from app.models.user_settings import _build_settings_from_row
 
-    monkeypatch.setattr(sm, "resolve_sub_agent_model", lambda s: "sub")
-    monkeypatch.setattr(sm, "resolve_skill_builder_model", lambda s: "builder")
-
-    # BOTH unset as None (the real fresh-DB state) must build cleanly, not 500.
-    resp = await sm._build_response(
-        _fake_settings(harness_judge_model=None, skill_builder_model=None)
-    )
+    s = _build_settings_from_row({})  # empty row => model defaults (fresh account)
+    resp = await sm._build_response(s)
     assert resp.harness_judge_model == ""
     assert resp.skill_builder_model == ""
-    # The resolved label still surfaces the effective default (resolver reads None safely).
     assert resp.resolved_harness_judge_model == "claude-opus-4-8"
 
 

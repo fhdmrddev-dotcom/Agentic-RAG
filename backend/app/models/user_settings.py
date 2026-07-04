@@ -167,6 +167,12 @@ class UserEffectiveSettings(BaseModel):
     # Settings UI (Plan 06) reads/writes this field.
     skill_builder_model: str = ""
 
+    # Phase 137.1-05 (EVAL-05f / D-11) — the ONE shared harness judge model id, resolved
+    # identically by the eval judge AND the publish judge via resolve_judge_model. app_settings-only
+    # (env_attr=None readback below; a model id is a VALUE, not a secret). Empty => the resolver
+    # picks the strong registry default (claude-opus-4-8). The Settings UI (Plan 10) reads/writes it.
+    harness_judge_model: str = ""
+
     # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
     # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
     embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
@@ -527,6 +533,10 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # fallback (a model id is a VALUE, not a secret). Missing/None => "" =>
         # resolve_skill_builder_model() picks a strong registry default.
         skill_builder_model=str(_val(row, "skill_builder_model", None, "")),
+
+        # Phase 137.1-05 (EVAL-05f / D-11) — env_attr=None: app_settings-only (a model id is
+        # a VALUE, not a secret). Missing/None => "" => resolve_judge_model() picks the default.
+        harness_judge_model=str(_val(row, "harness_judge_model", None, "")),
 
         # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
