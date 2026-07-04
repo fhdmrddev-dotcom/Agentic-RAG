@@ -64,7 +64,7 @@
 - [x] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01) — complete + secured 2026-07-03 (`d78e9778`)
 - [x] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01) — UAT 13/13 2026-07-04; secured 2026-07-04 (threats_open 0, `7850cf72`)
 - [x] **Phase 137.1: Skill Eval Production-Clean (INSERTED)** — cross-provider smoke sweep + matrix runs + determinate progress + judge case_feedback + per-arm duration + judge-model knob + bug closures (EVAL-05 / SEED-100) — complete 2026-07-05 (10/10 plans); secured (threats_open 0, `0fd0babb`) + validated (Nyquist; backend 120 / frontend 60 green, `f794eae4`) + UAT 9/9 (`dfc1be2c`)
-- [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101)
+- [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101) — 4 plans (planned 2026-07-05)
 - [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
 - [ ] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02)
 - [ ] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02)
@@ -282,6 +282,19 @@ Plans:
 
 **UI hint**: minimal (Built-in badge + any list ordering) — G-2 not expected to fire beyond a badge decision; confirm at discuss-phase.
 **Guardrail note**: operator's manual skill-creator copy is offered a cleanup/rename after the built-in lands — operator decision, never auto-deleted.
+
+**Plans**: 4 plans (planned 2026-07-05) — Wave 1 (3 parallel) + Wave 2 (1 gated apply)
+Plans:
+**Wave 1** *(parallel — disjoint files)*
+
+- [ ] 137.2-01-PLAN.md — Backend `is_system` contract: output-only `SkillResponse` field + pin-to-top `list_skills` order (D-05) + Wave 0 tests (CREATE-01) [wave 1]
+- [ ] 137.2-02-PLAN.md — Migration 087: additive `is_system` column + superseding platform-native skill-creator seed (D-02/D-03) + deploy-parity docs (CREATE-01) [wave 1]
+- [ ] 137.2-03-PLAN.md — Frontend: `is_system` wire type + "Built-in" pill (D-01) + `SkillCard.test.tsx` (CREATE-01) [wave 1]
+
+**Wave 2** *(gated — blocked on Wave 1)*
+
+- [ ] 137.2-04-PLAN.md — [BLOCKING] apply migration 087 to the live DB + regenerate `full-schema.sql` + one-off rename of the operator's manual copy (D-04) (CREATE-01) [wave 2, autonomous:false]
+
 
 #### Phase 138: Run-End Honesty (STRETCH)
 
