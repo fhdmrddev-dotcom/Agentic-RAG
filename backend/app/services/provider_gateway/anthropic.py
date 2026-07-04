@@ -39,10 +39,34 @@ from app.services.anthropic_service import stream_anthropic
 # Inline at agent_loop.py:1398 today — SAME source, moves with the construction.
 from app.services.openai_service import _resolve_max_tokens, get_tools
 
-from app.config import settings
+from app.config import settings, get_model_capability
 
 if TYPE_CHECKING:  # pragma: no cover
     from .dispatcher import GatewayRequest
+
+
+def _strip_unsupported_assistant_prefill(messages: list[dict], model: str) -> list[dict]:
+    """BUG-260701-01 / D-14: the Claude 4.6+/5 family 400s on assistant-message prefill
+    (``This model does not support assistant message prefill``) — a trailing
+    ``role:"assistant"`` turn. The SHARED agent-loop baseline (empty-catalog) path can emit
+    one; it first surfaced on the eval WITHOUT-skill arm, but it would equally break
+    Deep/Explorer chat on those models. Strip the trailing assistant prefill ONLY for models
+    whose registry capability marks it unsupported (``supports_assistant_prefill: False``);
+    an absent flag defaults to True, so messages are returned UNTOUCHED (byte-identical for
+    older Claude + every other provider — this adapter is Anthropic-only). Returns a NEW list
+    (never mutates ``request.messages``), so the shared loop state is untouched (agent_loop.py
+    is not forked — D-14).
+    """
+    cap = get_model_capability(model) or {}
+    if cap.get("supports_assistant_prefill", True):
+        return messages
+    if (
+        len(messages) > 1
+        and isinstance(messages[-1], dict)
+        and messages[-1].get("role") == "assistant"
+    ):
+        return messages[:-1]
+    return messages
 
 
 def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, None]:
@@ -73,8 +97,12 @@ def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, No
         if request.force_tool_name
         else None
     )
+    # BUG-260701-01 / D-14: strip a trailing assistant prefill for prefill-unsupported
+    # Claude models (4.6+/5). Byte-identical for prefill-supporting models + all other
+    # providers (returns request.messages unchanged). Never mutates request.messages.
+    _ant_messages = _strip_unsupported_assistant_prefill(request.messages, request.model)
     return stream_anthropic(
-        messages=request.messages,
+        messages=_ant_messages,
         tools=_ant_tools,
         system_prompt=request.system_prompt,
         model=request.model,

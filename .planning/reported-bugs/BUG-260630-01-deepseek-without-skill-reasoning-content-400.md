@@ -4,10 +4,10 @@ title: DeepSeek without-skill eval arm fails with reasoning_content 400
 reported: 2026-06-30
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/provider-gateway, cross-provider/deepseek, skills/eval]
 folded_into: "137.1"
-verified_closed_by: null
+verified_closed_by: "137.1-06 — CLEAN live re-verify, NO code change (D-14 no-fix-without-repro). The DeepSeek without_skill arm completed cleanly from 2026-07-03 22:12 onward per eval_results (graded verdicts, empty error); the reasoning_content 400 stopped reproducing after the f47d6736 baseline-reset fix. Operator live test (GLM/OpenAI/DeepSeek) corroborated."
 related_seeds: [SEED-100]
 re_open_trigger: "Routed at Phase 134 discuss (2026-07-01): 134 surfaces this HONESTLY as 'baseline errored — not measured' but does NOT fix it (the fix belongs at the DeepSeek adapter/sanitizer boundary = D-14 red line). Re-open when SEED-100 (cross-provider eval-hardening phase) enters planning — fix the DeepSeek reasoning_content message-shape on the empty-catalog baseline arm at the adapter boundary. || Folded at /gsd:discuss-phase 137.1 (2026-07-04) per this trigger (SEED-100 entered planning): likely root-caused by f47d6736 baseline-contamination fix; re-verify live in the smoke sweep, then close."
 reproduces_on:
@@ -56,3 +56,7 @@ Use a different provider for DeepSeek-class evals, or run only the WITH arm. The
 
 - Phase 133 live UAT (2026-06-30), eval run on `deepseek/deepseek-v4-flash`.
 - Related: cross-provider memories on DeepSeek reasoning-content handling; provider-gateway adapter boundary (D-14).
+
+## Resolution (Phase 137.1-06 — 2026-07-04)
+
+**CLOSED by clean live re-verify — zero code change** (D-14: no adapter diff lands without reproduction evidence). Per `eval_results`, the DeepSeek `without_skill` arm on `deepseek-v4-flash` failed with `The reasoning_content in the thinking mode must be passed back to the API` repeatedly through **2026-07-03 21:27**, then **flipped clean at 2026-07-03 22:12** and every run since completed (graded verdicts, empty `error`). Root-caused to the `f47d6736` baseline-reset fix (reset-before-each-arm removed the replayed with-skill assistant turn that echoed a stale `reasoning_content` into the baseline request). The operator's live GLM/OpenAI/**DeepSeek** test on 2026-07-04 (all arms showing no-skill-vs-with-skill progress) corroborated. No DeepSeek-adapter change was written.

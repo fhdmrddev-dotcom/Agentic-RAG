@@ -232,6 +232,74 @@ async def test_anthropic_adapter_yields_canonical_events(monkeypatch):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Anthropic assistant-prefill strip (BUG-260701-01 / D-14) — Phase 137.1-06
+# ════════════════════════════════════════════════════════════════════════════
+
+
+async def test_anthropic_adapter_strips_prefill_for_unsupported_model(monkeypatch):
+    """BUG-260701-01 / D-14: the Anthropic adapter strips a TRAILING assistant prefill
+    for prefill-UNSUPPORTED Claude models (4.6+/5) so the eval WITHOUT-skill arm + Deep
+    chat stop 400ing (``This model does not support assistant message prefill``) — while
+    leaving messages BYTE-IDENTICAL for prefill-supporting models (Deep-mode-unchanged)."""
+    import dataclasses
+    import app.services.provider_gateway.anthropic as _anthropic
+
+    captured: dict = {}
+
+    def _fake_stream_anthropic(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        yield {"type": "finish", "finish_reason": "stop", "tool_calls": []}
+
+    monkeypatch.setattr(_anthropic, "stream_anthropic", _fake_stream_anthropic, raising=False)
+
+    prefill_msgs = [
+        {"role": "user", "content": "Summarize the doc."},
+        {"role": "assistant", "content": "Here is the summary:"},  # the prefill that 400s
+    ]
+
+    # UNSUPPORTED (claude-sonnet-5): the trailing assistant prefill is stripped.
+    req_unsup = dataclasses.replace(
+        _mk_request("anthropic"), model="claude-sonnet-5", messages=list(prefill_msgs)
+    )
+    stream, _ = await open_stream("anthropic", req_unsup)
+    _collect_sync(stream)
+    assert captured["messages"] == [{"role": "user", "content": "Summarize the doc."}]
+
+    # SUPPORTED (claude-haiku-4-5): messages pass through BYTE-IDENTICAL (D-14 red line —
+    # a prefill-tolerating model's request shape is never altered).
+    req_sup = dataclasses.replace(
+        _mk_request("anthropic"), model="claude-haiku-4-5-20251001", messages=list(prefill_msgs)
+    )
+    stream2, _ = await open_stream("anthropic", req_sup)
+    _collect_sync(stream2)
+    assert captured["messages"] == prefill_msgs
+
+
+def test_strip_prefill_helper_edge_cases():
+    """Direct unit coverage of the strip helper's branches (fast, no async)."""
+    from app.services.provider_gateway.anthropic import (
+        _strip_unsupported_assistant_prefill as strip,
+    )
+
+    trailing_assistant = [
+        {"role": "user", "content": "a"},
+        {"role": "assistant", "content": "b"},
+    ]
+    # Unsupported model + trailing assistant => stripped to the user turn.
+    assert strip(list(trailing_assistant), "claude-opus-4-8") == [{"role": "user", "content": "a"}]
+    # Supported model + trailing assistant => unchanged (byte-identical).
+    assert strip(list(trailing_assistant), "claude-haiku-4-5-20251001") == trailing_assistant
+    # Unknown / other-provider model (absent flag => True) => unchanged.
+    assert strip(list(trailing_assistant), "gpt-5.5") == trailing_assistant
+    # Unsupported model + trailing USER (no prefill) => unchanged.
+    user_only = [{"role": "user", "content": "a"}]
+    assert strip(list(user_only), "claude-opus-4-8") == user_only
+    # Single assistant-only message (edge) => NOT stripped (len<=1 guard avoids empty msgs).
+    assistant_only = [{"role": "assistant", "content": "b"}]
+    assert strip(list(assistant_only), "claude-opus-4-8") == assistant_only
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # Google adapter contract — LIVE (provider_gateway/google landed Wave 2)
 # ════════════════════════════════════════════════════════════════════════════
 

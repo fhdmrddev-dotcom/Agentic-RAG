@@ -4,10 +4,10 @@ title: Agent-loop assistant prefill 400s on prefill-rejecting models (claude-son
 reported: 2026-07-01
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/agent-loop, cross-provider/anthropic, skills/eval]
 folded_into: "137.1"
-verified_closed_by: null
+verified_closed_by: "137.1-06 — FIXED. The Anthropic adapter (open_anthropic_stream) strips a trailing assistant prefill for supports_assistant_prefill:False Claude models (sonnet-5, opus-4-6/4-7/4-8, sonnet-4-6). Boundary-only (D-14): agent_loop.py/threads.py untouched, Deep byte-identical for prefill-tolerating models. Reproduced deterministically through 2026-07-02 (5x 'This model does not support assistant message prefill' on claude-sonnet-5/opus-4-8 without_skill arm per eval_results)."
 related_seeds: [SEED-100]
 re_open_trigger: "Routed at Phase 134 discuss (2026-07-01): 134 surfaces this HONESTLY as 'baseline errored — not measured' but does NOT fix it (the fix touches the shared agent-loop/gateway path = D-14 red line, so it gets its own focused phase). Re-open when SEED-100 (cross-provider eval-hardening phase) enters planning — strip/skip assistant-prefill for prefill-unsupported models at the gateway/adapter boundary per model capability. ALSO re-open immediately if the assistant-prefill 400 reproduces in Deep/Explorer chat on any Claude 4.6+/5 model (this is a shared-loop bug, not eval-only). || Folded at /gsd:discuss-phase 137.1 (2026-07-04) per this trigger (SEED-100 entered planning): re-test post-f47d6736 FIRST; if still live, fix at gateway/adapter boundary (D-14)."
 reproduces_on:
@@ -70,3 +70,12 @@ model that still tolerates the path. Not a crash — contained per-arm.
 - Phase 133 live eval on `claude-sonnet-5` (2026-07-01), run `9c7bace9-…`.
 - Claude-API reference: assistant prefill removed on Claude 4.6+/5 family (400).
 - Related: BUG-260630-01 (DeepSeek without-skill `reasoning_content` 400) — same "baseline arm trips a provider-specific request-shape rule" pattern.
+
+## Resolution (Phase 137.1-06 — 2026-07-04)
+
+**Live re-verify (DB evidence, not assumption):** the `without_skill` arm on `claude-sonnet-5` + `claude-opus-4-8` failed with `This model does not support assistant message prefill` **5 times** across 2026-06-30 → 2026-07-02 (`eval_results.error`), with **no clean run since** on that tier — a deterministic model-capability mismatch, NOT flaky. (Contrast: `claude-haiku-4-5` completed cleanly — it still accepts prefills.)
+
+**Fix (adapter boundary only — D-14):**
+- `config.py` MODEL_CAPABILITIES: additive `"supports_assistant_prefill": False` on the Claude 4.6+/5 family (sonnet-5, opus-4-6/4-7/4-8, sonnet-4-6). Absent flag ⇒ `True` ⇒ unchanged for older Claude + every other provider.
+- `provider_gateway/anthropic.py` `open_anthropic_stream`: `_strip_unsupported_assistant_prefill` drops a trailing `role:"assistant"` prefill when the model's capability says unsupported. Returns a NEW list (never mutates `request.messages`); `agent_loop.py`/`threads.py` untouched (`git diff --name-only` verified). Because it lives in the shared adapter, it also protects Deep/Explorer chat on those models.
+- Regression + Deep-mode-unchanged (byte-identical) assertions in `test_provider_gateway_seam.py`.
