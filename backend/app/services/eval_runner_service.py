@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -405,7 +406,7 @@ async def _persist_result(
     supabase,
     *,
     run_id: UUID,
-    test_case_id: str,
+    test_case_id: str | None,
     user_id: str,
     variant: str,
     provider: str,
@@ -420,15 +421,22 @@ async def _persist_result(
     verdict_score: int | None = None,
     verdict_reason: str | None = None,
     judge_model: str | None = None,
+    duration_ms: int | None = None,
 ) -> None:
     """Persist ONE eval_results row the instant an arm finishes (D-06 — partials stay
     readable), with the per-arm verdict INCLUDED in the SAME insert (D-06 — never a
     follow-up UPDATE; eval_results has no client/UPDATE policy anyway). Owner-stamped from
     ``current_user`` (never a body — T-133-03). Verdict params default to the honest
-    ``not_measured`` shape so an un-graded arm carries a NULL verdict_passed, never a fake."""
+    ``not_measured`` shape so an un-graded arm carries a NULL verdict_passed, never a fake.
+
+    ``duration_ms`` (EVAL-05e) is the per-arm wall-clock, persisted in this SAME insert
+    alongside the tokens (never a follow-up UPDATE). ``test_case_id`` is now NULL-tolerant
+    (D-02 / mig 085): a caseless skill-less smoke-sweep arm passes ``None`` and persists SQL
+    NULL — NEVER the string ``"None"`` (the FK stays enforced only when the column is
+    non-NULL)."""
     payload = {
         "eval_run_id": str(run_id),
-        "test_case_id": str(test_case_id),
+        "test_case_id": str(test_case_id) if test_case_id else None,
         "user_id": user_id,
         "variant": variant,
         "provider": provider,
@@ -443,6 +451,7 @@ async def _persist_result(
         "verdict_score": verdict_score,
         "verdict_reason": verdict_reason,
         "judge_model": judge_model,
+        "duration_ms": duration_ms,
     }
 
     def _insert():
@@ -550,6 +559,12 @@ async def _run_arm_body(
     output = ""
     in_tok: int | None = None
     out_tok: int | None = None
+    # EVAL-05e: per-arm wall-clock around the run_agent_loop await. time.monotonic is the
+    # honest, non-jumping clock (the 095 stable-wall-clock lesson). The measure lives in a
+    # `finally` so a completed, timed_out, AND failed arm all persist the wall-clock they
+    # actually burned — never a crash, never a NULL for a real (if failed) attempt.
+    duration_ms: int | None = None
+    _t0 = time.monotonic()
     try:
         result = await run_agent_loop(ctx, emit=_noop, emit_terminal=_noop, spawn=_spawn)
         output = result.full_content_final or ""
@@ -563,6 +578,8 @@ async def _run_arm_body(
         status = "failed"
         error = _truncate_error(exc)
         logger.exception("eval arm failed (run %s, case %s, %s)", run_id, test_case_id, variant)
+    finally:
+        duration_ms = int((time.monotonic() - _t0) * 1000)
 
     # ── D-04 honest-verdict gate ──────────────────────────────────────────────────────
     # Grade ONLY a completed, non-empty arm. An errored / empty arm stays not_measured
@@ -625,6 +642,7 @@ async def _run_arm_body(
         verdict_score=verdict_score,
         verdict_reason=verdict_reason,
         judge_model=judge_model,
+        duration_ms=duration_ms,
     )
     await _emit_eval(
         redis, run_id, EVENT_CASE_DONE,

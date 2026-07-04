@@ -736,6 +736,119 @@ def test_deep_mode_byte_identical_guard():
     assert r.returncode == 0, "agent_loop.py must stay byte-identical this phase (D-13)"
 
 
+# ================================================================================
+# Phase 137.1 Plan 02 (EVAL-05e / EVAL-05d) — two additive per-arm signals captured in
+# the SAME _persist_result insert (D-06), with ZERO new LLM calls: per-arm wall-clock
+# duration_ms measured around the run_agent_loop await, and the judge's advisory
+# case_feedback lifted from the SAME forced JudgeVerdict emission. Neither may touch the
+# with-skill rollup denominator (advisory / orthogonal). Plus the D-02 skill-less
+# smoke-sweep persist: a caseless arm (test_case_id=None) persists SQL NULL, never "None".
+# The judge is mocked in every unit test (no live provider call — the suite stays hermetic).
+# ================================================================================
+
+
+@pytest.mark.asyncio
+async def test_completed_arm_persists_duration_ms(redis, supabase, pool, fake_loop_result):
+    """EVAL-05e: every completed arm persists a non-null integer duration_ms — the
+    wall-clock of the run_agent_loop await (time.monotonic). The loop is given a small
+    real delay so the measured value is provably > 0, proving the timer WRAPS the await
+    (not a hardcoded 0). The with-skill rollup denominator is UNAFFECTED by the timer."""
+    import asyncio as _asyncio
+
+    from app.services import eval_runner_service
+
+    run_id = uuid4()
+
+    async def _slow_loop(ctx, **kwargs):
+        await _asyncio.sleep(0.05)  # ~50ms of real wall-clock the timer must capture
+        return fake_loop_result
+
+    upd = AsyncMock()
+    with patch.object(eval_runner_service, "run_agent_loop", _slow_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))), \
+         patch.object(eval_runner_service, "_update_eval_run_status", upd):
+        await eval_runner_service.run_eval_job(
+            run_id=run_id, skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    assert len(results) == 4, f"expected 4 persisted rows, got {len(results)}"
+    for r in results:
+        dm = r.get("duration_ms")
+        assert isinstance(dm, int), f"duration_ms must be a non-null int, got {dm!r}"
+        assert dm >= 20, f"the timer must wrap the ~50ms await; got {dm}ms"
+
+    # Rollup denominator is UNTOUCHED by duration (an orthogonal per-arm signal).
+    kw = upd.await_args.kwargs
+    assert kw["measured_count"] == 2, f"duration changed measured_count: {kw.get('measured_count')}"
+    assert kw["passed_count"] == 2, f"duration changed passed_count: {kw.get('passed_count')}"
+
+
+@pytest.mark.asyncio
+async def test_timed_out_arm_still_persists_duration_ms(redis, supabase, pool):
+    """EVAL-05e: the timer lives in a `finally`, so a timed_out / failed arm STILL persists
+    a duration_ms — never crashes. The judge is never called on an errored arm (D-04), so
+    the row stays not_measured; the wall-clock it DID burn is still recorded."""
+    import asyncio as _asyncio
+
+    from app.services import eval_runner_service
+
+    async def _timing_out_loop(ctx, **kwargs):
+        await _asyncio.sleep(0.03)
+        raise _asyncio.TimeoutError("per-call timeout")
+
+    judge = AsyncMock(return_value=dict(_FAKE_VERDICT_PASS))
+    with patch.object(eval_runner_service, "run_agent_loop", _timing_out_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer", judge):
+        await eval_runner_service.run_eval_job(
+            run_id=uuid4(), skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    assert len(results) == 4, f"all arms persist despite timeout, got {len(results)}"
+    for r in results:
+        assert r["status"] == "timed_out"
+        assert isinstance(r.get("duration_ms"), int), "timed_out arm must still carry a duration_ms"
+    assert judge.await_count == 0, "the judge must not run on a timed_out arm (D-04)"
+
+
+@pytest.mark.asyncio
+async def test_persist_null_case_id_is_sql_null(supabase):
+    """D-02 / mig 085: a caseless smoke-sweep arm calls _persist_result with test_case_id=None.
+    The persisted row must carry test_case_id as SQL NULL (Python None) — NEVER the string
+    "None" (the mig-085 NOT NULL relaxation persists the skill-less sweep honestly; the FK
+    stays enforced only when the column is non-NULL)."""
+    from app.services import eval_runner_service
+
+    await eval_runner_service._persist_result(
+        supabase,
+        run_id=uuid4(),
+        test_case_id=None,
+        user_id=OWNER["id"],
+        variant="with_skill",
+        provider="anthropic",
+        model="claude-haiku-4-5-20251001",
+        output="engine smoke ok",
+        status="completed",
+        error=None,
+        input_tokens=1,
+        output_tokens=2,
+    )
+
+    rows = supabase.store.get("eval_results", [])
+    assert len(rows) == 1
+    assert rows[0]["test_case_id"] is None, (
+        f"caseless sweep arm must persist SQL NULL, got {rows[0]['test_case_id']!r}"
+    )
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # Plan 04 — ROUTE / integration tests (evals.py): cross-user 404, durable readout
 # after the Redis buffer expires, and reattach via the companion public.runs row.
