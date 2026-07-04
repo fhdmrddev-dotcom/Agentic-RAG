@@ -397,6 +397,29 @@ def _patch_matrix(monkeypatch, evals):
     return spawn
 
 
+def test_openrouter_representative_model_is_operator_pinned():
+    """137.1 UAT: OpenRouter's AUTO-picked registry model (z-ai/glm-5.1) is registry-valid but 404s
+    on OpenRouter's router, so the representative is operator-PINNED to a model that actually routes.
+    Guards the pin until the user-selectable matrix-model picker ships."""
+    from app.api import evals
+
+    # The pin wins even when the provider's own models list offers a different registry model.
+    assert (
+        evals._representative_registry_model("openrouter", ["z-ai/glm-5.1"])
+        == "nvidia/nemotron-3-ultra-550b-a55b"
+    )
+    # A configured OpenRouter provider fans out with the pinned model (sweep + matrix path).
+    settings = SimpleNamespace(
+        active_provider="anthropic",
+        llm_model="claude-haiku-4-5-20251001",
+        providers=[SimpleNamespace(id="openrouter", api_key="sk-or-xxx", models=["z-ai/glm-5.1"])],
+    )
+    configs = evals._configured_provider_configs(
+        settings, exclude_local=True, prefer_active_model=False
+    )
+    assert configs == [{"provider": "openrouter", "model": "nvidia/nemotron-3-ultra-550b-a55b"}]
+
+
 @pytest.mark.asyncio
 async def test_matrix_launch_one_group_one_feeds_gate(monkeypatch):
     """D-05/D-06: one matrix launch fans N arms sharing ONE matrix_group_id under ONE SET NX claim

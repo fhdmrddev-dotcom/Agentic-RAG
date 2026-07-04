@@ -1968,11 +1968,29 @@ _SMOKE_CASE: dict = {
 }
 
 
+# Operator-PINNED representative model per provider for skill/engine testing — a TEMPORARY
+# stand-in for the user-selectable matrix-model picker (deferred; see
+# project_dynamic_settings_direction / "later we'll add the ability to select the matrix
+# models"). It overrides a provider whose AUTO-picked registry model is registry-valid but does
+# NOT actually route — e.g. OpenRouter's z-ai/glm-5.1 returns 404 "no endpoints found". OpenRouter
+# is a passthrough gateway, so a pinned model need NOT be in MODEL_CAPABILITIES to run
+# (get_model_capability infers caps for unknown ids). When the picker ships this becomes its
+# default seed.
+_PINNED_REPRESENTATIVE_MODEL: dict[str, str] = {
+    "openrouter": "nvidia/nemotron-3-ultra-550b-a55b",
+}
+
+
 def _representative_registry_model(provider_id: str, provider_models: list[str] | None) -> str | None:
-    """Pick ONE registry-known model for ``provider_id`` (D-01 / V5). Prefer the provider's OWN
-    configured ``models`` list (newest-first curation already lives there), else scan
-    ``MODEL_CAPABILITIES`` for the first registry entry whose provider matches. Returns None when the
-    provider has no registry model at all (that provider is then OMITTED — never a fabricated model)."""
+    """Pick ONE representative model for ``provider_id`` (D-01 / V5). An operator PIN
+    (``_PINNED_REPRESENTATIVE_MODEL``) wins first (a real provider model the auto-pick can't reach);
+    else prefer the provider's OWN configured ``models`` list (newest-first curation already lives
+    there), else scan ``MODEL_CAPABILITIES`` for the first registry entry whose provider matches.
+    Returns None when the provider has no model at all (that provider is then OMITTED — never a
+    fabricated model)."""
+    pinned = _PINNED_REPRESENTATIVE_MODEL.get(provider_id)
+    if pinned:
+        return pinned
     for m in provider_models or []:
         cap = get_model_capability(m)
         if cap.get("capability_source") == "registry" and cap.get("provider") == provider_id:
