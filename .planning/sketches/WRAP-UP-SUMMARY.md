@@ -1,5 +1,76 @@
 # Sketch Wrap-Up Summary
 
+## Wrap-up 2026-07-04 — batch wrap of 8 sessions
+
+**Date:** 2026-07-04
+**Sketches processed:** 27 (26 included, 1 excluded)
+**Design areas (new reference files):** settings-provider-picker-and-reembed ·
+auto-classification · governance-health · trigger-tuner · workflow-soul-and-two-doors ·
+cross-provider-chat-polish · skill-studio · eval-production-clean
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode — now
+covers all 59 winner-locked sketches, 001–060 minus orphan 017)
+
+### Included Sketches
+
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 024 | embedding-provider-picker | Synthesis (A + C footer) | Settings picker & re-embed |
+| 025 | reembed-confirm-gate | Synthesis (C frame + A facts) | Settings picker & re-embed |
+| 026 | reembed-in-progress | Synthesis (C home + pointer) | Settings picker & re-embed |
+| 036 | classification-suggestion | A | Auto-classification |
+| 037 | rule-builder-and-list | A | Auto-classification |
+| 038 | governance-health-surface | A | Governance health |
+| 039 | signal-row-and-fix-action | A | Governance health |
+| 040 | documents-sidebar-composition | A | Governance health |
+| 041 | tuner-surface-shell | A | Trigger Tuner |
+| 042 | scoreboard-and-candidates | D (as-built; A superseded at 123.1) | Trigger Tuner |
+| 043 | case-editor-and-live-run | A | Trigger Tuner |
+| 044 | lint-warning-and-handoff | A | Trigger Tuner |
+| 045 | tuner-prerun-editor-at-scale | B | Trigger Tuner |
+| 046 | workflow-soul-object | A | Soul & two doors |
+| 047 | strict-loose-two-doors | A | Soul & two doors |
+| 048 | cross-provider-tool-card | A | Cross-provider chat polish |
+| 049 | chat-area-reclaim | A | Cross-provider chat polish |
+| 050 | long-prompt-readmore | A | Cross-provider chat polish |
+| 053 | eval-studio-shell | A | Skill Studio |
+| 054 | one-truth-status | B | Skill Studio |
+| 055 | run-history-and-detail | B | Skill Studio |
+| 056 | version-history-and-diff | B | Skill Studio |
+| 057 | skill-studio-linkage | A | Skill Studio |
+| 058 | matrix-launch-and-rows | A | Eval production-clean |
+| 059 | determinate-progress-and-case-feedback | A | Eval production-clean |
+| 060 | engine-health-card | A | Eval production-clean |
+
+### Excluded Sketches
+
+| # | Name | Reason |
+|---|------|--------|
+| 017 | cross-thread-run-stop | Orphan — no README, no MANIFEST row, no locked winner; nothing validated to carry forward |
+
+### Key Decisions (headline per area)
+
+1. **Settings model knobs** = the reusable preset picker + always-on 🔒 endpoint footer;
+   serious-but-reversible confirms carry weight, not type-to-confirm friction;
+   background jobs get one rich home + a whisper where felt.
+2. **Classification** never silently moves; rule provenance, never a fake %.
+3. **Governance health** is its own read-only top-level home; the verb is the diagnosis;
+   the page writes nothing.
+4. **Tuner**: pick by held-out, fires/no-false always visible, N-column = configured
+   targets (never fixed-four), lint warns never blocks, sketch at REAL scale (045).
+5. **Workflow soul** = 5 purpose-led atoms at 3 scales; strict↔loose = an explicit
+   two-door fork with a live-derived, judge-locked tier.
+6. **Chat polish**: single-source provider logos, exactly two elapsed-status homes,
+   7-line user-prompt clamp.
+7. **Skill Studio** = one focused surface (Evals·Triggering·Versions), lifecycle-stepper
+   status, expandable honest run rows, immutable version table + compare.
+8. **Eval production-clean** = grouped matrix card of 055-B rows with one gate-feeder +
+   history-derived aggregation + deterministic analyst notes; thin determinate unit bar
+   + inline advisory case feedback; Settings engine-health tile board + judge knob.
+
+---
+
+## Wrap-up 2026-05-24 — original session
+
 **Date:** 2026-05-24
 **Sketches processed:** 3 (all included)
 **Design areas:** Live-Run Container, Tool-Call Panel

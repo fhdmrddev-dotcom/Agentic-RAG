@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 049 — Chat-Area Reclaim (CTC-03)</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  /* ── Sketch-049-only surfaces (reuse theme tokens; house chrome stays in default.css) ── */
+
+  .stage {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 var(--space-4);
+    transition: max-width var(--dur-base) var(--ease-out);
+  }
+
+  .sketch-head {
+    padding: var(--space-6) 0 var(--space-2);
+  }
+  .sketch-head h1 {
+    font-family: var(--font-headline);
+    font-size: var(--text-xl);
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .sketch-head p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    max-width: 62ch;
+  }
+
+  /* Before/After + scroll controls bar (per-variant) */
+  .ctrl-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    margin: var(--space-4) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .ctrl-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-bg-elev1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    padding: 3px;
+  }
+  .ctrl-group .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-dim);
+    padding: 0 8px 0 6px;
+    font-family: var(--font-mono);
+  }
+  .toggle-btn {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: none;
+    border-radius: var(--radius-full);
+    padding: 5px 14px;
+    font-size: var(--text-sm);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .toggle-btn.active {
+    background: var(--color-primary-dim);
+    color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary-glow);
+  }
+  .ctrl-hint {
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    font-family: var(--font-mono);
+  }
+  .scroll-now {
+    background: var(--color-accent);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 5px 12px;
+    font-size: var(--text-sm);
+    cursor: pointer;
+    font-family: var(--font-sans);
+  }
+  .scroll-now:hover { background: var(--color-muted); }
+
+  /* Count-of-surfaces honesty banner */
+  .surface-tally {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--color-text-dim);
+  }
+  .tally-pip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+  }
+  .tally-pip .num {
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: var(--color-text);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700;
+  }
+  .tally-pip.redundant {
+    border-color: hsl(0 72% 51% / 0.4);
+    background: var(--color-danger-dim);
+    color: var(--color-danger);
+  }
+  .tally-pip.redundant .num { background: var(--color-danger); color: #fff; }
+  .tally-pip.gone { opacity: 0.45; text-decoration: line-through; }
+
+  /* ── The chat column shell ── */
+  .chat-shell {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  /* The seamless scroll region (the real ScrollArea Viewport). The run-frame
+     is the ONLY framed thing inside; scrolling is seamless + thin slider. */
+  .msg-viewport {
+    position: relative;
+    height: 460px;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-2);
+  }
+
+  /* User bubble — mirrors MessageItem.tsx:205-217 */
+  .user-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--space-2) 0;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .user-row .inner {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    max-width: 70%;
+  }
+  .user-bubble {
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    color: #fff;
+    border-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    box-shadow: var(--shadow-sm);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .user-av {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--color-muted);
+    border: 1px solid var(--color-border-soft);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+  }
+
+  /* Assistant text answer row (calm, no frame) */
+  .asst-row {
+    display: flex;
+    gap: 10px;
+    padding: var(--space-2) 0;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .asst-av {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .asst-text {
+    font-size: var(--text-sm);
+    color: var(--color-text);
+    max-width: 76%;
+    padding-top: 3px;
+  }
+
+  /* ── The run-frame anatomy (mirrors RunCard.tsx; locked 014/095 language) ── */
+  .run-frame {
+    margin: var(--space-3) 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    transition: all var(--dur-slow) var(--ease-out);
+  }
+  .run-frame.active {
+    background: hsl(239 100% 82% / 0.05);
+    border-color: var(--color-primary-glow);
+    box-shadow: var(--shadow-glow-primary);
+  }
+  .run-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: hsl(220 30% 8% / 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .avatar {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    box-shadow: 0 1px 2px hsl(239 100% 82% / 0.2);
+  }
+  .run-frame.active .avatar { animation: brandPulse 1.5s ease-in-out infinite; }
+  .run-headtext { flex: 1; min-width: 0; }
+  .run-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .run-sub {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: hsl(220 16% 65% / 0.7);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+  .hdr-strip { margin-top: 6px; }
+
+  /* the canonical header status strip (RunStatusStrip placement="header") */
+  .status-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: hsl(220 30% 11% / 0.8);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    padding: 4px 10px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+  .status-strip .divider { width: 1px; height: 12px; background: hsl(220 20% 16% / 0.6); }
+  .status-strip .seg.time { display: inline-flex; align-items: center; gap: 4px; }
+  .status-strip .seg.act { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); }
+  .status-strip .seg.act .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+    animation: dotBounce 1.4s ease-in-out infinite;
+  }
+
+  .run-progress { height: 2px; background: var(--color-primary-dim); position: relative; overflow: hidden; }
+  .run-progress::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / 0.6), transparent);
+    animation: progressShimmer 1.8s ease-in-out infinite;
+  }
+  .run-body { padding: var(--space-3) var(--space-4) var(--space-4); }
+
+  /* the step rail (borderless, numbered status nodes — locked 014 language) */
+  .step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    align-items: start;
+    border-radius: var(--radius-sm);
+    animation: toolSlideIn var(--dur-base) var(--ease-out);
+  }
+  .rail { position: relative; display: flex; justify-content: center; }
+  .node {
+    position: absolute; top: 9px;
+    width: 11px; height: 11px; border-radius: 50%;
+    border: 2px solid var(--color-success); background: var(--color-success); z-index: 2;
+  }
+  .step.active .node {
+    background: var(--color-bg); border-color: var(--color-primary);
+    box-shadow: 0 0 0 4px var(--color-primary-dim);
+    animation: pulseGlow 1.6s ease-in-out infinite;
+  }
+  .step.queued .node { background: var(--color-bg); border-color: var(--color-border); }
+  .rail-line {
+    position: absolute; top: 19px; bottom: -6px;
+    width: 2px; left: 50%; transform: translateX(-50%);
+    background: var(--color-success);
+  }
+  .step.active .rail-line { background: linear-gradient(180deg, var(--color-success), var(--color-primary)); }
+  .step:last-child .rail-line { display: none; }
+  .step-head {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 0;
+    font-size: var(--text-sm);
+  }
+  .snum { font-family: var(--font-mono); font-size: 10px; color: var(--color-success); flex-shrink: 0; }
+  .step.active .snum { color: var(--color-primary); font-weight: 700; }
+  .ess-name { color: var(--color-text); font-weight: 500; }
+  .ess-arrow { color: var(--color-text-dim); }
+  .ess-text { color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step.active .ess-text { color: var(--color-primary); }
+  .step.queued .ess-name, .step.queued .ess-text { color: var(--color-text-dim); }
+  .step.active { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); border-radius: var(--radius-sm); }
+  .pill {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: var(--radius-full);
+    color: var(--color-success);
+    background: var(--color-success-dim);
+    flex-shrink: 0;
+  }
+  .step.active .pill {
+    color: var(--color-primary); background: var(--color-primary-dim);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .step.active .pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: dotBounce 1.4s ease-in-out infinite; }
+
+  /* ── Surface #3: the OLD StickyTimerBar (ChatArea.tsx:570) — OUTSIDE the scroll region ── */
+  .sticky-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;          /* px-4 py-1.5 */
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    border-top: 1px solid hsl(220 20% 16% / 0.5);   /* border-t border-border/50 */
+    background: hsl(216 45% 4% / 0.8);              /* bg-background/80 */
+    backdrop-filter: blur(6px);
+    position: relative;
+    /* default (BEFORE): present at its natural height */
+    max-height: 60px;
+    opacity: 1;
+    transition: max-height var(--dur-slow) var(--ease-out),
+                opacity var(--dur-slow) var(--ease-out),
+                padding var(--dur-slow) var(--ease-out),
+                border-color var(--dur-slow) var(--ease-out);
+  }
+  /* AFTER reclaim: the redundant sticky timer is DELETED — it collapses to
+     zero height + fades out, so the space is genuinely returned to the chat. */
+  .chat-shell.after .sticky-timer {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-color: transparent;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .sticky-timer .loader {
+    width: 12px; height: 12px;
+    flex-shrink: 0;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: lspin 0.9s linear infinite;   /* Loader2 animate-spin */
+  }
+  @keyframes lspin { to { transform: rotate(360deg); } }
+  .sticky-timer .dim { opacity: 0.4; }
+  .sticky-timer .desc { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sticky-timer .tabnum { font-variant-numeric: tabular-nums; }
+  /* the "redundant" overlay annotation on the BEFORE sticky timer */
+  .redundant-tag {
+    position: absolute;
+    top: -10px; right: 14px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-danger);
+    background: var(--color-danger-dim);
+    border: 1px solid hsl(0 72% 51% / 0.4);
+    border-radius: var(--radius-full);
+    padding: 1px 8px;
+  }
+
+  /* ── Surface #2: the floating "↓ Jump to live" chip (MessageList.tsx) ── */
+  .live-chip {
+    position: absolute;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: hsl(220 30% 8% / 0.92);
+    border: 1px solid var(--color-primary-glow);
+    box-shadow: var(--shadow-lg), var(--shadow-glow-primary);
+    border-radius: var(--radius-full);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+  }
+  .live-chip.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .live-chip .divider { width: 1px; height: 12px; background: hsl(220 20% 16% / 0.6); }
+  .live-chip .seg.act { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary); }
+  .live-chip .seg.act .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: dotBounce 1.4s ease-in-out infinite; }
+  .live-chip .jump {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  /* ── The composer (a normal one at the bottom) ── */
+  .composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
+    transition: padding var(--dur-slow) var(--ease-out);
+  }
+  /* AFTER reclaim: the composer visibly rises — its top room is reclaimed from
+     the now-deleted timer bar, so the input sits noticeably higher. */
+  .chat-shell.after .composer {
+    padding-top: var(--space-2);
+  }
+  /* AFTER reclaim: the composer breathes higher (extra top room reclaimed from the
+     removed timer). A faint highlight shows the reclaimed band. */
+  .reclaim-band {
+    height: 0;
+    overflow: hidden;
+    transition: height var(--dur-slow) var(--ease-out);
+    border-top: 1px dashed transparent;
+  }
+  .chat-shell.after .reclaim-band {
+    height: 26px;
+    border-top: 1px dashed hsl(142 71% 45% / 0.5);
+    background: hsl(142 71% 45% / 0.05);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .reclaim-band .lbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--color-success);
+    opacity: 0;
+    transition: opacity var(--dur-slow) var(--ease-out);
+  }
+  .chat-shell.after .reclaim-band .lbl { opacity: 1; }
+
+  .composer-input {
+    flex: 1;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 11px 14px;
+    color: var(--color-text-dim);
+    font-size: var(--text-sm);
+    min-height: 44px;
+  }
+  .composer-send {
+    width: 40px; height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-strong);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Honesty: gating note (CTC-03 is gated on CTC-02) */
+  .gate-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: var(--space-4) 0 var(--space-2);
+    padding: 9px 13px;
+    background: hsl(258 90% 66% / 0.08);
+    border: 1px solid hsl(258 90% 66% / 0.3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+  .nn-flag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-accent-violet);
+    border: 1px solid hsl(258 90% 66% / 0.45);
+    background: hsl(258 90% 66% / 0.1);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    flex-shrink: 0;
+  }
+  .gate-flag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning-dim);
+    background: var(--color-warning-dim);
+    border-radius: var(--radius-sm);
+    padding: 1px 6px;
+    flex-shrink: 0;
+  }
+
+  .footnote {
+    margin: var(--space-3) 0 var(--space-12);
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    line-height: 1.6;
+  }
+  .footnote code {
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 11px;
+  }
+  .variant { display: none; }
+  .variant.active { display: block; }
+  .b-promote-note { color: var(--color-primary); }
+</style>
+</head>
+<body>
+
+<!-- ── Variant nav (house chrome) ── -->
+<nav class="variant-nav">
+  <span class="label">Sketch 049 · Chat-area reclaim</span>
+  <button class="variant-tab active" id="tab-A" onclick="showVariant('A')">A: Clean removal<span class="star">★</span></button>
+  <button class="variant-tab" id="tab-B" onclick="showVariant('B')">B: Promoted floating chip</button>
+</nav>
+
+<div class="stage" id="stage">
+
+  <div class="sketch-head">
+    <h1>Deleting the redundant sticky timer</h1>
+    <p>
+      Three elapsed surfaces exist today. The tool card is now canonical, so the old
+      <code style="font-family:var(--font-mono)">StickyTimerBar</code> above the composer is dead weight.
+      Toggle <strong>Before / After</strong> and <strong>scroll</strong> to confirm status stays honest on the
+      header strip (in view) + the floating chip (scrolled away) alone.
+    </p>
+  </div>
+
+  <!-- ───────────────────────── VARIANT A ───────────────────────── -->
+  <div class="variant active" id="variant-A">
+
+    <div class="ctrl-bar">
+      <div class="ctrl-group">
+        <span class="lbl">State</span>
+        <button class="toggle-btn active" id="A-before" onclick="setState('A','before')">Before</button>
+        <button class="toggle-btn" id="A-after" onclick="setState('A','after')">After</button>
+      </div>
+      <button class="scroll-now" onclick="scrollRun('A')">Scroll up off live edge ↑</button>
+      <button class="scroll-now" onclick="scrollBottomHeaderOff('A')">Jump to bottom (header off top) ⤓</button>
+      <span class="ctrl-hint" id="A-hint">3 elapsed surfaces — one is redundant</span>
+    </div>
+
+    <div class="surface-tally" id="A-tally">
+      <span class="tally-pip"><span class="num">1</span> header strip · KEEP</span>
+      <span class="tally-pip"><span class="num">2</span> floating chip · KEEP</span>
+      <span class="tally-pip redundant" id="A-pip3"><span class="num">3</span> sticky timer · REMOVE</span>
+    </div>
+
+    <div class="chat-shell before" id="A-shell">
+      <div class="msg-viewport scrollbar-thin" id="A-vp" onscroll="onVpScroll('A')">
+
+        <div class="user-row">
+          <div class="inner">
+            <div class="user-bubble">Pull our Q3 revenue figures from the knowledge base and chart the trend.</div>
+            <div class="user-av">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="asst-row">
+          <div class="asst-av">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+          </div>
+          <div class="asst-text">On it — searching the knowledge base, then I'll chart the trend in Python.</div>
+        </div>
+
+        <!-- the live run-frame (header strip = surface #1) -->
+        <div class="run-frame active" id="A-run">
+          <div class="run-header">
+            <div class="avatar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+            </div>
+            <div class="run-headtext">
+              <div class="run-title">Q3 revenue analysis</div>
+              <div class="run-sub">anthropic · claude-opus-4-7 · turn 1</div>
+              <div class="hdr-strip">
+                <span class="status-strip">
+                  <span class="seg time">⏱ <span id="A-t-hdr" class="tabnum">3m12s</span></span>
+                  <span class="divider"></span>
+                  <span class="seg">Step 5</span>
+                  <span class="divider"></span>
+                  <span class="seg act"><span class="dot"></span>Running code…</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="run-progress"></div>
+          <div class="run-body">
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">1</span><span>🔍</span><span class="ess-name">search_documents</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Found 14 chunks in "thesis.pdf" (avg 0.61)</span>
+                <span class="pill">0.8s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">2</span><span>📄</span><span class="ess-name">read_file</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Read board_minutes_q3.md (1,204 lines)</span>
+                <span class="pill">0.4s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">3</span><span>🌐</span><span class="ess-name">web_search</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">6 results for "FY25 SaaS retention benchmarks"</span>
+                <span class="pill">1.5s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">4</span><span>✅</span><span class="ess-name">write_todos</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">4 todos (2 done)</span>
+                <span class="pill">0.1s</span>
+              </div>
+            </div>
+            <div class="step active">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">5</span><span>🐍</span><span class="ess-name">execute_code</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Writing a Python script to chart the revenue trend</span>
+                <span class="pill"><span class="dot"></span>2.1s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- assistant's interim answer text + trailing space so the run-header can
+             scroll fully off the top of the viewport (maxScroll ≫ run.offsetTop) -->
+        <div class="asst-row">
+          <div class="asst-av">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+          </div>
+          <div class="asst-text">Found the Q3 figures in the board minutes and pulled the comparable SaaS retention benchmarks. Now charting the revenue trend in Python — I'll surface the figure as soon as the script finishes running.</div>
+        </div>
+        <div style="height: 520px;"></div>
+
+        <!-- the floating chip (surface #2), shown on scroll-away -->
+        <div class="live-chip" id="A-chip" onclick="jumpLive('A')">
+          ⏱ <span id="A-t-chip" class="tabnum">3m12s</span>
+          <span class="divider"></span>
+          <span>Step 5</span>
+          <span class="divider"></span>
+          <span class="seg act"><span class="dot"></span>Streaming…</span>
+          <span class="divider"></span>
+          <span class="jump">↓ Jump to live</span>
+        </div>
+      </div>
+
+      <!-- the reclaimed band (AFTER only) -->
+      <div class="reclaim-band"><span class="lbl">↑ reclaimed — status now lives on the header strip + floating chip</span></div>
+
+      <!-- Surface #3 — the OLD StickyTimerBar (BEFORE only) -->
+      <!-- A's only file-producing tool (execute_code, step 5) is still ACTIVE — no
+           file has completed yet, so the real StickyTimerBar gates fileCount>0 OFF
+           and omits the "{N} files" segment (ChatArea.tsx:541-549,575). -->
+      <div class="sticky-timer" id="A-sticky">
+        <span class="redundant-tag">redundant — duplicates #1 + #2</span>
+        <span class="loader"></span>
+        <span class="tabnum" id="A-t-sticky">3:12</span>
+        <span class="dim">.</span>
+        <span>Step 5</span>
+        <span class="dim">.</span>
+        <span class="desc">Writing a Python script to chart the revenue trend</span>
+      </div>
+
+      <!-- the composer -->
+      <div class="composer">
+        <div class="composer-input">Ask a follow-up…</div>
+        <button class="composer-send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="gate-note">
+      <span class="gate-flag">gated</span>
+      <span><strong>CTC-03 is gated on CTC-02 holding.</strong> Remove the sticky timer only once the tool card is verifiably the canonical surface across all 8 providers — otherwise removing #3 could leave a provider with no status.</span>
+    </div>
+
+    <div class="footnote">
+      <strong>A — Clean removal.</strong> The AFTER is pure subtraction: <code>StickyTimerBar</code> (ChatArea.tsx:533) is deleted; status survives on the header strip (in view) and the floating chip (scroll-away, standard hybrid — appears only when you scroll <em>up</em> off the live edge). The composer reclaims the band. No net-new wire — both kept surfaces (header + floating) already ship today.
+    </div>
+  </div>
+
+  <!-- ───────────────────────── VARIANT B ───────────────────────── -->
+  <div class="variant" id="variant-B">
+
+    <div class="ctrl-bar">
+      <div class="ctrl-group">
+        <span class="lbl">State</span>
+        <button class="toggle-btn active" id="B-before" onclick="setState('B','before')">Before</button>
+        <button class="toggle-btn" id="B-after" onclick="setState('B','after')">After</button>
+      </div>
+      <button class="scroll-now" onclick="scrollRun('B')">Scroll up off live edge ↑</button>
+      <button class="scroll-now" onclick="scrollBottomHeaderOff('B')">Jump to bottom (header off top) ⤓</button>
+      <span class="ctrl-hint" id="B-hint">3 elapsed surfaces — one is redundant</span>
+    </div>
+
+    <div class="surface-tally" id="B-tally">
+      <span class="tally-pip"><span class="num">1</span> header strip · KEEP</span>
+      <span class="tally-pip"><span class="num">2</span> floating chip · KEEP (promoted)</span>
+      <span class="tally-pip redundant" id="B-pip3"><span class="num">3</span> sticky timer · REMOVE</span>
+    </div>
+
+    <div class="chat-shell before" id="B-shell">
+      <div class="msg-viewport scrollbar-thin" id="B-vp" onscroll="onVpScroll('B')">
+
+        <div class="user-row">
+          <div class="inner">
+            <div class="user-bubble">Reading the board minutes to extract the retention number, then summarise.</div>
+            <div class="user-av">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="asst-row">
+          <div class="asst-av">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+          </div>
+          <div class="asst-text">Reading the board minutes now to pull the retention figure.</div>
+        </div>
+
+        <div class="run-frame active" id="B-run">
+          <div class="run-header">
+            <div class="avatar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+            </div>
+            <div class="run-headtext">
+              <div class="run-title">Retention summary</div>
+              <div class="run-sub">moonshot · kimi-k2.6 · turn 1</div>
+              <div class="hdr-strip">
+                <span class="status-strip">
+                  <span class="seg time">⏱ <span id="B-t-hdr" class="tabnum">3m12s</span></span>
+                  <span class="divider"></span>
+                  <span class="seg">Step 5</span>
+                  <span class="divider"></span>
+                  <span class="seg act"><span class="dot"></span>Reading file…</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="run-progress"></div>
+          <div class="run-body">
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">1</span><span>🔍</span><span class="ess-name">search_documents</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Found 14 chunks in "thesis.pdf" (avg 0.61)</span>
+                <span class="pill">0.8s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">2</span><span>🌐</span><span class="ess-name">web_search</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">6 results for "FY25 SaaS retention benchmarks"</span>
+                <span class="pill">1.5s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">3</span><span>✅</span><span class="ess-name">write_todos</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">4 todos (2 done)</span>
+                <span class="pill">0.1s</span>
+              </div>
+            </div>
+            <div class="step done">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">4</span><span>🐍</span><span class="ess-name">execute_code</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Executed 22 lines → chart_revenue.png (exit 0, 2.1s)</span>
+                <span class="pill">2.1s</span>
+              </div>
+            </div>
+            <div class="step active">
+              <div class="rail"><div class="node"></div><div class="rail-line"></div></div>
+              <div class="step-head">
+                <span class="snum">5</span><span>📄</span><span class="ess-name">read_file</span>
+                <span class="ess-arrow">→</span>
+                <span class="ess-text">Reading the board minutes to extract the retention number</span>
+                <span class="pill"><span class="dot"></span>0.6s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="asst-row">
+          <div class="asst-av">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 3v4M15 3v4M9 13h.01M15 13h.01"/></svg>
+          </div>
+          <div class="asst-text">Charted the revenue trend (chart_revenue.png) and cross-checked the benchmarks. Reading the board minutes now to extract the exact retention number before I write the summary.</div>
+        </div>
+        <div style="height: 520px;"></div>
+
+        <div class="live-chip" id="B-chip" onclick="jumpLive('B')">
+          ⏱ <span id="B-t-chip" class="tabnum">3m12s</span>
+          <span class="divider"></span>
+          <span>Step 5</span>
+          <span class="divider"></span>
+          <span class="seg act"><span class="dot"></span>Streaming…</span>
+          <span class="divider"></span>
+          <span class="jump">↓ Jump to live</span>
+        </div>
+      </div>
+
+      <div class="reclaim-band"><span class="lbl">↑ reclaimed — header strip + promoted floating chip carry status</span></div>
+
+      <div class="sticky-timer" id="B-sticky">
+        <span class="redundant-tag">redundant — duplicates #1 + #2</span>
+        <span class="loader"></span>
+        <span class="tabnum" id="B-t-sticky">3:12</span>
+        <span class="dim">.</span>
+        <span>Step 5</span>
+        <span class="dim">.</span>
+        <span>1 file</span>
+        <span class="dim">.</span>
+        <span class="desc">Reading the board minutes to extract the retention number</span>
+      </div>
+
+      <div class="composer">
+        <div class="composer-input">Ask a follow-up…</div>
+        <button class="composer-send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="gate-note">
+      <span class="gate-flag">gated</span>
+      <span><strong>CTC-03 is gated on CTC-02 holding.</strong> Remove the sticky timer only once the tool card is verifiably the canonical surface across all 8 providers — otherwise removing #3 could leave a provider with no status.</span>
+    </div>
+
+    <div class="footnote">
+      <strong>B — Removal + promoted floating chip.</strong> Same deletion, but the floating chip appears the <span class="b-promote-note">moment the run-header scrolls off the top</span> (not only on scroll-up) — a stronger always-on fallback for users who relied on the old always-visible strip. <strong>This is still pure subtraction of surface #3</strong>; the floating chip is the existing 095 component (<code>RunStatusStrip placement="floating"</code> in MessageList.tsx), only its trigger predicate widens — <span class="nn-flag">net-new</span> trigger rule, no new wire field. Trade-off: a chip is almost always on screen during a tall run (closer to the old always-visible feel, slightly busier).
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Shared sketch toolbar (house chrome) ── -->
+<div class="sketch-toolbar">
+  <span>theme</span>
+  <select id="themeSel" onchange="setTheme(this.value)">
+    <option value="default">Default</option>
+  </select>
+  <span>view</span>
+  <button onclick="setViewport(400)">Phone 400</button>
+  <button onclick="setViewport(720)">Tablet 720</button>
+  <button onclick="setViewport(860)">Desktop 860</button>
+</div>
+
+<script>
+  // ── Variant switching ──
+  function showVariant(v) {
+    document.querySelectorAll('.variant').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.variant-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('variant-' + v).classList.add('active');
+    document.getElementById('tab-' + v).classList.add('active');
+  }
+
+  // ── Before / After state ──
+  function setState(v, state) {
+    const shell = document.getElementById(v + '-shell');
+    const before = document.getElementById(v + '-before');
+    const after = document.getElementById(v + '-after');
+    const hint = document.getElementById(v + '-hint');
+    const pip3 = document.getElementById(v + '-pip3');
+    if (state === 'after') {
+      shell.classList.remove('before');
+      shell.classList.add('after');
+      before.classList.remove('active');
+      after.classList.add('active');
+      hint.textContent = '2 surfaces — sticky timer deleted';
+      pip3.classList.add('gone');
+      pip3.classList.remove('redundant');
+    } else {
+      shell.classList.remove('after');
+      shell.classList.add('before');
+      after.classList.remove('active');
+      before.classList.add('active');
+      hint.textContent = '3 elapsed surfaces — one is redundant';
+      pip3.classList.remove('gone');
+      pip3.classList.add('redundant');
+    }
+  }
+
+  // ── Floating-chip scroll discipline ──
+  // A: standard hybrid — chip appears only when scrolled UP off the bottom edge.
+  // B: promoted — chip appears the moment the run-header scrolls off the TOP.
+  function onVpScroll(v) {
+    const vp = document.getElementById(v + '-vp');
+    const chip = document.getElementById(v + '-chip');
+    const run = document.getElementById(v + '-run');
+    if (!vp || !chip) return;
+
+    if (v === 'A') {
+      // standard hybrid: show when not near the bottom
+      const nearBottom = vp.scrollHeight - vp.scrollTop - vp.clientHeight < 56;
+      chip.classList.toggle('show', !nearBottom);
+    } else {
+      // promoted: show the moment the run-header scrolls off the top of the viewport
+      const headerOffTop = run && run.offsetTop < vp.scrollTop - 4;
+      const nearBottom = vp.scrollHeight - vp.scrollTop - vp.clientHeight < 56;
+      // promoted = on whenever the header is off-screen OR scrolled away from bottom
+      chip.classList.toggle('show', headerOffTop || !nearBottom);
+    }
+  }
+
+  // ── Scroll the run-header off the top but stop short of the live edge ──
+  // Lands in the "header off top AND NOT near bottom" state: BOTH variants show
+  // the chip here (A because we left the live edge, B because the header is off).
+  function scrollRun(v) {
+    const vp = document.getElementById(v + '-vp');
+    const run = document.getElementById(v + '-run');
+    if (!vp) return;
+    // target: just past the run-header so it clears the top, parked mid-scroll
+    // (well above the bottom so A's "not near bottom" predicate fires too).
+    const target = run
+      ? Math.min(run.offsetTop + run.offsetHeight + 40,
+                 vp.scrollHeight - vp.clientHeight - 120)
+      : vp.scrollHeight * 0.4;
+    vp.scrollTo({ top: Math.max(target, 0), behavior: 'smooth' });
+    // ensure the scroll handler fires after the smooth scroll settles
+    setTimeout(() => onVpScroll(v), 420);
+  }
+
+  // ── Jump to the very bottom with the run-header off the top (the A-vs-B prover) ──
+  // Lands in "header off top AND near bottom" — the ONLY state that separates the
+  // variants: A hides the chip (you're at the live edge), B keeps it shown (the
+  // header is off-screen, so the promoted trigger holds the status chip up).
+  function scrollBottomHeaderOff(v) {
+    const vp = document.getElementById(v + '-vp');
+    if (!vp) return;
+    vp.scrollTo({ top: vp.scrollHeight, behavior: 'smooth' });
+    setTimeout(() => onVpScroll(v), 420);
+  }
+
+  // ── Jump to live: re-pin to the bottom ──
+  function jumpLive(v) {
+    const vp = document.getElementById(v + '-vp');
+    if (!vp) return;
+    vp.scrollTo({ top: vp.scrollHeight, behavior: 'smooth' });
+    setTimeout(() => onVpScroll(v), 420);
+  }
+
+  // ── Live elapsed ticking on all three surfaces (so "always honest" reads true) ──
+  // Each surface reads the SAME stable start-ts (the 095 derivation) → they agree.
+  const START = Date.now() - 192000; // ~3m12s ago
+  function fmtClock(ms) {
+    const total = Math.floor(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+  function fmtCompact(ms) {
+    const total = Math.floor(ms / 1000);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return m > 0 ? m + 'm' + String(s).padStart(2, '0') + 's' : s + 's';
+  }
+  function tick() {
+    const el = Date.now() - START;
+    const compact = fmtCompact(el);
+    const clock = fmtClock(el);
+    ['A', 'B'].forEach(v => {
+      const hdr = document.getElementById(v + '-t-hdr');
+      const chip = document.getElementById(v + '-t-chip');
+      const sticky = document.getElementById(v + '-t-sticky');
+      if (hdr) hdr.textContent = compact;
+      if (chip) chip.textContent = compact;
+      if (sticky) sticky.textContent = clock; // the OLD bar used m:ss (ChatArea timeStr)
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ── Toolbar: viewport + theme ──
+  function setViewport(px) {
+    document.getElementById('stage').style.maxWidth = px + 'px';
+  }
+  function setTheme(name) {
+    // single theme shipped (Default); hook kept for parity with house toolbar
+  }
+</script>
+</body>
+</html>

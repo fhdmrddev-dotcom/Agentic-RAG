@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 024 — Embedding Provider Picker</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 56px; }
+  .stage {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-6) 120px;
+  }
+  .page-head { margin-bottom: var(--space-8); }
+  .page-head h1 {
+    font-family: var(--font-headline);
+    font-size: var(--text-2xl);
+    margin: 0 0 var(--space-2);
+    letter-spacing: -0.01em;
+  }
+  .page-head p { color: var(--color-text-muted); margin: 0; font-size: var(--text-sm); }
+
+  /* Settings section card */
+  .settings-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+  }
+  .settings-card.is-extraction { /* shows reuse */ }
+  .section-label {
+    display: flex; align-items: center; gap: var(--space-2);
+    font-family: var(--font-headline);
+    font-size: var(--text-md);
+    margin: 0 0 var(--space-1);
+  }
+  .section-label .reuse-chip {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-primary);
+    background: var(--color-primary-dim);
+    border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .section-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 var(--space-5); }
+
+  .field { margin-bottom: var(--space-4); }
+  .field-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: var(--text-sm); font-weight: 600;
+    margin-bottom: var(--space-2);
+    color: var(--color-text);
+  }
+  .field-hint { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 4px; }
+
+  select, input[type=text], input[type=password] {
+    width: 100%;
+    background: var(--color-bg-elev1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    padding: 10px 12px;
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  input.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--color-primary-strong);
+    box-shadow: 0 0 0 3px var(--color-primary-dim);
+  }
+  select { appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%237b88a8' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+  /* local badge */
+  .pin-row {
+    display: flex; align-items: center; gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+  }
+  .pin-row.local { background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / 0.3); }
+  .pin-row.cloud { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+  .pin-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pin-row.local .dot { background: var(--color-success); box-shadow: 0 0 8px hsl(142 71% 45% / 0.6); }
+  .pin-row.cloud .dot { background: var(--color-primary); }
+  .pin-row code { font-family: var(--font-mono); color: var(--color-text); }
+  .pin-row .pin-label { color: var(--color-text-muted); }
+
+  /* advanced disclosure */
+  .advanced { margin-top: var(--space-4); border-top: 1px dashed var(--color-border); padding-top: var(--space-4); }
+  .advanced-toggle {
+    background: none; border: none; color: var(--color-text-muted);
+    font-family: var(--font-sans); font-size: var(--text-xs); cursor: pointer;
+    display: flex; align-items: center; gap: 6px; padding: 0;
+  }
+  .advanced-toggle:hover { color: var(--color-text); }
+  .advanced-toggle .chev { transition: transform var(--dur-fast); }
+  .advanced.open .advanced-toggle .chev { transform: rotate(90deg); }
+  .advanced-body { display: none; margin-top: var(--space-4); }
+  .advanced.open .advanced-body { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* save bar */
+  .save-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--space-4); margin-top: var(--space-6);
+  }
+  .dirty-note { font-size: var(--text-xs); color: var(--color-warning); display: none; align-items: center; gap: 6px; }
+  .dirty-note.show { display: flex; }
+  .btn {
+    border: 1px solid var(--color-border); background: var(--color-muted);
+    color: var(--color-text); border-radius: var(--radius-md);
+    padding: 9px 18px; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+    font-family: var(--font-sans); transition: all var(--dur-fast) var(--ease-out);
+  }
+  .btn.primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color: hsl(226 60% 8%); }
+  .btn.primary:hover { box-shadow: var(--shadow-glow-primary); }
+  .btn:hover { border-color: var(--color-primary-glow); }
+
+  /* segmented (variant B) */
+  .provider-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+  .provider-card {
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-3); cursor: pointer; text-align: left;
+    transition: all var(--dur-fast) var(--ease-out); position: relative;
+  }
+  .provider-card:hover { border-color: var(--color-primary-glow); transform: translateY(-1px); }
+  .provider-card.selected { border-color: var(--color-primary-strong); background: var(--color-primary-dim); }
+  .provider-card .pc-name { font-weight: 600; font-size: var(--text-sm); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+  .provider-card .pc-tag { font-size: 10px; color: var(--color-text-dim); font-family: var(--font-mono); }
+  .provider-card .loc-pill {
+    position: absolute; top: 8px; right: 8px; font-size: 9px; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 1px 6px; border-radius: var(--radius-full);
+  }
+  .loc-pill.local { background: var(--color-success-dim); color: var(--color-success); }
+  .loc-pill.cloud { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* endpoint-first (variant C) */
+  .endpoint-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;
+  }
+  .endpoint-cell { padding: var(--space-3) var(--space-4); }
+  .endpoint-cell + .endpoint-cell { border-left: 1px solid var(--color-border); }
+  .endpoint-cell .ec-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); margin-bottom: 4px; }
+  .endpoint-cell select { border: none; background: transparent; padding: 0; font-size: var(--text-sm); font-weight: 600; }
+  .endpoint-foot {
+    display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2);
+    font-size: var(--text-xs); color: var(--color-text-muted); font-family: var(--font-mono);
+  }
+  .endpoint-foot .lock { color: var(--color-success); }
+  /* persistent footer (synthesis) — always-on, sits under the preset select */
+  .endpoint-foot.persistent {
+    margin-top: var(--space-3); padding: var(--space-3) var(--space-4);
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text);
+  }
+  .endpoint-foot.persistent .lock { font-size: 13px; }
+  .loc-tag {
+    margin-left: auto; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: var(--radius-full); font-family: var(--font-sans); font-weight: 600;
+  }
+  .loc-tag.cloud { background: var(--color-primary-dim); color: var(--color-primary); }
+  .loc-tag.local { background: var(--color-success-dim); color: var(--color-success); }
+  .endpoint-foot.persistent.is-local { border-color: hsl(142 71% 45% / 0.3); }
+
+  .callout {
+    margin-top: var(--space-5); padding: var(--space-3) var(--space-4);
+    background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3);
+    border-radius: var(--radius-md); font-size: var(--text-xs); color: var(--color-text-muted);
+    display: flex; gap: var(--space-2); align-items: flex-start;
+  }
+  .callout .ic { color: var(--color-warning); flex-shrink: 0; }
+  .callout b { color: var(--color-text); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--color-success); color: hsl(142 30% 8%); font-weight: 600;
+    padding: 10px 20px; border-radius: var(--radius-full); font-size: var(--text-sm);
+    opacity: 0; pointer-events: none; transition: all var(--dur-base) var(--ease-out); z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 024 · Provider Picker</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Preset + Advanced</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Provider Cards</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Endpoint-First</button>
+  <button class="variant-tab active" onclick="showVariant('synth', event)">Synthesis: A + C footer <span class="star">★</span></button>
+</div>
+
+<!-- ───────────────────────── VARIANT A ───────────────────────── -->
+<div id="variant-a" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Embeddings &amp; Extraction</h1>
+      <p>Pick a model and pin <b>where it runs</b>. One picker, reused for both jobs — so a local model can never silently call the cloud.</p>
+    </div>
+
+    <!-- Embedding model -->
+    <div class="settings-card">
+      <div class="section-label">Embedding model</div>
+      <p class="section-sub">Turns your documents into search vectors. Changing this re-embeds your library.</p>
+
+      <div class="field">
+        <label class="field-label">Provider preset</label>
+        <select id="a-preset" onchange="aApplyPreset(this.value)">
+          <option value="openai-small">OpenAI · text-embedding-3-small (default)</option>
+          <option value="openai-large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="google">Google · text-embedding-004</option>
+          <option value="cohere">Cohere · embed-v4.0</option>
+          <option value="jina">Jina · jina-embeddings-v3</option>
+          <option value="mistral">Mistral · mistral-embed</option>
+          <option value="ollama">Ollama (local) · nomic-embed-text</option>
+          <option value="lmstudio">LM Studio (local) · bge-m3</option>
+          <option value="custom">Custom / OpenAI-compatible…</option>
+        </select>
+        <div class="field-hint">Each preset auto-fills the endpoint, a strong default model, and recommended dimensions + retrieval threshold.</div>
+      </div>
+
+      <!-- The pin row: the whole point — model is bound to an endpoint -->
+      <div class="pin-row cloud" id="a-pin">
+        <span class="dot"></span>
+        <span class="pin-label">Runs at</span>
+        <code id="a-pin-url">https://api.openai.com/v1</code>
+        <span class="pin-label" id="a-pin-note">· cloud · uses your OpenAI key</span>
+      </div>
+
+      <div class="advanced" id="a-advanced">
+        <button class="advanced-toggle" onclick="document.getElementById('a-advanced').classList.toggle('open')">
+          <span class="chev">▸</span> Advanced overrides
+        </button>
+        <div class="advanced-body">
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Model ID</label>
+              <input type="text" class="mono" id="a-model" value="text-embedding-3-small">
+            </div>
+            <div class="field">
+              <label class="field-label">Dimensions</label>
+              <input type="text" class="mono" id="a-dims" value="1536">
+              <div class="field-hint">Flexible — never down-truncated.</div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Base URL</label>
+            <input type="text" class="mono" id="a-url" value="https://api.openai.com/v1">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">API key</label>
+              <input type="password" class="mono" id="a-key" value="sk-•••••••••••••••">
+            </div>
+            <div class="field">
+              <label class="field-label">Retrieval threshold</label>
+              <input type="text" class="mono" id="a-thresh" value="0.30">
+              <div class="field-hint">Travels with the preset.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extraction model — SAME component -->
+    <div class="settings-card is-extraction">
+      <div class="section-label">
+        Metadata extraction model
+        <span class="reuse-chip">same picker</span>
+      </div>
+      <p class="section-sub">Reads each document for title, summary, and custom fields. Pinning the endpoint here is what closes the local-model mis-route bug.</p>
+
+      <div class="field">
+        <label class="field-label">Provider preset</label>
+        <select id="a-xpreset" onchange="aApplyXPreset(this.value)">
+          <option value="openai">OpenAI · gpt-4o</option>
+          <option value="anthropic">Anthropic · claude-sonnet</option>
+          <option value="google">Google · gemini-2.5-flash</option>
+          <option value="lmstudio">LM Studio (local) · gemma-4-12b-qat</option>
+          <option value="ollama">Ollama (local) · llama3.1</option>
+        </select>
+      </div>
+      <div class="pin-row cloud" id="a-xpin">
+        <span class="dot"></span>
+        <span class="pin-label">Runs at</span>
+        <code id="a-xpin-url">https://api.openai.com/v1</code>
+        <span class="pin-label" id="a-xpin-note">· cloud</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="ic">⚠</span>
+      <span><b>Why pin the endpoint?</b> A model id like <code class="mono">google/gemma-3-4b</code> can live on OpenRouter <i>or</i> on your local LM Studio. Picking the provider tells the app exactly where to send your document text — no name-guessing, no surprise cloud egress.</span>
+    </div>
+
+    <div class="save-bar">
+      <div class="dirty-note" id="a-dirty"><span>●</span> Unsaved changes — saving a model change starts a re-embed</div>
+      <button class="btn primary" onclick="fakeSave()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── VARIANT B ───────────────────────── -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Embeddings &amp; Extraction</h1>
+      <p>Provider chosen as a card — local vs cloud is the loudest signal, since that's the decision that affects your data.</p>
+    </div>
+
+    <div class="settings-card">
+      <div class="section-label">Embedding provider</div>
+      <p class="section-sub">Pick where your documents get embedded.</p>
+
+      <div class="provider-cards" id="b-cards">
+        <button class="provider-card selected" data-p="openai" onclick="bSelect(this)">
+          <span class="loc-pill cloud">cloud</span>
+          <div class="pc-name">OpenAI</div>
+          <div class="pc-tag">3-small · 1536</div>
+        </button>
+        <button class="provider-card" data-p="google" onclick="bSelect(this)">
+          <span class="loc-pill cloud">cloud</span>
+          <div class="pc-name">Google</div>
+          <div class="pc-tag">embedding-004</div>
+        </button>
+        <button class="provider-card" data-p="cohere" onclick="bSelect(this)">
+          <span class="loc-pill cloud">cloud</span>
+          <div class="pc-name">Cohere</div>
+          <div class="pc-tag">embed-v4.0</div>
+        </button>
+        <button class="provider-card" data-p="jina" onclick="bSelect(this)">
+          <span class="loc-pill cloud">cloud</span>
+          <div class="pc-name">Jina</div>
+          <div class="pc-tag">v3 · 1024</div>
+        </button>
+        <button class="provider-card" data-p="ollama" onclick="bSelect(this)">
+          <span class="loc-pill local">local</span>
+          <div class="pc-name">Ollama</div>
+          <div class="pc-tag">nomic-embed</div>
+        </button>
+        <button class="provider-card" data-p="lmstudio" onclick="bSelect(this)">
+          <span class="loc-pill local">local</span>
+          <div class="pc-name">LM Studio</div>
+          <div class="pc-tag">bge-m3 · 1024</div>
+        </button>
+      </div>
+
+      <div class="pin-row cloud" id="b-pin" style="margin-top: var(--space-5);">
+        <span class="dot"></span>
+        <span class="pin-label">Runs at</span>
+        <code id="b-pin-url">https://api.openai.com/v1</code>
+        <span class="pin-label" id="b-pin-note">· cloud · uses your OpenAI key</span>
+      </div>
+
+      <div class="advanced" id="b-advanced" style="margin-top: var(--space-5)">
+        <button class="advanced-toggle" onclick="document.getElementById('b-advanced').classList.toggle('open')">
+          <span class="chev">▸</span> Model &amp; dimensions
+        </button>
+        <div class="advanced-body">
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Model ID</label>
+              <input type="text" class="mono" id="b-model" value="text-embedding-3-small">
+            </div>
+            <div class="field">
+              <label class="field-label">Dimensions</label>
+              <input type="text" class="mono" id="b-dims" value="1536">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="ic">⚠</span>
+      <span><b>Local means local.</b> Ollama and LM Studio run on your machine — your document text never leaves it. The card's <i>local</i> pill is the at-a-glance promise.</span>
+    </div>
+
+    <div class="save-bar">
+      <div class="dirty-note" id="b-dirty"><span>●</span> Unsaved changes — saving a model change starts a re-embed</div>
+      <button class="btn primary" onclick="fakeSave()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── VARIANT C ───────────────────────── -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Embeddings &amp; Extraction</h1>
+      <p>The endpoint and the model sit side by side as <b>one bound unit</b> — you literally can't read the model without seeing where it runs.</p>
+    </div>
+
+    <div class="settings-card">
+      <div class="section-label">Embedding model</div>
+      <p class="section-sub">A model + endpoint pair. Change either side; they save together.</p>
+
+      <div class="endpoint-row">
+        <div class="endpoint-cell">
+          <div class="ec-label">Runs on</div>
+          <select id="c-prov" onchange="cApply()">
+            <option value="openai">OpenAI (cloud)</option>
+            <option value="google">Google (cloud)</option>
+            <option value="cohere">Cohere (cloud)</option>
+            <option value="ollama">Ollama (local)</option>
+            <option value="lmstudio">LM Studio (local)</option>
+            <option value="custom">Custom endpoint</option>
+          </select>
+        </div>
+        <div class="endpoint-cell">
+          <div class="ec-label">Model</div>
+          <select id="c-model">
+            <option>text-embedding-3-small</option>
+            <option>text-embedding-3-large</option>
+          </select>
+        </div>
+      </div>
+      <div class="endpoint-foot">
+        <span class="lock">🔒</span>
+        <span id="c-foot">https://api.openai.com/v1 · 1536 dims · threshold 0.30 · OpenAI key</span>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <div class="section-label">
+        Extraction model
+        <span class="reuse-chip">same picker</span>
+      </div>
+      <p class="section-sub">Identical bound unit — this is the structural fix for the mis-route bug.</p>
+
+      <div class="endpoint-row">
+        <div class="endpoint-cell">
+          <div class="ec-label">Runs on</div>
+          <select id="c-xprov" onchange="cXApply()">
+            <option value="openai">OpenAI (cloud)</option>
+            <option value="lmstudio">LM Studio (local)</option>
+            <option value="ollama">Ollama (local)</option>
+          </select>
+        </div>
+        <div class="endpoint-cell">
+          <div class="ec-label">Model</div>
+          <select id="c-xmodel">
+            <option>gpt-4o</option>
+            <option>gemma-4-12b-qat</option>
+          </select>
+        </div>
+      </div>
+      <div class="endpoint-foot">
+        <span class="lock">🔒</span>
+        <span id="c-xfoot">https://api.openai.com/v1 · cloud</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="ic">⚠</span>
+      <span><b>One bound unit.</b> Because "runs on" and "model" are stored together, the backend routes by the stored provider — never by guessing from the model name. The <code class="mono">org/model</code> → OpenRouter mis-route becomes structurally impossible.</span>
+    </div>
+
+    <div class="save-bar">
+      <div class="dirty-note" id="c-dirty"><span>●</span> Unsaved changes — saving a model change starts a re-embed</div>
+      <button class="btn primary" onclick="fakeSave()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── SYNTHESIS: A + C footer ★ ───────────────────────── -->
+<div id="variant-synth" class="variant">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Embeddings &amp; Extraction</h1>
+      <p>A's calm preset picker (the existing rerank <code class="mono">&lt;select&gt;</code> pattern) — with C's <b>always-on 🔒 endpoint footer</b> so where-it-runs is visible <i>without</i> opening Advanced. One picker, reused for both jobs.</p>
+    </div>
+
+    <!-- Embedding model -->
+    <div class="settings-card">
+      <div class="section-label">Embedding model</div>
+      <p class="section-sub">Turns your documents into search vectors. Changing this re-embeds your library.</p>
+
+      <div class="field">
+        <label class="field-label">Provider preset</label>
+        <select id="s-preset" onchange="sApplyPreset(this.value)">
+          <option value="openai-small">OpenAI · text-embedding-3-small (default)</option>
+          <option value="openai-large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="google">Google · text-embedding-004</option>
+          <option value="cohere">Cohere · embed-v4.0</option>
+          <option value="jina">Jina · jina-embeddings-v3</option>
+          <option value="mistral">Mistral · mistral-embed</option>
+          <option value="ollama">Ollama (local) · nomic-embed-text</option>
+          <option value="lmstudio">LM Studio (local) · bge-m3</option>
+          <option value="custom">Custom / OpenAI-compatible…</option>
+        </select>
+        <div class="field-hint">Each preset auto-fills the endpoint, a strong default model, and recommended dimensions + retrieval threshold.</div>
+      </div>
+
+      <!-- C's persistent endpoint footer — ALWAYS visible, no click needed -->
+      <div class="endpoint-foot persistent" id="s-foot">
+        <span class="lock">🔒</span>
+        <span id="s-foot-text">https://api.openai.com/v1 · 1536 dims · threshold 0.30 · OpenAI key</span>
+        <span class="loc-tag cloud" id="s-foot-tag">cloud</span>
+      </div>
+
+      <div class="advanced" id="s-advanced">
+        <button class="advanced-toggle" onclick="document.getElementById('s-advanced').classList.toggle('open')">
+          <span class="chev">▸</span> Advanced overrides
+        </button>
+        <div class="advanced-body">
+          <div class="grid-2">
+            <div class="field"><label class="field-label">Model ID</label><input type="text" class="mono" id="s-model" value="text-embedding-3-small"></div>
+            <div class="field"><label class="field-label">Dimensions</label><input type="text" class="mono" id="s-dims" value="1536"><div class="field-hint">Flexible — never down-truncated.</div></div>
+          </div>
+          <div class="field"><label class="field-label">Base URL</label><input type="text" class="mono" id="s-url" value="https://api.openai.com/v1"></div>
+          <div class="grid-2">
+            <div class="field"><label class="field-label">API key</label><input type="password" class="mono" id="s-key" value="sk-•••••••••••••••"></div>
+            <div class="field"><label class="field-label">Retrieval threshold</label><input type="text" class="mono" id="s-thresh" value="0.30"><div class="field-hint">Travels with the preset.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extraction model — SAME component -->
+    <div class="settings-card is-extraction">
+      <div class="section-label">Metadata extraction model <span class="reuse-chip">same picker</span></div>
+      <p class="section-sub">Reads each document for title, summary, and custom fields. Pinning the endpoint here is what closes the local-model mis-route bug.</p>
+
+      <div class="field">
+        <label class="field-label">Provider preset</label>
+        <select id="s-xpreset" onchange="sApplyXPreset(this.value)">
+          <option value="openai">OpenAI · gpt-4o</option>
+          <option value="anthropic">Anthropic · claude-sonnet</option>
+          <option value="google">Google · gemini-2.5-flash</option>
+          <option value="lmstudio">LM Studio (local) · gemma-4-12b-qat</option>
+          <option value="ollama">Ollama (local) · llama3.1</option>
+        </select>
+      </div>
+      <div class="endpoint-foot persistent" id="s-xfoot">
+        <span class="lock">🔒</span>
+        <span id="s-xfoot-text">https://api.openai.com/v1 · OpenAI key</span>
+        <span class="loc-tag cloud" id="s-xfoot-tag">cloud</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="ic">⚠</span>
+      <span><b>The footer is the promise.</b> The 🔒 line shows the exact endpoint the picker resolved — visible before you ever open Advanced. A model id like <code class="mono">google/gemma-3-4b</code> can't silently go to OpenRouter cloud because you can always see where it's actually pinned.</span>
+    </div>
+
+    <div class="save-bar">
+      <div class="dirty-note" id="s-dirty"><span>●</span> Unsaved changes — saving a model change starts a re-embed</div>
+      <button class="btn primary" onclick="fakeSave()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>024</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<div class="toast" id="toast">Saved ✓</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  e.target.classList.add('active');
+}
+function fakeSave() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1400);
+}
+function markDirty(id) { document.getElementById(id).classList.add('show'); }
+
+// Variant A presets
+const A_PRESETS = {
+  'openai-small': { url:'https://api.openai.com/v1', model:'text-embedding-3-small', dims:'1536', thresh:'0.30', local:false, note:'· cloud · uses your OpenAI key' },
+  'openai-large': { url:'https://api.openai.com/v1', model:'text-embedding-3-large', dims:'3072', thresh:'0.32', local:false, note:'· cloud · uses your OpenAI key' },
+  'google':       { url:'https://generativelanguage.googleapis.com/v1', model:'text-embedding-004', dims:'768', thresh:'0.28', local:false, note:'· cloud · uses your Google key' },
+  'cohere':       { url:'https://api.cohere.ai/compatibility/v1', model:'embed-v4.0', dims:'1536', thresh:'0.30', local:false, note:'· cloud · uses your Cohere key' },
+  'jina':         { url:'https://api.jina.ai/v1', model:'jina-embeddings-v3', dims:'1024', thresh:'0.30', local:false, note:'· cloud · uses your Jina key' },
+  'mistral':      { url:'https://api.mistral.ai/v1', model:'mistral-embed', dims:'1024', thresh:'0.30', local:false, note:'· cloud · uses your Mistral key' },
+  'ollama':       { url:'http://localhost:11434/v1', model:'nomic-embed-text', dims:'768', thresh:'0.28', local:true, note:'· local · no key needed' },
+  'lmstudio':     { url:'http://localhost:1234/v1', model:'bge-m3', dims:'1024', thresh:'0.30', local:true, note:'· local · no key needed' },
+  'custom':       { url:'', model:'', dims:'1536', thresh:'0.30', local:false, note:'· set base URL + key below' },
+};
+function aApplyPreset(v) {
+  const p = A_PRESETS[v];
+  document.getElementById('a-model').value = p.model;
+  document.getElementById('a-dims').value = p.dims;
+  document.getElementById('a-url').value = p.url;
+  document.getElementById('a-thresh').value = p.thresh;
+  const pin = document.getElementById('a-pin');
+  pin.className = 'pin-row ' + (p.local ? 'local' : 'cloud');
+  document.getElementById('a-pin-url').textContent = p.url || '— set a base URL —';
+  document.getElementById('a-pin-note').textContent = p.note;
+  if (v === 'custom') document.getElementById('a-advanced').classList.add('open');
+  markDirty('a-dirty');
+}
+const A_XPRESETS = {
+  'openai':    { url:'https://api.openai.com/v1', local:false, note:'· cloud' },
+  'anthropic': { url:'https://api.anthropic.com/v1', local:false, note:'· cloud' },
+  'google':    { url:'https://generativelanguage.googleapis.com/v1', local:false, note:'· cloud' },
+  'lmstudio':  { url:'http://localhost:1234/v1', local:true, note:'· local · runs on your machine' },
+  'ollama':    { url:'http://localhost:11434/v1', local:true, note:'· local · runs on your machine' },
+};
+function aApplyXPreset(v) {
+  const p = A_XPRESETS[v];
+  const pin = document.getElementById('a-xpin');
+  pin.className = 'pin-row ' + (p.local ? 'local' : 'cloud');
+  document.getElementById('a-xpin-url').textContent = p.url;
+  document.getElementById('a-xpin-note').textContent = p.note;
+  markDirty('a-dirty');
+}
+
+// Variant B
+const B = {
+  openai:   { url:'https://api.openai.com/v1', local:false, note:'· cloud · uses your OpenAI key', model:'text-embedding-3-small', dims:'1536' },
+  google:   { url:'https://generativelanguage.googleapis.com/v1', local:false, note:'· cloud · uses your Google key', model:'text-embedding-004', dims:'768' },
+  cohere:   { url:'https://api.cohere.ai/compatibility/v1', local:false, note:'· cloud · uses your Cohere key', model:'embed-v4.0', dims:'1536' },
+  jina:     { url:'https://api.jina.ai/v1', local:false, note:'· cloud · uses your Jina key', model:'jina-embeddings-v3', dims:'1024' },
+  ollama:   { url:'http://localhost:11434/v1', local:true, note:'· local · no key needed', model:'nomic-embed-text', dims:'768' },
+  lmstudio: { url:'http://localhost:1234/v1', local:true, note:'· local · no key needed', model:'bge-m3', dims:'1024' },
+};
+function bSelect(el) {
+  document.querySelectorAll('#b-cards .provider-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const p = B[el.dataset.p];
+  const pin = document.getElementById('b-pin');
+  pin.className = 'pin-row ' + (p.local ? 'local' : 'cloud');
+  document.getElementById('b-pin-url').textContent = p.url;
+  document.getElementById('b-pin-note').textContent = p.note;
+  document.getElementById('b-model').value = p.model;
+  document.getElementById('b-dims').value = p.dims;
+  markDirty('b-dirty');
+}
+
+// Variant C
+const C = {
+  openai:   { url:'https://api.openai.com/v1', foot:'https://api.openai.com/v1 · 1536 dims · threshold 0.30 · OpenAI key' },
+  google:   { url:'https://generativelanguage.googleapis.com/v1', foot:'https://generativelanguage.googleapis.com/v1 · 768 dims · threshold 0.28 · Google key' },
+  cohere:   { url:'https://api.cohere.ai/compatibility/v1', foot:'https://api.cohere.ai/compatibility/v1 · 1536 dims · Cohere key' },
+  ollama:   { url:'http://localhost:11434/v1', foot:'http://localhost:11434/v1 · local · no key needed' },
+  lmstudio: { url:'http://localhost:1234/v1', foot:'http://localhost:1234/v1 · local · no key needed' },
+  custom:   { url:'', foot:'— set a custom base URL + key —' },
+};
+function cApply() {
+  const v = document.getElementById('c-prov').value;
+  document.getElementById('c-foot').textContent = C[v].foot;
+  markDirty('c-dirty');
+}
+const CX = {
+  openai:   'https://api.openai.com/v1 · cloud',
+  lmstudio: 'http://localhost:1234/v1 · local · runs on your machine',
+  ollama:   'http://localhost:11434/v1 · local · runs on your machine',
+};
+function cXApply() {
+  const v = document.getElementById('c-xprov').value;
+  document.getElementById('c-xfoot').textContent = CX[v];
+  markDirty('c-dirty');
+}
+
+// Synthesis: A presets feed the always-on footer
+const S_FOOT = {
+  'openai-small': { text:'https://api.openai.com/v1 · 1536 dims · threshold 0.30 · OpenAI key', local:false, model:'text-embedding-3-small', dims:'1536', url:'https://api.openai.com/v1', thresh:'0.30' },
+  'openai-large': { text:'https://api.openai.com/v1 · 3072 dims · threshold 0.32 · OpenAI key', local:false, model:'text-embedding-3-large', dims:'3072', url:'https://api.openai.com/v1', thresh:'0.32' },
+  'google':       { text:'https://generativelanguage.googleapis.com/v1 · 768 dims · threshold 0.28 · Google key', local:false, model:'text-embedding-004', dims:'768', url:'https://generativelanguage.googleapis.com/v1', thresh:'0.28' },
+  'cohere':       { text:'https://api.cohere.ai/compatibility/v1 · 1536 dims · threshold 0.30 · Cohere key', local:false, model:'embed-v4.0', dims:'1536', url:'https://api.cohere.ai/compatibility/v1', thresh:'0.30' },
+  'jina':         { text:'https://api.jina.ai/v1 · 1024 dims · threshold 0.30 · Jina key', local:false, model:'jina-embeddings-v3', dims:'1024', url:'https://api.jina.ai/v1', thresh:'0.30' },
+  'mistral':      { text:'https://api.mistral.ai/v1 · 1024 dims · threshold 0.30 · Mistral key', local:false, model:'mistral-embed', dims:'1024', url:'https://api.mistral.ai/v1', thresh:'0.30' },
+  'ollama':       { text:'http://localhost:11434/v1 · 768 dims · threshold 0.28 · no key needed', local:true, model:'nomic-embed-text', dims:'768', url:'http://localhost:11434/v1', thresh:'0.28' },
+  'lmstudio':     { text:'http://localhost:1234/v1 · 1024 dims · threshold 0.30 · no key needed', local:true, model:'bge-m3', dims:'1024', url:'http://localhost:1234/v1', thresh:'0.30' },
+  'custom':       { text:'— set a custom base URL + key in Advanced —', local:false, model:'', dims:'1536', url:'', thresh:'0.30' },
+};
+function sApplyPreset(v) {
+  const p = S_FOOT[v];
+  document.getElementById('s-foot-text').textContent = p.text;
+  const foot = document.getElementById('s-foot'), tag = document.getElementById('s-foot-tag');
+  foot.classList.toggle('is-local', p.local);
+  tag.className = 'loc-tag ' + (p.local ? 'local' : 'cloud');
+  tag.textContent = p.local ? 'local' : 'cloud';
+  document.getElementById('s-model').value = p.model;
+  document.getElementById('s-dims').value = p.dims;
+  document.getElementById('s-url').value = p.url;
+  document.getElementById('s-thresh').value = p.thresh;
+  if (v === 'custom') document.getElementById('s-advanced').classList.add('open');
+  markDirty('s-dirty');
+}
+const S_XFOOT = {
+  'openai':    { text:'https://api.openai.com/v1 · OpenAI key', local:false },
+  'anthropic': { text:'https://api.anthropic.com/v1 · Anthropic key', local:false },
+  'google':    { text:'https://generativelanguage.googleapis.com/v1 · Google key', local:false },
+  'lmstudio':  { text:'http://localhost:1234/v1 · runs on your machine · no key', local:true },
+  'ollama':    { text:'http://localhost:11434/v1 · runs on your machine · no key', local:true },
+};
+function sApplyXPreset(v) {
+  const p = S_XFOOT[v];
+  document.getElementById('s-xfoot-text').textContent = p.text;
+  const foot = document.getElementById('s-xfoot'), tag = document.getElementById('s-xfoot-tag');
+  foot.classList.toggle('is-local', p.local);
+  tag.className = 'loc-tag ' + (p.local ? 'local' : 'cloud');
+  tag.textContent = p.local ? 'local' : 'cloud';
+  markDirty('s-dirty');
+}
+</script>
+</body>
+</html>

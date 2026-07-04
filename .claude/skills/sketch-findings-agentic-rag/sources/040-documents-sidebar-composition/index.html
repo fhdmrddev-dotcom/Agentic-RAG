@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 040 — Documents Sidebar Composition</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 52px; }
+  .app { display: grid; grid-template-columns: 52px auto 1fr; min-height: calc(100vh - 52px); transition: grid-template-columns .25s var(--ease-out); }
+  .app.panel-open { grid-template-columns: 52px 50px 1fr 412px; }
+  .app.panel-open.pinned { grid-template-columns: 52px auto 1fr 412px; }
+
+  /* primary icon nav */
+  .nav-rail { background: var(--color-bg); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 0; }
+  .nav-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--color-text-dim); cursor: pointer; position: relative; }
+  .nav-ico:hover { background: var(--color-accent); color: var(--color-text-muted); }
+  .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .nav-ico svg { width: 18px; height: 18px; }
+  .nav-ico .warn { position: absolute; top: 5px; right: 5px; min-width: 14px; height: 14px; padding: 0 3px; font-size: 9px; display: flex; align-items: center; justify-content: center; border-radius: 99px; background: var(--color-warning); color: #1a1206; font-weight: 700; }
+
+  /* documents sub-sidebar */
+  .docnav { background: var(--color-bg-elev1); border-right: 1px solid var(--color-border); width: 248px; overflow-y: auto; max-height: calc(100vh - 52px); padding: 12px 8px; transition: width .25s var(--ease-out); }
+  .app.panel-open:not(.pinned) .docnav { width: 50px; padding: 12px 5px; overflow: hidden; }
+
+  .grp { margin-bottom: 6px; }
+  .grp-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 6px; cursor: pointer; user-select: none; }
+  .grp-head .gt { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: hsl(220 16% 65% / 0.6); flex: 1; }
+  .grp-head .gc { font-size: 10px; color: var(--color-text-dim); font-variant-numeric: tabular-nums; }
+  .grp-head .gchev { width: 13px; height: 13px; color: var(--color-text-dim); transition: transform var(--dur-base); }
+  .grp.collapsed .gchev { transform: rotate(-90deg); }
+  .grp.collapsed .grp-body { display: none; }
+  .grp-icon { width: 13px; height: 13px; color: hsl(220 16% 65% / 0.5); }
+
+  /* NavRow */
+  .nr { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; position: relative; transition: background var(--dur-fast); }
+  .nr:hover { background: hsl(220 25% 14% / 0.6); }
+  .nr.sel { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; box-shadow: var(--shadow-sm); }
+  .nr .lead { width: 14px; height: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .nr .lead svg { width: 12px; height: 12px; color: var(--color-text-dim); }
+  .nr .ri { width: 16px; height: 16px; flex-shrink: 0; }
+  .nr.folder .ri { color: hsl(38 92% 60% / 0.7); }
+  .nr.view .ri { color: var(--color-text-muted); }
+  .nr.rule .ri { color: var(--color-success); }
+  .nr.rule.off .ri { color: var(--color-text-dim); }
+  .nr.sel .ri { color: var(--color-primary); }
+  .nr .nm { font-size: var(--text-sm); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nr .gpill { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); background: var(--color-muted); padding: 1px 6px; border-radius: 99px; flex-shrink: 0; }
+  .nr .cnt { font-size: var(--text-xs); color: var(--color-text-dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .nr.indent { margin-left: 16px; }
+  .nr.indent::before { content: ''; position: absolute; left: -8px; top: 0; bottom: 0; border-left: 1px solid var(--color-border-soft); }
+
+  .grp-divider { border-top: 1px solid var(--color-border-soft); margin: 10px 6px; }
+
+  /* governance entries */
+  .gov-rail-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius-md); cursor: pointer; color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+  .gov-rail-row svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .gov-rail-row .nm { font-size: var(--text-sm); flex: 1; font-weight: 500; }
+  .gov-rail-row .warn { font-size: 10px; background: var(--color-warning-dim); color: var(--color-warning); padding: 1px 7px; border-radius: 99px; }
+
+  /* collapsed-rail icon stubs */
+  .stub { display: none; flex-direction: column; align-items: center; gap: 8px; }
+  .app.panel-open:not(.pinned) .grp-body, .app.panel-open:not(.pinned) .grp-head .gt, .app.panel-open:not(.pinned) .grp-head .gc, .app.panel-open:not(.pinned) .grp-divider, .app.panel-open:not(.pinned) .gov-rail-row .nm { display: none; }
+  .app.panel-open:not(.pinned) .stub { display: flex; }
+  .stub-ico { width: 38px; height: 38px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--color-text-dim); position: relative; cursor: pointer; }
+  .stub-ico:hover { background: var(--color-accent); color: var(--color-text-muted); }
+  .stub-ico svg { width: 17px; height: 17px; }
+  .stub-ico .b { position: absolute; top: 2px; right: 2px; min-width: 13px; height: 13px; font-size: 8px; display: flex; align-items: center; justify-content: center; border-radius: 99px; background: var(--color-muted); color: var(--color-text-muted); }
+
+  /* main content */
+  .content { overflow-y: auto; max-height: calc(100vh - 52px); }
+  .doc-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--color-border-soft); }
+  .doc-head h1 { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); margin: 0; }
+  .doc-head .crumb { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 2px; }
+  .rail-toggle { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 5px 10px; font-size: var(--text-xs); cursor: pointer; font-family: var(--font-sans); }
+  .rail-toggle:hover { background: var(--color-accent); color: var(--color-text); }
+  .doclist { padding: 8px 22px; }
+  .docrow { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid var(--color-border-soft); cursor: pointer; }
+  .docrow:hover { background: hsl(220 30% 11% / 0.3); }
+  .docrow svg { width: 15px; height: 15px; color: var(--color-text-dim); flex-shrink: 0; }
+  .docrow .dn { font-size: var(--text-sm); flex: 1; }
+  .docrow .dt { font-size: var(--text-xs); color: var(--color-text-dim); }
+
+  /* detail panel stub */
+  .dpanel { background: hsl(220 30% 7% / 0.7); border-left: 1px solid var(--color-border); display: none; flex-direction: column; }
+  .app.panel-open .dpanel { display: flex; }
+  .dpanel-head { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .dpanel-head .dn { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+  .dpanel-head button { background: transparent; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 18px; }
+  .dpanel-body { padding: 18px 16px; font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); padding: 14px 22px; display: flex; gap: 8px; align-items: flex-start; max-width: 760px; }
+  .note svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
+
+  .mobile-toggle { display:flex; gap:6px; align-items:center; }
+  .mobile-toggle button { background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: var(--font-mono); }
+  .mobile-toggle button.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 040 · Documents Sidebar Composition (consistency)</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Governance = top-level nav <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Governance = 4th rail entry</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Collapsible group headers</button>
+  <span style="flex:1"></span>
+  <div class="mobile-toggle"><span style="font-size:11px;color:var(--color-text-dim)">panel:</span><button id="pt-off" class="on" onclick="setPanel(false)">closed</button><button id="pt-on" onclick="setPanel(true)">open → rail collapses</button></div>
+</div>
+
+<svg style="display:none"><defs>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></symbol>
+  <symbol id="i-docs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 9-9"/><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M12.2 6.2 11 5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M5 5l1.5 1.5M17.5 17.5 19 19M2 12h2M20 12h2M5 19l1.5-1.5M17.5 6.5 19 5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-chevd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></symbol>
+</defs></svg>
+
+<!-- the three variants share a content shell; only the docnav composition differs -->
+
+<!-- ════════ VARIANT A — governance is a top-level nav icon (not in rail) ════════ -->
+<div id="variant-a" class="variant">
+  <div class="app" id="app-a">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg></div>
+      <div class="nav-ico active"><svg><use href="#i-docs"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-shield"/></svg><span class="warn">22</span></div>
+      <div class="nav-ico"><svg><use href="#i-gauge"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg></div>
+    </nav>
+    <aside class="docnav">
+      <div class="stub">
+        <div class="stub-ico"><svg><use href="#i-folder"/></svg></div>
+        <div class="stub-ico"><svg><use href="#i-funnel"/></svg><span class="b">3</span></div>
+        <div class="stub-ico"><svg><use href="#i-bolt"/></svg><span class="b">2</span></div>
+      </div>
+      <div class="full-rail">
+        <!-- FOLDERS -->
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Folders</span><span class="gc">128</span></div>
+          <div class="grp-body">
+            <div class="nr folder sel"><span class="lead"><svg><use href="#i-chevd"/></svg></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">All documents</span><span class="cnt">128</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Project Meridian</span><span class="cnt">41</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Contracts</span><span class="gpill">G</span><span class="cnt">23</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Finance</span><span class="cnt">19</span></div>
+          </div>
+        </div>
+        <div class="grp-divider"></div>
+        <!-- VIEWS -->
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Views</span><span class="gc">3</span></div>
+          <div class="grp-body">
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Expiring soon</span><span class="cnt">6</span></div>
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Needs review</span><span class="cnt">12</span></div>
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Vendor MSAs</span><span class="gpill">G</span><span class="cnt">8</span></div>
+          </div>
+        </div>
+        <div class="grp-divider"></div>
+        <!-- AUTOMATION -->
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Automation</span><svg class="grp-icon"><use href="#i-zap"/></svg></div>
+          <div class="grp-body">
+            <div class="nr rule"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Invoices → Finance</span></div>
+            <div class="nr rule off"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Contracts → Legal</span><span class="gpill">G</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="doc-head"><div><h1>All documents</h1><div class="crumb">Documents · 128 files</div></div>
+        <button class="rail-toggle" onclick="togglePin('a')"><svg style="width:13px;height:13px"><use href="#i-chev"/></svg> Pin sidebar</button>
+      </div>
+      <div class="doclist">
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><span class="dt">Project Meridian</span></div>
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Vendor-MSA-Acme-2026.pdf</span><span class="dt">Contracts</span></div>
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">2024_annual_report_scan.pdf</span><span class="dt">Finance</span></div>
+      </div>
+      <div class="note"><svg><use href="#i-shield"/></svg><span><b>A:</b> the Documents rail stays purely about <em>finding</em> documents (Folders + Views + Automation). Governance is a sibling top-level home (the shield, badge 22) — clean separation, but governance lives one nav-hop away from the documents it's about.</span></div>
+    </div>
+    <aside class="dpanel"><div class="dpanel-head"><svg style="width:15px;height:15px;color:var(--color-text-dim)"><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><button onclick="setPanel(false)">×</button></div><div class="dpanel-body">Metadata · Relationships · Classification sections (the shared 112/117/118 panel). When it opens the Documents rail collapses to a 50px icon stub — pinnable.</div></aside>
+  </div>
+</div>
+
+<!-- ════════ VARIANT B — governance is a 4th entry at the foot of the rail ════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app" id="app-b">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg></div>
+      <div class="nav-ico active"><svg><use href="#i-docs"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-gauge"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg></div>
+    </nav>
+    <aside class="docnav">
+      <div class="stub">
+        <div class="stub-ico"><svg><use href="#i-folder"/></svg></div>
+        <div class="stub-ico"><svg><use href="#i-funnel"/></svg><span class="b">3</span></div>
+        <div class="stub-ico"><svg><use href="#i-bolt"/></svg><span class="b">2</span></div>
+        <div class="stub-ico" style="color:var(--color-primary)"><svg><use href="#i-shield"/></svg><span class="b" style="background:var(--color-warning-dim);color:var(--color-warning)">22</span></div>
+      </div>
+      <div class="full-rail">
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Folders</span><span class="gc">128</span></div>
+          <div class="grp-body">
+            <div class="nr folder sel"><span class="lead"><svg><use href="#i-chevd"/></svg></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">All documents</span><span class="cnt">128</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Project Meridian</span><span class="cnt">41</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Contracts</span><span class="gpill">G</span><span class="cnt">23</span></div>
+          </div>
+        </div>
+        <div class="grp-divider"></div>
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Views</span><span class="gc">3</span></div>
+          <div class="grp-body">
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Expiring soon</span><span class="cnt">6</span></div>
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Needs review</span><span class="cnt">12</span></div>
+          </div>
+        </div>
+        <div class="grp-divider"></div>
+        <div class="grp">
+          <div class="grp-head"><span class="gt">Automation</span><svg class="grp-icon"><use href="#i-zap"/></svg></div>
+          <div class="grp-body">
+            <div class="nr rule"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Invoices → Finance</span></div>
+            <div class="nr rule off"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Contracts → Legal</span><span class="gpill">G</span></div>
+          </div>
+        </div>
+        <div class="grp-divider"></div>
+        <!-- governance as a single pinned entry -->
+        <div class="gov-rail-row"><svg><use href="#i-shield"/></svg><span class="nm">Governance health</span><span class="warn">22</span></div>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="doc-head"><div><h1>All documents</h1><div class="crumb">Documents · 128 files</div></div>
+        <button class="rail-toggle" onclick="togglePin('b')"><svg style="width:13px;height:13px"><use href="#i-chev"/></svg> Pin sidebar</button>
+      </div>
+      <div class="doclist">
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><span class="dt">Project Meridian</span></div>
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Vendor-MSA-Acme-2026.pdf</span><span class="dt">Contracts</span></div>
+      </div>
+      <div class="note"><svg><use href="#i-shield"/></svg><span><b>B:</b> governance lives <em>with</em> the documents — a single "Governance health" row at the foot of the rail with the warn-count. Co-located, but it's a fourth thing competing with a possibly-long folder tree for rail space.</span></div>
+    </div>
+    <aside class="dpanel"><div class="dpanel-head"><svg style="width:15px;height:15px;color:var(--color-text-dim)"><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><button onclick="setPanel(false)">×</button></div><div class="dpanel-body">Shared 112/117/118 detail panel.</div></aside>
+  </div>
+</div>
+
+<!-- ════════ VARIANT C — collapsible group headers (accordion rail) ════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app" id="app-c">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg></div>
+      <div class="nav-ico active"><svg><use href="#i-docs"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-shield"/></svg><span class="warn">22</span></div>
+      <div class="nav-ico"><svg><use href="#i-gauge"/></svg></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg></div>
+    </nav>
+    <aside class="docnav">
+      <div class="stub">
+        <div class="stub-ico"><svg><use href="#i-folder"/></svg></div>
+        <div class="stub-ico"><svg><use href="#i-funnel"/></svg><span class="b">3</span></div>
+        <div class="stub-ico"><svg><use href="#i-bolt"/></svg><span class="b">2</span></div>
+      </div>
+      <div class="full-rail">
+        <div class="grp" id="cg-folders">
+          <div class="grp-head" onclick="togGrp('cg-folders')"><svg class="gchev"><use href="#i-chev"/></svg><span class="gt">Folders</span><span class="gc">128</span></div>
+          <div class="grp-body">
+            <div class="nr folder sel"><span class="lead"><svg><use href="#i-chevd"/></svg></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">All documents</span><span class="cnt">128</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Project Meridian</span><span class="cnt">41</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Contracts</span><span class="gpill">G</span><span class="cnt">23</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Finance</span><span class="cnt">19</span></div>
+            <div class="nr folder indent"><span class="lead"></span><svg class="ri"><use href="#i-folder"/></svg><span class="nm">Archive</span><span class="cnt">45</span></div>
+          </div>
+        </div>
+        <div class="grp" id="cg-views">
+          <div class="grp-head" onclick="togGrp('cg-views')"><svg class="gchev"><use href="#i-chev"/></svg><span class="gt">Views</span><span class="gc">3</span></div>
+          <div class="grp-body">
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Expiring soon</span><span class="cnt">6</span></div>
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Needs review</span><span class="cnt">12</span></div>
+            <div class="nr view"><span class="lead"></span><svg class="ri"><use href="#i-funnel"/></svg><span class="nm">Vendor MSAs</span><span class="gpill">G</span><span class="cnt">8</span></div>
+          </div>
+        </div>
+        <div class="grp collapsed" id="cg-auto">
+          <div class="grp-head" onclick="togGrp('cg-auto')"><svg class="gchev"><use href="#i-chev"/></svg><span class="gt">Automation</span><span class="gc">2</span></div>
+          <div class="grp-body">
+            <div class="nr rule"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Invoices → Finance</span></div>
+            <div class="nr rule off"><span class="lead"></span><svg class="ri"><use href="#i-bolt"/></svg><span class="nm">Contracts → Legal</span><span class="gpill">G</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="content">
+      <div class="doc-head"><div><h1>All documents</h1><div class="crumb">Documents · 128 files</div></div>
+        <button class="rail-toggle" onclick="togglePin('c')"><svg style="width:13px;height:13px"><use href="#i-chev"/></svg> Pin sidebar</button>
+      </div>
+      <div class="doclist">
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><span class="dt">Project Meridian</span></div>
+        <div class="docrow" onclick="setPanel(true)"><svg><use href="#i-file"/></svg><span class="dn">Vendor-MSA-Acme-2026.pdf</span><span class="dt">Contracts</span></div>
+      </div>
+      <div class="note"><svg><use href="#i-chevd"/></svg><span><b>C:</b> each group header collapses (click "Automation" / "Views") so a long folder tree never buries the others — counts stay on the collapsed header. Density cure for the growing rail; governance stays a top-level home (shield).</span></div>
+    </div>
+    <aside class="dpanel"><div class="dpanel-head"><svg style="width:15px;height:15px;color:var(--color-text-dim)"><use href="#i-file"/></svg><span class="dn">Q3-Board-Deck-FINAL.pptx</span><button onclick="setPanel(false)">×</button></div><div class="dpanel-body">Shared 112/117/118 detail panel.</div></aside>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>040</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="vp(390)">📱</button><button onclick="vp(768)">▢</button><button onclick="vp(0)">🖥</button>
+</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  if (e) e.target.classList.add('active');
+}
+function setPanel(open) {
+  document.querySelectorAll('.app').forEach(a => a.classList.toggle('panel-open', open));
+  document.getElementById('pt-on').classList.toggle('on', open);
+  document.getElementById('pt-off').classList.toggle('on', !open);
+}
+function togglePin(v) {
+  const app = document.getElementById('app-' + v);
+  app.classList.toggle('pinned');
+}
+function togGrp(id) { document.getElementById(id).classList.toggle('collapsed'); }
+function vp(w) {
+  document.querySelectorAll('.app').forEach(a => { a.style.maxWidth = w ? w + 'px' : 'none'; a.style.margin = w ? '0 auto' : '0'; a.style.borderLeft = w ? '1px solid var(--color-border)' : 'none'; a.style.borderRight = w ? '1px solid var(--color-border)' : 'none'; });
+  // narrow → simulate mobile: collapse docnav to nothing, content full
+  const narrow = w && w <= 420;
+  document.querySelectorAll('.docnav').forEach(d => d.style.display = narrow ? 'none' : '');
+}
+</script>
+</body>
+</html>

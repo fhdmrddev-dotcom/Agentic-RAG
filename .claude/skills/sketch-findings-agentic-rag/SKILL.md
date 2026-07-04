@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127), and the 2026-07-04 batch wrap of six further sessions — 2026-06-16 (Settings provider picker + re-embed lifecycle — sketches 024-026, Phase 111.1), 2026-06-21 (auto-classification — 036-037, Phase 118; governance health — 038-040, Phase 119), 2026-06-23/25 (Trigger Tuner — 041-045, Phases 123/123.1), 2026-06-26 (workflow soul + strict/loose two doors — 046-047, Phase 124), 2026-06-27 (cross-provider chat polish — 048-050, Phase 128), 2026-07-03 (Skill Studio — 053-057, Phase 137), 2026-07-04 (eval production-clean: matrix runs + determinate progress + engine health — 058-060, Phase 137.1)
 </context>
 
 <design_direction>
@@ -176,6 +176,121 @@ One rule: **an icon for the same concept is byte-identical everywhere.** Full de
 - **Decorative/status icons** (`fluent-emoji`): VERIFY each slug resolves or bundle the SVG
   (the empty `fluent-emoji:direct-hit` → `bullseye` trap). Future Settings home for
   provider/model management + this convention: SEED-095.
+
+## Settings: Provider Picker & Re-embed Lifecycle (Phase 111.1)
+
+Full detail: `references/settings-provider-picker-and-reembed.md`.
+
+- **Model knob = preset `<select>` + an ALWAYS-ON 🔒 endpoint footer** (endpoint · dims ·
+  threshold · cloud/local tag, never behind Advanced) — you can never pick a model without
+  seeing where it runs (the BUG-260616-01 cure). ONE component (`ProviderPicker.tsx`)
+  reused for embedding, extraction, and any future model knob (the 060 judge knob).
+- **Serious confirm = weight, NOT friction** — danger rail + 4-fact grid + consequence
+  list + a two-step Confirm; NO type-to-confirm on reversible/resumable operations.
+- **Background-job honesty = one rich home (Settings status card) + a whisper where
+  it's felt** (a slim Documents-page pointer that deep-links + auto-hides) — never an
+  app-wide banner.
+
+## Auto-Classification (Phase 118)
+
+Full detail: `references/auto-classification.md`.
+
+- **"Suggested" ≠ "moved"** — never a silent auto-move; a deterministic rule match shows
+  the matched rule + condition, NEVER a fake confidence %; accept → move + audit receipt,
+  reversible; suggestion reads in BOTH the detail-panel Classification section AND on
+  the document row (036-A).
+- **Rules live on a dedicated surface** reached from the Documents rail's Automation
+  group (037-A: list + side-panel builder), reusing the 029 chip-strip condition grammar
+  + the 031 `G`-pill scope + a live "would match N" preview.
+
+## Governance Health (Phase 119)
+
+Full detail: `references/governance-health.md`.
+
+- **Its OWN top-level read-only surface** (never a Library-Health tab, never an in-rail
+  entry): three `HealthPanel` signal cards + a KPI strip; all-healthy = a posture hero.
+- **The verb IS the diagnosis** (039-A inline `Open links`/`Classify`/`Re-extract` rows);
+  the page **writes nothing** — verbs navigate to the canonical 112/117/118 edit
+  surfaces; counts re-fetch as rows resolve; metadata confidence renders the Phase-112
+  `ConfidenceChip`, never a retrieval-similarity %.
+
+## Skill Trigger Tuner (Phases 123 + 123.1)
+
+Full detail: `references/trigger-tuner.md`.
+
+- **Focused full-surface** (041-A — too big for the 384px panel), later ABSORBED as the
+  Skill Studio's Triggering tab (057).
+- **Provider scoreboards are N-column = the org's configured targets, never a fixed
+  four** — fixed grids crammed illegibly at the real 7-8 roster (BUG-260624-01; 042's ★
+  moved to the as-built vertical-rows variant D). Fires + no-false sub-scores always
+  visible; pick by HELD-OUT; author-confirm → PATCH, never auto-applied.
+- **Lint = warn-never-block** in the shared service layer (covers human form + agent
+  `save_skill`), with a one-click "Tune this →" handoff (now → Studio·Triggering).
+- **Sketch density surfaces at the org's REAL scale** (the 045 lesson — auto-seed
+  produces dozens of cases; pre-run, the editor gets the full width, no empty-results
+  rail).
+
+## Workflow Soul & Strict↔Loose Two Doors (Phase 124)
+
+Full detail: `references/workflow-soul-and-two-doors.md`.
+
+- **The soul = 5 atoms, PURPOSE-LED** (`business_requirement` hero · needs · glyph-dot
+  phase spine · ONE derived tier chip · deliverable line), ONE scale-keyed component
+  (`<WorkflowSoul scale="card|run|pub">`) so the same essence reads on the library card,
+  run header, and publish summary.
+- **Strict↔loose = an explicit two-door fork** ("Describe & run" vs "Author & govern");
+  nothing lost by picking fast; govern controls recompute the tier LIVE; the judge is
+  LOCKED always-on — a STRICT workflow can never silently downgrade.
+
+## Cross-Provider Chat Polish (Phase 128)
+
+Full detail: `references/cross-provider-chat-polish.md`.
+
+- **Tool-card header = the provider's REAL logo** (single-source `@lobehub/icons` map) +
+  the agent's "about to…" description during the `preparing` window; ONE byte-identical
+  card layout on all 8 providers.
+- **Exactly TWO elapsed-status homes** (header strip in view + floating Jump-to-live
+  chip) — the redundant sticky composer timer was DELETED (pure subtraction; the
+  imperceptible-delta variant was rejected: if the operator can't feel it in a sketch,
+  don't ship the mechanism).
+- **Long USER prompts clamp** to a 7-line preview + gradient-matched fade + inline
+  "Read more"; user bubbles only, assistant answers untouched.
+
+## Skill Studio (Phase 137)
+
+Full detail: `references/skill-studio.md`.
+
+- **ONE focused full-surface Studio** (053-A + 057-A): persistent header (name + vN +
+  LIVE + gate strip on EVERY tab) over **Evals · Triggering · Versions** tabs; the
+  Trigger Tuner absorbed as Triggering (re-homing, not rebuild); the detail panel slims
+  to form + gate line + "Open studio"; tabs deep-linkable.
+- **Status = the lifecycle stepper** (054-B): Cases → Eval → Gate → Published, each
+  count ON its stage node; only the current stage narrates; `passed_on_older_version`
+  reads as staleness; the gate strip is a CONDENSATION of the same server `PublishGate`
+  — never a second truth-teller.
+- **Run history = expandable rows** (055-B, shipped as `RunHistory`/`RunCaseDetail`):
+  provider logo + model + version + honest rollup; side-by-side WITH/WITHOUT arms;
+  `not_measured` = excluded-never-failed; `judge_error` = neither; interrupted = banner
+  + re-run; human ratings labeled DISTINCT from judge verdicts.
+- **Versions = table + any-to-any compare** (056-B): provenance chips from
+  `SkillVersion.source`; force-promote evidence never softens; NO "Restore" (immutable
+  — restore mints a NEW version).
+
+## Eval Production-Clean: Matrix, Progress, Engine Health (Phase 137.1)
+
+Full detail: `references/eval-production-clean.md`.
+
+- **Matrix run = ONE grouped card in RunHistory** (058-A) whose sub-rows ARE 055-B rows;
+  exactly ONE "▣ feeds gate" chip; aggregation footer = per-config mean±stddev from run
+  HISTORY (stddev only at ≥2 runs) + Δ skill lift + deterministic tagged analyst notes
+  (never LLM prose); launcher = one-click all-configured + gate-feeder select.
+- **Running row = a thin determinate unit bar** (059-A; units = cases × 2 arms + judge;
+  scales to any case count) + a live per-arm checklist with durations as arms land;
+  judge `case_feedback` renders inline as a violet "◇" advisory block — never a verdict.
+- **Engine health = a Settings tile board** (060-A): 8 logo tiles ✓/✗, staleness always
+  shown, ✗ carries the VERBATIM provider error; ENGINE health ≠ model quality; the
+  judge-model knob beneath = the 024-A picker with a registry-only list + an effective-
+  default 🔒 footer.
 </design_direction>
 
 <findings_index>
@@ -251,6 +366,54 @@ One rule: **an icon for the same concept is byte-identical everywhere.** Full de
 | Workflow Energized Re-skin | [references/workflow-energized-reskin.md](references/workflow-energized-reskin.md) | **051-A** publish gauntlet = energy-spine of the 8 stages + a plain-worded verdict + the raw 5-field `PublishVerdict` behind "Show raw verdict" (honesty kept: verbatim · judge hard-wall · 4 HTTP outcomes · run-link gated · criteria first-class on block); under the 124 pub soul. **052-A** live step-flow = quiet/still idle steps (SC#2) + a bloomed active step (glow + energy comet + running-only activity + AI-engine chip) + folded-essence done; under the 124 run soul; ⚠ G-5 `PhaseCard`/`PhaseTimeline`. Energized default + calm toggle. |
 | Icon Convention (cross-cutting) | [references/icon-convention.md](references/icon-convention.md) | An icon for the same concept is byte-identical everywhere. Provider/model icons = single-source `@lobehub/icons` (Phase 128 `providerLogo.tsx`); phase-type icons = the shared 3D `PHASE_GLYPHS` map (one additive swap propagates to soul card/run/pub + 127 surfaces); decorative `fluent-emoji` slugs must be verified-or-bundled (the empty `direct-hit`→`bullseye` trap). Future Settings home: SEED-095. |
 
+**Settings: provider picker & re-embed lifecycle (sketches 024–026, Phase 111.1):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Provider Picker & Re-embed | [references/settings-provider-picker-and-reembed.md](references/settings-provider-picker-and-reembed.md) | **024** ONE reusable preset picker + an ALWAYS-ON 🔒 endpoint footer (endpoint · dims · threshold · cloud/local) — never pick a model without seeing where it runs (BUG-260616-01 cure); local presets relax the key. **025** re-embed confirm = weight-not-friction modal (danger rail + 4-fact grid + two-step Confirm; NO type-to-confirm on reversible ops). **026** background re-embed = one rich Settings status card + a slim auto-hiding Documents-page pointer — never an app-wide banner. |
+
+**Auto-classification (sketches 036–037, Phase 118):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Classification Suggestion & Rules | [references/auto-classification.md](references/auto-classification.md) | **036-A** "suggested ≠ moved" (never silent auto-move); deterministic rule match shows the rule, never a fake %; accept → move + audit, reversible; reads in the panel Classification section AND on the doc row. **037-A** rules on a dedicated surface (Documents rail → Automation): list + side-panel builder reusing the 029 chip strip + 031 `G` pill + a live "would match N" preview. |
+
+**Governance health (sketches 038–040, Phase 119):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Governance Health Surface | [references/governance-health.md](references/governance-health.md) | **038/040-A** its OWN top-level read-only home (never a Library-Health tab, never in-rail): 3 `HealthPanel` signal cards + KPI strip; all-healthy = posture hero; the Documents rail stays pure. **039-A** inline verb rows (`Open links`/`Classify`/`Re-extract`) — the verb IS the diagnosis; the page writes NOTHING (verbs navigate to the canonical edit surfaces); counts re-fetch as rows resolve; `ConfidenceChip`, never retrieval-similarity. |
+
+**Skill Trigger Tuner (sketches 041–045, Phases 123 + 123.1):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Trigger Tuner | [references/trigger-tuner.md](references/trigger-tuner.md) | **041-A** focused full-surface (384px panel too small) — later absorbed as Studio·Triggering (057). **042** pick by HELD-OUT, fires/no-false always visible, author-confirm → PATCH never auto-applied; ★ = the as-built D (N vertical rows — the fixed 4-up grid crammed at the real 7-8 roster, BUG-260624-01); scoreboards are N-column = configured targets, never fixed-four. **043-A** two-column should/should-NOT lists + 60/40 split + background run w/ honest per-provider progress. **044-A** warn-never-block lint in the shared service layer + "Tune this →" handoff + the builder-model knob (decoupled from targets). **045-B** pre-run editor = full-width stack; sketch density at REAL scale. |
+
+**Workflow soul & two doors (sketches 046–047, Phase 124):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Soul Object & Strict↔Loose | [references/workflow-soul-and-two-doors.md](references/workflow-soul-and-two-doors.md) | **046-A** the soul = 5 purpose-led atoms (`business_requirement` hero · needs · glyph-dot spine · derived tier chip · deliverable), ONE scale-keyed `<WorkflowSoul>` across card/run/pub. **047-A** explicit two-door fork (Describe & run vs Author & govern); tier recomputes LIVE; judge LOCKED always-on; nothing lost by picking the fast door. |
+
+**Cross-provider chat polish (sketches 048–050, Phase 128):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Cross-Provider Chat Polish | [references/cross-provider-chat-polish.md](references/cross-provider-chat-polish.md) | **048-A** provider-logo card header (single-source `@lobehub/icons`) + the "about to…" preparing description + ONE byte-identical layout on all 8 providers. **049-A** delete the redundant sticky composer timer — exactly TWO status homes (header strip + floating chip); imperceptible variant deltas don't ship. **050-A** long USER prompts clamp to 7 lines + gradient-matched fade + inline Read more; user bubbles only. |
+
+**Skill Studio (sketches 053–057, Phase 137):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Skill Studio | [references/skill-studio.md](references/skill-studio.md) | **053-A + 057-A** ONE focused Studio: persistent header (name+vN+LIVE+gate strip on every tab) over Evals · Triggering · Versions; Tuner absorbed as Triggering; detail panel slims to form + gate line + "Open studio"; tabs deep-linkable. **054-B** lifecycle stepper (Cases→Eval→Gate→Published, counts ON nodes, only the current stage narrates; gate strip = a condensation of the same server `PublishGate`). **055-B** expandable run rows (side-by-side arms; `not_measured` excluded-never-failed; ratings distinct from verdicts) — the base grammar 137.1's matrix extends. **056-B** version table + any-to-any compare; provenance chips; NO Restore (immutable). |
+
+**Eval production-clean (sketches 058–060, Phase 137.1):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Matrix, Progress & Engine Health | [references/eval-production-clean.md](references/eval-production-clean.md) | **058-A** matrix = ONE grouped card of 055-B sub-rows (history never floods); one "▣ feeds gate" chip; footer = history-derived mean±stddev (≥2 runs) + Δ lift + deterministic tagged analyst notes; one-click all-configured launcher. **059-A** thin determinate unit bar (cases × 2 + judge; scales to any case count) + per-arm durations as they land + inline violet "◇" advisory `case_feedback` (never a verdict). **060-A** Settings engine-health tile board (✓/✗ per provider, staleness always shown, ✗ = verbatim provider error; ENGINE ≠ model quality) + the judge knob on the 024-A picker with a registry-only list + effective-default 🔒 footer. |
+
 ## Theme
 
 The winning theme file is at [sources/themes/default.css](sources/themes/default.css). Tokens are direct mirrors of `frontend/src/index.css :.dark` — so transitioning sketches to React code should be a straight port, not a rebuild.
@@ -287,6 +450,32 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/035-link-target-picker/](sources/035-link-target-picker/) — winner: A (dialog · type-first create-link picker; MoveToFolderDialog shell + searchable typeahead; per-type exclusion; simulate-failure error line)
 - [sources/051-gauntlet-pip-strip/](sources/051-gauntlet-pip-strip/) — winner: A (energized gauntlet energy-spine + worded verdict + raw-on-demand; under the 124 pub soul; lifecycle + Calm⇄Energized cyclers)
 - [sources/052-living-step-flow/](sources/052-living-step-flow/) — winner: A (quiet-idle / alive-active living step-flow; vertical energy comet into the active step; AI-engine chip; under the 124 run soul)
+- [sources/024-embedding-provider-picker/](sources/024-embedding-provider-picker/) — winner: Synthesis (A preset select + C's always-on 🔒 endpoint footer)
+- [sources/025-reembed-confirm-gate/](sources/025-reembed-confirm-gate/) — winner: Synthesis (C weight-frame + A's 4-fact grid; B checklist = documented fallback)
+- [sources/026-reembed-in-progress/](sources/026-reembed-in-progress/) — winner: Synthesis (C status card home + slim search pointer)
+- [sources/036-classification-suggestion/](sources/036-classification-suggestion/) — winner: A (suggested-not-moved on the doc row + panel section; rule provenance, no fake %)
+- [sources/037-rule-builder-and-list/](sources/037-rule-builder-and-list/) — winner: A (rules list + side-panel builder; chip-strip conditions; live would-match count)
+- [sources/038-governance-health-surface/](sources/038-governance-health-surface/) — winner: A (card-grid, own top-level home; posture-hero graft)
+- [sources/039-signal-row-and-fix-action/](sources/039-signal-row-and-fix-action/) — winner: A (inline verb buttons + mask-gated expand graft; B route-to-panel = strong alt)
+- [sources/040-documents-sidebar-composition/](sources/040-documents-sidebar-composition/) — winner: A (governance top-level, rail stays pure; collapsible headers = density fallback)
+- [sources/041-tuner-surface-shell/](sources/041-tuner-surface-shell/) — winner: A (focused full-surface; later absorbed as Studio·Triggering)
+- [sources/042-scoreboard-and-candidates/](sources/042-scoreboard-and-candidates/) — winner: D (as-built vertical rows; A = original data-model record, superseded at 123.1)
+- [sources/043-case-editor-and-live-run/](sources/043-case-editor-and-live-run/) — winner: A (two-column should/should-NOT + 60/40 split bar + background-run live card)
+- [sources/044-lint-warning-and-handoff/](sources/044-lint-warning-and-handoff/) — winner: A (inline-under-Description never-block lint + "Tune this →" + builder-model knob)
+- [sources/045-tuner-prerun-editor-at-scale/](sources/045-tuner-prerun-editor-at-scale/) — winner: B (full-width stack pre-run; scale/cap toolbar demonstrates the real-scale lesson)
+- [sources/046-workflow-soul-object/](sources/046-workflow-soul-object/) — winner: A (purpose-led 5-atom soul at 3 scales)
+- [sources/047-strict-loose-two-doors/](sources/047-strict-loose-two-doors/) — winner: A (explicit two-door fork; live deriveTier recompute; locked judge)
+- [sources/048-cross-provider-tool-card/](sources/048-cross-provider-tool-card/) — winner: A (real brand marks + preparing description; incl. logos/ assets)
+- [sources/049-chat-area-reclaim/](sources/049-chat-area-reclaim/) — winner: A (clean removal of the sticky composer timer; B rejected as imperceptible)
+- [sources/050-long-prompt-readmore/](sources/050-long-prompt-readmore/) — winner: A (7-line clamp + gradient-matched fade + inline Read more)
+- [sources/053-eval-studio-shell/](sources/053-eval-studio-shell/) — winner: A (focused full-surface Studio shell)
+- [sources/054-one-truth-status/](sources/054-one-truth-status/) — winner: B (lifecycle stepper Cases→Eval→Gate→Published)
+- [sources/055-run-history-and-detail/](sources/055-run-history-and-detail/) — winner: B (expandable run rows; the base grammar 137.1's matrix extends)
+- [sources/056-version-history-and-diff/](sources/056-version-history-and-diff/) — winner: B (version table + any-to-any compare picker)
+- [sources/057-skill-studio-linkage/](sources/057-skill-studio-linkage/) — winner: A (persistent header + 3 tabs; the every-button→destination nav map)
+- [sources/058-matrix-launch-and-rows/](sources/058-matrix-launch-and-rows/) — winner: A (grouped matrix card; gate-feeder chip; history aggregation + analyst notes; live sim)
+- [sources/059-determinate-progress-and-case-feedback/](sources/059-determinate-progress-and-case-feedback/) — winner: A (thin determinate unit bar + per-arm durations + inline violet case feedback; live sim)
+- [sources/060-engine-health-card/](sources/060-engine-health-card/) — winner: A (engine-health tile board + judge-model knob; sweep sim)
 
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
@@ -354,9 +543,51 @@ Load and apply this skill when:
 - Touching the `_INVERSE_LABEL` / `_NO_ACCESS_MASK` vocabulary from the UI side — mirror the backend maps verbatim, never invent wording
 - Working on any phase tagged `document-relationships`, `detail-panel`, `accordion`, `typeahead`, `move-to-folder-dialog`, or on Phase 117 (the relationships section on the shared 112/118 detail shell)
 
+**Settings model knobs & background jobs (sketches 024–026, Phase 111.1) — load when:**
+
+- Building or extending ANY Settings model picker — embedding, extraction, judge, builder — reuse `ProviderPicker.tsx` + the always-on 🔒 endpoint footer, never a bare select (`references/settings-provider-picker-and-reembed.md`)
+- Designing a serious confirm for a costly-but-reversible operation (the weight-not-friction modal), or the status surface for a long background job (rich home + whisper-where-felt)
+
+**Auto-classification (sketches 036–037, Phase 118) — load when:**
+
+- Building the Classification section of the detail panel, the doc-row suggestion chip, or the Classification-rules surface + builder (`references/auto-classification.md`)
+- Touching CLASS-02 semantics (suggested ≠ moved) or rule-match provenance display
+
+**Governance health (sketches 038–040, Phase 119) — load when:**
+
+- Building or extending the Governance Health page, its signal cards, or the verb-button fix rows (`references/governance-health.md`)
+- Tempted to add an in-rail governance entry or a Library-Health governance tab (both rejected forms), or to mutate from an aggregation page
+
+**Trigger Tuner (sketches 041–045, Phases 123/123.1) — load when:**
+
+- Working on the Studio Triggering tab (`SkillTunerPage` internals), the provider scoreboard, the benchmark case editor, or the save-time lint + "Tune this →" handoff (`references/trigger-tuner.md`)
+- Building ANY per-provider score/health grid — the N-column = configured-targets rule and the fixed-grid cram lesson (BUG-260624-01) apply beyond the Tuner
+- Sketching or building any list surface whose real-world item count is org-scale (the 045 real-scale lesson)
+
+**Workflow soul & two doors (sketches 046–047, Phase 124) — load when:**
+
+- Touching `<WorkflowSoul>`, `deriveTier`/`TIERS`, `PHASE_GLYPHS`, or the Builder's strict/loose entry fork (`references/workflow-soul-and-two-doors.md`)
+- Adding any surface that names a workflow — it should render the soul atoms, not invent a new summary
+
+**Cross-provider chat polish (sketches 048–050, Phase 128) — load when:**
+
+- Touching the tool-card header/avatar, `providerLogo.tsx`, the preparing-window description, elapsed-status placement, or the user-bubble clamp (`references/cross-provider-chat-polish.md`)
+- Adding ANY new provider mark or elapsed-time display anywhere in the app (two-homes rule; single-source logos)
+
+**Skill Studio (sketches 053–057, Phase 137) — load when:**
+
+- Building or refactoring the Studio shell/tabs (`EvalsTab`/`TriggeringTab`/`VersionsTab`), the `LifecycleStepper`, `RunBar`, `RunHistory`, `RunCaseDetail`, `VersionsTab` compare, or the `PublishGateDialog` seam (`references/skill-studio.md`)
+- Touching publish-gate display anywhere (one-truth-teller: every gate surface condenses the same server `PublishGate`)
+- Working on any phase tagged `skill-studio`, `evals`, `panel-01`, `gate-01`, `ver-01`, or extending the 055-B run-row grammar
+
+**Eval production-clean (sketches 058–060, Phase 137.1) — load when:**
+
+- Building matrix runs (launcher, group card, gate-feeder, aggregation, analyst notes), determinate run progress, per-arm durations, judge `case_feedback` rendering, the Settings engine-health card, or the judge-model knob (`references/eval-production-clean.md`)
+- Working on any phase tagged `eval-05`, `matrix-runs`, `smoke-sweep`, or `engine-health`
+
 Skip when:
 
-- Working on non-chat, non-panel surfaces (settings, skill studio, auth)
+- Working on auth or other surfaces not listed above — note the skill now DOES cover Settings (model pickers, engine health, re-embed lifecycle) and the whole Skill Studio (evals, triggering, versions)
 - Working on the plain document-library table ONLY — but note this skill DOES cover the Phase 112 detail panel (incl. the Phase 117 relationships section + create-link picker) AND the Phase 114 filter/view builder + saved-Views sidebar + folder-tree NavRow that now live on that surface
 - Working on backend-only changes (no UI touch)
 </when_to_load>
@@ -418,4 +649,56 @@ Skip when:
 
 - 051-gauntlet-pip-strip (winner: A — energized energy-spine + worded verdict + raw-on-demand; under the 124 pub soul)
 - 052-living-step-flow (winner: A — quiet-idle / alive-active living step-flow; under the 124 run soul)
+
+**Phase 111.1 — Settings Provider Picker & Re-embed Lifecycle (2026-06-16):**
+
+- 024-embedding-provider-picker (winner: Synthesis — preset select + always-on 🔒 endpoint footer)
+- 025-reembed-confirm-gate (winner: Synthesis — weight-frame + 4-fact grid)
+- 026-reembed-in-progress (winner: Synthesis — status card home + slim search pointer)
+
+**Phase 118 — Auto-Classification (2026-06-21):**
+
+- 036-classification-suggestion (winner: A — suggested-not-moved, rule provenance, reversible accept)
+- 037-rule-builder-and-list (winner: A — dedicated rules surface; list + side-panel builder)
+
+**Phase 119 — Governance Health (2026-06-21):**
+
+- 038-governance-health-surface (winner: A — card-grid, own top-level home)
+- 039-signal-row-and-fix-action (winner: A — inline verb buttons + mask-gated expand)
+- 040-documents-sidebar-composition (winner: A — governance top-level, rail stays pure)
+
+**Phases 123 + 123.1 — Skill Trigger Tuner (2026-06-23/25):**
+
+- 041-tuner-surface-shell (winner: A — focused full-surface; absorbed as Studio·Triggering at 057)
+- 042-scoreboard-and-candidates (winner: D — as-built vertical rows; A superseded at 123.1)
+- 043-case-editor-and-live-run (winner: A — two-column lists + split bar + background run)
+- 044-lint-warning-and-handoff (winner: A — inline never-block lint + Tune-this handoff + builder knob)
+- 045-tuner-prerun-editor-at-scale (winner: B — full-width stack; real-scale lesson)
+
+**Phase 124 — Workflow Soul & Strict↔Loose (2026-06-26):**
+
+- 046-workflow-soul-object (winner: A — purpose-led 5-atom soul at 3 scales)
+- 047-strict-loose-two-doors (winner: A — explicit two-door fork; live tier recompute; locked judge)
+
+**Phase 128 — Cross-Provider Chat Polish (2026-06-27):**
+
+- 048-cross-provider-tool-card (winner: A — real brand marks + preparing description)
+- 049-chat-area-reclaim (winner: A — clean removal of the sticky composer timer)
+- 050-long-prompt-readmore (winner: A — 7-line clamp + fade + inline Read more)
+
+**Phase 137 — Skill Studio (2026-07-03):**
+
+- 053-eval-studio-shell (winner: A — focused full-surface Studio)
+- 054-one-truth-status (winner: B — lifecycle stepper)
+- 055-run-history-and-detail (winner: B — expandable rows)
+- 056-version-history-and-diff (winner: B — table + compare picker)
+- 057-skill-studio-linkage (winner: A — persistent header + 3 tabs; nav map)
+
+**Phase 137.1 — Eval Production-Clean (2026-07-04):**
+
+- 058-matrix-launch-and-rows (winner: A — grouped matrix card)
+- 059-determinate-progress-and-case-feedback (winner: A — thin unit bar + inline feedback)
+- 060-engine-health-card (winner: A — tile board + judge knob)
+
+Excluded: 017-cross-thread-run-stop (orphan — no README, no MANIFEST row, no locked winner).
 </metadata>
