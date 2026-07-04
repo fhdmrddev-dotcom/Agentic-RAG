@@ -422,6 +422,7 @@ async def _persist_result(
     verdict_reason: str | None = None,
     judge_model: str | None = None,
     duration_ms: int | None = None,
+    case_feedback: str | None = None,
 ) -> None:
     """Persist ONE eval_results row the instant an arm finishes (D-06 — partials stay
     readable), with the per-arm verdict INCLUDED in the SAME insert (D-06 — never a
@@ -452,6 +453,7 @@ async def _persist_result(
         "verdict_reason": verdict_reason,
         "judge_model": judge_model,
         "duration_ms": duration_ms,
+        "case_feedback": case_feedback,
     }
 
     def _insert():
@@ -590,6 +592,10 @@ async def _run_arm_body(
     verdict_score: int | None = None
     verdict_reason: str | None = None
     judge_model: str | None = None
+    # EVAL-05d: advisory judge critique of the CASE, lifted from the SAME forced verdict
+    # (no second shot). Defaults None so a not_measured / judge_error arm carries NULL
+    # case_feedback — never fabricated, never counted in the rollup (advisory-only).
+    case_feedback: str | None = None
     if status == "completed" and output.strip():
         # Judge evidence channel (SEED-100): surface this arm's runtime tool receipts
         # (files produced, exit codes) so artifact-producing work is gradeable. The
@@ -623,6 +629,10 @@ async def _run_arm_body(
             verdict_score = verdict.get("overall_score")
             verdict_reason = (verdict.get("summary") or "")[:2000]
             judge_model = resolve_judge_model(settings)
+            # EVAL-05d: lift the advisory per-CASE critique from the SAME emission (bounded).
+            # It rides alongside — NEVER into — the verdict fields above; the rollup below
+            # counts only verdict_state=='graded' + verdict_passed, never case_feedback.
+            case_feedback = (verdict.get("case_feedback") or "")[:1000]
 
     await _persist_result(
         supabase,
@@ -643,6 +653,7 @@ async def _run_arm_body(
         verdict_reason=verdict_reason,
         judge_model=judge_model,
         duration_ms=duration_ms,
+        case_feedback=case_feedback,
     )
     await _emit_eval(
         redis, run_id, EVENT_CASE_DONE,

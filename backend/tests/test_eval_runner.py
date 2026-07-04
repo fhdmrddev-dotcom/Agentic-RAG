@@ -65,6 +65,15 @@ _FAKE_VERDICT_PASS = {
     "summary": "The answer meets the expected behavior.",
 }
 
+# Phase 137.1 (EVAL-05d): a graded verdict that ALSO carries the advisory case_feedback
+# field (JudgeVerdict.case_feedback — Plan 01 required it). The graded branch lifts it
+# from the SAME forced emission (no second judge shot); it is advisory-only and NEVER
+# counted in the with-skill rollup denominator.
+_FAKE_VERDICT_WITH_CASE_FEEDBACK = {
+    **_FAKE_VERDICT_PASS,
+    "case_feedback": "This case is a strong discriminator: it demands a rendered PDF, not prose.",
+}
+
 
 # ── A tiny in-memory async fake Redis (copied from the tuner route tests) ─────────
 class _FakeRedis:
@@ -685,6 +694,10 @@ async def test_judge_provider_independent(redis, supabase, pool, fake_loop_resul
         overall_passed=True, overall_score=88, grounded_in_evidence=True,
         answers_business_requirement=True, did_the_work_not_delegated=True,
         criteria=[], summary="ok",
+        # Plan 01 made JudgeVerdict.case_feedback a REQUIRED str (schema-bound, no default);
+        # this hand-built verdict must supply it. "" == advisory-empty (None is invalid for
+        # the str-typed field — it would ValidationError).
+        case_feedback="",
     )
     forced = AsyncMock(return_value={"emitted": fake_emitted, "failure": None})
 
@@ -847,6 +860,98 @@ async def test_persist_null_case_id_is_sql_null(supabase):
     assert rows[0]["test_case_id"] is None, (
         f"caseless sweep arm must persist SQL NULL, got {rows[0]['test_case_id']!r}"
     )
+
+
+@pytest.mark.asyncio
+async def test_case_feedback_persisted_on_graded_arm(redis, supabase, pool, fake_loop_result):
+    """EVAL-05d: a graded arm whose verdict carries case_feedback persists that advisory
+    string in eval_results.case_feedback — lifted from the SAME forced judge emission (the
+    judge fn is mocked; no second LLM shot is added). case_feedback is advisory-only: the
+    row stays verdict_state=='graded' with its own pass/fail unchanged."""
+    from app.services import eval_runner_service
+
+    async def _completed_loop(ctx, **kwargs):
+        return fake_loop_result
+
+    with patch.object(eval_runner_service, "run_agent_loop", _completed_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer",
+                      new=AsyncMock(return_value=dict(_FAKE_VERDICT_WITH_CASE_FEEDBACK))):
+        await eval_runner_service.run_eval_job(
+            run_id=uuid4(), skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    graded = [r for r in results if r["verdict_state"] == "graded"]
+    assert graded, "expected graded arms to grade"
+    for r in graded:
+        assert r["case_feedback"] == _FAKE_VERDICT_WITH_CASE_FEEDBACK["case_feedback"], (
+            f"graded arm must persist the advisory case_feedback, got {r.get('case_feedback')!r}"
+        )
+        # Advisory-only: the verdict fields are untouched by case_feedback's presence.
+        assert r["verdict_state"] == "graded"
+        assert r["verdict_passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_case_feedback_null_on_not_measured_arm(redis, supabase, pool):
+    """EVAL-05d: an errored / not_measured arm carries NULL case_feedback (never fabricated),
+    exactly like verdict_passed — the judge is never called on an errored arm (D-04), so there
+    is nothing to lift. Distinguishes an honest 'no advisory' from a graded empty critique."""
+    from app.services import eval_runner_service
+
+    async def _raising_loop(ctx, **kwargs):
+        raise RuntimeError("provider 400 — the baseline arm broke on a newer model")
+
+    judge = AsyncMock(return_value=dict(_FAKE_VERDICT_WITH_CASE_FEEDBACK))
+    with patch.object(eval_runner_service, "run_agent_loop", _raising_loop), \
+         patch.object(eval_runner_service, "_judge_eval_answer", judge):
+        await eval_runner_service.run_eval_job(
+            run_id=uuid4(), skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+            provider="anthropic", model="claude-haiku-4-5-20251001",
+            current_user=OWNER, user_settings=MagicMock(),
+            redis=redis, supabase=supabase, pool=pool,
+        )
+
+    results = supabase.store.get("eval_results", [])
+    assert len(results) == 4, f"all arms persist despite the raise, got {len(results)}"
+    for r in results:
+        assert r["verdict_state"] == "not_measured"
+        assert r["case_feedback"] is None, "an un-graded arm must carry NULL case_feedback"
+    assert judge.await_count == 0, "the judge must not run on an errored arm (D-04)"
+
+
+@pytest.mark.asyncio
+async def test_case_feedback_does_not_affect_rollup(redis, pool, fake_loop_result):
+    """EVAL-05d advisory-only: measured_count / passed_count are IDENTICAL whether or not the
+    verdict carries case_feedback — case_feedback is never in the rollup denominator. Drives
+    the SAME 2-case run twice (with-feedback verdict vs without) and compares the finalize."""
+    from app.services import eval_runner_service
+
+    async def _completed_loop(ctx, **kwargs):
+        return fake_loop_result
+
+    async def _run_and_capture_rollup(verdict):
+        sb = _FakeSupabase()
+        upd = AsyncMock()
+        with patch.object(eval_runner_service, "run_agent_loop", _completed_loop), \
+             patch.object(eval_runner_service, "_judge_eval_answer",
+                          new=AsyncMock(return_value=dict(verdict))), \
+             patch.object(eval_runner_service, "_update_eval_run_status", upd):
+            await eval_runner_service.run_eval_job(
+                run_id=uuid4(), skill_id=SKILL_ID, skill_version=SKILL_VERSION, cases=CASES,
+                provider="anthropic", model="claude-haiku-4-5-20251001",
+                current_user=OWNER, user_settings=MagicMock(),
+                redis=redis, supabase=sb, pool=pool,
+            )
+        return upd.await_args.kwargs
+
+    with_fb = await _run_and_capture_rollup(_FAKE_VERDICT_WITH_CASE_FEEDBACK)
+    without_fb = await _run_and_capture_rollup(_FAKE_VERDICT_PASS)
+    assert with_fb["measured_count"] == without_fb["measured_count"] == 2
+    assert with_fb["passed_count"] == without_fb["passed_count"] == 2
 
 
 # ════════════════════════════════════════════════════════════════════════════════
