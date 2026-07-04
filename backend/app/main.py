@@ -268,6 +268,29 @@ async def lifespan(app_instance):
 
     asyncio.create_task(_resume_stranded())
 
+    # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
+    # restart kills the in-process task driving a run, its terminal DB transition is
+    # never written and the row is stranded non-terminal forever (the user sees a run
+    # "running" with no error/timeout/recovery). This sweep honestly terminalizes
+    # orphans (eval → interrupted, chat → failed) + drops their stale Redis streams,
+    # guarded by a single-shot SET NX so WORKER_COUNT=2 never double-sweeps (mirrors
+    # _resume_stranded). Best-effort BACKGROUND task: a slow or failed sweep never
+    # blocks startup (logs + the app continues). Additive — NOT in threads.py (G-5),
+    # no agent-loop touch (D-14).
+    async def _reconcile_orphans():
+        try:
+            from app.services.run_reconciler import reconcile_orphaned_runs
+            from app.dependencies import get_redis, get_supabase
+            count = await reconcile_orphaned_runs(
+                pool=await get_pg_pool(), redis=get_redis(), supabase=get_supabase()
+            )
+            if count:
+                logger.info("Run reconciler closed %d orphaned run(s)", count)
+        except Exception:
+            logger.exception("Run reconciler failed (app continues)")
+
+    asyncio.create_task(_reconcile_orphans())
+
     # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
     # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
     # the app continues; the NEXT cadence re-runs). Idempotent by construction
