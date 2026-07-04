@@ -629,7 +629,7 @@ COMMENT ON TABLE public.eval_ratings IS 'Owner-scoped human-preference thumbs (E
 CREATE TABLE public.eval_results (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     eval_run_id uuid NOT NULL,
-    test_case_id uuid NOT NULL,
+    test_case_id uuid,
     user_id uuid NOT NULL,
     variant text NOT NULL,
     provider text NOT NULL,
@@ -645,6 +645,8 @@ CREATE TABLE public.eval_results (
     verdict_score integer,
     verdict_reason text,
     judge_model text,
+    duration_ms integer,
+    case_feedback text,
     CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
     CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text]))),
     CONSTRAINT eval_results_verdict_state_check CHECK ((verdict_state = ANY (ARRAY['graded'::text, 'not_measured'::text, 'judge_error'::text])))
@@ -666,13 +668,27 @@ COMMENT ON COLUMN public.eval_results.verdict_state IS 'OQ1 3-value verdict disc
 
 
 --
+-- Name: COLUMN eval_results.duration_ms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.duration_ms IS 'EVAL-05e per-arm wall-clock in milliseconds (time.monotonic around the agent loop). NULL on pre-085 rows and on arms that never timed. Persisted in the SAME insert as the result row (never a follow-up UPDATE), alongside input_tokens / output_tokens.';
+
+
+--
+-- Name: COLUMN eval_results.case_feedback; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.case_feedback IS 'EVAL-05d advisory judge critique of the TEST CASE itself (is the case weak / non-discriminating / ambiguous?). Written from the schema-bound JudgeVerdict.case_feedback field. NEVER a verdict, NEVER a gate input, NEVER counted in rollup math — it renders visually distinct from PASS/FAIL. NULL on pre-085 rows and un-graded arms.';
+
+
+--
 -- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.eval_runs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    skill_id uuid NOT NULL,
-    skill_version_id uuid NOT NULL,
+    skill_id uuid,
+    skill_version_id uuid,
     user_id uuid NOT NULL,
     provider text NOT NULL,
     model text NOT NULL,
@@ -684,6 +700,8 @@ CREATE TABLE public.eval_runs (
     passed_count integer,
     measured_count integer,
     verdict_summary text,
+    matrix_group_id uuid,
+    feeds_gate boolean DEFAULT false NOT NULL,
     CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
 );
 
@@ -700,6 +718,20 @@ COMMENT ON TABLE public.eval_runs IS 'One durable row per eval run (EVAL-02, D-0
 --
 
 COMMENT ON COLUMN public.eval_runs.verdict_summary IS 'NON-AUTHORITATIVE default rollup (OQ2, D-07). Default rule: "pass" iff measured_count >= 1 AND passed_count == measured_count, else "fail". This is DERIVED TEXT, not a hard constraint — Phase 136 (GATE-01) owns the real publish threshold and MUST be able to override it WITHOUT a new migration. passed_count/measured_count count WITH-SKILL arms only (D-02/D-07); the without-skill verdict is stored per-arm for the A/B story + SI-01, not as a rollup denominator.';
+
+
+--
+-- Name: COLUMN eval_runs.matrix_group_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.matrix_group_id IS 'D-06 matrix grouping. The shared uuid identity for the N single-provider arms of one matrix run; NULL for a single run (pre-085 rows backfill NULL — accurate, they were never matrix runs). Indexed (idx_eval_runs_matrix_group_id) for the group readout.';
+
+
+--
+-- Name: COLUMN eval_runs.feeds_gate; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.feeds_gate IS 'D-05 gate-feeder flag. Exactly ONE arm per matrix_group_id is TRUE (default = the user''s active provider); single runs and every pre-085 row are false and their publish-gate read is UNCHANGED. The "feeds gate" chip is a LABEL on this flag — NEVER a second gate computation.';
 
 
 --
@@ -1914,6 +1946,13 @@ CREATE INDEX idx_eval_results_run_id ON public.eval_results USING btree (eval_ru
 --
 
 CREATE INDEX idx_eval_results_user_id ON public.eval_results USING btree (user_id);
+
+
+--
+-- Name: idx_eval_runs_matrix_group_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_matrix_group_id ON public.eval_runs USING btree (matrix_group_id);
 
 
 --
