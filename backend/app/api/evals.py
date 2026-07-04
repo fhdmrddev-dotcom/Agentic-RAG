@@ -2317,3 +2317,179 @@ async def start_matrix_run(
     _spawn_group_release(redis, skill_id, group_id, arm_tasks)
 
     return {"matrix_group_id": str(group_id), "arms": arms}
+
+
+# ── The engine-health board (D-02/D-03) — built from the caller's LATEST skill-less sweep group ──
+async def _tile_for_run(supabase: Client, run: dict, user_id: str) -> dict:
+    """Compose ONE ``EngineHealthTile`` from a sweep arm's run row (owner-scoped results read).
+
+    ``healthy`` is honest ENGINE health — TRUE iff the run ``completed`` AND its with-skill arm
+    reached a GRADED verdict (the engine ran the loop end-to-end; a graded FAIL is still HEALTHY —
+    the model failed the case, the engine did not). A failed / not_measured / judge_error arm is
+    ``healthy=false`` and carries the VERBATIM provider/arm error (the truncated real error string,
+    never an engine-shaped message — D-02); a still-running arm is ``healthy=false`` with ``error``
+    None (the board renders it as in-flight). ``run_id`` deep-links to the skill-less run readout."""
+    run_id = run.get("id")
+
+    def _read_results():
+        return (
+            supabase.table("eval_results")
+            .select("*")
+            .eq("eval_run_id", str(run_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    results = list((await run_in_threadpool(_read_results)).data or [])
+    with_arm = next((r for r in results if r.get("variant") == "with_skill"), None)
+
+    if run.get("status") == "completed" and with_arm and with_arm.get("verdict_state") == "graded":
+        healthy = True
+        error = None
+    else:
+        healthy = False
+        error = None
+        if with_arm:
+            # The VERBATIM provider error: a failed/timed_out arm's truncated error, or a
+            # judge_error arm's reason. NEVER an engine-shaped message (D-02).
+            error = with_arm.get("error")
+            if not error and with_arm.get("verdict_state") == "judge_error":
+                error = with_arm.get("verdict_reason")
+        error = error or run.get("error")
+        # Only stamp a synthetic "did not complete" when the run is genuinely terminal-but-failed
+        # with no real error to show; a still-running arm keeps error=None (rendered as in-flight).
+        if not error and run.get("status") not in (None, "running"):
+            error = "The engine did not complete this arm."
+    return {
+        "provider": run.get("provider"),
+        "model": run.get("model"),
+        "healthy": healthy,
+        "error": error,
+        "run_id": str(run_id) if run_id else None,
+        "last_swept_at": run.get("created_at"),
+    }
+
+
+async def _build_engine_health_board(supabase: Client, user_id: str) -> dict:
+    """Assemble the caller's LATEST skill-less sweep board (``EngineHealthBoard`` — Plan 01 shape).
+
+    The latest-sweep lookup contract (Task 2/3): the caller's most-recent group where
+    ``matrix_group_id IS NOT NULL AND skill_id IS NULL`` (owner-scoped ``.eq("user_id")`` +
+    ``.is_("skill_id","null")`` — a NULL-skill row is a sweep arm BY CONSTRUCTION, so it isolates the
+    sweep arms; the newest one names the latest group). Returns one tile per arm in that group +
+    ``swept_at`` (the group's newest ``created_at``). Never swept -> ``{tiles: [], swept_at: null}``
+    (honest empty board, 200 — never a 404). All blocking reads threadpool-wrapped (D-v2.5-01)."""
+
+    def _read_sweep_runs():
+        return (
+            supabase.table("eval_runs")
+            .select("*")
+            .eq("user_id", user_id)
+            .is_("skill_id", "null")
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read_sweep_runs)).data or [])
+    sweep_runs = [r for r in rows if r.get("matrix_group_id")]
+    if not sweep_runs:
+        return {"tiles": [], "swept_at": None}
+    latest_group = sweep_runs[0].get("matrix_group_id")
+    group_runs = [r for r in sweep_runs if r.get("matrix_group_id") == latest_group]
+    tiles = [await _tile_for_run(supabase, r, user_id) for r in group_runs]
+    swept_at = max((r.get("created_at") for r in group_runs if r.get("created_at")), default=None)
+    return {"tiles": tiles, "swept_at": swept_at}
+
+
+# ── POST — engine smoke sweep: the matrix machinery over the built-in SKILL-LESS fixture (D-01/D-02) ──
+@router_evals.post("/engine-sweep")
+async def run_engine_sweep(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+):
+    """Fan one representative model per configured provider over the BUILT-IN in-memory smoke fixture
+    (EVAL-05a), riding the SAME matrix machinery as ``start_matrix_run``.
+
+    The fixture is synthesized IN-MEMORY (``_SMOKE_SKILL_VERSION`` + ``_SMOKE_CASE``) and passed
+    DIRECTLY to ``run_eval_job`` via its EXISTING ``skill_version`` + ``cases`` params — NO
+    ``_read_cases`` / ``_read_latest_version``, NO rows in skills / skill_versions / skill_test_cases.
+    Each arm's ``eval_runs`` row persists SKILL-LESS (``skill_id`` / ``skill_version_id`` NULL — mig
+    085) with ``matrix_group_id`` set + ``feeds_gate=false`` (the gate is irrelevant to a sweep),
+    owner-stamped from ``current_user``. The claim is a PER-USER sweep key
+    (``eval_inflight:engine-sweep:{user_id}``) so a sweep never collides with a skill's eval claim
+    (D-06 preserved, no per-skill 409 collateral). Local providers are excluded (D-01). Returns the
+    refreshed engine-health board (the just-created group's arms, freshly running)."""
+    user_id = current_user["id"]
+
+    from app.models.user_settings import load_user_settings  # function-local (avoid import cycle)
+
+    user_settings = await run_in_threadpool(load_user_settings, user_id)
+    configs = _configured_provider_configs(
+        user_settings, exclude_local=True, prefer_active_model=False
+    )
+    if not configs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No configured providers to run an engine sweep over",
+        )
+
+    # The sweep claim is SKILL-LESS — a per-user key so it never collides with a skill's eval claim.
+    sweep_key = f"engine-sweep:{user_id}"
+    group_id = uuid4()
+    claimed = await redis.set(
+        _inflight_key(sweep_key), str(group_id), nx=True, ex=_INFLIGHT_TTL_S
+    )
+    if not claimed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An engine sweep is already in progress",
+        )
+
+    arm_tasks: list = []
+    try:
+        for cfg in configs:
+            run_id = uuid4()
+
+            def _insert_eval_run(_cfg=cfg, _rid=run_id):
+                return (
+                    supabase.table("eval_runs")
+                    .insert({
+                        "id": str(_rid),
+                        "skill_id": None,          # SKILL-LESS (mig 085 relaxation — D-02)
+                        "skill_version_id": None,  # SKILL-LESS (mig 085 relaxation — D-02)
+                        "user_id": user_id,
+                        "provider": _cfg["provider"],
+                        "model": _cfg["model"],
+                        "status": "running",
+                        "case_count": 1,
+                        "matrix_group_id": str(group_id),
+                        "feeds_gate": False,  # the gate is irrelevant to a sweep
+                    })
+                    .execute()
+                )
+
+            await run_in_threadpool(_insert_eval_run)
+            task = await _spawn_eval_job(
+                run_id=run_id,
+                skill_id=sweep_key,  # synthetic JOB key (run_eval_job release/ZREM only) — row skill_id is NULL
+                skill_version=dict(_SMOKE_SKILL_VERSION),
+                cases=[dict(_SMOKE_CASE)],
+                provider=cfg["provider"],
+                model=cfg["model"],
+                current_user=current_user,
+                user_settings=user_settings,
+                redis=redis,
+                supabase=supabase,
+                pool=pool,
+            )
+            arm_tasks.append(task)
+    except Exception:
+        if _spawn_group_release(redis, sweep_key, group_id, arm_tasks) is None:
+            await eval_runner_service._release_inflight_if_owned(redis, sweep_key, group_id)
+        raise
+
+    _spawn_group_release(redis, sweep_key, group_id, arm_tasks)
+
+    return await _build_engine_health_board(supabase, user_id)

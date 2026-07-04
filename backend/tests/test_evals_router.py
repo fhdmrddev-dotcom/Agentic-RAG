@@ -505,3 +505,85 @@ async def test_matrix_cross_user_404(monkeypatch):
     assert exc.value.status_code == 404
     assert store["eval_runs"] == [], "nothing spawned on the 404 path"
     assert redis.set_calls == [], "no claim taken on the 404 path (owner gate is first)"
+
+
+# ── Task 2: engine smoke sweep — in-memory synthetic fixture over the matrix (D-01/D-02) ──
+
+
+def _empty_skill_store():
+    """An EMPTY skills/versions/cases world — proves the sweep synthesizes its fixture IN-MEMORY and
+    creates NO seeded rows (D-02)."""
+    return {
+        "skills": [], "skill_versions": [], "skill_test_cases": [],
+        "eval_runs": [], "eval_results": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_engine_sweep_persists_skill_less(monkeypatch):
+    """D-01/D-02: the sweep fans one arm per configured provider over a BUILT-IN in-memory fixture —
+    creating NO rows in skills / skill_versions / skill_test_cases; each eval_runs arm persists with
+    NULL skill_id / skill_version_id + matrix_group_id set + feeds_gate=false, owner-stamped from
+    current_user; the runner gets the SMOKE fixture via its EXISTING skill_version/cases params."""
+    from app.api import evals
+
+    store = _empty_skill_store()
+    sb = _FilterSupabase(store)
+    redis = _FakeRedis()
+    spawn = AsyncMock(return_value=object())
+    monkeypatch.setattr(evals, "_spawn_eval_job", spawn)
+    monkeypatch.setattr(
+        "app.models.user_settings.load_user_settings", lambda uid, *a, **k: _fake_settings()
+    )
+
+    board = await evals.run_engine_sweep(
+        current_user=OWNER, supabase=sb, redis=redis, pool=object()
+    )
+
+    # NO seeded rows anywhere (in-memory fixture — D-02).
+    assert store["skills"] == [] and store["skill_versions"] == [] and store["skill_test_cases"] == []
+    # One skill-less arm per configured provider (ollama unconfigured -> skipped).
+    runs = store["eval_runs"]
+    assert len(runs) == 3
+    assert all(r["skill_id"] is None and r["skill_version_id"] is None for r in runs)
+    assert all(r["matrix_group_id"] for r in runs) and all(r["feeds_gate"] is False for r in runs)
+    assert all(r["user_id"] == OWNER["id"] for r in runs)  # owner-stamped from current_user (T-133-03)
+    assert len({r["matrix_group_id"] for r in runs}) == 1, "one shared sweep group"
+    # Per-USER skill-less sweep claim (never a per-skill 409 collateral — D-06 preserved).
+    assert len(redis.set_calls) == 1
+    key, value, nx, _ex = redis.set_calls[0]
+    assert key == f"eval_inflight:engine-sweep:{OWNER['id']}" and nx is True
+    assert value == runs[0]["matrix_group_id"]
+    # The runner got the SMOKE fixture via its EXISTING skill_version/cases params (no signature change).
+    assert spawn.await_count == 3
+    kw = spawn.await_args.kwargs
+    assert kw["skill_id"] == f"engine-sweep:{OWNER['id']}"  # synthetic job key, not a real skill id
+    assert kw["skill_version"]["name"] == "engine-smoke"
+    assert len(kw["cases"]) == 1 and kw["cases"][0]["id"] is None  # NULL test_case_id persistence (D-02)
+    # The sweep returns the engine-health board shape.
+    assert set(board) == {"tiles", "swept_at"}
+    assert len(board["tiles"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_engine_sweep_no_skill_view_leak(monkeypatch):
+    """D-02: sweep rows (skill_id IS NULL) never appear in a skill-scoped Studio run-history read
+    (``.eq("skill_id", …)`` excludes NULL-skill rows by construction) — no RunHistory pollution."""
+    from app.api import evals
+
+    real_skill = str(uuid4())
+    store = _empty_skill_store()
+    store["skills"] = [{"id": real_skill, "name": "s", "description": "d", "user_id": OWNER["id"]}]
+    sb = _FilterSupabase(store)
+    redis = _FakeRedis()
+    monkeypatch.setattr(evals, "_spawn_eval_job", AsyncMock(return_value=object()))
+    monkeypatch.setattr(
+        "app.models.user_settings.load_user_settings", lambda uid, *a, **k: _fake_settings()
+    )
+
+    await evals.run_engine_sweep(current_user=OWNER, supabase=sb, redis=redis, pool=object())
+    assert len(store["eval_runs"]) == 3  # skill-less sweep rows exist
+
+    # The skill-scoped run-list read for a REAL owned skill returns NONE of the sweep rows.
+    skill_runs = await evals.list_eval_runs(real_skill, current_user=OWNER, supabase=sb)
+    assert skill_runs == [], "NULL-skill sweep rows must not leak into a skill's run history"
