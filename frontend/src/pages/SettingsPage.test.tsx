@@ -49,6 +49,8 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     active_provider: "anthropic",
     llm_model: "claude-sonnet-4-6",
     available_models: ["claude-sonnet-4-6"],
+    harness_judge_model: "",
+    resolved_harness_judge_model: "claude-opus-4-8",
     // A multi-provider set incl. a STRONG cloud model (claude-opus-4) and a real LOCAL
     // provider (ollama) — the configured-models source the builder picker now reads.
     providers: [

@@ -63,6 +63,8 @@ function mkRun(overrides: Partial<EvalRun> = {}): EvalRun {
     passed_count: 2,
     measured_count: 3,
     verdict_summary: null,
+    matrix_group_id: null,
+    feeds_gate: false,
     ...overrides,
   }
 }
