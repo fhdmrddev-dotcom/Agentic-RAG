@@ -96,6 +96,105 @@ async def test_build_candidates_passes_nonempty_system_prompt(monkeypatch):
     assert seen["schema_model"] is svc.CandidateDescriptions
 
 
+# ── 1024-char cap + bounded auto-shorten (D-13 i) ─────────────────────────────
+@pytest.mark.asyncio
+async def test_build_candidates_caps_over_long_with_shorten_retry(monkeypatch):
+    """D-13 (i): an over-cap candidate triggers ONE bounded auto-shorten re-emit; the
+    output never exceeds MAX_DESCRIPTION_CHARS and nothing crashes."""
+    import app.services.skill_tuner_service as svc
+    from app.services.skill_lint import MAX_DESCRIPTION_CHARS
+
+    _patch_provider(monkeypatch)
+    calls: list = []
+
+    async def _fake_forced_emit(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            # build shot: one fine candidate + one WAY over the cap
+            return {
+                "emitted": svc.CandidateDescriptions(
+                    candidates=[
+                        "Use to draft the weekly report.",
+                        "Z" * (MAX_DESCRIPTION_CHARS + 500),
+                    ]
+                ),
+                "failure": None,
+            }
+        # retry (shorten) shot: a compact rewrite
+        return {
+            "emitted": svc.CandidateDescriptions(
+                candidates=["Use to draft a concise weekly status report from KB documents."]
+            ),
+            "failure": None,
+        }
+
+    monkeypatch.setattr(svc, "forced_emit", _fake_forced_emit)
+
+    out = await svc.build_candidates(
+        name="reporter", description="d", builder_model="m", user_settings=object(), n=3
+    )
+    assert len(calls) == 2, "an over-cap candidate must trigger exactly ONE bounded shorten retry"
+    assert out, "candidates are still returned (never crash)"
+    assert all(len(c) <= MAX_DESCRIPTION_CHARS for c in out), "no candidate may exceed the cap"
+
+
+@pytest.mark.asyncio
+async def test_build_candidates_truncates_when_shorten_fails(monkeypatch):
+    """D-13 (i): if the bounded auto-shorten retry honest-fails (emitted=None), any
+    still-over-cap candidate is hard-truncated — the []-on-None never-crash floor holds."""
+    import app.services.skill_tuner_service as svc
+    from app.services.skill_lint import MAX_DESCRIPTION_CHARS
+
+    _patch_provider(monkeypatch)
+    calls: list = []
+
+    async def _fake_forced_emit(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            return {
+                "emitted": svc.CandidateDescriptions(
+                    candidates=["Q" * (MAX_DESCRIPTION_CHARS + 1000)]
+                ),
+                "failure": None,
+            }
+        return {"emitted": None, "failure": "model_failed_to_emit"}  # retry honest-fail
+
+    monkeypatch.setattr(svc, "forced_emit", _fake_forced_emit)
+
+    out = await svc.build_candidates(
+        name="x", description="y", builder_model="m", user_settings=object(), n=3
+    )
+    assert out, "the hard-truncated candidate survives (never crash on retry honest-fail)"
+    assert all(len(c) <= MAX_DESCRIPTION_CHARS for c in out), "over-cap input is hard-truncated to the cap"
+
+
+@pytest.mark.asyncio
+async def test_build_candidates_no_shorten_retry_when_within_cap(monkeypatch):
+    """A within-cap build makes exactly ONE forced_emit call — the cap logic adds no
+    needless retry (and preserves the existing <=N behavior)."""
+    import app.services.skill_tuner_service as svc
+
+    _patch_provider(monkeypatch)
+    calls: list = []
+
+    async def _fake_forced_emit(**kwargs):
+        calls.append(kwargs)
+        return {
+            "emitted": svc.CandidateDescriptions(
+                candidates=["Use to draft reports.", "Convert files to markdown."]
+            ),
+            "failure": None,
+        }
+
+    monkeypatch.setattr(svc, "forced_emit", _fake_forced_emit)
+
+    out = await svc.build_candidates(
+        name="x", description="y", builder_model="m", user_settings=object(), n=3
+    )
+    assert len(calls) == 1, "no shorten retry when every candidate is within the cap"
+    assert out == ["Use to draft reports.", "Convert files to markdown."]
+
+
 # ── classify_fires (Pitfall 1 — real policy) ──────────────────────────────────
 @pytest.mark.asyncio
 async def test_classify_fires_returns_trigger_decision(monkeypatch):

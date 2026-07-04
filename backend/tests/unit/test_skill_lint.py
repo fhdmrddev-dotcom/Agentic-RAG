@@ -135,11 +135,38 @@ def test_unique_description_does_not_warn_duplicate():
     assert "duplicate" not in _codes(lint_description("RR", desc, siblings))
 
 
+# ── name_not_kebab (D-13 ii — additive, never-blocking portability warning) ─────
+
+def test_non_kebab_name_warns_name_not_kebab():
+    # A name with uppercase + spaces is not a portable kebab-case name.
+    desc = "Use to generate a quarterly risk register from KB documents"
+    warnings = lint_description("My Skill", desc, [])
+    assert "name_not_kebab" in _codes(warnings)
+    _assert_well_formed(warnings)
+
+
+def test_kebab_name_does_not_warn_name_not_kebab():
+    desc = "Use to generate a quarterly risk register from KB documents"
+    assert "name_not_kebab" not in _codes(lint_description("my-skill", desc, []))
+    # Digits + hyphens are valid kebab too.
+    assert "name_not_kebab" not in _codes(lint_description("risk-register-v2", desc, []))
+
+
+def test_kebab_lint_is_name_only_and_never_raises():
+    # A non-kebab name with an EMPTY description still warns name_not_kebab (name-only
+    # check, independent of the description) and never raises.
+    warnings = lint_description("My Skill", "", [])
+    assert "name_not_kebab" in _codes(warnings)
+    # An empty name does NOT warn (nothing to lint) and never raises.
+    assert "name_not_kebab" not in _codes(lint_description("", "some description text here", []))
+
+
 # ── healthy ────────────────────────────────────────────────────────────────────
 
 def test_healthy_description_returns_empty_list():
+    # A kebab-case name keeps this example warning-free under the D-13 kebab lint.
     desc = "Use to generate a quarterly risk register from KB documents"
-    warnings = lint_description("Quarterly Risk Register", desc, [])
+    warnings = lint_description("quarterly-risk-register", desc, [])
     assert warnings == []
 
 
