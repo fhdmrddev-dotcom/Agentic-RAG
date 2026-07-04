@@ -44,7 +44,9 @@ from app.services.forced_emit import forced_emit
 # Pitfall 1 fidelity guard: the classifier measures the REAL production firing policy
 # by importing the SAME constant agent_loop.py interpolates into the "## Available
 # Skills" catalog note. NEVER duplicate or paraphrase the policy string.
-from app.services.skill_lint import LOAD_SKILL_POLICY
+# MAX_DESCRIPTION_CHARS is the SHARED portability bound (D-13 i / STD-01) — build_candidates
+# caps its output at the same length skill_lint flags as `too_long`, so ONE source of truth.
+from app.services.skill_lint import LOAD_SKILL_POLICY, MAX_DESCRIPTION_CHARS
 
 logger = logging.getLogger(__name__)
 
@@ -237,8 +239,79 @@ async def build_candidates(
     emitted = result.get("emitted")
     if emitted is None:
         return []  # honest-fail floor — never crash
-    candidates = [c for c in (emitted.candidates or []) if isinstance(c, str) and c.strip()]
-    return candidates[:n]
+    candidates = [c for c in (emitted.candidates or []) if isinstance(c, str) and c.strip()][:n]
+    # D-13 (i): cap candidates at MAX_DESCRIPTION_CHARS (the shared portability bound — the
+    # same length skill_lint flags as `too_long`). A builder model can over-write; an
+    # over-long candidate would trip the lint AND bloat the catalog note. When any candidate
+    # exceeds the cap, run ONE bounded auto-shorten retry and then hard-truncate anything
+    # still over — the honest-fail floor above is preserved (the retry is best-effort).
+    if any(len(c) > MAX_DESCRIPTION_CHARS for c in candidates):
+        candidates = await _shorten_over_cap(
+            candidates, name, builder_model, provider, user_settings, n
+        )
+    return candidates
+
+
+async def _shorten_over_cap(
+    candidates: list[str],
+    name: str,
+    builder_model: str,
+    provider: str,
+    user_settings: Any,
+    n: int,
+) -> list[str]:
+    """Bounded auto-shorten for over-cap candidates (D-13 i). ONE re-emit asks the builder to
+    rewrite ONLY the offenders under ``MAX_DESCRIPTION_CHARS``; then anything still over is
+    hard-truncated so NO returned candidate ever exceeds the cap. Best-effort + never-crash:
+    an honest-fail (``emitted`` is None) or an exception on the retry skips straight to
+    truncation (mirrors the ``build_candidates`` floor). Returns <=N candidates, de-duped,
+    order-preserving (already-fine first, then fitting rewrites, then truncated originals)."""
+    ok = [c for c in candidates if len(c) <= MAX_DESCRIPTION_CHARS]
+    over = [c for c in candidates if len(c) > MAX_DESCRIPTION_CHARS]
+
+    shortened: list[str] = []
+    if over:
+        prompt = (
+            f"Skill name: {name}\n"
+            f"These candidate descriptions are too long (over {MAX_DESCRIPTION_CHARS} "
+            f"characters). Rewrite EACH as ONE focused sentence UNDER "
+            f"{MAX_DESCRIPTION_CHARS} characters, keeping the concrete task + trigger. "
+            f"Return the shortened rewrites as candidates:\n\n"
+            + "\n".join(f"- {c[:200]}…" for c in over)
+        )
+        try:
+            result = await forced_emit(
+                messages=[{"role": "user", "content": prompt}],
+                model=builder_model,
+                provider=provider,
+                emitter="emit_candidates",
+                tools=_emit_tool("emit_candidates", CandidateDescriptions),
+                user_settings=user_settings,
+                system_prompt=_BUILDER_SYSTEM_PROMPT,
+                schema_model=CandidateDescriptions,
+                strict=False,
+            )
+            emitted = result.get("emitted")
+            if emitted is not None:
+                shortened = [
+                    c for c in (emitted.candidates or []) if isinstance(c, str) and c.strip()
+                ]
+        except Exception:  # pragma: no cover — best-effort; fall through to hard-truncation
+            logger.debug("auto-shorten retry failed; hard-truncating over-cap candidates", exc_info=True)
+
+    # Guarantee: every returned candidate is <= the cap. Prefer already-fine candidates, then
+    # the fitting rewrites, then hard-truncated originals as the never-crash backstop.
+    fits = [c for c in shortened if len(c) <= MAX_DESCRIPTION_CHARS]
+    truncated = [c[:MAX_DESCRIPTION_CHARS] for c in over]
+    out: list[str] = []
+    seen: set[str] = set()
+    for c in (*ok, *fits, *truncated):
+        if c and c not in seen:
+            seen.add(c)
+            out.append(c)
+        if len(out) >= n:
+            break
+    return out
 
 
 # ── Per-case classification (one forced_emit shot on each TARGET model) ──────────

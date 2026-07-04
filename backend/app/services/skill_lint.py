@@ -25,6 +25,11 @@ MIN_DESCRIPTION_CHARS = 25          # below this (and non-empty) = "too_short"
 MAX_DESCRIPTION_CHARS = 1024        # STD-01 ≤1024 hint — free length-bound
 NAME_ECHO_RATIO = 0.6               # > this fraction of desc tokens are just the name = "name_echo"
 
+# Phase 137.1-05 (D-13 ii) — a portable skill name is kebab-case (lowercase words joined
+# by single hyphens; digits allowed). This is an ADDITIVE, NEVER-BLOCKING warning: a
+# non-kebab name still saves (D-09 posture), it just travels less cleanly on import/export.
+_KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
 # A trigger verb signals an actionable description ("Use to generate…", "Convert…").
 TRIGGER_VERBS: set[str] = {
     "use", "when", "for", "to", "generate", "create", "analyze", "analyse",
@@ -160,6 +165,17 @@ def lint_description(
                         "Keep it to one focused sentence; move detail into the instructions."
                     ),
                 })
+
+        # Phase 137.1-05 (D-13 ii) — kebab-case name portability warning. Name-only, so it
+        # fires even when the description is empty; ADDITIVE + NEVER blocks save (D-09 posture).
+        if n and not _KEBAB_RE.match(n):
+            warnings.append({
+                "code": "name_not_kebab",
+                "message": (
+                    "Skill name isn't kebab-case (lowercase-with-hyphens). Portable skill "
+                    "names use kebab-case so they travel cleanly on import/export."
+                ),
+            })
 
         # Quality checks only when there is something to inspect.
         if d:
