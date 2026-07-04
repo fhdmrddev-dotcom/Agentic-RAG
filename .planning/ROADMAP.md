@@ -251,6 +251,7 @@ Plans:
   4. The judge can flag weak/non-discriminating test cases (`case_feedback`, surfaced per-case, never blocking) and per-arm wall-clock duration is captured alongside tokens (EVAL-05d/e; SEED-101 harvest).
   5. The judge model is selectable in Settings (single-provider/local-model orgs unblocked); BUG-260701-01 is re-tested post-`f47d6736` (fix at the gateway/adapter boundary if still live — D-14); BUG-260702-02 restart reconciliation closes orphaned `running` runs honestly (EVAL-05f/g).
   6. The judge evidence channel's new prompt surface (tool receipts as judge input) is formalized in the phase threat model — rubric data-posture + 4KB cap named as mitigations (EVAL-05h).
+  7. Folded SEED-100 harvest extras (discuss-phase 2026-07-04, CONTEXT D-13): description-builder 1024-char cap + auto-shorten retry, and additive lint warnings (kebab-case name + description length, never blocking); the Tuner failure-feedback iteration mode is explicitly OUT.
 
 **UI hint**: yes — matrix-run rows + determinate progress are new UI → **G-2 sketch proposed at discuss-phase** (extend the 053–057 Studio language; RunHistory/RunBar are the existing homes).
 **Guardrail note**: G-1 does not fire (first 137.x insert). D-14 red line: all provider fixes at the gateway/adapter/sanitizer boundary; the shared agent-loop path is never forked.

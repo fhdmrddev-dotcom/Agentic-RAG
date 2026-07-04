@@ -4,12 +4,12 @@ title: Agent-loop assistant prefill 400s on prefill-rejecting models (claude-son
 reported: 2026-07-01
 surface: Agentic-RAG
 severity: major
-status: deferred
+status: folded
 affected_areas: [backend/agent-loop, cross-provider/anthropic, skills/eval]
-folded_into: null
+folded_into: "137.1"
 verified_closed_by: null
 related_seeds: [SEED-100]
-re_open_trigger: "Routed at Phase 134 discuss (2026-07-01): 134 surfaces this HONESTLY as 'baseline errored — not measured' but does NOT fix it (the fix touches the shared agent-loop/gateway path = D-14 red line, so it gets its own focused phase). Re-open when SEED-100 (cross-provider eval-hardening phase) enters planning — strip/skip assistant-prefill for prefill-unsupported models at the gateway/adapter boundary per model capability. ALSO re-open immediately if the assistant-prefill 400 reproduces in Deep/Explorer chat on any Claude 4.6+/5 model (this is a shared-loop bug, not eval-only)."
+re_open_trigger: "Routed at Phase 134 discuss (2026-07-01): 134 surfaces this HONESTLY as 'baseline errored — not measured' but does NOT fix it (the fix touches the shared agent-loop/gateway path = D-14 red line, so it gets its own focused phase). Re-open when SEED-100 (cross-provider eval-hardening phase) enters planning — strip/skip assistant-prefill for prefill-unsupported models at the gateway/adapter boundary per model capability. ALSO re-open immediately if the assistant-prefill 400 reproduces in Deep/Explorer chat on any Claude 4.6+/5 model (this is a shared-loop bug, not eval-only). || Folded at /gsd:discuss-phase 137.1 (2026-07-04) per this trigger (SEED-100 entered planning): re-test post-f47d6736 FIRST; if still live, fix at gateway/adapter boundary (D-14)."
 reproduces_on:
   branch: develop
   commit: 362672fb

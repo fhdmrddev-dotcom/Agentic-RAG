@@ -4,12 +4,12 @@ title: In-flight eval/chat runs are orphaned on backend restart — stuck non-te
 reported: 2026-07-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/eval-runner, backend/run-lifecycle, backend/threads, frontend/run-status]
-folded_into: null
+folded_into: "137.1"
 verified_closed_by: null
 related_seeds: [SEED-100]
-re_open_trigger: "Reviewed at /gsd:discuss-phase 137 (2026-07-03) — NOT folded: backend reconciliation stays SEED-100. 137 owes only the DISPLAY half per the 055-B sketch contract: an interrupted eval run renders an honest banner + re-run affordance in the Studio run history (never a silent failure / stuck 'running')."
+re_open_trigger: "Reviewed at /gsd:discuss-phase 137 (2026-07-03) — NOT folded: backend reconciliation stays SEED-100. 137 owes only the DISPLAY half per the 055-B sketch contract: an interrupted eval run renders an honest banner + re-run affordance in the Studio run history (never a silent failure / stuck 'running'). || Folded at /gsd:discuss-phase 137.1 (2026-07-04): boot-time reconciliation sweep (eval->interrupted, chat->failed, stale streams dropped) is CONTEXT D-09/D-10."
 reproduces_on:
   branch: develop
   commit: 34834433
