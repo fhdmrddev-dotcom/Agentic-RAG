@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult, PublishGate } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult, PublishGate, MatrixRunKickoff, EngineHealthBoard, EvalAggregate } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -1765,6 +1765,86 @@ export async function rateEvalResult(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 137.1 (EVAL-05) — matrix runs, engine smoke-sweep health, and run-history
+// aggregation client. THIN wrappers over the Plan 04/05/07 routes; they mirror the
+// existing eval fetch + getAuthHeaders() shape and carry NO backend logic. Owner-
+// scoping is enforced SERVER-SIDE on every route (404 cross-user); this is a thin
+// client and not itself a security boundary. Each matrix arm rides the existing
+// eval_* SSE via subscribeToRun (its run_id), and the DURABLE readout still comes
+// from getEvalRun / getEvalRunById (the DB) after the Redis buffer TTL expires.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/matrix — kick off a matrix run (N single-provider arms
+ *  under one matrix_group_id; D-06). `gate_provider` designates the arm whose rows
+ *  feed the publish gate (D-05; defaults server-side to the user's active provider
+ *  when omitted). Returns the group id + per-arm kickoffs (202, non-blocking). */
+export async function startMatrixRun(
+  skillId: string,
+  body: { gate_provider?: string } = {},
+): Promise<MatrixRunKickoff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/matrix`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let detail = `Failed to start matrix run (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<MatrixRunKickoff>
+}
+
+/** POST /evals/engine-sweep — kick the skill-less cross-provider smoke sweep (D-02).
+ *  Returns the refreshed engine-health board (each provider ✓/✗ with its verbatim
+ *  error). Skill-less by design — the built-in in-memory fixture persists arms with
+ *  NULL skill_id (migration 085), so the sweep never pollutes a user's run history. */
+export async function runEngineSweep(): Promise<EngineHealthBoard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/engine-sweep`, { method: "POST", headers })
+  if (!res.ok) throw new Error("Failed to run engine sweep.")
+  return res.json() as Promise<EngineHealthBoard>
+}
+
+/** GET /evals/engine-health — the per-provider ✓/✗ smoke-sweep board (D-02 / 060-A).
+ *  A missing provider key renders as an honest ✗ with its verbatim error, never a
+ *  blocker. `swept_at` is null before the first sweep. */
+export async function getEngineHealth(): Promise<EngineHealthBoard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/engine-health`, { headers })
+  if (!res.ok) throw new Error("Failed to load engine health.")
+  return res.json() as Promise<EngineHealthBoard>
+}
+
+/** GET /evals/runs/{runId} — the SKILL-LESS run readout (D-02). Same run+results
+ *  shape as the skill-scoped getEvalRun, but keyed only by run_id so a NULL-skill
+ *  smoke-sweep arm (migration 085) is readable without a skill_id in the path.
+ *  Owner-scoped server-side (404 cross-user). */
+export async function getEvalRunById(runId: string): Promise<EvalRunReadout> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/runs/${runId}`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval run.")
+  return res.json() as Promise<EvalRunReadout>
+}
+
+/** GET /skills/{id}/evals/aggregate — mean±stddev/delta over the accumulated eval-run
+ *  history, grouped per (provider, model) (D-07). stddev is null at run_count<2; the
+ *  analyst_notes are deterministic backend-computed lines (D-08). Empty configs = no
+ *  history yet. */
+export async function getEvalAggregate(skillId: string): Promise<EvalAggregate> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/aggregate`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval aggregate.")
+  return res.json() as Promise<EvalAggregate>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Phase 135 (SI-01) — self-improvement proposal lifecycle helpers.
 //
 // The whole propose → review → approve → re-eval → promote/not-promote loop.
@@ -1943,6 +2023,13 @@ export interface FullAppSettings {
   // exists — the honest-None floor). Decoupled from the benchmark targets.
   skill_builder_model: string
   resolved_skill_builder_model: string | null
+  // Phase 137.1 (EVAL-05 / D-11, D-12) — the INDEPENDENT judge model knob (the model
+  // that grades eval answers + the publish gate). `harness_judge_model` is the raw
+  // setting ("" => unset); `resolved_harness_judge_model` is the strong registry
+  // default the resolver picks when unset (claude-opus-4-8; null only if no forceable
+  // default exists). Mirrors the skill_builder_model pair above; ONE resolver (D-11).
+  harness_judge_model: string
+  resolved_harness_judge_model: string | null
   llm_max_output_tokens: number
   openrouter_tool_strategy: "quality" | "native" | "xml"
   // Phase 075.3 D-075.3-13: registry-known model_ids — frontend uses this set
@@ -2000,6 +2087,9 @@ export interface SettingsUpdate {
   sub_agent_model?: string
   // Phase 123 (D-08) — the skill-builder model id (any provider incl. local; no SPOF).
   skill_builder_model?: string
+  // Phase 137.1 (D-12) — the independent judge model id (registry-validated server-side;
+  // "" clears back to the resolver default). Any provider incl. local — no SPOF.
+  harness_judge_model?: string
   llm_max_output_tokens?: number
   openrouter_tool_strategy?: "quality" | "native" | "xml"
 }
@@ -2030,6 +2120,26 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     throw new Error("Failed to save settings")
   }
   return res.json() as Promise<FullAppSettings>
+}
+
+// Phase 137.1 (EVAL-05 / D-11, D-12) — independent judge-model get/set. THIN wrappers
+// over getSettings / updateSettings (harness_judge_model is part of the settings
+// contract, not a dedicated endpoint — mirrors the skill_builder_model wiring). The
+// picker offers ONLY registry-known models (validated server-side, D-12); the effective
+// judge (resolve_judge_model → claude-opus-4-8 default) is shown when unset.
+
+/** Read the effective judge model. `judge_model` is the raw setting ("" => unset);
+ *  `resolved_judge_model` is the strong default the resolver picks (null only if no
+ *  forceable default exists — the honest-None floor). */
+export async function getJudgeModel(): Promise<{ judge_model: string; resolved_judge_model: string | null }> {
+  const s = await getSettings()
+  return { judge_model: s.harness_judge_model, resolved_judge_model: s.resolved_harness_judge_model }
+}
+
+/** Set the independent judge model (registry-validated server-side — D-12). Pass ""
+ *  to clear back to the resolver default. Returns the full refreshed settings. */
+export async function setJudgeModel(model: string): Promise<FullAppSettings> {
+  return updateSettings({ harness_judge_model: model })
 }
 
 // Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived

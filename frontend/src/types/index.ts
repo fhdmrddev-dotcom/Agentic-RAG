@@ -599,6 +599,12 @@ export interface EvalRun {
   passed_count: number | null
   measured_count: number | null
   verdict_summary: string | null
+  // Phase 137.1 (EVAL-05 / migration 085) — matrix grouping + gate-feeder flag.
+  // matrix_group_id groups the N single-provider arms of one matrix run (NULL on a
+  // single run). feeds_gate marks the ONE arm whose rows feed the publish gate (D-05;
+  // false on single runs and every pre-085 row — their gate read is unchanged).
+  matrix_group_id: string | null
+  feeds_gate: boolean
 }
 
 /** A durable eval_results row — one per (test_case × variant) (migration 080). */
@@ -630,12 +636,76 @@ export interface EvalResult {
   // Phase 134 (EVAL-04 / D-09) — the CALLER's own thumbs rating on this answer,
   // attached by get_eval_run from an owner-scoped eval_ratings read. null = unrated.
   rating: "up" | "down" | null
+  // Phase 137.1 (EVAL-05 / migration 085) — per-arm wall-clock (EVAL-05e; NULL on
+  // pre-085 rows) + advisory judge critique of the CASE (EVAL-05d). case_feedback is
+  // NEVER a verdict and never enters rollup math — it renders visually distinct from
+  // PASS/FAIL. Both NULL on old rows / un-graded arms.
+  duration_ms: number | null
+  case_feedback: string | null
 }
 
 /** GET /skills/{id}/evals/runs/{runId} response — the durable readout. */
 export interface EvalRunReadout {
   eval_run: EvalRun
   eval_results: EvalResult[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 137.1 (EVAL-05) — matrix runs, engine smoke-sweep health, and run-history
+// aggregation wire mirrors. Snake_case, no reshape — these mirror the Plan 04/05/07
+// route payloads the Studio + Settings consume. All owner-scoped SERVER-SIDE (thin
+// client, not itself a security boundary).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/matrix response (202 kickoff). One matrix run fans N
+ *  single-provider arms under ONE matrix_group_id; each arm is a normal EvalRunKickoff
+ *  and streams via subscribeToRun. Exactly one arm has feeds_gate=true (D-05). */
+export interface MatrixRunKickoff {
+  matrix_group_id: string
+  arms: EvalRunKickoff[]
+}
+
+/** One provider/model tile on the engine-health board (D-02 / 060-A). `healthy` is the
+ *  honest smoke-sweep outcome; `error` is the VERBATIM provider error string when
+ *  unhealthy (a missing key is an honest ✗, not a blocker); `run_id` deep-links to that
+ *  arm's run detail; `last_swept_at` is the ISO timestamp of the sweep (null if never). */
+export interface EngineHealthTile {
+  provider: string
+  model: string
+  healthy: boolean
+  error: string | null
+  run_id: string | null
+  last_swept_at: string | null
+}
+
+/** GET /evals/engine-health response — the per-provider ✓/✗ board (skill-less smoke
+ *  sweep, D-02). `swept_at` is the board-level sweep timestamp (null before the first
+ *  sweep). */
+export interface EngineHealthBoard {
+  tiles: EngineHealthTile[]
+  swept_at: string | null
+}
+
+/** One (provider, model) aggregation row over an eval run's HISTORY (D-07). `with_mean`
+ *  / `without_mean` are the mean pass-rates; `with_stddev` is NULL at run_count<2 (no
+ *  spread from a single run — the honest "first run" floor); `delta` = with_mean −
+ *  without_mean; `analyst_notes` are DETERMINISTIC backend-computed lines (D-08, never an
+ *  LLM paragraph). */
+export interface EvalConfigAgg {
+  provider: string
+  model: string
+  run_count: number
+  with_mean: number
+  without_mean: number
+  with_stddev: number | null
+  delta: number
+  analyst_notes: string[]
+}
+
+/** GET /skills/{id}/evals/aggregate response — mean±stddev/delta over accumulated run
+ *  history, grouped per (provider, model). Empty `configs` = no history yet. */
+export interface EvalAggregate {
+  configs: EvalConfigAgg[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────

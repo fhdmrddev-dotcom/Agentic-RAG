@@ -110,6 +110,14 @@ class JudgeVerdict(BaseModel):
     did_the_work_not_delegated: bool
     criteria: list[JudgeCriterionVerdict]
     summary: str
+    # Phase 137.1 (EVAL-05d): advisory judge critique of the TEST CASE itself — is the
+    # case weak / non-discriminating / ambiguous? This is ADVISORY only: it is NEVER
+    # blocking and NEVER a gate input (overall_passed remains the sole schema-bound
+    # pass/fail signal the gate derives from — T-137.1-02). Declared LAST with NO default
+    # (FINDING-04 above) so it lands in the strict `required` list and is OpenAI-strict-safe
+    # on ALL providers; the forced judge tool guarantees the model supplies it, so it can
+    # never be regex-parsed from prose. Anthropic/Google already emit it, so unaffected.
+    case_feedback: str
 
 
 # The FIXED rubric core (D-04). The three SEED-050 failure modes are baked in as
