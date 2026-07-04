@@ -2,7 +2,7 @@
 sketch: 060
 name: engine-health-card
 question: "How does the Settings Engine-health board answer 'how do I know the eval engine works for each provider without hand-running all 8' — per-provider ✓/✗, staleness always shown, Run sweep, links to the smoke runs — plus the shared judge-model knob?"
-winner: null
+winner: "A"
 tags: [phase-137.1, eval-05a, smoke-sweep, engine-health, settings, staleness, judge-model-knob, d-11, d-12]
 ---
 

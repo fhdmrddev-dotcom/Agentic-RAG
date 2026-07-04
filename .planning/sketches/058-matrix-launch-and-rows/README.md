@@ -2,7 +2,7 @@
 sketch: 058
 name: matrix-launch-and-rows
 question: "How does ONE click fan a skill's eval across N providers as N parallel run rows — launcher + gate-feeder designation, the matrix group in RunHistory, and the history-derived mean±stddev/delta aggregation + deterministic analyst notes?"
-winner: null
+winner: "A"
 tags: [phase-137.1, eval-05, matrix-runs, run-history, gate-feeder, aggregation, analyst-notes, 055-b-extension]
 ---
 

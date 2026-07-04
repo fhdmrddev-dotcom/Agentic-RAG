@@ -2,7 +2,7 @@
 sketch: 059
 name: determinate-progress-and-case-feedback
 question: "How does a RUNNING eval row read with determinate progress (units = cases × 2 arms + judge), per-arm wall-clock duration, and where does the judge's never-blocking case_feedback land in the run detail?"
-winner: null
+winner: "A"
 tags: [phase-137.1, eval-05, determinate-progress, per-arm-duration, case-feedback, run-row, 055-b-extension]
 ---
 
