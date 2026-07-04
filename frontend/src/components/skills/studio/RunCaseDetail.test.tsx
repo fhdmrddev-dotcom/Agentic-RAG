@@ -63,6 +63,9 @@ function makeResult(
     verdict_reason: `judge reason for ${variant}`,
     judge_model: "claude-opus-4-8",
     rating: null,
+    // Phase 137.1 (EVAL-05 / mig 085) — advisory-only fields (Plan 09 renders them).
+    duration_ms: null,
+    case_feedback: null,
     ...overrides,
   }
 }
@@ -201,5 +204,67 @@ describe("RunCaseDetail — honest verdicts + side-by-side arms + labeled thumbs
     // Clicking the other thumb sets that rating.
     await user.click(down)
     expect(onRate).toHaveBeenCalledWith("res-with", "down")
+  })
+})
+
+describe("RunCaseDetail — 059-A advisory case_feedback + ⏱ duration (EVAL-05d/e)", () => {
+  it("renders a non-empty case_feedback as a violet '◇ Judge on this case' advisory — distinct from PASS/FAIL, captioned never-blocks, verdict untouched", () => {
+    render(
+      <RunCaseDetail
+        testCase={makeCase()}
+        results={[
+          makeResult("with_skill", {
+            verdict_passed: true,
+            case_feedback: "The without-skill answer already covered the rubric, so this case did not discriminate.",
+          }),
+          makeResult("without_skill", { id: "res-wo", verdict_passed: true }),
+        ]}
+        onRate={vi.fn()}
+      />,
+    )
+    const advisory = screen.getByTestId("case-feedback")
+    expect(advisory.textContent).toMatch(/Judge on this case/i)
+    expect(advisory.textContent).toMatch(/did not discriminate/i)
+    // Advisory vocabulary — captioned "feedback only — never blocks the run".
+    expect(advisory.textContent).toMatch(/feedback only — never blocks the run/i)
+    // Violet (info) — NEVER a verdict tone (emerald/destructive/amber are verdicts).
+    const html = advisory.outerHTML
+    expect(html).toMatch(/accent-violet/)
+    expect(html).not.toMatch(/destructive|emerald|amber/)
+    // The verdict badge is UNCHANGED (honesty lock) — PASS still reads PASS, and the
+    // advisory is not a verdict chip.
+    expect(screen.getByTestId("verdict-chip-with_skill").textContent).toContain("PASS")
+  })
+
+  it("renders per-arm ⏱ duration beside the token line only when duration_ms is set", () => {
+    render(
+      <RunCaseDetail
+        testCase={makeCase()}
+        results={[
+          makeResult("with_skill", { duration_ms: 1840 }),
+          makeResult("without_skill", { id: "res-wo", duration_ms: null }),
+        ]}
+        onRate={vi.fn()}
+      />,
+    )
+    const dur = screen.getByTestId("duration-with_skill")
+    expect(dur.textContent).toMatch(/⏱/)
+    expect(dur.textContent).toMatch(/1840ms/)
+    // The without arm carries null duration → no ⏱ segment.
+    expect(screen.queryByTestId("duration-without_skill")).toBeNull()
+  })
+
+  it("renders NO advisory block when case_feedback is null on every arm", () => {
+    render(
+      <RunCaseDetail
+        testCase={makeCase()}
+        results={[
+          makeResult("with_skill", { case_feedback: null }),
+          makeResult("without_skill", { id: "res-wo", case_feedback: null }),
+        ]}
+        onRate={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId("case-feedback")).toBeNull()
   })
 })

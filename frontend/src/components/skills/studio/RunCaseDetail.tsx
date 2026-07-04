@@ -1,5 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 137 Plan 03 Task 1 (PANEL-01 / EVAL-03 / EVAL-04) — RunCaseDetail.
+// Phase 137.1 Plan 09 Task 2 (EVAL-05d/e / 059-A) — the judge's advisory
+// `case_feedback` as a violet "◇ Judge on this case" note (never a verdict, never in
+// the rollup) + per-arm `⏱ duration_ms` beside the token line (metadata, never a verdict).
 //
 // The per-case body of an expanded eval run (sketch 055-B "expandable rows"). It
 // is a PURE presentational leaf: EvalsTab (Plan 05) owns all state and passes the
@@ -61,6 +64,13 @@ export function RunCaseDetail({ testCase, results, onRate }: Props) {
   const byVariant: Partial<Record<string, EvalResult>> = {}
   for (const r of results) byVariant[r.variant] = r
 
+  // 059-A (EVAL-05d): the judge's ADVISORY critique of the CASE — never a verdict,
+  // never in the rollup. The judge annotates the case once, so it is sourced from the
+  // first arm that carries a non-empty `case_feedback` and rendered as a violet note
+  // (visually distinct from the PASS/FAIL chips). Absent → no advisory block renders.
+  const caseFeedback =
+    results.find((r) => r.case_feedback && r.case_feedback.trim())?.case_feedback ?? null
+
   return (
     <div
       data-testid="run-case-detail"
@@ -92,6 +102,24 @@ export function RunCaseDetail({ testCase, results, onRate }: Props) {
         >
           (this test case was removed)
         </p>
+      )}
+
+      {/* 059-A: the judge's advisory case critique — INFO, not a verdict. Violet +
+          dashed-left border (green/red are reserved for verdicts, amber for stale);
+          captioned never-blocks; NEVER enters the rollup or a pass count. */}
+      {caseFeedback && (
+        <div
+          data-testid="case-feedback"
+          className="flex flex-col gap-0.5 rounded-r-md border-l-2 border-dashed border-accent-violet/60 bg-accent-violet/5 py-1.5 pl-2.5"
+        >
+          <p className="text-[11px] leading-relaxed text-accent-violet-text">
+            <span aria-hidden>◇</span>{" "}
+            <span className="font-semibold">Judge on this case:</span> {caseFeedback}
+          </p>
+          <p className="text-[9px] uppercase tracking-wide text-accent-violet-text/80">
+            feedback only — never blocks the run
+          </p>
+        </div>
       )}
 
       {/* Side-by-side WITH / WITHOUT arms. */}
@@ -166,10 +194,17 @@ export function RunCaseDetail({ testCase, results, onRate }: Props) {
                 )
               )}
 
-              {/* Token counts. */}
-              {r && (r.input_tokens != null || r.output_tokens != null) && (
+              {/* Token counts + per-arm wall-clock duration (EVAL-05e). Duration is
+                  METADATA beside tokens — never a verdict. */}
+              {r && (r.input_tokens != null || r.output_tokens != null || r.duration_ms != null) && (
                 <p className="font-mono text-[9px] text-muted-foreground/70">
                   {r.input_tokens ?? "—"} → {r.output_tokens ?? "—"} tok
+                  {r.duration_ms != null && (
+                    <span data-testid={`duration-${v}`}>
+                      {" "}
+                      · <span aria-hidden>⏱</span> {r.duration_ms}ms
+                    </span>
+                  )}
                 </p>
               )}
 
