@@ -106,6 +106,9 @@ function mkRun(overrides: Partial<EvalRun> = {}): EvalRun {
     passed_count: 1,
     measured_count: 1,
     verdict_summary: null,
+    // Phase 137.1 (EVAL-05 / mig 085) — matrix grouping + gate-feeder flag (single run).
+    matrix_group_id: null,
+    feeds_gate: false,
     ...overrides,
   }
 }
@@ -131,6 +134,9 @@ function mkResult(overrides: Partial<EvalResult> = {}): EvalResult {
     verdict_reason: "meets the bar",
     judge_model: "claude-judge",
     rating: null,
+    // Phase 137.1 (EVAL-05 / mig 085) — advisory-only per-arm fields (Plan 09 renders).
+    duration_ms: null,
+    case_feedback: null,
     ...overrides,
   }
 }
