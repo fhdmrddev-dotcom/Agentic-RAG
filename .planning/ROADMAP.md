@@ -63,7 +63,7 @@
 - [x] **Phase 135: Self-Improvement Loop (SI-01)** — propose instruction diff → human approve → new version → auto-re-eval gate (SI-01) — verified 2026-07-02 (5/5 truths + live SC#10 UAT U1-U11: 10 passed, 1 blocked third-party); secured 2026-07-03 (threats_open 0)
 - [x] **Phase 136: Skill Publish Gate (GATE-01)** — publish blocked until an eval passes; future publishes only (GATE-01) — complete + secured 2026-07-03 (`d78e9778`)
 - [x] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01) — UAT 13/13 2026-07-04; secured 2026-07-04 (threats_open 0, `7850cf72`)
-- [ ] **Phase 137.1: Skill Eval Production-Clean (INSERTED)** — cross-provider smoke sweep + matrix runs + determinate progress + judge case_feedback + per-arm duration + judge-model knob + bug closures (EVAL-05 / SEED-100)
+- [x] **Phase 137.1: Skill Eval Production-Clean (INSERTED)** — cross-provider smoke sweep + matrix runs + determinate progress + judge case_feedback + per-arm duration + judge-model knob + bug closures (EVAL-05 / SEED-100) — complete 2026-07-05 (10/10 plans); secured (threats_open 0, `0fd0babb`) + validated (Nyquist; backend 120 / frontend 60 green, `f794eae4`) + UAT 9/9 (`dfc1be2c`)
 - [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101)
 - [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
 - [ ] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02)
@@ -256,16 +256,16 @@ Plans:
 **UI hint**: yes — matrix-run rows + determinate progress are new UI → **G-2 sketch proposed at discuss-phase** (extend the 053–057 Studio language; RunHistory/RunBar are the existing homes).
 **Guardrail note**: G-1 does not fire (first 137.x insert). D-14 red line: all provider fixes at the gateway/adapter/sanitizer boundary; the shared agent-loop path is never forked.
 **Plans:** 10 plans (planned 2026-07-04, revised same day per plan-checker) — 5 waves
-- [ ] 137.1-01-PLAN.md — Contracts & migration 085 (matrix/gate/duration/case_feedback columns + nullable skill FKs for the skill-less sweep + JudgeVerdict field + TS types + api fns) [W1, autonomous:false — BLOCKING SQL apply]
-- [ ] 137.1-02-PLAN.md — Eval runner: per-arm duration timer + advisory case_feedback capture + NULL-tolerant persist for sweep arms (EVAL-05d/e/h) [W2]
-- [ ] 137.1-03-PLAN.md — Boot-time run reconciler (eval→interrupted, chat→failed) + lifespan mount (EVAL-05g / BUG-260702-02) [W1]
-- [ ] 137.1-04-PLAN.md — Matrix launch + skill-less engine smoke-sweep + GET engine-health board routes (one group claim, one gate-feeder) (EVAL-05a/b) [W3]
-- [ ] 137.1-05-PLAN.md — Judge-model settings API (registry-validated) + D-13 extras (kebab lint + 1024 cap) (EVAL-05f) [W1]
-- [ ] 137.1-06-PLAN.md — Provider bug re-tests (BUG-260701-01 / -260630-01) + conditional adapter-boundary fixes (EVAL-05g / D-14) [W1, autonomous:false]
-- [ ] 137.1-07-PLAN.md — Deterministic aggregation (mean±σ/Δ over history) + analyst-note rules + owner-scoped endpoint (EVAL-05b) [W4]
-- [ ] 137.1-08-PLAN.md — Studio matrix launch + live grouped card + determinate unit bar (058-A/059-A) [W4]
-- [ ] 137.1-09-PLAN.md — Aggregation footer + analyst notes + inline violet case_feedback + duration (058-A/059-A) [W5]
-- [ ] 137.1-10-PLAN.md — Settings Engine-health tile board + registry-only judge-model picker (060-A) (EVAL-05a/f) [W4]
+- [x] 137.1-01-PLAN.md — Contracts & migration 085 (matrix/gate/duration/case_feedback columns + nullable skill FKs for the skill-less sweep + JudgeVerdict field + TS types + api fns) [W1, autonomous:false — BLOCKING SQL apply]
+- [x] 137.1-02-PLAN.md — Eval runner: per-arm duration timer + advisory case_feedback capture + NULL-tolerant persist for sweep arms (EVAL-05d/e/h) [W2]
+- [x] 137.1-03-PLAN.md — Boot-time run reconciler (eval→interrupted, chat→failed) + lifespan mount (EVAL-05g / BUG-260702-02) [W1]
+- [x] 137.1-04-PLAN.md — Matrix launch + skill-less engine smoke-sweep + GET engine-health board routes (one group claim, one gate-feeder) (EVAL-05a/b) [W3]
+- [x] 137.1-05-PLAN.md — Judge-model settings API (registry-validated) + D-13 extras (kebab lint + 1024 cap) (EVAL-05f) [W1]
+- [x] 137.1-06-PLAN.md — Provider bug re-tests (BUG-260701-01 / -260630-01) + conditional adapter-boundary fixes (EVAL-05g / D-14) [W1, autonomous:false]
+- [x] 137.1-07-PLAN.md — Deterministic aggregation (mean±σ/Δ over history) + analyst-note rules + owner-scoped endpoint (EVAL-05b) [W4]
+- [x] 137.1-08-PLAN.md — Studio matrix launch + live grouped card + determinate unit bar (058-A/059-A) [W4]
+- [x] 137.1-09-PLAN.md — Aggregation footer + analyst notes + inline violet case_feedback + duration (058-A/059-A) [W5]
+- [x] 137.1-10-PLAN.md — Settings Engine-health tile board + registry-only judge-model picker (060-A) (EVAL-05a/f) [W4]
 
 #### Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED 2026-07-04)
 
