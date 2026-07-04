@@ -65,7 +65,7 @@ from app.models.eval_run import (
     SkillProposalResponse,
     StartEvalRunBody,
 )
-from app.services import eval_runner_service, skill_proposer_service
+from app.services import eval_aggregation, eval_runner_service, skill_proposer_service
 
 logger = logging.getLogger(__name__)
 
@@ -2317,6 +2317,84 @@ async def start_matrix_run(
     _spawn_group_release(redis, skill_id, group_id, arm_tasks)
 
     return {"matrix_group_id": str(group_id), "arms": arms}
+
+
+# ── GET aggregate — per-config mean±stddev/delta over run HISTORY + analyst notes (D-07/D-08) ──
+@router.get("/{skill_id}/evals/aggregate")
+async def get_eval_aggregate(
+    skill_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the per-config aggregation (mean±stddev/delta over accumulated run HISTORY) + the
+    deterministic D-08 analyst notes for a skill (EVAL-05b / D-07 / D-08 — the Studio renders this
+    VERBATIM, Plan 09).
+
+    Owner-gate FIRST (404 cross-user — T-133-01 carried), read the caller's COMPLETED eval-run
+    history for this skill owner-scoped (``.eq user_id``; a partial / interrupted run has no honest
+    run-level rollup, so only ``completed`` runs are samples), read those runs' ``eval_results`` in
+    ONE bounded owner-scoped ``.in_`` read, then DELEGATE all aggregation math + fixed phrasing to
+    the pure ``eval_aggregation`` module (NO inline stats here — the honesty locks + analyst-note
+    phrasing live in ONE testable place, RESEARCH OQ4). A never-evaluated skill returns the honest
+    empty ``{configs: []}`` (200, not 404). Every blocking supabase-py call is threadpool-wrapped
+    (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner gate FIRST — 404 cross-user before any history is read (T-133-01).
+    await _verify_owned_skill(supabase, skill_id, user_id)
+
+    # 2. The caller's COMPLETED run history for this skill (owner-scoped; completed = honest samples —
+    #    a partial run has no run-level rollup to average).
+    def _read_runs():
+        return (
+            supabase.table("eval_runs")
+            .select("id, provider, model, status, created_at")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .order("created_at")
+            .execute()
+        )
+
+    runs = list((await run_in_threadpool(_read_runs)).data or [])
+    if not runs:
+        # Never evaluated — the honest empty aggregate (200, not 404).
+        return {"configs": []}
+
+    run_ids = [str(r["id"]) for r in runs]
+
+    # 3. Those runs' eval_results in ONE bounded owner-scoped read (.in_ the run ids) — never
+    #    over-fetches beyond this skill's completed runs.
+    def _read_results():
+        return (
+            supabase.table("eval_results")
+            .select(
+                "eval_run_id, provider, model, test_case_id, variant, "
+                "verdict_state, verdict_passed, verdict_score, duration_ms"
+            )
+            .in_("eval_run_id", run_ids)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    results = list((await run_in_threadpool(_read_results)).data or [])
+
+    # 4. Embed each run's results, then feed the rows into the pure module. ALL math + phrasing is
+    #    delegated — the route does no stats (aggregate_configs → analyst_notes → to_wire).
+    by_run: dict[str, list[dict]] = {}
+    for r in results:
+        by_run.setdefault(str(r.get("eval_run_id")), []).append(r)
+    history = [
+        {
+            "provider": run.get("provider"),
+            "model": run.get("model"),
+            "results": by_run.get(str(run["id"]), []),
+        }
+        for run in runs
+    ]
+    configs = eval_aggregation.aggregate_configs(history)
+    notes = eval_aggregation.analyst_notes(configs, results)
+    return eval_aggregation.to_wire(configs, notes)
 
 
 # ── The engine-health board (D-02/D-03) — built from the caller's LATEST skill-less sweep group ──
