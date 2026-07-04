@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target, Maximize2, ExternalLink } from "lucide-react"
+import { Paperclip, FileText, Trash2, Loader2, AlertTriangle, Target, Maximize2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -418,14 +418,9 @@ interface SkillDetailPanelProps {
    *  forked) that opens the Trigger Tuner for a skill. The inline lint's "Tune
    *  this" button fires it with the saved skill's id. */
   onTuneSkill?: (skillId: string) => void
-  /** Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06 / D-07): the SOLE "Open studio"
-   *  navigator. The panel's status section owns the app's single studio-entry button
-   *  (Plan 06 deliberately added no second one). Threaded App → ChatLayout →
-   *  SkillsPage → here. */
-  onOpenStudio?: (skillId: string, tab?: "evals" | "triggering" | "versions") => void
 }
 
-export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTuneSkill, onOpenStudio }: SkillDetailPanelProps) {
+export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTuneSkill }: SkillDetailPanelProps) {
   const isEdit = !!skill
   const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
 
@@ -605,19 +600,6 @@ export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId, onTu
                 : "not evaled yet"}
             </p>
 
-            {/* The app's SINGLE "Open studio" control (057 MAP) — opens the Studio's
-                Evals tab for this skill. */}
-            {onOpenStudio && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-center gap-2"
-                onClick={() => onOpenStudio(savedSkillId, "evals")}
-              >
-                <ExternalLink className="h-4 w-4" />
-                Open studio
-              </Button>
-            )}
           </div>
         )}
       </div>

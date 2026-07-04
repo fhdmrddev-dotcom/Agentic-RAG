@@ -268,7 +268,6 @@ describe("SkillDetailPanel — slimmed panel: shared stepper + Open studio, sect
         onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
         onDiscard={vi.fn()}
         currentUserId="user-1"
-        onOpenStudio={vi.fn()}
       />,
     )
 
@@ -291,16 +290,14 @@ describe("SkillDetailPanel — slimmed panel: shared stepper + Open studio, sect
         onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
         onDiscard={vi.fn()}
         currentUserId="user-1"
-        onOpenStudio={vi.fn()}
       />,
     )
 
     await waitFor(() => expect(screen.getByText(/not evaled yet/i)).toBeInTheDocument())
   })
 
-  it("Open studio button calls onOpenStudio with (skillId, 'evals') — the sole studio entry", async () => {
-    const user = userEvent.setup()
-    const onOpenStudio = vi.fn()
+  it("no longer renders an Open studio button in the status section (relocated to the panel header)", async () => {
+    listTestCases.mockResolvedValue([{ id: "c1" }])
     const skill = mkSkill({ id: "skill-77" })
     render(
       <SkillDetailPanel
@@ -308,13 +305,12 @@ describe("SkillDetailPanel — slimmed panel: shared stepper + Open studio, sect
         onSave={vi.fn(async (): Promise<Skill> => mkSkill())}
         onDiscard={vi.fn()}
         currentUserId="user-1"
-        onOpenStudio={onOpenStudio}
       />,
     )
 
-    const btn = await screen.findByRole("button", { name: /open studio/i })
-    await user.click(btn)
-
-    expect(onOpenStudio).toHaveBeenCalledWith("skill-77", "evals")
+    // The status section stays (stepper + counts); its studio-entry button is GONE —
+    // the sole "Open Studio" entry now lives at the top of the SkillsPage panel header.
+    await waitFor(() => expect(screen.getByText("Gate")).toBeInTheDocument())
+    expect(screen.queryByRole("button", { name: /open studio/i })).not.toBeInTheDocument()
   })
 })

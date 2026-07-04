@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { Plus, Zap, Upload, Loader2, Target } from "lucide-react"
+import { Plus, Zap, Upload, Loader2, FlaskConical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSkills } from "@/hooks/useSkills"
 import { useAuth } from "@/hooks/useAuth"
@@ -193,16 +193,15 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
                 saved skill, never while creating). This is the reachability entry
                 point: onTuneSkill(id) → App's tunerSkillId setter +
                 onNavigate('skill-tuner'). */}
-            {selectedSkill && onTuneSkill && (
+            {selectedSkill && onOpenStudio && (
               <div className="px-6 pt-4 shrink-0">
                 <Button
-                  variant="outline"
                   size="sm"
                   className="w-full justify-center gap-2"
-                  onClick={() => onTuneSkill(selectedSkill.id)}
+                  onClick={() => onOpenStudio(selectedSkill.id, "evals")}
                 >
-                  <Target className="h-4 w-4" />
-                  Tune triggers
+                  <FlaskConical className="h-4 w-4" />
+                  Open Studio
                 </Button>
               </div>
             )}
@@ -213,7 +212,6 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
                 onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
                 currentUserId={user?.id}
                 onTuneSkill={onTuneSkill}
-                onOpenStudio={onOpenStudio}
               />
             </div>
           </div>
