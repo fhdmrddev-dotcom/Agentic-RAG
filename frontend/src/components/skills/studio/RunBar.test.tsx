@@ -127,7 +127,8 @@ describe("RunBar — 058-A matrix launcher (EVAL-05 / D-05 / D-06)", () => {
   })
 
   it("disables the matrix button when no providers are configured", () => {
-    render(<RunBar {...baseProps} {...matrixProps} configuredProviders={[]} />)
+    // gateProvider="" matches the lone "No providers" option (no controlled-select mismatch).
+    render(<RunBar {...baseProps} {...matrixProps} configuredProviders={[]} gateProvider="" />)
     expect(screen.getByRole("button", { name: /run matrix \(0 configured\)/i })).toBeDisabled()
   })
 })
