@@ -343,3 +343,35 @@ link on the unmet branch (closing the "gate only discoverable in the dialog" com
 | 055 | run-history-and-detail | How does the eval run history read, and how does drilling into per-case side-by-side WITH/WITHOUT outputs + honest verdicts (graded / not_measured / judge_error) + inline thumbs ratings feel? | **B — Expandable rows** ★ | phase-137, panel-01, eval-03, eval-04, run-history, side-by-side, ratings, honest-verdicts, drill-in |
 | 056 | version-history-and-diff | How do immutable versions read — which is LIVE, diff between versions, provenance (manual / proposal-promoted / forced-override), per-version eval binding — and where does the 135 proposal card terminally rest? | **B — Table + compare picker** ★ | phase-137, panel-01, ver-01, si-01, version-history, diff, provenance, promotion-gate |
 | 057 | skill-studio-linkage | With Tuner ⟷ Evals LOCKED as unified Skill Studio tabs, how do the tabs compose (persistent-header+3-tabs / Overview-landing / two-tabs) — and what is the complete every-button→destination navigation contract (incl. Tuner absorption + the PublishGateDialog seam)? | **A — Header + 3 tabs** ★ | phase-137, panel-01, skill-studio, tabs, ia, nav-map, linkage, tuner-absorption, reference |
+
+### Phase 137.1 session — Skill Eval Production-Clean (2026-07-04)
+
+G-2 fired on Phase 137.1 (EVAL-05 / SEED-100 promoted) — the three net-new UI surfaces:
+matrix-run rows, determinate run progress, and the Settings Engine-health card. The
+sketches EXTEND the 053–057 Studio language (055-B expandable-row grammar is the locked
+base — the matrix is a group OF those rows, never a new surface; the shipped
+`RunBar`/`RunHistory`/`RunCaseDetail` are the homes). Grounded in `137.1-CONTEXT.md`
+(D-01..D-14): D-05 explicit gate-feeder (ONE config feeds the publish gate, default =
+the active provider, others analysis-only), D-07 aggregation = mean±stddev/delta per
+config across accumulated run HISTORY (stddev only at ≥2 runs — ×1 run per provider per
+click, no repeat knob), D-08 deterministic analyst notes with fixed phrasing (never an
+LLM paragraph), D-01/D-02 the smoke sweep IS a matrix run over a hidden built-in smoke
+case asserting ENGINE health (✗ = a VERBATIM provider error, never engine-shaped; a
+model may honestly fail the case and still be a healthy row), D-03/D-04 Settings board
+with staleness-always-shown + on-demand only, D-11/D-12 the shared `harness_judge_model`
+knob (UI-only — the setting exists end-to-end; registry-validated picker; effective
+default `claude-opus-4-8` shown when unset). Honest-state vocabulary carries from
+134/137: `not_measured` excluded-never-failed with the verbatim provider error, no
+mid-run verdicts, one-truth gate. Unit math = cases × 2 arms + 1 judge step (judge as
+ONE unit — confirm at plan). Per-arm wall-clock duration renders live (checklist) and
+at rest (arm cards, next to tokens). The judge `case_feedback` is ADVISORY — violet
+info vocabulary, never blended with verdict chips. Provider marks in the sketches are
+placeholders — the build uses the single-source `@lobehub/icons` 048 map. Each sketch
+carries a live sim (launch a matrix / a run / a sweep and watch it) for the G-4
+lived-experience bar. Winners TBD (awaiting operator review).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 058 | matrix-launch-and-rows | How does ONE click fan a skill's eval across N providers as N parallel run rows — launcher + D-05 gate-feeder designation (the all-configured-vs-checkboxes discretion is the variant axis), the matrix group inside the 055-B run history, and the D-07 history-derived mean±stddev/Δ aggregation + D-08 deterministic analyst notes? | TBD | phase-137.1, eval-05, matrix-runs, run-history, gate-feeder, aggregation, analyst-notes, 055-b-extension |
+| 059 | determinate-progress-and-case-feedback | How does a RUNNING eval row read with determinate progress (units = cases × 2 arms + judge), per-arm wall-clock duration live + at rest, and where does the judge's never-blocking case_feedback land — inline block, weak-case tag, or run-level digest? | TBD | phase-137.1, eval-05, determinate-progress, per-arm-duration, case-feedback, run-row, 055-b-extension |
+| 060 | engine-health-card | How does the Settings Engine-health board answer "how do I know the engine works for all 8 without hand-running them" — tile board / row list / posture strip, staleness always shown, verbatim provider errors, links to smoke runs — plus the shared judge-model knob (D-11/D-12)? | TBD | phase-137.1, eval-05a, smoke-sweep, engine-health, settings, staleness, judge-model-knob |
