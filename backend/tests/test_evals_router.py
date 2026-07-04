@@ -587,3 +587,125 @@ async def test_engine_sweep_no_skill_view_leak(monkeypatch):
     # The skill-scoped run-list read for a REAL owned skill returns NONE of the sweep rows.
     skill_runs = await evals.list_eval_runs(real_skill, current_user=OWNER, supabase=sb)
     assert skill_runs == [], "NULL-skill sweep rows must not leak into a skill's run history"
+
+
+# ── Task 3: GET engine-health board + skill-less run readout (D-03) ──
+
+
+def _sweep_run(*, group, provider, model, status="completed", created_at, user=OWNER, error=None):
+    """One skill-less sweep eval_runs row (skill_id / skill_version_id NULL, matrix_group_id set)."""
+    return {
+        "id": str(uuid4()), "skill_id": None, "skill_version_id": None, "user_id": user["id"],
+        "provider": provider, "model": model, "status": status, "case_count": 1,
+        "matrix_group_id": group, "feeds_gate": False, "created_at": created_at, "error": error,
+    }
+
+
+@pytest.mark.asyncio
+async def test_engine_health_latest_group_only():
+    """D-03: the board returns ONLY the caller's LATEST sweep group — an older sweep group is ignored,
+    and ``swept_at`` is the newest arm's created_at."""
+    from app.api import evals
+
+    old_group, new_group = str(uuid4()), str(uuid4())
+    runs = [
+        _sweep_run(group=old_group, provider="openai", model="gpt-4o", created_at="2026-07-04T00:00:00Z"),
+        _sweep_run(group=new_group, provider="anthropic", model="m1", created_at="2026-07-04T01:00:00Z"),
+        _sweep_run(group=new_group, provider="google", model="m2", created_at="2026-07-04T01:00:01Z"),
+    ]
+    sb = _FilterSupabase({"eval_runs": runs, "eval_results": []})
+
+    board = await evals.get_engine_health(current_user=OWNER, supabase=sb)
+    assert {t["provider"] for t in board["tiles"]} == {"anthropic", "google"}  # latest group only
+    assert board["swept_at"] == "2026-07-04T01:00:01Z"
+
+
+@pytest.mark.asyncio
+async def test_engine_health_owner_scoped():
+    """D-03: another user's sweep is INVISIBLE — even when it is NEWER — the board is owner-scoped."""
+    from app.api import evals
+
+    owner_group, other_group = str(uuid4()), str(uuid4())
+    runs = [
+        _sweep_run(group=owner_group, provider="anthropic", model="m1", created_at="2026-07-04T01:00:00Z"),
+        # OTHER_USER's sweep is newer, but must never appear on OWNER's board.
+        _sweep_run(group=other_group, provider="openai", model="m2", created_at="2026-07-04T02:00:00Z", user=OTHER_USER),
+    ]
+    sb = _FilterSupabase({"eval_runs": runs, "eval_results": []})
+
+    board = await evals.get_engine_health(current_user=OWNER, supabase=sb)
+    assert {t["provider"] for t in board["tiles"]} == {"anthropic"}
+    assert board["swept_at"] == "2026-07-04T01:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_engine_health_never_swept_empty():
+    """D-03: never swept -> the honest empty board (200 with tiles=[] + swept_at=null), NOT a 404/500."""
+    from app.api import evals
+
+    sb = _FilterSupabase({"eval_runs": [], "eval_results": []})
+    board = await evals.get_engine_health(current_user=OWNER, supabase=sb)
+    assert board == {"tiles": [], "swept_at": None}
+
+
+@pytest.mark.asyncio
+async def test_engine_health_verbatim_error_and_healthy_null():
+    """D-02/D-03: an unhealthy tile carries the VERBATIM provider error (not an engine-shaped message);
+    a healthy tile (completed + graded) carries error=null. The tile run_id deep-links to the arm."""
+    from app.api import evals
+
+    group = str(uuid4())
+    healthy_run = _sweep_run(group=group, provider="anthropic", model="m1", created_at="2026-07-04T01:00:00Z")
+    sick_run = _sweep_run(group=group, provider="openai", model="m2", status="failed", created_at="2026-07-04T01:00:00Z")
+    results = [
+        {"id": str(uuid4()), "eval_run_id": healthy_run["id"], "test_case_id": None, "user_id": OWNER["id"],
+         "variant": "with_skill", "verdict_state": "graded", "verdict_passed": True, "error": None},
+        {"id": str(uuid4()), "eval_run_id": sick_run["id"], "test_case_id": None, "user_id": OWNER["id"],
+         "variant": "with_skill", "verdict_state": "not_measured", "verdict_passed": None,
+         "error": "AuthenticationError: no api key configured for openai"},
+    ]
+    sb = _FilterSupabase({"eval_runs": [healthy_run, sick_run], "eval_results": results})
+
+    board = await evals.get_engine_health(current_user=OWNER, supabase=sb)
+    tiles = {t["provider"]: t for t in board["tiles"]}
+    assert tiles["anthropic"]["healthy"] is True and tiles["anthropic"]["error"] is None
+    assert tiles["openai"]["healthy"] is False
+    assert tiles["openai"]["error"] == "AuthenticationError: no api key configured for openai"
+    assert tiles["openai"]["run_id"] == sick_run["id"]  # deep-link target
+
+
+@pytest.mark.asyncio
+async def test_skillless_readout_owner_scoped():
+    """D-03: a NULL-skill sweep run is READABLE by its owner via GET /evals/runs/{id} (no skill_id
+    filter), returning the get_eval_run-shaped run + results — the existing skill-scoped readout
+    (``.eq("skill_id", …)``) could NEVER match a NULL-skill row, so this route makes tile deep-links
+    resolvable."""
+    from app.api import evals
+
+    run = _sweep_run(group=str(uuid4()), provider="anthropic", model="m1", created_at="2026-07-04T01:00:00Z")
+    results = [{
+        "id": str(uuid4()), "eval_run_id": run["id"], "test_case_id": None, "user_id": OWNER["id"],
+        "variant": "with_skill", "provider": "anthropic", "model": "m1", "output": "PONG",
+        "status": "completed", "verdict_state": "graded", "verdict_passed": True,
+        "created_at": "2026-07-04T01:00:01Z",
+    }]
+    sb = _FilterSupabase({"eval_runs": [run], "eval_results": results, "eval_ratings": []})
+
+    readout = await evals.get_eval_run_by_id(UUID(run["id"]), current_user=OWNER, supabase=sb)
+    assert readout["eval_run"]["id"] == run["id"]
+    assert readout["eval_run"]["skill_id"] is None  # a NULL-skill sweep run is readable by its owner
+    assert len(readout["eval_results"]) == 1 and readout["eval_results"][0]["output"] == "PONG"
+    assert readout["eval_results"][0]["rating"] is None  # ratings merge (get_eval_run shape parity)
+
+
+@pytest.mark.asyncio
+async def test_run_by_id_cross_user_404():
+    """D-03 / T-133-01: a cross-user run_id returns 404 (never 403) — owner-scoped on BOTH reads."""
+    from app.api import evals
+
+    run = _sweep_run(group=str(uuid4()), provider="anthropic", model="m1", created_at="2026-07-04T01:00:00Z")
+    sb = _FilterSupabase({"eval_runs": [run], "eval_results": []})
+
+    with pytest.raises(HTTPException) as exc:
+        await evals.get_eval_run_by_id(UUID(run["id"]), current_user=OTHER_USER, supabase=sb)
+    assert exc.value.status_code == 404

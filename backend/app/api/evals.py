@@ -2493,3 +2493,88 @@ async def run_engine_sweep(
     _spawn_group_release(redis, sweep_key, group_id, arm_tasks)
 
     return await _build_engine_health_board(supabase, user_id)
+
+
+# ── GET — the caller's latest engine-health board (D-03, on-demand; no cache, no scheduler) ──
+@router_evals.get("/engine-health")
+async def get_engine_health(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the caller's LATEST smoke-sweep board (``EngineHealthBoard`` — the Settings card's data
+    source, D-03). Owner-scoped (it reads only the caller's sweep groups); another user's sweep is
+    invisible; never-swept returns the honest empty board (``{tiles: [], swept_at: null}``, 200) — not
+    a 404. ``healthy`` is derived SERVER-SIDE + honestly (completed + graded = healthy; failed /
+    not_measured / judge_error render ``healthy=false`` with the VERBATIM provider error). On-demand
+    only — no cache, no scheduler (D-04); the board itself displays staleness via ``swept_at``."""
+    return await _build_engine_health_board(supabase, current_user["id"])
+
+
+# ── GET — the SKILL-LESS run readout (makes every engine-health tile's run_id deep-link resolvable) ──
+@router_evals.get("/runs/{run_id}")
+async def get_eval_run_by_id(
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return the eval_run + its eval_results for ANY of the caller's runs BY ID — including NULL-skill
+    sweep rows — with NO ``skill_id`` filter (D-03).
+
+    The existing skill-scoped readout ``GET /skills/{skill_id}/evals/runs/{run_id}`` filters
+    ``.eq("skill_id", skill_id)``, so a NULL-skill sweep row can NEVER match it — that is why this
+    skill-less route exists: it makes every engine-health tile's ``run_id`` deep-link resolvable
+    (Plan 10 consumes it via ``getEvalRunById``). Owner-scoped ``.eq("user_id")`` on BOTH reads,
+    404-never-403 on a cross-user / missing run (T-133-01). Returns the SAME run+results shape as
+    ``get_eval_run`` (including the caller's merged thumbs rating). All calls threadpool-wrapped
+    (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    def _read_run():
+        return (
+            supabase.table("eval_runs")
+            .select("*")
+            .eq("id", str(run_id))
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    run_rows = list((await run_in_threadpool(_read_run)).data or [])
+    if not run_rows:
+        # 404 (never 403) — don't leak the run's existence to another user (T-133-01).
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Eval run not found")
+    eval_run = run_rows[0]
+
+    def _read_results():
+        return (
+            supabase.table("eval_results")
+            .select("*")
+            .eq("eval_run_id", str(run_id))
+            .eq("user_id", user_id)
+            .order("created_at")
+            .execute()
+        )
+
+    results = list((await run_in_threadpool(_read_results)).data or [])
+
+    # Merge the caller's own thumbs rating onto each result (get_eval_run shape parity — EVAL-04).
+    # A bounded (.in_) owner-scoped read, so it never over-fetches or drops this run's ratings.
+    result_ids = {r["id"] for r in results}
+    if result_ids:
+        def _read_ratings():
+            return (
+                supabase.table("eval_ratings")
+                .select("eval_result_id, rating")
+                .eq("user_id", user_id)
+                .in_("eval_result_id", list(result_ids))
+                .execute()
+            )
+
+        rating_map = {
+            row["eval_result_id"]: row["rating"]
+            for row in ((await run_in_threadpool(_read_ratings)).data or [])
+        }
+        for r in results:
+            r["rating"] = rating_map.get(r["id"])
+
+    return {"eval_run": eval_run, "eval_results": results}
