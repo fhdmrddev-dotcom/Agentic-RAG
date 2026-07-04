@@ -213,12 +213,19 @@ async def _build_response(s=None) -> FullSettingsResponse:
         sub_agent_model=s.sub_agent_model,
         resolved_sub_agent_model=resolve_sub_agent_model(s),
         # Phase 123 (D-08) — the raw knob + the resolved label (strong default when unset).
-        skill_builder_model=s.skill_builder_model,
+        # `or ""` — same None-into-str guard as harness_judge_model below: skill_builder_model
+        # also defaults to None (config.py:1020), which would 500 GET /settings for a fresh-DB
+        # user who never opened the 123.1 picker. "" is the response contract's unset sentinel.
+        skill_builder_model=s.skill_builder_model or "",
         resolved_skill_builder_model=resolve_skill_builder_model(s),
         # Phase 137.1-05 (EVAL-05f / D-11) — the shared judge knob + its resolved label.
         # resolve_judge_model is the ONE source of truth (eval + publish judge); the raw
         # value is "" when unset and the resolved label surfaces the effective default.
-        harness_judge_model=s.harness_judge_model,
+        # `or ""` coerces the config default (None when unset — config.py:1006) to the
+        # documented "" sentinel the response contract requires (str, non-nullable, line
+        # 88). Without it a fresh/unset judge model 500s GET /settings ("failed to fetch"
+        # on the whole Settings page — the unit test only ever passed "", never None).
+        harness_judge_model=s.harness_judge_model or "",
         resolved_harness_judge_model=resolve_judge_model(s),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).

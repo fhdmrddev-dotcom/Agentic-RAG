@@ -142,6 +142,28 @@ async def test_build_response_wires_shared_judge_resolver(monkeypatch):
     assert resp2.resolved_harness_judge_model == "claude-sonnet-5"
 
 
+async def test_build_response_survives_none_model_ids(monkeypatch):
+    """REGRESSION (137.1-05): the config defaults for harness_judge_model AND
+    skill_builder_model are None when unset (config.py:1006 / :1020), but the response
+    contract types both as non-nullable `str` (settings.py:88 / :78). Passing the bare
+    None raised a Pydantic ValidationError → GET /settings 500 → "failed to fetch" on the
+    whole Settings page for every real (unset) user. The prior tests only ever passed "",
+    masking it. _build_response must coerce None → "" (the documented unset sentinel)."""
+    import app.api.settings as sm
+
+    monkeypatch.setattr(sm, "resolve_sub_agent_model", lambda s: "sub")
+    monkeypatch.setattr(sm, "resolve_skill_builder_model", lambda s: "builder")
+
+    # BOTH unset as None (the real fresh-DB state) must build cleanly, not 500.
+    resp = await sm._build_response(
+        _fake_settings(harness_judge_model=None, skill_builder_model=None)
+    )
+    assert resp.harness_judge_model == ""
+    assert resp.skill_builder_model == ""
+    # The resolved label still surfaces the effective default (resolver reads None safely).
+    assert resp.resolved_harness_judge_model == "claude-opus-4-8"
+
+
 async def test_update_settings_rejects_unknown_judge_model(monkeypatch):
     """PUT with a NON-registry judge model 400s (D-12 registry validation) — before
     any persist (an unroutable/inferred model can never reach the shared judge setting)."""
