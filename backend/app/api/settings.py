@@ -77,6 +77,16 @@ class FullSettingsResponse(BaseModel):
     # resolved label as the strong default when unset.
     skill_builder_model: str
     resolved_skill_builder_model: str | None
+    # Phase 137.1-05 (EVAL-05f / D-11) — the ONE shared harness judge model, surfaced
+    # raw ("" when unset) + resolved. This is the SAME harness_judge_model that already
+    # drives BOTH the eval judge and the harness/publish judge via resolve_judge_model
+    # (validator_kinds.py:58 — the ONE source of truth, D-11). NO new setting, NO
+    # migration, NO split. The resolved label surfaces the effective default
+    # (claude-opus-4-8) so a single-provider / local-model org can see what the judge
+    # will use before picking one (the picker lands in Plan 10). A model id is a VALUE
+    # not a secret -> exposed through the settings contract (CLAUDE.md).
+    harness_judge_model: str
+    resolved_harness_judge_model: str | None
     # Phase 075.3 D-075.3-13: registry-known model_ids (frontend uses this set
     # to decide whether to render the "unverified" badge inline next to each
     # model in the main LLM dropdown + selected-label).
@@ -141,6 +151,13 @@ class SettingsUpdate(BaseModel):
     # "" = unset (the resolver falls back to a strong default); decoupled from the
     # benchmark targets (the builder WRITES candidates, the targets MEASURE firing).
     skill_builder_model: str | None = None
+    # Phase 137.1-05 (EVAL-05f / D-11 / D-12) — the shared harness judge model id. The
+    # SAME setting the eval judge + publish judge already resolve (no new setting, no
+    # migration). Registry-validated on persist (D-12): only a MODEL_CAPABILITIES-known
+    # model is accepted (an unknown/inferred id 400s), so the shared judge can never be
+    # pointed at an unroutable model. "" = unset (the resolver falls back to the
+    # effective default — claude-opus-4-8).
+    harness_judge_model: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -148,6 +165,10 @@ class SettingsUpdate(BaseModel):
 async def _build_response(s=None) -> FullSettingsResponse:
     if s is None:
         s = await load_app_settings_async()
+    # Phase 137.1-05 (D-11) — the ONE judge resolver, shared by the eval judge AND the
+    # publish judge. Function-local import keeps the harness validators registry off the
+    # settings module-load path; NEVER introduce a second resolver (T-137.1-J2).
+    from app.services.harness.validator_kinds import resolve_judge_model
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -194,6 +215,11 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # Phase 123 (D-08) — the raw knob + the resolved label (strong default when unset).
         skill_builder_model=s.skill_builder_model,
         resolved_skill_builder_model=resolve_skill_builder_model(s),
+        # Phase 137.1-05 (EVAL-05f / D-11) — the shared judge knob + its resolved label.
+        # resolve_judge_model is the ONE source of truth (eval + publish judge); the raw
+        # value is "" when unset and the resolved label surfaces the effective default.
+        harness_judge_model=s.harness_judge_model,
+        resolved_harness_judge_model=resolve_judge_model(s),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).
         verified_models=sorted(MODEL_CAPABILITIES.keys()),
@@ -343,6 +369,22 @@ async def update_settings(
     # targets, no SPOF). "" persists as unset.
     if body.skill_builder_model is not None:
         updates["skill_builder_model"] = body.skill_builder_model
+    # Phase 137.1-05 (EVAL-05f / D-11 / D-12) — the shared harness judge model knob. Same
+    # field the eval + publish judge already resolve (resolve_judge_model — no new setting,
+    # no migration). D-12: registry-validate on write — a NON-EMPTY value must be a
+    # MODEL_CAPABILITIES-known model (mirrors evals.py:165-170), else 400; an unknown /
+    # inferred id can never reach the shared judge setting (T-137.1-J1). "" persists as
+    # unset (the resolver then falls back to the effective default).
+    if body.harness_judge_model is not None:
+        if body.harness_judge_model:
+            from app.config import get_model_capability  # function-local (Pitfall 4)
+            cap = get_model_capability(body.harness_judge_model)
+            if cap.get("capability_source") != "registry":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unknown judge model: {body.harness_judge_model}",
+                )
+        updates["harness_judge_model"] = body.harness_judge_model
 
     # MDL-01: Validate sub_agent_model against active provider's model list
     if body.sub_agent_model:
