@@ -375,6 +375,12 @@ function MatrixFooter({ skillId }: { skillId: string }) {
           // VERBATIM from the server — no client stats. The explicit +/− sign and
           // toFixed are DISPLAY formatting of the server `delta`, not a computation.
           const deltaTxt = c.delta >= 0 ? `+${c.delta.toFixed(2)}` : c.delta.toFixed(2)
+          // 137.1 UAT: color-code the lift by direction so a glance reads it — green
+          // when the skill improved the score, red when it regressed, neutral at 0.
+          // Display-only tint; the value stays the server `delta`, VERBATIM. Tones match
+          // this file's own pass/fail palette (text-emerald-500 / text-destructive).
+          const deltaTone =
+            c.delta > 0 ? "text-emerald-500" : c.delta < 0 ? "text-destructive" : "text-foreground"
           return (
             <div
               key={`${c.provider}:${c.model}`}
@@ -408,7 +414,7 @@ function MatrixFooter({ skillId }: { skillId: string }) {
                   )}
                 </span>
                 <span>
-                  Δ <span className="text-foreground">{deltaTxt}</span> skill lift
+                  Δ <span className={deltaTone}>{deltaTxt}</span> skill lift
                 </span>
               </div>
               {c.analyst_notes.length > 0 && (

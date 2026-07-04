@@ -49,6 +49,16 @@ import { CaseEditor } from "./CaseEditor"
 import { RunBar } from "./RunBar"
 import { RunHistory } from "./RunHistory"
 import { ProposalCard } from "./ProposalCard"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type Stage = "cases" | "eval" | "gate"
 
@@ -97,6 +107,10 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
   // determinate progress (RunHistory reads liveByRun[run.id]). Separate from `live`
   // (the single-run/re-eval map) so the battle-tested single-run path is untouched.
   const [matrixLive, setMatrixLive] = useState<Record<string, LiveStatus>>({})
+  // 137.1 UAT: a matrix run fans the eval across EVERY configured provider (N arms ×
+  // all cases × 2 variants) — many API calls, real token cost. Gate it behind an
+  // explicit in-app confirm so one stray click can't spend a fleet of providers.
+  const [matrixConfirmOpen, setMatrixConfirmOpen] = useState(false)
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null)
   const [results, setResults] = useState<EvalResult[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -701,7 +715,7 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
           configuredProviders={providers}
           gateProvider={gateProvider}
           onGateProviderChange={setGateProvider}
-          onRunMatrix={handleRunMatrix}
+          onRunMatrix={() => setMatrixConfirmOpen(true)}
         />
         {error && <p className="text-xs text-destructive">{error}</p>}
         <RunHistory
@@ -717,6 +731,36 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
           onProposeFromRun={handlePropose}
         />
       </div>
+
+      {/* 137.1 UAT: matrix-run cost confirm — one click fans the eval across ALL
+          configured providers (real API calls + token spend), so require an explicit
+          yes first. In-app AlertDialog (never a blocking browser confirm). */}
+      <AlertDialog open={matrixConfirmOpen} onOpenChange={setMatrixConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run the full provider matrix?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This evaluates the skill across all {providers.length} configured
+              {providers.length === 1 ? " provider" : " providers"} — every test case
+              runs twice (with the skill and without) on each one. That is a lot of API
+              calls and it will cost tokens. The gate-feeder arm feeds the publish gate;
+              the rest are analysis-only.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30"
+              onClick={() => {
+                setMatrixConfirmOpen(false)
+                void handleRunMatrix()
+              }}
+            >
+              Run matrix
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Self-improvement proposal (below history). */}
       {proposalError && <p className="text-xs text-destructive">{proposalError}</p>}
