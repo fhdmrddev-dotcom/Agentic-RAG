@@ -237,7 +237,7 @@ export function EngineHealthCard() {
       <div className="flex items-start gap-3 p-5 pb-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-headline text-sm font-bold text-foreground">Engine health</h4>
+            <h4 className="font-headline text-sm font-bold text-foreground">Eval engine health</h4>
             {!isEmpty && (
               <span className="rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-mono text-muted-foreground ghost-border">
                 {healthyCount}/{tiles.length} engines healthy
@@ -255,6 +255,14 @@ export function EngineHealthCard() {
               {stale.text}
             </span>
           </div>
+          {/* What this IS — a GLOBAL cross-provider engine check, NOT a per-skill eval (137.1 UAT:
+              the word "engine" alone read as ambiguous). The skill-level surface is the matrix run
+              in Skill Studio; this proves the eval engine itself runs, provider by provider. */}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Checks the <b className="text-foreground/80">skill-eval engine</b> runs end-to-end on
+            every configured provider — <b className="text-foreground/80">global, not scoped to any
+            single skill</b> (that's the matrix run in a skill's Studio).
+          </p>
           {/* Subtitle — the load-bearing semantics, VERBATIM (D-01/D-02) */}
           <p className="mt-1 text-xs text-muted-foreground">
             <b className="text-foreground/80">ENGINE health ≠ model quality</b> — a model may
