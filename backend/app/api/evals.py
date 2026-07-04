@@ -51,9 +51,10 @@ import asyncpg
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
 from supabase import Client
 
-from app.config import get_model_capability
+from app.config import MODEL_CAPABILITIES, get_model_capability
 from app.db.runs import insert_run
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
 from app.models.eval_run import (
@@ -69,6 +70,12 @@ from app.services import eval_runner_service, skill_proposer_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/skills", tags=["skill-evals"])
+
+# Phase 137.1 (EVAL-05) — the skill-LESS eval surface (engine smoke sweep + engine-health
+# board + the skill-less run readout). These routes are NOT under the ``/skills`` prefix (a
+# sweep run has no skill_id — D-02), so they live on their own ``/evals`` router. Registered
+# alongside ``router`` in main.py.
+router_evals = APIRouter(prefix="/evals", tags=["evals"])
 
 # TTL on the Redis in-flight claim — generously above the longest bounded run so a
 # crashed/killed worker that never reaches the job ``finally`` can't wedge a skill forever
@@ -1906,3 +1913,407 @@ async def force_promote_skill_proposal(
         supabase, row.get("base_skill_version_id"), user_id
     )
     return _proposal_response(row, base_instructions=base_instructions, gate=gate)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Phase 137.1 Plan 04 (EVAL-05) — matrix fan-out + engine smoke sweep + engine-health.
+#
+#   POST /skills/{skill_id}/evals/matrix   -> {matrix_group_id, arms[]}  (N single-provider
+#                                             runs under ONE group claim, ONE feeds_gate — D-05/D-06)
+#   POST /evals/engine-sweep               -> EngineHealthBoard  (the sweep rides the SAME matrix
+#                                             machinery over a built-in in-memory SKILL-LESS fixture — D-01/D-02)
+#   GET  /evals/engine-health              -> EngineHealthBoard  (the caller's latest sweep board — D-03)
+#   GET  /evals/runs/{run_id}              -> {eval_run, eval_results}  (skill-less run readout — D-03)
+#
+# THE HARD PARTS ARE ALREADY SOLVED (RESEARCH): each arm is an existing self-contained
+# ``run_eval_job``; N rows are N existing per-run subscriptions; the SSE + re-attach machinery is
+# reused UNCHANGED. Net-new is (a) the ONE group claim (value=group_id, D-06/Pitfall 1), (b) the
+# exactly-one gate-feeder flag (D-05), and (c) the in-memory smoke fixture (D-02). The per-arm spawn
+# is the SAME companion machinery ``start_eval_run`` uses, extracted into ``_spawn_eval_job`` so the
+# matrix + sweep + single-run paths never diverge. OWNER-SCOPING is the sole runtime gate on every
+# route (404-never-403); arms are owner-stamped from ``current_user``, NEVER the body (T-133-03).
+# ═══════════════════════════════════════════════════════════════════════════════════
+
+# Local (non-cloud) provider ids the engine smoke sweep excludes (D-01 — "native-7 + OpenRouter,
+# exclude local"). A matrix run stays inclusive (a user CAN A/B a local model); only the sweep skips
+# these so an unconfigured/absent local endpoint doesn't skew the cross-provider engine board.
+_LOCAL_PROVIDER_IDS = frozenset({"ollama", "lmstudio", "lm_studio", "local"})
+
+# Strong references to the fire-and-forget group-release coordinators so an ``asyncio.create_task``
+# is never GC'd mid-flight (mirrors ``_RECONCILE_TASKS`` / ``eval_runner_service._BACKGROUND_TASKS``).
+# NOT run state (D-PRD-12) — the in-flight correctness gate is the Redis SET NX group claim.
+_MATRIX_COORD_TASKS: set[asyncio.Task] = set()
+
+# The built-in in-memory engine smoke fixture (D-02). Synthesized IN-MEMORY and passed DIRECTLY to
+# ``run_eval_job`` via its EXISTING ``skill_version`` + ``cases`` params — NO ``_read_cases`` /
+# ``_read_latest_version``, and NO rows in skills / skill_versions / skill_test_cases. The arm
+# persists NULL skill_id / skill_version_id (mig 085 relaxation) + NULL test_case_id (case id=None,
+# Plan 02 NULL-tolerant _persist_result). Deterministic + token-cheap + judge-gradeable: an engine
+# that runs end-to-end returns the token and grades PASS (healthy); a provider with no key fails the
+# arm honestly -> not_measured carrying the REAL provider error (unhealthy — never engine-shaped).
+# COORDINATION NOTE: if Phase 137.2 (CREATE-01) lands a shared hidden/built-in skill mechanism, this
+# fixture MAY migrate onto it — it is intentionally a plain dict here so that move is a one-liner.
+_SMOKE_SKILL_VERSION: dict = {
+    "id": None,
+    "name": "engine-smoke",
+    "description": "Built-in engine smoke check — a trivial no-op skill used only to prove the "
+    "agent loop runs end-to-end on each provider.",
+    "instructions": "Answer the user directly and concisely.",
+}
+_SMOKE_CASE: dict = {
+    "id": None,  # NULL test_case_id (Plan 02 NULL-tolerant _persist_result) — no skill_test_cases row
+    "prompt": "Reply with exactly the single word: PONG. Output nothing else.",
+    "expected_behavior": "The response contains the token PONG.",
+    "order_index": 0,
+}
+
+
+def _representative_registry_model(provider_id: str, provider_models: list[str] | None) -> str | None:
+    """Pick ONE registry-known model for ``provider_id`` (D-01 / V5). Prefer the provider's OWN
+    configured ``models`` list (newest-first curation already lives there), else scan
+    ``MODEL_CAPABILITIES`` for the first registry entry whose provider matches. Returns None when the
+    provider has no registry model at all (that provider is then OMITTED — never a fabricated model)."""
+    for m in provider_models or []:
+        cap = get_model_capability(m)
+        if cap.get("capability_source") == "registry" and cap.get("provider") == provider_id:
+            return m
+    for m, cap in MODEL_CAPABILITIES.items():
+        if cap.get("capability_source") == "registry" and cap.get("provider") == provider_id:
+            return m
+    return None
+
+
+def _configured_provider_configs(
+    user_settings, *, exclude_local: bool, prefer_active_model: bool
+) -> list[dict]:
+    """Build the fan-out config list: ONE ``{provider, model}`` per CONFIGURED provider (a provider
+    is configured iff it carries a non-empty ``api_key``), each with a registry-valid representative
+    model. A provider with no registry model is OMITTED (D-01). When ``prefer_active_model`` is set,
+    the user's active provider uses the user's OWN selected ``llm_model`` if it is registry-valid for
+    that provider (so the default gate-feeder arm measures the model the user actually runs). Pure /
+    deterministic — no I/O — so the config logic is unit-testable off a fake settings object."""
+    configs: list[dict] = []
+    seen: set[str] = set()
+    for p in getattr(user_settings, "providers", None) or []:
+        pid = getattr(p, "id", None)
+        if not pid or pid in seen:
+            continue
+        if not getattr(p, "api_key", ""):  # unconfigured provider — skip
+            continue
+        if exclude_local and pid in _LOCAL_PROVIDER_IDS:
+            continue
+        model: str | None = None
+        if prefer_active_model and pid == getattr(user_settings, "active_provider", None):
+            m = getattr(user_settings, "llm_model", "") or ""
+            cap = get_model_capability(m) if m else {}
+            if cap.get("capability_source") == "registry" and cap.get("provider") == pid:
+                model = m
+        if model is None:
+            model = _representative_registry_model(pid, getattr(p, "models", None))
+        if model is None:
+            continue
+        seen.add(pid)
+        configs.append({"provider": pid, "model": model})
+    return configs
+
+
+async def _spawn_eval_job(
+    *,
+    run_id: UUID,
+    skill_id: str,
+    skill_version: dict,
+    cases: list[dict],
+    provider: str,
+    model: str,
+    current_user: dict,
+    user_settings,
+    redis: aioredis.Redis,
+    supabase: Client,
+    pool: asyncpg.Pool,
+) -> asyncio.Task:
+    """Spawn ONE eval arm's background job, REUSING ``start_eval_run``'s companion machinery
+    verbatim (anchor ``is_eval`` thread -> companion ``public.runs`` row -> ZADD -> seed the run
+    buffer BEFORE any subscriber -> per-arm provider/model override -> ``run_eval_job`` task ->
+    register in ``RUN_TASKS``). RETURNS the created ``asyncio.Task`` so the group coordinator can
+    await ALL arms before releasing the ONE shared group claim (D-06 / Pitfall 1).
+
+    ``skill_id`` is the JOB key (a real skill id for a matrix arm; the synthetic
+    ``engine-sweep:{user_id}`` key for the skill-less sweep) — used ONLY for ``run_eval_job``'s
+    inflight CAS-release + ZREM keys, NEVER for the ``eval_runs`` row (the CALLER inserts that with
+    the correct real / NULL skill_id). The per-arm ``override_provider`` mirrors the chat +
+    ``start_eval_run`` route (the 306dd2d4 routing trap — the gateway routes on
+    ``active_provider``, so each arm's provider must be applied as a per-run override)."""
+    user_id = current_user["id"]
+    eval_thread_id = uuid4()
+
+    def _insert_thread():
+        return (
+            supabase.table("threads")
+            .insert({
+                "id": str(eval_thread_id),
+                "user_id": user_id,
+                "title": "[eval] matrix arm",
+                "folder_id": None,
+                "is_eval": True,  # Phase 134.1 — keep the anchor thread out of the sidebar.
+            })
+            .execute()
+        )
+
+    await run_in_threadpool(_insert_thread)
+
+    await insert_run(
+        pool,
+        run_id=run_id,
+        thread_id=eval_thread_id,
+        user_id=UUID(user_id),
+        status="streaming",
+        model=model,
+        provider=provider,
+    )
+
+    _score = time_mod.time()
+    try:
+        await redis.zadd(f"runs_by_thread:eval:{skill_id}", {str(run_id): _score})
+        await redis.zadd("runs:active", {str(run_id): _score})
+    except Exception:
+        logger.exception("matrix/sweep arm ZADD failed for run %s; continuing", run_id)
+    # Seed the buffer BEFORE returning so a fast subscriber never hits a missing run:{id} key and
+    # synthesizes a terminal error (the d0c0c10a race — best-effort, never raises).
+    await eval_runner_service._emit_eval(redis, run_id, eval_runner_service.EVENT_RUN_STARTED)
+
+    from app.models.user_settings import override_provider  # function-local (avoid import cycle)
+
+    arm_settings = user_settings
+    if provider and provider != arm_settings.active_provider:
+        arm_settings = override_provider(arm_settings, provider)
+    arm_settings = arm_settings.model_copy(update={"llm_model": model})
+
+    from app.api.threads import RUN_TASKS  # function-local (avoid circular import)
+
+    task = asyncio.create_task(
+        eval_runner_service.run_eval_job(
+            run_id=run_id,
+            skill_id=skill_id,
+            skill_version=skill_version,
+            cases=cases,
+            provider=provider,
+            model=model,
+            current_user=current_user,
+            user_settings=arm_settings,
+            redis=redis,
+            supabase=supabase,
+            pool=pool,
+        )
+    )
+    RUN_TASKS[run_id] = task
+    task.add_done_callback(lambda _t, _r=run_id: RUN_TASKS.pop(_r, None))
+    return task
+
+
+async def _release_group_when_done(
+    redis: aioredis.Redis, claim_skill_id: str, group_id: UUID, tasks: list
+) -> None:
+    """After ALL arms of a matrix/sweep group finish, CAS-release the ONE shared group claim
+    (``_inflight_key(claim_skill_id)`` with value == ``group_id``). CRITICAL (D-06 / Pitfall 1):
+    each arm's own ``run_eval_job`` ``finally`` CAS-releases with value == ITS run_id, which NO-OPS
+    because the stored claim value is ``group_id`` — so ONLY this group-level release actually frees
+    the skill/sweep key after the last arm. Best-effort (``_release_inflight_if_owned`` swallows)."""
+    real = [t for t in tasks if isinstance(t, asyncio.Task)]
+    if real:
+        await asyncio.gather(*real, return_exceptions=True)
+    await eval_runner_service._release_inflight_if_owned(redis, claim_skill_id, group_id)
+
+
+def _spawn_group_release(
+    redis: aioredis.Redis, claim_skill_id: str, group_id: UUID, arm_tasks: list
+) -> asyncio.Task | None:
+    """Spawn the group-release coordinator IFF at least one real ``asyncio.Task`` arm was created
+    (production). Returns the coordinator task, or None when no real arm ran (e.g. a unit test that
+    mocks ``_spawn_eval_job`` — the claim then stays until its TTL, which is fine for the mocked
+    assertions). Retains a strong reference so the fire-and-forget task is not GC'd."""
+    real = [t for t in arm_tasks if isinstance(t, asyncio.Task)]
+    if not real:
+        return None
+    coord = asyncio.create_task(_release_group_when_done(redis, claim_skill_id, group_id, real))
+    _MATRIX_COORD_TASKS.add(coord)
+    coord.add_done_callback(_MATRIX_COORD_TASKS.discard)
+    return coord
+
+
+async def matrix_gate_feeder_run(
+    supabase: Client, *, matrix_group_id, user_id: str
+) -> dict | None:
+    """Return the ONE ``feeds_gate=true`` run of a matrix group, owner-scoped (D-05 / 137 D-03).
+
+    The publish gate reads ONLY this run's rows — the gate-feeder is a LABEL on the ``feeds_gate``
+    flag, NEVER a second ``met`` computation. The other N−1 arms are analysis-only and never feed the
+    gate. Returns None when the group has no gate-feeder (e.g. a sweep group — feeds_gate is false on
+    every arm). Owner-scoped ``.eq("user_id")`` (T-133-01); threadpool-wrapped (D-v2.5-01)."""
+
+    def _read():
+        return (
+            supabase.table("eval_runs")
+            .select("*")
+            .eq("matrix_group_id", str(matrix_group_id))
+            .eq("user_id", user_id)
+            .eq("feeds_gate", True)
+            .limit(1)
+            .execute()
+        )
+
+    rows = list((await run_in_threadpool(_read)).data or [])
+    return rows[0] if rows else None
+
+
+class MatrixRunBody(BaseModel):
+    """POST body for a matrix launch. ``gate_provider`` designates the ONE arm whose rows feed the
+    publish gate (D-05); it defaults SERVER-SIDE to the caller's active provider when omitted.
+    ``user_id``/``skill_id`` come from the caller + path, NEVER this body (T-133-03)."""
+
+    gate_provider: str | None = None
+
+
+# ── POST — matrix launch: N arms under ONE group claim, exactly ONE gate-feeder (D-05/D-06) ──
+@router.post("/{skill_id}/evals/matrix", status_code=status.HTTP_202_ACCEPTED)
+async def start_matrix_run(
+    skill_id: str,
+    body: MatrixRunBody | None = None,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+):
+    """Fan a skill's eval across N providers as N parallel single-provider runs (EVAL-05b).
+
+    Owner-gate FIRST (404 cross-user — T-133-01). Resolve the LATEST owner-scoped version snapshot +
+    the owner's test cases (reject an empty corpus — T-133-02). Build the config list (one
+    registry-valid representative model per CONFIGURED provider; the active provider uses the user's
+    selected model). Take the ONE ``SET NX`` claim keyed by ``skill_id`` with value == ``group_id``
+    (D-06 — a second launch on the same skill 409s while the matrix is live). Per config: insert the
+    ``eval_runs`` row (+ ``matrix_group_id`` + exactly-one ``feeds_gate`` — D-05), then spawn the arm
+    via the SHARED ``_spawn_eval_job`` companion machinery. A group coordinator releases the ONE claim
+    only after ALL arms finish (Pitfall 1). Returns ``{matrix_group_id, arms[]}`` immediately (D-06)."""
+    user_id = current_user["id"]
+    body = body or MatrixRunBody()
+
+    # 1. Owner gate FIRST (404 cross-user before anything else — T-133-01).
+    await _verify_owned_skill(supabase, skill_id, user_id)
+
+    # 2. Resolve the LATEST owner-scoped version snapshot (the WITH-arm target — D-03/D-10).
+    def _read_latest_version():
+        return (
+            supabase.table("skill_versions")
+            .select("id, name, description, version_number")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("version_number", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    version_rows = list((await run_in_threadpool(_read_latest_version)).data or [])
+    if not version_rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No skill version found for this skill",
+        )
+    skill_version = version_rows[0]
+
+    # 3. Read the owner-scoped test cases (reject an empty fan-out — T-133-02).
+    cases = await _read_skill_cases(supabase, skill_id, user_id)
+    if not cases:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This skill has no test cases to evaluate",
+        )
+
+    # 4. Build the fan-out configs (one registry model per configured provider; active provider uses
+    #    the user's selected model). The gate_provider defaults to the caller's active provider.
+    from app.models.user_settings import load_user_settings  # function-local (avoid import cycle)
+
+    user_settings = await run_in_threadpool(load_user_settings, user_id)
+    configs = _configured_provider_configs(
+        user_settings, exclude_local=False, prefer_active_model=True
+    )
+    if not configs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No configured providers with a registry model to run a matrix over",
+        )
+    gate_provider = body.gate_provider or user_settings.active_provider
+    # Exactly ONE feeds_gate (D-05): the gate_provider arm, or the FIRST config when the chosen
+    # gate_provider is not in the list (never zero, never two).
+    gate_idx = next((i for i, c in enumerate(configs) if c["provider"] == gate_provider), 0)
+
+    # 5. Mint the group id + take the ONE claim (value == group_id — D-06 / Pitfall 1). NEVER swallow
+    #    a Redis failure here — it must surface, not silently disable the DoS bound.
+    group_id = uuid4()
+    claimed = await redis.set(
+        _inflight_key(skill_id), str(group_id), nx=True, ex=_INFLIGHT_TTL_S
+    )
+    if not claimed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An eval run is already in progress for this skill",
+        )
+
+    # 6. Fan the arms under the held claim. On a pre-spawn failure, let the coordinator release the
+    #    claim after the arms that DID spawn finish (or release immediately if none did).
+    arm_tasks: list = []
+    arms: list[dict] = []
+    try:
+        for i, cfg in enumerate(configs):
+            run_id = uuid4()
+            feeds_gate = i == gate_idx
+
+            def _insert_eval_run(_cfg=cfg, _rid=run_id, _fg=feeds_gate):
+                return (
+                    supabase.table("eval_runs")
+                    .insert({
+                        "id": str(_rid),
+                        "skill_id": skill_id,
+                        "skill_version_id": skill_version["id"],
+                        "user_id": user_id,
+                        "provider": _cfg["provider"],
+                        "model": _cfg["model"],
+                        "status": "running",
+                        "case_count": len(cases),
+                        "matrix_group_id": str(group_id),
+                        "feeds_gate": _fg,
+                    })
+                    .execute()
+                )
+
+            await run_in_threadpool(_insert_eval_run)
+            task = await _spawn_eval_job(
+                run_id=run_id,
+                skill_id=skill_id,
+                skill_version=skill_version,
+                cases=cases,
+                provider=cfg["provider"],
+                model=cfg["model"],
+                current_user=current_user,
+                user_settings=user_settings,
+                redis=redis,
+                supabase=supabase,
+                pool=pool,
+            )
+            arm_tasks.append(task)
+            arms.append({
+                "run_id": str(run_id),
+                "skill_id": skill_id,
+                "skill_version_id": str(skill_version["id"]),
+                "provider": cfg["provider"],
+                "model": cfg["model"],
+                "case_count": len(cases),
+            })
+    except Exception:
+        if _spawn_group_release(redis, skill_id, group_id, arm_tasks) is None:
+            await eval_runner_service._release_inflight_if_owned(redis, skill_id, group_id)
+        raise
+
+    # 7. Release the ONE claim only after ALL arms finish (Pitfall 1 — a per-arm run_id release CAS
+    #    no-ops against the group_id-valued claim).
+    _spawn_group_release(redis, skill_id, group_id, arm_tasks)
+
+    return {"matrix_group_id": str(group_id), "arms": arms}

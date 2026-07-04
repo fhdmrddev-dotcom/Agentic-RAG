@@ -17,10 +17,13 @@ The in-memory ``_FilterSupabase`` honors ``.eq()`` chains + ``upsert(on_conflict
 delete so the owner-scoping + toggle/clear assertions are meaningful (modeled on the filtering
 fake in ``test_eval_runner.py``, extended with ``upsert`` for the ratings write path).
 """
-from uuid import uuid4
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport
 
 from app.dependencies import get_current_user, get_supabase
@@ -48,6 +51,7 @@ class _FilterTable:
         self._on_conflict = None
         self._filters = []
         self._in_filters = []
+        self._is_filters = []
         self._order = None
         self._desc = False
         self._limit = None
@@ -87,6 +91,12 @@ class _FilterTable:
         self._in_filters.append((col, [str(v) for v in values]))
         return self
 
+    def is_(self, col, val):
+        # NULL predicate — mirrors supabase-py .is_(col, "null"): a row matches when its
+        # column value IS NULL (None). The skill-less sweep readout uses .is_("skill_id","null").
+        self._is_filters.append((col, val))
+        return self
+
     def order(self, col, desc=False, **k):
         self._order = col
         self._desc = desc
@@ -110,6 +120,13 @@ class _FilterTable:
             if not all(str(r.get(c)) == v for c, v in self._filters):
                 continue
             if not all(str(r.get(c)) in vals for c, vals in self._in_filters):
+                continue
+            if not all(
+                (r.get(c) is None)
+                if (v is None or str(v).lower() == "null")
+                else (str(r.get(c)) == str(v))
+                for c, v in self._is_filters
+            ):
                 continue
             out.append(r)
         return out
@@ -284,3 +301,207 @@ async def test_rating_cross_user_404():
     assert not any(r.get("user_id") == OTHER_USER["id"] for r in ratings), \
         "cross-user rating must NOT be written (T-134-01)"
     assert ratings == [], "no eval_ratings row should exist on the 404 path"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Phase 137.1 Plan 04 (EVAL-05) — matrix fan-out + engine smoke sweep + engine-health.
+#
+# These tests drive the Plan-04 route functions DIRECTLY (no httpx / no live DB / no live LLM /
+# no real asyncio spawn) over the in-memory ``_FilterSupabase`` fake (the ``test_skill_proposals``
+# precedent). The per-arm ``_spawn_eval_job`` seam (anchor thread + companion runs row + ZADD +
+# ``run_eval_job`` task) is patched to an ``AsyncMock`` so the route's OWN ``eval_runs`` inserts
+# (matrix_group_id + feeds_gate; skill-less NULL FKs) are the MEANINGFUL assertion surface, while
+# the launch machinery itself is exercised by ``test_skill_proposals`` + live UAT. ``load_user_settings``
+# is patched to a controlled fake so the configured-provider fan-out is deterministic.
+# ═══════════════════════════════════════════════════════════════════════════════════
+
+
+class _FakeRedis:
+    """A minimal async redis fake: dict-backed ``SET NX`` (records every call so the ONE-claim +
+    value==group_id assertion is meaningful) + best-effort zadd/get/eval/zrem/expire/xadd no-ops."""
+
+    def __init__(self):
+        self.store = {}
+        self.set_calls = []
+
+    async def set(self, key, value, nx=False, ex=None):
+        self.set_calls.append((key, value, nx, ex))
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+    async def get(self, key):
+        return self.store.get(key)
+
+    async def zadd(self, *a, **k):
+        return 1
+
+    async def zrem(self, *a, **k):
+        return 1
+
+    async def eval(self, *a, **k):
+        return 0
+
+    async def expire(self, *a, **k):
+        return 1
+
+    async def xadd(self, *a, **k):
+        return "1-1"
+
+
+def _fake_settings():
+    """A controlled effective-settings stand-in: three CONFIGURED native providers (anthropic active +
+    openai + google) each with a registry model, plus an UNCONFIGURED ollama (empty api_key — must be
+    skipped). ``_configured_provider_configs`` reads only ``providers`` / ``active_provider`` /
+    ``llm_model``, so a SimpleNamespace suffices (no full UserEffectiveSettings)."""
+    return SimpleNamespace(
+        active_provider="anthropic",
+        llm_model="claude-haiku-4-5-20251001",
+        providers=[
+            SimpleNamespace(id="anthropic", api_key="sk-ant-xxx", models=["claude-haiku-4-5-20251001"]),
+            SimpleNamespace(id="openai", api_key="sk-xxx", models=["gpt-4o"]),
+            SimpleNamespace(id="google", api_key="AIzaXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", models=["gemini-2.5-flash"]),
+            SimpleNamespace(id="ollama", api_key="", models=["llama3"]),  # unconfigured -> skipped
+        ],
+    )
+
+
+def _matrix_store(skill_id):
+    """An owner-owned skill + its latest version + one test case — the fan-out corpus. eval_runs /
+    eval_results start empty so the matrix inserts are the assertion surface."""
+    version_id = str(uuid4())
+    return {
+        "skills": [{"id": skill_id, "name": "pdf-builder", "description": "d", "user_id": OWNER["id"]}],
+        "skill_versions": [{
+            "id": version_id, "skill_id": skill_id, "user_id": OWNER["id"],
+            "version_number": 1, "name": "pdf-builder", "description": "d",
+        }],
+        "skill_test_cases": [{
+            "id": str(uuid4()), "skill_id": skill_id, "user_id": OWNER["id"],
+            "prompt": "Make a PDF", "expected_behavior": "makes a pdf", "order_index": 0,
+        }],
+        "eval_runs": [],
+        "eval_results": [],
+    }
+
+
+def _patch_matrix(monkeypatch, evals):
+    """Patch the async ``_spawn_eval_job`` seam (return a non-Task so no coordinator/real spawn runs)
+    + ``load_user_settings`` (the 3-configured-provider fake). Returns the spawn AsyncMock."""
+    spawn = AsyncMock(return_value=object())
+    monkeypatch.setattr(evals, "_spawn_eval_job", spawn)
+    monkeypatch.setattr(
+        "app.models.user_settings.load_user_settings", lambda uid, *a, **k: _fake_settings()
+    )
+    return spawn
+
+
+@pytest.mark.asyncio
+async def test_matrix_launch_one_group_one_feeds_gate(monkeypatch):
+    """D-05/D-06: one matrix launch fans N arms sharing ONE matrix_group_id under ONE SET NX claim
+    (value == group_id), with EXACTLY ONE feeds_gate=true (the active provider by default)."""
+    from app.api import evals
+
+    skill_id = str(uuid4())
+    store = _matrix_store(skill_id)
+    sb = _FilterSupabase(store)
+    redis = _FakeRedis()
+    spawn = _patch_matrix(monkeypatch, evals)
+
+    resp = await evals.start_matrix_run(
+        skill_id, evals.MatrixRunBody(),
+        current_user=OWNER, supabase=sb, redis=redis, pool=object(),
+    )
+
+    group_id = resp["matrix_group_id"]
+    # The claim was taken ONCE, keyed by skill_id, with value == group_id (D-06 / Pitfall 1).
+    assert len(redis.set_calls) == 1, "the group claim must be taken exactly once"
+    key, value, nx, _ex = redis.set_calls[0]
+    assert key == f"eval_inflight:{skill_id}" and value == group_id and nx is True
+
+    # N eval_runs rows, all sharing the ONE group, with EXACTLY ONE feeds_gate=true.
+    runs = store["eval_runs"]
+    assert len(runs) == 3, "one arm per configured provider (ollama unconfigured -> skipped)"
+    assert all(r["matrix_group_id"] == group_id for r in runs)
+    assert sum(1 for r in runs if r["feeds_gate"]) == 1, "exactly one gate-feeder (D-05)"
+    gate_run = next(r for r in runs if r["feeds_gate"])
+    assert gate_run["provider"] == "anthropic", "default gate-feeder = the active provider"
+    # N arms spawned via the shared companion machinery; the kickoff echoes them.
+    assert spawn.await_count == 3
+    assert len(resp["arms"]) == 3
+    assert {a["provider"] for a in resp["arms"]} == {"anthropic", "openai", "google"}
+
+
+@pytest.mark.asyncio
+async def test_matrix_second_launch_409(monkeypatch):
+    """D-06: a second matrix launch on the SAME skill while the first is live returns 409 (the ONE
+    SET NX claim is held — the group coordinator only releases it after ALL arms finish)."""
+    from app.api import evals
+
+    skill_id = str(uuid4())
+    sb = _FilterSupabase(_matrix_store(skill_id))
+    redis = _FakeRedis()
+    _patch_matrix(monkeypatch, evals)
+
+    await evals.start_matrix_run(
+        skill_id, evals.MatrixRunBody(),
+        current_user=OWNER, supabase=sb, redis=redis, pool=object(),
+    )
+    with pytest.raises(HTTPException) as exc:
+        await evals.start_matrix_run(
+            skill_id, evals.MatrixRunBody(),
+            current_user=OWNER, supabase=sb, redis=redis, pool=object(),
+        )
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_matrix_gate_feeder_run_only():
+    """D-05 / 137 D-03: the gate reads ONLY the feeds_gate=true run of the group — the other N−1
+    analysis-only arms never feed it (the gate-feeder is a LABEL on the flag, not a 2nd computation)."""
+    from app.api import evals
+
+    skill_id = str(uuid4())
+    group_id = str(uuid4())
+    feeder_id = str(uuid4())
+    runs = [
+        {"id": feeder_id, "skill_id": skill_id, "user_id": OWNER["id"], "provider": "anthropic",
+         "model": "m1", "matrix_group_id": group_id, "feeds_gate": True, "status": "completed"},
+        {"id": str(uuid4()), "skill_id": skill_id, "user_id": OWNER["id"], "provider": "openai",
+         "model": "m2", "matrix_group_id": group_id, "feeds_gate": False, "status": "completed"},
+        {"id": str(uuid4()), "skill_id": skill_id, "user_id": OWNER["id"], "provider": "google",
+         "model": "m3", "matrix_group_id": group_id, "feeds_gate": False, "status": "completed"},
+    ]
+    sb = _FilterSupabase({"eval_runs": runs})
+
+    feeder = await evals.matrix_gate_feeder_run(sb, matrix_group_id=group_id, user_id=OWNER["id"])
+    assert feeder is not None
+    assert feeder["feeds_gate"] is True
+    assert feeder["id"] == feeder_id and feeder["provider"] == "anthropic"
+
+    # Cross-user cannot read the group's gate-feeder (owner-scoped).
+    assert await evals.matrix_gate_feeder_run(
+        sb, matrix_group_id=group_id, user_id=OTHER_USER["id"]
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_matrix_cross_user_404(monkeypatch):
+    """T-133-01: a cross-user matrix launch 404s on the owner gate BEFORE any claim/spawn/insert."""
+    from app.api import evals
+
+    skill_id = str(uuid4())
+    store = _matrix_store(skill_id)  # owned by OWNER
+    sb = _FilterSupabase(store)
+    redis = _FakeRedis()
+    _patch_matrix(monkeypatch, evals)
+
+    with pytest.raises(HTTPException) as exc:
+        await evals.start_matrix_run(
+            skill_id, evals.MatrixRunBody(),
+            current_user=OTHER_USER, supabase=sb, redis=redis, pool=object(),
+        )
+    assert exc.value.status_code == 404
+    assert store["eval_runs"] == [], "nothing spawned on the 404 path"
+    assert redis.set_calls == [], "no claim taken on the 404 path (owner gate is first)"
