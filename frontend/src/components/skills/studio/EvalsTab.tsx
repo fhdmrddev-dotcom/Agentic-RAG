@@ -126,6 +126,11 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
   // skill — the RunBar disables both launchers for the whole group).
   const matrixAbortRef = useRef<AbortController | null>(null)
   const matrixPendingRef = useRef<Set<string>>(new Set())
+  // Mirrors evalRun.id so a matrix arm's stream callback can tell if that arm is the
+  // one currently pinned into the single readout slot (loaded on expand) and refresh it
+  // on finalize — otherwise runsForHistory's evalRun-override would freeze the arm on
+  // its stale "running" row after it actually completes.
+  const evalRunIdRef = useRef<string | null>(null)
 
   // Pull the durable readout from the DB (survives the Redis TTL). Guarded against a
   // skill switch (BUG-260701-02) — LIFTED VERBATIM from SkillEvalSection :183-198.
@@ -360,6 +365,13 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running])
 
+  // Keep evalRunIdRef in lockstep with the pinned readout so a matrix arm's stream
+  // callback (which closes over stale render values) can test whether IT is the pinned
+  // run and refresh it on finalize.
+  useEffect(() => {
+    evalRunIdRef.current = evalRun?.id ?? null
+  }, [evalRun])
+
   // Launch a fresh eval run — LIFTED VERBATIM from SkillEvalSection :390-410.
   async function handleRun() {
     if (!provider || !model) {
@@ -412,9 +424,12 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
         onEvalComplete: () => {
           if (ctrl.signal.aborted) return
           // Durable rollups are authoritative — refresh the history so this arm's honest
-          // rollup lands. The gate-feeder arm ALSO refreshes the gate (both homes of the
-          // one truth-teller) the moment it finalizes.
+          // rollup lands (the "load its durable readout on onEvalComplete" path). If this
+          // arm is the one the user has expanded (pinned in evalRun), reload its readout
+          // so its finalized cases replace the live view. The gate-feeder arm ALSO
+          // refreshes the gate (both homes of the one truth-teller) the moment it finalizes.
           void refreshRuns()
+          if (evalRunIdRef.current === rid) void loadReadout(rid)
           if (isGateFeeder) {
             void refreshGate()
             onGateStale?.()
@@ -424,6 +439,9 @@ export function EvalsTab({ skillId, skillVersion, onNavigateStage, onGateStale }
           if (ctrl.signal.aborted) return
           matrixPendingRef.current.delete(rid)
           void refreshRuns()
+          // Refresh the pinned readout on ANY terminal (complete/error/interrupt) so the
+          // viewed arm never freezes on a stale "running" row.
+          if (evalRunIdRef.current === rid) void loadReadout(rid)
           // When the LAST arm settles, drop the claim → RunBar re-enables; the
           // running→false effect refreshes the gate + history (backstop).
           if (matrixPendingRef.current.size === 0) setRunning(false)
