@@ -16,11 +16,25 @@
  *   - The D-09 "Propose an improvement?" nudge appears only when a finished run has
  *     >= 1 failed measured case.
  */
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { RunHistory } from "./RunHistory"
+import { getEvalAggregate } from "@/lib/api"
 import type { EvalResult, EvalRun, TestCase } from "@/types"
+
+// Plan 09: the matrix card's aggregation footer fetches getEvalAggregate on mount.
+// Mock it here — every finished+expanded matrix triggers the fetch, so a safe default
+// (empty configs) is set in beforeEach; the footer tests override per-case.
+vi.mock("@/lib/api", () => ({
+  getEvalAggregate: vi.fn(),
+}))
+const mockGetAggregate = vi.mocked(getEvalAggregate)
+
+beforeEach(() => {
+  mockGetAggregate.mockReset()
+  mockGetAggregate.mockResolvedValue({ configs: [] })
+})
 
 function makeCase(id: string, prompt: string): TestCase {
   return {
@@ -324,5 +338,112 @@ describe("RunHistory — 058-A matrix grouped card + 059-A determinate bar (EVAL
     expect(screen.getByTestId("run-row-solo")).toBeInTheDocument()
     expect(screen.queryByTestId(/^matrix-card-/)).toBeNull()
     expect(screen.queryByTestId("feeds-gate-chip")).toBeNull()
+  })
+})
+
+describe("RunHistory — 058-A aggregation footer + analyst notes (D-07/D-08)", () => {
+  // Finished matrix arms (default makeRun status = "completed") so the footer renders
+  // AT FINALIZE when the card is expanded.
+  function finishedMatrix(): EvalRun[] {
+    return [
+      makeRun({ id: "arm-oa", provider: "openai", model: "gpt-5.4-mini", matrix_group_id: "grp-1", feeds_gate: true }),
+      makeRun({ id: "arm-an", provider: "anthropic", model: "claude-haiku-4-5", matrix_group_id: "grp-1" }),
+    ]
+  }
+
+  it("renders a 1-run config as 'first run — no spread yet' with NO numeric σ (verbatim from the server)", async () => {
+    const user = userEvent.setup()
+    mockGetAggregate.mockResolvedValue({
+      configs: [
+        {
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          run_count: 1,
+          with_mean: 0.8,
+          without_mean: 0.5,
+          with_stddev: null, // server withholds spread at run_count < 2
+          delta: 0.3,
+          analyst_notes: [],
+        },
+      ],
+    })
+    render(<RunHistory {...baseProps} runs={finishedMatrix()} />)
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+
+    const footer = await screen.findByTestId("matrix-aggregation-footer")
+    expect(footer.textContent).toMatch(/first run — no spread yet/)
+    // The single-run mean shows; there is NO "± <number>" spread rendered.
+    expect(footer.textContent).toMatch(/0\.80/)
+    expect(footer.textContent).not.toMatch(/±\s*0\.\d/)
+    // getEvalAggregate was called with the arms' shared skill_id.
+    expect(mockGetAggregate).toHaveBeenCalledWith("skill-1")
+  })
+
+  it("renders a 2+-run config WITH a numeric σ + the Δ skill-lift, both verbatim from the server", async () => {
+    const user = userEvent.setup()
+    mockGetAggregate.mockResolvedValue({
+      configs: [
+        {
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          run_count: 3,
+          with_mean: 0.82,
+          without_mean: 0.4,
+          with_stddev: 0.05, // server provides spread at run_count >= 2
+          delta: 0.42,
+          analyst_notes: [],
+        },
+      ],
+    })
+    render(<RunHistory {...baseProps} runs={finishedMatrix()} />)
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+
+    const footer = await screen.findByTestId("matrix-aggregation-footer")
+    expect(footer.textContent).toMatch(/0\.82/)
+    expect(footer.textContent).toMatch(/±\s*0\.05/)
+    expect(footer.textContent).not.toMatch(/first run — no spread yet/)
+    // Δ = the SERVER delta rendered with an explicit sign (not client-computed).
+    expect(footer.textContent).toMatch(/\+0\.42/)
+    expect(footer.textContent).toMatch(/skill lift/)
+  })
+
+  it("renders deterministic analyst notes VERBATIM from the server payload (no client phrasing)", async () => {
+    const user = userEvent.setup()
+    const NOTE_A = "Non-discriminating: every config passed both arms on this case."
+    const NOTE_B = "Flaky variance: with-skill scores swing widely across runs."
+    mockGetAggregate.mockResolvedValue({
+      configs: [
+        {
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          run_count: 2,
+          with_mean: 0.7,
+          without_mean: 0.6,
+          with_stddev: 0.2,
+          delta: 0.1,
+          analyst_notes: [NOTE_A, NOTE_B],
+        },
+      ],
+    })
+    render(<RunHistory {...baseProps} runs={finishedMatrix()} />)
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+
+    await screen.findByTestId("matrix-aggregation-footer")
+    // The exact server strings render — the component invents no phrasing.
+    expect(screen.getByText(NOTE_A)).toBeInTheDocument()
+    expect(screen.getByText(NOTE_B)).toBeInTheDocument()
+    expect(screen.getAllByTestId("analyst-note")).toHaveLength(2)
+  })
+
+  it("does NOT render the aggregation footer while any matrix arm is still running", () => {
+    // A running matrix defaults open, but aggregation lands only AT FINALIZE.
+    render(
+      <RunHistory
+        {...baseProps}
+        runs={finishedMatrix().map((r) => ({ ...r, status: "running" as const, passed_count: null, measured_count: null }))}
+      />,
+    )
+    expect(screen.queryByTestId("matrix-aggregation-footer")).toBeNull()
+    expect(mockGetAggregate).not.toHaveBeenCalled()
   })
 })

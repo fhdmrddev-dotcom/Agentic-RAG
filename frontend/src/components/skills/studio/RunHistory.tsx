@@ -2,6 +2,9 @@
 // Phase 137 Plan 03 Task 2 (PANEL-01 / EVAL-03) — RunHistory.
 // Phase 137.1 Plan 08 Task 3 (EVAL-05 / 058-A + 059-A) — matrix grouped card +
 // determinate unit bar.
+// Phase 137.1 Plan 09 Task 1 (EVAL-05b / 058-A / D-07 + D-08) — the matrix card's
+// aggregation FOOTER (per-config mean±σ + Δ skill-lift + deterministic analyst notes,
+// rendered VERBATIM from the Plan 07 aggregate endpoint).
 //
 // The 055-B "expandable rows" run list — the reading surface for a skill's eval
 // history. Each row is provider logo (048 @lobehub/icons map) + model + version
@@ -24,7 +27,9 @@
 // forked). A collapsed matrix occupies ONE resting row (anti-flood). Exactly ONE
 // sub-row carries the "▣ feeds gate" chip, rendered off the SERVER `feeds_gate` flag
 // (T-137.1-U1 — a label on data, never a client-side gate recomputation), and the
-// card header states the gate semantics ONCE. The aggregation FOOTER lands in Plan 09.
+// card header states the gate semantics ONCE. The aggregation FOOTER (Plan 09) renders
+// below the sub-rows AT FINALIZE only — per-config mean±σ + Δ + deterministic analyst
+// notes, ALL echoed verbatim from the Plan 07 endpoint (no client stats, T-137.1-U2).
 //
 // 059-A (EVAL-05c): a RUNNING row carries a thin DETERMINATE unit bar —
 // total = case_count*2 + 1 (2 arms/case + 1 judge unit that completes at finalize);
@@ -44,10 +49,11 @@
 // runs/results/cases it is handed; it constructs no ids and echoes server responses
 // verbatim (a missing case renders RunCaseDetail's neutral fallback, never a leaked id).
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Bot, RotateCw, Sparkles } from "lucide-react"
 import { providerLogo } from "@/lib/providerLogo"
-import type { EvalResult, EvalRun, TestCase } from "@/types"
+import { getEvalAggregate } from "@/lib/api"
+import type { EvalAggregate, EvalResult, EvalRun, TestCase } from "@/types"
 import { RunCaseDetail } from "./RunCaseDetail"
 
 interface Props {
@@ -323,6 +329,112 @@ function RunRow({ run, ctx }: { run: EvalRun; ctx: RowContext }) {
   )
 }
 
+// ── 058-A aggregation FOOTER (Plan 09 / D-07 + D-08). Per-config mean±σ + a Δ
+//    skill-lift column + deterministic analyst notes — ALL rendered VERBATIM from the
+//    Plan 07 `getEvalAggregate` endpoint. The component computes NO statistics: it
+//    echoes the server `with_mean` / `with_stddev` / `delta` / `analyst_notes`. A
+//    spread (σ) renders ONLY when the server provides `with_stddev` (run_count >= 2, the
+//    server's honest floor); a single-run config reads "first run — no spread yet"
+//    (T-137.1-U2 spread honesty). The notes are the server's fixed-phrasing rows (D-08 —
+//    never LLM prose, never client-derived). A failed fetch renders nothing — the footer
+//    is additive and never blocks the run rows above it. ──
+function MatrixFooter({ skillId }: { skillId: string }) {
+  const [agg, setAgg] = useState<EvalAggregate | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getEvalAggregate(skillId)
+      .then((a) => {
+        if (!cancelled) setAgg(a)
+      })
+      .catch(() => {
+        /* additive footer — a failed aggregate never blocks the run rows */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [skillId])
+
+  if (!agg) return null
+
+  return (
+    <div
+      data-testid="matrix-aggregation-footer"
+      className="mt-1 flex flex-col gap-2 border-t border-primary/20 pt-2"
+    >
+      <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
+        Aggregation · per config, from run history
+      </p>
+      {agg.configs.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground/80">
+          Aggregation appears once runs finish — spread accumulates from run history.
+        </p>
+      ) : (
+        agg.configs.map((c) => {
+          const Mark = providerLogo(c.provider)
+          // VERBATIM from the server — no client stats. The explicit +/− sign and
+          // toFixed are DISPLAY formatting of the server `delta`, not a computation.
+          const deltaTxt = c.delta >= 0 ? `+${c.delta.toFixed(2)}` : c.delta.toFixed(2)
+          return (
+            <div
+              key={`${c.provider}:${c.model}`}
+              data-testid="agg-config"
+              className="flex flex-col gap-1 rounded-md border border-border/30 bg-background/40 px-2.5 py-1.5"
+            >
+              <div className="flex items-center gap-2">
+                {Mark ? (
+                  <Mark size={13} />
+                ) : (
+                  <Bot aria-hidden className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span className="text-[11px] font-semibold text-foreground">{c.model}</span>
+                <span className="font-mono text-[9px] text-muted-foreground/60">
+                  {c.run_count} {c.run_count === 1 ? "run" : "runs"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
+                <span>
+                  mean <span className="text-foreground">{c.with_mean.toFixed(2)}</span>
+                  {c.with_stddev != null ? (
+                    <>
+                      {" "}
+                      ± <span className="text-foreground">{c.with_stddev.toFixed(2)}</span>
+                    </>
+                  ) : (
+                    <span className="italic text-muted-foreground/70">
+                      {" "}
+                      · first run — no spread yet
+                    </span>
+                  )}
+                </span>
+                <span>
+                  Δ <span className="text-foreground">{deltaTxt}</span> skill lift
+                </span>
+              </div>
+              {c.analyst_notes.length > 0 && (
+                <ul className="flex flex-col gap-0.5 pt-0.5">
+                  {c.analyst_notes.map((note, i) => (
+                    <li
+                      key={`${c.provider}:${c.model}:${i}`}
+                      data-testid="analyst-note"
+                      className="flex items-start gap-1 text-[10px] leading-relaxed text-muted-foreground/90"
+                    >
+                      <span aria-hidden className="text-muted-foreground/50">
+                        ◈
+                      </span>
+                      <span>{note}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
 // ── 058-A: the grouped matrix card. Collapsed = ONE resting row (anti-flood); the
 //    card owns its own local collapse (defaults open while any arm streams). Its
 //    sub-rows are the SAME RunRow — reused, never forked. ──
@@ -331,6 +443,8 @@ function MatrixCard({ groupId, arms, ctx }: { groupId: string; arms: EvalRun[]; 
   const [open, setOpen] = useState(anyRunning)
   const n = arms.length
   const m = arms[0]?.case_count ?? 0
+  // The skill under eval (all arms share it) — the aggregation footer's fetch key.
+  const skillId = arms[0]?.skill_id
   // The gate-feeder arm (server-flagged); its provider is named ONCE in the header.
   const gateArm = arms.find((a) => a.feeds_gate)
   const gateProvider = gateArm?.provider ?? "the selected provider"
@@ -379,7 +493,10 @@ function MatrixCard({ groupId, arms, ctx }: { groupId: string; arms: EvalRun[]; 
               <RunRow key={arm.id} run={arm} ctx={ctx} />
             ))}
           </div>
-          {/* The aggregation FOOTER (mean±σ grid + Δ + analyst notes) lands in Plan 09. */}
+          {/* 058-A aggregation FOOTER (Plan 09) — per-config mean±σ/Δ + analyst notes,
+              VERBATIM from the Plan 07 endpoint. Only AT FINALIZE (no arm running):
+              aggregation lands at finalize, never mid-run (058 design lock). */}
+          {!anyRunning && skillId && <MatrixFooter skillId={skillId} />}
         </div>
       )}
     </div>
