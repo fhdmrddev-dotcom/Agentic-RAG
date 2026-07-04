@@ -255,17 +255,17 @@ Plans:
 
 **UI hint**: yes — matrix-run rows + determinate progress are new UI → **G-2 sketch proposed at discuss-phase** (extend the 053–057 Studio language; RunHistory/RunBar are the existing homes).
 **Guardrail note**: G-1 does not fire (first 137.x insert). D-14 red line: all provider fixes at the gateway/adapter/sanitizer boundary; the shared agent-loop path is never forked.
-**Plans:** 10 plans (planned 2026-07-04) — 4 waves
-- [ ] 137.1-01-PLAN.md — Contracts & migration 085 (matrix/gate/duration/case_feedback columns + JudgeVerdict field + TS types + api fns) [W1, autonomous:false — BLOCKING SQL apply]
-- [ ] 137.1-02-PLAN.md — Eval runner: per-arm duration timer + advisory case_feedback capture (EVAL-05d/e/h) [W2]
+**Plans:** 10 plans (planned 2026-07-04, revised same day per plan-checker) — 5 waves
+- [ ] 137.1-01-PLAN.md — Contracts & migration 085 (matrix/gate/duration/case_feedback columns + nullable skill FKs for the skill-less sweep + JudgeVerdict field + TS types + api fns) [W1, autonomous:false — BLOCKING SQL apply]
+- [ ] 137.1-02-PLAN.md — Eval runner: per-arm duration timer + advisory case_feedback capture + NULL-tolerant persist for sweep arms (EVAL-05d/e/h) [W2]
 - [ ] 137.1-03-PLAN.md — Boot-time run reconciler (eval→interrupted, chat→failed) + lifespan mount (EVAL-05g / BUG-260702-02) [W1]
-- [ ] 137.1-04-PLAN.md — Matrix launch + engine smoke-sweep routes (one group claim, one gate-feeder, in-memory fixture) (EVAL-05a/b) [W2]
+- [ ] 137.1-04-PLAN.md — Matrix launch + skill-less engine smoke-sweep + GET engine-health board routes (one group claim, one gate-feeder) (EVAL-05a/b) [W3]
 - [ ] 137.1-05-PLAN.md — Judge-model settings API (registry-validated) + D-13 extras (kebab lint + 1024 cap) (EVAL-05f) [W1]
 - [ ] 137.1-06-PLAN.md — Provider bug re-tests (BUG-260701-01 / -260630-01) + conditional adapter-boundary fixes (EVAL-05g / D-14) [W1, autonomous:false]
-- [ ] 137.1-07-PLAN.md — Deterministic aggregation (mean±σ/Δ over history) + analyst-note rules + owner-scoped endpoint (EVAL-05b) [W3]
-- [ ] 137.1-08-PLAN.md — Studio matrix launch + live grouped card + determinate unit bar (058-A/059-A) [W3]
-- [ ] 137.1-09-PLAN.md — Aggregation footer + analyst notes + inline violet case_feedback + duration (058-A/059-A) [W4]
-- [ ] 137.1-10-PLAN.md — Settings Engine-health tile board + registry-only judge-model picker (060-A) (EVAL-05a/f) [W3]
+- [ ] 137.1-07-PLAN.md — Deterministic aggregation (mean±σ/Δ over history) + analyst-note rules + owner-scoped endpoint (EVAL-05b) [W4]
+- [ ] 137.1-08-PLAN.md — Studio matrix launch + live grouped card + determinate unit bar (058-A/059-A) [W4]
+- [ ] 137.1-09-PLAN.md — Aggregation footer + analyst notes + inline violet case_feedback + duration (058-A/059-A) [W5]
+- [ ] 137.1-10-PLAN.md — Settings Engine-health tile board + registry-only judge-model picker (060-A) (EVAL-05a/f) [W4]
 
 #### Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED 2026-07-04)
 
