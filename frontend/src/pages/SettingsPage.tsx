@@ -19,6 +19,8 @@ import {
 } from "@/components/settings/ProviderPicker"
 import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
+import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
+import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -1109,6 +1111,14 @@ export function SettingsPage() {
                   {savedAI ? "Saved!" : savingAI ? "Saving\u2026" : "Save AI Model"}
                 </Button>
               </div>
+
+              {/* Phase 137.1 (EVAL-05 / 060-A) — eval engine health + the independent
+                  judge model. Self-contained infra cards that live OUTSIDE the AI Model
+                  save cycle: the board self-fetches + sweeps on demand; the judge picker
+                  self-persists via setJudgeModel. Registry-only judge options come from
+                  the verified-models registry the page already loads. */}
+              <EngineHealthCard />
+              <JudgeModelPicker registryModels={[...verifiedModels]} />
             </div>
           </TabsContent>
 
