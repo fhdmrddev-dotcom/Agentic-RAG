@@ -19,9 +19,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { EngineHealthCard } from "./EngineHealthCard"
+import { EngineHealthCard, hasInFlight } from "./EngineHealthCard"
 import { getEngineHealth, runEngineSweep, getEvalRunById } from "@/lib/api"
-import type { EngineHealthBoard, EvalResult, EvalRunReadout } from "@/types"
+import type { EngineHealthBoard, EngineHealthTile, EvalResult, EvalRunReadout } from "@/types"
 
 vi.mock("@/lib/api", () => ({
   getEngineHealth: vi.fn(),
@@ -201,5 +201,42 @@ describe("EngineHealthCard — 060-A tile board (D-01..D-04)", () => {
     await screen.findByTestId("engine-staleness")
     expect(screen.getByText(/no sweep yet/i)).toBeInTheDocument()
     expect(screen.getByTestId("engine-staleness")).toHaveAttribute("data-fresh", "false")
+  })
+})
+
+// 137.1 UAT fix — the sweep route returns "freshly running" and the arms grade 10-20s
+// later, so onRunSweep must keep polling until every tile is terminal. This predicate is
+// the stop-condition; a regression here would freeze the board on the 0/N early snapshot.
+describe("hasInFlight — the running-poll stop-condition", () => {
+  const tile = (o: Partial<EngineHealthTile>): EngineHealthTile => ({
+    provider: "openai",
+    model: "m",
+    healthy: false,
+    error: null,
+    run_id: "r",
+    last_swept_at: null,
+    ...o,
+  })
+
+  it("is true while any arm is still running (healthy=false, no error yet) → keep polling", () => {
+    expect(hasInFlight({ swept_at: null, tiles: [tile({ healthy: false, error: null })] })).toBe(true)
+    // A mix of graded + still-running is still in-flight.
+    expect(
+      hasInFlight({ swept_at: null, tiles: [tile({ healthy: true }), tile({ provider: "google" })] }),
+    ).toBe(true)
+  })
+
+  it("is false once every tile is terminal (healthy OR carries an error) → stop polling", () => {
+    expect(
+      hasInFlight({
+        swept_at: null,
+        tiles: [tile({ healthy: true }), tile({ provider: "google", healthy: false, error: "401 Unauthorized" })],
+      }),
+    ).toBe(false)
+  })
+
+  it("is false for an honest-empty board or null (nothing to wait for)", () => {
+    expect(hasInFlight({ swept_at: null, tiles: [] })).toBe(false)
+    expect(hasInFlight(null)).toBe(false)
   })
 })

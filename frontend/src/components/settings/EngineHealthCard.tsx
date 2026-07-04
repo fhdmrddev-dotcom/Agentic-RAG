@@ -42,6 +42,11 @@ import { RunCaseDetail } from "@/components/skills/studio/RunCaseDetail"
  */
 
 const SWEEP_POLL_MS = 3000
+// A sweep's arms grade 10-20s AFTER the POST returns (the route spawns the arms and
+// returns the board "freshly running"), so the running-poll must keep going until every
+// tile is terminal. Bounded so a wedged/never-finishing arm can never poll forever
+// (~2 min ceiling at SWEEP_POLL_MS).
+const SWEEP_MAX_POLLS = 40
 // A board swept within this window reads "just now" (green); older reads amber.
 const FRESH_WINDOW_MS = 90_000
 
@@ -83,6 +88,13 @@ function tileState(tile: EngineHealthTile): TileState {
   return "unswept"
 }
 
+// A sweep arm still RUNNING shows healthy=false with NO error yet (tileState "unswept").
+// The sweep is DONE only when every tile is terminal — healthy OR carrying an error — so
+// this predicate decides whether the running-poll should keep going. Exported for tests.
+export function hasInFlight(b: EngineHealthBoard | null): boolean {
+  return !!b?.tiles?.some((t) => !t.healthy && !t.error)
+}
+
 export function EngineHealthCard() {
   const [board, setBoard] = useState<EngineHealthBoard | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -98,14 +110,16 @@ export function EngineHealthCard() {
   // Guards a slow detail fetch from overwriting a newer expand (last-click wins).
   const detailReqRef = useRef<string | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<EngineHealthBoard | null> => {
     try {
       const b = await getEngineHealth()
       setBoard(b)
       setError(null)
+      return b
     } catch (e) {
       // A failed fetch is transient — keep the last-good board rather than blanking it.
       setError(e instanceof Error ? e.message : "Could not read engine health")
+      return null
     }
   }, [])
 
@@ -123,23 +137,44 @@ export function EngineHealthCard() {
   const onRunSweep = useCallback(async () => {
     setSweeping(true)
     setError(null)
-    // Light-poll the board WHILE the (≈24-call) sweep runs, so incremental tile writes
-    // surface as they land — the ONLY setInterval in this card (D-04: no scheduler).
-    if (pollRef.current) clearInterval(pollRef.current)
-    pollRef.current = setInterval(() => void refresh(), SWEEP_POLL_MS)
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    let posted: EngineHealthBoard | null = null
     try {
-      const b = await runEngineSweep()
-      setBoard(b)
+      // The route spawns the arms and returns the board "freshly running" — it does NOT
+      // wait for grading. So this response is the EARLY snapshot (arms still running).
+      posted = await runEngineSweep()
+      setBoard(posted)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not run engine sweep")
-    } finally {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
       setSweeping(false)
+      return
     }
+    // If every tile is already terminal, we're done. Otherwise KEEP POLLING until the arms
+    // grade (10-20s later) — else the board freezes on the 0/N "freshly running" snapshot
+    // and misreports healthy engines as neutral (the bug this replaces). The running-poll
+    // is the ONLY setInterval and lives only for the duration of an active sweep (D-04: no
+    // background scheduler). Bounded by SWEEP_MAX_POLLS so a wedged arm can't poll forever.
+    if (!hasInFlight(posted)) {
+      setSweeping(false)
+      return
+    }
+    let polls = 0
+    pollRef.current = setInterval(async () => {
+      polls += 1
+      const b = await refresh()
+      const settled = b !== null && !hasInFlight(b)
+      if (settled || polls >= SWEEP_MAX_POLLS) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current)
+          pollRef.current = null
+        }
+        setSweeping(false)
+      }
+    }, SWEEP_POLL_MS)
   }, [refresh])
 
   // Tile click = the resolvable D-03/060-A deep-link. Toggle an inline detail section
