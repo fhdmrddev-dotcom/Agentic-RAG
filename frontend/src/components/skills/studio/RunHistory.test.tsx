@@ -52,6 +52,9 @@ function makeRun(overrides: Partial<EvalRun> = {}): EvalRun {
     passed_count: 2,
     measured_count: 2,
     verdict_summary: null,
+    // Phase 137.1 (EVAL-05 / mig 085) — single runs carry no group + never feed the gate.
+    matrix_group_id: null,
+    feeds_gate: false,
     ...overrides,
   }
 }
@@ -228,5 +231,95 @@ describe("RunHistory — 055-B expandable rows + honest states (D-04/D-11)", () 
     expect(screen.getByTestId("provider-fallback")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /gpt-5\.4-mini/i }))
     expect(onToggleExpand).toHaveBeenCalledWith("run-x")
+  })
+})
+
+describe("RunHistory — 058-A matrix grouped card + 059-A determinate bar (EVAL-05)", () => {
+  // Three arms of one matrix run: same matrix_group_id, one gate-feeder.
+  function matrixArms(overrides: Partial<EvalRun> = {}): EvalRun[] {
+    return [
+      makeRun({ id: "arm-oa", provider: "openai", model: "gpt-5.4-mini", matrix_group_id: "grp-1", feeds_gate: true, ...overrides }),
+      makeRun({ id: "arm-an", provider: "anthropic", model: "claude-haiku-4-5", matrix_group_id: "grp-1", feeds_gate: false, ...overrides }),
+      makeRun({ id: "arm-gg", provider: "google", model: "gemini-3-flash", matrix_group_id: "grp-1", feeds_gate: false, ...overrides }),
+    ]
+  }
+
+  it("collapses N same-group runs into ONE resting matrix card (anti-flood): sub-rows hidden until expand", async () => {
+    const user = userEvent.setup()
+    render(<RunHistory {...baseProps} runs={matrixArms()} />)
+
+    // One resting card, not three flat rows.
+    const card = screen.getByTestId("matrix-card-grp-1")
+    expect(card).toBeInTheDocument()
+    expect(within(card).getByText(/Matrix run/)).toBeInTheDocument()
+    // Header count summary (middot-agnostic): "3 configs" + "3 cases".
+    expect(card.textContent).toMatch(/3 configs/)
+    expect(card.textContent).toMatch(/3 cases/)
+    // Collapsed → the arm sub-rows are NOT in the DOM yet.
+    expect(screen.queryByTestId("run-row-arm-oa")).toBeNull()
+    expect(screen.queryByTestId("run-row-arm-an")).toBeNull()
+
+    // Expand the card → the three 055-B sub-rows appear.
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+    expect(screen.getByTestId("run-row-arm-oa")).toBeInTheDocument()
+    expect(screen.getByTestId("run-row-arm-an")).toBeInTheDocument()
+    expect(screen.getByTestId("run-row-arm-gg")).toBeInTheDocument()
+  })
+
+  it("shows EXACTLY ONE '▣ feeds gate' chip (off feeds_gate) + states the gate semantics once", async () => {
+    const user = userEvent.setup()
+    render(<RunHistory {...baseProps} runs={matrixArms()} />)
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+
+    // Exactly one gate chip across all sub-rows (the feeds_gate=true arm).
+    expect(screen.getAllByTestId("feeds-gate-chip")).toHaveLength(1)
+    // The chip lives on the gate-feeder arm's row.
+    const gateRow = screen.getByTestId("run-row-arm-oa")
+    expect(within(gateRow).getByTestId("feeds-gate-chip")).toBeInTheDocument()
+    // The header names the gate provider once with the analysis-only semantics.
+    const semantics = screen.getByTestId("matrix-gate-semantics")
+    expect(semantics.textContent).toMatch(/gate reads[\s\S]*openai[\s\S]*only/i)
+    expect(semantics.textContent).toMatch(/analysis-only/i)
+  })
+
+  it("a matrix with a running arm defaults open + renders a determinate unit bar (done/(case_count*2+1)), no mid-run verdict", () => {
+    // One case done (2 arm-units), one case in flight (with_skill running) → done=2, total=3*2+1=7.
+    render(
+      <RunHistory
+        {...baseProps}
+        runs={matrixArms({ status: "running", passed_count: null, measured_count: null })}
+        liveByRun={{
+          "arm-oa": {
+            "tc1:with_skill": "completed",
+            "tc1:without_skill": "completed",
+            "tc2:with_skill": "running",
+          },
+        }}
+      />,
+    )
+    // Running matrix defaults expanded → the gate arm's determinate bar is present.
+    const gateRow = screen.getByTestId("run-row-arm-oa")
+    const bar = within(gateRow).getByTestId("determinate-bar")
+    expect(bar).toHaveAttribute("aria-valuenow", "2")
+    expect(bar).toHaveAttribute("aria-valuemax", "7")
+    // Caption reflects the pure FE math (2/7 ≈ 29%) and shows NO pass/fail verdict.
+    expect(bar.textContent).toMatch(/2\/7/)
+    expect(bar.textContent).not.toMatch(/\bPASS\b/)
+    expect(bar.textContent).not.toMatch(/\bFAIL\b/)
+  })
+
+  it("does NOT render a determinate bar on a finished (non-running) matrix arm", async () => {
+    const user = userEvent.setup()
+    render(<RunHistory {...baseProps} runs={matrixArms()} />)
+    await user.click(screen.getByRole("button", { name: /matrix run/i }))
+    const gateRow = screen.getByTestId("run-row-arm-oa")
+    expect(within(gateRow).queryByTestId("determinate-bar")).toBeNull()
+  })
+
+  it("still renders a single (non-matrix) run as a top-level row — no card", () => {
+    render(<RunHistory {...baseProps} runs={[makeRun({ id: "solo" })]} />)
+    expect(screen.getByTestId("run-row-solo")).toBeInTheDocument()
+    expect(screen.queryByTestId(/^matrix-card-/)).toBeNull()
+    expect(screen.queryByTestId("feeds-gate-chip")).toBeNull()
   })
 })
