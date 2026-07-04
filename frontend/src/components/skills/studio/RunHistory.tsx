@@ -50,7 +50,7 @@
 // verbatim (a missing case renders RunCaseDetail's neutral fallback, never a leaked id).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from "react"
-import { Bot, RotateCw, Sparkles } from "lucide-react"
+import { Bot, Minus, RotateCw, Sparkles, TrendingDown, TrendingUp } from "lucide-react"
 import { providerLogo } from "@/lib/providerLogo"
 import { getEvalAggregate } from "@/lib/api"
 import type { EvalAggregate, EvalResult, EvalRun, TestCase } from "@/types"
@@ -375,12 +375,15 @@ function MatrixFooter({ skillId }: { skillId: string }) {
           // VERBATIM from the server — no client stats. The explicit +/− sign and
           // toFixed are DISPLAY formatting of the server `delta`, not a computation.
           const deltaTxt = c.delta >= 0 ? `+${c.delta.toFixed(2)}` : c.delta.toFixed(2)
-          // 137.1 UAT: color-code the lift by direction so a glance reads it — green
-          // when the skill improved the score, red when it regressed, neutral at 0.
-          // Display-only tint; the value stays the server `delta`, VERBATIM. Tones match
-          // this file's own pass/fail palette (text-emerald-500 / text-destructive).
+          // 137.1 UAT: read the lift at a glance — a DIRECTIONAL trend icon (up = gain,
+          // down = regression, flat = no change) plus a matching tint: green when the
+          // skill improved the score, red when it regressed, neutral at 0. Replaces the
+          // static Δ glyph (a fixed up-triangle that misread as "always up" on negatives).
+          // Display-only; the value stays the server `delta`, VERBATIM. Tones match this
+          // file's own pass/fail palette (text-emerald-500 / text-destructive).
           const deltaTone =
-            c.delta > 0 ? "text-emerald-500" : c.delta < 0 ? "text-destructive" : "text-foreground"
+            c.delta > 0 ? "text-emerald-500" : c.delta < 0 ? "text-destructive" : "text-muted-foreground"
+          const DeltaIcon = c.delta > 0 ? TrendingUp : c.delta < 0 ? TrendingDown : Minus
           return (
             <div
               key={`${c.provider}:${c.model}`}
@@ -414,7 +417,11 @@ function MatrixFooter({ skillId }: { skillId: string }) {
                   )}
                 </span>
                 <span>
-                  Δ <span className={deltaTone}>{deltaTxt}</span> skill lift
+                  <span className={`inline-flex items-center gap-1 align-middle ${deltaTone}`}>
+                    <DeltaIcon aria-hidden className="h-3 w-3" />
+                    {deltaTxt}
+                  </span>{" "}
+                  skill lift
                 </span>
               </div>
               {c.analyst_notes.length > 0 && (
