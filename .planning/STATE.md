@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: ready_to_plan
-last_updated: 2026-07-05T08:06:29.427Z
-last_activity: 2026-07-05 -- Phase 137.2 execution started
+last_updated: "2026-07-05T17:58:13.906Z"
+last_activity: 2026-07-05 - Phase 144 added (SEED-104) + quick task 260705-hz1 (SEED-102 fix, needs a confirmatory test-run next session)
 progress:
-  total_phases: 28
-  completed_phases: 16
+  total_phases: 29
+  completed_phases: 17
   total_plans: 86
   completed_plans: 87
-  percent: 57
-stopped_at: Phase 137.2 complete (4/4) — ready to discuss Phase 138
+  percent: 59
+stopped_at: Phase 138 context gathered — ready to plan
 ---
 
 # Project State
@@ -29,8 +29,9 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 
 Phase: 138
 Plan: Not started
-Next action: Phase 137.2 CONTEXT gathered (2026-07-05, commit `7e033d63`) — 4 gray areas resolved: is_system column for the "Built-in" badge/protection signal (D-01), no new agent tool for eval-case creation (hand off to Skill Studio Evals tab, D-03), rename (not delete) the operator's manual copy `7f504819-...` (D-04, verified live only 3/18 zip files imported), pin is_system skills to top of Skills list (D-05). Next: `/gsd:plan-phase 137.2`.
-Prior: Phase 137.1 FULLY CLOSED — secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).
+Next action: Phase 138 CONTEXT gathered (2026-07-05, commit `e18b80cc`) — 3 gray areas resolved: "ended with open todos" honesty signal rides as a plain text suffix on the existing todo `content` field, never stacking, same wording for pending/in_progress (D-01..04) — zero frontend/schema change; forward-only scope, no backfill for the 14 threads found live-stuck right now incl. repro thread `13ae9bfe` (D-06, backlog note planted); the `final_output_files` leak fix is display-only — the newly-found redundant sandbox re-upload/re-insert mechanism behind it is deliberately NOT fixed here (D-07/D-08, logged as a new seed candidate). Also surfaced + deferred: todo-content writing-quality (generic/vague todo text) as a separate future concern. Root-cause finding: the original bug report's own proposed fix ("filter iteration==-1") is confirmed insufficient by its own live re-test — real prior-run files with valid URLs leak too, not just empty-URL baseline seeds; and the actual `_terminal_status` classification lives in `threads.py`'s `_shielded_finalize`, not `agent_loop.py`. Next: `/gsd:plan-phase 138`.
+Prior: Phase 137.2 CONTEXT gathered (2026-07-05, commit `7e033d63`) — 4 gray areas resolved: is_system column for the "Built-in" badge/protection signal (D-01), no new agent tool for eval-case creation (hand off to Skill Studio Evals tab, D-03), rename (not delete) the operator's manual copy `7f504819-...` (D-04, verified live only 3/18 zip files imported), pin is_system skills to top of Skills list (D-05).
+Status (prior — Phase 137.1, FULLY CLOSED): secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).
 Execution close-out (2026-07-04): all 10 plans executed. Mid-execution regression fixes: Settings 500 — `harness_judge_model` missing from `UserEffectiveSettings` + no `app_settings` column (fixed `2dafac36` + migration 086, applied live, full-schema regen). Plan 06 cross-provider: BUG-260630-01 (DeepSeek reasoning_content) CLOSED clean-no-code-change per eval_results; BUG-260701-01 (Claude assistant-prefill 400) FIXED at the Anthropic adapter boundary — `supports_assistant_prefill:False` on the 4.6+/5 family, strip trailing prefill in `open_anthropic_stream` (`a4133ff3`; D-14 held — no agent_loop.py/threads.py; 12/12 seam tests). **Guardrail override:** operator directed "all models should just work" → proceeded on deterministic DB reproduction rather than the autonomous:false manual re-test.
 Status (prior — Phase 137, COMPLETE + SECURED): **UAT 13/13 PASSED 2026-07-04** (137-UAT.md; the 1 gap — stepper stale after in-session eval — closed by `40e2f8a3`, live-verified `bce451d7`); **SECURED 2026-07-04** (`137-SECURITY.md` = verified, threats_open: 0 — 7/7 threats closed with file:line evidence, 1 accepted risk R-137-01 zero-new-deps; commit `7850cf72`). Same-day eval-trust wave: baseline-contamination root-cause fix (`f47d6736` — thread reset before EACH arm; BUG-260630-01 likely root cause), gate refetch on eval finalize (`40e2f8a3`), **judge evidence channel** (`dd694916` — runtime tool receipts reach the judge; live-proven FAIL·10 → WITH PASS·72 / WITHOUT FAIL·40 flip), stepper connector visual (`fa253174`).
 **Inserted 2026-07-04 (operator decision — fully close the skills topic before CORE-complete):** **Phase 137.1** (EVAL-05; SEED-100 promoted: cross-provider engine smoke sweep, matrix runs + mean±stddev/delta aggregation + analyst notes, determinate progress, judge case_feedback, per-arm duration, judge-model Settings knob, BUG-260701-01 re-test + BUG-260702-02 restart reconciliation, evidence-channel threat-model formalization) + **Phase 137.2** (CREATE-01; SEED-101: built-in read-only seeded platform-native skill-creator. Investigation findings: mig-018's thin seeded creator is GONE from the live DB and was never deploy-safe — data seeds are NOT in schema-only full-schema.sql; the operator's manual copy is user-owned/unprotected and runtime-inert [assumes subagents/`claude -p`/browser]; Anthropic's skill-creator.zip studied file-by-file — all 18 files dispositioned HAVE/HARVEST/ADAPT/SKIP in SEED-101's capability matrix; our 132–137 Studio already covers most of the loop, Tuner exceeds their optimizer [N-provider matrix, same 60/40 held-out math]).
