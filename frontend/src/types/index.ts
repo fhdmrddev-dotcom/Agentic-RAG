@@ -480,6 +480,7 @@ export interface Skill {
   instructions: string
   is_enabled: boolean
   is_global: boolean
+  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it)
   created_at: string
   updated_at: string
   /** Phase 123-06 (TRIG-03) — the optional save-time lint warnings the
