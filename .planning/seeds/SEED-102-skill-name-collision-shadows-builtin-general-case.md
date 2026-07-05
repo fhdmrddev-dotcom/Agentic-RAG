@@ -33,12 +33,12 @@ and confirmed it goes RED pre-fix / GREEN post-fix), executed by `gsd-executor` 
 isolated worktree (19/19 tests green, plus an explicit RED-check: temporarily reverting
 the fix made the new test fail as expected, then restored). The orchestrator hit a
 tool-availability outage preventing `git merge`/`git cherry-pick` of the worktree branch
-and blocking a final independent pytest re-run + `gsd-verifier` spawn in the same session
 — the fix was instead copied byte-for-byte (diffed to confirm) into the main tree and
-committed directly as `244668f0`. **Recommend one quick confirmatory test run**
-(`cd backend && ./venv/Scripts/python.exe -m pytest tests/test_load_skill_collision.py -q`)
-next session as a final sanity check, since the orchestrator's own live re-verification
-was blocked by the outage rather than genuinely completed.
+committed directly as `244668f0`. **Independently re-confirmed 2026-07-05** once the
+outage cleared: `pytest tests/test_load_skill_collision.py tests/test_load_skill_override.py
+tests/integration/test_skills.py -q` → **19 passed**; `git show 244668f0 --stat` confirms
+only `tool_dispatcher.py` (+6/-2) and the new test file were touched. Fully closed, no
+outstanding verification gap.
 
 # SEED-102 — skill-creator name collision: only one known instance was fixed, not the general case
 
