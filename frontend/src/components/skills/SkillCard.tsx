@@ -98,7 +98,16 @@ export function SkillCard({
       <div className="flex items-start gap-2">
         <Zap className="h-4 w-4 mt-0.5 text-primary shrink-0" />
         <span className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">{skill.name}</span>
-        {skill.is_global && (
+        {/* Phase 137.2 / CREATE-01 (D-01) — ONE pill via a ternary: "Built-in"
+            (trust-badge tint) for a system-owned platform built-in, else the
+            existing muted "Global" pill. A built-in is inherently global, so
+            two pills would be redundant. Reflects the backend value; never set
+            here (badge-spoofing mitigation, T-137.2-02). */}
+        {skill.is_system ? (
+          <span className="text-[10px] text-primary bg-primary/10 px-2 py-1 rounded-full shrink-0">
+            Built-in
+          </span>
+        ) : skill.is_global && (
           <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full shrink-0">
             Global
           </span>
