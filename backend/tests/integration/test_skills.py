@@ -156,7 +156,7 @@ class TestDeleteSkill:
     def test_delete_skill_cleans_storage(self, client, auth_headers, mock_builder):
         """DELETE /skills/{id} returns 204 and calls storage.remove for each file. (SKIL-03)"""
         file_list_result = _make_result([_file_row()])
-        delete_result = _make_result([])
+        delete_result = _make_result([_skill_row()])
         mock_builder.execute.side_effect = [file_list_result, delete_result]
 
         response = client.delete(f"/skills/{SKILL_ID}", headers=auth_headers)
@@ -311,3 +311,23 @@ class TestSystemSkillProtection:
             headers=auth_headers,
         )
         assert response.status_code == 403
+
+    def test_toggle_global_nonowner_system_skill_returns_403(self, client, auth_headers, mock_builder):
+        """PATCH /skills/{id}/toggle-global on a non-owned row → 403 (the ACTUAL code)."""
+        mock_builder.execute.side_effect = [_make_result([])]  # empty fetch = owner miss
+        response = client.patch(
+            f"/skills/{SKILL_ID}/toggle-global",
+            headers=auth_headers,
+        )
+        assert response.status_code == 403
+
+    def test_delete_nonowner_system_skill_returns_404(self, client, auth_headers, mock_builder):
+        """DELETE /skills/{id} on a row the user doesn't own → 404 (delete-empty-result)."""
+        file_lookup_result = _make_result([])  # empty — no files to clean up
+        delete_result = _make_result([])  # empty delete = owner miss
+        mock_builder.execute.side_effect = [file_lookup_result, delete_result]
+        response = client.delete(
+            f"/skills/{SKILL_ID}",
+            headers=auth_headers,
+        )
+        assert response.status_code == 404

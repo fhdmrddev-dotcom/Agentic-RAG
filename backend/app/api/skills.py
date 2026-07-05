@@ -372,7 +372,15 @@ async def delete_skill(
             pass
 
     # Step 3: Delete the skill row (skill_files cascade via FK)
-    supabase.table("skills").delete().eq("id", skill_id).eq("user_id", current_user["id"]).execute()
+    result = (
+        supabase.table("skills")
+        .delete()
+        .eq("id", skill_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Skill not found")
 
 
 @router.patch("/{skill_id}/toggle-enabled", response_model=SkillResponse)
