@@ -36,7 +36,7 @@ Each maps to exactly one roadmap phase.
 ### CORE-closing additions (inserted 2026-07-04 — operator decision to fully close the skills topic before CORE-complete)
 
 - [x] **EVAL-05**: The Skill Eval engine is production-clean and trustworthy: (a) an automated cross-provider engine smoke sweep (one representative model per configured provider, one case, asserting per-arm engine health — verdict `graded` or honest `not_measured` with a REAL provider error, never an engine-shaped error); (b) matrix runs — one click fans a skill's eval out across N providers as N parallel run rows with explicit gate semantics and per-config aggregation (mean ± stddev + delta where run counts allow) + analyst-style annotations; (c) determinate run progress (units = cases × 2 arms + judge); (d) judge critiques weak/non-discriminating test cases (`case_feedback`, never blocking); (e) per-arm wall-clock duration captured; (f) judge model selectable in Settings; (g) BUG-260701-01 re-tested post-`f47d6736` and BUG-260702-02 restart reconciliation closed; (h) evidence-channel judge-prompt surface formalized in the threat model. (SEED-100; SC#10 full-roster.)
-- [ ] **CREATE-01**: A built-in `skill-creator` skill exists for every user — seeded (idempotent migration, system-user-owned, `is_global=true`), read-only and undeletable through app paths, "Built-in" badged in the UI, and deploy-safe (seed reaches cloud via the parity checklist — data seeds are not in `full-schema.sql`). Its instructions are platform-native (harvested from Anthropic's skill-creator per SEED-101's capability matrix): interview → RAG research (`search_documents`) → draft via `save_skill` with writing-craft guidance → propose eval cases → eval run → proposals loop + Trigger Tuner → publish gate; it never claims capabilities the runtime lacks (SEED-096 honesty). (SEED-101.)
+- [x] **CREATE-01**: A built-in `skill-creator` skill exists for every user — seeded (idempotent migration, system-user-owned, `is_global=true`), read-only and undeletable through app paths, "Built-in" badged in the UI, and deploy-safe (seed reaches cloud via the parity checklist — data seeds are not in `full-schema.sql`). Its instructions are platform-native (harvested from Anthropic's skill-creator per SEED-101's capability matrix): interview → RAG research (`search_documents`) → draft via `save_skill` with writing-craft guidance → propose eval cases → eval run → proposals loop + Trigger Tuner → publish gate; it never claims capabilities the runtime lacks (SEED-096 honesty). (SEED-101.)
 
 ## v1 Requirements (STRETCH — gated behind CORE)
 
@@ -82,7 +82,7 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 | GATE-01 | Phase 136 | Complete |
 | PANEL-01 | Phase 137 | Pending |
 | EVAL-05 | Phase 137.1 | Complete |
-| CREATE-01 | Phase 137.2 | Pending |
+| CREATE-01 | Phase 137.2 | Complete |
 | SI-02 (STRETCH) | Phase 139 | Pending (gated) |
 | TRIG-02 (STRETCH) | Phase 140 | Pending (gated) |
 | COLL-02 (STRETCH) | Phase 141 | Pending (gated) |
