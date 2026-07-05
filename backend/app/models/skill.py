@@ -25,6 +25,12 @@ class SkillResponse(BaseModel):
     instructions: str
     is_enabled: bool
     is_global: bool
+    # CREATE-01 (D-01): OUTPUT-ONLY "Built-in" trust badge. The client READS this
+    # (GET /skills carries it); it is NEVER accepted from a request body — SkillCreate
+    # /SkillUpdate deliberately omit it (badge-spoofing mitigation, threat T-137.2-02).
+    # The `= False` default is load-bearing: pre-migration-087 DB rows and older mocked
+    # test rows omit the column and must keep deserializing.
+    is_system: bool = False
     created_at: datetime
     updated_at: datetime
     # TRIG-03 (D-09): non-blocking save-time description lint warnings.
