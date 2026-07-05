@@ -15,14 +15,14 @@
 - ✅ **v2.9 Workflow Studio** — Phases 097-104 CORE (shipped 2026-06-15); STRETCH 105-109 deferred
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
 - ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
-- 🔨 **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-143 (CORE 132-137; STRETCH 138-143), started 2026-06-28. The net-new eval+versioning backend: immutable skill version snapshots + eval test-case persistence + with-skill-vs-without eval runner (SSE) + honest per-provider results + inline ratings + the full self-improvement loop (SI-01) + a skill publish gate, surfaced in a sketch-gated Skill Evals panel. Brief: `PRDs/v3.1-skill-studio-eval.md`.
+- 🔨 **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-144 (CORE 132-137; STRETCH 138-144), started 2026-06-28. The net-new eval+versioning backend: immutable skill version snapshots + eval test-case persistence + with-skill-vs-without eval runner (SSE) + honest per-provider results + inline ratings + the full self-improvement loop (SI-01) + a skill publish gate, surfaced in a sketch-gated Skill Evals panel. Brief: `PRDs/v3.1-skill-studio-eval.md`.
 - 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
 
 ---
 
 ## v3.2 Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS (started 2026-06-28)
 
-**Started:** 2026-06-28. Numbering continues from v3.1's last phase (131) → **CORE Phases 132-137**, then **STRETCH Phases 138-143** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent).
+**Started:** 2026-06-28. Numbering continues from v3.1's last phase (131) → **CORE Phases 132-137**, then **STRETCH Phases 138-144** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent). *Phase 144 added 2026-07-05 (SEED-104, promoted from Phase 137.2's live SC#4 UAT).*
 
 **Goal:** Give users a real iterative environment to test, compare, and improve their skills — see exactly how a skill change affects real outputs across providers, and let the system suggest improvements automatically (human always in the loop). This turns the v3.1 Skill Trigger Tuner into a full improvement cycle.
 
@@ -53,6 +53,7 @@
 | 141 | template_input Resolver Run-Scope | The `template_input` resolver is run-scoped — a template uploaded in one run is not visible/accessible in another | COLL-02 | 2 | depends on Phase 120 COLL-01 run-scope seam (shipped); defense-in-depth |
 | 142 | Non-Python Skill-Script Honesty | A skill bundling a non-Python script yields an honest "cannot execute this skill type" signal instead of silent failure / fake narration | SRH-01 | 3 | DISC-01 Layer 1 / SEED-044; additive, OFF the Phase 120 COLL-01 seam; precursor to v3.3+ full Node execution |
 | 143 | Starter Workflow Library | A curated is_global shelf of fork-able starter workflows on the Workflows page; users fork a starter into a personal draft | WF-01 | 3 | SEED-084; UI hint; no new runtime — one shelf section + content authoring |
+| 144 | Agent-Driven Skill File Attachment | The agent can attach files/scripts/assets it creates directly to the skill it's authoring, and a user can hand the agent an existing template file mid-conversation for the agent to attach — no manual upload hand-off for either path | FILE-01 | 4 | SEED-104 (promoted from Phase 137.2's live SC#4 UAT, the motivating consumer); new WRITE-capable tool (`attach_skill_file`) — needs its own threat model + SC#10 proof; reuses existing `skill_files` table/bucket (no new storage surface); no hard dependency |
 
 ### Phase Checklist
 
@@ -71,6 +72,7 @@
 - [ ] **Phase 141: template_input Resolver Run-Scope (STRETCH)** — run-scoped template_input resolution (COLL-02)
 - [ ] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01)
 - [ ] **Phase 143: Starter Workflow Library (STRETCH)** — fork-able is_global starter-workflow shelf (WF-01)
+- [ ] **Phase 144: Agent-Driven Skill File Attachment (STRETCH)** — new `attach_skill_file` tool + endpoint so the agent can attach files it creates, and a user can hand it a template mid-chat (FILE-01, SEED-104)
 
 ### Phase Details
 
@@ -376,6 +378,21 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
+#### Phase 144: Agent-Driven Skill File Attachment (STRETCH)
+
+**Goal**: The agent can attach files it creates (scripts, generated config/style assets) directly to the skill it's authoring — no manual "please upload this" hand-off — and a user who hands the agent an existing template file mid-conversation gets it attached to the skill being built, not stranded in general workspace scratch.
+**Depends on**: Nothing hard (the `skill_files` table + `skill-files` storage bucket already exist from the core skills system). Phase 137.2's skill-creator is the motivating consumer — its live SC#4 UAT is what surfaced this gap (SEED-104). Gated behind CORE.
+**Requirements**: FILE-01
+**Success Criteria** (what must be TRUE):
+
+  1. A new agent tool (e.g. `attach_skill_file`) lets the agent write a file directly into the skill's own `skill_files` storage — not `workspace_write`'s general scratch area — so `read_skill_file` can find it in any later thread (FILE-01).
+  2. A user can hand the agent an existing file (template, reference doc, script) during a skill-creation conversation, and the agent attaches it to the skill being authored, without a separate pre/post-chat upload step (FILE-01).
+  3. The new tool/endpoint reuses the existing `skill_files` table + `skill-files` storage bucket and stays owner-scoped (same RLS model as every other skill-file path) — no new storage surface (FILE-01).
+  4. Proven across representative providers (SC#10) — a net-new WRITE-capable tool needs the same cross-provider tool-use rigor (arg shape, error handling) as any other tool_dispatcher addition.
+
+**Plans**: TBD
+**Scope note (SEED-104, 2026-07-05):** distinct from SEED-096 (bundle-tree fidelity / execution capability — can a skill's own bundled scripts run) — this phase is about attachment capability (can the agent or user get a file INTO a skill's storage at all during authoring). Needs its own threat model at discuss-phase (new write path), per the project's security-review discipline — this is exactly the kind of surface the operator deliberately deferred out of Phase 137.2 rather than rush in mid-verification.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -392,6 +409,7 @@ Plans:
 | 141. template_input Resolver Run-Scope (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 
 ### Guardrails firing (v3.2)
 

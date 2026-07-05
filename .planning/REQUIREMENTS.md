@@ -48,6 +48,7 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 - [ ] **SRH-01**: When a skill's script is non-Python (JS, shell, etc.), the agent surfaces an honest "cannot execute this skill type" signal rather than silently failing or narrating the code as if it ran. (v3.1 STRETCH carry-forward; DISC-01 Layer 1; SEED-044.)
 - [ ] **RUN-01**: Run-end honesty — (a) baseline files seeded at run start no longer appear as dead "Download unavailable" cards in the final_output_files emit; (b) a run-end reconciler marks open todos as "ended with open todos" (never silently auto-completes). (SEED-094; backend agent_loop.py finalizer pair; additive, shared-path-safe.)
 - [ ] **WF-01**: A curated set of fork-able starter workflows is available on the Workflows page as an is_global published shelf — users fork a starter into a personal draft instead of starting from a blank description. (SEED-084; no new runtime, one shelf section + content authoring.)
+- [ ] **FILE-01**: The agent can attach files it creates (scripts, generated config/style assets) directly to the skill it's authoring via a new tool, and a user can hand the agent an existing template file mid-conversation for the agent to attach to the skill being built — neither path requires a manual pre/post-chat upload step. Reuses the existing `skill_files` table + `skill-files` storage bucket (no new storage surface); owner-scoped like every other skill-file path. (Phase 144, added 2026-07-05; SEED-104, promoted from Phase 137.2's live SC#4 UAT — a net-new WRITE-capable tool, needs its own threat model + SC#10 proof.)
 
 ## Future Requirements (deferred beyond v3.2)
 
@@ -89,3 +90,4 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 | SRH-01 (STRETCH) | Phase 142 | Pending (gated) |
 | RUN-01 (STRETCH) | Phase 138 | Pending (gated) |
 | WF-01 (STRETCH) | Phase 143 | Pending (gated) |
+| FILE-01 (STRETCH) | Phase 144 | Pending (gated) |

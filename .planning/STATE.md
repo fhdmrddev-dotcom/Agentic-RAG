@@ -124,7 +124,7 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 | 136 | Skill Publish Gate (GATE-01) | GATE-01 | 3 | UI hint (publish-flow gate); future-publish-only |
 | 137 | Skill Evals Panel UI (PANEL-01) | PANEL-01 | 4 | **G-2 sketch**; UI hint; SC#10 (UI state); additive (no Skills-tab redesign) |
 
-**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent) — Phases 138-143:**
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent) — Phases 138-144:**
 
 | Phase | Name | REQ-IDs | SC# | Depends |
 |---|---|---|---|---|
@@ -134,8 +134,9 @@ Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (3
 | 141 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 (shipped) |
 | 142 | Non-Python Skill-Script Honesty | SRH-01 | 3 | 120 (off COLL-01 seam, shipped); DISC-01 Layer 1 |
 | 143 | Starter Workflow Library | WF-01 | 3 | — (Workflows page exists); SEED-084; UI hint |
+| 144 (added 2026-07-05) | Agent-Driven Skill File Attachment | FILE-01 | 4 | — (no hard dependency; `skill_files` table/bucket already exist); new WRITE-capable tool — needs its own threat model + SC#10 proof; SEED-104 (promoted from Phase 137.2's live SC#4 UAT) |
 
-- **Coverage:** 14/14 requirements mapped (8 CORE + 6 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Coverage:** 15/15 requirements mapped (8 CORE + 7 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 - **Sequencing rationale:** VER-01 paired WITH EVAL-01 in the foundation (132) — test cases reference an immutable skill version. Strict eval chain 132 → 133 → 134 (persistence → runner → results). SI-01 (135) needs the full eval substrate (EVAL-02 + EVAL-03 + VER-01 + EVAL-04 ratings). GATE-01 (136) consumes the pass/fail verdict. PANEL-01 (137) lands LAST as the sketch-gated consolidation of the whole eval experience (depends EVAL-01..04 + VER-01). RUN-01 (138) is backend-only/small — the safest STRETCH to pull forward; it closes SEED-094.
 - **SC#10 (cross-provider mandate):** flagged on every phase touching streaming / agent loop / provider routing / UI state — headline three EVAL-02 (133), SI-01 (135), TRIG-02 (140), plus per-provider-display / UI-state phases 134, 137, 139.
 - **UI hint:** 134, 135, 136, 137 (CORE) + 139, 143 (STRETCH).
@@ -249,6 +250,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ### Roadmap Evolution
 
+- **Phase 144 added (2026-07-05):** Agent-Driven Skill File Attachment (FILE-01) — new `attach_skill_file` tool + endpoint so the agent can attach files/scripts/assets it creates during skill authoring, and a user can hand the agent an existing template file mid-conversation for the agent to attach; reuses the existing `skill_files` table/bucket, no new storage surface. Promoted from SEED-104 (planted during Phase 137.2's live SC#4 UAT, deliberately deferred there to avoid a 3rd decimal insert onto the 137.x chain mid-verification). Appended to the end of v3.2 STRETCH (after Phase 143); needs its own threat model at discuss-phase (net-new WRITE-capable tool) + SC#10 cross-provider proof.
 - **Phase 111.1 INSERTED after Phase 111 (2026-06-15):** "Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)" — embedding-provider picker + local presets + re-embed-on-change lifecycle; new reqs **EMBED-01..06**; depends on Phase 111 (reuses its `lmstudio` provider plumbing); G-2 sketch fires (Settings UI). Lands before the DM read-path phases (113-119). Sourced from a 5-agent investigation (the `embedding-flexibility-scoping` workflow). **Decision:** keep embedding flexibility OUT of Phase 111 (different domain = retrieval substrate, not the metadata LLM; plus the fixed-`vector(1536)`/HNSW dimension + destructive-re-embed landmine) → its own phase. **Retires SEED-048.** **SEED-048 correction:** embeddings are NOT OpenAI-hardwired today — `embedding_model`/`embedding_base_url`/`embedding_api_key`/`embedding_dimensions` are already configurable Settings with UI controls (`SettingsPage.tsx:934-950`); what's missing = a provider picker, local presets, the re-embed lifecycle, and a fix for the `embed_chunks` `user_settings`-drop bug (folded in as EMBED-04). The 111.1 plan must VERIFY these findings against live code.
 
 **Open blockers:** None. (Resolved 2026-06-08: Phase 097 Plan 01 Task 3 human-action checkpoint — operator confirmed folder `75755ec9-5ba7-495b-ad93-7500011cf6f2` "Project Meridian — Risks" and ingested a synthetic risk corpus to ground it; `out/spike-config.json` written + committed `61025148`.)
