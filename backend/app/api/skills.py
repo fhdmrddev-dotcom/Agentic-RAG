@@ -144,7 +144,11 @@ async def list_skills(
         supabase.table("skills")
         .select("*")
         .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-        .order("name")
+        # CREATE-01 (D-05): is_system rows FIRST, then alphabetical — the built-in
+        # skill-creator pins to the top of the Skills list. PostgREST emits
+        # order=is_system.desc,name.asc. Chained multi-column order is an established
+        # pattern here (documents.py:1903; toggle_global chains version_number desc).
+        .order("is_system", desc=True).order("name")
         .execute()
     )
     seen = set()
