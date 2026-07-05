@@ -1,8 +1,10 @@
 ---
 seed_id: SEED-102
 title: Any user can silently shadow the built-in skill-creator by name collision (general case, not just the one known dev account)
-status: open
+status: closed
 planted: 2026-07-05
+closed: 2026-07-05
+closed_by: "quick task 260705-hz1 (candidate fix #1 — tie-break reversal), commit 244668f0 on develop"
 phase_origin: "Code review of Phase 137.2 (137.2-REVIEW.md, WR-02) — found while verifying the 'Protected' half of CREATE-01/SEED-101"
 category: security-hardening — skill resolution / built-in protection
 related_seeds:
@@ -10,6 +12,33 @@ related_seeds:
 related_memories: []
 priority: medium
 ---
+
+## Resolution (2026-07-05)
+
+Closed via `/gsd:quick --validate` (task `260705-hz1`), implementing candidate fix #1 from
+this seed: `_handle_load_skill` (`backend/app/services/tool_dispatcher.py`) now orders
+`.order("is_system", desc=True).order("is_global", desc=True)` instead of the old
+ascending `.order("is_global")` — precedence **system > global > owned** on a name
+collision. A new regression test (`backend/tests/test_load_skill_collision.py`) proves
+resolution picks the `is_system` built-in over a same-named owned row, using a
+sorting-capable fake (not the passthrough fake elsewhere in the test suite, which would
+have been a false-green). `create_skill`/`save_skill`/`import_skill` and every other
+`.or_(...)` skill query were left untouched — candidate fix #2 (a name-collision guard on
+write) remains a separate, not-yet-needed option if this tie-break ever proves
+insufficient.
+
+**Verification chain:** planned by `gsd-planner`, checked twice by `gsd-plan-checker`
+(0 blockers both passes; the plan-checker independently hand-simulated the sorting logic
+and confirmed it goes RED pre-fix / GREEN post-fix), executed by `gsd-executor` in an
+isolated worktree (19/19 tests green, plus an explicit RED-check: temporarily reverting
+the fix made the new test fail as expected, then restored). The orchestrator hit a
+tool-availability outage preventing `git merge`/`git cherry-pick` of the worktree branch
+and blocking a final independent pytest re-run + `gsd-verifier` spawn in the same session
+— the fix was instead copied byte-for-byte (diffed to confirm) into the main tree and
+committed directly as `244668f0`. **Recommend one quick confirmatory test run**
+(`cd backend && ./venv/Scripts/python.exe -m pytest tests/test_load_skill_collision.py -q`)
+next session as a final sanity check, since the orchestrator's own live re-verification
+was blocked by the outage rather than genuinely completed.
 
 # SEED-102 — skill-creator name collision: only one known instance was fixed, not the general case
 
