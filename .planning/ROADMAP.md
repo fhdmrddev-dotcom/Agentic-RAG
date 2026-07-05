@@ -293,7 +293,7 @@ Plans:
 
 **Wave 2** *(gated — blocked on Wave 1)*
 
-- [ ] 137.2-04-PLAN.md — [BLOCKING] apply migration 087 to the live DB + regenerate `full-schema.sql` + one-off rename of the operator's manual copy (D-04) (CREATE-01) [wave 2, autonomous:false]
+- [x] 137.2-04-PLAN.md — [BLOCKING] apply migration 087 to the live DB + regenerate `full-schema.sql` + one-off rename of the operator's manual copy (D-04) (CREATE-01) [wave 2, autonomous:false]
 
 
 #### Phase 138: Run-End Honesty (STRETCH)
