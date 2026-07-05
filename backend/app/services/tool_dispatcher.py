@@ -666,14 +666,16 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     skill_name = args.get("skill_name", "")
     # Emit skill_activated SSE event immediately (SKIL-12)
     await ctx.emit(ctx.redis, ctx.run_id, 'skill_activated', skill_name=skill_name)
-    # Resolve skill -- prefer user-owned over global when names conflict
+    # Resolve skill -- on a name collision the most-authoritative row wins:
+    # system > global > owned (SEED-102). is_system DESC pins a protected built-in
+    # above any same-named owned row; is_global DESC is the secondary tie-break.
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
         .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
         .eq("name", skill_name)
         .eq("is_enabled", True)
-        .order("is_global")
+        .order("is_system", desc=True).order("is_global", desc=True)
     )
     skill_row = _skill_resp.data
     if not skill_row:
