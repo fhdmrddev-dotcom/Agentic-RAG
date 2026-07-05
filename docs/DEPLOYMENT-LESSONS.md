@@ -53,10 +53,11 @@ from local. Most of these bugs were config/data, not code.*
   seed rows**. The `app_settings 'global'` row was missing, and `save_app_settings` does
   `UPDATE ... WHERE id='global'` (not upsert) → matched 0 rows → silent success.
 - **Fix:** `INSERT INTO app_settings (id) VALUES ('global') ON CONFLICT DO NOTHING`.
-- **Prevention:** a fresh cloud DB needs the **7 seed migrations** that the schema-only dump
+- **Prevention:** a fresh cloud DB needs the **8 seed migrations** that the schema-only dump
   misses (010 app_settings, 018 skill_creator_seed, 053, 056 workflow_definitions, 061
   harness_seed_templates, 066 eval_coverage_seed, 087 skill_creator_reborn (supersedes 018's
-  seed)). Long-term: extend the schema generator with
+  seed), 088 skill_creator_eval_step_sequencing (UPDATEs 087's row — apply 087 first, in
+  order)). Long-term: extend the schema generator with
   a seed-data supplement. Also: `save_app_settings` should upsert / stop swallowing write errors.
 
 ### A7. Vercel build + author gotchas
