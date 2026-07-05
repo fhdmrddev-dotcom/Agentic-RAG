@@ -309,7 +309,16 @@ Plans:
   2. When a run ends with open todos, a run-end reconciler marks them "ended with open todos" — never silently auto-completed (RUN-01b).
   3. The change is additive and shared-path-safe — Deep Mode stays byte-identical (red line).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+**Wave 1** *(parallel — disjoint files)*
+
+- [ ] 138-01-PLAN.md — RUN-01a: filter the final_output_files emit to content-hashes genuinely new to the run (agent_loop.py accumulator + tool_dispatcher.py field); baseline/leftover files no longer leak (D-07/D-08) [wave 1]
+- [ ] 138-02-PLAN.md — RUN-01b: net-new reconcile_open_todos_on_run_end() in todos_service.py wired at BOTH clean-completion finalizers in threads.py (two-clause cap gate at _shielded_finalize, plain gate at the continuation site); marks open todos honestly, never auto-completes (D-01..D-06, LOCK-1/LOCK-2) [wave 1]
+
+**Wave 2** *(gated — blocked on Wave 1)*
+
+- [ ] 138-03-PLAN.md — [CHECKPOINT] operator live-verifies both fixes + cap_paused negative + Continue positive + Deep red-line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
 
 #### Phase 139: Self-Improve Proposer — Description-Only (STRETCH)
 
