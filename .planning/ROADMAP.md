@@ -287,9 +287,9 @@ Plans:
 Plans:
 **Wave 1** *(parallel — disjoint files)*
 
-- [ ] 137.2-01-PLAN.md — Backend `is_system` contract: output-only `SkillResponse` field + pin-to-top `list_skills` order (D-05) + Wave 0 tests (CREATE-01) [wave 1]
-- [ ] 137.2-02-PLAN.md — Migration 087: additive `is_system` column + superseding platform-native skill-creator seed (D-02/D-03) + deploy-parity docs (CREATE-01) [wave 1]
-- [ ] 137.2-03-PLAN.md — Frontend: `is_system` wire type + "Built-in" pill (D-01) + `SkillCard.test.tsx` (CREATE-01) [wave 1]
+- [x] 137.2-01-PLAN.md — Backend `is_system` contract: output-only `SkillResponse` field + pin-to-top `list_skills` order (D-05) + Wave 0 tests (CREATE-01) [wave 1]
+- [x] 137.2-02-PLAN.md — Migration 087: additive `is_system` column + superseding platform-native skill-creator seed (D-02/D-03) + deploy-parity docs (CREATE-01) [wave 1]
+- [x] 137.2-03-PLAN.md — Frontend: `is_system` wire type + "Built-in" pill (D-01) + `SkillCard.test.tsx` (CREATE-01) [wave 1]
 
 **Wave 2** *(gated — blocked on Wave 1)*
 

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: ready_to_plan
-last_updated: "2026-07-04T22:18:05.244Z"
-last_activity: 2026-07-04 -- Phase 137.2 planning complete
+last_updated: "2026-07-05T01:50:40.284Z"
+last_activity: 2026-07-05 -- Phase 137.2 execution started
 progress:
   total_phases: 28
   completed_phases: 16
@@ -22,12 +22,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 137.2 — skill creator reborn — built in + protected (inserted 2026 07 04)
+**Current focus:** Phase 137.2 — skill-creator-reborn-built-in-protected-inserted-2026-07-04
 
 ## Current Position
 
-Phase: 137.2
-Plan: Not started
+Phase: 137.2 (skill-creator-reborn-built-in-protected-inserted-2026-07-04) — EXECUTING
+Plan: 1 of 4
 Next action: Phase 137.2 CONTEXT gathered (2026-07-05, commit `7e033d63`) — 4 gray areas resolved: is_system column for the "Built-in" badge/protection signal (D-01), no new agent tool for eval-case creation (hand off to Skill Studio Evals tab, D-03), rename (not delete) the operator's manual copy `7f504819-...` (D-04, verified live only 3/18 zip files imported), pin is_system skills to top of Skills list (D-05). Next: `/gsd:plan-phase 137.2`.
 Prior: Phase 137.1 FULLY CLOSED — secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).
 Execution close-out (2026-07-04): all 10 plans executed. Mid-execution regression fixes: Settings 500 — `harness_judge_model` missing from `UserEffectiveSettings` + no `app_settings` column (fixed `2dafac36` + migration 086, applied live, full-schema regen). Plan 06 cross-provider: BUG-260630-01 (DeepSeek reasoning_content) CLOSED clean-no-code-change per eval_results; BUG-260701-01 (Claude assistant-prefill 400) FIXED at the Anthropic adapter boundary — `supports_assistant_prefill:False` on the 4.6+/5 family, strip trailing prefill in `open_anthropic_stream` (`a4133ff3`; D-14 held — no agent_loop.py/threads.py; 12/12 seam tests). **Guardrail override:** operator directed "all models should just work" → proceeded on deterministic DB reproduction rather than the autonomous:false manual re-test.
@@ -38,7 +38,7 @@ Status (prior — Phase 134, complete + secured): **COMPLETE 2026-07-02** (134-V
 **UAT found + fixed a major live-surface defect in-session** (`d0c0c10a`): every live eval view died with a spurious "ended with an error" + stale 'running' readout — root causes (a) POST returned run_id before the job's first XADD → subscribe race hit runs.py Step-3b synthetic `buffer_expired_while_streaming`; (b) eval arms silent 40-70s (NO-OP emit) → replay-tail consumer's ~30s Redis XREAD socket timeout closed the stream mid-run; (c) client painted any error terminal as fatal + froze on a mid-run readout. Fix (eval-scoped, chat path untouched): seed `eval_run_started` before 202 + `eval_heartbeat` every 15s wrapping `_run_arm` + bounded client re-attach self-heal. Re-verified live on a 9-min OpenRouter run (live per-arm verdict badges → auto-final readout, zero errors). Also fixed during UAT: the POST-side anchor thread (the "empty twin") was a second uncovered `is_eval` creation site — both threads/run now flagged. U8 proved D-04 honesty against the REAL BUG-260701-01 prefill 400 (sonnet-5 baseline → `not_measured` render, rollup 1/1 excludes it); U9 captured the judge-PASS+human-DOWN disagreement row (Phase-135 query returns it).
 **Inserted — Phase 134.1 (Evals Run Silently) SHIPPED + live-verified 2026-07-02** (BUG-260702-01; commits `b073cced` + `58ec1da6`). During 134 UAT the user flagged eval runs polluting the chat sidebar (34 `[eval]` threads = 10% of 338, half empty). Root cause: the eval runner creates a REAL `threads` row per run to drive `run_agent_loop` (no in-memory path). Fix (quick-style): mig 082 `threads.is_eval` flag + backfill + partial index (applied live :54322, full-schema regen) · `_create_eval_thread` sets is_eval=True · `list_threads` `.eq("is_eval", False)`. Live proof: `GET /threads` = **303 (was 337), 0 `[eval]`**; 14/14 eval tests. No FE change. Also, while investigating a "15-min stuck eval," found in-flight runs are **orphaned on backend restart** (no reconciliation) → cleaned up (1 eval→`interrupted`, 15 chat runs→`failed`, stale Redis stream dropped) + filed **BUG-260702-02** (→ run-reconciliation phase / SEED-100). Judge model (`harness_judge_model`, settings-backed but no UI, defaults `claude-opus-4-8`) needs a Settings knob for single-provider/local-model orgs → SEED-100. **Next: resume `/gsd:verify-work 134` (U1–U9) with a clean sidebar.**
 Status (prior — Phase 133, complete): `133-VERIFICATION.md` = **passed**; `133-SECURITY.md` = **verified** (threats_open: 0 — gsd-security-auditor verify-mitigations mode confirmed all 11 mitigate-threats present in code + 1 accepted risk AR-133-01 logged for the zero-new-deps supply-chain accept). EVAL-02 eval runner shipped: migration 080 (`eval_runs`+`eval_results`, owner-only RLS, FK→skill_versions/skill_test_cases, applied live via psycopg2 :54322) · additive default-off `RunContext.skill_catalog_override` (the one G-5 agent_loop.py touch; `test_deep_mode_unchanged` → Deep byte-identical) · `eval_runner_service.run_eval_job` drives `run_agent_loop` 2×/case (WITH=version-snapshot target-only / WITHOUT=empty, NO-OP emit) · `api/evals.py` owner-scoped router (POST 202 + companion `public.runs` row; cross-user 404) · thin `--skip-ui` SkillEvalSection. **LIVE SC#10 UAT (orchestrator-driven against the live API, psycopg2 cross-check) caught + fixed a real cross-provider routing bug** (`306dd2d4`): eval sent non-OpenAI models to the OpenAI SDK → 404, because the gateway routes on `user_settings.active_provider` not `ctx.resolved_provider` and evals.py never applied the provider override; fix = `override_provider`+`llm_model` pin in the eval router (threads.py:1059-1096 precedent; net-new file, Deep untouched) + regression test. **Proven live across all 4 providers** (OpenAI/Anthropic/Google/OpenRouter route correctly; honest WITH/WITHOUT token delta), **multi-tool** (search_documents+execute_code: "9 distinct risks across 3 docs"), **long-history** (7KB prompt). 9/9 eval tests green. All UAT artifacts cleaned up (eval tables empty; docx restored to 1 case). Remaining = 2 OPTIONAL operator lived-glances (thin-UI live-progress render + parallel-thread feel; engine isolation already confirmed). **Secure-phase DONE 2026-07-01** (`133-SECURITY.md`, threats_open: 0). Next: Phase 134 (EVAL-03/04) / `/gsd:complete-milestone` later.
-Last activity: 2026-07-04 -- Phase 137.2 planning complete
+Last activity: 2026-07-05 -- Phase 137.2 execution started
 
 ### Quick Tasks Completed
 
