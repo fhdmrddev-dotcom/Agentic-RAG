@@ -30,6 +30,7 @@ def _skill_row(
     instructions="Write valid SQL",
     is_enabled=True,
     is_global=False,
+    is_system=False,
 ):
     return {
         "id": skill_id or SKILL_ID,
@@ -39,6 +40,7 @@ def _skill_row(
         "instructions": instructions,
         "is_enabled": is_enabled,
         "is_global": is_global,
+        "is_system": is_system,
         "created_at": NOW,
         "updated_at": NOW,
     }
@@ -82,6 +84,22 @@ class TestCreateSkill:
         assert data["name"] == "SQL Writer"
         assert data["user_id"] == USER_ID
 
+    def test_is_system_serializes_in_response(self, client, auth_headers, mock_execute_result):
+        """SkillResponse carries the is_system trust badge on the wire (CREATE-01 D-01).
+
+        Pydantic drops any field not on the response model, so this asserts the badge
+        actually reaches the JSON. A system row (is_system=True) must serialize as True."""
+        mock_execute_result.data = [_skill_row(is_system=True)]
+        response = client.post("/skills", headers=auth_headers, json={
+            "name": "skill-creator",
+            "description": "Built-in",
+            "instructions": "...",
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert "is_system" in data, "is_system missing from SkillResponse JSON"
+        assert data["is_system"] is True
+
 
 # ── GET /skills ────────────────────────────────────────────────────────────────
 
@@ -96,6 +114,24 @@ class TestListSkills:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
+
+    def test_list_skills_orders_is_system_first(self, client, auth_headers, mock_builder, mock_execute_result):
+        """GET /skills issues a two-column order — is_system DESC then name ASC (D-05).
+
+        The mock .order() is a PASSTHROUGH (conftest sets order.return_value = builder);
+        it does NOT sort, so assert the CALL, not the output order. This proves list_skills
+        pins the built-in to the top; the mock returns .data verbatim."""
+        mock_execute_result.data = [
+            _skill_row(skill_id=str(uuid4()), name="skill-creator", is_system=True),
+            _skill_row(name="Alpha"),
+        ]
+        response = client.get("/skills", headers=auth_headers)
+        assert response.status_code == 200
+        # Backend order is authoritative (no client-side re-sort): is_system first, then name.
+        mock_builder.order.assert_any_call("is_system", desc=True)
+        mock_builder.order.assert_any_call("name")
+        # D-01: the is_system badge reaches the wire on the list endpoint too.
+        assert any(row["is_system"] is True for row in response.json())
 
 
 # ── PATCH /skills/{id} ────────────────────────────────────────────────────────
@@ -243,3 +279,35 @@ class TestDeleteFile:
             headers=auth_headers,
         )
         assert response.status_code == 404
+
+
+# ── CREATE-01: built-in (is_system) read-only protection ──────────────────────
+
+class TestSystemSkillProtection:
+    """The built-in skill-creator is owner-scoped to the system user (…0001).
+
+    A non-owner mutation misses the owner-scoped WHERE (user_id.eq) and returns the
+    EXISTING 404/403 — proving the built-in is read-only/undeletable with ZERO new
+    authorization code (threat T-137.2-01). The fixture user id EQUALS the system UUID
+    and .eq() is a passthrough, so ownership is simulated via an EMPTY result (the
+    owner-scoped miss), NOT an id mismatch.
+    """
+
+    def test_update_nonowner_system_skill_returns_404(self, client, auth_headers, mock_builder):
+        """PATCH /skills/{id} on a row the user doesn't own → 404 (update-empty-result)."""
+        mock_builder.execute.side_effect = [_make_result([])]  # empty update = owner miss
+        response = client.patch(
+            f"/skills/{SKILL_ID}",
+            headers=auth_headers,
+            json={"name": "Hijacked Built-in"},
+        )
+        assert response.status_code == 404
+
+    def test_toggle_enabled_nonowner_system_skill_returns_403(self, client, auth_headers, mock_builder):
+        """PATCH /skills/{id}/toggle-enabled on a non-owned row → 403 (the ACTUAL code)."""
+        mock_builder.execute.side_effect = [_make_result([])]  # empty fetch = owner miss
+        response = client.patch(
+            f"/skills/{SKILL_ID}/toggle-enabled",
+            headers=auth_headers,
+        )
+        assert response.status_code == 403
