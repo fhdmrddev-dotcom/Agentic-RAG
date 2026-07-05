@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import re
 import zipfile
@@ -22,6 +23,8 @@ from app.models.skill import (
 )
 from app.services.publish_gate_service import compute_publish_gate
 from app.services.skill_lint import lint_description
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -80,31 +83,75 @@ def _find_skill_entries(zf: zipfile.ZipFile) -> list[tuple[str, bytes]]:
     return entries
 
 
+def _dedup_flattened_name(filename: str, used_names: set[str]) -> str:
+    """Return a collision-free flattened basename, registering it in ``used_names``.
+
+    First occurrence keeps its plain name. A repeat gets the smallest integer
+    ``>= 2`` inserted before the extension (``__init__.py`` -> ``__init__2.py`` ->
+    ``__init__3.py``; a no-extension name like ``Makefile`` -> ``Makefile2``),
+    skipping any candidate already taken. Deterministic and collision-free — this is
+    the fix that stops two ZIP entries in different folders (which flatten to the same
+    basename) from resolving to one storage path and silently losing a file.
+    """
+    if filename not in used_names:
+        used_names.add(filename)
+        return filename
+    stem, ext = os.path.splitext(filename)
+    n = 2
+    candidate = f"{stem}{n}{ext}"
+    while candidate in used_names:
+        n += 1
+        candidate = f"{stem}{n}{ext}"
+    used_names.add(candidate)
+    return candidate
+
+
 def _upload_skill_files(
     files_to_upload: list[dict],
     skill_id: str,
     user_id: str,
     supabase: Client,
-) -> None:
+) -> list[dict]:
     """Upload companion files to storage and insert metadata rows.
 
     Each dict in files_to_upload must contain:
       file_bytes, filename, storage_path, mime_type
+
+    Resilient per-file: a single file's storage upload OR DB insert failure is
+    caught, logged, and collected — it never aborts the loop, so every later file
+    is still attempted. This fixes the silent data-loss bug where one unhandled
+    upload exception (e.g. a duplicate storage path) dropped every file after it.
+
+    Returns a list of ``{"filename", "error"}`` dicts (empty when all succeed).
+    Callers decide how to surface it: the synchronous import path folds it into the
+    response ``errors`` list (SkillImportError channel); the backgrounded path has no
+    response channel left, so these failures live only in the ``logger.warning`` log.
     """
+    errors: list[dict] = []
     for entry in files_to_upload:
-        supabase.storage.from_("skill-files").upload(
-            path=entry["storage_path"],
-            file=entry["file_bytes"],
-            file_options={"content-type": entry["mime_type"]},
-        )
-        supabase.table("skill_files").insert({
-            "skill_id": skill_id,
-            "user_id": user_id,
-            "filename": entry["filename"],
-            "file_path": entry["storage_path"],
-            "file_size": len(entry["file_bytes"]),
-            "mime_type": entry["mime_type"],
-        }).execute()
+        try:
+            supabase.storage.from_("skill-files").upload(
+                path=entry["storage_path"],
+                file=entry["file_bytes"],
+                file_options={"content-type": entry["mime_type"]},
+            )
+            supabase.table("skill_files").insert({
+                "skill_id": skill_id,
+                "user_id": user_id,
+                "filename": entry["filename"],
+                "file_path": entry["storage_path"],
+                "file_size": len(entry["file_bytes"]),
+                "mime_type": entry["mime_type"],
+            }).execute()
+        except Exception as exc:
+            logger.warning(
+                "Skill file upload failed (skill_id=%s, filename=%s): %s",
+                skill_id,
+                entry["filename"],
+                exc,
+            )
+            errors.append({"filename": entry["filename"], "error": str(exc)})
+    return errors
 
 
 def _sibling_descriptions(
@@ -264,6 +311,7 @@ async def import_skill(
 
             # Build list of companion file dicts
             files_to_upload: list[dict] = []
+            used_names: set[str] = set()
             for entry_name in zf.namelist():
                 if not entry_name.startswith(prefix):
                     continue
@@ -273,17 +321,26 @@ async def import_skill(
                 filename = os.path.basename(relative)
                 if not filename:
                     continue
+                # De-dup the flattened basename BEFORE building the storage path so two
+                # entries in different folders that flatten to the same basename (e.g.
+                # pkg_a/__init__.py + pkg_b/__init__.py) get DISTINCT paths and neither is
+                # silently lost. The os.path.basename flattening above is unchanged —
+                # folder-tree fidelity stays out of scope; this only stops collisions.
+                unique_name = _dedup_flattened_name(filename, used_names)
                 file_bytes = zf.read(entry_name)
-                storage_path = f"{current_user['id']}/{skill_row['id']}/{filename}"
+                storage_path = f"{current_user['id']}/{skill_row['id']}/{unique_name}"
                 files_to_upload.append({
                     "file_bytes": file_bytes,
-                    "filename": filename,
+                    "filename": unique_name,
                     "storage_path": storage_path,
                     "mime_type": "application/octet-stream",
                 })
 
             file_count = len(files_to_upload)
             if file_count > 20:
+                # Backgrounded: the HTTP response is already sent, so per-file failures
+                # have no response channel — they are captured by the logger.warning in
+                # _upload_skill_files. Its return is intentionally discarded here.
                 background_tasks.add_task(
                     _upload_skill_files,
                     files_to_upload,
@@ -293,7 +350,24 @@ async def import_skill(
                 )
                 has_background = True
             else:
-                _upload_skill_files(files_to_upload, skill_row["id"], current_user["id"], supabase)
+                upload_errors = _upload_skill_files(
+                    files_to_upload, skill_row["id"], current_user["id"], supabase
+                )
+                if upload_errors:
+                    # Surface per-file failures through the EXISTING SkillImportError
+                    # channel ({skill, error}) the endpoint already returns and the
+                    # frontend already renders as "X imported, Y failed" — one summary
+                    # row per skill naming each failed file and its reason.
+                    failed_summary = "; ".join(
+                        f"{e['filename']}: {e['error']}" for e in upload_errors
+                    )
+                    errors.append({
+                        "skill": fm["name"],
+                        "error": (
+                            f"{len(upload_errors)} file(s) failed to upload — "
+                            f"{failed_summary}"
+                        ),
+                    })
 
     if has_background:
         return JSONResponse(
