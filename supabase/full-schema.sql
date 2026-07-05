@@ -1079,7 +1079,8 @@ CREATE TABLE public.skills (
     is_enabled boolean DEFAULT true NOT NULL,
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_system boolean DEFAULT false NOT NULL
 );
 
 
