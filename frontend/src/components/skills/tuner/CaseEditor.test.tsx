@@ -28,6 +28,7 @@ const SKILL: Skill = {
   instructions: "Write SQL.",
   is_enabled: true,
   is_global: false,
+  is_system: false,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 }
