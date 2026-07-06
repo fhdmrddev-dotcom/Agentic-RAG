@@ -104,6 +104,10 @@ def _seed(*, proposal_status=None, proposal_id=None):
                 "re_eval_run_id": None,
                 "source_eval_run_id": source_run_id,
                 "user_id": OWNER["id"],
+                # CR-01 (139 review): migration 090 added the kind discriminator (DEFAULT
+                # 'instruction' + backfill) and the SI-01 routes are now kind-scoped — seeds
+                # must mirror the migrated schema.
+                "kind": "instruction",
                 "proposed_instructions": "PROPOSED BODY",
                 "rationale": "r",
                 "evidence_summary": "e",

@@ -92,6 +92,10 @@ def _make(
             "id": proposal_id, "skill_id": skill_id, "base_skill_version_id": base_version_id,
             "new_skill_version_id": draft_version_id, "re_eval_run_id": re_eval_run_id,
             "source_eval_run_id": source_run_id, "user_id": OWNER["id"],
+            # CR-01 (139 review): migration 090 added the kind discriminator (DEFAULT
+            # 'instruction' + backfill) and the SI-01 routes are now kind-scoped — seeds
+            # must mirror the migrated schema.
+            "kind": "instruction",
             "proposed_instructions": "PROPOSED BODY", "rationale": "r", "evidence_summary": "e",
             "status": proposal_status, "override_forced": override_forced,
             "created_at": "2026-07-02T00:00:00Z", "updated_at": "2026-07-02T00:00:00Z",

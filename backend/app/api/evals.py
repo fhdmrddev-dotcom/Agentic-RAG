@@ -680,6 +680,10 @@ def _proposal_response(row: dict, *, base_instructions: str, gate=None) -> Skill
         new_skill_version_id=row.get("new_skill_version_id"),
         re_eval_run_id=row.get("re_eval_run_id"),
         source_eval_run_id=row.get("source_eval_run_id"),
+        # CR-01 (139 review): forward the STORED kind (defense-in-depth — the SI-01 reads are
+        # kind-scoped to 'instruction', so this is belt-and-suspenders against a kind-blind read
+        # ever mislabeling a description row as an instruction proposal again).
+        kind=row.get("kind", "instruction") or "instruction",
         proposed_instructions=row.get("proposed_instructions", "") or "",
         base_instructions=base_instructions,
         rationale=row.get("rationale", "") or "",
@@ -791,6 +795,9 @@ async def propose_skill_improvement(
             .select("id, status")
             .eq("skill_id", skill_id)
             .eq("user_id", user_id)
+            # CR-01 (139 review): kind-scope the open set — a pending DESCRIPTION proposal
+            # (SI-02) must never be superseded by drafting an INSTRUCTION proposal.
+            .eq("kind", "instruction")
             .in_("status", list(_OPEN_PROPOSAL_STATUSES))
             .execute()
         )
@@ -809,6 +816,7 @@ async def propose_skill_improvement(
                 .update({"status": "rejected"})
                 .in_("id", superseded_ids)
                 .eq("user_id", user_id)
+                .eq("kind", "instruction")  # CR-01: mirror the kind-scoped read
                 .execute()
             )
 
@@ -851,6 +859,9 @@ async def propose_skill_improvement(
         "base_skill_version_id": base_skill_version_id,
         "source_eval_run_id": str(source_run_id),
         "user_id": user_id,
+        # CR-01 (139 review): explicit kind (matches the DB DEFAULT from migration 090) so the
+        # kind-scoped SI-01 reads always see rows this route inserts.
+        "kind": "instruction",
         "proposed_instructions": proposal.proposed_instructions,
         "rationale": proposal.rationale,
         "evidence_summary": proposal.evidence_cited,
@@ -895,6 +906,9 @@ async def list_skill_proposals(
             .select("*")
             .eq("skill_id", skill_id)
             .eq("user_id", user_id)
+            # CR-01 (139 review): kind-scope — description proposals (SI-02) must never leak
+            # into the SI-01 surface mislabeled as instruction proposals.
+            .eq("kind", "instruction")
             .order("created_at", desc=True)
             .execute()
         )
@@ -960,6 +974,9 @@ async def get_skill_proposal(
             .eq("id", str(proposal_id))
             .eq("user_id", user_id)
             .eq("skill_id", skill_id)
+            # CR-01 (139 review): kind-gate — a description proposal is indistinguishable from
+            # absent through the SI-01 route (mirrors the description routes' T-139-10 guard).
+            .eq("kind", "instruction")
             .limit(1)
             .execute()
         )
@@ -1006,6 +1023,8 @@ async def reject_skill_proposal(
     user_id = current_user["id"]
 
     # 1. Owner-verify the proposal row (404 cross-user — never 403; T-135-01 IDOR gate).
+    #    CR-01 (139 review): also kind-gated — a pending DESCRIPTION proposal (SI-02) can never be
+    #    flipped through this INSTRUCTION route (mirrors the description reject's T-139-10 guard).
     def _verify():
         return (
             supabase.table("skill_proposals")
@@ -1013,6 +1032,7 @@ async def reject_skill_proposal(
             .eq("id", str(proposal_id))
             .eq("user_id", user_id)
             .eq("skill_id", skill_id)
+            .eq("kind", "instruction")
             .limit(1)
             .execute()
         )
@@ -1032,6 +1052,7 @@ async def reject_skill_proposal(
             .update({"status": "rejected"})
             .eq("id", str(proposal_id))
             .eq("user_id", user_id)
+            .eq("kind", "instruction")  # CR-01: mirror the kind-gated verify
             .execute()
         )
 
@@ -1940,6 +1961,9 @@ async def approve_skill_proposal(
     user_id = current_user["id"]
 
     # 1. Owner-verify the skill (404 cross-user) + read the proposal (id AND user_id AND skill_id).
+    #    CR-01 (139 review): kind-gated — a description proposal (SI-02) approved through this
+    #    INSTRUCTION route would dead-end at the source-run guard with a nonsense 400; make it a
+    #    clean 404 instead (indistinguishable from absent — T-139-10 symmetry).
     skill = await _verify_owned_skill(supabase, skill_id, user_id)
 
     def _read_proposal():
@@ -1949,6 +1973,7 @@ async def approve_skill_proposal(
             .eq("id", str(proposal_id))
             .eq("user_id", user_id)
             .eq("skill_id", skill_id)
+            .eq("kind", "instruction")
             .limit(1)
             .execute()
         )
