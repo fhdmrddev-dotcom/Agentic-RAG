@@ -339,8 +339,8 @@ Plans:
 **Plans**: 5 plans across 2 waves (planned 2026-07-06)
 Plans:
 **Wave 1** *(parallel — disjoint files: backend contracts vs frontend contracts)*
-- [ ] 139-01-PLAN.md — Migration 090 (skill_proposals kind discriminator + proposed_description + scoreboard_snapshot + provenance source_tuner_run_id FK + kind-gated CHECK) + extended SkillProposalResponse/ProposeDescriptionBody (SI-02) [wave 1]
-- [ ] 139-04-PLAN.md — Frontend contracts: extended SkillProposal type + proposeDescription/approveDescription/rejectDescription wire fns (SI-02) [wave 1]
+- [x] 139-01-PLAN.md — Migration 090 (skill_proposals kind discriminator + proposed_description + scoreboard_snapshot + provenance source_tuner_run_id FK + kind-gated CHECK) + extended SkillProposalResponse/ProposeDescriptionBody (SI-02) [wave 1]
+- [x] 139-04-PLAN.md — Frontend contracts: extended SkillProposal type + proposeDescription/approveDescription/rejectDescription wire fns (SI-02) [wave 1]
 
 **Wave 2** *(gated — blocked on Wave 1)*
 - [ ] 139-02-PLAN.md — Description propose/approve/reject routes in evals.py (honest-winner gate → 400 baseline-wins, inline scoreboard snapshot, synchronous trigger-versioned approve — no re-eval/SSE, never grow threads.py) + integration tests (SI-02) [wave 2]
