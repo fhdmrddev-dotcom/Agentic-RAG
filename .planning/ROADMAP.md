@@ -365,7 +365,7 @@ Plans:
 - [ ] 140-02-PLAN.md — skill_embedding_service.py: build_skill_embed_source (D-01 signal set) + reembed-shaped backfill job (stale-only, user_id hand-scope, threadpool embed, non-destructive, fail-open) (TRIG-02) [wave 1]
 - [ ] 140-03-PLAN.md — Budget knob (config + user_settings, bounds-checked resolver) + pure build_skill_catalog_block trim fn + _CATALOG_TRIM_MARKER + pin-scan + DB-free unit tests (SC#1/SC#2/SC#3/D-05) (TRIG-02) [wave 1]
 
-**Wave 2** *(gated — shares agent_loop.py; imports Plan 03 + Plan 01 RPC)*
+**Wave 2** *(gated — shares agent_loop.py; imports Plan 02 self-heal kick + Plan 03 trim fn + Plan 01 RPC)*
 - [ ] 140-04-PLAN.md — Hot-path wiring inside the skill_catalog_override-None branch only (fits->byte-identical no-embed fast path; over-budget->threadpool embed + match_skills + pure trim; fail-open; D-06 eval seam untouched) + extend override seam test + escape-hatch verification (TRIG-02) [wave 2]
 
 **Wave 3** *(gated — [BLOCKING] apply, autonomous:false)*

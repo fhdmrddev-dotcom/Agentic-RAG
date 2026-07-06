@@ -374,14 +374,17 @@ def build_skill_catalog_block(
     # mirror), then by similarity desc (None => fail-open, ranked after scored ones but still eligible).
     pinned = [s for s in enabled if s["id"] in pinned_recent_ids]
     rest   = [s for s in enabled if s["id"] not in pinned_recent_ids]
-    rest.sort(key=lambda s: (-(sim_by_id or {}).get(s["id"], -1.0)))   # -1 sentinel keeps None-sim last
+    def _score(s):                                   # None-SAFE: a present-but-None value (real LEFT-JOIN
+        v = (sim_by_id or {}).get(s["id"])           # shape) resolves to the sentinel, NOT via dict.get's
+        return v if v is not None else -1.0          # default -- .get(id, -1.0) returns None when the key
+    rest.sort(key=lambda s: -_score(s))              # maps to None, and -(None) would TypeError (Blocker-3)
     kept: list[dict] = []
     for s in _cap_pins(pinned, budget, model) + rest:        # _cap_pins evicts least-recent over the pin cap
         trial = kept + [s]
         n_cut = len(enabled) - len(trial)
         candidate = block(sorted(trial, key=lambda x: x["name"])) + \
                     (_CATALOG_TRIM_MARKER_TMPL.format(n=n_cut) if n_cut > 0 else "")
-        if estimate_tokens(candidate, model) <= budget or s["id"] in pinned_recent_ids:
+        if estimate_tokens(candidate, model) <= budget or s["id"] in pinned_recent_ids:  # pins forced (D-02)
             kept.append(s)                                   # pins forced in (D-02), capped upstream
         # else: skip this skill (least-relevant cut first — SC#1)
     n_cut = len(enabled) - len(kept)
@@ -568,7 +571,8 @@ if enabled_skills:
                                      or "text-embedding-3-small",
             }))
             sim_by_id = {r["id"]: r["similarity"] for r in (ranked.data or [])}
-            _maybe_kick_backfill(...)                # fire-and-forget if stale skills detected (optional)
+            kick_skill_backfill(supabase, current_user["id"], app_settings,   # Blocker-1: REQUIRED self-heal --
+                only_skill_ids=[sid for sid, sim in sim_by_id.items() if sim is None])  # fire-and-forget, fail-open
         except Exception:
             logger.warning("skill pre-filter embed/rank failed; failing open", exc_info=True)  # D-05
             sim_by_id = None                         # None => build_skill_catalog_block trims by name only
@@ -600,13 +604,15 @@ Trigger Tuner's *offline* mechanism and is NOT to be placed on the live path (D-
 
 **If the planner disagrees with any A#, it is a discuss-phase confirmation point, not a research gap.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the query embedding include a small preceding-turn window for follow-ups ("do that again")?**
    - What we know: D-01 marks this discretionary; latest-turn-only is the sensible default.
    - What's unclear: whether recall suffers on terse follow-ups.
    - Recommendation: ship latest-turn-only; the always-keep pinned/recent set (D-02) already covers the
      "continue using the loaded skill" case, so follow-up recall is largely handled without multi-turn embed.
+   - **RESOLVED:** ship **latest-turn-only** (no preceding-turn window). The always-keep pinned/recent set
+     (D-02) covers follow-ups; revisit only if live recall on terse follow-ups suffers.
 
 2. **Backfill trigger point for the vector job (lazy vs explicit endpoint).**
    - What we know: triggers detect staleness; the job embeds.
@@ -614,6 +620,12 @@ Trigger Tuner's *offline* mechanism and is NOT to be placed on the live path (D-
      silent self-heal.
    - Recommendation: implement the reembed-shaped job with a callable entrypoint; wire an opportunistic kick
      for self-heal now, leave an explicit admin control as a trivial later addition (A3).
+   - **RESOLVED:** the **opportunistic self-heal kick** is the chosen mechanism -- `kick_skill_backfill`
+     (Plan 02) is fired fire-and-forget from the Plan 04 over-budget branch whenever `match_skills` returns
+     an in-scope skill with a missing/NULL-similarity vector (Blocker-1). It is off-the-hot-path and
+     fail-open, so a newly-created/edited skill self-heals within ~one turn instead of being silently
+     starved. An explicit admin "backfill now" control (like the re-embed card) is DEFERRED as a trivial
+     later addition.
 
 ## Environment Availability
 

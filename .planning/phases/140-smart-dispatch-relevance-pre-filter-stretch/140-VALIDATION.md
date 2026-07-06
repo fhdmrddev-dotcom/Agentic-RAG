@@ -44,11 +44,14 @@ created: 2026-07-07
 | 140-01-01 | 01 | 1 | TRIG-02 | T-140-01 | `match_skills` reproduces owner+global scope exactly (no cross-user leak) | DB-CHECK | `pytest tests/integration/test_140_migration_091.py -x` | ❌ W0 (green post-apply, Plan 05) | ⬜ pending |
 | 140-01-02 | 01 | 1 | TRIG-02 | T-140-02 | stale/absent vector → NULL similarity (fail-open keep) | DB-CHECK | `pytest tests/integration/test_140_migration_091.py -x` | ❌ W0 (green post-apply) | ⬜ pending |
 | 140-02-01 | 02 | 1 | TRIG-02 | — | embed source = description + should_fire prompts, name fallback | unit | `pytest tests/integration/test_140_skill_embedding_service.py::test_embed_source_builder -x` | ❌ W0 | ⬜ pending |
-| 140-02-02 | 02 | 1 | TRIG-02 | T-140-03 / T-140-04 | job hand-scopes `.eq(user_id)`; `embed_texts` off the loop | unit (mock) | `pytest tests/integration/test_140_skill_embedding_service.py -x` | ❌ W0 (real run Plan 05) | ⬜ pending |
+| 140-02-02 | 02 | 1 | TRIG-02 | T-140-03 / T-140-04 | job hand-scopes `.eq(user_id)`; `embed_texts` AND every supabase read/write run via `run_in_threadpool` (Warning-1) | unit (mock) | `pytest tests/integration/test_140_skill_embedding_service.py -x` | ❌ W0 (real run Plan 05) | ⬜ pending |
+| 140-02-03 | 02 | 1 | TRIG-02 (SC#3) | T-140-12 | `kick_skill_backfill` fire-and-forget + double-wrapped fail-open self-heal (Blocker-1) | unit (mock) | `pytest tests/integration/test_140_skill_embedding_service.py -k kick -x` | ❌ W0 | ⬜ pending |
 | 140-03-01 | 03 | 1 | TRIG-02 (SC#2) | T-140-05 | budget bounds-checked; ≤0 disables cleanly (inject-all) | unit | `pytest tests/test_140_catalog_trim.py::test_budget_zero_injects_all -x` | ❌ W0 | ⬜ pending |
 | 140-03-02 | 03 | 1 | TRIG-02 (SC#1/SC#3) | T-140-06 | fits→byte-identical (no marker); trim→honest `_CATALOG_TRIM_MARKER` | unit | `pytest tests/test_140_catalog_trim.py -x` | ❌ W0 | ⬜ pending |
+| 140-03-03 | 03 | 1 | TRIG-02 (D-05) | T-140-14 | mixed `sim_by_id` (floats + None) is None-safe: no crash, None sorts last (Blocker-3) | unit | `pytest tests/test_140_catalog_trim.py::test_mixed_sim_none_safe_sorts_last -x` | ❌ W0 | ⬜ pending |
 | 140-04-01 | 04 | 2 | TRIG-02 (SC#1/SC#3/D-05/D-06) | T-140-07 / T-140-08 / T-140-09 | embed only over-budget + threadpool + fail-open; override tuple branch untouched | integration | `pytest tests/test_agent_loop_catalog_override.py -x` | ✅ (extend) | ⬜ pending |
 | 140-04-02 | 04 | 2 | TRIG-02 (SC#3) | — | `load_skill` loads a menu-absent skill by exact name | integration | `pytest tests/integration/test_140_escape_hatch.py -x` | ❌ W0 | ⬜ pending |
+| 140-04-03 | 04 | 2 | TRIG-02 (SC#3) | T-140-08 | over-budget NULL-sim skill fires `kick_skill_backfill` fire-and-forget, fail-open, override-None only (Blocker-1) | integration | `pytest tests/test_agent_loop_catalog_override.py -k kick -x` | ✅ (extend) | ⬜ pending |
 | 140-05-01 | 05 | 3 | TRIG-02 (schema) | T-140-10 | operator applies reviewed SQL to live LOCAL DB (never `db push`) | DB-CHECK | `pytest tests/integration/test_140_migration_091.py -x` (now green) | ❌ W0 → green | ⬜ pending |
 | 140-05-02 | 05 | 3 | TRIG-02 (data) | T-140-11 | backfill hand-scopes user_id; vectors populated | integration | `pytest tests/integration/test_140_skill_embedding_service.py -x` (now green) | ❌ W0 → green | ⬜ pending |
 
@@ -58,11 +61,11 @@ created: 2026-07-07
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/test_140_catalog_trim.py` — unit tests for `build_skill_catalog_block` + `resolve_skill_catalog_budget` (SC#1 byte-identical + cut-least-relevant, SC#2 budget-zero, SC#3 marker + pinned-kept, D-05 fail-open None-sim). Pure function → NO DB/LLM.
+- [ ] `backend/tests/test_140_catalog_trim.py` — unit tests for `build_skill_catalog_block` + `resolve_skill_catalog_budget` (SC#1 byte-identical + cut-least-relevant, SC#2 budget-zero, SC#3 marker + pinned-kept, D-05 fail-open None-sim, **Blocker-3 mixed-sim None-safe sort**). Pure function → NO DB/LLM.
 - [ ] `backend/tests/integration/test_140_escape_hatch.py` — proves the existing `_handle_load_skill` (`tool_dispatcher.py:666`) loads a menu-absent skill by exact name (verifies, does not rebuild).
 - [ ] `backend/tests/integration/test_140_migration_091.py` — psycopg2 DB-CHECK (`:54322`): `skill_embeddings` table + `vector(1536)` col + owner-only RLS + both mark-stale triggers + `match_skills` RPC + `app_settings.skill_catalog_max_tokens`. RED until Plan 05 apply.
-- [ ] `backend/tests/integration/test_140_skill_embedding_service.py` — embed-source builder (pure, green now) + reembed-shaped job (staleness predicate, RLS hand-scope, non-destructive) mirroring `test_111_1_reembed_*`. Job real run in Plan 05.
-- [ ] Extend `backend/tests/test_agent_loop_catalog_override.py` — add a fits-budget byte-identical case + an over-budget-trim case (mock `match_skills` + `embed_texts`) + a fail-open case, reusing the existing `_capture_system_prompt` harness. The `None`/`()`/tuple branches must stay green (D-06).
+- [ ] `backend/tests/integration/test_140_skill_embedding_service.py` — embed-source builder (pure, green now) + reembed-shaped job (staleness predicate, RLS hand-scope, non-destructive, **all supabase read/write threadpool-wrapped — Warning-1**) + **`kick_skill_backfill` fire-and-forget/fail-open self-heal (Blocker-1)** mirroring `test_111_1_reembed_*`. Job real run in Plan 05.
+- [ ] Extend `backend/tests/test_agent_loop_catalog_override.py` — add a fits-budget byte-identical case + an over-budget-trim case (mock `match_skills` + `embed_texts`) + a fail-open case + **a self-heal-kick case (over-budget NULL-sim skill fires `kick_skill_backfill` fire-and-forget — Blocker-1)**, reusing the existing `_capture_system_prompt` harness. The `None`/`()`/tuple branches must stay green (D-06).
 
 ---
 
@@ -88,6 +91,11 @@ clearly matches the test prompt. The escape-hatch + honest marker must hold live
 > Cross-provider axis satisfied when U1-U4 pass (one representative model per configured provider). If a
 > provider is unavailable at UAT time, note it as blocked (not failed) with the upstream reason, per the
 > Phase 135 U4 precedent.
+>
+> **Self-heal note (Blocker-1):** for a freshly-created/edited skill (vector absent → NULL similarity), the
+> first over-budget turn injects it fail-open AND fires the background `kick_skill_backfill`; a *second* turn
+> (after the backfill completes) should rank it by real similarity. Optionally spot-check that a
+> newly-added should-fire skill is never *silently* dropped on the first turn (marker present + escape hatch).
 
 ### Why these are manual
 The 4-axis matrix exercises live cross-provider streaming + real embedding + real DB ranking end-to-end,
@@ -107,3 +115,4 @@ manual (SC#10 recipe).
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+</content>
