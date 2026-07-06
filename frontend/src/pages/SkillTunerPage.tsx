@@ -183,6 +183,19 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
     if (!skillId) return
     let cancelled = false
 
+    // WR-01 (139 review): reset the per-skill run + proposal state on mount / skill switch.
+    // `runId` feeds handleConfirmWinner (a stale/wrong-skill id 409s at the propose door with a
+    // misleading "the tuner has re-run since"), and `descProposal` mounts a review card (skill
+    // A's diff + Approve must never render inside skill B's results). The scoreboard/latestRun
+    // are NOT nulled here — getTunerLatest below reconciles them authoritatively (D-v2.5-03).
+    setRunId(null)
+    setRunPhase("idle")
+    setLanes([])
+    setRunError(null)
+    setRunBackgroundNote(null)
+    setDescProposal(null)
+    setDescError(null)
+
     // 1. Hydrate the case editor from the backend's seeded cases (real provenance).
     getSeededCases(skillId)
       .then((seeded) => {
@@ -278,6 +291,11 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
     if (!skillId || runPhase === "running") return
     setRunError(null)
     setRunBackgroundNote(null) // TT-16: clear any stale "still running" note on a fresh kickoff
+    // WR-01 (139 review): a fresh run invalidates the open review card — approving an OLD run's
+    // proposal while looking at NEW evidence would apply the old winner (approve has no
+    // staleness gate against a re-run; the card must not outlive the evidence it reviewed).
+    setDescProposal(null)
+    setDescError(null)
     // TT-14 (no-flash): do NOT null the scoreboard if a durable latest result is already shown —
     // keep the prior scoreboard visible until the new run's result arrives (it's replaced in
     // place on completion). Only clear when there is nothing durable to show (so a stale
@@ -391,6 +409,7 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
                         // No durable row for THIS run (null/404) OR only a PREVIOUS run's row
                         // exists — the current run is genuinely dead. Honest hard-error terminal.
                         setRunPhase("error")
+                        setRunId(null) // WR-01: a dead run's id must not feed the propose door
                         setRunError(
                           "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
                         )
@@ -401,6 +420,7 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
                       // The durable poll itself failed — we cannot prove the run is alive, so a
                       // dead run must still reach an honest terminal (never stuck forever).
                       setRunPhase("error")
+                      setRunId(null) // WR-01: a dead run's id must not feed the propose door
                       setRunError(
                         "Lost the live connection to the tuning run. Reopen this skill to load the finished scoreboard.",
                       )
@@ -413,6 +433,7 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
           // A genuine error terminal (run_not_found / streaming_unavailable / etc.).
           if (status === "error") {
             setRunPhase("error")
+            setRunId(null) // WR-01: a failed run's id must not feed the propose door
             setRunError(reason ?? "The tuning run failed.")
             return
           }
@@ -439,6 +460,10 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
       void streamTunerRun(skillId, runIdForStream, callbacks, "0", controller.signal)
     } catch (err) {
       setRunPhase("error")
+      // WR-01: the kickoff failed — a retained PREVIOUS run's id must not feed the propose door
+      // (handleConfirmWinner falls back to the durable latestRun.run_id, which matches the
+      // scoreboard actually displayed).
+      setRunId(null)
       setRunError(
         err instanceof ApiError && err.status === 409
           ? "A tuning run is already in progress for this skill."
@@ -464,6 +489,10 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
       }
     }
     setRunPhase("idle")
+    // WR-01 (139 review): the cancelled run's id must not feed the propose door — the scoreboard
+    // still displayed is the durable PREVIOUS run's, so proposing must use latestRun.run_id
+    // (the raw runId would 409 with a misleading "the tuner has re-run since").
+    setRunId(null)
   }, [skillId, runId])
 
   // ── Phase 139 (SI-02, D-08): the one-click "apply winning description" is replaced by the
