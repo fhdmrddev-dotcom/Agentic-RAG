@@ -39,14 +39,17 @@ import {
   getSeededCases,
   getTunerLatest,
   getSettings,
+  proposeDescription,
+  approveDescriptionProposal,
+  rejectDescriptionProposal,
   ApiError,
   type TunerTarget,
   type TunerScoreboard,
-  type TunerCandidate,
   type TunerStreamCallbacks,
   type LatestTunerRun,
 } from "@/lib/api"
-import type { Skill } from "@/types"
+import { DescriptionProposalCard } from "@/components/skills/studio/DescriptionProposalCard"
+import type { Skill, SkillProposal } from "@/types"
 
 interface Props {
   /** The skill being tuned. App holds this selection (per-view state); a null id
@@ -92,9 +95,10 @@ const MAX_TARGETS = 8
 type RunPhase = "idle" | "running" | "reconciling" | "done" | "error"
 
 export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
-  // The Tuner reuses useSkills() so the author-confirm winner write goes through
-  // the SAME updateSkill (PATCH /skills/{id}) the SkillsPage uses (042-A / D-03).
-  const { skills, loading: skillsLoading, updateSkill } = useSkills()
+  // The Tuner reuses useSkills() to read the live skill list. The one-click apply that
+  // used updateSkill (PATCH /skills) is replaced by the SI-02 propose door (D-08); manual
+  // description edits still use useSkills().updateSkill from the SkillsPage.
+  const { skills, loading: skillsLoading } = useSkills()
   const skill: Skill | null = useMemo(
     () => skills.find((s) => s.id === skillId) ?? null,
     [skills, skillId],
@@ -133,6 +137,13 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
   const [lanes, setLanes] = useState<ProviderLane[]>([])
   const [scoreboard, setScoreboard] = useState<TunerScoreboard | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // ── Phase 139 (SI-02, D-08): the description-proposal review state. `descProposal`
+  //    holds the reconciled server proposal opened by the winner's "Propose this
+  //    description" door; the DescriptionProposalCard renders its diff + per-provider
+  //    scoreboard + Approve/Reject. `descError` surfaces an approve/reject failure. ──
+  const [descProposal, setDescProposal] = useState<SkillProposal | null>(null)
+  const [descError, setDescError] = useState<string | null>(null)
 
   // ── D-12 pre-run cost preview: the SCORED-TARGET model count resolved client-side from
   //    the user's providers, mirroring the POST-WR-01 effective backend scored set
@@ -455,16 +466,44 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
     setRunPhase("idle")
   }, [skillId, runId])
 
-  // ── Author-confirm winner write (042-A / D-03): writes the live description via
-  //    PATCH /skills/{id} (useSkills().updateSkill re-lints). NEVER auto-applied —
-  //    CandidateCard reveals an explicit diff strip; this fires only on confirm. ──
-  const handleConfirmWinner = useCallback(
-    async (candidate: TunerCandidate) => {
-      if (!skillId) return
-      await updateSkill(skillId, { description: candidate.description })
-    },
-    [skillId, updateSkill],
-  )
+  // ── Phase 139 (SI-02, D-08): the one-click "apply winning description" is replaced by the
+  //    honest propose door. handleConfirmWinner now opens a description PROPOSAL
+  //    (proposeDescription → a SkillProposal held in state) instead of a direct PATCH /skills
+  //    write; the DescriptionProposalCard reviews the diff + the per-provider scoreboard, and
+  //    Approve writes skills.description (the 079 trigger versions it). The tuner run_id is the
+  //    in-session runId, or the durable latestRun.run_id on a rehydrated result. It throws on
+  //    failure so the CandidateCard's own propose button surfaces the error inline. ──
+  const handleConfirmWinner = useCallback(async () => {
+    const proposeRunId = runId ?? latestRun?.run_id ?? null
+    if (!skillId || !proposeRunId) return
+    setDescError(null)
+    const proposal = await proposeDescription(skillId, proposeRunId)
+    setDescProposal(proposal)
+  }, [skillId, runId, latestRun])
+
+  // Approve → writes skills.description (079 trigger versions it). Refetch-not-optimistic:
+  // set the card's proposal from the returned promoted row (D-06/D-08). Reject → dismiss.
+  const handleApproveDescription = useCallback(async () => {
+    if (!skillId || !descProposal) return
+    setDescError(null)
+    try {
+      const updated = await approveDescriptionProposal(skillId, descProposal.id)
+      setDescProposal(updated)
+    } catch {
+      setDescError("Couldn't apply the proposed description. Please try again.")
+    }
+  }, [skillId, descProposal])
+
+  const handleRejectDescription = useCallback(async () => {
+    if (!skillId || !descProposal) return
+    setDescError(null)
+    try {
+      await rejectDescriptionProposal(skillId, descProposal.id)
+      setDescProposal(null)
+    } catch {
+      setDescError("Couldn't dismiss the proposal. Please try again.")
+    }
+  }, [skillId, descProposal])
 
   // ── D-04 standalone block: the BASELINE candidate is the current/live description
   //    (TunerCandidate.is_baseline). Its `cells` feed a standalone ProviderScoreboard at
@@ -777,16 +816,31 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
                         ) : (
                           <>
                             <span className="font-semibold">A reworded description scored best on held-out.</span>{" "}
-                            Review the highlighted candidate below and press <span className="font-mono">Use</span> to apply it — nothing changes until you confirm.
+                            Review the highlighted candidate below and press <span className="font-mono">Propose this description</span> to open it for review — nothing is applied until you approve.
                           </>
                         )}
                       </p>
+                      {/* SI-02 (D-08): the honest review door — mounted once the winner's
+                          "Propose this description" opens a proposal. Owns the diff + the
+                          per-provider scoreboard + Approve/Reject; Approve writes the live
+                          description (079 trigger versions it). */}
+                      {descProposal && (
+                        <DescriptionProposalCard
+                          proposal={descProposal}
+                          onApprove={handleApproveDescription}
+                          onReject={handleRejectDescription}
+                        />
+                      )}
+                      {descError && (
+                        <p role="alert" className="text-xs text-destructive">
+                          {descError}
+                        </p>
+                      )}
                       {sortedCandidates.map((candidate) => (
                         <CandidateCard
                           key={candidate.index}
                           candidate={candidate}
                           isWinner={candidate.index === scoreboard.winner_index}
-                          currentDescription={skill.description ?? ""}
                           onConfirm={handleConfirmWinner}
                         />
                       ))}
