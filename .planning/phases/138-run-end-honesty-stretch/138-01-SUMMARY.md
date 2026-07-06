@@ -120,6 +120,14 @@ None - no external service configuration required.
 - RUN-01a (display-only emit filter) is complete and unit-proven. Live/manual confirmation of the leftover-exclusion behaviour is covered by plan 138-03 (checkpoint), per the plan's verification section.
 - RUN-01b (run-end todo reconciler) is a separate plan on this phase and is unaffected by these changes.
 
+## Self-Check: PASSED
+
+- Created files exist: `138-01-SUMMARY.md`, `deferred-items.md` — FOUND.
+- Task commits exist: `de8c2bed`, `fbe9beec` — FOUND; metadata `bd70c552` — FOUND.
+- `git diff --stat 6d4b8623 HEAD -- backend/app/services/sandbox_service.py` empty (D-07 held).
+- STATE.md / ROADMAP.md untouched (orchestrator owns shared writes).
+- `pytest tests/unit/test_120_collision_regression.py tests/unit/test_075_4_final_output_files_payload.py` = 9 passed.
+
 ---
 *Phase: 138-run-end-honesty-stretch*
 *Completed: 2026-07-06*
