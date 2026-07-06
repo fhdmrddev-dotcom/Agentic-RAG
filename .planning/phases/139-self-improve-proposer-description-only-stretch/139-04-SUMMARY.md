@@ -93,6 +93,14 @@ None — this plan delivers interface/type + wire-function contracts only. No ha
 - `SkillProposal` + `DescriptionScoreboardSnapshot` + the four wires are ready for 139-05 (the DescriptionProposalCard + Skill Studio Triggering-tab wiring).
 - No blockers. Backend routes are contracted by 139-02 (same wave); frontend contracts here mirror the backend response shape byte-for-byte.
 
+## Self-Check: PASSED
+
+- FOUND: `frontend/src/types/index.ts`
+- FOUND: `frontend/src/lib/api.ts`
+- FOUND: `.planning/phases/139-self-improve-proposer-description-only-stretch/139-04-SUMMARY.md`
+- FOUND commit `80830436` (Task 1)
+- FOUND commit `87eaff21` (Task 2)
+
 ---
 *Phase: 139-self-improve-proposer-description-only-stretch*
 *Completed: 2026-07-06*
