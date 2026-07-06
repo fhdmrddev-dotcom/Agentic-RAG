@@ -87,6 +87,11 @@ function mkProposal(overrides: Partial<SkillProposal> = {}): SkillProposal {
   return {
     id: "prop-x",
     skill_id: "skill-1",
+    kind: "instruction",
+    proposed_description: null,
+    base_description: null,
+    source_tuner_run_id: null,
+    scoreboard_snapshot: null,
     base_skill_version_id: "ver-4",
     new_skill_version_id: "ver-5",
     re_eval_run_id: "run-r",
