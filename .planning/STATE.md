@@ -3,15 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: ready_to_plan
-last_updated: 2026-07-06T16:00:53.804Z
-last_activity: 2026-07-06 -- Phase 139 execution started
+last_updated: "2026-07-06T20:20:44.744Z"
+last_activity: 2026-07-06
 progress:
   total_phases: 29
-  completed_phases: 18
+  completed_phases: 19
   total_plans: 96
   completed_plans: 97
-  percent: 62
-stopped_at: Phase 139 complete (5/5) — ready to discuss Phase 144
+  percent: 66
 ---
 
 # Project State
