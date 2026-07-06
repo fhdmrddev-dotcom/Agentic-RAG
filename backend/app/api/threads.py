@@ -1618,6 +1618,34 @@ async def send_message(
                     except BaseException:
                         logger.exception("Shielded system-warning persist failed for run %s", run_id)
 
+                    # Phase 138 RUN-01b (SITE 1) — on a genuinely-clean run end, append
+                    # the honesty marker to any still-open todo so the Workspace TODOS
+                    # panel reads "… (run ended — not completed)" instead of looking
+                    # permanently stuck. Positioned AFTER step-1 persist and BEFORE
+                    # step-2 finalize_run so the todo_updated emit reaches the live SSE
+                    # consumer ahead of the terminal sentinel and isn't trimmed by EXPIRE
+                    # (S5 — no existing step is reordered). Best-effort: the reconciler
+                    # NEVER raises into the byte-locked finalizer.
+                    #
+                    # LOCK-2 / S6 two-clause gate: _shielded_finalize NEVER reads
+                    # cap_disposition, so a fresh Deep run that hit the iteration cap
+                    # arrives here as _terminal_status == "completed" with
+                    # _result_sink["cap_disposition"] == "cap_paused". Gating on status
+                    # alone would WRONGLY mark a cap-paused run (the D-05 trap) — the
+                    # cap_paused clause is load-bearing.
+                    if _terminal_status == "completed" and _result_sink.get("cap_disposition") != "cap_paused":
+                        try:
+                            from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
+                            await reconcile_open_todos_on_run_end(
+                                await get_pg_pool(),
+                                UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                                emit=_emit,
+                                redis=redis,
+                                run_id=run_id,
+                            )
+                        except BaseException:
+                            logger.exception("RUN-01b reconciler failed for run %s", run_id)
+
                     # Plan 075.4-03 T-075.4-04 — STEP-SWAP race fix.
                     # Legacy order was (2) sentinel → (3) finalize_run, but
                     # frontend consumes the SSE `done` (which is the
@@ -2123,6 +2151,28 @@ async def spawn_continuation_run(
                         await _persist_sys(_sink_warnings)
                 except BaseException:
                     logger.exception("Continuation sys-warning persist failed for run %s", run_id)
+
+                # Phase 138 RUN-01b (SITE 2 / LOCK-1) — a Continue-completed run ending
+                # with open todos is just as dishonest as a first-turn completion, so it
+                # must reconcile too. Positioned AFTER persist and BEFORE finalize_run so
+                # the todo_updated emit lands before the terminal sentinel (S5). PLAIN
+                # gate here (no cap_disposition clause): this finalizer's own `finally`
+                # (~2104-2107) already set _terminal_status = "cap_paused" when the cap
+                # fired, so a cap-paused continuation never reaches "completed".
+                # Best-effort — never raises into the finalizer.
+                if _terminal_status == "completed":
+                    try:
+                        from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
+                        await reconcile_open_todos_on_run_end(
+                            await get_pg_pool(),
+                            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                            emit=_emit,
+                            redis=redis,
+                            run_id=run_id,
+                        )
+                    except BaseException:
+                        logger.exception("RUN-01b reconciler failed for run %s", run_id)
+
                 try:
                     await finalize_run(
                         await get_pg_pool(),
