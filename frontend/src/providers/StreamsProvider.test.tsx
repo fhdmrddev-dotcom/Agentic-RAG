@@ -72,7 +72,12 @@ vi.mock("@/lib/api", async () => {
 })
 
 import { subscribeToRun, type StreamCallbacks } from "@/lib/api"
-import { makeStreamCallbacks, StreamsProvider, useTodos } from "@/providers/StreamsProvider"
+import {
+  makeStreamCallbacks,
+  StreamsProvider,
+  useTodos,
+  _reconcileTodosOnTerminal,
+} from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 
 const THREAD_A = "thread-A"
@@ -272,5 +277,81 @@ describe("Phase 101.1-09 gap 4 (frontend) — terminal workspace refetch", () =>
     // run_completed with status!=="completed" must not refetch (gap 4 guard).
     const calledThreads = mockGetThreadWorkspaceFiles.mock.calls.map((c) => c[0])
     expect(calledThreads).not.toContain(THREAD_A)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 138-04 (RUN-01 live-surfacing) — _reconcileTodosOnTerminal fetch-on-
+// clean-terminal helper. Locks the contract that closes the Scenario B live gap:
+// on a genuinely-clean run terminal ("done"/"reader_done") the Workspace TODOS
+// panel reconciles LIVE via the existing getThreadTodos GET + replaceTodosForThread
+// store action (D-v2.5-03: the GET is the source of truth, not the best-effort
+// todo_updated SSE). Non-clean kinds ("cancelled"/"error"/"timed_out") short-
+// circuit — the 138-02 backend only writes the "(run ended — not completed)"
+// marker on clean completion, so nothing changed on those kinds. Best-effort:
+// a rejected fetch never throws into the fire-and-forget terminal caller.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Phase 138-04 — _reconcileTodosOnTerminal live panel reconcile", () => {
+  const MARKED: Todo[] = [
+    {
+      id: "todo-1",
+      content: "Draft the quarterly report (run ended — not completed)",
+      status: "in_progress",
+      parent_id: null,
+      order_index: 0,
+    },
+  ]
+  const SEED: Todo[] = [
+    { id: "seed-1", content: "existing todo", status: "pending", parent_id: null, order_index: 0 },
+  ]
+
+  it("kind 'done' fetches once for the owning thread then replaces its todos", async () => {
+    mockGetThreadTodos.mockResolvedValue(MARKED)
+    await act(async () => {
+      await _reconcileTodosOnTerminal(THREAD_A, "done")
+    })
+    expect(mockGetThreadTodos).toHaveBeenCalledTimes(1)
+    expect(mockGetThreadTodos).toHaveBeenCalledWith(THREAD_A)
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A)).toEqual(MARKED)
+  })
+
+  it("kind 'reader_done' also reconciles (clean-completion kind)", async () => {
+    mockGetThreadTodos.mockResolvedValue(MARKED)
+    await act(async () => {
+      await _reconcileTodosOnTerminal(THREAD_A, "reader_done")
+    })
+    expect(mockGetThreadTodos).toHaveBeenCalledTimes(1)
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A)).toEqual(MARKED)
+  })
+
+  it("kind 'cancelled' does NOT fetch and leaves the store unchanged (clean-completion gate)", async () => {
+    act(() => {
+      useStreamsStore.getState().actions.replaceTodosForThread(THREAD_A, SEED)
+    })
+    await act(async () => {
+      await _reconcileTodosOnTerminal(THREAD_A, "cancelled")
+    })
+    expect(mockGetThreadTodos).not.toHaveBeenCalled()
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A)).toEqual(SEED)
+  })
+
+  it("kind 'error' does NOT fetch and leaves the store unchanged (clean-completion gate)", async () => {
+    act(() => {
+      useStreamsStore.getState().actions.replaceTodosForThread(THREAD_A, SEED)
+    })
+    await act(async () => {
+      await _reconcileTodosOnTerminal(THREAD_A, "error")
+    })
+    expect(mockGetThreadTodos).not.toHaveBeenCalled()
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A)).toEqual(SEED)
+  })
+
+  it("a rejected getThreadTodos does NOT throw and leaves the store unchanged (best-effort)", async () => {
+    act(() => {
+      useStreamsStore.getState().actions.replaceTodosForThread(THREAD_A, SEED)
+    })
+    mockGetThreadTodos.mockRejectedValue(new Error("boom"))
+    await expect(_reconcileTodosOnTerminal(THREAD_A, "done")).resolves.toBeUndefined()
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A)).toEqual(SEED)
   })
 })
