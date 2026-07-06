@@ -1,3 +1,9 @@
+// Phase 139 (SI-02): reuse the tuner's cell-bearing candidate as the winner /
+// baseline member of a description proposal's inline scoreboard snapshot. This is
+// a type-only import (verbatimModuleSyntax) — fully elided at compile, so the
+// api.ts ↔ types circular *type* reference creates no runtime import cycle.
+import type { TunerCandidate } from "@/lib/api"
+
 export interface Thread {
   id: string
   user_id: string
@@ -757,21 +763,51 @@ export interface PromotionGate {
   excluded_not_measured: number
 }
 
-/** A durable skill_proposals row (migration 083). Mirrors the LOCKED backend
- *  response shape; the client computes the base→proposed diff itself (lineDiff).
- *  Nullable ids are set as the proposal advances (new version + re-eval run
- *  appear on approve/promote); `gate` is null until the terminal gate verdict. */
+/** Phase 139 (SI-02) — the inline per-provider scoreboard a `kind='description'`
+ *  proposal carries as PRE-approval evidence (D-04/D-10). This is the EXACT
+ *  top-level shape 139-02's writer persists — literally `{ winner, baseline,
+ *  run_id }` — NOT a `TunerScoreboard` (whose `candidates[]` + `winner_index`
+ *  shape has no top-level `.winner`/`.baseline`, so the card could not read them
+ *  off it). `winner`/`baseline` reuse the tuner's cell-bearing `TunerCandidate`
+ *  so the description card can feed their `cells` straight into `ProviderScoreboard`;
+ *  `baseline` is null when the tuner run had no baseline candidate. */
+export interface DescriptionScoreboardSnapshot {
+  winner: TunerCandidate
+  baseline: TunerCandidate | null
+  run_id: string
+}
+
+/** A durable skill_proposals row (migration 083; description fields migration 090).
+ *  Mirrors the LOCKED backend response shape; the client computes the base→proposed
+ *  diff itself (lineDiff). Nullable ids are set as the proposal advances (new
+ *  version + re-eval run appear on approve/promote); `gate` is null until the
+ *  terminal gate verdict. `kind` discriminates SI-01 instruction rows from SI-02
+ *  description rows. */
 export interface SkillProposal {
   id: string
   skill_id: string
+  /** Which proposal family this row is. `instruction` = SI-01 (an
+   *  instructions-body diff, migration 083); `description` = SI-02 (a
+   *  trigger-description diff sourced from a Trigger Tuner run, migration 090). */
+  kind: "instruction" | "description"
   base_skill_version_id: string
   new_skill_version_id: string | null
   re_eval_run_id: string | null
   source_eval_run_id: string | null
+  // For a `kind='description'` row these instruction fields may be empty strings —
+  // the diff the card renders lives in proposed_description/base_description instead.
   proposed_instructions: string
   base_instructions: string
   rationale: string
   evidence_summary: string
+  // Phase 139 (SI-02) description-proposal fields — null on a `kind='instruction'`
+  // row. The description card renders lineDiff(base_description, proposed_description)
+  // + a ProviderScoreboard from scoreboard_snapshot; source_tuner_run_id is the
+  // provenance FK back to the Trigger Tuner run that produced the winner (D-09/D-10).
+  proposed_description: string | null
+  base_description: string | null
+  source_tuner_run_id: string | null
+  scoreboard_snapshot: DescriptionScoreboardSnapshot | null
   status:
     | "proposed"
     | "rejected"
