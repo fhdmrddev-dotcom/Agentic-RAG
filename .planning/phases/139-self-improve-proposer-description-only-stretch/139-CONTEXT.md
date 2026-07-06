@@ -112,7 +112,7 @@ version lifecycle"** — not a new proposer and not a new runtime.
   surfaces**, not a new mockup.
 
 ### Reported-bugs cross-check (mandatory touchpoint)
-- **D-16:** The 8 open `surface: Agentic-RAG` reports were reviewed; **none overlap the SI-02
+- **D-16 [informational]:** The 8 open `surface: Agentic-RAG` reports were reviewed; **none overlap the SI-02
   description-proposer domain** (they are run-honesty / chat-composer / provider-routing /
   workflows-page). Nothing folded into this phase.
 
