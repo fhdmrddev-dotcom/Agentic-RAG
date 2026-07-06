@@ -16,6 +16,7 @@ import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
@@ -235,6 +236,14 @@ function dedupParagraphs(text: string): string {
   // consecutively, collapse to single occurrence.
   const result = deduped.map(block => {
     if (block.length < 80) return block
+    // Only flatten-dedup single-line run-on repeats (models that concatenate
+    // the same sentence without a break). A block with real line breaks — e.g.
+    // the agent's interim narration — is preserved verbatim so markdown keeps
+    // its newlines (breaks:true renders them); Pass 1 already handled
+    // paragraph-level repeats. Without this guard the sentence rejoin below
+    // collapsed every intra-paragraph newline into a single space (the
+    // reported run-on-blob narration).
+    if (block.includes('\n')) return block
     // Split on sentence boundaries (period/exclamation/question + space + capital)
     const sentences = block.split(/(?<=[.!?])\s+(?=[A-Z])/)
     if (sentences.length < 2) return block
@@ -417,7 +426,15 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             types + StreamsProvider for DB-loaded-message compat. */}
         {message.content ? (
           <div className="text-sm text-foreground">
-            <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
+            {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
+              // Live agentic run: message.content here is the model's interim
+              // narration ("Now I'll search…"), not the final answer. Fold it to
+              // a one-line gist (click to expand the full trail). At run-end the
+              // backend-persisted final answer renders normally via the else path.
+              <StreamingNarration content={dedupParagraphs(message.content)} />
+            ) : (
+              <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
+            )}
             {isStreaming && !hasRunningTools && (
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
