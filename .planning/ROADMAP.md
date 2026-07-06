@@ -336,7 +336,16 @@ Plans:
   2. A human reviews and approves the description diff; on approval a new immutable version is created, on rejection nothing changes (SI-02).
   3. The proposal reuses the SI-01 substrate and the cross-provider scoreboard, holding across providers (SC#10) (SI-02).
 
-**Plans**: TBD
+**Plans**: 5 plans across 2 waves (planned 2026-07-06)
+Plans:
+**Wave 1** *(parallel — disjoint files: backend contracts vs frontend contracts)*
+- [ ] 139-01-PLAN.md — Migration 090 (skill_proposals kind discriminator + proposed_description + scoreboard_snapshot + provenance source_tuner_run_id FK + kind-gated CHECK) + extended SkillProposalResponse/ProposeDescriptionBody (SI-02) [wave 1]
+- [ ] 139-04-PLAN.md — Frontend contracts: extended SkillProposal type + proposeDescription/approveDescription/rejectDescription wire fns (SI-02) [wave 1]
+
+**Wave 2** *(gated — blocked on Wave 1)*
+- [ ] 139-02-PLAN.md — Description propose/approve/reject routes in evals.py (honest-winner gate → 400 baseline-wins, inline scoreboard snapshot, synchronous trigger-versioned approve — no re-eval/SSE, never grow threads.py) + integration tests (SI-02) [wave 2]
+- [ ] 139-03-PLAN.md — [BLOCKING] apply migration 090 to live DB (SQL editor/psycopg2, never db push) + regen full-schema.sql + DB-CHECK test (SI-02) [wave 2, autonomous:false]
+- [ ] 139-05-PLAN.md — DescriptionProposalCard (lineDiff + ProviderScoreboard, Approve/Reject only) + repoint SkillTunerPage one-click apply → "Propose this description" + CandidateCard re-label (D-08) (SI-02) [wave 2]
 **UI hint**: yes
 
 #### Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)
@@ -418,7 +427,7 @@ Plans:
 | 136. Skill Publish Gate (GATE-01) | 4/4 | Complete | 2026-07-03 |
 | 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
 | 138. Run-End Honesty (STRETCH) | 5/5 | Complete | 2026-07-06 |
-| 139. Self-Improve Proposer — Description-Only (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 139. Self-Improve Proposer — Description-Only (STRETCH) | 0/5 | Not started | - |
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 141. template_input Resolver Run-Scope (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
