@@ -1,30 +1,27 @@
 /**
- * Phase 075.6 Plan 03 / Req #7 — step-list collapse + iteration-divider
- * preservation tests for ToolCallPanel.
+ * ToolCallPanel — unified essence-card rendering + iteration-divider tests.
  *
- * Updated for Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate):
- *   The prior single shared `stepsCollapsed` boolean — where ONE click on any
- *   collapsed summary row expanded ALL finished cards (the #1 felt bug) — is
- *   replaced by a per-step `expandedSteps` Set keyed on the same `stepKeyOf`
- *   identity the rail/dedup use. Expanding ONE finished essence row reveals
- *   ONLY that row's body; the others stay one-line essence rows. The >=3
- *   collapse gate is gone — EVERY finished step before the active one folds to
- *   an essence row (Focus Mode from step 1). Each expanded earlier step can
- *   re-fold independently (the Set shrinks for that key only). The
- *   iteration-divider preservation invariant (Pitfall 6 / Landmine L5) is
- *   unchanged.
+ * A finished step renders as the SAME one-line ToolEssenceLine card
+ * (icon + label + result + status-pill badge + chevron) in EVERY run state —
+ * whether it is an earlier step in a still-streaming run or part of the
+ * settled all-done view. There is no separate "Focus Mode" degraded-text
+ * summary row anymore (the old `-> {result}` / `skill:` rows that flipped the
+ * card to bare badge-less text mid-run are removed), so the streaming and
+ * settled views are identical (the reported "card flips to text" bug).
+ *
+ * Per-step expand is an `expandedSteps` Set keyed on `stepKeyOf`: clicking one
+ * essence card expands ONLY that card's full body; the others stay folded.
+ * An expanded earlier step gets its own per-row re-collapse control.
  *
  * Covers the per-step invariants:
- *   1. 5 done + 1 active across iter-0+iter-1+iter-2 → 5 per-step essence
- *      rows + the active step row; the iteration divider above the active
- *      step still fires (prevToolIteration from the LAST collapsed item).
- *   2. Clicking ONE essence row expands ONLY that row's body — the other
- *      essence rows stay folded (closes GAP-095-01).
- *   3. Clicking a second essence row expands it too; the first stays expanded
- *      (the Set grows).
- *   4. A single finished step before the active tool STILL folds to an
- *      essence row (proves the >=3 un-gate, GAP-095-03).
- *   5. A per-row re-collapse affordance returns one expanded row to its
+ *   1. 5 done + 1 active → the 5 finished steps render as essence CARDS (each
+ *      with its status-pill badge); no `step-summary-row` text rows exist; the
+ *      round dividers fire at every iteration boundary.
+ *   2. Clicking ONE essence card expands ONLY that card — the others stay
+ *      folded (closes GAP-095-01).
+ *   3. Clicking a second essence card expands it too; the first stays expanded.
+ *   4. A single finished step before the active tool also renders as a card.
+ *   5. A per-row re-collapse affordance returns one expanded card to its
  *      essence (the Set shrinks for that key only).
  */
 import { describe, it, expect } from "vitest"
@@ -59,8 +56,8 @@ function mkActiveTool(overrides: Partial<ToolCall> & { id: string; iteration: nu
   } as ToolCall
 }
 
-describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)", () => {
-  it("folds 5 done + 1 active into 5 per-step essence rows + active row by default", () => {
+describe("ToolCallPanel — unified essence cards (no card-to-text flip)", () => {
+  it("renders finished steps before the active one as essence CARDS, never degraded text", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -71,23 +68,27 @@ describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)",
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // 5 per-step essence rows for the finished steps before the active one.
-    const summaries = container.querySelectorAll("[data-testid='step-summary-row']")
-    expect(summaries.length).toBe(5)
-    // First still-collapsed row carries the iteration-min hint.
-    expect(summaries[0]?.getAttribute("data-iteration-min")).toBe("0")
-
-    // The old aggregate row no longer exists.
+    // The 5 finished steps before the active one each render as the SAME
+    // one-line ToolEssenceLine CARD — identical to the settled view.
+    const essences = container.querySelectorAll("[data-testid='tool-result-summary']")
+    expect(essences.length).toBe(5)
+    // Every finished essence card carries its status-pill badge (the "DONE ·
+    // Ns" chip) — proving there is no badge-less degraded text representation.
+    essences.forEach((row) => {
+      expect(row.querySelector("[data-testid='status-pill']")).toBeTruthy()
+    })
+    // The removed "Focus Mode" degraded-text summary rows no longer exist.
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(0)
     expect(container.querySelectorAll("[data-testid='collapsed-steps-summary']").length).toBe(0)
 
-    // The iteration divider above the active step (iter-2) still fires because
-    // prevToolIteration is derived from the LAST collapsed item (iter-1).
+    // Round dividers fire at every iteration boundary among the rendered cards
+    // (iter-0->1 above t4, iter-1->2 above the active t6).
     const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
-    expect(dividers.length).toBe(1)
-    expect(dividers[0]?.getAttribute("data-iteration")).toBe("2")
+    expect(dividers.length).toBe(2)
+    expect(dividers[dividers.length - 1]?.getAttribute("data-iteration")).toBe("2")
   })
 
-  it("expands ONLY the clicked essence row — the others stay folded (GAP-095-01)", () => {
+  it("expands ONLY the clicked essence card — the others stay folded (GAP-095-01)", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -98,20 +99,20 @@ describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)",
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // Pre-click: 5 essence rows present.
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(5)
+    // Pre-click: 5 essence cards present.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(5)
 
-    // Click the FIRST essence row.
-    const firstSummary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
-    expect(firstSummary).toBeTruthy()
-    fireEvent.click(firstSummary!)
+    // Click the FIRST essence card.
+    const first = container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement | null
+    expect(first).toBeTruthy()
+    fireEvent.click(first!)
 
-    // Post-click: only ONE row expanded → 4 essence rows remain (the others
-    // stay folded). This is the core fold-all fix: NOT all 5 expand.
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(4)
+    // Post-click: only ONE expanded → 4 essence cards remain (the others stay
+    // folded). This is the core fold-all fix: NOT all 5 expand.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(4)
   })
 
-  it("clicking a second essence row expands it too; the first stays expanded (the Set grows)", () => {
+  it("clicking a second essence card expands it too; the first stays expanded (the Set grows)", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkDoneTool({ id: "t2", iteration: 0 }),
@@ -122,24 +123,25 @@ describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)",
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // Expand the first essence row → 4 remain.
-    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(4)
+    // Expand the first essence card → 4 remain.
+    fireEvent.click(container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(4)
 
-    // Expand the next still-folded essence row → 3 remain (both stay expanded).
-    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(3)
+    // Expand the next still-folded essence card → 3 remain (both stay expanded).
+    fireEvent.click(container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(3)
   })
 
-  it("folds a SINGLE finished step before the active tool — proves the >=3 un-gate (GAP-095-03)", () => {
+  it("a SINGLE finished step before the active tool also renders as an essence card", () => {
     const toolCalls: ToolCall[] = [
       mkDoneTool({ id: "t1", iteration: 0 }),
       mkActiveTool({ id: "t2", iteration: 0 }),
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // 1 finished step → it STILL folds to an essence row (no >=3 gate).
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(1)
+    // 1 finished step → 1 essence card (no degraded text row).
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(1)
+    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(0)
   })
 
   it("re-collapses one expanded earlier step back to its essence (the Set shrinks for that key only)", () => {
@@ -150,19 +152,19 @@ describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)",
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
 
-    // 2 finished steps fold (un-gated).
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(2)
+    // 2 finished steps rest as essence cards.
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(2)
 
-    // Expand the first → 1 essence row remains, and a per-row re-collapse
+    // Expand the first → 1 essence card remains, and a per-row re-collapse
     // control appears for the expanded step.
-    fireEvent.click(container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement)
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(1)
+    fireEvent.click(container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement)
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(1)
     const recollapse = container.querySelector("[data-testid='step-recollapse']") as HTMLButtonElement | null
     expect(recollapse).toBeTruthy()
 
-    // Click the re-collapse control → the row folds back to its essence (2 again).
+    // Click the re-collapse control → the card folds back to its essence (2 again).
     fireEvent.click(recollapse!)
-    expect(container.querySelectorAll("[data-testid='step-summary-row']").length).toBe(2)
+    expect(container.querySelectorAll("[data-testid='tool-result-summary']").length).toBe(2)
   })
 })
 
@@ -307,12 +309,8 @@ describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider
       mkActiveTool({ id: "t4", iteration: 2 }),
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
-    // With 3 done before the active step, Focus Mode collapses past steps; the
-    // divider above the active step still fires (Pitfall 6 / L5). Expand to see
-    // both dividers.
-    const summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
-    if (summary) fireEvent.click(summary)
-
+    // Every step renders at rest now (finished steps as essence cards), so the
+    // round dividers are visible without expanding anything.
     const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
     expect(dividers.length).toBeGreaterThanOrEqual(1)
     dividers.forEach((d) => {
@@ -328,16 +326,9 @@ describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider
       mkActiveTool({ id: "t3", iteration: 0 }),
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
-    // Phase 095 Plan 06: the 2 finished steps before the active one fold to
-    // one-line essence rows (Focus Mode from step 1), so only the active step
-    // renders its full StepRow rail node at rest. Expand the essence rows to
-    // see all 3 rails — the snum numbering + node-state mapping is the point.
-    let summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
-    while (summary) {
-      fireEvent.click(summary)
-      summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
-    }
-    // One rail node + one snum per deduped tool (3 tools → 3 of each).
+    // Every step renders its StepRow rail node at rest (finished steps as
+    // essence cards, the active step live) — no expansion needed. One rail
+    // node + one snum per deduped tool (3 tools → 3 of each).
     const nodes = container.querySelectorAll("[data-testid='step-node']")
     const snums = container.querySelectorAll("[data-testid='step-snum']")
     expect(nodes.length).toBe(3)

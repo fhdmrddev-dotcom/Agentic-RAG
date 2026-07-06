@@ -564,36 +564,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   const togglePanel = (id: string, defaultExpanded: boolean) =>
     setPanelExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }))
 
-  // 075.6 Plan 03 / SPEC Req #7: step-list collapse predicate.
-  // Threshold N=3 locked per Boundary Keeper Round 1. Collapse window is the
-  // run of consecutive completed (status === "done") tool items STRICTLY
-  // preceding the active (running/preparing) tool item. When the window
-  // length is ≥3, the displayItems map renders ONE summary row at i=0 and
-  // null-returns for 1 ≤ i < activeIndex; expanding the chevron restores
-  // per-row rendering. Iteration divider at L729 walks backward through
-  // displayItems[j] for j=i-1 → 0 to find prevToolIteration — when collapsed,
-  // the immediate predecessor of the active step is the LAST collapsed item,
-  // so the divider above the active step fires correctly for the
-  // iter-N → iter-(N+1) boundary (Pitfall 6 / Landmine L5 mitigation).
+  // `activeIndex` = index of the running/preparing tool item (or -1 when the
+  // run has settled). Used only to give an EXPANDED earlier step its per-row
+  // re-collapse control (isExpandedEarlierStep below) — it no longer gates any
+  // collapse-to-text behavior. Every finished step renders as the SAME one-line
+  // ToolEssenceLine card whether the run is live or settled, so the streaming
+  // and settled views are identical (no card-to-text flip).
   const activeIndex = displayItems.findIndex(
     (it) => it.kind === "tool" && (it.tc.status === "running" || it.tc.status === "preparing"),
   )
-  const completedBeforeActive =
-    activeIndex === -1
-      ? []
-      : displayItems.slice(0, activeIndex).filter(
-          (it): it is Extract<DisplayItem, { kind: "tool" }> =>
-            it.kind === "tool" && it.tc.status === "done",
-        )
-  // Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate): replace the
-  // single shared collapse boolean — where one click on ANY collapsed summary
-  // row toggled the whole flag and expanded EVERY finished card (the #1 felt
-  // bug, violates D-01 click-to-expand) — with a per-step expanded Set keyed
-  // on the SAME `stepKeyOf` identity the rail snum + dedup use. Membership in
-  // the Set means "this finished step is expanded to its full body"; absence
-  // means "folded to its one-line essence". The prior >=3 collapse gate is
-  // GONE — EVERY finished step folds from step 1 (Focus Mode from the very
-  // first finished tool). The identity scheme survives the
+  // Per-step expanded Set keyed on the SAME `stepKeyOf` identity the rail snum
+  // + dedup use. Membership means "this step is expanded to its full body";
+  // absence means "folded to its one-line essence card" (ToolEssenceLine).
+  // Clicking one essence card expands ONLY that card (D-01 click-to-expand);
+  // the others stay folded. The identity scheme survives the
   // preparing->running->done id mutation (075.9) and a reload (state is
   // reconstructed from `toolCalls` each render). State stays component-local
   // and provider-agnostic — no StreamsProvider/api.ts/backend change.
@@ -605,98 +589,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
       n.delete(key)
       return n
     })
-  // Skill collapsed rows have no stepKey identity in toolStepNumber; give them
-  // a stable composite key so a skill row is individually expandable too and a
-  // tool-row click NEVER expands a skill row (or any other tool row).
-  const skillStepKey = (activation: SkillActivation) => `skill-${activation.occurredAt}`
-
-  // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
-  // collapsed items) as data-iteration-min so future readers can see the
-  // boundary the summary row spans without re-deriving it.
-  const collapsedIterationMin = (() => {
-    const iters = completedBeforeActive
-      .map((it) => it.tc.iteration)
-      .filter((x): x is number => x !== undefined)
-    return iters.length > 0 ? Math.min(...iters) : undefined
-  })()
-
-  // Phase 095 Plan 06: under interleaved partial-expand the contiguous
-  // collapsed block can break, so the data-iteration-min hint can no longer be
-  // hard-coded at i === 0. Compute the FIRST still-collapsed earlier step
-  // (i < activeIndex, kind === 'tool', not in expandedSteps) and put the hint
-  // on that row only.
-  const firstCollapsedToolIndex = (() => {
-    if (activeIndex === -1) return -1
-    for (let i = 0; i < activeIndex; i++) {
-      const it = displayItems[i]
-      if (it.kind === "tool" && !expandedSteps.has(stepKeyOf(it.tc, i))) return i
-    }
-    return -1
-  })()
-
   // Phase 075.7 UAT fix (Bug D): RunCard.tsx wraps this component and owns
   // the outer rounded frame, sticky header (run summary + timer + counter +
   // brand-pulse avatar), expand/collapse state, and shimmer. ToolCallPanel
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* Phase 095 Plan 06 (GAP-095-01 + GAP-095-03 un-gate):
-              EVERY finished step before the active one folds to a one-line
-              `→ {result}` essence row (Focus Mode from step 1 — no >=3 gate).
-              Clicking ONE essence row adds ONLY that row's key to
-              `expandedSteps`, so it alone expands to its full body; the other
-              finished essence rows stay folded (closes the fold-all bug). The
-              prior aggregate "Hide earlier steps" toggle (re-folded ALL) is
-              gone — each expanded earlier step gets its own per-row re-collapse
-              control instead (rendered in the full-body branch below). The
-              iteration divider above the active step still derives
-              prevToolIteration from the LAST collapsed-but-rendered item
-              (Pitfall 6 / Landmine L5 mitigation preserved). */}
+          {/* Every step renders as the SAME frame in all run states — no
+              card-to-text flip. Finished steps before the active one fall
+              through to the one-line ToolEssenceLine card (badge + timing +
+              chevron), identical to how they render once the run settles;
+              clicking one expands ONLY that card (expandedSteps). The prior
+              "Focus Mode" degraded-text summary rows are gone. */}
           {displayItems.map((item, i) => {
-            if (
-              i < activeIndex &&
-              (item.kind !== "tool" || !expandedSteps.has(stepKeyOf(item.tc, i)))
-            ) {
-              if (item.kind === 'tool') {
-                const collapsedTc = item.tc
-                const collapsedKey = stepKeyOf(collapsedTc, i)
-                const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
-                return (
-                  <button
-                    key={`step-summary-${i}-${collapsedKey}`}
-                    type="button"
-                    onClick={() => expandStep(collapsedKey)}
-                    data-testid="step-summary-row"
-                    data-iteration-min={i === firstCollapsedToolIndex ? collapsedIterationMin : undefined}
-                    aria-label="Expand this step"
-                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
-                  >
-                    <span className="opacity-50 flex-shrink-0">→</span>
-                    <span className="truncate flex-1 min-w-0">{summaryText}</span>
-                  </button>
-                )
-              }
-              // Skill rows in collapsed Focus Mode: keep them visible as a
-              // single compact line so the user still sees the activation
-              // happened mid-run. A skill row expands ONLY its own composite
-              // key — a tool-row click never reaches it.
-              return (
-                <button
-                  key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
-                  type="button"
-                  onClick={() => expandStep(skillStepKey(item.activation))}
-                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
-                >
-                  <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
-                  <span className="truncate flex-1 min-w-0 italic">
-                    skill: {item.activation.skillName}
-                  </span>
-                </button>
-              )
-            }
-            // Phase 095 Plan 06: a skill row whose key IS in expandedSteps (or
-            // any skill row at/after the active index) falls through to the
-            // full SkillRow render below.
+            // Skill activation rows always render as the full SkillRow card.
             if (item.kind === 'skill') {
               return (
                 <div key={`skill-${i}-${item.activation.occurredAt}`}>
