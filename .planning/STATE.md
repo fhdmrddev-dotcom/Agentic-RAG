@@ -3,14 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: ready_to_plan
-last_updated: "2026-07-06T09:03:17.757Z"
+last_updated: 2026-07-06T10:53:36.129Z
 last_activity: 2026-07-06
 progress:
   total_phases: 29
   completed_phases: 17
   total_plans: 91
-  completed_plans: 91
+  completed_plans: 92
   percent: 59
+stopped_at: Phase 138 complete (5/5) — ready to discuss Phase 144
 ---
 
 # Project State
@@ -22,12 +23,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 138 — run-end-honesty-stretch
+**Current focus:** Phase 144 — agent driven skill file attachment
 
 ## Current Position
 
-Phase: 138 (run-end-honesty-stretch) — EXECUTING
-Plan: 2 of 5
+Phase: 144
+Plan: Not started
 Next action: Phase 138 CONTEXT gathered (2026-07-05, commit `e18b80cc`) — 3 gray areas resolved: "ended with open todos" honesty signal rides as a plain text suffix on the existing todo `content` field, never stacking, same wording for pending/in_progress (D-01..04) — zero frontend/schema change; forward-only scope, no backfill for the 14 threads found live-stuck right now incl. repro thread `13ae9bfe` (D-06, backlog note planted); the `final_output_files` leak fix is display-only — the newly-found redundant sandbox re-upload/re-insert mechanism behind it is deliberately NOT fixed here (D-07/D-08, logged as a new seed candidate). Also surfaced + deferred: todo-content writing-quality (generic/vague todo text) as a separate future concern. Root-cause finding: the original bug report's own proposed fix ("filter iteration==-1") is confirmed insufficient by its own live re-test — real prior-run files with valid URLs leak too, not just empty-URL baseline seeds; and the actual `_terminal_status` classification lives in `threads.py`'s `_shielded_finalize`, not `agent_loop.py`. Next: `/gsd:plan-phase 138`.
 Prior: Phase 137.2 CONTEXT gathered (2026-07-05, commit `7e033d63`) — 4 gray areas resolved: is_system column for the "Built-in" badge/protection signal (D-01), no new agent tool for eval-case creation (hand off to Skill Studio Evals tab, D-03), rename (not delete) the operator's manual copy `7f504819-...` (D-04, verified live only 3/18 zip files imported), pin is_system skills to top of Skills list (D-05).
 Status (prior — Phase 137.1, FULLY CLOSED): secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).

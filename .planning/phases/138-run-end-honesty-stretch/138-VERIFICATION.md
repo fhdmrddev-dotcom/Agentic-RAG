@@ -1,8 +1,8 @@
 ---
 phase: 138-run-end-honesty-stretch
-verified: 2026-07-06T08:30:00Z
-status: gaps_found
-score: 4/5 must-have themes verified (RUN-01b live-surfacing gap)
+verified: 2026-07-06T11:00:00Z
+status: passed
+score: 5/5 must-have themes verified (RUN-01b live-surfacing gap CLOSED by 138-04 + re-verified live in 138-05)
 overrides_applied: 0
 requirements: [RUN-01]
 ---
@@ -27,9 +27,19 @@ confirmed live via Chrome MCP + psycopg2 (see `138-03-SUMMARY.md` for the full S
 | 2 | RUN-01b: open todos get the exact `(run ended — not completed)` marker on a genuinely-clean run end; status never flipped; never stacks | ✅ Verified in the DB (psycopg2, two runs) + unit tests `test_085`; marker persists and renders correctly once the panel reconciles |
 | 3 | RUN-01b fires at BOTH clean finalizers; never on cancelled/failed/timed_out/cap_paused (two-clause gate) | ✅ Verified in merged code + unit tests (LOCK-1 / LOCK-2 / D-05) |
 | 4 | D-14 red line: normal Deep run (no todos / no leftover files) byte-identical — no spurious marker, output renders normally | ✅ Verified live (Scenario E PASS) |
-| 5 | **RUN-01b is visible LIVE in the Workspace TODOS panel at run-end** (lived-experience honesty — the whole point of the marker) | ❌ **GAP** — marker only appears after a manual reconcile (thread-switch / refresh); the live panel keeps showing un-marked open todos at run-end |
+| 5 | **RUN-01b is visible LIVE in the Workspace TODOS panel at run-end** (lived-experience honesty — the whole point of the marker) | ✅ **Verified** (was ❌ GAP) — closed by `138-04` fetch-on-terminal (`_reconcileTodosOnTerminal` wired into both StreamsProvider onTerminal handlers). Re-verified live in `138-05` via Chrome MCP (×2, deterministic) + psycopg2: the marker surfaces in the panel within ~1–2s of run-end with NO thread-switch / refresh; browser matches DB |
 
-## The gap
+## The gap — CLOSED (138-04 + 138-05)
+
+**Resolution:** `138-04` added `_reconcileTodosOnTerminal(threadId, kind)` (a fetch-on-terminal per
+CLAUDE.md D-v2.5-03) wired into BOTH `StreamsProvider` onTerminal handlers; on a clean terminal
+(`done`/`reader_done`) it re-fetches `getThreadTodos` and full-state-replaces via
+`replaceTodosForThread`. `138-05` re-verified live via Chrome MCP (×2, deterministic) + psycopg2 —
+the marker now surfaces at run-end with no refresh; browser matches DB. The earlier live failure was
+stale frontend code (Vite HMR does not hot-apply a React provider change). Original gap description
+retained below for history.
+
+---
 
 **RUN-01b marker is not surfaced live.** The `138-02` reconciler is correct — it commits the marked
 todos to the DB before the terminal sentinel — but the frontend does not reflect it live. The
@@ -54,5 +64,6 @@ re-verify Scenario B live. Track via `/gsd:plan-phase 138 --gaps`.
 ## Disposition
 
 - RUN-01a: fully verified — no gap.
-- RUN-01b: backend correct + persistent; ONE live-surfacing gap → gap closure.
-- SEED-094 stays OPEN until the gap plan verifies.
+- RUN-01b: backend correct + persistent; live-surfacing gap CLOSED by `138-04`, re-verified live in `138-05`.
+- SEED-094: CLOSED — both original re-open triggers verified fixed live.
+- Phase 138: COMPLETE (5/5 must-have themes verified).

@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-094
 title: Run-end honesty pair — Phase-120 baseline files leak into the live final_output_files emit (BUG-260626-02) + no run-end todo finalizer leaves todos visibly stuck (BUG-260626-03)
-status: planted
+status: closed
+closed: 2026-07-06
+closed_by: "Phase 138 (Run-End Honesty). RUN-01a baseline-emit leak fixed in 138-01 (run-scoped content-hash accumulator) + live-verified 138-03. RUN-01b run-end todo finalizer landed in 138-02 (reconcile_open_todos_on_run_end, both clean finalizers) + live-surfaced by 138-04 (fetch-on-terminal) + re-verified live in 138-05 (Chrome MCP ×2 + psycopg2). Both original re-open triggers verified fixed live."
 planted: 2026-06-26
 phase_origin: "Phase 123 SC#10 Axis-2 (multi-tool/multi-run) lived-experience UAT (thread 13ae9bfe / run 89125149, 2026-06-26) — root-caused + adversarially verified via workflow wf_cf429301-479"
 category: backend agent-loop run-end honesty — two additive, shared-path-safe finalizers (D-14 intact); both surfaced together, both small, both belong in one dedicated backend fix phase

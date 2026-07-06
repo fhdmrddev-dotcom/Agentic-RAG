@@ -66,7 +66,7 @@
 - [x] **Phase 137: Skill Evals Panel UI (PANEL-01)** — sketch-gated consolidated Evals panel in the Skills UI (PANEL-01) — UAT 13/13 2026-07-04; secured 2026-07-04 (threats_open 0, `7850cf72`)
 - [x] **Phase 137.1: Skill Eval Production-Clean (INSERTED)** — cross-provider smoke sweep + matrix runs + determinate progress + judge case_feedback + per-arm duration + judge-model knob + bug closures (EVAL-05 / SEED-100) — complete 2026-07-05 (10/10 plans); secured (threats_open 0, `0fd0babb`) + validated (Nyquist; backend 120 / frontend 60 green, `f794eae4`) + UAT 9/9 (`dfc1be2c`)
 - [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101) — 4 plans (planned 2026-07-05)
-- [ ] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01)
+- [x] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01) — complete 2026-07-06 (5/5 plans; RUN-01a + RUN-01b backend + 138-04 fetch-on-terminal live-surfacing; live-verified Scenario B ×2 via Chrome MCP + psycopg2; closes SEED-094)
 - [ ] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02)
 - [ ] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02)
 - [ ] **Phase 141: template_input Resolver Run-Scope (STRETCH)** — run-scoped template_input resolution (COLL-02)
@@ -323,7 +323,7 @@ Plans:
 **Gap closure** *(RUN-01b live-surfacing — Scenario B failed 138-03; backend correct, frontend never reconciled the todos panel at run-terminal)*
 
 - [x] 138-04-PLAN.md — Frontend fetch-on-terminal: shared `_reconcileTodosOnTerminal(threadId, kind)` helper wired into BOTH StreamsProvider onTerminal handlers (clean-completion gated), reusing getThreadTodos + replaceTodosForThread so the `(run ended — not completed)` marker surfaces LIVE at run-end with no refresh; additive-only on the G-5 file + Vitest (D-v2.5-03, RUN-01) [wave 1]
-- [ ] 138-05-PLAN.md — [CHECKPOINT] operator live re-verifies Scenario B (marker surfaces live at run-end, no refresh; browser matches DB via psycopg2) + D-14 red line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
+- [x] 138-05-PLAN.md — [CHECKPOINT] operator live re-verifies Scenario B (marker surfaces live at run-end, no refresh; browser matches DB via psycopg2) + D-14 red line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
 
 #### Phase 139: Self-Improve Proposer — Description-Only (STRETCH)
 
@@ -417,7 +417,7 @@ Plans:
 | 135. Self-Improvement Loop (SI-01) | 9/9 | Complete | 2026-07-02 |
 | 136. Skill Publish Gate (GATE-01) | 4/4 | Complete | 2026-07-03 |
 | 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
-| 138. Run-End Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 138. Run-End Honesty (STRETCH) | 5/5 | Complete | 2026-07-06 |
 | 139. Self-Improve Proposer — Description-Only (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 141. template_input Resolver Run-Scope (STRETCH) | 0/TBD | Gated (behind CORE) | - |
