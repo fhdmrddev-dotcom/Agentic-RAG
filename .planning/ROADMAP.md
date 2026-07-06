@@ -318,7 +318,7 @@ Plans:
 
 **Wave 2** *(gated — blocked on Wave 1)*
 
-- [ ] 138-03-PLAN.md — [CHECKPOINT] operator live-verifies both fixes + cap_paused negative + Continue positive + Deep red-line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
+- [x] 138-03-PLAN.md — [CHECKPOINT] operator live-verifies both fixes + cap_paused negative + Continue positive + Deep red-line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
 
 #### Phase 139: Self-Improve Proposer — Description-Only (STRETCH)
 
