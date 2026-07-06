@@ -72,7 +72,7 @@
 
 **Analog:** `evals.py` — `propose_skill_improvement` :695, `reject_skill_proposal` :991, `approve_skill_proposal` :1459, `_verify_owned_skill` :113, `_proposal_response` :671, open/inflight guards :604-605
 
-**Propose (`POST /skills/{id}/proposals` with `kind='description'`):**
+**Propose (`POST /skills/{id}/description-proposals`, body `ProposeDescriptionBody {run_id}`, route sets `kind='description'`):**
 - **Owner gate FIRST** — copy `_verify_owned_skill` (evals.py:113-142): `.eq("id").eq("user_id")`, 404-not-403 on miss, malformed UUID → 404 (never leak error shape), `run_in_threadpool`-wrapped.
 - **Read the Tuner winner from the DURABLE `tuner_runs` row** — mirror `get_latest_tuner_run`'s read (skill_tuner.py:840-847) OR verify `source_tuner_run_id` is owner-or-global-skill scoped (`_fetch_owned_or_global_skill`, skill_tuner.py:177-206) before snapshotting. The winner + candidates + cells live INSIDE `scoreboard` jsonb (skill_tuner.py:560-566: `{ candidates[], winner_index, winner_description }`).
 - **Honest-by-construction gate (D-02)** — the winner from `pick_winner` MAY be the baseline (skill_tuner_service.py:642-662 returns `max(measured, key=held_out_score)`). Refuse to propose when `winner is None or winner["is_baseline"]` → 400 "nothing to propose" (RESEARCH Code Examples 139-RESEARCH.md:372-376; mirrors `CandidateCard.tsx:52` `isActionableWinner`).
@@ -109,7 +109,7 @@ The SI-01 approve (evals.py:1459+) INSERTs a `source='self_improve'` DRAFT versi
 **Analog:** self — `SkillProposal` (:764-788), `PromotionGate` (:749-758), `ProposalApproveResult` (:792-795)
 
 **What to copy:**
-- Add `kind: "instruction" | "description"`, `proposed_description: string | null`, `base_description: string | null`, `scoreboard_snapshot: TunerScoreboard | null` (reuse the wire shape from `api.ts:3170`), `source_tuner_run_id: string | null`. Keep the existing status union (:775-782) unchanged (description rows use a subset).
+- Add `kind: "instruction" | "description"`, `proposed_description: string | null`, `base_description: string | null`, `scoreboard_snapshot: DescriptionScoreboardSnapshot | null` — a DEDICATED type `{ winner: TunerCandidate; baseline: TunerCandidate | null; run_id: string }` matching what 139-02 writes (do NOT alias to `TunerScoreboard`, whose `candidates[]`/`winner_index` shape differs; reuse only the `TunerCandidate`/`TunerCell` members from `api.ts:3151-3175`), `source_tuner_run_id: string | null`. Keep the existing status union (:775-782) unchanged (description rows use a subset).
 - Mirror the nullable idiom (`new_skill_version_id: string | null`, :768) and the doc-comment discipline (:760-763).
 
 ---
@@ -119,7 +119,7 @@ The SI-01 approve (evals.py:1459+) INSERTs a `source='self_improve'` DRAFT versi
 **Analog:** `proposeImprovement` (api.ts:1876-1888), `approveProposal` (:1915-1926), `rejectProposal` (:1945-1956)
 
 **What to copy:**
-- The exact fetch shape: `getAuthHeaders()` → `fetch(`${API_BASE}/skills/${skillId}/proposals`, {method:"POST", headers, body})` → `if (!res.ok) throw await proposalError(...)` → `return res.json()`. Body carries `{ source_tuner_run_id }` instead of `{ source_eval_run_id }` (mirror :1884).
+- The exact fetch shape: `getAuthHeaders()` → `fetch(`${API_BASE}/skills/${skillId}/description-proposals`, {method:"POST", headers, body})` → `if (!res.ok) throw await proposalError(...)` → `return res.json()`. Body is `ProposeDescriptionBody` carrying `{ run_id }` (the tuner run's `run_id`, NOT `source_eval_run_id`; the `source_tuner_run_id` provenance FK is derived server-side from `tuner_runs.id`) (mirror :1884).
 - **Approve/reject REUSE the existing wires** (`approveProposal` :1915, `rejectProposal` :1945) — the routes share the path shape. Only note: the description approve returns a plain `SkillProposal` (no `re_eval_run_id`), so either add a description-specific `approveDescriptionProposal` returning `SkillProposal`, or branch on the response — planner's call. The reject wire (:1945-1956) is reusable as-is.
 
 ---
