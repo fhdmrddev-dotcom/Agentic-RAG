@@ -1,10 +1,11 @@
 ---
 phase: 139
 slug: self-improve-proposer-description-only-stretch
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-06
+validated: 2026-07-07
 ---
 
 # Phase 139 — Validation Strategy
@@ -47,26 +48,28 @@ created: 2026-07-06
 
 | # | Requirement | Behavior | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---|-------------|----------|------------|-----------------|-----------|-------------------|-------------|--------|
-| V1 | SI-02 | Propose a description draft (`kind='description'`) from a Tuner winner; NEVER auto-publish, NEVER edit the live description | T-139 owner-scope | Draft row only; `skills.description` unchanged until approve | integration | `pytest tests/integration/test_139_description_proposals.py::test_propose_creates_draft_no_live_write -x` | ❌ W0 | ⬜ pending |
-| V2 | SI-02 | Baseline wins → refuse to propose (honest-by-construction, D-02) | — | 400 "nothing to propose"; zero rows | integration | `pytest .../test_139_description_proposals.py::test_baseline_winner_refuses_propose -x` | ❌ W0 | ⬜ pending |
-| V3 | SI-02 | Approve → `skills.description` written + new immutable version + `status='promoted'` | T-139 owner-scope | Only owner can approve; one version captured | integration | `pytest .../test_139_description_proposals.py::test_approve_writes_desc_and_version -x` | ❌ W0 | ⬜ pending |
-| V4 | SI-02 | Reject → nothing changes (pure audit flip, `new_skill_version_id` NULL) | — | No description/version mutation | integration | `pytest .../test_139_description_proposals.py::test_reject_is_pure_audit -x` | ❌ W0 | ⬜ pending |
-| V5 | SI-02 | Cross-user 404-not-403 on propose/approve/reject (IDOR) | T-139 IDOR (V4) | 404 masks existence for non-owner | integration | `pytest .../test_139_description_proposals.py::test_cross_user_404 -x` | ❌ W0 | ⬜ pending |
-| V6 | SI-02 | Migration 090: `kind`-gated CHECK rejects `kind='description'` row with NULL `proposed_description`; `proposed_instructions` relaxed to nullable | — | DB CHECK is second gate | unit/DB | `pytest tests/test_139_migration_090.py::test_kind_check_constraint -x` (requires migration applied to live DB) | ❌ W0 | ⬜ pending |
-| V7 | SI-02 | Frontend: baseline-winner card shows "nothing to propose"; rewrite-winner shows "Propose this description" | — | Honest affordance gating | frontend unit | `npm run test -- --run src/components/skills/studio/` | ❌ W0 | ⬜ pending |
+| V1 | SI-02 | Propose a description draft (`kind='description'`) from a Tuner winner; NEVER auto-publish, NEVER edit the live description | T-139 owner-scope | Draft row only; `skills.description` unchanged until approve | integration | `pytest tests/integration/test_139_description_proposals.py::test_propose_creates_draft_no_live_write -x` | ✅ `:194` | ✅ green |
+| V2 | SI-02 | Baseline wins → refuse to propose (honest-by-construction, D-02) | — | 400 "nothing to propose"; zero rows | integration | `pytest .../test_139_description_proposals.py::test_baseline_winner_refuses_propose -x` | ✅ `:250` | ✅ green |
+| V3 | SI-02 | Approve → `skills.description` written + new immutable version + `status='promoted'` | T-139 owner-scope | Only owner can approve; one version captured | integration | `pytest .../test_139_description_proposals.py::test_approve_writes_desc_and_version -x` | ✅ `:277` | ✅ green |
+| V4 | SI-02 | Reject → nothing changes (pure audit flip, `new_skill_version_id` NULL) | — | No description/version mutation | integration | `pytest .../test_139_description_proposals.py::test_reject_is_pure_audit -x` | ✅ `:315` | ✅ green |
+| V5 | SI-02 | Cross-user 404-not-403 on propose/approve/reject (IDOR) | T-139 IDOR (V4) | 404 masks existence for non-owner | integration | `pytest .../test_139_description_proposals.py::test_cross_user_404 -x` | ✅ `:373` | ✅ green |
+| V6 | SI-02 | Migration 090: `kind`-gated CHECK rejects `kind='description'` row with NULL `proposed_description`; `proposed_instructions` relaxed to nullable | — | DB CHECK is second gate | unit/DB | `pytest tests/test_139_migration_090.py::test_kind_check_constraint -x` (requires migration applied to live DB) | ✅ `:132` | ✅ green (live DB :54322) |
+| V7 | SI-02 | Frontend: baseline-winner card shows "nothing to propose"; rewrite-winner shows "Propose this description" | — | Honest affordance gating | frontend unit | `npm run test -- --run src/components/skills/studio/DescriptionProposalCard.test.tsx src/components/skills/tuner/CandidateCard.test.tsx src/pages/SkillTunerPage.test.tsx` | ✅ 3 files | ✅ green (29 tests) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+**Audited green at HEAD `922d90ce` on 2026-07-07:** V1–V5 → 5 passed (`test_139_description_proposals.py`, fake-backed owner-scoping); V6 → 1 passed (`test_139_migration_090.py` against live Postgres :54322); V7 → 29 passed across the 3 card/page suites. No MISSING or PARTIAL gaps — every SI-02 requirement row has a green automated test.
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/integration/test_139_description_proposals.py` — propose / approve / reject / cross-user-404 (mirror `test_skill_proposals_router.py`)
-- [ ] `backend/tests/test_139_migration_090.py` — `kind`-gated CHECK + nullable `proposed_instructions` (requires migration 090 applied to the live local DB via SQL editor / psycopg2 :54322 — NEVER `db push`)
-- [ ] `frontend/src/components/skills/studio/*.test.tsx` — description-proposal card (baseline-wins vs rewrite-winner branches)
-- [ ] Shared fixtures: reuse existing `conftest` skill/user fixtures + the tuner-scoreboard fixture from `test_skill_tuner_service.py`
+- [x] `backend/tests/integration/test_139_description_proposals.py` — propose / approve / reject / cross-user-404 (mirrors `test_skill_proposals_router.py`; 5 fake-backed tests, real owner-scoping)
+- [x] `backend/tests/test_139_migration_090.py` — `kind`-gated CHECK + nullable `proposed_instructions` (runs against the live local DB :54322 — migration 090 applied)
+- [x] `frontend/src/components/skills/studio/DescriptionProposalCard.test.tsx` + `tuner/CandidateCard.test.tsx` + `pages/SkillTunerPage.test.tsx` — description-proposal card (baseline-wins vs rewrite-winner branches, propose→review→approve flow)
+- [x] Shared fixtures: reuses `_FilterSupabase`/`_FilterTable`/`_override` from `test_evals_router` + a trigger-mirroring `_TriggerSupabase` for the one-version-not-two guard
 
-*Framework already installed — no install step.*
+*Framework already installed — no install step. All Wave 0 files landed during execution (Plans 139-02/05 + REVIEW-FIX).*
 
 ---
 
@@ -90,12 +93,26 @@ created: 2026-07-06
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] 4-axis UAT (cross-provider, honest-baseline-wins, parallel-thread, long-history) authored + drivable
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references — all 7 rows now COVERED (green)
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s (integration subset ~0.2s; frontend subset ~4.6s)
+- [x] 4-axis UAT (cross-provider, honest-baseline-wins, parallel-thread, long-history) authored + drivable — 4/7 driven live 2026-07-06 (see below)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ✅ validated 2026-07-07 (`/gsd:validate-phase 139`) — 7/7 requirement rows automated + green.
+
+---
+
+## Validation Audit 2026-07-07
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 (all tests already present from execution) |
+| Escalated | 0 |
+
+State A audit: the plan-time draft map (V1–V7, all `⬜ pending`) predated execution. All 7 tests landed during Plans 139-02/05 + REVIEW-FIX and were re-run green at HEAD `922d90ce`: V1–V5 (5 passed), V6 (1 passed, live DB), V7 (29 passed). No `gsd-nyquist-auditor` spawn was needed — zero MISSING/PARTIAL gaps.
+
+**Manual-Only 4-axis UAT status** (out of scope for automated Nyquist coverage; tracked separately): driven live 2026-07-06 at `/gsd:verify-work 139` — **4/7 PASS** (cross-provider full 8-provider Tuner lifecycle, honest baseline-wins gate, long-history base-version resolution, G-4 approve one-version guard). **3 deferred** per operator (parallel-thread isolation, G-4 reject, G-4 snapshot immutability) — each backed by the automated suite (V4 reject, one-version-not-two guard, snapshot-not-FK) + CR-01; a full re-drive is a ~20-min all-provider run. See `139-HUMAN-UAT.md`.
