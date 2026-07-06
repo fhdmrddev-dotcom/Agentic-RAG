@@ -116,6 +116,19 @@ class ProposeBody(BaseModel):
     source_eval_run_id: str
 
 
+class ProposeDescriptionBody(BaseModel):
+    """POST body — draft ONE DESCRIPTION proposal from a SOURCE Trigger Tuner run (SI-02, D-11).
+
+    Mirrors ``ProposeBody`` but carries ONLY the source pointer for a tuner run: ``run_id`` — the
+    ephemeral tuner run-buffer id the client observed. The route derives the winning description +
+    snapshots its scoreboard from that run and sets ``kind='description'`` itself; the body carries
+    NO ``kind`` field. ``user_id`` comes from the authenticated caller and ``skill_id`` from the path,
+    NEVER this body (T-135-02 — a forged owner/skill id is ignored). Single-typed ``str`` (Gemini
+    ``type: [...]`` array trap)."""
+
+    run_id: str
+
+
 class ForcePromoteBody(BaseModel):
     """POST body — force-promote a proposal despite a non-improving gate (D-06).
 
@@ -160,6 +173,16 @@ class SkillProposalResponse(BaseModel):
         Plan 05 WRITES it (at reconcile-on-read), Plan 07 DISPLAYS it. Declared here so FastAPI
         does not strip it from the serialized response.
 
+    Phase 139 (SI-02, D-11) extends this ONE contract to cover BOTH kinds — an instruction proposal
+    (SI-01, the default) and a description proposal (SI-02). A ``kind='description'`` row carries
+    ``proposed_description`` (the Trigger-Tuner-winning description), ``base_description`` (the current
+    live description — the diff base the frontend renders ``proposed_description`` against, hydrated
+    per-response like ``base_instructions``), ``scoreboard_snapshot`` (the IMMUTABLE proposed-vs-current
+    per-provider cells copied inline at propose-time — the evidence the card renders, NOT read live
+    through the mutable ``source_tuner_run_id`` FK), and ``source_tuner_run_id`` (provenance only). The
+    instruction fields default to ``""`` so a description row (no instructions) serializes without a
+    validation error.
+
     ``created_at``/``updated_at`` are nullable because the response is assembled in-app (the id is
     minted app-side, mirroring ``start_eval_run``'s ``run_id``); they are hydrated from the DB
     insert/update echo when present (always, in production) and are ``None`` only under a
@@ -172,12 +195,24 @@ class SkillProposalResponse(BaseModel):
     new_skill_version_id: UUID | None = None
     re_eval_run_id: UUID | None = None
     source_eval_run_id: UUID | None = None
-    proposed_instructions: str
-    base_instructions: str
+    proposed_instructions: str = ""
+    base_instructions: str = ""
     rationale: str
     evidence_summary: str
     status: str
     override_forced: bool = False
     gate: PromotionGate | None = None
+    # ── Phase 139 (SI-02) — the description-proposal fields (D-11). ONE contract for both kinds:
+    # a kind='description' row carries proposed_description (+ its base_description diff base +
+    # the immutable scoreboard_snapshot evidence + the provenance source_tuner_run_id), and the
+    # instruction fields above default to "" so it serializes cleanly. Declared HERE (not a Wave-2
+    # module) so FastAPI does not strip a field the description routes WRITE (module docstring
+    # :99-106). All FLAT single-typed (Gemini ``type: [...]`` array trap): ``str | None`` /
+    # ``dict | None`` / ``UUID | None``.
+    kind: str = "instruction"
+    proposed_description: str | None = None
+    base_description: str | None = None
+    scoreboard_snapshot: dict | None = None
+    source_tuner_run_id: UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
