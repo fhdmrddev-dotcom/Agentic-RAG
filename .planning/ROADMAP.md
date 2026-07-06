@@ -309,7 +309,7 @@ Plans:
   2. When a run ends with open todos, a run-end reconciler marks them "ended with open todos" — never silently auto-completed (RUN-01b).
   3. The change is additive and shared-path-safe — Deep Mode stays byte-identical (red line).
 
-**Plans**: 3 plans
+**Plans**: 5 plans (3 original + 2 gap-closure — RUN-01b live-surfacing)
 
 **Wave 1** *(parallel — disjoint files)*
 
@@ -318,7 +318,12 @@ Plans:
 
 **Wave 2** *(gated — blocked on Wave 1)*
 
-- [x] 138-03-PLAN.md — [CHECKPOINT] operator live-verifies both fixes + cap_paused negative + Continue positive + Deep red-line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
+- [x] 138-03-PLAN.md — [CHECKPOINT] operator live-verifies both fixes + cap_paused negative + Continue positive + Deep red-line + cross-provider spot check; found RUN-01b live-surfacing gap (marker not shown live at run-end) → gap closure (RUN-01) [wave 2, autonomous:false]
+
+**Gap closure** *(RUN-01b live-surfacing — Scenario B failed 138-03; backend correct, frontend never reconciled the todos panel at run-terminal)*
+
+- [ ] 138-04-PLAN.md — Frontend fetch-on-terminal: shared `_reconcileTodosOnTerminal(threadId, kind)` helper wired into BOTH StreamsProvider onTerminal handlers (clean-completion gated), reusing getThreadTodos + replaceTodosForThread so the `(run ended — not completed)` marker surfaces LIVE at run-end with no refresh; additive-only on the G-5 file + Vitest (D-v2.5-03, RUN-01) [wave 1]
+- [ ] 138-05-PLAN.md — [CHECKPOINT] operator live re-verifies Scenario B (marker surfaces live at run-end, no refresh; browser matches DB via psycopg2) + D-14 red line + cross-provider spot check; closes SEED-094 (RUN-01) [wave 2, autonomous:false]
 
 #### Phase 139: Self-Improve Proposer — Description-Only (STRETCH)
 
