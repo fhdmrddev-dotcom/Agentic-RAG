@@ -40,6 +40,7 @@ import {
   getTunerLatest,
   getSettings,
   proposeDescription,
+  getLatestDescriptionProposal,
   approveDescriptionProposal,
   rejectDescriptionProposal,
   ApiError,
@@ -168,7 +169,7 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
   }, [skillId])
 
   // ── Reconcile-via-fetch on open (D-v2.5-03 — SSE/Realtime is a hint, NOT truth). On
-  //    mount / skill-switch we fetch three things authoritatively:
+  //    mount / skill-switch we fetch four things authoritatively:
   //      1. getSeededCases  → hydrate the editor (D-05/D-06) so seeded/sibling cases show
   //         + are editable BEFORE a run (no more "0 cases" while the run uses hidden cases).
   //      2. getTunerLatest  → rehydrate the durable latest result (D-07) so a completed
@@ -276,6 +277,20 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
       })
       .catch(() => {
         if (!cancelled) setConfiguredTargetCount(null)
+      })
+
+    // 4. WR-04 (139 review): rehydrate the durable description proposal (SI-02) so a
+    //    status='proposed' review card survives reload/navigation. Without this the only
+    //    recovery was clicking "Propose this description" again, which supersedes the original
+    //    to 'rejected' (audit clutter) and re-snapshots. Rejected rows are ignored (the card
+    //    renders nothing for them); a read failure is non-fatal (the propose door still works).
+    getLatestDescriptionProposal(skillId)
+      .then((latest) => {
+        if (cancelled) return
+        setDescProposal(latest && latest.status !== "rejected" ? latest : null)
+      })
+      .catch(() => {
+        if (!cancelled) setDescProposal(null)
       })
 
     return () => {

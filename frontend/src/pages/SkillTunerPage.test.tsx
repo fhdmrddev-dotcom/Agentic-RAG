@@ -31,6 +31,7 @@ const getSeededCases = vi.fn()
 const getTunerLatest = vi.fn()
 const getSettings = vi.fn()
 const proposeDescription = vi.fn()
+const getLatestDescriptionProposal = vi.fn()
 const approveDescriptionProposal = vi.fn()
 const rejectDescriptionProposal = vi.fn()
 
@@ -57,6 +58,7 @@ vi.mock("@/lib/api", () => {
     getTunerLatest: (...a: unknown[]) => getTunerLatest(...a),
     getSettings: (...a: unknown[]) => getSettings(...a),
     proposeDescription: (...a: unknown[]) => proposeDescription(...a),
+    getLatestDescriptionProposal: (...a: unknown[]) => getLatestDescriptionProposal(...a),
     approveDescriptionProposal: (...a: unknown[]) => approveDescriptionProposal(...a),
     rejectDescriptionProposal: (...a: unknown[]) => rejectDescriptionProposal(...a),
     ApiError: FakeApiError,
@@ -173,6 +175,8 @@ beforeEach(() => {
   getSettings.mockResolvedValue(SETTINGS_2_CONFIGURED)
   // SI-02 description-proposal wires (Phase 139).
   proposeDescription.mockResolvedValue(DESC_PROPOSAL)
+  // WR-04: the mount effect rehydrates the durable proposal — default: none pending.
+  getLatestDescriptionProposal.mockResolvedValue(null)
   approveDescriptionProposal.mockResolvedValue({
     ...DESC_PROPOSAL,
     status: "promoted",
@@ -354,6 +358,19 @@ describe("SkillTunerPage — rehydration, empty state, cost preview, D-04 block 
     // block is ABSENT (no empty void). No candidates, no error, no throw.
     expect(screen.getByRole("button", { name: /run tuning/i })).toBeTruthy()
     expect(screen.queryByTestId("tuner-results")).toBeNull()
+  })
+
+  it("WR-04 (139 review): a durable `proposed` description proposal rehydrates the review card on open", async () => {
+    // After a reload/navigation the durable status='proposed' row must be visible + actionable
+    // WITHOUT re-proposing (a re-propose supersedes the original to 'rejected' — audit clutter).
+    getTunerLatest.mockResolvedValue(LATEST_RUN)
+    getLatestDescriptionProposal.mockResolvedValue(DESC_PROPOSAL)
+    render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
+    await screen.findByText(/current · live · drives firing/i)
+    const reviewCard = await screen.findByTestId("description-proposal-card")
+    expect(within(reviewCard).getByTestId("description-proposal-diff")).toBeTruthy()
+    expect(within(reviewCard).getByRole("button", { name: /approve/i })).toBeTruthy()
+    expect(proposeDescription).not.toHaveBeenCalled()
   })
 
   it("D-12 / WR-02: the pre-run cost preview counts keyed providers with a backend representative model", async () => {
