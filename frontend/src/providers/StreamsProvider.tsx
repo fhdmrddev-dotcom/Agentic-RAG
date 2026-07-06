@@ -277,6 +277,59 @@ export async function _reattachAfterTransient(
   return true
 }
 
+/**
+ * Phase 138-04 (RUN-01 live-surfacing) — reconcile the Workspace TODOS panel on
+ * a genuinely-clean run terminal so the 138-02 backend-committed
+ * "(run ended — not completed)" marker surfaces LIVE, with NO thread-switch and
+ * NO refresh (VERIFICATION.md must-have #5 / Scenario B).
+ *
+ * The 138-02 finalizer writes the marker to the todos table BEFORE the clean
+ * terminal sentinel fires (DB-verified twice via psycopg2), so a fetch-on-
+ * terminal guarantees the marker appears live — robust regardless of whether the
+ * finalize-time `todo_updated` SSE was delivered/applied. This is the project's
+ * own architecture rule (CLAUDE.md D-v2.5-03): Realtime is a best-effort hint,
+ * NOT a source of truth — always reconcile via fetch. The GET is the source of
+ * truth, so we ALWAYS re-fetch on a clean terminal (never gated on whether the
+ * local todos store is non-empty or the SSE landed).
+ *
+ * Mirrors the `onRunCompleted` fire-and-forget workspace-refetch analog
+ * (~950 below): reuse the existing `getThreadTodos` GET + `replaceTodosForThread`
+ * store action (NO new fetch machinery, NO new route/component/package — the
+ * marker rides on `content`, D-01, so TodosSection is untouched). No
+ * AbortController: the write is keyed by the captured owning `threadId`, so a
+ * resolve that lands after a thread-switch updates its OWN thread's slot and
+ * never corrupts the viewed thread (Pitfall 6).
+ *
+ * Clean-completion gate: only "done"/"reader_done" reconcile — this mirrors the
+ * 138-02 two-clause finalizer gate (the marker is written ONLY on a genuinely-
+ * clean completion; on cancelled/error/timed_out nothing changed on the backend,
+ * so there is nothing to surface). Best-effort: the fetch+replace is wrapped so
+ * the helper NEVER throws — a callers' fire-and-forget invocation cannot reject
+ * into the byte-locked onTerminal handler.
+ *
+ * Exported for unit tests (mirrors `_isTransientStreamEnd` / `_reattachAfterTransient`
+ * export-for-tests pattern; driven directly in StreamsProvider.test.tsx).
+ */
+export async function _reconcileTodosOnTerminal(
+  threadId: string,
+  kind: "done" | "error" | "cancelled" | "timed_out" | "reader_done",
+): Promise<void> {
+  // Clean-completion gate FIRST: on a non-clean terminal the backend wrote
+  // nothing, so there is nothing to surface — no fetch, no store write.
+  if (kind !== "done" && kind !== "reader_done") return
+  try {
+    // ALWAYS fetch on a clean terminal — the GET is the source of truth
+    // (D-v2.5-03), never gated on the best-effort todo_updated SSE.
+    const todos = await getThreadTodos(threadId)
+    useStreamsStore.getState().actions.replaceTodosForThread(threadId, todos)
+  } catch (err) {
+    // Best-effort self-heal — a failed/slow refetch is non-fatal (the panel's
+    // own thread-switch/mount reconcile remains the floor). Never throw into
+    // the fire-and-forget terminal caller.
+    console.error("Phase 138-04 todos terminal reconcile failed:", err)
+  }
+}
+
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random()}`
 }
