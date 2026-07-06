@@ -1973,6 +1973,83 @@ export async function forcePromoteProposal(
   return res.json() as Promise<SkillProposal>
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 139 (SI-02) — description-proposal wires. These mirror the SI-01 proposal
+// helpers above but hit the `/description-proposals` routes. Additive, D-13: no
+// shared-path change, reuse getAuthHeaders() + proposalError. A description
+// proposal wraps a Trigger Tuner run's held-out winning DESCRIPTION in the
+// propose→review-diff→approve→immutable-version lifecycle — there is NO
+// post-approval re-eval (D-07), so approve returns a PLAIN SkillProposal (not the
+// ProposalApproveResult / re_eval_run_id shape the SI-01 approve carries).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/description-proposals — propose a new trigger description
+ *  from a Trigger Tuner run's held-out per-provider winner. Body carries the
+ *  tuner run's `run_id`; the `source_tuner_run_id` provenance FK is derived
+ *  server-side from `tuner_runs.id`. Returns the fresh `proposed` SkillProposal
+ *  (`kind='description'`). */
+export async function proposeDescription(
+  skillId: string,
+  runId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals`,
+    { method: "POST", headers, body: JSON.stringify({ run_id: runId }) },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to propose description")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** GET /skills/{id}/description-proposals — owner-scoped description proposals for
+ *  the skill, newest-first. Returns the most recent row (or null when none) for
+ *  rehydration-on-open of the Triggering-tab proposal card. */
+export async function getLatestDescriptionProposal(
+  skillId: string,
+): Promise<SkillProposal | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals`,
+    { headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to load description proposals")
+  const rows = (await res.json()) as SkillProposal[]
+  return rows.length > 0 ? rows[0] : null
+}
+
+/** POST /skills/{id}/description-proposals/{proposalId}/approve — accept the
+ *  proposal, writing skills.description (which the 079 trigger versions). Returns
+ *  a PLAIN SkillProposal — there is no companion re-eval run (D-07), so this does
+ *  NOT return the ProposalApproveResult / re_eval_run_id shape the SI-01 approve
+ *  carries. */
+export async function approveDescriptionProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals/${proposalId}/approve`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to approve description proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/description-proposals/{proposalId}/reject — dismiss the
+ *  description proposal. Returns the updated SkillProposal. */
+export async function rejectDescriptionProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals/${proposalId}/reject`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to reject description proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
 export interface ProviderInfo {
   id: string
   name: string
