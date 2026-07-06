@@ -131,6 +131,7 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "glm-5":                                180_000,  # newest flagship family
     "glm-5-turbo":                          128_000,  # fast GLM-5 tier
     "glm-5.1":                              180_000,  # latest flagship
+    "glm-5.2":                              800_000,  # actual 1M — practical cap (newest flagship, 2026-06-13)
 }
 
 
@@ -341,6 +342,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # GLM-5 family — 200K ctx / 128K out
     "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # fast GLM-5 tier
     "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
+    "glm-5.2":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 900, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # newest flagship — 1M ctx / 128K out / tools + thinking (2026-06-13)
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek/deepseek-reasoner
@@ -357,6 +359,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
+    "z-ai/glm-5.2":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     # moonshotai/kimi-* route to Kimi (unforceable even with require_parameters) → coerce.
     "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry", "emit_tier": "coerce"},
     "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry", "emit_tier": "coerce"},
@@ -810,6 +813,14 @@ class Settings(BaseSettings):
     # 1536 = text-embedding-3-small, 768 = nomic-embed-text, 384 = all-MiniLM-L6-v2
     # Only change if switching models (requires resize_embedding_column + re-ingestion)
     embedding_dimensions: int = 1536
+
+    # Phase 140 (TRIG-02 / D-04) — global token budget for the "## Available Skills"
+    # catalog block. app_settings-only (env_attr=None readback in user_settings.py; a
+    # budget is a VALUE, not a secret). 0 / negative => inject-all kill switch (today's
+    # unbounded behavior). Default 1500 ≈ ~45-55 skills byte-identical — small catalogs
+    # stay untouched (D-03 bypass). Resolved via resolve_skill_catalog_budget(), never a
+    # hot-path magic number (CTX-03 discipline).
+    skill_catalog_max_tokens: int = 1500
 
     # Retrieval settings
     retrieval_top_k: int = 5

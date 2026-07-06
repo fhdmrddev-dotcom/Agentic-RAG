@@ -173,6 +173,12 @@ class UserEffectiveSettings(BaseModel):
     # picks the strong registry default (claude-opus-4-8). The Settings UI (Plan 10) reads/writes it.
     harness_judge_model: str = ""
 
+    # Phase 140 (TRIG-02 / D-04) — global token budget for the "## Available Skills"
+    # catalog block. app_settings-only (env_attr=None readback below; a budget is a
+    # VALUE, not a secret). 0 = inject-all kill switch (D-04). Default 1500 keeps small
+    # catalogs byte-identical (D-03 bypass); resolved via resolve_skill_catalog_budget().
+    skill_catalog_max_tokens: int = 1500
+
     # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
     # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
     embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
@@ -537,6 +543,11 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # Phase 137.1-05 (EVAL-05f / D-11) — env_attr=None: app_settings-only (a model id is
         # a VALUE, not a secret). Missing/None => "" => resolve_judge_model() picks the default.
         harness_judge_model=str(_val(row, "harness_judge_model", None, "")),
+
+        # Phase 140 (TRIG-02 / D-04) — env_attr=None: app_settings-only, no env fallback
+        # (a budget is a VALUE, not a secret). Missing/None => 1500 default. 0 = inject-all
+        # kill switch; resolve_skill_catalog_budget() bounds-checks the untrusted value.
+        skill_catalog_max_tokens=int(_val(row, "skill_catalog_max_tokens", None, 1500)),
 
         # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.
