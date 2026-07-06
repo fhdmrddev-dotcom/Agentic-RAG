@@ -487,7 +487,7 @@ test runs. [VERIFIED: CLAUDE.md migration discipline; scripts/regenerate-full-sc
 | A3 | Description proposals need only a `('proposed',)` open-guard (no async in-flight state). | Runtime State Inventory | LOW — approve is synchronous (D-07); no `approved`/`re_evaling` gap exists for description. [VERIFIED by D-07 + synchronous approve design] |
 | A4 | `base_skill_version_id` = the skill's latest `skill_versions` row is the correct diff base. | Pitfall 3 | LOW — every description save versions (079 trigger), so latest == current live description. [VERIFIED: 079 trigger fires on description change] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Version `source` attribution (`manual` vs `self_improve`/`tuner`).**
    - What we know: Writing `skills.description` fires the trigger → `source='manual'`; the enum reserves
@@ -496,6 +496,9 @@ test runs. [VERIFIED: CLAUDE.md migration discipline; scripts/regenerate-full-sc
      promotion, or is content with the proposal row carrying that provenance.
    - Recommendation: Ship with `manual` (Discretion #2 primary); raise the GUC option at discuss-phase
      if attribution matters. Low-risk to defer.
+   - **RESOLVED (settled in 139-02 Task 3):** ship with `source='manual'` — the approve route accepts the
+     079/132 trigger's `manual` capture (no GUC, no trigger change); the promoted `kind='description'`
+     proposal row (with `source_tuner_run_id`) is the self-improve audit anchor. GUC/`self_improve` deferred.
 
 2. **`ProposalCard` variant vs. thin sibling card.**
    - What we know: `studio/ProposalCard.tsx` is render-only with injected handlers and uses `lineDiff`.
@@ -503,6 +506,9 @@ test runs. [VERIFIED: CLAUDE.md migration discipline; scripts/regenerate-full-sc
      re_evaling, add `ProviderScoreboard`) is cleaner than a small `DescriptionProposalCard` sibling.
    - Recommendation: Planner's call; a thin sibling reusing `lineDiff` + `ProviderScoreboard` keeps the
      SI-01 card's honesty locks untouched. Either satisfies D-09.
+   - **RESOLVED (settled in 139-05):** build a thin sibling `DescriptionProposalCard` (NOT a `kind`
+     branch on `ProposalCard`), reusing `lineDiff` + `ProviderScoreboard` so SI-01's card honesty-locks
+     stay untouched.
 
 ## Environment Availability
 
