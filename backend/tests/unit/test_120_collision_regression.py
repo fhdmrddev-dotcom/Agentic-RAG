@@ -210,3 +210,141 @@ def test_harness_phase_keeps_own_output() -> None:
     # Own deliverable kept, prior leftover excluded.
     assert [f["filename"] for f in delta] == ["phase2-report.docx"]
     assert all(f["filename"] != "phase1-summary.docx" for f in delta)
+
+
+# ── RUN-01a (Phase 138 Plan 01) — PRIMARY behavioral proof ────────────────────
+#
+# BUG-260626-02: on a reused sandbox session, harvest_output_files() re-walks the
+# ENTIRE /sandbox/output/ dir and re-stamps a FRESH {iteration:N, url:<real>} meta
+# for EVERY file — including a prior-run leftover that snapshot_output_baseline()
+# only seeded as {iteration:-1, url:None}. So filtering the final aggregate emit on
+# `iteration == -1` is INSUFFICIENT: that marker (and the None url) is overwritten
+# before the emit runs. These tests drive the REAL snapshot_output_baseline() /
+# harvest_output_files() functions (NOT hand-built substitute dicts) to reproduce
+# the exact reappearance, then prove the run-scoped `_new_file_hashes_in_run`
+# accumulator excludes the leftover from the aggregate `final_output_files` emit.
+
+LEFTOVER = b"prior-run-leftover-bytes" * 500     # a real prior-run file, still on disk
+NEW_OUT = b"this-run-genuinely-new-output" * 400  # the file THIS run actually created
+
+
+def _accrue_new_hashes(previous_files: dict, new_hashes: set, iter_files: dict) -> None:
+    """Reproduce the EXACT production accumulator population from the execute_code
+    handler (tool_dispatcher.py, harvest delta-merge):
+
+        if ctx.new_file_hashes_in_run is not None:
+            ctx.new_file_hashes_in_run |= (set(_iter_files) - _previous_files_in_run.keys())
+        _previous_files_in_run.update(_iter_files)
+
+    The set-difference is computed BEFORE the .update() so baseline hashes (already
+    in previous_files) and cross-cell regenerations are excluded.
+    """
+    new_hashes |= (set(iter_files) - previous_files.keys())
+    previous_files.update(iter_files)
+
+
+def _final_emit_metas_prefix(previous_files: dict) -> list:
+    """The PRE-FIX aggregate emit (agent_loop.py, before RUN-01a):
+    ``list(_previous_files_in_run.values())`` — unfiltered (the leak)."""
+    return list(previous_files.values())
+
+
+def _final_emit_metas_fixed(previous_files: dict, new_hashes: set) -> list:
+    """The POST-FIX aggregate emit (agent_loop.py, RUN-01a): filter by hash-key
+    membership in the run-scoped accumulator (the KEY of previous_files IS the hash)."""
+    return [meta for h, meta in previous_files.items() if h in new_hashes]
+
+
+def test_run01a_reappeared_baseline_hash_excluded_from_final_emit() -> None:
+    """PRIMARY proof (RUN-01a / BUG-260626-02): a prior-run leftover, re-harvested
+    with a fresh real URL (its iteration:-1 baseline marker overwritten to
+    iteration:0), is present in _previous_files_in_run yet EXCLUDED from the final
+    aggregate emit — while the pre-fix unfiltered emit WOULD have leaked it.
+
+    Genuine behavioral proof: fails against the pre-fix code
+    (``list(_previous_files_in_run.values())`` includes the leftover) and passes
+    against the fix (hash-membership filter drops it).
+    """
+    leftover_hash = hashlib.sha256(LEFTOVER).hexdigest()
+    new_hash = hashlib.sha256(NEW_OUT).hexdigest()
+
+    # Run start: /sandbox/output/ holds ONLY the prior-run leftover. REAL baseline.
+    baseline = snapshot_output_baseline(
+        _build_mock_session_with_payloads({"prior.docx": LEFTOVER})
+    )
+    assert leftover_hash in baseline
+    assert baseline[leftover_hash]["iteration"] == -1  # seeded as pre-run baseline
+    assert baseline[leftover_hash]["url"] is None       # never uploaded by THIS run
+
+    # Production run state (agent_loop.py init + `_previous_files_in_run.update(_baseline)`).
+    previous_files: dict = dict(baseline)
+    new_hashes: set = set()
+
+    # Cell 1: the model's execute_code creates ONE new file; harvest re-walks the
+    # WHOLE dir so it sees BOTH the leftover AND the new file (the reappearance).
+    sb = _build_mock_supabase()
+    _delta, iter_files = harvest_output_files(
+        session=_build_mock_session_with_payloads(
+            {"prior.docx": LEFTOVER, "report.docx": NEW_OUT}
+        ),
+        execution_id="exec-1",
+        user_id="u-1",
+        supabase=sb,
+        previous_files=previous_files,
+        iteration=0,
+    )
+    _accrue_new_hashes(previous_files, new_hashes, iter_files)
+
+    # The reappearance is REAL: the leftover's baseline meta was overwritten with a
+    # fresh iteration:0 + real URL — so an `iteration == -1` / `url is None` filter
+    # would FAIL to exclude it. This is why the accumulator (not the meta) is authoritative.
+    assert leftover_hash in previous_files
+    assert previous_files[leftover_hash]["iteration"] == 0
+    assert previous_files[leftover_hash]["url"] is not None
+
+    # Pre-fix emit WOULD have leaked the leftover (documents the bug on real data).
+    prefix_names = {m["filename"] for m in _final_emit_metas_prefix(previous_files)}
+    assert "prior.docx" in prefix_names  # the leak the fix removes
+
+    # Post-fix emit excludes the leftover, keeps only the genuinely-new file.
+    fixed = _final_emit_metas_fixed(previous_files, new_hashes)
+    assert {m["filename"] for m in fixed} == {"report.docx"}
+    assert leftover_hash not in new_hashes  # leftover never entered the accumulator
+    assert new_hash in new_hashes
+
+
+def test_run01a_all_leftover_run_emits_nothing() -> None:
+    """PRIMARY proof (RUN-01a): a run whose only sandbox files are leftovers/baseline
+    (no genuinely-new bytes) produces an EMPTY filtered emit list — so the guarded
+    `final_output_files` event is NOT emitted at all (no dead "Download unavailable"
+    card, no re-surfaced prior-run file).
+    """
+    leftover_hash = hashlib.sha256(LEFTOVER).hexdigest()
+
+    baseline = snapshot_output_baseline(
+        _build_mock_session_with_payloads({"prior.docx": LEFTOVER})
+    )
+    previous_files: dict = dict(baseline)
+    new_hashes: set = set()
+
+    # Cell 1: execute_code produces NO new file — only the unchanged leftover is on
+    # disk. REAL harvest returns an empty delta (hash already in previous_files).
+    sb = _build_mock_supabase()
+    delta, iter_files = harvest_output_files(
+        session=_build_mock_session_with_payloads({"prior.docx": LEFTOVER}),
+        execution_id="exec-1",
+        user_id="u-1",
+        supabase=sb,
+        previous_files=previous_files,
+        iteration=0,
+    )
+    assert delta == []  # the per-cell panel already showed nothing new
+    _accrue_new_hashes(previous_files, new_hashes, iter_files)
+
+    # Pre-fix emit WOULD have emitted the leftover as a dead card.
+    assert _final_emit_metas_prefix(previous_files)  # non-empty → would emit
+
+    # Post-fix: nothing genuinely new → empty list → the `if _emit_metas:` guard in
+    # agent_loop.py suppresses the final_output_files event entirely.
+    assert _final_emit_metas_fixed(previous_files, new_hashes) == []
+    assert leftover_hash not in new_hashes

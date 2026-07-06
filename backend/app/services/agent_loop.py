@@ -1474,6 +1474,12 @@ async def run_agent_loop(
         # affordance. Plan 04 Wave 0 historical context:
         # B-260519-11 + BUG-260514-01 (per-run cumulative state).
         _previous_files_in_run: dict[str, dict] = {}
+        # RUN-01a — content-hashes genuinely new to THIS run. Threaded by-reference
+        # exactly like _previous_files_in_run (init here → both ctx builds → mutated
+        # in the dispatcher's harvest delta-merge → read at the final_output_files
+        # emit). The final emit filters against this so baseline/leftover files
+        # re-harvested with fresh URLs (BUG-260626-02) never leak into the aggregate.
+        _new_file_hashes_in_run: set[str] = set()
 
         # Phase 085 D-085-15 — per-run task() concurrency semaphore.
         # Initialized ONCE per top-level run (outside the iteration loop) so
@@ -1524,6 +1530,7 @@ async def run_agent_loop(
                 spawn=_spawn,
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
+                new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -2306,6 +2313,7 @@ async def run_agent_loop(
                 spawn=_spawn,
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
+                new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service
@@ -2450,50 +2458,66 @@ async def run_agent_loop(
             # silent dead anchor (RESEARCH dead-link root #1). The flag is
             # presentation-only and never feeds the owner-fenced re-sign
             # download path (T-095-05-01).
-            _emit_metas = list(_previous_files_in_run.values())
-            # Phase 095 Plan 09 Task 2 (GAP-095-02 / WR-02) — compute the hero set
-            # ONCE over the COMPLETE run file set. This is the single source of
-            # truth shared by BOTH the live emit (below) AND the post-loop re-stamp
-            # of the persisted execute_code rows, so live == reload (a multi-cell
-            # reload heroes the same single file as the live run).
-            _hero_set = _select_hero_filenames(_emit_metas, body.content)
+            # RUN-01a — filter the aggregate emit to content-hashes genuinely new to
+            # THIS run. _previous_files_in_run is keyed by SHA-256 content-hash (the
+            # KEY is the hash; meta dicts carry none — read identity from .items()).
+            # On a reused sandbox session a baseline/leftover file is re-harvested with
+            # a fresh real URL, so filtering on `iteration == -1` is INSUFFICIENT (that
+            # marker is overwritten before this emit runs — BUG-260626-02). The
+            # run-scoped _new_file_hashes_in_run accumulator only accreted hashes that
+            # the per-cell harvest deltas flagged as new, so filtering against it
+            # excludes every baseline/leftover file — consistent with what the per-cell
+            # delta panels already showed live. An empty result => this run surfaced
+            # only leftovers => emit NOTHING (correct — no dead "Download unavailable"
+            # cards, no re-surfaced prior-run files).
+            _emit_metas = [
+                meta for _h, meta in _previous_files_in_run.items()
+                if _h in _new_file_hashes_in_run
+            ]
+            if _emit_metas:
+                # Phase 095 Plan 09 Task 2 (GAP-095-02 / WR-02) — compute the hero set
+                # ONCE over the COMPLETE run file set. This is the single source of
+                # truth shared by BOTH the live emit (below) AND the post-loop re-stamp
+                # of the persisted execute_code rows, so live == reload (a multi-cell
+                # reload heroes the same single file as the live run).
+                _hero_set = _select_hero_filenames(_emit_metas, body.content)
 
-            # Re-stamp the persisted execute_code rows against the canonical
-            # ``_hero_set`` (the per-cell persist above stamped a False placeholder
-            # over the PARTIAL cumulative list). Each row's output_files ``is_hero``
-            # is recomputed from the complete-set hero, re-serialized, written back.
-            # Guarded: a truncated/non-JSON fallback ``result`` (the per-cell
-            # ``except`` path) is skipped gracefully.
-            for _tc in persisted_tool_calls:
-                if _tc.get("name") != "execute_code":
-                    continue
-                try:
-                    _pr = json.loads(_tc["result"])
-                    _of_rows = _pr.get("output_files")
-                    if not isinstance(_of_rows, list):
+                # Re-stamp the persisted execute_code rows against the canonical
+                # ``_hero_set`` (the per-cell persist above stamped a False placeholder
+                # over the PARTIAL cumulative list). Each row's output_files ``is_hero``
+                # is recomputed from the complete-set hero, re-serialized, written back.
+                # Guarded: a truncated/non-JSON fallback ``result`` (the per-cell
+                # ``except`` path) is skipped gracefully.
+                for _tc in persisted_tool_calls:
+                    if _tc.get("name") != "execute_code":
                         continue
-                    _pr["output_files"] = [
-                        {**_of, "is_hero": _of.get("filename") in _hero_set}
-                        for _of in _of_rows
-                    ]
-                    _tc["result"] = json.dumps(_pr)
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    continue
+                    try:
+                        _pr = json.loads(_tc["result"])
+                        _of_rows = _pr.get("output_files")
+                        if not isinstance(_of_rows, list):
+                            continue
+                        _pr["output_files"] = [
+                            {**_of, "is_hero": _of.get("filename") in _hero_set}
+                            for _of in _of_rows
+                        ]
+                        _tc["result"] = json.dumps(_pr)
+                    except (json.JSONDecodeError, TypeError, KeyError):
+                        continue
 
-            await _emit(
-                redis,
-                run_id,
-                'final_output_files',
-                files=[
-                    {
-                        "filename": meta["filename"],
-                        "url": meta.get("url") or "",
-                        "size": meta["size"],
-                        "is_hero": meta["filename"] in _hero_set,
-                    }
-                    for meta in _emit_metas
-                ],
-            )
+                await _emit(
+                    redis,
+                    run_id,
+                    'final_output_files',
+                    files=[
+                        {
+                            "filename": meta["filename"],
+                            "url": meta.get("url") or "",
+                            "size": meta["size"],
+                            "is_hero": meta["filename"] in _hero_set,
+                        }
+                        for meta in _emit_metas
+                    ],
+                )
 
         # Fallback: if the loop ended with no content produced, emit a safe message
         if not full_content:

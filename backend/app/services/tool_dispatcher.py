@@ -90,6 +90,7 @@ class ToolContext:
     spawn: Callable  # reference to _spawn
     model: str = ""  # user's selected model (for sub-agent routing)
     previous_files_in_run: dict | None = None  # sandbox output file tracking across execute_code calls
+    new_file_hashes_in_run: set | None = None  # RUN-01a — content-hashes genuinely new to THIS run (run-scoped accumulator)
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
@@ -1205,6 +1206,16 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                 _previous_files_in_run,
                 ctx.iteration,
             )
+            # RUN-01a: content-hashes present THIS cell that weren't already tracked
+            # are genuinely new to the run. Compute the set difference BEFORE the
+            # .update() below so (a) baseline hashes seeded at ~929 (already in
+            # _previous_files_in_run.keys() because the baseline seed runs earlier
+            # in this same handler on the first cell) are excluded, and (b) cross-cell
+            # regenerations (a hash already tracked from an earlier cell) are excluded —
+            # matching the per-cell delta_files "not new" semantics. Guarded on the
+            # None default so sub-agent/harness ctx builds stay byte-identical (D-14).
+            if ctx.new_file_hashes_in_run is not None:
+                ctx.new_file_hashes_in_run |= (set(_iter_files) - _previous_files_in_run.keys())
             _previous_files_in_run.update(_iter_files)
             output_file_list = delta_files
 
