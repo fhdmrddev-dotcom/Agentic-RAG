@@ -1573,6 +1573,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 useStreamsStore.setState((s) => ({
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, run.run_id),
                 }))
+                // Phase 138-04 (RUN-01 live-surfacing): on the TRUE terminal
+                // (post transient-reattach return), fire-and-forget a todos
+                // reconcile so the 138-02 "(run ended — not completed)" marker
+                // surfaces LIVE with no thread-switch/refresh. Clean-completion
+                // gate lives in the helper; not awaited (never blocks teardown);
+                // best-effort (.catch belt-and-suspenders — the helper swallows).
+                void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
                 if (errorPayload === "buffer_expired") {
                   useStreamsStore
                     .getState()
@@ -1869,6 +1876,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
                 }))
               }
+              // Phase 138-04 (RUN-01 live-surfacing): same fire-and-forget todos
+              // reconcile as the reconcile-path onTerminal — surface the 138-02
+              // "(run ended — not completed)" marker LIVE on the true terminal
+              // (post transient-reattach return). Clean-completion gate lives in
+              // the helper; not awaited; best-effort (.catch — helper swallows).
+              void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
               // Phase 092 (SC#3 / MODE-02): a TERMINAL kind unlocks the thread
               // (the lock-clear is also authoritative server-side — finish_run
               // clears the anchor; the mount reconcile is the source of truth).
