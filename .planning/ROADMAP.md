@@ -343,9 +343,9 @@ Plans:
 - [x] 139-04-PLAN.md — Frontend contracts: extended SkillProposal type + proposeDescription/approveDescription/rejectDescription wire fns (SI-02) [wave 1]
 
 **Wave 2** *(gated — blocked on Wave 1)*
-- [ ] 139-02-PLAN.md — Description propose/approve/reject routes in evals.py (honest-winner gate → 400 baseline-wins, inline scoreboard snapshot, synchronous trigger-versioned approve — no re-eval/SSE, never grow threads.py) + integration tests (SI-02) [wave 2]
-- [ ] 139-03-PLAN.md — [BLOCKING] apply migration 090 to live DB (SQL editor/psycopg2, never db push) + regen full-schema.sql + DB-CHECK test (SI-02) [wave 2, autonomous:false]
-- [ ] 139-05-PLAN.md — DescriptionProposalCard (lineDiff + ProviderScoreboard, Approve/Reject only) + repoint SkillTunerPage one-click apply → "Propose this description" + CandidateCard re-label (D-08) (SI-02) [wave 2]
+- [x] 139-02-PLAN.md — Description propose/approve/reject routes in evals.py (honest-winner gate → 400 baseline-wins, inline scoreboard snapshot, synchronous trigger-versioned approve — no re-eval/SSE, never grow threads.py) + integration tests (SI-02) [wave 2]
+- [x] 139-03-PLAN.md — [BLOCKING] apply migration 090 to live DB (SQL editor/psycopg2, never db push) + regen full-schema.sql + DB-CHECK test (SI-02) [wave 2, autonomous:false]
+- [x] 139-05-PLAN.md — DescriptionProposalCard (lineDiff + ProviderScoreboard, Approve/Reject only) + repoint SkillTunerPage one-click apply → "Propose this description" + CandidateCard re-label (D-08) (SI-02) [wave 2]
 **UI hint**: yes
 
 #### Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)
