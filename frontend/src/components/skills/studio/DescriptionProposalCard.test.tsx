@@ -22,7 +22,7 @@
  *   4. text-node-only render (no dangerouslySetInnerHTML sink).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, fireEvent, cleanup } from "@testing-library/react"
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react"
 import type { SkillProposal } from "@/types"
 import type { TunerCandidate, TunerCell } from "@/lib/api"
 import { DescriptionProposalCard } from "./DescriptionProposalCard"
@@ -116,14 +116,34 @@ describe("DescriptionProposalCard — SI-02 propose door (139-05)", () => {
     expect(screen.getByRole("button", { name: /Reject/i })).toBeInTheDocument()
   })
 
-  it("2. Approve → onApprove; Reject → onReject", () => {
+  it("2. Approve → onApprove; Reject → onReject; both disabled while a mutation is in flight (WR-03)", async () => {
     const h = handlers()
+    // WR-03 (139 review): a quick Approve→Reject double-click must send only ONE mutation —
+    // approve promotes, a racing reject would then flip the just-promoted row. Drive an
+    // in-flight (unsettled) approve and assert both buttons lock until it settles.
+    let resolveApprove!: () => void
+    h.onApprove.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveApprove = resolve
+        }),
+    )
     render(<DescriptionProposalCard proposal={mkProposal({ status: "proposed" })} {...h} />)
 
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }))
     expect(h.onApprove).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole("button", { name: /Reject/i }))
+    // While approve is in flight, BOTH action buttons are disabled — the reject click is a no-op.
+    const rejectBtn = screen.getByRole("button", { name: /Reject/i })
+    expect(screen.getByRole("button", { name: /Approve/i })).toBeDisabled()
+    expect(rejectBtn).toBeDisabled()
+    fireEvent.click(rejectBtn)
+    expect(h.onReject).not.toHaveBeenCalled()
+
+    // Once the approve settles, the buttons re-enable and Reject fires normally.
+    resolveApprove()
+    await waitFor(() => expect(rejectBtn).not.toBeDisabled())
+    fireEvent.click(rejectBtn)
     expect(h.onReject).toHaveBeenCalledTimes(1)
   })
 

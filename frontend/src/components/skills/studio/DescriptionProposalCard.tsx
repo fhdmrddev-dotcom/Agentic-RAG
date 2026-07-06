@@ -19,6 +19,7 @@
 // It reuses the design-locked surfaces (D-15, no fresh sketch): the SI-01 ProposalCard
 // tokens/chip idiom + `lineDiff` red/green diff + the Trigger Tuner `ProviderScoreboard`.
 // ─────────────────────────────────────────────────────────────────────────────
+import { useState } from "react"
 import { Check, X, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { lineDiff } from "@/lib/lineDiff"
@@ -29,10 +30,12 @@ export interface DescriptionProposalCardProps {
   /** The reconciled server proposal row (`kind='description'`), or `null` → no active
    *  proposal (the card offers "Propose this description" when `onPropose` is wired). */
   proposal: SkillProposal | null
-  /** Accept the proposal → writes `skills.description` (079 trigger versions it). */
-  onApprove: () => void
-  /** Dismiss the proposal (pure audit — nothing is written to the live skill). */
-  onReject: () => void
+  /** Accept the proposal → writes `skills.description` (079 trigger versions it).
+   *  May be async — the card disables both action buttons while it is in flight (WR-03). */
+  onApprove: () => Promise<void> | void
+  /** Dismiss the proposal (pure audit — nothing is written to the live skill).
+   *  May be async — the card disables both action buttons while it is in flight (WR-03). */
+  onReject: () => Promise<void> | void
   /** Kick off a fresh proposal from the tuner's held-out winner (null-proposal
    *  affordance). Omitted → no propose button when there is no active proposal. */
   onPropose?: () => void
@@ -81,6 +84,20 @@ export function DescriptionProposalCard({
   onReject,
   onPropose,
 }: DescriptionProposalCardProps) {
+  // WR-03 (139 review): a quick Approve→Reject double-click must not send BOTH mutations —
+  // approve promotes, reject would then flip the just-promoted row. Disable both action
+  // buttons while either request is in flight (mirrors CandidateCard's `proposing` guard).
+  const [busy, setBusy] = useState(false)
+  const runAction = async (action: () => Promise<void> | void) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await action()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // No active proposal (or a dismissed `rejected` one) → offer the propose affordance
   // when wired; otherwise render nothing. This is the honest "one door" (D-08): the
   // card never fabricates a proposal.
@@ -189,7 +206,13 @@ export function DescriptionProposalCard({
           terminal applied state with NO buttons. No re-eval gate (D-07). */}
       {proposal.status === "proposed" && (
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" className="gap-1 text-xs" onClick={onApprove}>
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1 text-xs"
+            disabled={busy}
+            onClick={() => void runAction(onApprove)}
+          >
             <Check className="h-3 w-3" /> Approve
           </Button>
           <Button
@@ -197,7 +220,8 @@ export function DescriptionProposalCard({
             size="sm"
             variant="outline"
             className="gap-1 text-xs"
-            onClick={onReject}
+            disabled={busy}
+            onClick={() => void runAction(onReject)}
           >
             <X className="h-3 w-3" /> Reject
           </Button>

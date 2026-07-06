@@ -1389,6 +1389,15 @@ async def reject_description_proposal(
     if not verify_rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
 
+    # WR-03 (139 review): status guard — a ``promoted`` (already-applied) proposal must never be
+    # flipped to ``rejected``: the audit trail would then claim the live winning description was
+    # never applied while it is live and driving triggering. Mirror approve's 409.
+    if verify_rows[0].get("status") != "proposed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal is not rejectable (status={verify_rows[0].get('status')})",
+        )
+
     def _reject():
         return (
             supabase.table("skill_proposals")
@@ -1396,6 +1405,9 @@ async def reject_description_proposal(
             .eq("id", str(proposal_id))
             .eq("user_id", user_id)
             .eq("kind", "description")
+            # WR-03: race-proof the write too — an approve landing between the read above and
+            # this update must not be corrupted (the filter makes the flip a no-op).
+            .eq("status", "proposed")
             .execute()
         )
 
