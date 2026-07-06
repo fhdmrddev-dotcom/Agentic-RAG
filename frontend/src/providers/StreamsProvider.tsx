@@ -1894,6 +1894,45 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // (post transient-reattach return). Clean-completion gate lives in
               // the helper; not awaited; best-effort (.catch — helper swallows).
               void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
+              // BUG-260707-03 (final answer stays folded live): message.content is
+              // the ACCUMULATED narration+answer blob (onDelta only APPENDS — the
+              // :358 invariant), but the backend persists only the clean final
+              // answer (last iteration). While runStatus === "streaming" the
+              // StreamingNarration folds that blob to a gist; the final answer
+              // streams in as the blob's tail and is folded with it, only
+              // "resolving" on a later reload. On a clean Deep terminal, reconcile
+              // JUST this run's assistant content to the persisted answer so the
+              // fold gives way to a clean, separated answer LIVE (no reload). Scoped
+              // to the ONE message's content — preserves tool_calls / suggestions /
+              // output-files / runStatus, far lighter than a full loadMessages
+              // replace. Fire-and-forget; a slow/failed fetch just leaves the
+              // reload-time reconcile as the floor (D-v2.5-03: reconcile via fetch).
+              // Keyed by the OWNING threadId so a resolve landing after a
+              // thread-switch updates its own bucket, never the viewed thread.
+              if (kind === "done" || kind === "reader_done") {
+                const rid = registeredRunId
+                if (rid) {
+                  getMessages(threadId)
+                    .then((persisted) => {
+                      const answer = persisted.find(
+                        (m) => m.runId === rid && m.role === "assistant",
+                      )
+                      if (!answer) return
+                      useStreamsStore
+                        .getState()
+                        .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                          prev.map((m) =>
+                            m.runId === rid &&
+                            m.role === "assistant" &&
+                            m.content !== answer.content
+                              ? { ...m, content: answer.content }
+                              : m,
+                          ),
+                        )
+                    })
+                    .catch(() => {})
+                }
+              }
               // Phase 092 (SC#3 / MODE-02): a TERMINAL kind unlocks the thread
               // (the lock-clear is also authoritative server-side — finish_run
               // clears the anchor; the mount reconcile is the source of truth).
