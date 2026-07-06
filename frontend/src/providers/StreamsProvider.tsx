@@ -1836,8 +1836,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
+                      // BUG-260707-01: also RESTORE streamingThreads here. The
+                      // sendMessage `finally` (below) unconditionally deletes threadId
+                      // from streamingThreads when the awaited subscribeToRun resolves
+                      // at a transient stream-end. subscribeToRun calls onTerminal
+                      // WITHOUT await (api.ts) and returns immediately, so the finally
+                      // runs BEFORE this reattach body — delete-then-readd nets to
+                      // "present". Without this, isStreaming (= streamingThreads.has(
+                      // tid)) reads false for the REST of the reattached run, so the
+                      // composer flips Stop→Send and the 👍/👎 feedback buttons appear
+                      // mid-run (MessageItem.tsx:451). Mirrors the proven
+                      // subscriptionsByThread delete-then-readd lifecycle above.
                       useStreamsStore.setState((s) => ({
                         subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, rid),
+                        streamingThreads: new Set(s.streamingThreads).add(threadId),
                       }))
                       subscribeToRun(rid, since, callbacks, newController.signal).catch(
                         (err) => {
