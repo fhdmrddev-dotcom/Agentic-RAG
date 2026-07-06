@@ -226,6 +226,10 @@ describe("SkillTunerPage — SI-02: the propose door replaces one-click apply (D
     await waitFor(() =>
       expect(approveDescriptionProposal).toHaveBeenCalledWith("skill-1", "desc-prop-1"),
     )
+
+    // WR-05 (139 review): approve reconciles the live skill via refetch (D-v2.5-03) so the
+    // "current · live · drives firing" section stops rendering the pre-approve description.
+    await waitFor(() => expect(listSkills).toHaveBeenCalledTimes(2))
   })
 })
 

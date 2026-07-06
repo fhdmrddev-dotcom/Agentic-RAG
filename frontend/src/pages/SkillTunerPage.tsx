@@ -98,8 +98,9 @@ type RunPhase = "idle" | "running" | "reconciling" | "done" | "error"
 export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
   // The Tuner reuses useSkills() to read the live skill list. The one-click apply that
   // used updateSkill (PATCH /skills) is replaced by the SI-02 propose door (D-08); manual
-  // description edits still use useSkills().updateSkill from the SkillsPage.
-  const { skills, loading: skillsLoading } = useSkills()
+  // description edits still use useSkills().updateSkill from the SkillsPage. `loadSkills`
+  // re-reads the list after an approve lands (WR-05 — reconcile-via-fetch, D-v2.5-03).
+  const { skills, loading: skillsLoading, loadSkills } = useSkills()
   const skill: Skill | null = useMemo(
     () => skills.find((s) => s.id === skillId) ?? null,
     [skills, skillId],
@@ -533,10 +534,17 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
     try {
       const updated = await approveDescriptionProposal(skillId, descProposal.id)
       setDescProposal(updated)
+      // WR-05 (139 review): the approve wrote skills.description server-side — refetch the
+      // skills list (reconcile-via-fetch, D-v2.5-03) so the "current · live · drives firing"
+      // section and the baseline "current description" label stop rendering the pre-approve
+      // text on the same screen that just said "this description now drives triggering".
+      loadSkills().catch(() => {
+        // Non-fatal: the server write landed; the header reconciles on the next fetch.
+      })
     } catch {
       setDescError("Couldn't apply the proposed description. Please try again.")
     }
-  }, [skillId, descProposal])
+  }, [skillId, descProposal, loadSkills])
 
   const handleRejectDescription = useCallback(async () => {
     if (!skillId || !descProposal) return
