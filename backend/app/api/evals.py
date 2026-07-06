@@ -1235,6 +1235,14 @@ async def propose_description_improvement(
             detail="Nothing to propose — the current description already wins",
         )
     winner_description = winner.get("description") or scoreboard.get("winner_description")
+    # WR-06 (139 review): a malformed / legacy scoreboard can leave the winner with NO description.
+    # Refuse honestly (400) instead of letting the INSERT hit the skill_proposals_kind_fields CHECK
+    # (an unguarded PostgREST raise → an opaque 500).
+    if not winner_description:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The tuner winner has no description to propose",
+        )
     baseline_candidate = next((c for c in candidates if c.get("is_baseline")), None)
 
     # 5. Concurrency guard, kind-scoped (D-04): supersede any lingering ``proposed`` DESCRIPTION draft
