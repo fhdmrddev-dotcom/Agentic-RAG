@@ -16,11 +16,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import type { Skill } from "@/types"
+import type { Skill, SkillProposal } from "@/types"
 import type { TunerScoreboard } from "@/lib/api"
 
 // ── api.ts mock — useSkills() reads listSkills + writes updateSkill; the page also
-//    calls startTunerRun / streamTunerRun / getTunerResults. ──
+//    calls startTunerRun / streamTunerRun / getTunerResults + (Phase 139, SI-02) the
+//    description-proposal wires. ──
 const listSkills = vi.fn()
 const updateSkill = vi.fn()
 const startTunerRun = vi.fn()
@@ -29,6 +30,9 @@ const getTunerResults = vi.fn()
 const getSeededCases = vi.fn()
 const getTunerLatest = vi.fn()
 const getSettings = vi.fn()
+const proposeDescription = vi.fn()
+const approveDescriptionProposal = vi.fn()
+const rejectDescriptionProposal = vi.fn()
 
 vi.mock("@/lib/api", () => {
   class FakeApiError extends Error {
@@ -52,6 +56,9 @@ vi.mock("@/lib/api", () => {
     getSeededCases: (...a: unknown[]) => getSeededCases(...a),
     getTunerLatest: (...a: unknown[]) => getTunerLatest(...a),
     getSettings: (...a: unknown[]) => getSettings(...a),
+    proposeDescription: (...a: unknown[]) => proposeDescription(...a),
+    approveDescriptionProposal: (...a: unknown[]) => approveDescriptionProposal(...a),
+    rejectDescriptionProposal: (...a: unknown[]) => rejectDescriptionProposal(...a),
     ApiError: FakeApiError,
   }
 })
@@ -95,6 +102,35 @@ const SCOREBOARD: TunerScoreboard = {
   winner_description: "Use this skill when the user asks to write or fix SQL queries.",
 }
 
+// The description proposal proposeDescription resolves to (SI-02). Its scoreboard_snapshot
+// is the {winner, baseline, run_id} shape (NOT a candidates[]/winner_index blob).
+const DESC_PROPOSAL: SkillProposal = {
+  id: "desc-prop-1",
+  skill_id: "skill-1",
+  kind: "description",
+  base_skill_version_id: "ver-0",
+  new_skill_version_id: null,
+  re_eval_run_id: null,
+  source_eval_run_id: null,
+  proposed_instructions: "",
+  base_instructions: "",
+  rationale: "",
+  evidence_summary: "",
+  base_description: "Fires on SQL.",
+  proposed_description: "Use this skill when the user asks to write or fix SQL queries.",
+  source_tuner_run_id: "run-1",
+  scoreboard_snapshot: {
+    winner: SCOREBOARD.candidates[1],
+    baseline: SCOREBOARD.candidates[0],
+    run_id: "run-1",
+  },
+  status: "proposed",
+  override_forced: false,
+  gate: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
+
 // A settings fixture with EXACTLY 2 scored targets, mirroring the POST-WR-01 effective
 // backend scored set: a keyed provider with a backend representative model counts EVEN
 // with an empty `models` list; a keyless/local provider does NOT count.
@@ -135,6 +171,14 @@ beforeEach(() => {
   })
   getTunerLatest.mockResolvedValue(null)
   getSettings.mockResolvedValue(SETTINGS_2_CONFIGURED)
+  // SI-02 description-proposal wires (Phase 139).
+  proposeDescription.mockResolvedValue(DESC_PROPOSAL)
+  approveDescriptionProposal.mockResolvedValue({
+    ...DESC_PROPOSAL,
+    status: "promoted",
+    new_skill_version_id: "ver-1",
+  })
+  rejectDescriptionProposal.mockResolvedValue({ ...DESC_PROPOSAL, status: "rejected" })
   // Stream helper drives the scoreboard in via onComplete then a done terminal.
   streamTunerRun.mockImplementation(async (_skillId, _runId, callbacks) => {
     callbacks.onComplete?.(SCOREBOARD)
@@ -142,8 +186,8 @@ beforeEach(() => {
   })
 })
 
-describe("SkillTunerPage — page-level author-confirm, no auto-apply (T-123-05-02)", () => {
-  it("running the benchmark renders candidate cards with held-out scores; Use → diff → confirm calls updateSkill", async () => {
+describe("SkillTunerPage — SI-02: the propose door replaces one-click apply (D-08)", () => {
+  it("running the benchmark renders candidates; Propose → review card → Approve calls approveDescriptionProposal", async () => {
     const user = userEvent.setup()
     render(<SkillTunerPage skillId="skill-1" onBack={vi.fn()} />)
 
@@ -158,23 +202,26 @@ describe("SkillTunerPage — page-level author-confirm, no auto-apply (T-123-05-
     // Held-out score visible on the winning candidate.
     expect(screen.getByTestId("tuner-candidates").textContent).toMatch(/0\.92|0\.93/)
 
-    // Nothing auto-applied on completion.
+    // The one-click direct write is GONE — no PATCH /skills on completion or ever.
     expect(updateSkill).not.toHaveBeenCalled()
 
-    // Winner card is first (sorted by held-out). It's an ACTIONABLE winner (a rewrite that beat
-    // the baseline), so its CTA is the filled "Use this →" (123.1-rev calibrated winner pop).
-    // Use → diff → confirm.
+    // The actionable winner (first, sorted by held-out) offers "Propose this description".
     const winnerCard = cards[0]
-    await user.click(within(winnerCard).getByRole("button", { name: /use this/i }))
-    const strip = within(winnerCard).getByTestId("candidate-diff-confirm")
-    expect(strip.textContent).toContain("Fires on SQL.")
+    await user.click(within(winnerCard).getByRole("button", { name: /propose this description/i }))
+
+    // The propose door opens a review proposal from the tuner run (no direct write).
+    await waitFor(() => expect(proposeDescription).toHaveBeenCalledWith("skill-1", "run-1"))
     expect(updateSkill).not.toHaveBeenCalled()
 
-    await user.click(within(strip).getByRole("button", { name: /confirm|save/i }))
-    await waitFor(() => expect(updateSkill).toHaveBeenCalledTimes(1))
-    expect(updateSkill).toHaveBeenCalledWith("skill-1", {
-      description: "Use this skill when the user asks to write or fix SQL queries.",
-    })
+    // The DescriptionProposalCard mounts with the diff + Approve / Reject.
+    const reviewCard = await screen.findByTestId("description-proposal-card")
+    expect(within(reviewCard).getByTestId("description-proposal-diff")).toBeTruthy()
+
+    // Approve writes skills.description via the owner-scoped route (079 trigger versions it).
+    await user.click(within(reviewCard).getByRole("button", { name: /approve/i }))
+    await waitFor(() =>
+      expect(approveDescriptionProposal).toHaveBeenCalledWith("skill-1", "desc-prop-1"),
+    )
   })
 })
 

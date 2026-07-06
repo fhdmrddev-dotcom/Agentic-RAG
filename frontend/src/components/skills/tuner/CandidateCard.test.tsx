@@ -1,21 +1,23 @@
 /**
- * Phase 123 Plan 05 Task 2a (TRIG-01) + Phase 123.1 Plan 02 Task 2 (D-11) — CandidateCard tests.
+ * Phase 123 Plan 05 Task 2a (TRIG-01) + Phase 123.1 Plan 02 Task 2 (D-11)
+ * + Phase 139 Plan 05 (SI-02, D-08) — CandidateCard tests.
  *
- * CandidateCard (T-123-05-02 author-confirm, no auto-apply):
+ * CandidateCard (D-08 propose door, no one-click apply):
  *  - shows the candidate's held-out score.
- *  - selecting "Use" reveals an explicit diff-confirm strip (old vs new); confirming
- *    calls onConfirm (which wraps updateSkill) — nothing auto-applies.
- *  - WR-04: a failed save surfaces an inline error, never silent.
+ *  - the ACTIONABLE winner offers "Propose this description" — clicking it calls
+ *    onConfirm (which opens the DescriptionProposalCard review door); nothing is
+ *    written directly, and it is NOT called on mount (no auto-apply).
+ *  - a BASELINE winner (nothing beat current) shows NO propose affordance (D-02).
+ *  - a non-winner candidate shows NO propose affordance (gated on isActionableWinner).
+ *  - WR-04: a failed propose surfaces an inline error, never silent.
  *
- * D-11 (Phase 123.1 Plan 02) — long-description line-clamp + expand:
+ * D-11 — long-description line-clamp + expand:
  *  - a ~1500-char description renders clamped (line-clamp) by default with a Show
  *    more / Show less toggle; expanding removes the clamp.
- *  - the header description AND both sides of the diff-confirm strip clamp+expand.
- *  - the held-out score and the Use action stay visible regardless of length (they
- *    are siblings of the clamped description, never pushed off-screen).
+ *  - the held-out score and the propose action stay visible regardless of length.
  */
 import { describe, it, expect, vi } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { CandidateCard } from "./CandidateCard"
 import type { TunerCell, TunerCandidate } from "@/lib/api"
@@ -40,13 +42,12 @@ const LONG_DESC =
   "Use this skill when the user asks to create, build, generate, write, or update a " +
   "Microsoft Word document (.docx) from the knowledge base. ".repeat(20)
 
-describe("CandidateCard — held-out score + author-confirm, no auto-apply (042-A / D-03)", () => {
+describe("CandidateCard — held-out score + the propose door, no one-click apply (D-08)", () => {
   it("shows the candidate's held-out score", () => {
     render(
       <CandidateCard
         candidate={makeCandidate({ held_out_score: 0.83 })}
         isWinner={false}
-        currentDescription="old description"
         onConfirm={vi.fn()}
       />,
     )
@@ -55,117 +56,100 @@ describe("CandidateCard — held-out score + author-confirm, no auto-apply (042-
     expect(card.textContent).toMatch(/0\.83|83/)
   })
 
-  it("selecting Use reveals a diff strip and confirming calls onConfirm — nothing auto-applies", async () => {
+  it("the actionable winner offers 'Propose this description'; clicking calls onConfirm — no auto-apply", async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    const candidate = makeCandidate({
-      description: "Use this skill when the user asks to write or fix SQL queries.",
-    })
-    render(
-      <CandidateCard
-        candidate={candidate}
-        isWinner={true}
-        currentDescription="Fires on SQL."
-        onConfirm={onConfirm}
-      />,
-    )
+    render(<CandidateCard candidate={makeCandidate()} isWinner={true} onConfirm={onConfirm} />)
+
     // No auto-apply: onConfirm is NOT called on mount.
     expect(onConfirm).not.toHaveBeenCalled()
-    // The diff strip is not shown until the author asks for it.
-    expect(screen.queryByTestId("candidate-diff-confirm")).toBeNull()
 
-    await user.click(screen.getByRole("button", { name: /use/i }))
+    // The propose door is the ONLY action — no inline diff-confirm strip.
+    const propose = screen.getByRole("button", { name: /propose this description/i })
+    expect(propose).toBeInTheDocument()
 
-    // The diff-confirm strip appears (old vs new visible).
-    const strip = screen.getByTestId("candidate-diff-confirm")
-    expect(strip.textContent).toContain("Fires on SQL.")
-    expect(strip.textContent).toContain(candidate.description)
-    // STILL not applied — revealing the diff is not the write.
-    expect(onConfirm).not.toHaveBeenCalled()
-
-    await user.click(within(strip).getByRole("button", { name: /confirm|save/i }))
+    await user.click(propose)
+    // Clicking opens the review door (onConfirm) — the write itself lives in the review card.
     expect(onConfirm).toHaveBeenCalledTimes(1)
-    expect(onConfirm).toHaveBeenCalledWith(candidate)
+    // After a successful propose the card states the proposal is under review below.
+    expect(await screen.findByTestId("candidate-proposed")).toBeInTheDocument()
   })
 
-  it("WR-04: a failed save surfaces an inline error and keeps the diff strip open (never silent)", async () => {
+  it("WR-04: a failed propose surfaces an inline error (never silent)", async () => {
     const user = userEvent.setup()
-    const onConfirm = vi.fn().mockRejectedValue(new Error("Failed to update skill. Please try again."))
-    render(
-      <CandidateCard
-        candidate={makeCandidate()}
-        isWinner={true}
-        currentDescription="Fires on SQL."
-        onConfirm={onConfirm}
-      />,
-    )
-    await user.click(screen.getByRole("button", { name: /use/i }))
-    await user.click(within(screen.getByTestId("candidate-diff-confirm")).getByRole("button", { name: /confirm|save/i }))
+    const onConfirm = vi.fn().mockRejectedValue(new Error("Failed to propose description. Please try again."))
+    render(<CandidateCard candidate={makeCandidate()} isWinner={true} onConfirm={onConfirm} />)
 
-    // The rejection is caught and surfaced — not swallowed.
-    const err = await screen.findByTestId("candidate-save-error")
-    expect(err.textContent).toMatch(/failed to update skill/i)
-    // The strip stays open (the write failed) and "Saved" never renders.
-    expect(screen.getByTestId("candidate-diff-confirm")).toBeTruthy()
-    expect(screen.queryByText(/now drives firing/i)).toBeNull()
+    await user.click(screen.getByRole("button", { name: /propose this description/i }))
+
+    const err = await screen.findByTestId("candidate-propose-error")
+    expect(err.textContent).toMatch(/failed to propose/i)
+    // The propose button stays (retry-able); no false "proposed" state on failure.
+    expect(screen.getByRole("button", { name: /propose this description/i })).toBeInTheDocument()
+    expect(screen.queryByTestId("candidate-proposed")).toBeNull()
   })
 })
 
 describe("CandidateCard — 123.1-rev calibrated winner pop (honest, not misleading)", () => {
-  it("an ACTIONABLE winner (a rewrite that beat baseline) shows the loud '★ best held-out' badge + filled CTA", () => {
+  it("an ACTIONABLE winner (a rewrite that beat baseline) shows the loud '★ best held-out' badge + propose CTA", () => {
     render(
       <CandidateCard
         candidate={makeCandidate({ is_baseline: false, held_out_score: 0.94 })}
         isWinner={true}
-        currentDescription="old description"
         onConfirm={vi.fn()}
       />,
     )
     const card = screen.getByTestId("candidate-card")
-    // The unmistakable "apply this one" badge.
     expect(card.textContent?.toLowerCase()).toContain("best held-out")
-    // The filled CTA reads "Use this →", not the quiet "Use".
-    expect(screen.getByRole("button", { name: /use this/i })).toBeTruthy()
+    // The propose door is offered on the actionable winner.
+    expect(screen.getByRole("button", { name: /propose this description/i })).toBeTruthy()
   })
 
-  it("a BASELINE winner (nothing beat current) stays CALM — no '★ best held-out', no 'apply me' CTA", () => {
+  it("a BASELINE winner (nothing beat current) stays CALM — no '★ best held-out', no propose affordance (D-02)", () => {
     render(
       <CandidateCard
         candidate={makeCandidate({ is_baseline: true, held_out_score: 1.0 })}
         isWinner={true}
-        currentDescription="old description"
         onConfirm={vi.fn()}
       />,
     )
     const card = screen.getByTestId("candidate-card")
-    // Honesty: the description you ALREADY run must not scream "best, apply me!" — the page's
-    // winner-verdict banner ("keeping it") owns that message. The baseline card shows its
-    // "current (baseline)" label and NOT the loud badge.
+    // Honesty: the description you ALREADY run must not offer "propose" — the page's
+    // winner-verdict banner ("keeping it") owns that message.
     expect(card.textContent?.toLowerCase()).toContain("current (baseline)")
     expect(card.textContent?.toLowerCase()).not.toContain("best held-out")
-    // No "Use this →" filled CTA on the baseline winner (the quiet "Use" remains for re-save).
-    expect(screen.queryByRole("button", { name: /use this/i })).toBeNull()
+    expect(screen.queryByRole("button", { name: /propose this description/i })).toBeNull()
+  })
+
+  it("a NON-winner candidate shows NO propose affordance (gated on isActionableWinner)", () => {
+    render(
+      <CandidateCard
+        candidate={makeCandidate({ is_baseline: false, held_out_score: 0.5 })}
+        isWinner={false}
+        onConfirm={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /propose this description/i })).toBeNull()
   })
 })
 
 describe("CandidateCard — D-11 long-description line-clamp + expand", () => {
-  it("clamps a ~1500-char header description by default and keeps the held-out score + Use action visible", () => {
+  it("clamps a ~1500-char header description by default and keeps the held-out score + propose action visible", () => {
     render(
       <CandidateCard
-        candidate={makeCandidate({ description: LONG_DESC, held_out_score: 0.77 })}
-        isWinner={false}
-        currentDescription="old description"
+        candidate={makeCandidate({ description: LONG_DESC, held_out_score: 0.77, is_baseline: false })}
+        isWinner={true}
         onConfirm={vi.fn()}
       />,
     )
     // The header description is clamped by default (the class is present).
     const desc = screen.getByTestId("candidate-description")
     expect(desc.className).toContain("line-clamp")
-    // The held-out score + Use action are siblings — never pushed off-screen by the long text.
+    // The held-out score + propose action are siblings — never pushed off-screen by the long text.
     const card = screen.getByTestId("candidate-card")
     expect(card.textContent?.toLowerCase()).toContain("held-out")
     expect(card.textContent).toMatch(/0\.77|77/)
-    expect(screen.getByRole("button", { name: /use/i })).toBeTruthy()
+    expect(screen.getByRole("button", { name: /propose this description/i })).toBeTruthy()
     // A show-more toggle is offered for the long text.
     expect(screen.getByRole("button", { name: /show more/i })).toBeTruthy()
   })
@@ -173,52 +157,16 @@ describe("CandidateCard — D-11 long-description line-clamp + expand", () => {
   it("Show more removes the clamp (full text) and Show less re-clamps", async () => {
     const user = userEvent.setup()
     render(
-      <CandidateCard
-        candidate={makeCandidate({ description: LONG_DESC })}
-        isWinner={false}
-        currentDescription="old description"
-        onConfirm={vi.fn()}
-      />,
+      <CandidateCard candidate={makeCandidate({ description: LONG_DESC })} isWinner={false} onConfirm={vi.fn()} />,
     )
     const desc = screen.getByTestId("candidate-description")
     expect(desc.className).toContain("line-clamp")
 
     await user.click(screen.getByRole("button", { name: /show more/i }))
-    // Expanded — the clamp is removed and the toggle flips to "Show less".
     expect(screen.getByTestId("candidate-description").className).not.toContain("line-clamp")
     expect(screen.getByRole("button", { name: /show less/i })).toBeTruthy()
 
     await user.click(screen.getByRole("button", { name: /show less/i }))
     expect(screen.getByTestId("candidate-description").className).toContain("line-clamp")
-  })
-
-  it("clamps BOTH sides of the diff-confirm strip (current + new) and the Use→confirm action stays reachable", async () => {
-    const user = userEvent.setup()
-    render(
-      <CandidateCard
-        candidate={makeCandidate({ description: LONG_DESC })}
-        isWinner={true}
-        currentDescription={LONG_DESC}
-        onConfirm={vi.fn()}
-      />,
-    )
-    await user.click(screen.getByRole("button", { name: /use/i }))
-    const strip = screen.getByTestId("candidate-diff-confirm")
-    // both the line-through current AND the new description clamp by default.
-    const current = within(strip).getByTestId("diff-current")
-    const next = within(strip).getByTestId("diff-new")
-    expect(current.className).toContain("line-clamp")
-    expect(next.className).toContain("line-clamp")
-    // the Confirm action is still visible (clamp didn't bury it).
-    expect(within(strip).getByRole("button", { name: /confirm|save/i })).toBeTruthy()
-
-    // expanding the diff reveals both sides in full.
-    await user.click(within(strip).getByRole("button", { name: /show more/i }))
-    expect(within(screen.getByTestId("candidate-diff-confirm")).getByTestId("diff-current").className).not.toContain(
-      "line-clamp",
-    )
-    expect(within(screen.getByTestId("candidate-diff-confirm")).getByTestId("diff-new").className).not.toContain(
-      "line-clamp",
-    )
   })
 })
