@@ -98,6 +98,13 @@ None - no external service configuration required. No migration, no frontend, no
 - Plan 138-03 (checkpoint) provides the LIVE confirmation of both call sites firing (first-turn + Continue-completed) and the cap_paused negative — code surface is in place for that verification.
 - Forward-only (D-06): the 14 pre-existing stuck threads observed 2026-07-05 are intentionally left untouched.
 
+## Self-Check: PASSED
+
+- Files verified present: `138-02-SUMMARY.md`, `todos_service.py`, `threads.py`, `test_085_todos_service.py`.
+- Commits verified in git log: `14913653` (Task 1), `18cb617e` (Task 2), `e84ba524` (SUMMARY).
+- No accidental file deletions across the plan's commits.
+- Verifications green: marker exact-text assert OK; `pytest test_085_todos_service.py` 13 passed; `py_compile threads.py` OK; exactly 2 non-comment reconciler call sites + the two-clause cap gate present (VERIFIED).
+
 ---
 *Phase: 138-run-end-honesty-stretch*
 *Completed: 2026-07-06*
