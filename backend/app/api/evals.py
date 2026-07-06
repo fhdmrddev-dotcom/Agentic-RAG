@@ -1378,6 +1378,130 @@ async def reject_description_proposal(
     return _description_proposal_response(row, base_description=base_description)
 
 
+# ── POST approve — synchronous live-write + trigger-versioned promote (drops the async arm) ──
+@router.post(
+    "/{skill_id}/description-proposals/{proposal_id}/approve",
+    response_model=SkillProposalResponse,
+)
+async def approve_description_proposal(
+    skill_id: str,
+    proposal_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Approve a DESCRIPTION proposal: write the LIVE description ONCE, let the 079/132 trigger
+    version it, and promote — NO draft INSERT, NO re-eval, NO SSE (D-04/D-07 — the winner was
+    already gated at draft-time by the held-out score).
+
+    Owner-verify the skill (404 cross-user) + read the proposal on ``id`` AND ``user_id`` AND
+    ``skill_id`` (404 not 403 — T-139-04); guard ``kind == 'description'`` (409 if an instruction
+    proposal is sent here) and ``status == 'proposed'`` (409 otherwise). Then: (1) ``UPDATE skills SET
+    description = proposed_description WHERE id AND user_id`` — WRAPPED in ``run_in_threadpool`` (NEVER
+    the bare skills.py:404 call — RESEARCH Pitfall 5) — which fires ``capture_skill_version`` (INSERTs
+    ONE immutable ``skill_versions`` row, source='manual'); (2) read back MAX(version_number) for
+    ``new_skill_version_id`` (do NOT also INSERT — double-capture, Pitfall 2); (3) link it + flip
+    ``status='promoted'``. The promoted ``kind='description'`` proposal row (with ``source_tuner_run_id``)
+    is the self-improve audit anchor (RESEARCH Discretion #2). Returns the promoted proposal (NO
+    ``re_eval_run_id``). Every supabase-py call is threadpool-wrapped (D-v2.5-01)."""
+    user_id = current_user["id"]
+
+    # 1. Owner-verify the skill (404 cross-user) + read the proposal (id AND user_id AND skill_id).
+    await _verify_owned_skill(supabase, skill_id, user_id)
+
+    def _read_proposal():
+        return (
+            supabase.table("skill_proposals")
+            .select("*")
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .eq("skill_id", skill_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        prop_rows = list((await run_in_threadpool(_read_proposal)).data or [])
+    except Exception:
+        logger.debug("description-proposal ownership read raised; treating as 404", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not prop_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    proposal = prop_rows[0]
+
+    # 2. Kind + state guards. Kind-gate so an instruction proposal can never be promoted through the
+    #    description route (409); only a ``proposed`` draft can be approved (409 otherwise — T-139-04).
+    if proposal.get("kind") != "description":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Not a description proposal",
+        )
+    if proposal.get("status") != "proposed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Proposal is not proposable (status={proposal.get('status')})",
+        )
+    proposed_description = proposal.get("proposed_description")
+    if not proposed_description:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Proposal has no proposed description",
+        )
+
+    # 3. Write the LIVE description ONCE (fires the 079/132 capture_skill_version trigger →
+    #    source='manual'). WRAP in run_in_threadpool — do NOT copy skills.py:404's bare blocking call
+    #    (D-v2.5-01 / Pitfall 5). No matching owned skill → 404.
+    def _apply_description():
+        return (
+            supabase.table("skills")
+            .update({"description": proposed_description})
+            .eq("id", skill_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    apply_rows = list((await run_in_threadpool(_apply_description)).data or [])
+    if not apply_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Skill not found")
+
+    # 4. Read back the just-created immutable version (MAX(version_number)) — mirror _read_max_version.
+    #    Do NOT INSERT a version (the trigger already did — double-capture, Pitfall 2).
+    def _read_max_version():
+        return (
+            supabase.table("skill_versions")
+            .select("id, version_number")
+            .eq("skill_id", skill_id)
+            .eq("user_id", user_id)
+            .order("version_number", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    max_rows = list((await run_in_threadpool(_read_max_version)).data or [])
+    new_skill_version_id = max_rows[0].get("id") if max_rows else None
+
+    # 5. Promote the proposal — link the captured version + flip to ``promoted`` (owner-scoped). No
+    #    re_evaling / interrupted / not_promoted transition (D-07).
+    def _promote():
+        return (
+            supabase.table("skill_proposals")
+            .update({"new_skill_version_id": new_skill_version_id, "status": "promoted"})
+            .eq("id", str(proposal_id))
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    promoted_rows = list((await run_in_threadpool(_promote)).data or [])
+    row = (
+        promoted_rows[0]
+        if promoted_rows
+        else {**proposal, "new_skill_version_id": new_skill_version_id, "status": "promoted"}
+    )
+    base_description = await _read_base_description(
+        supabase, row.get("base_skill_version_id"), user_id
+    )
+    return _description_proposal_response(row, base_description=base_description)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════════
 # Phase 135 Plan 05 (SI-01) — approval + auto re-eval + the honest promotion gate.
 #
