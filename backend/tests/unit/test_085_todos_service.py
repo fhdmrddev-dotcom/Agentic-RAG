@@ -15,7 +15,7 @@ ordering, transaction nesting, payload shape.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -166,6 +166,152 @@ async def test_replace_todos_missing_id_or_content_raises_before_db():
         )
     assert "requires id and content" in str(ei.value)
     pool.acquire.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 138 RUN-01b — reconcile_open_todos_on_run_end
+# ---------------------------------------------------------------------------
+
+_MARKER = " (run ended — not completed)"
+
+
+def _row(id_, content, status, order_index=0, parent_id=None):
+    """Build a canonical todo row dict as pool.fetch would return it."""
+    return {
+        "id": id_,
+        "content": content,
+        "status": status,
+        "parent_id": parent_id,
+        "order_index": order_index,
+    }
+
+
+@pytest.mark.asyncio
+async def test_run_ended_marker_exact_text():
+    """The marker constant is the exact locked string (leading space + em-dash, D-03)."""
+    from app.services.todos_service import _RUN_ENDED_MARKER
+
+    assert _RUN_ENDED_MARKER == " (run ended — not completed)", repr(_RUN_ENDED_MARKER)
+
+
+@pytest.mark.asyncio
+async def test_reconcile_marks_open_pending_and_in_progress_leaves_completed():
+    """(a) open pending AND open in_progress BOTH get the identical suffix (D-02);
+    the completed item's content + ALL statuses are byte-unchanged (honesty guardrail);
+    replace_todos is called with the FULL 3-item list (S1 full-state-replace)."""
+    from app.services import todos_service
+
+    pool, _conn = _make_pool_mock()
+    pool.fetch = AsyncMock(return_value=[
+        _row("t1", "First task", "pending", order_index=0),
+        _row("t2", "Second task", "in_progress", order_index=1),
+        _row("t3", "Third task", "completed", order_index=2),
+    ])
+
+    with patch.object(
+        todos_service, "replace_todos",
+        new=AsyncMock(return_value={"accepted": 3, "version": 1}),
+    ) as mock_replace:
+        await todos_service.reconcile_open_todos_on_run_end(pool, THREAD_ID)
+
+    mock_replace.assert_awaited_once()
+    passed = mock_replace.await_args.args[2]
+    assert len(passed) == 3
+    by_id = {t["id"]: t for t in passed}
+    # D-02: identical suffix on BOTH open statuses.
+    assert by_id["t1"]["content"] == "First task" + _MARKER
+    assert by_id["t2"]["content"] == "Second task" + _MARKER
+    # completed content untouched.
+    assert by_id["t3"]["content"] == "Third task"
+    # honesty guardrail — every status byte-unchanged (never auto-completed).
+    assert by_id["t1"]["status"] == "pending"
+    assert by_id["t2"]["status"] == "in_progress"
+    assert by_id["t3"]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_reconcile_does_not_stack_marker_and_skips_replace_when_only_open_already_marked():
+    """(b) an already-marked open item is NOT re-appended (D-04 no-stack); when it is
+    the ONLY open item, replace_todos is NOT called (nothing changed)."""
+    from app.services import todos_service
+
+    pool, _conn = _make_pool_mock()
+    pool.fetch = AsyncMock(return_value=[
+        _row("t1", "First task" + _MARKER, "pending", order_index=0),
+        _row("t2", "Done task", "completed", order_index=1),
+    ])
+
+    with patch.object(todos_service, "replace_todos", new=AsyncMock()) as mock_replace:
+        await todos_service.reconcile_open_todos_on_run_end(pool, THREAD_ID)
+
+    mock_replace.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconcile_all_completed_early_returns_no_replace_no_emit():
+    """(c) all-completed / no-open list → early return: NO replace_todos, NO emit (D-14)."""
+    from app.services import todos_service
+
+    pool, _conn = _make_pool_mock()
+    pool.fetch = AsyncMock(return_value=[
+        _row("t1", "Done 1", "completed", order_index=0),
+        _row("t2", "Done 2", "completed", order_index=1),
+    ])
+    emit = AsyncMock()
+
+    with patch.object(todos_service, "replace_todos", new=AsyncMock()) as mock_replace:
+        await todos_service.reconcile_open_todos_on_run_end(
+            pool, THREAD_ID, emit=emit, redis="R", run_id="RID",
+        )
+
+    mock_replace.assert_not_awaited()
+    emit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconcile_empty_list_early_returns():
+    """(c companion) an empty todo list → early return, no mutation, no emit."""
+    from app.services import todos_service
+
+    pool, _conn = _make_pool_mock()
+    pool.fetch = AsyncMock(return_value=[])
+    emit = AsyncMock()
+
+    with patch.object(todos_service, "replace_todos", new=AsyncMock()) as mock_replace:
+        await todos_service.reconcile_open_todos_on_run_end(
+            pool, THREAD_ID, emit=emit, redis="R", run_id="RID",
+        )
+
+    mock_replace.assert_not_awaited()
+    emit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconcile_emits_todo_updated_once_with_full_list_on_change():
+    """(d) when emit is supplied and a change occurs, todo_updated is emitted exactly
+    once with the full re-selected list (S2 shape)."""
+    from app.services import todos_service
+
+    pool, _conn = _make_pool_mock()
+    pool.fetch = AsyncMock(return_value=[
+        _row("t1", "Task", "pending", order_index=0),
+    ])
+    emit = AsyncMock()
+
+    with patch.object(todos_service, "replace_todos", new=AsyncMock()) as mock_replace:
+        await todos_service.reconcile_open_todos_on_run_end(
+            pool, THREAD_ID, emit=emit, redis="R", run_id="RID",
+        )
+
+    mock_replace.assert_awaited_once()
+    emit.assert_awaited_once()
+    args, kwargs = emit.await_args
+    # (redis, run_id, event, todos=[...]) — identical positional shape to every emit.
+    assert args[0] == "R"
+    assert args[1] == "RID"
+    assert args[2] == "todo_updated"
+    assert isinstance(kwargs["todos"], list)
+    assert len(kwargs["todos"]) == 1
 
 
 # ---------------------------------------------------------------------------
