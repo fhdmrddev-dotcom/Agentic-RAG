@@ -977,13 +977,19 @@ CREATE TABLE public.skill_proposals (
     re_eval_run_id uuid,
     source_eval_run_id uuid,
     user_id uuid NOT NULL,
-    proposed_instructions text NOT NULL,
+    proposed_instructions text,
     rationale text DEFAULT ''::text NOT NULL,
     evidence_summary text DEFAULT ''::text NOT NULL,
     status text DEFAULT 'proposed'::text NOT NULL,
     override_forced boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'instruction'::text NOT NULL,
+    proposed_description text,
+    scoreboard_snapshot jsonb,
+    source_tuner_run_id uuid,
+    CONSTRAINT skill_proposals_kind_check CHECK ((kind = ANY (ARRAY['instruction'::text, 'description'::text]))),
+    CONSTRAINT skill_proposals_kind_fields CHECK ((((kind = 'instruction'::text) AND (proposed_instructions IS NOT NULL) AND (proposed_description IS NULL)) OR ((kind = 'description'::text) AND (proposed_description IS NOT NULL) AND (proposed_instructions IS NULL)))),
     CONSTRAINT skill_proposals_status_check CHECK ((status = ANY (ARRAY['proposed'::text, 'rejected'::text, 'approved'::text, 're_evaling'::text, 'promoted'::text, 'not_promoted'::text, 'interrupted'::text])))
 );
 
@@ -993,6 +999,41 @@ CREATE TABLE public.skill_proposals (
 --
 
 COMMENT ON TABLE public.skill_proposals IS 'One durable row per proposed skill-instruction edit (SI-01, D-07). proposed_instructions + rationale + evidence_summary + the 7-value lifecycle status (proposed/rejected/approved/re_evaling/promoted/not_promoted/interrupted). base_skill_version_id (NOT NULL) is what the diff is against; new_skill_version_id is INSERTed ONLY on approval (source=''self_improve'', Plan 05) so skill_versions history stays clean of unapproved drafts; rejections keep their audit trail here with new_skill_version_id NULL. source_eval_run_id = the run whose evidence drove the proposal (D-13 baseline); re_eval_run_id = the auto re-eval (D-12, Phase 136 can consume). override_forced records a D-06 force-promote-with-evidence. Owner-only RLS SELECT is defense-in-depth; the service-role SI-01 router writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-135-07). NO write policies — only the service-role router writes (T-135-01).';
+
+
+--
+-- Name: COLUMN skill_proposals.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.kind IS 'Discriminator (SI-02, D-11): ''instruction'' (SI-01 loop — proposed_instructions set) or ''description'' (SI-02 Trigger-Tuner-winner loop — proposed_description set). Enforced together with the presence invariant by the skill_proposals_kind_fields CHECK. Defaults ''instruction'' so pre-existing rows backfill correctly.';
+
+
+--
+-- Name: COLUMN skill_proposals.proposed_description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.proposed_description IS 'The proposed skill DESCRIPTION (SI-02) — the held-out per-provider WINNING description snapshotted from a Trigger Tuner run at propose-time. NULL for kind=''instruction'' rows. On approval it is written to skills.description (the 079/132 trigger versions it — no draft INSERT, no re-eval; D-07).';
+
+
+--
+-- Name: COLUMN skill_proposals.scoreboard_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.scoreboard_snapshot IS 'IMMUTABLE proposed-vs-current per-provider scoreboard cells, COPIED inline at propose-time (SI-02, RESEARCH Pitfall 1). This — NOT source_tuner_run_id — is the evidence the proposal card renders, because tuner_runs is a latest-wins singleton (UNIQUE(skill_id)) that mutates on re-run.';
+
+
+--
+-- Name: COLUMN skill_proposals.source_tuner_run_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.source_tuner_run_id IS 'PROVENANCE-ONLY FK to the tuner_runs row that produced this description proposal (ON DELETE SET NULL). The displayed evidence is scoreboard_snapshot (copied inline); this FK is audit lineage only and MUST NOT be read live for the scoreboard — the tuner_runs row is overwritten latest-wins on every re-run (RESEARCH Pitfall 1, Pattern 1).';
+
+
+--
+-- Name: CONSTRAINT skill_proposals_kind_fields ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON CONSTRAINT skill_proposals_kind_fields ON public.skill_proposals IS 'Kind-gated presence invariant (SI-02): an ''instruction'' row has proposed_instructions and no proposed_description; a ''description'' row has proposed_description and no proposed_instructions. DB-level integrity gate below the route validation (T-139-02).';
 
 
 --
@@ -2733,6 +2774,14 @@ ALTER TABLE ONLY public.skill_proposals
 
 ALTER TABLE ONLY public.skill_proposals
     ADD CONSTRAINT skill_proposals_source_eval_run_id_fkey FOREIGN KEY (source_eval_run_id) REFERENCES public.eval_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_source_tuner_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_source_tuner_run_id_fkey FOREIGN KEY (source_tuner_run_id) REFERENCES public.tuner_runs(id) ON DELETE SET NULL;
 
 
 --
