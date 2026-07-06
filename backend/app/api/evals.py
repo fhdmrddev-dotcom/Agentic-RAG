@@ -1435,7 +1435,8 @@ async def approve_description_proposal(
     user_id = current_user["id"]
 
     # 1. Owner-verify the skill (404 cross-user) + read the proposal (id AND user_id AND skill_id).
-    await _verify_owned_skill(supabase, skill_id, user_id)
+    #    The returned row carries the LIVE description — the WR-02 staleness guard reads it below.
+    skill = await _verify_owned_skill(supabase, skill_id, user_id)
 
     def _read_proposal():
         return (
@@ -1474,6 +1475,30 @@ async def approve_description_proposal(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Proposal has no proposed description",
+        )
+
+    # WR-02 (139 review): staleness + no-op guards between propose-time and approve-time.
+    # (a) Hydrate the STORED diff base (immutable version row) and compare it to the LIVE
+    #     description: a manual edit since propose means the reviewed diff is NOT the change that
+    #     would actually land — 409 (mirror the propose route's stale-run 409), never a blind
+    #     last-write-wins clobber of the newer edit.
+    live_description = skill.get("description") or ""
+    base_description = await _read_base_description(
+        supabase, proposal.get("base_skill_version_id"), user_id
+    )
+    if live_description != base_description:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The live description has changed since this was proposed — re-run the tuner and propose again",
+        )
+    # (b) No-op guard: if the live description ALREADY equals the proposal, the 079/132 trigger
+    #     would NOT fire (it captures only IS DISTINCT FROM changes), so _read_max_version would
+    #     link a version this approval never created — the audit anchor would point at the wrong
+    #     artifact. Refuse honestly instead of fabricating a version link.
+    if live_description == proposed_description:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The live description already matches this proposal — nothing to apply",
         )
 
     # 3. Write the LIVE description ONCE (fires the 079/132 capture_skill_version trigger →
@@ -1525,9 +1550,8 @@ async def approve_description_proposal(
         if promoted_rows
         else {**proposal, "new_skill_version_id": new_skill_version_id, "status": "promoted"}
     )
-    base_description = await _read_base_description(
-        supabase, row.get("base_skill_version_id"), user_id
-    )
+    # base_description was hydrated for the WR-02 staleness guard above — the base version row is
+    # immutable, so it is still the honest diff base here (no second read needed).
     return _description_proposal_response(row, base_description=base_description)
 
 
