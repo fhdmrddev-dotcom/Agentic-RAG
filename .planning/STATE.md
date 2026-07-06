@@ -3,15 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: ready_to_plan
-last_updated: 2026-07-06T10:53:36.129Z
+last_updated: "2026-07-06T11:19:07.695Z"
 last_activity: 2026-07-06
 progress:
   total_phases: 29
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 91
   completed_plans: 92
-  percent: 59
-stopped_at: Phase 138 complete (5/5) — ready to discuss Phase 144
+  percent: 62
 ---
 
 # Project State
@@ -27,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 144
+Phase: 139
 Plan: Not started
-Next action: Phase 138 CONTEXT gathered (2026-07-05, commit `e18b80cc`) — 3 gray areas resolved: "ended with open todos" honesty signal rides as a plain text suffix on the existing todo `content` field, never stacking, same wording for pending/in_progress (D-01..04) — zero frontend/schema change; forward-only scope, no backfill for the 14 threads found live-stuck right now incl. repro thread `13ae9bfe` (D-06, backlog note planted); the `final_output_files` leak fix is display-only — the newly-found redundant sandbox re-upload/re-insert mechanism behind it is deliberately NOT fixed here (D-07/D-08, logged as a new seed candidate). Also surfaced + deferred: todo-content writing-quality (generic/vague todo text) as a separate future concern. Root-cause finding: the original bug report's own proposed fix ("filter iteration==-1") is confirmed insufficient by its own live re-test — real prior-run files with valid URLs leak too, not just empty-URL baseline seeds; and the actual `_terminal_status` classification lives in `threads.py`'s `_shielded_finalize`, not `agent_loop.py`. Next: `/gsd:plan-phase 138`.
-Prior: Phase 137.2 CONTEXT gathered (2026-07-05, commit `7e033d63`) — 4 gray areas resolved: is_system column for the "Built-in" badge/protection signal (D-01), no new agent tool for eval-case creation (hand off to Skill Studio Evals tab, D-03), rename (not delete) the operator's manual copy `7f504819-...` (D-04, verified live only 3/18 zip files imported), pin is_system skills to top of Skills list (D-05).
+Next action: Phase 139 (SI-02, Self-Improve Proposer — Description-Only, STRETCH) CONTEXT gathered (2026-07-06, commit `71eed39c`). 5 gray areas resolved — SI-02 = wrap the Trigger Tuner's held-out per-provider winning DESCRIPTION in the SI-01 propose→review-diff→approve→version lifecycle; the "proposer" IS a Tuner run (no new LLM, honest-by-construction: baseline-wins → nothing to propose) [D-01/D-02]; the per-provider scoreboard is PRE-approval evidence, NO post-approval re-run gate (lighter than SI-01, whose gate existed only because its proposer was unmeasured) [D-04]; REPLACE the Tuner's one-click "apply winning description" PATCH with the proposal path — one honest human-in-the-loop door [D-08]; proposal card lives on the Skill Studio Triggering tab reusing SI-01's unified-diff ProposalCard [D-09]; persistence = EXTEND skill_proposals with a kind ('instruction'|'description') discriminator + proposed_description + source_tuner_run_id FK [D-11]; no fresh sketch — surfaces design-locked in sketch-findings [D-15]. Descriptions are already versioned (079 trigger fires on description change) so "new version on approval" is nearly free. Net-new/additive, never grow threads.py, Deep byte-identical. Reported-bugs cross-check: 8 open Agentic-RAG reports, none overlap SI-02. Next: `/gsd:plan-phase 139`.
+Prior: Phase 138 complete (5/5) 2026-07-06 — Run-End Honesty (RUN-01) shipped (RUN-01a baseline-file leak + RUN-01b open-todo finalizer + 138-04 fetch-on-terminal live-surfacing); SEED-094 closed; commit `ebe26081`.
 Status (prior — Phase 137.1, FULLY CLOSED): secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).
 Execution close-out (2026-07-04): all 10 plans executed. Mid-execution regression fixes: Settings 500 — `harness_judge_model` missing from `UserEffectiveSettings` + no `app_settings` column (fixed `2dafac36` + migration 086, applied live, full-schema regen). Plan 06 cross-provider: BUG-260630-01 (DeepSeek reasoning_content) CLOSED clean-no-code-change per eval_results; BUG-260701-01 (Claude assistant-prefill 400) FIXED at the Anthropic adapter boundary — `supports_assistant_prefill:False` on the 4.6+/5 family, strip trailing prefill in `open_anthropic_stream` (`a4133ff3`; D-14 held — no agent_loop.py/threads.py; 12/12 seam tests). **Guardrail override:** operator directed "all models should just work" → proceeded on deterministic DB reproduction rather than the autonomous:false manual re-test.
 Status (prior — Phase 137, COMPLETE + SECURED): **UAT 13/13 PASSED 2026-07-04** (137-UAT.md; the 1 gap — stepper stale after in-session eval — closed by `40e2f8a3`, live-verified `bce451d7`); **SECURED 2026-07-04** (`137-SECURITY.md` = verified, threats_open: 0 — 7/7 threats closed with file:line evidence, 1 accepted risk R-137-01 zero-new-deps; commit `7850cf72`). Same-day eval-trust wave: baseline-contamination root-cause fix (`f47d6736` — thread reset before EACH arm; BUG-260630-01 likely root cause), gate refetch on eval finalize (`40e2f8a3`), **judge evidence channel** (`dd694916` — runtime tool receipts reach the judge; live-proven FAIL·10 → WITH PASS·72 / WITHOUT FAIL·40 flip), stepper connector visual (`fa253174`).
