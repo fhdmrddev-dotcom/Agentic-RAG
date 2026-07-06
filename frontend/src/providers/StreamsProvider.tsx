@@ -736,14 +736,14 @@ export function makeStreamCallbacks(opts: {
       )
     },
     onCodeExecutionStart: undefined,
-    onCodeExecuting: (toolIndex: number, elapsedSeconds: number) => {
+    onCodeExecuting: (toolIndex: number, elapsedSeconds: number, phase?: string) => {
       void toolIndex
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
             tc.name === "execute_code" && tc.status === "running"
-              ? { ...tc, elapsedSeconds }
+              ? { ...tc, elapsedSeconds, ...(phase ? { codePhase: phase } : {}) }
               : tc,
           )
           return { ...m, tool_calls: updated }

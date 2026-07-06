@@ -303,7 +303,7 @@ export interface StreamCallbacks {
    * the hook handler updates tool_calls[N].elapsedSeconds for the matching execute_code
    * tool with status==='running'. Strictly additive — does NOT replace post-completion
    * line emit (`onCodeStdout` / `onCodeStderr` still fire after `code_execution_complete`). */
-  onCodeExecuting?: (toolIndex: number, elapsedSeconds: number) => void
+  onCodeExecuting?: (toolIndex: number, elapsedSeconds: number, phase?: string) => void
   onCodeStdout?: (content: string) => void
   onCodeStderr?: (content: string) => void
   onCodeExecutionComplete?: (
@@ -642,7 +642,7 @@ export async function subscribeToRun(
         // + elapsed_seconds. Inserted before code_stdout to keep heartbeat dispatch
         // contiguous with execution-lifecycle events.
         else if (t === "code_executing" && callbacks.onCodeExecuting)
-          callbacks.onCodeExecuting(parsed.tool_index as number, parsed.elapsed_seconds as number)
+          callbacks.onCodeExecuting(parsed.tool_index as number, parsed.elapsed_seconds as number, parsed.phase as string | undefined)
         else if (t === "code_stdout" && callbacks.onCodeStdout)
           callbacks.onCodeStdout(parsed.content as string)
         else if (t === "code_stderr" && callbacks.onCodeStderr)

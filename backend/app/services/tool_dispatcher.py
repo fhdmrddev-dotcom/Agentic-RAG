@@ -906,12 +906,26 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
     libraries = args.get("libraries") or []
     # Emit start event (SAND-04)
     await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_start', code_preview=code[:200])
+    # SAND (silence fix): setup-window clock for the honest phase labels below
+    # ('starting sandbox' / 'installing libraries'). Everything between here and
+    # the drain loop (container bring-up + pip install) used to run blocking on
+    # the event loop and emit NOTHING — the real dead-air the user perceived.
+    _setup_started = time_mod.time()
 
     # Use the previous_files_in_run dict from ctx for cross-call file tracking
     _previous_files_in_run = ctx.previous_files_in_run if ctx.previous_files_in_run is not None else {}
 
     try:
-        session = sandbox_manager.get_or_create(ctx.thread_id)
+        # SAND (silence fix): honest 'starting sandbox' phase for the container
+        # spin-up window + threadpool the blocking create/attach so it never
+        # freezes the event loop (D-v2.5-01). A NEW-thread container build is
+        # 15-22s that used to be silent dead-air, also stalling SSE flush for
+        # every run on the worker.
+        await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
+                       tool_index=ctx.tool_index,
+                       elapsed_seconds=round(time_mod.time() - _setup_started, 1),
+                       phase='starting_sandbox')
+        session = await run_in_threadpool(sandbox_manager.get_or_create, ctx.thread_id)
 
         # Phase 120 (COLL-01) — run-scope the harvest by SEEDING the per-run
         # dedup baseline ONCE with a SHA-256 snapshot of every file already in
@@ -946,9 +960,9 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                 {"type": "stderr_chunk", "content": chunk, "captured_at": time_mod.time()}
             )
 
-        # Ensure /sandbox/output exists
+        # Ensure /sandbox/output exists (threadpool — blocking container I/O, D-v2.5-01)
         try:
-            session.execute_command("mkdir -p /sandbox/output")
+            await run_in_threadpool(session.execute_command, "mkdir -p /sandbox/output")
         except Exception:
             pass
 
@@ -1009,7 +1023,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _tmp_fp.write(wrapped_code)
             _local_tmp_path = _tmp_fp.name
         try:
-            session.copy_to_runtime(_local_tmp_path, code_file)
+            await run_in_threadpool(session.copy_to_runtime, _local_tmp_path, code_file)
         finally:
             try:
                 _os_local.unlink(_local_tmp_path)
@@ -1018,8 +1032,15 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
 
         # Install libraries
         if libraries:
+            # SAND (silence fix): honest 'installing libraries' phase for the pip
+            # window + threadpool the blocking install (matplotlib/pandas/etc.
+            # can be many seconds) so it never freezes the event loop (D-v2.5-01).
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
+                           tool_index=ctx.tool_index,
+                           elapsed_seconds=round(time_mod.time() - _setup_started, 1),
+                           phase='installing_libraries')
             try:
-                session.install(libraries=libraries)
+                await run_in_threadpool(session.install, libraries=libraries)
             except Exception as _install_err:
                 logger.warning(
                     "sandbox library install failed thread=%s err=%s",
@@ -1110,7 +1131,8 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     }))
                 if now - _last_output_at >= _HEARTBEAT_INTERVAL_S:
                     await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
-                                   tool_index=_tool_index, elapsed_seconds=round(elapsed, 1))
+                                   tool_index=_tool_index, elapsed_seconds=round(elapsed, 1),
+                                   phase='running')
                 if now - _heartbeat_last >= 10.0:
                     await ctx.emit(ctx.redis, ctx.run_id, 'keepalive')
                     _heartbeat_last = now

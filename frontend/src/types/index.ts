@@ -59,6 +59,12 @@ export interface ToolCall {
    * counter next to the spinner. Replaced by the post-completion duration badge
    * (`executionDurationMs`) once execution completes. */
   elapsedSeconds?: number
+  /** SAND (silence fix): current sub-phase of an execute_code step, from the
+   * `code_executing` SSE `phase` field — 'starting_sandbox' | 'installing_libraries'
+   * | 'running'. Drives the honest header label ("Starting sandbox…", "Installing
+   * libraries…") so the pre-execution setup window (container spin-up + pip
+   * install) is no longer shown as an indeterminate "Running code…". */
+  codePhase?: string
   /** D-067-03: 0-based iteration index from iteration_start SSE event. Used by
    * ToolCallPanel to render "Step N" gradient dividers between iteration groups.
    * Undefined for tool calls loaded from DB (historical messages — no divider). */
