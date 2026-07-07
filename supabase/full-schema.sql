@@ -182,6 +182,37 @@ $$;
 
 
 --
+-- Name: match_skills(public.vector, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, name text, description text, similarity double precision)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT s.id, s.name, s.description,
+         CASE WHEN se.embedding IS NULL THEN NULL
+              ELSE 1 - (se.embedding <=> query_embedding) END AS similarity
+  FROM public.skills s
+  LEFT JOIN public.skill_embeddings se
+         ON se.skill_id = s.id
+        AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+  WHERE (s.user_id = match_user_id OR s.is_global = true)   -- BYTE-EXACT clone of today's catalog scope (V4)
+    AND s.is_enabled = true
+  ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
+END;
+$$;
+
+
+--
+-- Name: FUNCTION match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text) IS 'Cosine ranking of the owner+global enabled skill set against a query vector (TRIG-02, Phase 140). Mirrors match_document_chunks (mig 073). LEFT JOIN → NULL similarity for a skill with no current-model vector (fail-open keep, NULLS LAST). WHERE clause is the byte-exact clone of agent_loop.py:1207-1208; as a SECURITY DEFINER body it is the ONLY cross-user gate (T-140-01) — never widen it.';
+
+
+--
 -- Name: query_user_documents(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -261,6 +292,42 @@ BEGIN
     'skill_versions row % is append-only and immutable; insert a new version instead',
     OLD.id
     USING ERRCODE = 'check_violation';   -- SQLSTATE 23514, distinguishable in tests
+END;
+$$;
+
+
+--
+-- Name: stale_skill_embedding(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stale_skill_embedding() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NOT (
+       NEW.name        IS DISTINCT FROM OLD.name
+    OR NEW.description IS DISTINCT FROM OLD.description
+  ) THEN
+    RETURN NEW;  -- instructions/toggle-only change → vector stays valid, no invalidation
+  END IF;
+  DELETE FROM public.skill_embeddings WHERE skill_id = NEW.id;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: stale_skill_embedding_from_case(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stale_skill_embedding_from_case() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  DELETE FROM public.skill_embeddings WHERE skill_id = COALESCE(NEW.skill_id, OLD.skill_id);
+  RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
@@ -394,6 +461,7 @@ CREATE TABLE public.app_settings (
     confidence_bucket_medium double precision DEFAULT 0.38,
     skill_builder_model text DEFAULT ''::text NOT NULL,
     harness_judge_model text DEFAULT ''::text NOT NULL,
+    skill_catalog_max_tokens integer DEFAULT 1500 NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -947,6 +1015,28 @@ CREATE TABLE public.sandbox_files (
     file_size bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: skill_embeddings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_embeddings (
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    embedding public.vector(1536),
+    embedding_model text,
+    embedding_dimensions integer,
+    source_text_hash text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_embeddings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_embeddings IS 'One embedding row per skill (TRIG-02, Phase 140). Sibling to skills, mirroring documents→document_chunks (mig 002) but with NO ANN index (skills are tens–hundreds of rows). Ships EMPTY (SQL cannot call the embedding API) — the skill_embedding_service backfill job (Plan 02) populates it; absence of a row == D-05 fail-open. Owner-only RLS (defense-in-depth); the service-role backfill writer bypasses RLS and hand-scopes .eq("user_id", …) (V4). embedding_model is the D-10 stale-model tag; source_text_hash is a non-crypto staleness fingerprint.';
 
 
 --
@@ -1598,6 +1688,14 @@ ALTER TABLE ONLY public.sandbox_files
 
 
 --
+-- Name: skill_embeddings skill_embeddings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_pkey PRIMARY KEY (skill_id);
+
+
+--
 -- Name: skill_files skill_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2083,6 +2181,13 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_skill_embeddings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_embeddings_user_id ON public.skill_embeddings USING btree (user_id);
+
+
+--
 -- Name: idx_skill_proposals_skill_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2332,6 +2437,20 @@ CREATE TRIGGER skills_capture_version AFTER INSERT OR UPDATE ON public.skills FO
 --
 
 CREATE TRIGGER skills_set_updated_at BEFORE UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skills stale_skill_embedding; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stale_skill_embedding AFTER UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.stale_skill_embedding();
+
+
+--
+-- Name: skill_test_cases stale_skill_embedding_from_case; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stale_skill_embedding_from_case AFTER INSERT OR DELETE OR UPDATE ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.stale_skill_embedding_from_case();
 
 
 --
@@ -2718,6 +2837,22 @@ ALTER TABLE ONLY public.sandbox_files
 
 ALTER TABLE ONLY public.sandbox_files
     ADD CONSTRAINT sandbox_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_embeddings skill_embeddings_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_embeddings skill_embeddings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -3475,6 +3610,20 @@ CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SEL
 
 
 --
+-- Name: skill_embeddings Users can view own skill embeddings; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill embeddings" ON skill_embeddings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill embeddings" ON public.skill_embeddings IS 'Owner-only SELECT. Defense-in-depth: the backfill writer runs as service-role (bypasses RLS) and hand-scopes .eq("user_id", …); the match_skills RPC WHERE clause is the real cross-user gate (V4).';
+
+
+--
 -- Name: skill_proposals Users can view own skill proposals; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -3698,6 +3847,12 @@ CREATE POLICY runs_select_own ON public.runs FOR SELECT USING ((auth.uid() = use
 --
 
 ALTER TABLE public.sandbox_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_embeddings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_embeddings ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: skill_files; Type: ROW SECURITY; Schema: public; Owner: -
