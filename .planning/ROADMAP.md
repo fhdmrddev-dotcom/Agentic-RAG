@@ -369,7 +369,7 @@ Plans:
 - [x] 140-04-PLAN.md — Hot-path wiring inside the skill_catalog_override-None branch only (fits->byte-identical no-embed fast path; over-budget->threadpool embed + match_skills + pure trim; fail-open; D-06 eval seam untouched) + extend override seam test + escape-hatch verification (TRIG-02) [wave 2]
 
 **Wave 3** *(gated — [BLOCKING] apply, autonomous:false)*
-- [ ] 140-05-PLAN.md — [BLOCKING] apply migration 091 to live LOCAL DB (SQL editor, never db push) + one-time skill-vector backfill + regen full-schema.sql (no reset) + cloud deploy-parity checklist (TRIG-02) [wave 3, autonomous:false]
+- [x] 140-05-PLAN.md — [BLOCKING] apply migration 091 to live LOCAL DB (SQL editor, never db push) + one-time skill-vector backfill + regen full-schema.sql (no reset) + cloud deploy-parity checklist (TRIG-02) [wave 3, autonomous:false]
 
 #### Phase 141: template_input Resolver Run-Scope (STRETCH)
 
