@@ -381,7 +381,11 @@ Plans:
   1. The `template_input` resolver only resolves inputs scoped to the current run — a template uploaded in one run is never visible or accessible in another run's `render_template` (COLL-02).
   2. The `render_template` happy path is unchanged for in-scope inputs — no regression (COLL-02).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 141-01-PLAN.md — Claim contract: migration 092 run_claim column + pure helpers (claim_visible / own_claim_for_ctx) + RED test backstop [wave 1]
+- [ ] 141-02-PLAN.md — Resolver Branch 2 claim filter + stamp + honest foreign-claim error, both Branch-2 callers, _ProducerStreamCtx workflow_run_id stamp (Landmine 2) [wave 2]
+- [ ] 141-03-PLAN.md — [BLOCKING] apply migration 092 to live LOCAL DB (psycopg2 :54322, never db push) + regen full-schema.sql (no reset) + commit + cloud-parity note [wave 3, autonomous:false]
 
 #### Phase 142: Non-Python Skill-Script Honesty (STRETCH)
 
