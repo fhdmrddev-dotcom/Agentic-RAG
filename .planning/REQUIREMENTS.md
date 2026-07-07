@@ -86,7 +86,7 @@ Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 | CREATE-01 | Phase 137.2 | Complete |
 | SI-02 (STRETCH) | Phase 139 | Pending (gated) |
 | TRIG-02 (STRETCH) | Phase 140 | Pending (gated) |
-| COLL-02 (STRETCH) | Phase 141 | Pending (gated) |
+| COLL-02 (STRETCH) | Phase 141 | Complete |
 | SRH-01 (STRETCH) | Phase 142 | Pending (gated) |
 | RUN-01 (STRETCH) | Phase 138 | Pending (gated) |
 | WF-01 (STRETCH) | Phase 143 | Pending (gated) |

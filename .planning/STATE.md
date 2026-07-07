@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: ready_for_verification
-last_updated: "2026-07-07T19:18:57.702Z"
+status: ready_to_plan
+last_updated: 2026-07-07T19:39:23.536Z
 last_activity: 2026-07-07
 progress:
   total_phases: 29
@@ -11,6 +11,7 @@ progress:
   total_plans: 104
   completed_plans: 105
   percent: 72
+stopped_at: Phase 141 complete (3/3) — ready to discuss Phase 144
 ---
 
 # Project State
@@ -22,12 +23,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-28 — v3.2 Skill Eval Studio + Self-Improving milestone started; v3.1 Workflow & Skill Studio SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 141 — template-input-resolver-run-scope-stretch
+**Current focus:** Phase 144 — agent driven skill file attachment
 
 ## Current Position
 
-Phase: 141 (template-input-resolver-run-scope-stretch) — EXECUTING
-Plan: 3 of 3
+Phase: 144
+Plan: Not started
 Next action: **Plan 141-03 EXECUTED 2026-07-07 (BLOCKING, operator-approved)** — migration 092 applied live on :54322 (psycopg2; `run_claim` nullable text / NULL default; dev data intact 513/1162/53) + `supabase/full-schema.sql` regenerated (no --reset) with the column; committed `32b5cd63` (full-schema only — mig 092 already committed Plan 01 `fc668805`); **COLL-02 schema-complete + marked complete**; cloud-parity follow-up recorded (092 joins the pending-cloud set — apply to cloud Supabase by hand at deploy); D-141-07 cross-provider render SMOKE (141-VALIDATION.md) remains a manual operator UAT. **All 3 plans executed → Next: `/gsd:verify-work 141`.** — Prior: **Plan 141-02 EXECUTED 2026-07-07** (3 tasks / 3 commits — claim-aware Branch 2 WHERE + conditional race-safe stamp + honest foreign-claim relay `c29cf9cb` + own-claim threaded at BOTH Branch-2 resolve sites [tool_dispatcher via `own_claim_for_ctx` `59ed350c`; harness emit via `str(ctx.run_id)` + `_ProducerStreamCtx.workflow_run_id` Landmine-2 fix `3b70a824`]; all 7 Plan-01 xfail markers dropped → **15/15 green, 0 xfail**; blast-radius 79 passed; G-5 clean [threads.py/template_service.py/pin_templates_for_run untouched]; COLL-02 NOT yet complete — the `run_claim` column is not live until Plan 03 applies migration 092 + regenerates full-schema.sql). **Next: `/gsd:execute-phase 141` Plan 03 [BLOCKING — operator applies migration 092 to the live local DB by hand + regenerates full-schema.sql].** — Prior: **Plan 141-01 EXECUTED 2026-07-07** (migration 092 nullable `run_claim` column `fc668805` + pure `claim_visible`/`own_claim_for_ctx` helpers `df7e9d97` + `test_141_run_scope.py` RED backstop `bb2d5d69` — the schema+logic contract only). — Phase 141 (template_input Resolver Run-Scope, COLL-02, STRETCH) — **context gathered 2026-07-07** (`141-CONTEXT.md`, commit `05545c5d`). 7 decisions locked (D-141-01..07) across the 4 discussed areas: **NARROW scope** (block cross-context leak — a workflow-run's template can't resolve in a Deep turn & vice-versa, + cross-workflow-run W1→W2 — but KEEP same-mode reuse: Deep→Deep + same-workflow_run-across-phases; strict per-run REJECTED as a felt regression that fights Phase-100 keep-alive) · mechanism = **claim-stamp column, migration 092** on `workspace_files` (lineage value = `str(workflow_run_id)` OR a `'deep'` sentinel — the sentinel makes the block symmetric; **claim-on-first-resolve inside `template_asset_service.resolve_template_source` Branch 2** via asyncpg UPDATE, so `threads.py` stays untouched / G-5) · **no backfill** (NULL = unclaimed, mirror 120 D-05) · honest "belongs to another run/context — upload again" message reusing the resolver's existing two-query pattern · verification = **faithful cross-run repro test** (fails-before/passes-after, both directions + W1→W2) + **cross-provider SMOKE, NOT full SC#10 4-axis** (provider-agnostic resolver; 141 not in SC#10 headline list). Architecture reality driving it: templates upload to a THREAD with no run_id (`api/workspace.py` "has no run"); `ctx.workflow_run_id` (None⇒Deep) is the ready-made discriminator; `render_template` reached from BOTH Deep & harness (`emitters.py` re-dispatch) so one resolver fix covers both. Reported-bugs cross-check: **none of the open `surface: Agentic-RAG` reports fold**. **Next: `/clear` then `/gsd:plan-phase 141`.** — Prior: **Phase 140 (TRIG-02) COMPLETE 2026-07-07 (5/5)** — mig 091 skill_embeddings + match_skills pre-filter (applied live :54322, 7 vectors); secure 16/16 threats_open 0; verify human_needed (3/3 truths + 41/41 tests + 0 regressions); UAT partial (mechanism live-proven, 4 chat axes blocked on OpenAI embed 429 → re-run `/gsd:verify-work 140` when quota restored); 3 advisory CRs open (WR-02 global-skill self-heal needs operator OK, WR-01 hardcoded vector(1536), WR-03 sort collation). Remaining v3.2 STRETCH: 142 (SRH-01) / 143 (WF-01) unplanned + 144 (FILE-01) planned.
 Prior: Phase 139 complete (5/5) 2026-07-06/07 — SI-02 Self-Improve Proposer (Description-Only) shipped: live UAT 4/7 (3 deferred, automated-backed), security 21/21 CLOSED (`922d90ce`), Nyquist validation CLOSED (`9d8ed300`). Filed BUG-260706-01 (cosmetic version-pointer stale-until-reload).
 Status (prior — Phase 137.1, FULLY CLOSED): secured (`0fd0babb`, threats_open 0, 25/25) + validated (`f794eae4`, Nyquist-compliant, backend 120 / frontend 60 green) + UAT 9/9 (`dfc1be2c`, all live-verified incl. U7 kill-restart reconciliation).
