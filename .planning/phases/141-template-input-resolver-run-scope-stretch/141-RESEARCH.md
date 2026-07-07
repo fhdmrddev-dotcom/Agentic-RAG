@@ -275,16 +275,18 @@ class _ProducerStreamCtx:
 | A1 | The workflow **emit** path (`_exec_llm_emit`) does reach Branch 2 (ephemeral) in practice when a definition has no bound `kind=="template"` asset — making the `_ProducerStreamCtx` lineage fix load-bearing. | Landmines 1–2 | LOW: verified in code (`_emit_bound_asset_ref` returns `None` → `resolve_template_source(asset_ref=None)` → Branch 2). If in practice every render-emitting workflow binds a library asset, Branch 1 (unchanged) covers it and the emit-path fix is belt-and-suspenders — still correct, just less exercised. Recommend the plan include the emit-phase repro direction regardless. |
 | A2 | Phase 120's faithful repro used offline semantic simulation, not a live DB — so the 141 offline repro is acceptable to the D-141-06 bar. | Validation Architecture | LOW: verified by reading `test_120_origin_filter.py`. If the planner/verifier wants a truly stateful DB repro, an optional `backend/tests/integration/` test against `:54322` can supplement (asyncpg + real INSERT/stamp/re-select). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Stamp at one resolve site or both on the emit path?**
    - What we know: the emit path resolves the ephemeral template twice (`phase_types.py:1105` + `tool_dispatcher.py:2051`); the second is authoritative for bytes.
    - What's unclear: whether to filter+stamp at both or only the authoritative second resolve.
    - Recommendation: filter+stamp at both (derivation at `:1105` is trivially `str(ctx.run_id)`); it yields the cleaner "belongs to another run" state and avoids a wasted forced-emit shot. Planner's discretion per D-141-03.
+   - **RESOLVED:** filter+stamp at BOTH. Plan 141-02 wires the own-claim at `tool_dispatcher.py:2051` (Task 2, via `own_claim_for_ctx`) AND at the direct emit pre-resolve `phase_types.py:1105` (Task 3, via `str(ctx.run_id)`), plus the `_ProducerStreamCtx.workflow_run_id` stamp at `:1398` so the authoritative re-resolve derives the SAME `str(W)` (Landmine 1 & 2).
 
 2. **Exact claim column type/name.**
    - What we know: contract is "holds `workflow_run_id` OR the `'deep'` sentinel"; a plain uuid FK cannot hold the sentinel.
    - Recommendation: a plain nullable `text` column (e.g. `run_claim`), no FK, no default. Simplest thing that holds both value shapes (D-141-02). Optionally a CHECK is unnecessary (server-set only).
+   - **RESOLVED:** Plan 141-01 Task 1 authors a nullable `text run_claim` column on `workspace_files` (migration 092) — no FK, no default, no CHECK, no backfill (server-set value only).
 
 ## Environment Availability
 
