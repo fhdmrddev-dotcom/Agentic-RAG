@@ -1961,7 +1961,7 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     # CLEAN in the backend venv — the heavy libs (docxtpl/...) are only SHIPPED into
     # the sandbox via _RENDER_DRIVER_SRC, never executed in-process here (Pitfall 4).
     from app.services.template_render_service import check_coverage, select_engine
-    from app.services.template_asset_service import resolve_template_source
+    from app.services.template_asset_service import own_claim_for_ctx, resolve_template_source
 
     import json as _json_local
     import os as _os_local
@@ -2048,12 +2048,19 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
                 "message": f"Invalid `asset` reference: {exc}",
             }))
 
+    # Phase 141 (COLL-02): run-scope the ephemeral (Branch 2) resolve. own_claim is
+    # SERVER-DERIVED from ctx.workflow_run_id (None→'deep', else str(W)) — NEVER from the
+    # model's tool args (D-141 / Tampering). Correct for all three ctx shapes that reach
+    # here: Deep (None→'deep'), workflow sub-agent (inherited W→str(W)), and the emit
+    # re-dispatch (_ProducerStreamCtx whose workflow_run_id is stamped in the harness).
+    own_claim = own_claim_for_ctx(ctx)
     src = await resolve_template_source(
         pool=ctx.pool,
         supabase=ctx.supabase,
         thread_id=ctx.thread_id,
         user_id=ctx.current_user["id"],
         asset_ref=asset_ref,
+        own_claim=own_claim,
     )
     if src.get("error"):
         # Run-honesty (D-05/D-10): relay the clean resolver error, never a traceback.
