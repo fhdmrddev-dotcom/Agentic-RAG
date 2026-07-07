@@ -439,19 +439,19 @@ else:
 
 **No assumptions touch compliance, retention, security standards, or performance targets.** The one behavioral assumption (A1) is explicitly backstopped by a deterministic mechanism.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact reshape wording per gap class (planner/discuss to finalize).**
+1. **Exact reshape wording per gap class (planner/discuss to finalize).** — RESOLVED: authored as the `GAP_MESSAGES` dict verbatim in Plan 142-01 `<authored_content>`.
    - What we know: must be permanent-framed, name the gap, offer the in-sandbox alternative, say "do not retry" (D-06). The applied pptx copy is the tone model.
    - What's unclear: the precise sentence per token (soffice → "QA in-memory with python-pptx"; pandoc/pdftoppm → "no conversion available; work with the source format"; node → "JS cannot run here").
    - Recommendation: the plan defines a small `GAP_MESSAGES: dict[str, str]` keyed by token, each ending with a forward action. Author the strings in the plan, not left to the executor.
 
-2. **Should the `language` param be added to the schema as a clean G-B pre-flight hook?**
+2. **Should the `language` param be added to the schema as a clean G-B pre-flight hook?** — RESOLVED: NO — no plan touches it; DISC-01 wiring hook stays documented-only.
    - What we know: `args.get("language","python")` is read at `:1271` (audit only); the param is NOT in the schema, so the model never sends it.
    - What's unclear: adding it gives a zero-false-positive G-B pre-flight but risks implying multi-language support (out of scope, D-02).
    - Recommendation: DO NOT add the param in 142 (keep the DISC-01 wiring hook documented). Rely on post-hoc + the import note for G-B.
 
-3. **Note dedup across re-imports (belt-and-suspenders for D-03).**
+3. **Note dedup across re-imports (belt-and-suspenders for D-03).** — RESOLVED: D-03 verification re-imports the STOCK pptx skill (142-VALIDATION.md "D-03 stock-skill proof" manual row) to prove the generic fix.
    - What we know: BUG-260707-02 is per-user data; a re-import of the stock skill reintroduces the tool-referencing instructions.
    - What's unclear: nothing blocking — the generic mechanism handles re-imports by design (the reshape/guard fire regardless of which skill).
    - Recommendation: the D-03 verification should re-import the stock pptx skill and confirm no loop, proving the generic (not per-user) fix.

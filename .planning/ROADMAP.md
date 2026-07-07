@@ -398,7 +398,12 @@ Plans:
   2. When the agent would run a non-Python skill script, it fails cleanly with a specific message instead of silently running it as Python or narrating it as if it executed (SRH-01).
   3. (Optional) `read_skill_file` can return a bundled non-Python file as reference text without implying it can be executed (SRH-01).
 
-**Plans**: TBD
+**Plans**: 5 plans (3 waves)
+- [ ] 142-01-PLAN.md - runtime-gap classifier + shared honesty constants (KNOWN_MISSING / GAP_MESSAGES / SCRIPT_EXTS); T-142-01 pass-through negative [wave 1]
+- [ ] 142-02-PLAN.md - reactive reshape + per-run repeat-guard + run-scope threading (SC#2, D-06, D-03 loop-cap) [wave 2]
+- [ ] 142-03-PLAN.md - skill-file read honesty: decode whitelist + load_skill flag (SC#3/D-11, D-05b) [wave 3]
+- [ ] 142-04-PLAN.md - proactive capability facts on the execute_code tool schema (D-05a, D-14-safe) [wave 1]
+- [ ] 142-05-PLAN.md - import-time honesty note + frontend render (SC#1/D-08, D-09) [wave 2]
 **Scope note (operator, 2026-06-29 — SEED-096):** broaden the honest "can't execute this" signal to fire on ALL "runtime can't do this" cases — **missing bundled file (G-A: bundle-tree flatten)** and **missing system binary (G-C: pandoc/LibreOffice/Poppler)** — not only non-Python scripts (G-B). Worked example: Anthropic's `docx` skill triggers but is inert (its all-Python edit path can't resolve `scripts/office/*.py` because import + sandbox injection flatten the nested tree). The CAPABILITY fix (real tree-fidelity + Node + binaries) is OUT of 142 → DISC-01 / v3.3+. Pull SEED-096 into discuss-phase 142.
 
 #### Phase 143: Starter Workflow Library (STRETCH)
@@ -444,7 +449,7 @@ Plans:
 | 139. Self-Improve Proposer — Description-Only (STRETCH) | 5/5 | Complete | 2026-07-06 |
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
-| 142. Non-Python Skill-Script Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 142. Non-Python Skill-Script Honesty (STRETCH) | 0/5 | Planned | - |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 
