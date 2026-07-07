@@ -1,0 +1,91 @@
+---
+phase: 141
+slug: template-input-resolver-run-scope-stretch
+status: draft
+nyquist_compliant: false
+wave_0_complete: false
+created: 2026-07-07
+---
+
+# Phase 141 — Validation Strategy
+
+> Per-phase validation contract for feedback sampling during execution.
+> Derived from `141-RESEARCH.md` §Validation Architecture. Task/Plan/Wave columns
+> are finalized by the planner; behavior→test rows below are the load-bearing contract.
+
+---
+
+## Test Infrastructure
+
+| Property | Value |
+|----------|-------|
+| **Framework** | pytest (+ pytest-asyncio) — the backend suite (offline-friendly by design) |
+| **Config file** | `backend/pytest.ini` / `backend/pyproject.toml` (existing) |
+| **Quick run command** | `cd backend && venv/Scripts/python -m pytest tests/test_141_run_scope.py -x -q` |
+| **Full suite command** | `cd backend && venv/Scripts/python -m pytest -q` |
+| **Estimated runtime** | ~2–4 s (quick file) · full suite minutes |
+| **Key fixtures (reuse)** | `mock_asyncpg_pool` (`set_fetchrow_result` / `set_fetchrow_results` / `set_fetch_results` / `set_execute_result` / `.calls`) — `conftest.py:455-509`; `fake_redis`; supabase mock + TestClient |
+
+---
+
+## Sampling Rate
+
+- **After every task commit:** Run `pytest tests/test_141_run_scope.py -x -q`
+- **After every plan wave:** Run `pytest tests/test_141_run_scope.py tests/test_workspace_template.py tests/unit/test_citation_policy.py tests/unit/test_llm_emit_executor.py -q` (resolver blast-radius neighbors)
+- **Before `/gsd:verify-work`:** Full suite (`pytest -q`) must be green
+- **Max feedback latency:** ~4 seconds (quick file)
+
+---
+
+## Per-Task Verification Map
+
+> Task ID / Plan / Wave assigned by the planner. Every row below MUST map to at least one task.
+
+| Behavior | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command |
+|----------|-------------|------------|-----------------|-----------|-------------------|
+| `claim_visible(None, own)` → True (unclaimed → resolvable + stamp) | COLL-02 | — | Unclaimed legacy/new row is resolvable by first claimer only | unit | `pytest tests/test_141_run_scope.py::test_unclaimed_visible -x` |
+| Deep→Deep reuse: `claim_visible('deep','deep')` → True | COLL-02 (SC#2) | — | Same-mode reuse preserved (no re-upload) | unit | `...::test_deep_to_deep_reuse -x` |
+| Same-workflow across phases: `claim_visible(str(W), str(W))` → True | COLL-02 (SC#2) | — | Phases of one workflow_run share the template | unit | `...::test_same_workflow_run_reuse -x` |
+| **workflow→Deep blocked**: `claim_visible(str(W),'deep')` → False | COLL-02 (SC#1) | T-info-disclosure | Foreign-lineage row invisible | unit | `...::test_workflow_to_deep_blocked -x` |
+| **Deep→workflow blocked** (`'deep'` sentinel earns its keep): `claim_visible('deep', str(W))` → False | COLL-02 (SC#1) | T-info-disclosure | Symmetric block via sentinel | unit | `...::test_deep_to_workflow_blocked -x` |
+| **W1→W2 blocked**: `claim_visible(str(W1), str(W2))` → False | COLL-02 (SC#1) | T-info-disclosure | Cross-workflow-run isolation | unit | `...::test_cross_workflow_run_blocked -x` |
+| Resolver returns bytes + stamps own-claim for a NULL-claim row (own-claim in `pool.calls`) | COLL-02 | T-race | Conditional `UPDATE ... WHERE claim IS NULL` | integration (offline) | `...::test_resolver_stamps_unclaimed -x` |
+| Resolver returns the D-141-05 "belongs to another run" error (NOT bytes) for a foreign-claimed non-expired row | COLL-02 (SC#1) | T-info-disclosure | Relay string, no foreign bytes/ids/filename | integration (offline) | `...::test_resolver_foreign_claim_honest_error -x` |
+| Emit-path lineage: `_ProducerStreamCtx` yields `workflow_run_id == str(W)` (Landmine 2 guard — never `'deep'`) | COLL-02 (SC#1) | T-info-disclosure | Workflow emit render claims `str(W)` | unit | `...::test_emit_ctx_carries_workflow_lineage -x` |
+| Happy path unchanged: own-upload render + Branch 1 (library asset) render resolve byte-identically | COLL-02 (SC#2) | — | No regression | integration (offline) | `...::test_in_scope_render_unchanged -x` |
+| Scope-preservation backstop: claim-aware WHERE still carries `created_by` + `thread_id` | COLL-02 | T-scope-widen | Deny-by-default not widened | unit | `...::test_where_preserves_user_and_thread_scope -x` |
+| Migration 092 static contract: nullable claim column, NO `NOT NULL`, NO default, `IF NOT EXISTS`, no `db push`/`db reset` | COLL-02 | — | Additive-nullable-no-backfill | static | `...::test_migration_092_additive_nullable -x` |
+
+*Status legend: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky (planner/executor annotates)*
+
+---
+
+## Wave 0 Requirements
+
+- [ ] `backend/tests/test_141_run_scope.py` — new resolver + `claim_visible` helper + migration-contract test file (covers COLL-02 rows above)
+- [ ] `supabase/migrations/092_*.sql` — authored in an implementing plan; applied **by hand** (Supabase SQL editor / psycopg2 :54322 — never `db push`/`db reset`) + `full-schema.sql` regenerated by an operator/`[BLOCKING] autonomous:false` task (mirror the 120 author→apply split)
+- [ ] No new framework install — pytest + pytest-asyncio already present
+
+*Faithful fail-before / pass-after (D-141-06): tests import the not-yet-created `claim_visible` helper / assert the currently-wrong foreign-claim behavior → RED by construction pre-fix; helper + WHERE predicate + stamp land → all five directions green.*
+
+---
+
+## Manual-Only Verifications
+
+| Behavior | Requirement | Why Manual | Test Instructions |
+|----------|-------------|------------|-------------------|
+| Cross-provider SMOKE (D-141-07) | COLL-02 (SC#2) | Live provider render; not the SC#10 4-axis (141 not on the SC#10 headline list; model only emits the tool call — resolver is shared backend) | **ONE** representative model (OpenAI **or** Anthropic **or** Google) uploads a `.docx` template in a Deep turn and renders it via `render_template` → deliverable produced, in-scope, byte-correct. Proves the resolver did not regress the render happy path. |
+| Live cross-run repro (optional lived-glance) | COLL-02 (SC#1) | Confirms the offline repro matches live behavior | In a shared thread, run a workflow phase that renders a template; then in a Deep turn call `render_template` → get the honest "belongs to a different run" message, not the workflow's template. |
+
+---
+
+## Validation Sign-Off
+
+- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
+- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
+- [ ] Wave 0 covers all MISSING references
+- [ ] No watch-mode flags
+- [ ] Feedback latency < 4s
+- [ ] `nyquist_compliant: true` set in frontmatter
+
+**Approval:** pending
