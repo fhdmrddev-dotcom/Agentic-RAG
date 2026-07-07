@@ -68,7 +68,7 @@
 - [ ] **Phase 137.2: Skill Creator Reborn — Built-in + Protected (INSERTED)** — seeded read-only platform-native skill-creator, Built-in badge, cloud deploy parity (CREATE-01 / SEED-101) — 4 plans (planned 2026-07-05)
 - [x] **Phase 138: Run-End Honesty (STRETCH)** — honest baseline-file + open-todo run finalizer (RUN-01) — complete 2026-07-06 (5/5 plans; RUN-01a + RUN-01b backend + 138-04 fetch-on-terminal live-surfacing; live-verified Scenario B ×2 via Chrome MCP + psycopg2; closes SEED-094)
 - [x] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02) — executed + review-fix wave 2026-07-06 (verification: human_needed — live 4-axis+G-4 UAT via /gsd:verify-work 139)
-- [ ] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02)
+- [x] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02) — executed 2026-07-07 (5/5 plans; migration 091 applied live + 7 vectors backfilled; verification human_needed — live 4-axis SC#10 UAT via /gsd:verify-work 140; 0 regressions vs cb9fef39 baseline; code-review 0 critical / 3 advisory WR-01..03)
 - [ ] **Phase 141: template_input Resolver Run-Scope (STRETCH)** — run-scoped template_input resolution (COLL-02)
 - [ ] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01)
 - [ ] **Phase 143: Starter Workflow Library (STRETCH)** — fork-able is_global starter-workflow shelf (WF-01)
@@ -438,7 +438,7 @@ Plans:
 | 137. Skill Evals Panel UI (PANEL-01) | 0/TBD | Not started | - |
 | 138. Run-End Honesty (STRETCH) | 5/5 | Complete | 2026-07-06 |
 | 139. Self-Improve Proposer — Description-Only (STRETCH) | 5/5 | Complete | 2026-07-06 |
-| 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 0/5 | Planned | - |
+| 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
