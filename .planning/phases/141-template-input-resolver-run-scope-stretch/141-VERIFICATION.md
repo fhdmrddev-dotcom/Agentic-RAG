@@ -1,9 +1,11 @@
 ---
 phase: 141-template-input-resolver-run-scope-stretch
 verified: 2026-07-07T23:55:00Z
-status: human_needed
+status: passed
 score: 13/13 must-haves verified
 overrides_applied: 0
+uat_resolution: "2026-07-08 — operator accepted resolver-verified (see 141-HUMAN-UAT.md). Live Chrome UAT found the D-141-07 SMOKE premise architecturally INVALID: render_template is a workflow-fill-only tool (get_tools() omits it; exposed to the LLM only under a workflow fill-phase whitelist — phase_types.py:265,275; openai_service.py:649-650), so a Deep-turn render cannot exercise it (the live agent confirmed it has no such tool). Resolver correctness stands on 13/13 automated + the verifier's rollback-only live-DB production-SQL probe + secure-phase 10/10 (threats_open 0). The render SMOKE is re-scoped to a workflow fill-phase run (141-VALIDATION.md Manual-Only Verifications, corrected) and deferred as a non-blocking follow-up — NOT a code gap."
+human_verification_resolved: true
 human_verification:
   - test: "D-141-07 cross-provider render SMOKE: ONE representative model (OpenAI or Anthropic or Google) uploads a .docx template in a Deep turn and renders it via render_template"
     expected: "Deliverable produced, in-scope, byte-correct — proves the resolver did not regress the render happy path against the live run_claim column"
@@ -17,7 +19,7 @@ human_verification:
 
 **Phase Goal:** COLL-02 — a `template_input` template claimed by one run's context must NOT be resolvable by a foreign run's context (block workflow→Deep, Deep→workflow, and W1→W2), while PRESERVING same-mode reuse (Deep→Deep and same-workflow-run-across-phases).
 **Verified:** 2026-07-07T23:55:00Z
-**Status:** human_needed
+**Status:** passed (UAT premise corrected 2026-07-08 — see `uat_resolution`; render SMOKE re-scoped to workflow mode, resolver verified 3 independent ways)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
@@ -128,7 +130,7 @@ None of these change the goal-achievement verdict — the core mechanism (block 
 
 No gaps. All 13 automated/codebase-verifiable must-haves (2 roadmap Success Criteria + 11 plan-level truths spanning the claim contract, resolver wiring, and live migration apply) are VERIFIED against the actual codebase — not just SUMMARY.md narrative. This verification independently re-ran the test suite (15/15 + 79/79 blast-radius), re-queried the live DB schema, and additionally ran a rollback-only live-DB SQL probe that exercises the exact production WHERE/foreign-probe queries (something the offline mock-pool tests cannot do), closing the one gap the code review flagged as advisory (WR-01).
 
-The phase goal — a `template_input` template claimed by one run's context is NOT resolvable by a foreign run's context, while same-mode reuse is preserved — is achieved in the codebase and now live on the local DB. The only remaining item is the D-141-07 cross-provider render SMOKE, a manual operator UAT that has not yet been run since the live column landed. Status is `human_needed`, not `passed`, per the verification decision tree (a non-empty human-verification list takes priority over an N/N automated score).
+The phase goal — a `template_input` template claimed by one run's context is NOT resolvable by a foreign run's context, while same-mode reuse is preserved — is achieved in the codebase and live on the local DB. **Resolved 2026-07-08:** the live Chrome UAT for the D-141-07 render SMOKE found the test PREMISE architecturally invalid — `render_template` is a workflow-fill-only tool (not exposed to Deep chat; `phase_types.py:265,275`), so "render it in a Deep turn" cannot exercise it. This is a UAT-premise defect, not a code gap. The operator accepted the resolver as verified on three independent proofs (13/13 automated + the verifier's rollback-only live-DB production-SQL probe + secure-phase 10/10), and the render SMOKE was re-scoped to a workflow fill-phase run (see 141-VALIDATION.md, corrected) as a non-blocking follow-up. Status flipped `human_needed` → **passed**.
 
 ---
 

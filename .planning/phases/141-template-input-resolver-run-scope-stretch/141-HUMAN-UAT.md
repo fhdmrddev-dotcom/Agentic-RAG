@@ -1,14 +1,15 @@
 ---
-status: partial
+status: complete
 phase: 141-template-input-resolver-run-scope-stretch
 source: [141-VERIFICATION.md]
 started: "2026-07-07T19:38:36Z"
-updated: "2026-07-08T00:20:00Z"
+updated: "2026-07-08T00:35:00Z"
+resolution: "operator-accepted resolver-verified (2026-07-08); D-141-07 render SMOKE premise corrected (workflow-fill-only tool) and re-scoped to a workflow run as a non-blocking follow-up. No code gap."
 ---
 
 ## Current Test
 
-[testing paused — Test 1 premise found architecturally invalid; awaiting operator decision on re-scope]
+[session concluded — operator accepted resolver-verified. Both items blocked by an invalid Deep-turn premise; render SMOKE re-scoped to a workflow fill-phase run (141-VALIDATION.md, corrected) as a non-blocking follow-up. Verification flipped human_needed → passed.]
 
 ## Tests
 
