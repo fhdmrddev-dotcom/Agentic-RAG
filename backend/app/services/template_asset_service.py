@@ -124,6 +124,7 @@ async def resolve_template_source(
     thread_id: str,
     user_id: str,
     asset_ref: Any | None = None,  # AssetRef | None — library path (trusted)
+    own_claim: str | None = None,  # Phase 141 (COLL-02) — the caller's run-context claim
 ) -> dict:
     """Resolve template bytes by PROVENANCE (D-02/D-09).
 
@@ -134,6 +135,12 @@ async def resolve_template_source(
 
     Branch selection is by source, NOT by content (D-02): an ``asset_ref`` resolves the
     trusted library path; ``asset_ref is None`` resolves the untrusted ephemeral upload.
+
+    Phase 141 (COLL-02) — ``own_claim`` run-scopes the ephemeral Branch 2 ONLY. It is the
+    resolving run-context's lineage (``str(workflow_run_id)`` or the ``'deep'`` sentinel,
+    derived by the callers via ``own_claim_for_ctx`` / raw-bag ``run_id``). Branch 1 (the
+    trusted library path) ignores it. ``own_claim=None`` (legacy / Branch-1-only callers)
+    is a pure no-op — pre-141 behavior, no claim predicate, no stamp.
     """
     # ── Branch 1: Library AssetRef (trusted → docxtpl) ──────────────────────────────
     if asset_ref is not None:
@@ -177,23 +184,81 @@ async def resolve_template_source(
     # cross-user thread yields no row → the clean "no template" error below, never
     # another user's bytes. Mirror template_service.py:105 WHERE clause + the 100 D-10
     # read gate (expires_at IS NULL OR expires_at > now()).
+    #
+    # Phase 141 (COLL-02): the WHERE now also carries the run-lineage claim
+    # `(run_claim IS NULL OR run_claim = $3 OR $3 IS NULL)` — the `OR $3 IS NULL` arm
+    # makes `own_claim=None` (legacy / Branch-1-only callers) a pure no-op (pre-141
+    # behavior, single static query, no dynamic SQL). This mirrors the pure
+    # `claim_visible` helper (the single source of the run-eligibility truth).
+
+    def _foreign_error() -> dict:
+        # D-141-05: name the condition ONLY — never the foreign run's id/filename/bytes.
+        return _result(
+            provenance="template_input",
+            error=(
+                "This template belongs to a different run or context. "
+                "Upload it again for this run."
+            ),
+        )
+
     row = await pool.fetchrow(
         """
         SELECT id, thread_id, path, mime_type, content_inline,
-               content_storage_path, created_by, created_at, kind, expires_at
+               content_storage_path, created_by, created_at, kind, expires_at, run_claim
         FROM workspace_files
         WHERE thread_id = $1
           AND created_by = $2
           AND kind = 'template_input'
           AND (expires_at IS NULL OR expires_at > now())
+          AND (run_claim IS NULL OR run_claim = $3 OR $3 IS NULL)
         ORDER BY created_at DESC
         LIMIT 1
         """,
         thread_id,
         user_id,
+        own_claim,
     )
 
-    if row is None:
+    file_row = dict(row) if row is not None else None
+
+    # In-code claim mirror (defense-in-depth + faithful offline repro): the WHERE above
+    # already filters foreign rows in the live DB, but the offline recorder does NOT
+    # evaluate the predicate — and any future WHERE drift must never leak foreign bytes.
+    # `claim_visible` encodes the SAME truth as the SQL (Plan 01), so re-checking here can
+    # never disagree with the WHERE.
+    if (
+        file_row is not None
+        and own_claim is not None
+        and not claim_visible(file_row.get("run_claim"), own_claim)
+    ):
+        return _foreign_error()
+
+    if file_row is None:
+        # Row-not-found probe chain (Pitfall 4 ordering: eligible → FOREIGN → expired →
+        # never). FIRST, when own_claim is set, distinguish a foreign-claimed non-expired
+        # row (honest "belongs to a different run" relay) from a genuinely absent/expired
+        # template — WITHOUT ever reading the foreign row's bytes / id / filename (D-141-05).
+        if own_claim is not None:
+            foreign_row = await pool.fetchrow(
+                """
+                SELECT id
+                FROM workspace_files
+                WHERE thread_id = $1
+                  AND created_by = $2
+                  AND kind = 'template_input'
+                  AND (expires_at IS NULL OR expires_at > now())
+                  AND run_claim IS NOT NULL
+                  AND run_claim <> $3
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                thread_id,
+                user_id,
+                own_claim,
+            )
+            if foreign_row is not None:
+                return _foreign_error()
+
         # Distinguish "expired" from "never uploaded" by dropping the expiry gate (D-10):
         # a row that exists but is gated-out is expired; truly no row → not uploaded.
         # Still user-scoped (cross-user → no row here either → "no template", never 403).
@@ -224,7 +289,28 @@ async def resolve_template_source(
             ),
         )
 
-    file_row = dict(row)
+    # The eligible row is visible to this run-context. Phase 141 (D-141-03): claim it on
+    # first resolve via a CONDITIONAL, race-safe UPDATE — only an unclaimed row is stamped,
+    # and only when the caller supplied an own_claim (legacy callers skip the stamp). The
+    # stamp is a non-blocking asyncpg execute (CLAUDE.md D-v2.5-01 — no run_in_threadpool).
+    if own_claim is not None and file_row.get("run_claim") is None:
+        status = await pool.execute(
+            "UPDATE workspace_files SET run_claim = $1 WHERE id = $2 AND run_claim IS NULL",
+            own_claim,
+            file_row.get("id"),
+        )
+        # Pitfall 2 / T-141-03 — losing race: our conditional stamp affected 0 rows because
+        # another context claimed it first. Re-SELECT the claim; if it is now foreign, relay
+        # the honest error rather than returning bytes.
+        if isinstance(status, str) and status.strip().upper().endswith(" 0"):
+            recheck = await pool.fetchrow(
+                "SELECT run_claim FROM workspace_files WHERE id = $1",
+                file_row.get("id"),
+            )
+            current = dict(recheck).get("run_claim") if recheck is not None else None
+            if not claim_visible(current, own_claim):
+                return _foreign_error()
+
     filename = _filename_from_path(file_row.get("path"))
     mime = file_row.get("mime_type")
     try:

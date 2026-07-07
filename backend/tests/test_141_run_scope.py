@@ -164,7 +164,6 @@ def test_migration_092_additive_nullable():
 # ── (4) Resolver stamp + honest error + race (xfail-pending Plan 141-02) ─────────────
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 async def test_resolver_stamps_unclaimed(mock_asyncpg_pool):
     """A NULL-claim row resolves for the resolving context AND is stamped with that context's
     own-claim via a conditional ``UPDATE ... SET run_claim = $ WHERE ... AND run_claim IS NULL``
@@ -186,7 +185,6 @@ async def test_resolver_stamps_unclaimed(mock_asyncpg_pool):
     assert DEEP_CLAIM in args, "the resolving context's own-claim must be bound into the stamp"
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 async def test_resolver_foreign_claim_honest_error(mock_asyncpg_pool):
     """A foreign-claimed (str(W)) non-expired row must NEVER leak as bytes to a Deep resolve —
     the resolver returns the honest 'belongs to another run' relay string (D-141-05), never a
@@ -209,7 +207,6 @@ async def test_resolver_foreign_claim_honest_error(mock_asyncpg_pool):
     assert "run" in low or "context" in low, "the error must name the run/context condition (D-141-05)"
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 async def test_resolver_claim_race_falls_through(mock_asyncpg_pool):
     """Claim-stamp losing race (Pitfall 2 / T-141-03): two contexts resolve the same NULL-claim
     row; our conditional ``UPDATE ... WHERE run_claim IS NULL`` affects 0 rows (the other context
@@ -256,7 +253,6 @@ def test_emit_ctx_carries_workflow_lineage():
 # ── (6) No-regression happy path (xfail-pending Plan 141-02) ─────────────────────────
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 async def test_in_scope_render_unchanged(mock_asyncpg_pool, monkeypatch):
     """SC#2 — the render happy path is byte-identical: an own-upload (Branch 2, unclaimed →
     resolves for the resolving context) AND a library AssetRef (Branch 1, trusted, NO run
@@ -300,7 +296,6 @@ async def test_in_scope_render_unchanged(mock_asyncpg_pool, monkeypatch):
 # ── (7) Scope-preservation + both-sites wiring (xfail-pending Plan 141-02) ───────────
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 def test_where_preserves_user_and_thread_scope():
     """V4 backstop — the claim-aware Branch-2 WHERE (Plan 02) must NEVER widen the existing
     owner/thread scope: ``thread_id = $1`` + ``created_by = $2`` stay, and ``run_claim`` joins
