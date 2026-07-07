@@ -1467,6 +1467,7 @@ CREATE TABLE public.workspace_files (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     kind text,
     expires_at timestamp with time zone,
+    run_claim text,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
@@ -1485,6 +1486,13 @@ COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agen
 --
 
 COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
+
+
+--
+-- Name: COLUMN workspace_files.run_claim; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.run_claim IS 'Phase 141 (COLL-02). Run-context claim lineage for kind=''template_input'' rows: str(workflow_run_id) for a workflow phase, the ''deep'' sentinel for a Deep turn, NULL = unclaimed. Server-set on first resolve; the ''deep'' sentinel makes the cross-context block symmetric. Nullable, no default, no backfill (D-141-02/04).';
 
 
 --
