@@ -4,9 +4,9 @@ title: pptx skill QA workflow calls uninstalled soffice/markitdown (+ wrong outp
 reported: 2026-07-07
 surface: Agentic-RAG
 severity: major
-status: open                      # skill-content fix APPLIED 2026-07-07 (instructions rewritten in DB); stays open pending ONE live pptx run confirming no retry loop
+status: folded                    # per-user data fix APPLIED 2026-07-07; durable SYSTEMIC fix folded into Phase 142 (SRH-01) at discuss-phase 2026-07-08 (G-C worked example). Flips to `closed` when 142's mechanism verifiably stops such a loop generically.
 affected_areas: [skills, sandbox, backend/tools]
-folded_into: null
+folded_into: 142
 verified_closed_by: null
 resolution_applied: 2026-07-07     # data fix to skills.instructions (id a573ebc5); see Resolution section
 related_seeds: [SEED-093]
