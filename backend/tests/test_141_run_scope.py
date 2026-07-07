@@ -236,7 +236,6 @@ async def test_resolver_claim_race_falls_through(mock_asyncpg_pool):
 # ── (5) Emit-path lineage (xfail-pending Plan 141-02 — Landmine 2 guard) ──────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 141-02 stamps _ProducerStreamCtx.workflow_run_id (Landmine 2)")
 def test_emit_ctx_carries_workflow_lineage():
     """The harness emit re-dispatch wraps the harness bag in ``_ProducerStreamCtx`` (which
     overrides run_id to the producer id and hides workflow_run_id). Plan 02 stamps the workflow
@@ -308,7 +307,6 @@ def test_where_preserves_user_and_thread_scope():
     assert "run_claim" in code, "Plan 02 must add the claim dimension to the executable Branch-2 SQL"
 
 
-@pytest.mark.xfail(strict=False, reason=_PLAN_02)
 def test_both_branch2_resolve_sites_pass_own_claim():
     """Landmine 1 — BOTH Branch-2-reaching resolve sites must derive an own-claim (Plan 02):
     the tool-call/emit re-dispatch site (tool_dispatcher.py, via own_claim_for_ctx) AND the
