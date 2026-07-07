@@ -43,7 +43,7 @@ Each maps to exactly one roadmap phase.
 Ship only if CORE lands clean and budget remains (v2.9 / v3.1 precedent).
 
 - [x] **SI-02**: A description-only self-improve proposer drafts a description diff → human approves → a new immutable version is created. No instruction-body edits (description only). (v3.1 STRETCH carry-forward; depends on SI-01 eval substrate.)
-- [ ] **TRIG-02**: Only plausibly-relevant skills are surfaced to the model for a given query, keeping the active catalog within a configurable token budget. (v3.1 STRETCH carry-forward; depends on Phase 123 CTX-03 pin substrate; G-5 catalog injection path; SC#10.)
+- [x] **TRIG-02**: Only plausibly-relevant skills are surfaced to the model for a given query, keeping the active catalog within a configurable token budget. (v3.1 STRETCH carry-forward; depends on Phase 123 CTX-03 pin substrate; G-5 catalog injection path; SC#10.)
 - [ ] **COLL-02**: The `template_input` resolver is scoped to the current run — a template uploaded in one run is not visible or accessible in another. (v3.1 STRETCH carry-forward; depends on Phase 120 COLL-01 run-scope seam.)
 - [ ] **SRH-01**: When a skill's script is non-Python (JS, shell, etc.), the agent surfaces an honest "cannot execute this skill type" signal rather than silently failing or narrating the code as if it ran. (v3.1 STRETCH carry-forward; DISC-01 Layer 1; SEED-044.)
 - [x] **RUN-01**: Run-end honesty — (a) baseline files seeded at run start no longer appear as dead "Download unavailable" cards in the final_output_files emit; (b) a run-end reconciler marks open todos as "ended with open todos" (never silently auto-completes). (SEED-094; backend agent_loop.py finalizer pair; additive, shared-path-safe.)
