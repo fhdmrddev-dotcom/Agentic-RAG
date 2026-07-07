@@ -50,6 +50,7 @@ from app.services.openai_service import (
     EXPLORER_SYSTEM_PROMPT,
     CallingMode,
     get_tools,
+    embed_texts,
 )
 # Phase 092.5 Wave 4 (D-04): create_adaptive_streaming_chat + normalize_finish_reason
 # moved BEHIND the gateway — the OpenAI-compat adapter
@@ -73,11 +74,25 @@ from app.services.context_window import (
     trim_messages_to_fit,
     estimate_messages_tokens,
     resolve_context_budget,
+    estimate_tokens,
 )
 # Phase 123-01 (D-01): the relaxed "## Available Skills" catalog-note policy lives
 # in skill_lint as the single source of truth, so this runtime note and the Plan 03
 # Tuner classifier measure the SAME production policy (Pitfall 1 fidelity guard).
 from app.services.skill_lint import LOAD_SKILL_POLICY
+# Phase 140 (TRIG-02): the smart-dispatch relevance pre-filter consumables. The three
+# Plan 03 pure contracts (budget resolver, trim/assemble fn, pin-scan) plus the private
+# `_block` — reused here as the fits-budget gate so the embed is skipped BYTE-IDENTICALLY
+# to the pure fn's own internal gate (Pitfall 1: never embed on the fast path). Plus the
+# Plan 02 fire-and-forget self-heal for NULL-sim skills (Blocker-1). Wired STRICTLY inside
+# the `skill_catalog_override is None` branch below (D-06 — the eval seam stays byte-exact).
+from app.services.skill_catalog_filter import (
+    resolve_skill_catalog_budget,
+    build_skill_catalog_block,
+    _recently_loaded_skill_names,
+    _block as _skill_catalog_block,
+)
+from app.services.skill_embedding_service import kick_skill_backfill
 
 if TYPE_CHECKING:
     import asyncpg
@@ -1201,9 +1216,13 @@ async def run_agent_loop(
         # arms drive exactly these skills (D-03 WITH = target-only; D-04 WITHOUT
         # = empty → the `if enabled_skills:` guard below short-circuits).
         if skill_catalog_override is None:
+            # Phase 140 (TRIG-02): now also SELECT `id` — the match_skills RPC and the
+            # D-02 pin set key on skill id (avoids the SEED-102 owner/global name
+            # collision). Scope/order are byte-identical to today (owner+global enabled,
+            # name-ordered) so Deep Mode stays unchanged when the catalog fits budget.
             _skills_resp = await aexec(
                 supabase.table("skills")
-                .select("name, description")
+                .select("id, name, description")
                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                 .eq("is_enabled", True)
                 .order("name")
@@ -1213,15 +1232,99 @@ async def run_agent_loop(
             enabled_skills = list(skill_catalog_override)
 
         if enabled_skills:
-            catalog_lines = "\n".join(
-                f"- **{s['name']}**: {s['description']}" for s in enabled_skills
-            )
-            # D-01: relaxed, description-driven load_skill firing — reconciled with
-            # LOAD_SKILL_TOOL.description via the shared LOAD_SKILL_POLICY constant.
-            catalog_note = (
-                f"\n\n## Available Skills\n"
-                f"The following skills are available. {LOAD_SKILL_POLICY}\n{catalog_lines}"
-            )
+            if skill_catalog_override is None:
+                # Phase 140 (TRIG-02) smart-dispatch relevance pre-filter — lives STRICTLY
+                # inside this override-None (live DB) branch so the eval-tuple path below
+                # stays byte-identical and NEVER embeds, ranks, or kicks (D-06 eval seam).
+                # ② settings-resolved global token budget (0/disable => inject-all, D-04).
+                budget = resolve_skill_catalog_budget(user_settings)
+                # ④ D-02 always-keep set: skills load_skill-ed earlier in THIS thread stay
+                # listed regardless of relevance rank (id-keyed → SEED-102-safe).
+                _pinned_names = _recently_loaded_skill_names(history_resp.data)
+                pinned_recent_ids = {
+                    s["id"] for s in enabled_skills if s["name"] in _pinned_names
+                }
+                # ③ Budget gate FIRST (Pitfall 1): the fits-budget fast path makes ZERO
+                # embed call and is byte-identical to today. `_skill_catalog_block` is the
+                # pure fn's own block builder, so this gate matches its internal gate
+                # exactly — no divergence between "we embedded" and "it trimmed".
+                sim_by_id: dict | None = None
+                _full_block = _skill_catalog_block(
+                    sorted(enabled_skills, key=lambda s: s["name"])
+                )
+                if budget > 0 and estimate_tokens(_full_block, user_settings.llm_model) > budget:
+                    try:
+                        # Embed the turn OFF the event loop (SEED-065 / D-v2.5-01).
+                        q_vec = (await run_in_threadpool(embed_texts, [body.content], user_settings=user_settings))[0]
+                        # Rank owner+global enabled skills by cosine in pgvector. The RPC
+                        # WHERE clause is the byte-exact clone of today's catalog scope
+                        # (V4 — no cross-user leak) and filters the CURRENT embedding model
+                        # (D-10 stale guard); a vector-less skill returns similarity NULL.
+                        _ranked = await aexec(
+                            supabase.rpc(
+                                "match_skills",
+                                {
+                                    "query_embedding": q_vec,
+                                    "match_user_id": current_user["id"],
+                                    "p_embedding_model": getattr(
+                                        user_settings, "embedding_model", ""
+                                    )
+                                    or "text-embedding-3-small",
+                                },
+                            )
+                        )
+                        sim_by_id = {
+                            r["id"]: r["similarity"] for r in (_ranked.data or [])
+                        }
+                        # Blocker-1 self-heal: any in-scope skill the RPC returned with a
+                        # missing/NULL similarity has a stale/absent vector — fire the
+                        # fire-and-forget backfill so it re-vectorizes within ~one turn.
+                        # It returns immediately, is NEVER awaited, and swallows its own
+                        # failures (off the hot path), so no extra guard is needed here.
+                        _stale_ids = [
+                            s["id"]
+                            for s in enabled_skills
+                            if sim_by_id.get(s["id"]) is None
+                        ]
+                        if _stale_ids:
+                            kick_skill_backfill(
+                                supabase,
+                                current_user["id"],
+                                user_settings,
+                                only_skill_ids=_stale_ids,
+                            )
+                    except Exception:
+                        # D-05 fail-open: any embed/RPC failure degrades to inject-all-up-
+                        # to-budget (sim_by_id=None => trim by name only), never crashing or
+                        # emptying the catalog. build_skill_catalog_block runs OUTSIDE this
+                        # try/except (it is None-safe) so the note is ALWAYS emitted.
+                        logger.warning(
+                            "skill pre-filter embed/rank failed; failing open",
+                            exc_info=True,
+                        )
+                        sim_by_id = None
+                # ⑤ Assemble the note (pure, None-safe): fits => byte-identical, over budget
+                # => keep pinned/recent + top-similarity, name-sorted display, honest
+                # _CATALOG_TRIM_MARKER (SC#1 + SC#3 / D-14).
+                catalog_note = build_skill_catalog_block(
+                    enabled_skills,
+                    budget,
+                    user_settings.llm_model,
+                    pinned_recent_ids,
+                    sim_by_id,
+                )
+            else:
+                # Eval-tuple branch (D-06): byte-identical to today — no budget, no embed,
+                # no rank, no kick. The eval arms drive exactly these skills.
+                catalog_lines = "\n".join(
+                    f"- **{s['name']}**: {s['description']}" for s in enabled_skills
+                )
+                # D-01: relaxed, description-driven load_skill firing — reconciled with
+                # LOAD_SKILL_TOOL.description via the shared LOAD_SKILL_POLICY constant.
+                catalog_note = (
+                    f"\n\n## Available Skills\n"
+                    f"The following skills are available. {LOAD_SKILL_POLICY}\n{catalog_lines}"
+                )
             active_system_prompt = active_system_prompt + catalog_note
 
         # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
