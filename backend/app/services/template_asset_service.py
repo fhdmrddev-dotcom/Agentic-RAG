@@ -78,6 +78,45 @@ def _filename_from_path(path: str | None) -> str | None:
     return path.rstrip("/").rsplit("/", 1)[-1] or path
 
 
+# ── Phase 141 (COLL-02 / D-141-01, D-141-02) — run-scope claim helpers ──────────────
+# Pure (no I/O), importable by the offline truth-table tests AND by the Plan-02 callers.
+# `claim_visible` is the SINGLE source of the run-context eligibility truth — the Branch-2
+# WHERE predicate (Plan 02) mirrors it (`run_claim IS NULL OR run_claim = $own`) so the SQL
+# and this helper can never disagree (mirror Phase 120's `_apply_origin_filter`).
+
+DEEP_CLAIM = "deep"
+"""The fixed sentinel a Deep turn stamps as its run-context lineage — distinct from a
+`str(workflow_run_id)`. It is what makes the block SYMMETRIC: a Deep-claimed row is invisible
+to a workflow run AND a workflow-claimed row is invisible to a Deep turn (D-141-02). Without
+the sentinel, a Deep-touched row would stay NULL and a later workflow run could claim it =
+an unblocked Deep→workflow leak."""
+
+
+def claim_visible(row_claim: "str | None", own_claim: str) -> bool:
+    """Is a `workspace_files` row with claim `row_claim` resolvable by the run-context whose
+    own-claim is `own_claim`? (pure — no I/O).
+
+    True iff the row is unclaimed (`row_claim is None` → first claimer wins) OR already
+    claimed by this same run-context (`row_claim == own_claim` → same-mode reuse: Deep→Deep,
+    same-`workflow_run` across phases). A FOREIGN claim (`row_claim != own_claim`) → False →
+    the row is invisible → the resolver's clean "belongs to another run" path (D-141-05).
+    This is the exact predicate the Plan-02 Branch-2 WHERE clause mirrors."""
+    return row_claim is None or row_claim == own_claim
+
+
+def own_claim_for_ctx(ctx: Any) -> str:
+    """Derive the current run-context's own-claim from a ToolContext-like `ctx` (pure — no I/O).
+
+    Keyed off `workflow_run_id` ONLY: it is `None` on EVERY Deep caller and the
+    `workflow_runs.id` on a workflow phase (inherited by sub-agents at `task_service.py:625`
+    with zero plumbing → a sub-agent shares its parent run's context). Returns
+    `str(workflow_run_id)` when set, else the `DEEP_CLAIM` sentinel. Do NOT key off `run_id`
+    (differs every Deep turn → breaks Deep→Deep reuse) or `parent_run_id` (null on top-level
+    runs) — `workflow_run_id` is the only clean discriminator (141-RESEARCH §sub-agent lineage)."""
+    wf = getattr(ctx, "workflow_run_id", None)
+    return str(wf) if wf is not None else DEEP_CLAIM
+
+
 async def resolve_template_source(
     *,
     pool: "asyncpg.Pool",
