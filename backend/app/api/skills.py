@@ -23,6 +23,10 @@ from app.models.skill import (
 )
 from app.services.publish_gate_service import compute_publish_gate
 from app.services.skill_lint import lint_description
+# Phase 142 (SRH-01 / SC#1 / D-08): single source for the non-Python script-extension
+# set (Plan 01 defines it in tool_dispatcher). No circular import — tool_dispatcher does
+# NOT import app.api.skills.
+from app.services.tool_dispatcher import SCRIPT_EXTS
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +299,9 @@ async def import_skill(
 
         # 6. Create DB rows for successfully parsed skills
         has_background = False
+        # Phase 142 (SRH-01 / SC#1 / D-08): non-blocking honesty notes — one entry per
+        # skill that bundles a non-Python script (the G-B, import-time-knowable gap, D-10).
+        notes: list[dict] = []
         for prefix, fm, instructions in parsed:
             skill_row = (
                 supabase.table("skills")
@@ -312,6 +319,7 @@ async def import_skill(
             # Build list of companion file dicts
             files_to_upload: list[dict] = []
             used_names: set[str] = set()
+            script_names: list[str] = []  # 142: non-Python scripts this skill bundles
             for entry_name in zf.namelist():
                 if not entry_name.startswith(prefix):
                     continue
@@ -321,6 +329,15 @@ async def import_skill(
                 filename = os.path.basename(relative)
                 if not filename:
                     continue
+                # Phase 142 (SC#1 / D-08 / D-10 / T-142-03): static ZIP-extension scan —
+                # the only import-time-knowable runtime-gap signal (G-B). Inspect ONLY
+                # splitext(basename) on the entry, which was already validated by
+                # _sanitize_zip_name at step 3; no path is built from untrusted input, so
+                # this adds no new traversal surface. Mechanism-only — never blocks the
+                # import and never edits instructions (D-12).
+                ext = os.path.splitext(filename)[1].lstrip(".").lower()
+                if ext in SCRIPT_EXTS and filename not in script_names:
+                    script_names.append(filename)
                 # De-dup the flattened basename BEFORE building the storage path so two
                 # entries in different folders that flatten to the same basename (e.g.
                 # pkg_a/__init__.py + pkg_b/__init__.py) get DISTINCT paths and neither is
@@ -334,6 +351,17 @@ async def import_skill(
                     "filename": unique_name,
                     "storage_path": storage_path,
                     "mime_type": "application/octet-stream",
+                })
+
+            # Phase 142 (SC#1 / D-08): attach a single non-blocking honesty note if this
+            # skill bundles any non-Python script. The import still succeeds regardless.
+            if script_names:
+                notes.append({
+                    "skill": fm["name"],
+                    "note": (
+                        f"'{fm['name']}' includes a step the sandbox can't run yet "
+                        f"({', '.join(script_names)}); its instructions still work."
+                    ),
                 })
 
             file_count = len(files_to_upload)
@@ -375,10 +403,13 @@ async def import_skill(
             content={
                 "created": results,
                 "errors": errors,
+                # Phase 142 (SC#1 / Pitfall 5): additive OPTIONAL key on BOTH branches —
+                # existing consumers ignore it.
+                "notes": notes,
                 "message": "Skill imported — files uploading in background",
             },
         )
-    return {"created": results, "errors": errors}
+    return {"created": results, "errors": errors, "notes": notes}
 
 
 @router.patch("/{skill_id}", response_model=SkillResponse)
