@@ -70,7 +70,7 @@
 - [x] **Phase 139: Self-Improve Proposer — Description-Only (STRETCH)** — description-only diff → human approve → new version (SI-02) — executed + review-fix wave 2026-07-06 (verification: human_needed — live 4-axis+G-4 UAT via /gsd:verify-work 139)
 - [x] **Phase 140: Smart-Dispatch Relevance Pre-Filter (STRETCH)** — relevance-filtered, token-budgeted skill catalog (TRIG-02) — executed 2026-07-07 (5/5 plans; migration 091 applied live + 7 vectors backfilled; verification human_needed — live 4-axis SC#10 UAT via /gsd:verify-work 140; 0 regressions vs cb9fef39 baseline; code-review 0 critical / 3 advisory WR-01..03)
 - [x] **Phase 141: template_input Resolver Run-Scope (STRETCH)** — run-scoped template_input resolution (COLL-02) — executed 2026-07-07 (3/3 plans; migration 092 `run_claim` applied live on :54322 + full-schema regenerated; claim-aware resolver Branch 2 filter/stamp/honest-error + both callers + emit `_ProducerStreamCtx` lineage; verification human_needed — D-141-07 cross-provider render SMOKE via /gsd:verify-work 141; 236 passed / 1 pre-existing unrelated fail; code-review 0 critical / 3 advisory WR-01..03)
-- [ ] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01)
+- [x] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01) — complete 2026-07-08 (5/5 plans; runtime-gap classifier G-A/G-B/G-C + reactive reshape + per-run repeat-guard + proactive execute_code capability facts + honest read_skill_file/load_skill + import note; code-review found 2 T-142-01 blockers, both fixed root-cause + independently re-verified; 87 tests + 11 adversarial; 0 regressions vs baseline-60 rot; verification human_needed — 3 live cross-provider narration rows in 142-HUMAN-UAT.md via /gsd:verify-work 142)
 - [ ] **Phase 143: Starter Workflow Library (STRETCH)** — fork-able is_global starter-workflow shelf (WF-01)
 - [ ] **Phase 144: Agent-Driven Skill File Attachment (STRETCH)** — new `attach_skill_file` tool + endpoint so the agent can attach files it creates, and a user can hand it a template mid-chat (FILE-01, SEED-104)
 
@@ -449,7 +449,7 @@ Plans:
 | 139. Self-Improve Proposer — Description-Only (STRETCH) | 5/5 | Complete | 2026-07-06 |
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
-| 142. Non-Python Skill-Script Honesty (STRETCH) | 0/5 | Planned | - |
+| 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 
