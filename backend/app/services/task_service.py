@@ -600,6 +600,12 @@ async def run_task_sub_agent(
         # the parent's pinned-outputs panel would briefly show files that
         # belong to the sub-agent and vice versa.
         previous_files_in_run={},
+        # Phase 142 (SRH-01 / D-06 / Pitfall 6 / T-142-05) — a FRESH set(), NOT the
+        # parent's run-scoped set. A sub-agent's failed soffice/markitdown call must
+        # not short-circuit a legitimately-different parent context (or a sibling
+        # sub-agent). This is the ONE run-scoped repeat-guard field that is fresh-
+        # per-sub-agent (mirror previous_files_in_run={} above) rather than propagated.
+        dead_gap_tokens_in_run=set(),
         # D-085-12 — non-null parent_run_id makes _handle_task short-circuit
         # inside the sub-agent's own dispatch chain. 1-level nesting cap.
         parent_run_id=parent_ctx.run_id,

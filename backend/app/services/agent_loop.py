@@ -1583,6 +1583,14 @@ async def run_agent_loop(
         # emit). The final emit filters against this so baseline/leftover files
         # re-harvested with fresh URLs (BUG-260626-02) never leak into the aggregate.
         _new_file_hashes_in_run: set[str] = set()
+        # Phase 142 (SRH-01 / D-06) — run-scoped repeat-guard set. Init ONCE per
+        # run (OUTSIDE the iteration loop), threaded by-reference into BOTH
+        # ToolContext builds below exactly like _new_file_hashes_in_run so a
+        # PERMANENT runtime gap that fired on iteration N short-circuits the same
+        # dead call on iteration N+1 (Pitfall 1 — a fresh ctx is built every
+        # iteration; setattr would not survive). Sub-agents get a FRESH set()
+        # (task_service) so a sub-agent's dead call never blocks the parent.
+        _dead_gap_tokens_in_run: set[str] = set()
 
         # Phase 085 D-085-15 — per-run task() concurrency semaphore.
         # Initialized ONCE per top-level run (outside the iteration loop) so
@@ -1634,6 +1642,7 @@ async def run_agent_loop(
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
+                dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -2417,6 +2426,7 @@ async def run_agent_loop(
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
                 new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
+                dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service
