@@ -65,6 +65,7 @@ must be fixed before this ships. Everything else is secondary.
 ### CR-01: `_classify_runtime_gap` suppresses genuine errors (T-142-01 violation)
 
 **File:** `backend/app/services/tool_dispatcher.py:2122-2180` (invoked unconditionally at `:1366`)
+**Outcome:** fixed (commit `330453f3`) — POST-HOC classifier now gated on `actual_exit_code != 0` (1a); G-C binary detection uses precise per-token boundary-anchored regexes that require the shell to NAME the token as missing, not bare co-occurrence (1b); `"let "` dropped from JS_TOKENS and Python line-comments stripped before the G-B scan (1c). Adversarial regression tests added.
 **Issue:** The classifier is documented as "NEVER reshape ... a genuine error,"
 but three independent, reachable paths do exactly that:
 
@@ -122,6 +123,7 @@ tokens co-occur — not a single `"let "` anywhere in the buffer.
 ### CR-02: Run-scoped repeat-guard poisons the whole run via bare substring match
 
 **File:** `backend/app/services/tool_dispatcher.py:987-995` (pre-flight), `:1371-1372` (record)
+**Outcome:** fixed (commit `6904701c`) — new `_code_references_dead_token` matches binary/module identifiers at word boundaries (`\bnode\b`, escaped, case-insensitive) and keeps containment only for distinctive JS markers / G-A path tokens, so a substring inside a larger word (`annotate`, `node_list`) never re-blocks. Residual accepted edge documented. Adversarial tests added.
 **Issue:** On any classifier hit, `ctx.dead_gap_tokens_in_run.add(_gap["token"])`
 records the token (`:1372`). The pre-flight (`:987-995`) then blocks *any*
 subsequent `execute_code` whose code contains that token as a **bare
@@ -174,6 +176,7 @@ allowlist). See WR-01.
 ### WR-01: G-A branch misclassifies genuine missing relative paths as permanent
 
 **File:** `backend/app/services/tool_dispatcher.py:2170-2178`
+**Outcome:** fixed (commit `017e7000`) — G-A now fires only when the missing relative path is prefixed by a known skill-bundle subdir (`scripts/`|`assets/`|`resources/`); any other relative miss (`data/input.json`) passes through as None. Dataclass T-142-04 comment reconciled to reflect that G-A records only these narrowed paths. Tests added.
 **Issue:** Branch (d) treats *any* not-found path that contains `/` and is not
 absolute as a lost, flattened skill-tree path and tells the model *"Do NOT retry
 the same path."* But a model reading its own relative input — `open("data/input.json")`,
@@ -193,6 +196,7 @@ bundles — rather than "any relative path with a slash." When in doubt, return
 ### WR-02: Pre-flight short-circuit skips SSE lifecycle events and execution logging
 
 **File:** `backend/app/services/tool_dispatcher.py:993-995`
+**Outcome:** fixed (commit `8ba38181`) — the short-circuit now emits a matched `code_execution_start` + `code_execution_complete` pair before returning (mirroring the normal path), so the UI code-card resolves instead of spinning forever. Still a no-op for unwired callers and touches no sandbox. Test added.
 **Issue:** The repeat-guard short-circuit returns before the handler emits
 `code_execution_start` / `code_execution_complete` (`:998`, `:1335`), before the
 `code_executions` DB insert (`:1301`), and before the audit entry (`:1374`).
