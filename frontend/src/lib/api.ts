@@ -4,6 +4,10 @@ import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate
 export interface SkillImportResult {
   created: Skill[]
   errors: Array<{ skill: string; error: string }>
+  // Phase 142 (SRH-01 / SC#1 / D-08): non-blocking honesty notes — one per imported
+  // skill that bundles a non-Python script. OPTIONAL so existing consumers keep
+  // compiling and ignore it (additive, Pitfall 5).
+  notes?: Array<{ skill: string; note: string }>
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string

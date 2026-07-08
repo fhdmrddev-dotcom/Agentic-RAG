@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useResizablePanel } from "@/hooks/useResizablePanel"
 import { SkillCard } from "@/components/skills/SkillCard"
 import { SkillDetailPanel } from "@/components/skills/SkillFormDialog"
-import { exportSkill, importSkillZip } from "@/lib/api"
+import { exportSkill, importSkillZip, type SkillImportResult } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
@@ -25,6 +25,31 @@ interface Props {
   // interface ready.
   onOpenStudio?: (skillId: string, tab?: "evals" | "triggering" | "versions") => void
   onReviewEvals?: (skillId: string) => void
+}
+
+/**
+ * Phase 142 (SRH-01 / SC#1 / D-08): build the muted import-result line. Pure — so it can
+ * be unit-tested without mounting the whole page. When the result carries non-blocking
+ * honesty notes[] (a bundled non-Python script the sandbox can't run), the note text is
+ * appended to the SAME muted line — no new component (D-09), stays `isError: false`.
+ * Exported for SkillsPage.import.test.tsx; handleImport MUST call it so the test exercises
+ * the real render path.
+ */
+export function buildImportMessage(result: SkillImportResult): { text: string; isError: boolean } {
+  const created = result.created.length
+  const failed = result.errors.length
+  if (created === 0) {
+    return { text: "No skills were imported.", isError: true }
+  }
+  let text =
+    failed > 0
+      ? `${created} skill${created > 1 ? "s" : ""} imported, ${failed} failed - check your ZIP.`
+      : `${created} skill${created > 1 ? "s" : ""} imported.`
+  // Append any non-blocking script-honesty notes onto the existing muted line (D-09).
+  if (result.notes?.length) {
+    text += result.notes.map((n) => ` Note: ${n.note}`).join("")
+  }
+  return { text, isError: false }
 }
 
 export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEvals }: Props) {
@@ -67,15 +92,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
     setImportMessage(null)
     try {
       const result = await importSkillZip(file)
-      const created = result.created.length
-      const failed = result.errors.length
-      if (failed > 0 && created > 0) {
-        setImportMessage({ text: `${created} skill${created > 1 ? "s" : ""} imported, ${failed} failed - check your ZIP.`, isError: false })
-      } else if (created > 0) {
-        setImportMessage({ text: `${created} skill${created > 1 ? "s" : ""} imported.`, isError: false })
-      } else {
-        setImportMessage({ text: "No skills were imported.", isError: true })
-      }
+      setImportMessage(buildImportMessage(result))
       await loadSkills()
     } catch (err) {
       setImportMessage({ text: err instanceof Error ? err.message : "Import failed", isError: true })
