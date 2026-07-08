@@ -5,6 +5,7 @@ planted: 2026-05-31
 planted_during: v2.8 (Harness Engine & Workflow Mode — surfaced during Phase 090 operator-testing-notes triage)
 trigger_when: Any user report of "the agent failed because a package was missing" OR Skill Studio (v3.0) needing per-skill declared dependencies
 scope: Medium
+last_assessed: 2026-07-08 (thread 5a86a9fd investigation — see "2026-07-08 Assessment" below)
 ---
 
 # SEED-043: Managed/Extensible Sandbox Package Set + Hardened Missing-Package Fallback
@@ -85,6 +86,76 @@ Present during /gsd:new-milestone when the milestone scope matches:
   SEED-024 (settings-architecture unification — config home for the allowlist),
   SEED-040 (model-registry self-service — the operator-UI-for-infra-knobs pattern to
   reuse), SEED-002 (Skill Studio milestone — per-skill declared dependencies)
+
+## 2026-07-08 Assessment (thread 5a86a9fd — "generate executive report" on DeepSeek)
+
+Triggered by a real user report: a skill "worked before, now many failures + dirty
+content." Investigation (DB thread 5a86a9fd) separated three unrelated causes; the
+package-relevant one feeds this seed directly.
+
+### Finding 1 — the "missing package" was not actually missing capability
+The `meridian-executive-report` skill's PDF step failed with `ModuleNotFoundError: No
+module named 'fpdf'`, then wrestled fpdf2's latin-1 Unicode crash across 4 execute_code
+attempts. **But the sandbox already ships `reportlab`** — a full, Unicode-safe PDF
+writer (added 2026-05-31, the very incident that planted this seed). So the correct
+answer was **NOT "add fpdf2 to the image"** — it was "author skills against the
+installed set." fpdf2 is smaller but strictly worse here (latin-1 default fonts).
+Fixed at the authoring layer instead of the image:
+- Migration `093_skill_creator_sandbox_library_awareness.sql` — skill-creator now lists
+  the preinstalled set and forbids recommending uninstalled same-purpose libs (fpdf →
+  reportlab; no pdfkit/weasyprint/xlsxwriter; no network libs).
+- The existing meridian skill's "PDF Library" line was corrected to reportlab (DB row).
+
+**Takeaway for half (a):** before adding ANY package, check whether an installed
+package already covers the need. The managed-package UI should surface "you already
+have X for this" rather than silently accepting a redundant add.
+
+### Finding 2 — OPEN ITEM (sandbox network reachability) is now PARTIALLY RESOLVED
+The seed's blocking open item asked whether the sandbox can reach PyPI for a runtime
+`pip install`. **Evidence says YES (outbound to PyPI works):** in the same run,
+execute_code attempt [22] hit `ModuleNotFoundError: fpdf` in **68 ms** (no install),
+but attempt [23] with the same `libraries=["fpdf2"]` took **6607 ms** and got *past*
+the import to an fpdf runtime error — i.e. fpdf2 was fetched and installed from PyPI
+mid-run. So the container is **not** network-sealed for pip; **half (b) (runtime
+pip-install fallback) is viable** and does not have to collapse into "bake-only."
+(The `Dockerfile.sandbox:27` "network is sealed" comment is therefore inaccurate for
+egress — worth reconciling when this seed is scoped.)
+
+### Finding 3 — the `libraries` param may not reliably install (feeds half (b))
+Attempt [22] passed `libraries=["fpdf2"]` yet ran in 68 ms and still `ModuleNotFound`ed
+— the declared-library install did **not** fire before the code ran — while [23]
+(same param) did install. This inconsistency is exactly the "safety net exists but
+isn't reliable" failure half (b) targets. Worth a focused probe of how `libraries` is
+threaded into `sandbox_service` / whether it's honored on a cached (warm) session.
+
+### Size / performance impact model (the "size or performance" question)
+Current image: `python:3.11-slim` + 13 pinned packages ≈ **~700 MB** (per
+`Dockerfile.sandbox:25` comment; measure live with
+`docker images agentic-rag-sandbox --format '{{.Size}}'`). The cost of adding a package
+is **not usually installed-size** — it's a layered tradeoff:
+
+| Cost axis | Pure-Python pkg (e.g. fpdf2 ~1–2 MB) | Heavy pkg (torch/transformers, GBs) |
+|-----------|--------------------------------------|-------------------------------------|
+| Image size | Negligible (<0.5%) | Dominant — rejected already (Dockerfile:30) |
+| Build time | Seconds | Minutes |
+| **Cold cloud-deploy pull** | Negligible | The real pain — every Coolify rebuild re-pulls |
+| Supply-chain surface | +1 dep to trust/pin | +many transitive deps |
+| Perf win vs NOT baking | Saves ~5–15 s pip warm-up on **first** use in each new chat | Same, but warm-up can be 30 s+ |
+
+**Rule of thumb:** bake a package in only when it is (1) not already covered by an
+installed peer, AND (2) either hot (used most chats) or heavy enough that a runtime
+`pip install` warm-up hurts. Light, rarely-used libs are better left to the runtime
+fallback (half b) — which we now know works. Telemetry (SEED-025) should drive
+promotions: "these N packages got pip-installed at runtime most this month → bake them."
+
+### Net recommendation
+- **No package added for this incident** — reportlab already covers PDF; the fix was
+  authoring guidance (shipped) + the DeepSeek content-leak guard (separate, shipped).
+- When this seed is scoped as a phase: half (a) managed-set UI should (i) show
+  installed-peer coverage before an add, (ii) single-source the list that migration 093
+  now hard-codes into the skill-creator prompt (one source of truth for "what's
+  installed" shared by the sandbox, the execute_code tool description, AND skill-creator).
+- Half (b) is unblocked (network egress confirmed) and should also fix Finding 3.
 
 ## Notes
 
