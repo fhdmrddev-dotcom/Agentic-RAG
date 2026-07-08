@@ -201,3 +201,97 @@ def test_non_gap_passthrough():
         ),
         exit_code=1,
     ) is None
+
+
+# --- CR-01 regression: the adversarial cases test_non_gap_passthrough missed ---
+
+
+def test_cr01_generic_not_found_is_not_gc():
+    """CR-01(1b): a bare token co-occurring with the words 'not found' is NOT a
+    G-C hit. A generic ``ValueError("config node 'db' not found")`` yields
+    ``node 'db' not found`` (NOT ``node: not found``) and MUST pass through — the
+    exact false-positive the old ``tok in out_l and 'not found' in out_l`` logic
+    produced."""
+    assert _classify_runtime_gap(
+        code="raise ValueError(\"config node 'db' not found\")",
+        stdout="",
+        stderr=(
+            "Traceback (most recent call last):\n"
+            "  File \"<string>\", line 1, in <module>\n"
+            "ValueError: config node 'db' not found"
+        ),
+        exit_code=1,
+    ) is None
+
+
+def test_cr01_soffice_named_missing_still_hits_gc():
+    """CR-01(1b): the shell NAMING the binary as missing is still a true G-C hit
+    — both ``soffice: not found`` and ``soffice: command not found`` — on a plain
+    non-127 exit (exercises the precise per-token regex, not the 124/127 shortcut)."""
+    for stderr in (
+        "/bin/sh: 1: soffice: not found",
+        "/bin/sh: soffice: command not found",
+    ):
+        hit = _classify_runtime_gap(
+            code="import subprocess; subprocess.run(['soffice', '--headless'])",
+            stdout="",
+            stderr=stderr,
+            exit_code=1,
+        )
+        assert hit is not None, stderr
+        assert hit["class"] == "G-C"
+        assert hit["token"] == "soffice"
+        assert hit["message"] == GAP_MESSAGES["soffice"]
+
+
+def test_cr01_syntaxerror_no_js_token_passes_through():
+    """CR-01(1c): a real Python SyntaxError whose source merely CONTAINS the
+    English word 'let' (a removed token) with no JS-exclusive marker passes
+    through as None — the model must still see and fix its real typo."""
+    assert _classify_runtime_gap(
+        code='print("let there be light")\ndef f(:\n    pass',
+        stdout="",
+        stderr=(
+            "  File \"<string>\", line 2\n"
+            "    def f(:\n"
+            "          ^\n"
+            "SyntaxError: invalid syntax"
+        ),
+        exit_code=1,
+    ) is None
+
+
+def test_cr01_syntaxerror_with_real_js_token_hits_gb():
+    """A genuine JS-exclusive token (``const ``) on a non-comment line together
+    with a Python SyntaxError is still a G-B hit (no false negative)."""
+    hit = _classify_runtime_gap(
+        code="const x = 1;\nconsole.log(x);",
+        stdout="",
+        stderr=(
+            "  File \"<string>\", line 1\n"
+            "    const x = 1;\n"
+            "          ^\n"
+            "SyntaxError: invalid syntax"
+        ),
+        exit_code=1,
+    )
+    assert hit is not None
+    assert hit["class"] == "G-B"
+    assert hit["message"] == GAP_MESSAGES_JS
+
+
+def test_cr01_js_token_only_in_comment_passes_through():
+    """CR-01(1c): a JS-looking token that appears ONLY inside a Python line-comment
+    (``# let me build a => b``) is stripped before the G-B scan, so a real
+    SyntaxError elsewhere still passes through as None."""
+    assert _classify_runtime_gap(
+        code="total = 0  # let me build a => b\ndef f(:\n    pass",
+        stdout="",
+        stderr=(
+            "  File \"<string>\", line 2\n"
+            "    def f(:\n"
+            "          ^\n"
+            "SyntaxError: invalid syntax"
+        ),
+        exit_code=1,
+    ) is None

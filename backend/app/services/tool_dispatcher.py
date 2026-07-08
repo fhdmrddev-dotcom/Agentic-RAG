@@ -1363,9 +1363,17 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # unwired). On a MISS (T-142-01) stdout/stderr pass through UNCHANGED — a
         # real error still reaches the model. `tool_result` (the persisted/UI copy)
         # is left untouched: only the model-facing view carries the honest note.
-        _gap = _classify_runtime_gap(
-            code, exec_result.stdout or "", exec_result.stderr or "", actual_exit_code
-        )
+        # CR-01(1a): classify ONLY an actual FAILURE. A successful exit-0 run is
+        # NEVER reshaped and NEVER records a repeat-guard token — even if its stdout
+        # happens to print a string like "node not found". All three real gap
+        # classes always exit non-zero (or get bumped to 1 above when an exit-0 run
+        # prints a Python error marker to stdout), so gating on failure loses no
+        # true positive while removing the successful-run false-reshape path.
+        _gap = None
+        if actual_exit_code != 0:
+            _gap = _classify_runtime_gap(
+                code, exec_result.stdout or "", exec_result.stderr or "", actual_exit_code
+            )
         if _gap is not None:
             _llm_payload["runtime_gap"] = _gap
             if ctx.dead_gap_tokens_in_run is not None:
@@ -2041,11 +2049,15 @@ def _safe_out_filename(raw: str | None, template_ext: str) -> str:
 #
 # DESIGN LAW (threat T-142-01 — the most important property in the phase):
 # NEVER reshape on error-type or exit-code ALONE. A hit requires a token from a
-# FIXED allowlist co-occurring with a not-found phrase (or a 124/127 exit), OR a
-# `No module named '<mod>'` for a known module, OR a JS-exclusive token in `code`
-# together with a Python SyntaxError, OR a missing RELATIVE subdir path.
-# Everything else returns None so a genuine ValueError / a genuine missing
-# /sandbox/output file / a real SyntaxError still reaches the model unchanged.
+# FIXED allowlist NAMED by the shell as missing (`<tok>: not found` / a
+# FileNotFoundError exec of it), or present with a 124/127 exit, OR a
+# `No module named '<mod>'` for a known module, OR a JS-exclusive token on a
+# NON-COMMENT `code` line together with a Python SyntaxError, OR a missing
+# RELATIVE path under a known skill-bundle subdir (`scripts/`|`assets/`|`resources/`).
+# The POST-HOC caller additionally gates on a NON-ZERO exit so a successful run is
+# never reshaped. Everything else returns None so a genuine ValueError / a genuine
+# missing /sandbox/output file / a real SyntaxError / a recoverable relative miss
+# still reaches the model unchanged.
 # Proven by test_142_runtime_gap.py::test_non_gap_passthrough. This mirrors the
 # "distrust a model/sandbox string, match a FIXED set, safe default on non-match"
 # posture of _safe_out_filename above.
@@ -2058,11 +2070,11 @@ KNOWN_MISSING_BINARIES = frozenset({
     "node", "npm", "npx", "extract-text",
 })
 KNOWN_MISSING_MODULES = frozenset({"markitdown"})
-NOT_FOUND_PHRASES = (
-    "no such file or directory", "filenotfounderror",
-    "command not found", "not found",
-)
-JS_TOKENS = ("const ", "let ", "=>", "require(", "console.log",
+# CR-01(1c): JS-exclusive markers for the G-B (non-Python script) branch. `"let "`
+# was REMOVED — Python has no `let`, but the substring is too common in ordinary
+# English inside comments/strings ("let me…", "let's…") to be a safe JS signal and
+# collided with the repeat-guard. The remaining markers are JS-only constructs.
+JS_TOKENS = ("const ", "=>", "require(", "console.log",
              "export default", "function*")
 
 # Shared script-extension set — consumed by D-11 decode (Plan 03), the D-05b
@@ -2118,6 +2130,53 @@ _MISSING_PATH_RE = _re_filename.compile(
     r"no such file or directory:\s*['\"]([^'\"]+)['\"]", _re_filename.IGNORECASE
 )
 
+# CR-01(1b): a MISSING BINARY only classifies as G-C when the shell NAMES it as
+# missing — `<tok>: not found`, `<tok>: command not found`, or a FileNotFoundError
+# exec of EXACTLY that token — anchored to a left token boundary. A bare
+# co-occurrence of the token with the words "not found" (a `ValueError` printing
+# `config node 'db' not found`, which yields `node 'db' not found` NOT
+# `node: not found`) is NOT a gap and passes through (None). One precompiled regex
+# per fixed-allowlist token — no attacker-controlled key growth (T-142-04).
+_BINARY_GAP_RES = {
+    _btok: _re_filename.compile(
+        rf"(?<![\w/-]){_re_filename.escape(_btok)}:\s*(?:command\s+)?not found"
+        rf"|no such file or directory:\s*['\"]{_re_filename.escape(_btok)}['\"]",
+        _re_filename.IGNORECASE,
+    )
+    for _btok in KNOWN_MISSING_BINARIES
+}
+
+
+def _strip_py_line_comments(code: str) -> str:
+    """CR-01(1c) — drop each line's unquoted ``#…`` tail so a Python COMMENT can
+    never supply a JS token to the G-B check (``# let me handle a => b``). Quote
+    tracking is per-line and deliberately simple: on the rare edge it over-strips
+    (a ``#`` inside a triple-quoted string spanning lines), it only removes MORE
+    text, which can only SUPPRESS a G-B hit — the safe-default (pass-through)
+    direction, so it never causes a false reshape."""
+    out_lines: list[str] = []
+    for line in code.splitlines():
+        quote: str | None = None
+        cut = len(line)
+        i = 0
+        n = len(line)
+        while i < n:
+            ch = line[i]
+            if quote is not None:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = None
+            elif ch in ("'", '"'):
+                quote = ch
+            elif ch == "#":
+                cut = i
+                break
+            i += 1
+        out_lines.append(line[:cut])
+    return "\n".join(out_lines)
+
 
 def _classify_runtime_gap(
     code: str, stdout: str, stderr: str, exit_code: int
@@ -2127,24 +2186,30 @@ def _classify_runtime_gap(
 
     Returns ``{"class": "G-A"|"G-B"|"G-C", "token": <str>, "message": <str>}``
     on a hit; ``None`` otherwise. Pure — no I/O. See the DESIGN LAW comment above:
-    a hit ALWAYS requires a fixed-allowlist token (or the JS-token+SyntaxError
-    combination, or a relative-subdir missing path) — never error-type or exit
-    code alone. Safe default (``None``) on any non-match, exactly like
-    ``_safe_out_filename`` returns ``deliverable.<ext>`` on a bad name.
+    a hit ALWAYS requires a fixed-allowlist token NAMED as missing (or the
+    JS-token+SyntaxError combination, or a bundled-skill-tree missing path) —
+    never error-type or exit code alone. Safe default (``None``) on any non-match,
+    exactly like ``_safe_out_filename`` returns ``deliverable.<ext>`` on a bad name.
     """
     code_s = code or ""
     out_l = f"{stdout or ''}\n{stderr or ''}".lower()
     all_l = f"{code_s.lower()}\n{out_l}"
-    not_found = any(p in out_l for p in NOT_FOUND_PHRASES)
     shell_exit = exit_code in (124, 127)
 
-    # (a) G-C missing binary. A known binary token co-occurs with a not-found
-    #     phrase (the token must appear in OUTPUT — where "command not found"
-    #     names it), OR with a 124/127 exit (the token may appear in `code` too:
-    #     a hung/killed binary leaves its name only in the executed code, since
-    #     the timeout stderr is our own abort message). Never on exit alone.
+    # (a) G-C missing binary. Two disjoint signals, BOTH requiring a fixed-
+    #     allowlist token — NEVER exit code alone:
+    #       * a 124/127 exit with the token anywhere in code+output — a hung/killed
+    #         binary leaves its name only in the executed code (the timeout stderr
+    #         is our own abort message); OR
+    #       * the shell NAMING the token as missing — `<tok>: not found`,
+    #         `<tok>: command not found`, or a FileNotFoundError exec of EXACTLY
+    #         that token — via the precise per-token regex (CR-01 1b). A bare
+    #         co-occurrence of the token with the words "not found"
+    #         (`config node 'db' not found`) is NOT a gap → falls through to None.
     for tok in sorted(KNOWN_MISSING_BINARIES):
-        if (tok in out_l and not_found) or (tok in all_l and shell_exit):
+        if shell_exit and tok in all_l:
+            return {"class": "G-C", "token": tok, "message": GAP_MESSAGES[tok]}
+        if _BINARY_GAP_RES[tok].search(out_l):
             return {"class": "G-C", "token": tok, "message": GAP_MESSAGES[tok]}
 
     # (b) G-C missing module — `No module named '<mod>'` for a KNOWN module only
@@ -2156,11 +2221,16 @@ def _classify_runtime_gap(
         if mod in KNOWN_MISSING_MODULES:
             return {"class": "G-C", "token": mod, "message": GAP_MESSAGES[mod]}
 
-    # (c) G-B non-Python script — a JS-exclusive token in `code` AND a Python
-    #     SyntaxError in stderr. Both required (a bare SyntaxError passes through).
+    # (c) G-B non-Python script — a JS-exclusive token on a NON-COMMENT `code`
+    #     line AND a Python SyntaxError in stderr. Both required (a bare
+    #     SyntaxError passes through). CR-01 1c: line-comments are stripped first
+    #     so a `# let me handle a => b` note cannot masquerade as JS, and `"let "`
+    #     is no longer a token (so `print("let there be light")` + SyntaxError
+    #     passes through as None).
     if "syntaxerror" in out_l:
+        code_no_comments = _strip_py_line_comments(code_s)
         for jtok in JS_TOKENS:
-            if jtok in code_s:
+            if jtok in code_no_comments:
                 return {"class": "G-B", "token": jtok, "message": GAP_MESSAGES_JS}
 
     # (d) G-A missing bundled file — a not-found path that is a RELATIVE subdir

@@ -237,3 +237,34 @@ async def test_pptx_soffice_loop_capped():
     assert distinct_tokens == 1                       # only soffice failed
     assert get_or_create.call_count <= distinct_tokens
     assert get_or_create.call_count == 1              # the 7 retries all short-circuited
+
+
+# ── 5. CR-01(1a): a SUCCESSFUL (exit-0) run is never classified or recorded ─────
+
+
+async def test_exit0_success_never_reshaped_or_recorded():
+    """CR-01(1a) — the POST-HOC classifier is GATED on failure. A run that exits 0
+    is never reshaped and never records a repeat-guard token, even when its stdout
+    literally prints ``soffice: command not found`` / ``node not found`` (a value a
+    completely ordinary successful program could emit). Without the gate this
+    exit-0 output would be reshaped and would poison the run via the repeat-guard."""
+    dead: set = set()
+    ctx = _make_ctx(dead)
+    ok = _FakeExecResult(
+        stdout="soffice: command not found\nnode not found\n",
+        stderr="",
+        exit_code=0,
+    )
+
+    with patch.object(tool_dispatcher, "_classify_runtime_gap") as spy:
+        with _sandbox_patched(ok) as (_get_or_create, _s):
+            r = await _handle_execute_code(
+                {"code": "print('soffice: command not found')"}, ctx
+            )
+        # The gate stops the classifier from ever being invoked on success.
+        spy.assert_not_called()
+
+    payload = json.loads(r.llm_content)
+    assert payload["status"] == "completed"
+    assert "runtime_gap" not in payload          # nothing reshaped
+    assert dead == set()                         # nothing recorded → run not poisoned
