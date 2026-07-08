@@ -91,6 +91,16 @@ class ToolContext:
     model: str = ""  # user's selected model (for sub-agent routing)
     previous_files_in_run: dict | None = None  # sandbox output file tracking across execute_code calls
     new_file_hashes_in_run: set | None = None  # RUN-01a — content-hashes genuinely new to THIS run (run-scoped accumulator)
+    # Phase 142 (SRH-01 / D-06) — run-scoped repeat-guard. The set of KNOWN_MISSING
+    # gap tokens (soffice / markitdown / a lost `scripts/office/*` path / a JS
+    # marker) that have already FAILED this run with a PERMANENT runtime gap.
+    # By-reference run-scoped accumulator (mirrors new_file_hashes_in_run): init
+    # once in agent_loop.py, threaded into BOTH ToolContext builds, FRESH set() for
+    # sub-agents (task_service — a sub-agent's dead call must not block the parent).
+    # None on EVERY unwired (harness/eval/test/duck-typed) caller => the reshape
+    # `.add` and the pre-flight membership check are literal no-ops (D-14
+    # byte-identical Deep). Bounded by the fixed allowlist => no key growth (T-142-04).
+    dead_gap_tokens_in_run: set | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
@@ -904,6 +914,27 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
 
     code = args.get("code", "")
     libraries = args.get("libraries") or []
+
+    # Phase 142 (SRH-01 / D-06) — PRE-FLIGHT repeat-guard. If a PERMANENT runtime
+    # gap already fired on a token THIS run and the incoming code references it
+    # again, short-circuit BEFORE acquiring the sandbox. This structurally caps the
+    # BUG-260707-02 soffice/markitdown retry loop at <=1 real dead sandbox call per
+    # token, even for a weak model that ignores the honest framing. Guarded
+    # `is not None` => a literal no-op for every unwired (Deep/harness/eval/test)
+    # caller, so no sandbox event fires and Deep behavior stays byte-identical.
+    # Tokens are drawn only from the fixed KNOWN_MISSING allowlist (or a G-A path
+    # captured from stderr), matched case-insensitively against the model-supplied
+    # code (the `_safe_out_filename` distrust-the-string posture, bounded set).
+    if ctx.dead_gap_tokens_in_run is not None:
+        _code_lower = code.lower()
+        _dead_token = next(
+            (t for t in ctx.dead_gap_tokens_in_run if t and t.lower() in _code_lower),
+            None,
+        )
+        if _dead_token is not None:
+            _short_circuit = _repeat_blocked_result(_dead_token)
+            return ToolResult(result=_short_circuit, llm_content=_short_circuit)
+
     # Emit start event (SAND-04)
     await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_start', code_preview=code[:200])
     # SAND (silence fix): setup-window clock for the honest phase labels below
@@ -1257,14 +1288,30 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             "stderr": exec_result.stderr or "",
         })
         # Strip signed URLs from LLM context
-        llm_content = json.dumps({
+        _llm_payload = {
             "status": exec_status,
             "exit_code": actual_exit_code,
             "duration_ms": duration_ms,
             "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
             "stdout": exec_result.stdout or "",
             "stderr": exec_result.stderr or "",
-        })
+        }
+        # Phase 142 (SRH-01 / D-06) — POST-HOC reshape. Classify the completed
+        # failure against the fixed KNOWN_MISSING allowlist; on a HIT append a
+        # PERMANENT-framed `runtime_gap` note to the MODEL-facing llm_content (so a
+        # weak model can't misread a bare stderr as transient) AND record the token
+        # in the run-scoped repeat-guard set (guarded `is not None` => no-op when
+        # unwired). On a MISS (T-142-01) stdout/stderr pass through UNCHANGED — a
+        # real error still reaches the model. `tool_result` (the persisted/UI copy)
+        # is left untouched: only the model-facing view carries the honest note.
+        _gap = _classify_runtime_gap(
+            code, exec_result.stdout or "", exec_result.stderr or "", actual_exit_code
+        )
+        if _gap is not None:
+            _llm_payload["runtime_gap"] = _gap
+            if ctx.dead_gap_tokens_in_run is not None:
+                ctx.dead_gap_tokens_in_run.add(_gap["token"])
+        llm_content = json.dumps(_llm_payload)
         ctx.spawn(write_audit_entry(
             user_id=ctx.current_user["id"],
             action_type="code.execute",
@@ -2072,6 +2119,48 @@ def _classify_runtime_gap(
             }
 
     return None
+
+
+# Phase 142 (SRH-01 / D-06) — pre-flight repeat-guard support. A recorded dead
+# token is one of: a KNOWN_MISSING binary/module (keys GAP_MESSAGES), a JS marker
+# (GAP_MESSAGES_JS), or a lost flattened-tree G-A path (GAP_MESSAGES_MISSING_FILE).
+# Map it back to its permanent-framed wording without re-running the classifier.
+def _message_for_dead_token(token: str) -> str:
+    if token in GAP_MESSAGES:
+        return GAP_MESSAGES[token]
+    if token in JS_TOKENS:
+        return GAP_MESSAGES_JS
+    return GAP_MESSAGES_MISSING_FILE.format(path=token)
+
+
+_REPEAT_BLOCKED_NOTE = (
+    "You already attempted this in the current run and it failed with a PERMANENT "
+    "runtime gap — it will not succeed on retry. Stop retrying; use the in-sandbox "
+    "alternative described above, or tell the user this is unavailable."
+)
+
+
+def _repeat_blocked_result(token: str) -> str:
+    """Build the short-circuit tool-result JSON for the pre-flight repeat-guard.
+
+    Error-shaped (``status='error'`` + non-zero ``exit_code``) so the model treats
+    it as a failed call, carrying the same permanent-framed message plus the
+    "already attempted this run" line. No sandbox is touched to produce it.
+    """
+    return json.dumps({
+        "status": "error",
+        "exit_code": 1,
+        "duration_ms": 0,
+        "output_files": [],
+        "stdout": "",
+        "stderr": "",
+        "runtime_gap": {
+            "token": token,
+            "message": _message_for_dead_token(token),
+            "repeat_blocked": True,
+            "note": _REPEAT_BLOCKED_NOTE,
+        },
+    })
 
 
 async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
