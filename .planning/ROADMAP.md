@@ -401,7 +401,7 @@ Plans:
 **Plans**: 5 plans (3 waves)
 - [x] 142-01-PLAN.md - runtime-gap classifier + shared honesty constants (KNOWN_MISSING / GAP_MESSAGES / SCRIPT_EXTS); T-142-01 pass-through negative [wave 1]
 - [x] 142-02-PLAN.md - reactive reshape + per-run repeat-guard + run-scope threading (SC#2, D-06, D-03 loop-cap) [wave 2]
-- [ ] 142-03-PLAN.md - skill-file read honesty: decode whitelist + load_skill flag (SC#3/D-11, D-05b) [wave 3]
+- [x] 142-03-PLAN.md - skill-file read honesty: decode whitelist + load_skill flag (SC#3/D-11, D-05b) [wave 3]
 - [x] 142-04-PLAN.md - proactive capability facts on the execute_code tool schema (D-05a, D-14-safe) [wave 1]
 - [x] 142-05-PLAN.md - import-time honesty note + frontend render (SC#1/D-08, D-09) [wave 2]
 **Scope note (operator, 2026-06-29 — SEED-096):** broaden the honest "can't execute this" signal to fire on ALL "runtime can't do this" cases — **missing bundled file (G-A: bundle-tree flatten)** and **missing system binary (G-C: pandoc/LibreOffice/Poppler)** — not only non-Python scripts (G-B). Worked example: Anthropic's `docx` skill triggers but is inert (its all-Python edit path can't resolve `scripts/office/*.py` because import + sandbox injection flatten the nested tree). The CAPABILITY fix (real tree-fidelity + Node + binaries) is OUT of 142 → DISC-01 / v3.3+. Pull SEED-096 into discuss-phase 142.
