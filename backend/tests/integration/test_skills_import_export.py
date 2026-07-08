@@ -372,6 +372,81 @@ class TestImportSkill:
         )
         assert response.status_code == 413
 
+    # ── Phase 142 (SRH-01 / SC#1 / D-08): non-blocking import note ────────────────
+    # A skill that bundles a non-Python script still imports SUCCESSFULLY; the response
+    # carries an additive, OPTIONAL `notes[]` entry so the user learns at import time
+    # that the skill has a step the sandbox can't run yet (D-10 = the G-B static
+    # ZIP-extension scan, the only import-time-knowable signal). The note goes on BOTH
+    # the sync (201) and the background (202) response bodies (Pitfall 5). An all-Python
+    # ZIP produces no note.
+
+    def test_import_note_for_js(self, client, auth_headers, mock_builder):
+        """A .js-bundling skill imports (201) with a non-blocking notes[] entry. (SC#1/D-08)"""
+        zip_bytes = _make_zip({
+            "SKILL.md": _valid_skill_md(name="JS Skill"),
+            "helper.js": "console.log('hi')",
+        })
+        # The skills INSERT needs .data[0]; the single file INSERT ignores its return, so a
+        # single return_value (not a call-counted side_effect) is safest.
+        mock_builder.execute.return_value = _make_result([_skill_row(name="JS Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        # Import SUCCEEDS — the note never blocks (D-08).
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["created"]) == 1
+        assert "notes" in data, "the additive notes[] key must be present (Pitfall 5)"
+        notes = data["notes"]
+        assert len(notes) == 1
+        assert notes[0]["skill"] == "JS Skill"
+        assert "helper.js" in notes[0]["note"]
+        assert "can't run" in notes[0]["note"]
+
+    def test_no_note_for_all_python(self, client, auth_headers, mock_builder):
+        """An all-Python ZIP imports (201) with NO honesty note (empty or absent). (SC#1)"""
+        zip_bytes = _make_zip({
+            "SKILL.md": _valid_skill_md(name="Py Skill"),
+            "util.py": "x = 1",
+        })
+        mock_builder.execute.return_value = _make_result([_skill_row(name="Py Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["created"]) == 1
+        # A pure-Python bundle must not trigger a false honesty note.
+        assert not data.get("notes")
+
+    def test_note_on_background_path(self, client, auth_headers, mock_builder):
+        """The 202 background branch ALSO carries notes[] for a script bundle. (SC#1 Pitfall 5)"""
+        # 20 .py + 1 .js == 21 files > 20 -> the has_background JSONResponse (202) branch.
+        entries = {"skill-x/SKILL.md": _valid_skill_md(name="BG JS Skill")}
+        for i in range(20):
+            entries[f"skill-x/f{i:02d}.py"] = f"x = {i}"
+        entries["skill-x/runner.js"] = "console.log(1)"
+        zip_bytes = _make_zip(entries)
+        mock_builder.execute.return_value = _make_result([_skill_row(name="BG JS Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        # 202 = the background branch; the note MUST ride along here too (Pitfall 5).
+        assert response.status_code == 202
+        data = response.json()
+        assert "notes" in data
+        assert data["notes"][0]["skill"] == "BG JS Skill"
+        assert any("runner.js" in n["note"] for n in data["notes"])
+
 
 # ── Collision / resilience regression tests (quick 260705-nfu) ─────────────────
 
