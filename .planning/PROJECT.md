@@ -344,7 +344,7 @@ CORE 132-137 + inserted 137.1 (EVAL-05) + inserted 137.2 (CREATE-01) all shipped
 
 ### Active (current milestone)
 
-*v3.2 Skill Eval Studio + Self-Improving — all CORE + inserted phases (132-137, 137.1, 137.2) shipped as of 2026-07-05. Next: STRETCH Phases 138-143 (gated behind CORE, ship only if budget remains). Backlog: v2.9 STRETCH 105-109; SEED-013/014 connectors; SEED-082 emit-gate; SEED-102/103/104 (name-collision general case, batched interview questions, agent-driven skill file attachment — all deferred with concrete re-open triggers); open run-honesty/provider-polish bug reports.*
+*v3.2 Skill Eval Studio + Self-Improving — all CORE + inserted phases (132-137, 137.1, 137.2) shipped as of 2026-07-05. STRETCH shipped: 138 (RUN-01 run-end honesty), 139 (SI-02 description-only proposer), 140 (TRIG-02 smart-dispatch pre-filter), 141 (COLL-02 template_input run-scope), 142 (SRH-01 non-Python skill-script honesty — 2026-07-08, verify human_needed: 3 live cross-provider rows in 142-HUMAN-UAT.md; secure-phase pending). Remaining STRETCH: 143 (WF-01 starter workflow library, unplanned) + 144 (FILE-01 agent-driven skill file attachment, planned). Backlog: v2.9 STRETCH 105-109; SEED-013/014 connectors; SEED-082 emit-gate; SEED-102/103 (name-collision general case, batched interview questions — deferred with concrete re-open triggers; SEED-104 promoted to Phase 144); open run-honesty/provider-polish bug reports.*
 
 ### Out of Scope
 
