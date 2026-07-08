@@ -1,10 +1,11 @@
 ---
 phase: 145
 slug: run-lifecycle-honesty-threads-py-extraction-stretch
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-09
+approved: 2026-07-09
 ---
 
 # Phase 145 — Validation Strategy
@@ -95,12 +96,13 @@ created: 2026-07-09
 
 ## Validation Sign-Off
 
-- [ ] All behavior tasks have an `<automated>` verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all ❌ MISSING references above
-- [ ] No watch-mode flags in any command
-- [ ] Feedback latency < 20s (quick) / < 4 min (full)
-- [ ] Live SC#10 UAT matrix exercised (both directions × cross-provider × parallel-thread × long-gap × cancel)
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All behavior tasks have an `<automated>` verify or a Wave 0 dependency *(plan-checker confirmed 2026-07-09 — every task carries a concrete `<automated>` command; Wave 0 gaps authored inline as RED→GREEN task pairs)*
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify *(plan-checker Dimension 8)*
+- [x] Wave 0 covers all ❌ MISSING references above *(authored as tasks in 145-02/03/04/05; files become ✅ during execution)*
+- [x] No watch-mode flags in any command
+- [x] Feedback latency < 20s (quick) / < 4 min (full)
+- [ ] Live SC#10 UAT matrix exercised (both directions × cross-provider × parallel-thread × long-gap × cancel) *(runs during /gsd:verify-work — operator-driven)*
+- [x] `nyquist_compliant: true` set in frontmatter
+- [ ] `wave_0_complete: true` — flip once the Wave 0 test files are authored + green during execution
 
-**Approval:** pending
+**Approval:** approved 2026-07-09 (plan-phase checker: 0 blockers)

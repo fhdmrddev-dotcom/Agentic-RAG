@@ -494,22 +494,22 @@ The 4-axis bandwidth (CLAUDE.md UAT recipe) applied to both directions:
 
 *(Every `[ASSUMED]`/A-tagged item needs operator confirmation or LIVE-repro verification before it becomes a locked decision. A1 in particular contradicts a value in CONTEXT and must be surfaced.)*
 
-## Open Questions
+## Open Questions (RESOLVED at plan time — 2026-07-09)
 
-1. **Cross-worker cancel (WORKER_COUNT=2).**
+> All three were settled during `/gsd:plan-phase 145` (operator ratification + plan design). Kept here for the audit trail with the resolution pointer.
+
+1. **Cross-worker cancel (WORKER_COUNT=2).** — **RESOLVED: FLAGGED, not fixed (out of 145 scope).**
    - What we know: `task.cancel()` is in-process; a Stop on the non-owning worker falls to zombie-heal (marks DB cancelled) while the live producer keeps running on the other worker.
    - What's unclear: whether this reproduces in the operator's dev setup (WORKER_COUNT=2 default) and whether the producer's own terminal then overwrites `cancelled` (no CAS in `finalize_run`).
-   - Recommendation: verify in the cancel UAT; if it reproduces, file a follow-up (cross-worker cancel pub/sub) — OUT of 145 scope (honesty/extraction only). Re-open trigger recorded in U4.
+   - **Resolution:** honesty/extraction scope only — Plan 145-03 records it as an accepted threat (`T-145-03-03`) + surfaces it in the cancel UAT; Plan 145-06 plants it in SEED-109 with re-open trigger "a live run is not cancellable when Stop lands on the non-owning worker." No fix in 145.
 
-2. **`cap_paused` under the periodic sweep.**
+2. **`cap_paused` under the periodic sweep.** — **RESOLVED: excluded from the periodic sweep.**
    - What we know: `cap_paused` is non-terminal, quiet, and re-attachable (harness Continue).
-   - What's unclear: whether the periodic stream-age sweep should ever touch it.
-   - Recommendation: exclude `cap_paused` from the *periodic* sweep; leave it to boot / the Continue flow. Confirm at plan time.
+   - **Resolution:** Plan 145-04 calls the periodic reconciler with `include_cap_paused=False` (boot sweep / Continue flow keep owning it); covered by `test_cap_paused_not_swept_periodically`.
 
-3. **`STALE_TIMEOUT` final value (A1).**
+3. **`STALE_TIMEOUT` final value (A1).** — **RESOLVED: config-driven 2400s (operator-ratified).**
    - What we know: longest legit silent gap = 1800s (ask_user) / 900s (reasoning).
-   - What's unclear: operator's tolerance for dead-producer correction latency vs false-kill safety.
-   - Recommendation: default 2400s config field; present alternative (exclude ask_user + 1200s). Operator ratifies.
+   - **Resolution:** operator ratified the config-driven generous default over the exclude-ask_user alternative — Plan 145-04 adds `run_stale_sweep_timeout_seconds: int = 2400` (+ `run_stale_sweep_interval_seconds`) to `config.py`. The exclude-ask_user path is NOT built.
 
 ---
 
