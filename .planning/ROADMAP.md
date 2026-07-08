@@ -437,6 +437,22 @@ Plans:
 **Plans**: TBD
 **Scope note (SEED-104, 2026-07-05):** distinct from SEED-096 (bundle-tree fidelity / execution capability — can a skill's own bundled scripts run) — this phase is about attachment capability (can the agent or user get a file INTO a skill's storage at all during authoring). Needs its own threat model at discuss-phase (new write path), per the project's security-review discipline — this is exactly the kind of surface the operator deliberately deferred out of Phase 137.2 rather than rush in mid-verification.
 
+#### Phase 145: Run-Lifecycle Honesty + threads.py Extraction (STRETCH)
+
+**Goal**: The chat run-state is authoritative and honest in BOTH directions — a genuinely-streaming run shows a working Stop; a finished run finalizes with no phantom "running" / dead Stop — by making Redis `runs:active` the single source of truth (register on start, remove only on terminal, reconcile via fetch on reconnect per D-v2.5-03); the run-lifecycle logic is extracted OUT of `threads.py` into a dedicated, tested module.
+**Depends on**: Phase 138 (SEED-094 run-end honesty, shipped); Phase 137.1 (boot-time orphan reconciler `run_reconciler.py`, shipped — 145 extends it to LIVE self-heal, not boot-sweep-from-scratch). D-v2.5-03 (Realtime is a hint; reconcile via fetch on reconnect). Operator pivot 2026-07-09: foundation pass before more feature phases.
+**Requirements**: FND-01
+**Success Criteria** (what must be TRUE):
+
+  1. Direction A can't persist: when the backend run reaches a terminal state, the chat UI finalizes to done with no phantom "running" and no dead Stop — even if the terminal SSE event is missed, a reconcile fetch self-heals within one mount / thread-switch / reconnect cycle (FND-01; BUG-260709-01 Direction A).
+  2. Direction B is honest: a genuinely-streaming run shows a working Stop that actually cancels; a run whose producer died (backend restart / broken SSE) is detected and reconciled to a terminal state instead of showing a live-but-dead stream (FND-01; BUG-260709-01 Direction B + BUG-260702-02).
+  3. The drifting representations agree: exactly ONE signal is authoritative for "is this run streaming?", and Redis `runs:active` + `run_reconciler.py` + admin backpressure `ZCARD` derive from / stay consistent with it — no independent drift (FND-01).
+  4. The run-lifecycle / `runs:active` register-on-start / remove-on-terminal / reconcile logic is extracted out of `backend/app/api/threads.py` into a dedicated, unit-tested module — `threads.py` no longer owns run-lifecycle state transitions (G-5 paydown).
+  5. Proven across representative providers (SC#10) — streaming × UI-state × parallel-thread, since the desync was observed cross-provider (OpenAI Direction A; DeepSeek + MiniMax Direction B).
+
+**Plans**: TBD
+**Scope note (root-cause CORRECTED 2026-07-09, `c12ff264`):** the static trace in `.planning/reported-bugs/BUG-260709-01-run-state-stop-button-desync.md` supersedes the original "make `runs:active` the single source of truth" hypothesis — the frontend does NOT read `runs:active`; it derives `isStreaming` from Postgres `runs.status='streaming'` via `get_snapshot` (`backend/app/api/threads.py` ~:364 / :413-423). The two observed directions have DIFFERENT root causes (A = purely frontend missed-terminal + no reconcile; B = restarted producer / broken SSE — the `runs:active`-empty is a SEPARATE reconciler-accuracy inconsistency, NOT why Stop was missing). WHICH signal becomes authoritative is a discuss-phase decision. LIVE repro required BEFORE the fix (operator drives; verify DB + Redis). NOT caused by the 2026-07-08 DeepSeek/openai_compat change (MiniMax, off that path, shows the same behavior).
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -454,6 +470,7 @@ Plans:
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 0/TBD | Not started (execute NEXT) | - |
 
 ### Guardrails firing (v3.2)
 
