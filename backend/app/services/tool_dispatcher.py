@@ -997,6 +997,17 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             None,
         )
         if _dead_token is not None:
+            # WR-02: bracket the short-circuit with the SAME code_execution
+            # start/complete SSE pair the normal path emits (:998 / :1335), so the
+            # UI code-card for this call RESOLVES instead of spinning forever with
+            # no matching complete event. Every other exit path from this handler
+            # (timeout abort, exception) already emits a complete. Safe for unwired
+            # callers — the whole block is gated on `dead_gap_tokens_in_run is not
+            # None`, so Deep/eval/duck-typed ctx never reach it (byte-identical D-14).
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_start',
+                           code_preview=code[:200])
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete',
+                           exit_code=1, duration_ms=0, output_files=[])
             _short_circuit = _repeat_blocked_result(_dead_token)
             return ToolResult(result=_short_circuit, llm_content=_short_circuit)
 

@@ -331,3 +331,31 @@ async def test_cr02_soffice_repeat_and_benign_node_substring():
         r_repeat = await _handle_execute_code({"code": SOFFICE_CODE}, ctx)
     assert goc3.call_count == 0
     assert json.loads(r_repeat.llm_content)["runtime_gap"]["repeat_blocked"] is True
+
+
+# ── 7. WR-02: the pre-flight short-circuit still emits the SSE lifecycle pair ───
+
+
+async def test_wr02_short_circuit_emits_lifecycle_events():
+    """WR-02: a blocked (short-circuited) call must still emit a matched
+    code_execution_start + code_execution_complete pair, or the UI code-card for
+    that call renders as never-completing. It still touches NO sandbox."""
+    events: list[tuple] = []
+
+    async def _record_emit(_redis, _run_id, event_type, **kwargs):
+        events.append((event_type, kwargs))
+
+    # soffice already dead this run → the incoming SOFFICE_CODE short-circuits.
+    ctx = _make_ctx({"soffice"}, emit=_record_emit)
+    ok = _FakeExecResult(stdout="", stderr="", exit_code=0)
+    with _sandbox_patched(ok) as (get_or_create, _s):
+        r = await _handle_execute_code({"code": SOFFICE_CODE}, ctx)
+
+    # Short-circuited → no sandbox acquired.
+    assert get_or_create.call_count == 0
+    assert json.loads(r.llm_content)["runtime_gap"]["repeat_blocked"] is True
+
+    # A matched start+complete pair was emitted so the UI card resolves.
+    types = [e[0] for e in events]
+    assert types == ["code_execution_start", "code_execution_complete"]
+    assert events[1][1].get("exit_code") == 1
