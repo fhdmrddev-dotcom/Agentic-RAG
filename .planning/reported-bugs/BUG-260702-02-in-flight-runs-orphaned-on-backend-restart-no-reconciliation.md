@@ -9,7 +9,7 @@ affected_areas: [backend/eval-runner, backend/run-lifecycle, backend/threads, fr
 folded_into: "137.1"
 verified_closed_by: null
 related_seeds: [SEED-100]
-re_open_trigger: "Reviewed at /gsd:discuss-phase 137 (2026-07-03) — NOT folded: backend reconciliation stays SEED-100. 137 owes only the DISPLAY half per the 055-B sketch contract: an interrupted eval run renders an honest banner + re-run affordance in the Studio run history (never a silent failure / stuck 'running'). || Folded at /gsd:discuss-phase 137.1 (2026-07-04): boot-time reconciliation sweep (eval->interrupted, chat->failed, stale streams dropped) is CONTEXT D-09/D-10."
+re_open_trigger: "Reviewed at /gsd:discuss-phase 137 (2026-07-03) — NOT folded: backend reconciliation stays SEED-100. 137 owes only the DISPLAY half per the 055-B sketch contract: an interrupted eval run renders an honest banner + re-run affordance in the Studio run history (never a silent failure / stuck 'running'). || Folded at /gsd:discuss-phase 137.1 (2026-07-04): boot-time reconciliation sweep (eval->interrupted, chat->failed, stale streams dropped) is CONTEXT D-09/D-10. || Extended at /gsd:discuss-phase 145 (2026-07-09): 137.1 shipped the BOOT sweep; 145 adds the LIVE half — a periodic stream-age staleness sweep (D-145-06) so a dead-producer run self-heals WHILE the app is up, not only on next boot. The 137.1 orphan predicate ('absent from runs:active') is also being replaced by stream-age, since 145 demotes runs:active to a derived mirror (D-145-02). Re-open if a restart/crash-orphaned run stays non-terminal with the app running after 145 ships."
 reproduces_on:
   branch: develop
   commit: 34834433

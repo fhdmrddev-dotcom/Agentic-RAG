@@ -4,12 +4,12 @@ title: Composer flips Stop→Send and 👍/👎 feedback appears mid-run after a
 reported: 2026-07-07
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat-ui]
-folded_into: null
+folded_into: "145"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09, D-145-10) — same _isTransientStreamEnd / transient-reattach surface. Contract: UI must NOT flip to 'done' affordances (Send, feedback thumbs) until runs.status is actually terminal (D-145-01 authoritative signal). Gets a dedicated VALIDATION row. Re-open if the composer/feedback still flips mid-run after 145 ships."
 reproduces_on:
   branch: develop
   commit: cb9fef39

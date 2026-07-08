@@ -4,12 +4,12 @@ title: Chat run-state / stop button desyncs from backend reality (both direction
 reported: 2026-07-09
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/streaming, backend/run-lifecycle, StreamsProvider, redis/runs-active]
-folded_into: null
+folded_into: "145"
 verified_closed_by: null
 related_seeds: [SEED-094]
-re_open_trigger: null
+re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09). Fix model: Postgres runs.status authoritative (D-145-01); runs:active demoted to derived mirror written atomically by the extracted owner (D-145-02); Direction A = client inactivity watchdog + silent finalize (D-145-03/04); Direction B = periodic+boot stream-age staleness sweep (D-145-06). Re-open if either direction still reproduces after 145 ships."
 reproduces_on:
   branch: develop
   commit: 6ce1be0a
