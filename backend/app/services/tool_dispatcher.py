@@ -673,6 +673,34 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
     )
 
 
+# Phase 142 (SRH-01 / D-05 / D-05b) — the proactive per-skill runtime note ridden
+# along the load_skill RESULT (the load_skill-flag half of the D-05 proactive home).
+# Names the non-Python script file(s) a skill bundles that the Python-only sandbox
+# cannot run. Model-facing, advisory only — mirrors save_skill's lint_warnings.
+_SKILL_RUNTIME_NOTE = (
+    "This skill bundles non-Python script file(s) ({names}) that this Python-only "
+    "sandbox cannot execute. Their content may still guide you; do not try to run "
+    "them as programs."
+)
+
+
+def _skill_runtime_note(file_names: list[str]) -> str | None:
+    """Return an advisory note naming any bundled non-Python script files, else None.
+
+    Pure: scans each filename's extension against the shared Plan-01 ``SCRIPT_EXTS``
+    allowlist. Non-blocking by contract — the caller computes this defensively and
+    NEVER lets it fail a load (the ``lint_warnings`` posture). Returns ``None`` when
+    the file list is all-Python / non-script (nothing to warn about).
+    """
+    offending = [
+        name for name in file_names
+        if os.path.splitext(name)[1].lstrip(".").lower() in SCRIPT_EXTS
+    ]
+    if not offending:
+        return None
+    return _SKILL_RUNTIME_NOTE.format(names=", ".join(offending))
+
+
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     skill_name = args.get("skill_name", "")
     # Emit skill_activated SSE event immediately (SKIL-12)
@@ -727,11 +755,22 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     instructions = row["instructions"]
     if override is not None and skill_name in override:
         instructions = override[skill_name]
-    return ToolResult(result=json.dumps({
+    result_payload = {
         "name": row["name"],
         "instructions": instructions,
         "files": file_names,
-    }))
+    }
+    # D-05b — attach a non-blocking runtime note when the skill bundles a script the
+    # Python-only sandbox cannot execute. Computed defensively (the save_skill
+    # lint_warnings posture): any failure degrades to no note, and the key is added
+    # ONLY when present so the all-Python result stays byte-identical. Never blocks.
+    try:
+        runtime_note = _skill_runtime_note(file_names)
+    except Exception:
+        runtime_note = None
+    if runtime_note is not None:
+        result_payload["runtime_note"] = runtime_note
+    return ToolResult(result=json.dumps(result_payload))
 
 
 async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
