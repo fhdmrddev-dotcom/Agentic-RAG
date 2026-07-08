@@ -795,6 +795,17 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         ))
 
 
+# Phase 142 (SRH-01 / SC#3 / D-11) — the honest caveat prepended to a decoded
+# non-Python script (an ext in the shared SCRIPT_EXTS). read_skill_file stops
+# mislabeling script text as unreadable "binary"; the model is told the file is
+# reference-only, not runnable here. PLAIN TEXT (not json) — matches the .py/.md
+# text-return contract so the model reads it as source, not an error object.
+_SCRIPT_REF_CAVEAT = (
+    "[reference only — '{filename}' is a {ext} script; this sandbox runs Python only "
+    "and cannot execute it. Read it for reference; do not attempt to run it.]\n\n"
+)
+
+
 def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:
     """Decode skill-file bytes to a text tool_result by extension.
 
@@ -831,6 +842,15 @@ def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:
         return "\n".join(slides)
     elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
         return raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+    elif ext in SCRIPT_EXTS:
+        # SC#3 / D-11 — non-Python scripts (.js/.sh/...) ARE text: decode them as
+        # honest reference source with a "not executable in this sandbox" caveat,
+        # replacing the misleading "binary — upload a text version" else-branch below.
+        # This lives in the SHARED decoder, so the live read (_handle_read_skill_file
+        # live path) and the 099 snapshot read inherit the identical string for free
+        # (byte-symmetry / Pitfall 3). SCRIPT_EXTS is the Plan-01 single source.
+        source = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+        return _SCRIPT_REF_CAVEAT.format(filename=filename, ext=ext) + source
     else:
         # Unrecognized or binary type
         return json.dumps({
