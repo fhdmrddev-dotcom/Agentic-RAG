@@ -450,7 +450,13 @@ Plans:
   4. The run-lifecycle / `runs:active` register-on-start / remove-on-terminal / reconcile logic is extracted out of `backend/app/api/threads.py` into a dedicated, unit-tested module — `threads.py` no longer owns run-lifecycle state transitions (G-5 paydown).
   5. Proven across representative providers (SC#10) — streaming × UI-state × parallel-thread, since the desync was observed cross-provider (OpenAI Direction A; DeepSeek + MiniMax Direction B).
 
-**Plans**: TBD
+**Plans**: 6 plans in 3 waves (planned 2026-07-09)
+- [ ] 145-01-PLAN.md — LIVE repro of both directions (checkpoint; precedes every fix — D-145-11)
+- [ ] 145-02-PLAN.md — Extract `run_lifecycle.py` atomic owner (register/finalize co-writers) + unit tests
+- [ ] 145-03-PLAN.md — Wire `threads.py` producer + `runs.py` cancel-parity onto the owner (G-5 extraction)
+- [ ] 145-04-PLAN.md — Direction B: reconciler stream-age sweep + config (STALE_TIMEOUT=2400s) + periodic single-flight host
+- [ ] 145-05-PLAN.md — Direction A: frontend `streamingThreads` reconcile-derive + inactivity watchdog + silent finalize
+- [ ] 145-06-PLAN.md — FND-01 wording correction + SEED-109 (deferred 5-writer migration) planting
 **Scope note (root-cause CORRECTED 2026-07-09, `c12ff264`):** the static trace in `.planning/reported-bugs/BUG-260709-01-run-state-stop-button-desync.md` supersedes the original "make `runs:active` the single source of truth" hypothesis — the frontend does NOT read `runs:active`; it derives `isStreaming` from Postgres `runs.status='streaming'` via `get_snapshot` (`backend/app/api/threads.py` ~:364 / :413-423). The two observed directions have DIFFERENT root causes (A = purely frontend missed-terminal + no reconcile; B = restarted producer / broken SSE — the `runs:active`-empty is a SEPARATE reconciler-accuracy inconsistency, NOT why Stop was missing). WHICH signal becomes authoritative is a discuss-phase decision. LIVE repro required BEFORE the fix (operator drives; verify DB + Redis). NOT caused by the 2026-07-08 DeepSeek/openai_compat change (MiniMax, off that path, shows the same behavior).
 
 ### Progress
