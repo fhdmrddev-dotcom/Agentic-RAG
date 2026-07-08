@@ -1,6 +1,10 @@
 # Phase 075.1 Plan 04 (B-260519-08) — sandbox base image with common
 # data-science + document-generation packages pre-installed.
 #
+# CANONICAL PACKAGE DOC: docs/SANDBOX-PACKAGES.md (what's installed, why, the
+# add-a-package / size-perf rules). This pip line is the machine truth — keep the
+# doc in sync in the SAME commit whenever the package set below changes.
+#
 # Why: pre-Plan-04, the agent loop crashed on first ModuleNotFoundError
 # because the default llm_sandbox image had no python-pptx / matplotlib /
 # numpy / pandas. OpenAI gpt-5.4 gave up after the failure (UAT
