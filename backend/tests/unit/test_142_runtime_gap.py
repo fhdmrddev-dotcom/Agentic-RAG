@@ -295,3 +295,41 @@ def test_cr01_js_token_only_in_comment_passes_through():
         ),
         exit_code=1,
     ) is None
+
+
+# --- WR-01 regression: G-A only fires on a bundled-skill-tree path ------------
+
+
+def test_wr01_ordinary_relative_miss_passes_through():
+    """WR-01: a genuine missing relative USER path (`data/input.json`,
+    `config/settings.yaml`) is RECOVERABLE and MUST pass through as None — it is
+    NOT a lost flattened skill-tree helper, so the model must see the real
+    FileNotFoundError and fix/create the path."""
+    for path in ("data/input.json", "config/settings.yaml", "output/report.txt"):
+        assert _classify_runtime_gap(
+            code=f"open({path!r}).read()",
+            stdout="",
+            stderr=f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'",
+            exit_code=1,
+        ) is None, path
+
+
+def test_wr01_bundled_tree_paths_hit_ga():
+    """WR-01: a not-found RELATIVE path under a known skill-bundle subdir
+    (`scripts/` | `assets/` | `resources/`) is still the lost flattened-tree G-A
+    signal."""
+    for path in (
+        "scripts/office/convert.py",
+        "assets/templates/base.docx",
+        "resources/fonts/arial.ttf",
+    ):
+        hit = _classify_runtime_gap(
+            code=f"import subprocess; subprocess.run(['python', {path!r}])",
+            stdout="",
+            stderr=f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'",
+            exit_code=1,
+        )
+        assert hit is not None, path
+        assert hit["class"] == "G-A"
+        assert hit["token"] == path
+        assert hit["message"] == GAP_MESSAGES_MISSING_FILE.format(path=path)

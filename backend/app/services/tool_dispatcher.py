@@ -99,7 +99,10 @@ class ToolContext:
     # sub-agents (task_service — a sub-agent's dead call must not block the parent).
     # None on EVERY unwired (harness/eval/test/duck-typed) caller => the reshape
     # `.add` and the pre-flight membership check are literal no-ops (D-14
-    # byte-identical Deep). Bounded by the fixed allowlist => no key growth (T-142-04).
+    # byte-identical Deep). Binary/module/JS tokens are bounded by the fixed
+    # allowlist; a G-A entry is a NARROWED bundled-skill-tree path (a
+    # `scripts/`|`assets/`|`resources/`-prefixed relative miss — WR-01), so the set
+    # grows only with genuinely-lost helper paths, never arbitrary model input (T-142-04).
     dead_gap_tokens_in_run: set | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
@@ -2080,6 +2083,13 @@ KNOWN_MISSING_MODULES = frozenset({"markitdown"})
 JS_TOKENS = ("const ", "=>", "require(", "console.log",
              "export default", "function*")
 
+# WR-01: the ONLY missing-path shape that classifies as a lost, flattened
+# skill-tree helper (G-A). A relative path under one of these known skill-bundle
+# subdirs (e.g. `scripts/office/convert.py`) is the flattened-tree signal. ANY
+# other relative miss (`data/input.json`, `config/settings.yaml`) is a RECOVERABLE
+# user error and passes through (None) so the model can create the dir / fix it.
+_SKILL_BUNDLE_DIRS = ("scripts/", "assets/", "resources/")
+
 # Shared script-extension set — consumed by D-11 decode (Plan 03), the D-05b
 # load_skill flag (Plan 03), and the SC#1 import note (Plan 05). Single source;
 # import from here.
@@ -2236,14 +2246,21 @@ def _classify_runtime_gap(
             if jtok in code_no_comments:
                 return {"class": "G-B", "token": jtok, "message": GAP_MESSAGES_JS}
 
-    # (d) G-A missing bundled file — a not-found path that is a RELATIVE subdir
-    #     path (contains '/', not absolute): a lost flattened skill-tree path.
-    #     A genuine missing absolute /sandbox/output/*.csv (starts with '/')
-    #     passes through unchanged.
+    # (d) G-A missing BUNDLED skill helper — a not-found RELATIVE path under a
+    #     known skill-bundle subdir (`scripts/` | `assets/` | `resources/`): the
+    #     lost flattened skill-tree signal. WR-01: a genuine missing relative USER
+    #     path (`data/input.json`, `config/settings.yaml`) is RECOVERABLE — create
+    #     the dir / fix the path — so it passes through (None); only bundle-prefixed
+    #     relative paths are reshaped as a permanent lost-tree gap. A genuine
+    #     absolute /sandbox/output/*.csv (starts with '/') also passes through.
+    #     Recording only these narrowed paths keeps the repeat-guard set from
+    #     growing on arbitrary model-supplied paths (T-142-04 reconciliation).
     pm = _MISSING_PATH_RE.search(stderr or "")
     if pm:
         path = pm.group(1).strip()
-        if "/" in path and not path.startswith("/"):
+        if not path.startswith("/") and any(
+            path.startswith(prefix) for prefix in _SKILL_BUNDLE_DIRS
+        ):
             return {
                 "class": "G-A",
                 "token": path,
