@@ -399,7 +399,7 @@ Plans:
   3. (Optional) `read_skill_file` can return a bundled non-Python file as reference text without implying it can be executed (SRH-01).
 
 **Plans**: 5 plans (3 waves)
-- [ ] 142-01-PLAN.md - runtime-gap classifier + shared honesty constants (KNOWN_MISSING / GAP_MESSAGES / SCRIPT_EXTS); T-142-01 pass-through negative [wave 1]
+- [x] 142-01-PLAN.md - runtime-gap classifier + shared honesty constants (KNOWN_MISSING / GAP_MESSAGES / SCRIPT_EXTS); T-142-01 pass-through negative [wave 1]
 - [ ] 142-02-PLAN.md - reactive reshape + per-run repeat-guard + run-scope threading (SC#2, D-06, D-03 loop-cap) [wave 2]
 - [ ] 142-03-PLAN.md - skill-file read honesty: decode whitelist + load_skill flag (SC#3/D-11, D-05b) [wave 3]
 - [ ] 142-04-PLAN.md - proactive capability facts on the execute_code tool schema (D-05a, D-14-safe) [wave 1]
