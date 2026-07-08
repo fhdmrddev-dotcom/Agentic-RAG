@@ -400,7 +400,7 @@ Plans:
 
 **Plans**: 5 plans (3 waves)
 - [x] 142-01-PLAN.md - runtime-gap classifier + shared honesty constants (KNOWN_MISSING / GAP_MESSAGES / SCRIPT_EXTS); T-142-01 pass-through negative [wave 1]
-- [ ] 142-02-PLAN.md - reactive reshape + per-run repeat-guard + run-scope threading (SC#2, D-06, D-03 loop-cap) [wave 2]
+- [x] 142-02-PLAN.md - reactive reshape + per-run repeat-guard + run-scope threading (SC#2, D-06, D-03 loop-cap) [wave 2]
 - [ ] 142-03-PLAN.md - skill-file read honesty: decode whitelist + load_skill flag (SC#3/D-11, D-05b) [wave 3]
 - [x] 142-04-PLAN.md - proactive capability facts on the execute_code tool schema (D-05a, D-14-safe) [wave 1]
 - [ ] 142-05-PLAN.md - import-time honesty note + frontend render (SC#1/D-08, D-09) [wave 2]
