@@ -45,16 +45,53 @@ stuck and unstoppable, and a genuinely long-running one can offer no stop contro
 erodes confidence independent of how good the underlying features are — the user hit it live
 and did not know whether tokens were still burning (they were not).
 
-## Hypothesized cause
+## Root-cause trace (static, 2026-07-09 — CORRECTS the earlier hypothesis)
 
-Two-part, hypothesis (needs tracing):
-1. `runs:active` (Redis sorted set the UI/lifecycle relies on for "a run is active") is **empty
-   even while runs are streaming** — registration into `runs:active` either never happens, is
-   removed prematurely, or is swept by a cleanup/boot-reconciler while the producer continues.
-   This kills the stop button for live runs (Direction B).
-2. On completion, the frontend `StreamsProvider` local state isn't finalized when the terminal
-   SSE event is missed/dropped, leaving a phantom "running" + dead stop (Direction A). Related
-   to the run-end finalizer gaps (BUG-260626-03) and SEED-094 (run-end honesty).
+A static trace of the run-active plumbing (for Phase 145 scoping) found **three separate
+representations of "is this run streaming?" that can drift apart** — and that the frontend does
+**NOT** read the Redis set the original hypothesis blamed:
+
+1. **StreamsProvider LOCAL state (SSE-driven)** — the in-session running/Stop signal
+   (`frontend/src/providers/StreamsProvider.tsx`). This is what the user sees live.
+2. **Postgres `runs.status='streaming'`** — the RECONCILE source of truth. `get_snapshot`
+   (`backend/app/api/threads.py:364`, Step 3 ~:413-423) SELECTs `runs WHERE status='streaming'`;
+   `StreamsProvider` derives `isStreaming = snapshot.active_runs.some(...)` (line ~232) from it
+   on every mount / thread-switch / onTerminal reconcile. **A browser refresh fixes Direction A
+   precisely because this SELECT returns `[]` once the run is `completed`.**
+3. **Redis `runs:active`** — used ONLY by the boot orphan reconciler
+   (`run_reconciler.py`, liveness oracle) and admin backpressure `ZCARD` (`api/admin.py:72`).
+   **The frontend never reads it** (it is server-side). ZADD on start (threads.py:1125), ZREM on
+   spawn-failure (:1138) / terminal (:1721 / :2209).
+
+So the two observed directions have DIFFERENT root causes, and neither is "the UI reads an empty
+`runs:active`":
+
+- **Direction A (phantom running + dead Stop, backend done):** purely FRONTEND. The terminal SSE
+  event failed to finalize `StreamsProvider`'s local streaming state AND no reconcile fetch fired
+  to self-heal. The backend DB was already correct (`status=completed`; all ZREMs ran). Lives near
+  the onTerminal transient-close probe (StreamsProvider ~:161-235) + the reconcile trigger — NOT
+  the backend finalizer.
+- **Direction B (no Stop on a live run; `runs:active` empty):** the empty `runs:active` is a REAL
+  but SEPARATE inconsistency (reconciler / backpressure accuracy) — it is NOT why the Stop button
+  was missing, because the UI does not read `runs:active`. The missing Stop is a local-state /
+  broken-SSE issue: the run's last stream events were **13–37s STALE (not growing)**, consistent
+  with the **backend having restarted mid-stream** (the operator noted the app "is being booted
+  somehow" — uvicorn `--reload` recycles on file writes). A restart kills the in-process producer
+  task; the DB can still read `streaming` until the NEXT boot's reconciler flips it, and the
+  browser's SSE silently broke with no local Stop affordance + no reconcile.
+
+**Still needs a LIVE repro to CONFIRM** (operator drives; verify via DB+Redis) — a Phase 145
+discuss/plan task: (i) why `runs:active` was empty during Direction B (restart-swept vs ZADD race
+vs reconciler `_drop_stream`); (ii) whether Direction A reproduces WITHOUT a restart (pure
+missed-terminal-SSE) or only after one.
+
+**Fix implication (reshapes Phase 145):** the fix is NOT merely "make `runs:active` authoritative"
+— the frontend does not consume it. It is (a) pick ONE authoritative streaming signal (Postgres
+`runs.status` is already the reconcile truth) and make `runs:active` + the reconciler +
+backpressure derive from / agree with it; (b) guarantee the frontend self-heals a missed terminal
+(reconcile safety-net) so Direction A cannot persist; (c) detect a broken SSE / restarted producer
+and reconcile (ties BUG-260702-02). The G-5 extraction of the run-lifecycle out of `threads.py` is
+the vehicle to centralize (a).
 
 NOT caused by the 2026-07-08 DeepSeek/openai_compat change — MiniMax (which does not go through
 that deepseek-only code path) shows the same `runs:active`-empty behavior.
