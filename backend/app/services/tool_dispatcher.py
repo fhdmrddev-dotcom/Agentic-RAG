@@ -981,13 +981,16 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
     # token, even for a weak model that ignores the honest framing. Guarded
     # `is not None` => a literal no-op for every unwired (Deep/harness/eval/test)
     # caller, so no sandbox event fires and Deep behavior stays byte-identical.
-    # Tokens are drawn only from the fixed KNOWN_MISSING allowlist (or a G-A path
-    # captured from stderr), matched case-insensitively against the model-supplied
-    # code (the `_safe_out_filename` distrust-the-string posture, bounded set).
+    # Tokens are drawn only from the fixed KNOWN_MISSING allowlist (or a narrowed
+    # bundled-tree G-A path captured from stderr). CR-02: binary/module IDENTIFIERS
+    # (`node`, `soffice`, `markitdown`) are matched at WORD BOUNDARIES and JS/path
+    # tokens by containment via `_code_references_dead_token` — a bare substring
+    # inside a larger word (`annotate`, `node_list`, `network_xyz`) never re-blocks
+    # legitimate code for the rest of the run.
     if ctx.dead_gap_tokens_in_run is not None:
-        _code_lower = code.lower()
         _dead_token = next(
-            (t for t in ctx.dead_gap_tokens_in_run if t and t.lower() in _code_lower),
+            (t for t in ctx.dead_gap_tokens_in_run
+             if t and _code_references_dead_token(code, t)),
             None,
         )
         if _dead_token is not None:
@@ -2260,6 +2263,24 @@ def _message_for_dead_token(token: str) -> str:
     if token in JS_TOKENS:
         return GAP_MESSAGES_JS
     return GAP_MESSAGES_MISSING_FILE.format(path=token)
+
+
+# Phase 142 (SRH-01 / D-06) — pre-flight repeat-guard MATCH (CR-02). Decide whether
+# a newly-submitted `code` re-references an already-dead token this run. A binary/
+# module IDENTIFIER (`node`, `soffice`, `markitdown`, `extract-text`) is matched at
+# WORD BOUNDARIES so a substring inside a larger word (`annotate`, `node_list`,
+# `network_xyz`) never re-blocks legitimate code; a JS marker (`const `, `=>`, …) or
+# a G-A bundled-tree path (contains `/`) is distinctive enough to keep containment.
+# RESIDUAL ACCEPTED EDGE: a later cell that uses a variable literally named after a
+# missing binary at a real word boundary (e.g. `node = 1`) is still blocked — rare,
+# and the cost is one blocked benign cell, not the multi-round retry loop this guard
+# exists to cap.
+def _code_references_dead_token(code: str, token: str) -> bool:
+    if token in KNOWN_MISSING_BINARIES or token in KNOWN_MISSING_MODULES:
+        return _re_filename.search(
+            rf"\b{_re_filename.escape(token)}\b", code, _re_filename.IGNORECASE
+        ) is not None
+    return token.lower() in code.lower()
 
 
 _REPEAT_BLOCKED_NOTE = (

@@ -268,3 +268,66 @@ async def test_exit0_success_never_reshaped_or_recorded():
     assert payload["status"] == "completed"
     assert "runtime_gap" not in payload          # nothing reshaped
     assert dead == set()                         # nothing recorded → run not poisoned
+
+
+# ── 6. CR-02: pre-flight guard matches identifiers at WORD BOUNDARIES ───────────
+
+
+async def test_cr02_word_boundary_match():
+    """CR-02: a recorded binary identifier re-blocks only on a WORD-BOUNDARY
+    match, never as a bare substring. With `node` already dead this run:
+      * a benign cell containing only the SUBSTRING (`node_list`, `annotate`) is
+        NOT short-circuited — it reaches the sandbox; while
+      * a genuine `subprocess.run(['node', ...])` at a real word boundary IS
+        short-circuited (no sandbox)."""
+    ok = _FakeExecResult(stdout="", stderr="", exit_code=0)
+
+    # Substring-only cell → NOT blocked (reaches the sandbox).
+    ctx_sub = _make_ctx({"node"})
+    with _sandbox_patched(ok) as (goc_sub, _s):
+        r_sub = await _handle_execute_code(
+            {"code": "node_list = [1, 2]\nx = annotate(node_list)  # networkx walk\n"},
+            ctx_sub,
+        )
+    assert goc_sub.call_count == 1
+    assert json.loads(r_sub.llm_content)["status"] == "completed"
+
+    # Bounded-word re-reference → short-circuited (NO sandbox).
+    ctx_word = _make_ctx({"node"})
+    with _sandbox_patched(ok) as (goc_word, _s):
+        r_word = await _handle_execute_code(
+            {"code": "import subprocess\nsubprocess.run(['node', 'app.js'])\n"},
+            ctx_word,
+        )
+    assert goc_word.call_count == 0
+    assert json.loads(r_word.llm_content)["runtime_gap"]["repeat_blocked"] is True
+
+
+async def test_cr02_soffice_repeat_and_benign_node_substring():
+    """CR-02 (directive scenario): after a REAL soffice gap is recorded, a benign
+    later cell `x = annotate(node_list)` is NOT blocked (reaches the sandbox),
+    while a genuine `subprocess.run(['soffice', ...])` repeat IS blocked."""
+    dead: set = set()
+    ctx = _make_ctx(dead)
+    fail = _FakeExecResult(stderr=SOFFICE_FAIL, exit_code=1)
+    ok = _FakeExecResult(stdout="", stderr="", exit_code=0)
+
+    # 1. real soffice gap → records "soffice"
+    with _sandbox_patched(fail) as (_goc1, _s):
+        await _handle_execute_code({"code": SOFFICE_CODE}, ctx)
+    assert "soffice" in dead
+
+    # 2. benign cell with a `node` substring (no soffice) → reaches the sandbox
+    with _sandbox_patched(ok) as (goc2, _s):
+        r_benign = await _handle_execute_code(
+            {"code": "node_list = [1]\nx = annotate(node_list)\n"}, ctx
+        )
+    assert goc2.call_count == 1
+    assert json.loads(r_benign.llm_content)["status"] == "completed"
+    assert dead == {"soffice"}          # benign success recorded nothing new
+
+    # 3. genuine soffice repeat → short-circuited (no sandbox)
+    with _sandbox_patched(fail) as (goc3, _s):
+        r_repeat = await _handle_execute_code({"code": SOFFICE_CODE}, ctx)
+    assert goc3.call_count == 0
+    assert json.loads(r_repeat.llm_content)["runtime_gap"]["repeat_blocked"] is True
