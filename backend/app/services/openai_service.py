@@ -592,7 +592,14 @@ EXECUTE_CODE_TOOL = {
             "Use skill_files to inject skill attachment files (templates, assets) into the sandbox "
             "at /sandbox/{filename} before your code runs — reference them with that path in code. "
             "Use this for data analysis, calculations, generating charts, creating documents, "
-            "or any task that benefits from running actual Python code."
+            "or any task that benefits from running actual Python code. "
+            "This sandbox runs Python only. Pre-installed: python-pptx, matplotlib, numpy, pandas, "
+            "openpyxl, python-docx, pypdf, reportlab, docxtpl, seaborn, scipy, scikit-learn, plotly "
+            "(install other PyPI packages via `libraries`). NOT available and cannot be installed "
+            "here: Node/npm/npx, LibreOffice (soffice), pandoc, Poppler (pdftoppm), markitdown, and "
+            "any bundled scripts/office/* helpers. If a skill's instructions tell you to shell out "
+            "to those, do NOT -- they will fail; do the equivalent work in-memory with the Python "
+            "libraries above, or tell the user it is not available."
         ),
         "parameters": {
             "type": "object",
