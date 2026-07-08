@@ -1922,6 +1922,158 @@ def _safe_out_filename(raw: str | None, template_ext: str) -> str:
     return f"deliverable.{ext}"
 
 
+# ---------------------------------------------------------------------------
+# Phase 142 (SRH-01) — non-Python skill-script runtime-gap honesty.
+#
+# `_classify_runtime_gap` is the single correctness-critical piece of Phase 142:
+# it decides WHETHER a completed sandbox failure is one of three KNOWN runtime
+# gaps (G-A missing bundled file / G-B non-Python script / G-C missing binary or
+# module) and, if so, WHICH permanent-framed honest message to surface. It is a
+# PURE function (four string/int args -> dict | None). Nothing calls it in this
+# plan — Plan 02 wires it into the completed-run result builder + the per-run
+# repeat-guard; on its own it changes no runtime behavior.
+#
+# DESIGN LAW (threat T-142-01 — the most important property in the phase):
+# NEVER reshape on error-type or exit-code ALONE. A hit requires a token from a
+# FIXED allowlist co-occurring with a not-found phrase (or a 124/127 exit), OR a
+# `No module named '<mod>'` for a known module, OR a JS-exclusive token in `code`
+# together with a Python SyntaxError, OR a missing RELATIVE subdir path.
+# Everything else returns None so a genuine ValueError / a genuine missing
+# /sandbox/output file / a real SyntaxError still reaches the model unchanged.
+# Proven by test_142_runtime_gap.py::test_non_gap_passthrough. This mirrors the
+# "distrust a model/sandbox string, match a FIXED set, safe default on non-match"
+# posture of _safe_out_filename above.
+
+# Fixed allowlists (single source — Plans 02/03/05 import these). Tokens are the
+# bounded key space for GAP_MESSAGES and the repeat-guard set, so there is no
+# attacker-controlled key growth (threat T-142-04).
+KNOWN_MISSING_BINARIES = frozenset({
+    "soffice", "libreoffice", "pandoc", "pdftoppm", "pdfinfo",
+    "node", "npm", "npx", "extract-text",
+})
+KNOWN_MISSING_MODULES = frozenset({"markitdown"})
+NOT_FOUND_PHRASES = (
+    "no such file or directory", "filenotfounderror",
+    "command not found", "not found",
+)
+JS_TOKENS = ("const ", "let ", "=>", "require(", "console.log",
+             "export default", "function*")
+
+# Shared script-extension set — consumed by D-11 decode (Plan 03), the D-05b
+# load_skill flag (Plan 03), and the SC#1 import note (Plan 05). Single source;
+# import from here.
+SCRIPT_EXTS = frozenset({
+    "js", "ts", "jsx", "tsx", "mjs", "cjs", "sh", "bash",
+    "rb", "go", "rs", "php", "pl", "lua", "ps1", "bat",
+})
+
+# Permanent-framed reshape wording per gap. Each: names the gap, says it cannot
+# become available, says do NOT retry, and offers the in-sandbox forward action
+# (tone modeled on BUG-260707-02-pptx-skill-instructions-sandbox-aware.md).
+_MSG_SOFFICE = ("LibreOffice (`soffice`) is not installed in this sandbox and cannot be "
+    "installed here. Do NOT retry. Build or QA the presentation/document in-memory with "
+    "python-pptx / python-docx / openpyxl, or tell the user this conversion is unavailable.")
+_MSG_NODE = ("This sandbox runs Python only — Node.js/npm/npx are not installed and cannot "
+    "be installed here. Do NOT retry as JavaScript. Re-implement the step in Python, or tell "
+    "the user JavaScript execution is unavailable.")
+GAP_MESSAGES = {
+    "soffice": _MSG_SOFFICE,
+    "libreoffice": _MSG_SOFFICE,
+    "node": _MSG_NODE,
+    "npm": _MSG_NODE,
+    "npx": _MSG_NODE,
+    "pandoc": ("pandoc is not installed in this sandbox and cannot be installed here. Do NOT "
+        "retry. Work with the source format directly using python-docx / pypdf / openpyxl, or "
+        "tell the user document conversion is unavailable."),
+    "pdftoppm": ("Poppler (`pdftoppm`) is not installed in this sandbox and cannot be installed "
+        "here. Do NOT retry. Read PDF text with pypdf instead of rasterizing pages, or tell the "
+        "user PDF-to-image rendering is unavailable."),
+    "pdfinfo": ("Poppler (`pdfinfo`) is not installed in this sandbox and cannot be installed "
+        "here. Do NOT retry. Inspect the PDF with pypdf, or tell the user this is unavailable."),
+    "extract-text": ("The `extract-text` helper is not installed in this sandbox and cannot be "
+        "installed here. Do NOT retry. Extract text in-memory with pypdf / python-docx / "
+        "python-pptx, or tell the user."),
+    "markitdown": ("`markitdown` is not installed in this sandbox and cannot be installed here. "
+        "Do NOT retry. Read the document in-memory with python-docx / python-pptx / openpyxl / "
+        "pypdf, or tell the user this conversion is unavailable."),
+}
+# Class-level messages for G-B (JS) and G-A (missing bundled file), keyed by class not token:
+GAP_MESSAGES_JS = _MSG_NODE
+GAP_MESSAGES_MISSING_FILE = ("A bundled skill script at '{path}' was not found in the sandbox. "
+    "Nested helper scripts (e.g. `scripts/office/*`) do not resolve here — the skill's folder "
+    "tree is flattened on import. Do NOT retry the same path. Do the equivalent work in-memory "
+    "with the Python libraries available, or tell the user.")
+
+# Precompiled extractors (reuse the module-level `re` alias bound above). The
+# module regex runs on a lowercased haystack; the path regex runs on the ORIGINAL
+# stderr (IGNORECASE) so the captured path keeps its real case for the message.
+_NO_MODULE_RE = _re_filename.compile(r"no module named ['\"]?([\w\.\-]+)")
+_MISSING_PATH_RE = _re_filename.compile(
+    r"no such file or directory:\s*['\"]([^'\"]+)['\"]", _re_filename.IGNORECASE
+)
+
+
+def _classify_runtime_gap(
+    code: str, stdout: str, stderr: str, exit_code: int
+) -> dict | None:
+    """Classify a completed sandbox failure as one of the three known runtime
+    gaps, or None (pass-through — a real error the model must still see).
+
+    Returns ``{"class": "G-A"|"G-B"|"G-C", "token": <str>, "message": <str>}``
+    on a hit; ``None`` otherwise. Pure — no I/O. See the DESIGN LAW comment above:
+    a hit ALWAYS requires a fixed-allowlist token (or the JS-token+SyntaxError
+    combination, or a relative-subdir missing path) — never error-type or exit
+    code alone. Safe default (``None``) on any non-match, exactly like
+    ``_safe_out_filename`` returns ``deliverable.<ext>`` on a bad name.
+    """
+    code_s = code or ""
+    out_l = f"{stdout or ''}\n{stderr or ''}".lower()
+    all_l = f"{code_s.lower()}\n{out_l}"
+    not_found = any(p in out_l for p in NOT_FOUND_PHRASES)
+    shell_exit = exit_code in (124, 127)
+
+    # (a) G-C missing binary. A known binary token co-occurs with a not-found
+    #     phrase (the token must appear in OUTPUT — where "command not found"
+    #     names it), OR with a 124/127 exit (the token may appear in `code` too:
+    #     a hung/killed binary leaves its name only in the executed code, since
+    #     the timeout stderr is our own abort message). Never on exit alone.
+    for tok in sorted(KNOWN_MISSING_BINARIES):
+        if (tok in out_l and not_found) or (tok in all_l and shell_exit):
+            return {"class": "G-C", "token": tok, "message": GAP_MESSAGES[tok]}
+
+    # (b) G-C missing module — `No module named '<mod>'` for a KNOWN module only
+    #     (a genuine `No module named some_pip_pkg` the user could install via
+    #     libraries=[...] is NOT reshaped as permanent).
+    m = _NO_MODULE_RE.search(out_l)
+    if m:
+        mod = m.group(1)
+        if mod in KNOWN_MISSING_MODULES:
+            return {"class": "G-C", "token": mod, "message": GAP_MESSAGES[mod]}
+
+    # (c) G-B non-Python script — a JS-exclusive token in `code` AND a Python
+    #     SyntaxError in stderr. Both required (a bare SyntaxError passes through).
+    if "syntaxerror" in out_l:
+        for jtok in JS_TOKENS:
+            if jtok in code_s:
+                return {"class": "G-B", "token": jtok, "message": GAP_MESSAGES_JS}
+
+    # (d) G-A missing bundled file — a not-found path that is a RELATIVE subdir
+    #     path (contains '/', not absolute): a lost flattened skill-tree path.
+    #     A genuine missing absolute /sandbox/output/*.csv (starts with '/')
+    #     passes through unchanged.
+    pm = _MISSING_PATH_RE.search(stderr or "")
+    if pm:
+        path = pm.group(1).strip()
+        if "/" in path and not path.startswith("/"):
+            return {
+                "class": "G-A",
+                "token": path,
+                "message": GAP_MESSAGES_MISSING_FILE.format(path=path),
+            }
+
+    return None
+
+
 async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     """Phase 101 (TMPL-02 / TMPL-03) — fill a template into a real deliverable.
 
