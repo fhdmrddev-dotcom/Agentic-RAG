@@ -451,7 +451,7 @@ Plans:
   5. Proven across representative providers (SC#10) — streaming × UI-state × parallel-thread, since the desync was observed cross-provider (OpenAI Direction A; DeepSeek + MiniMax Direction B).
 
 **Plans**: 6 plans in 3 waves (planned 2026-07-09)
-- [ ] 145-01-PLAN.md — LIVE repro of both directions (checkpoint; precedes every fix — D-145-11)
+- [x] 145-01-PLAN.md — LIVE repro of both directions (checkpoint; precedes every fix — D-145-11)
 - [ ] 145-02-PLAN.md — Extract `run_lifecycle.py` atomic owner (register/finalize co-writers) + unit tests
 - [ ] 145-03-PLAN.md — Wire `threads.py` producer + `runs.py` cancel-parity onto the owner (G-5 extraction)
 - [ ] 145-04-PLAN.md — Direction B: reconciler stream-age sweep + config (STALE_TIMEOUT=2400s) + periodic single-flight host
