@@ -143,6 +143,17 @@ const EMPTY_DERIVED: DerivedPanelItem[] = []
 // EXISTING reconcile path with replay from the retained cursor (D-11).
 const STREAM_POOL_SIZE = 3
 
+// ── Phase 145-05 (FND-01, D-145-03/04/05) — client inactivity watchdog ──────────
+// ONE shared setInterval (~5s tick) sweeps the streamingThreads set; a per-thread
+// inactivity window N (~20s) that RESETS on every stream event decides when to
+// fire the READ-ONLY getSnapshot probe. The window is short/tunable because the
+// watchdog only RECONCILES, never kills (D-145-05) — the authoritative kill of a
+// dead producer is the backend stale-sweep (STALE_TIMEOUT=2400s), NOT this belt.
+// A false fire during a legit silent-reasoning gap is one cheap read that returns
+// "still streaming" → no-op (threat T-145-05-02: accept).
+const WATCHDOG_TICK_MS = 5_000 // shared-interval tick cadence
+const WATCHDOG_INACTIVITY_MS = 20_000 // per-thread N: quiet-for-this-long → probe
+
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
 // all three watched refs are unchanged, so a reference change in bucketsBySurface
@@ -1121,6 +1132,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
   // lockstep) still drives the composer's OWN-thread disable + Stop button.
   const sendingThreadsRef = useRef<Set<string>>(new Set())
+  // Phase 145-05 (D-145-05): per-thread last-stream-event epoch-ms. Stamped on
+  // every streamingThreads add (send / reattach / reconcile-derive) and reset on
+  // each stream event (onCursor); read by the inactivity watchdog (useEffect #3)
+  // to decide when a quiet run warrants a read-only getSnapshot probe. An absent
+  // entry reads as "immediately stale" (probe on the next tick) — safe, because
+  // the probe is read-only and no-ops when the run is still streaming.
+  const lastEventAtRef = useRef<Map<string, number>>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
@@ -1234,6 +1252,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       })
       callbacks.onCursor = (msId: string) => {
         lastSeenOffsetRef.current.set(producerRunId, msId)
+        // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+        lastEventAtRef.current.set(threadId, Date.now())
       }
       const originalOnTerminal = callbacks.onTerminal
       callbacks.onTerminal = (kind, errorPayload) => {
@@ -1440,6 +1460,41 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
 
             const activeRuns = snapshot.active_runs
+
+            // ── Phase 145-05 (U7 / Pattern 2 / D-145-01, FND-01) ──────────────
+            // Reconcile-DERIVE streamingThreads from the AUTHORITATIVE
+            // snapshot.active_runs. Before this, streamingThreads was written ONLY
+            // by the send path (add :1715, reattach re-add :1852, finally-delete
+            // :2020) and reconcile() never touched it, so a missed-terminal SSE
+            // left a permanent phantom Stop until a full reload (RESEARCH A3).
+            // Deriving here makes the Stop button agree with runs.status in BOTH
+            // directions through the EXISTING selectors with zero call-site
+            // changes: Direction A (delete when no run is streaming) and Direction
+            // B (re-add when a still-active run is reconciled). runs.status is
+            // truth (D-v2.5-03 reconcile-via-fetch); the local flag never decides.
+            // Pitfall 1: the delete is guarded by sendingThreadsRef so an
+            // in-flight send is never clobbered (mirrors clearThreadBucket:1302).
+            // Per-thread only — never touches another thread's membership (D-145-13).
+            const hasStreamingRun = activeRuns.some((r) => r.status === "streaming")
+            const wasStreaming = useStreamsStore.getState().streamingThreads.has(threadId)
+            if (hasStreamingRun && !wasStreaming) {
+              lastEventAtRef.current.set(threadId, Date.now())
+              useStreamsStore.setState((s) => ({
+                streamingThreads: new Set(s.streamingThreads).add(threadId),
+              }))
+            } else if (
+              !hasStreamingRun &&
+              wasStreaming &&
+              !sendingThreadsRef.current.has(threadId)
+            ) {
+              useStreamsStore.setState((s) => {
+                const next = new Set(s.streamingThreads)
+                next.delete(threadId)
+                return { streamingThreads: next }
+              })
+              lastEventAtRef.current.delete(threadId)
+            }
+
             for (const run of activeRuns) {
               // Pitfall 3 cross-thread safety: only attach if this thread is still
               // the viewing thread when reconcile started.
@@ -1592,6 +1647,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
               callbacks.onCursor = (msId: string) => {
                 lastSeenOffsetRef.current.set(run.run_id, msId)
+                // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+                lastEventAtRef.current.set(threadId, Date.now())
               }
 
               subscribeToRun(
@@ -1714,6 +1771,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => ({
             streamingThreads: new Set(s.streamingThreads).add(threadId),
           }))
+          // Phase 145-05 (D-145-05): seed the watchdog activity clock at send.
+          lastEventAtRef.current.set(threadId, Date.now())
 
           const controller = new AbortController()
           abortControllerRef.current = controller
@@ -1851,6 +1910,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                         subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, rid),
                         streamingThreads: new Set(s.streamingThreads).add(threadId),
                       }))
+                      // Phase 145-05 (D-145-05/10): a transient reattach counts as
+                      // fresh activity — reset the watchdog clock so the belt does
+                      // not immediately probe a run that just re-attached.
+                      lastEventAtRef.current.set(threadId, Date.now())
                       subscribeToRun(rid, since, callbacks, newController.signal).catch(
                         (err) => {
                           if (!(err instanceof Error && err.name === "AbortError")) {
@@ -1953,6 +2016,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
             callbacks.onCursor = (msId: string) => {
               lastSeenOffsetRef.current.set(run_id, msId)
+              // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+              lastEventAtRef.current.set(threadId, Date.now())
             }
 
             // Phase 096-05 (D-09): same gate as the slot reservation above —
@@ -2021,6 +2086,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               next.delete(threadId)
               return { streamingThreads: next }
             })
+            // Phase 145-05 (D-145-05): drop the watchdog clock in lockstep with the
+            // streamingThreads delete. On a TRANSIENT stream-end this runs BEFORE
+            // the reattach re-add (subscribeToRun fires onTerminal WITHOUT await),
+            // which re-stamps it — so a still-live reattached run keeps its clock.
+            lastEventAtRef.current.delete(threadId)
             // L-068-07 safety net: only delete if entry still present (catch
             // paths where onTerminal didn't fire).
             // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -2613,6 +2683,85 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       window.removeEventListener("focus", onFocus)
       window.removeEventListener("pageshow", onPageShow)
     }
+  }, [])
+
+  // ---- useEffect #3 (Phase 145-05, D-145-03/04/05, FND-01): inactivity watchdog ----
+  // ONE shared setInterval (~5s) sweeps the streamingThreads set. For each thread
+  // whose last stream event is older than the inactivity window N (~20s, reset on
+  // every onCursor + streamingThreads add), fire a READ-ONLY getSnapshot probe —
+  // the _isTransientStreamEnd-style active_runs check (:194-236), NOT the full
+  // reconcile() action (which re-derives buckets + re-attaches; RESEARCH
+  // anti-pattern). On a confirmed-terminal verdict, SILENTLY finalize (D-145-04):
+  // delete the thread from streamingThreads (guarded by sendingThreadsRef —
+  // Pitfall 1) AND flip the live placeholder's runStatus to "completed" via the
+  // done→completed branch of the terminal-flip map (:1562 / :1873). No banner, no
+  // "reconnecting" state. While still streaming it is a no-op (fixes the phantom
+  // Stop with the tab open — U7). The watchdog only RECONCILES, never kills
+  // (D-145-05); the authoritative kill of a dead producer is the backend sweep.
+  // The visibility/focus belt (#2) now heals Direction A on tab-focus for free,
+  // because reconcile() derives streamingThreads.
+  useEffect(() => {
+    const finalizeThreadSilently = (threadId: string) => {
+      // Pitfall 1: never finalize a thread with an in-flight send.
+      if (sendingThreadsRef.current.has(threadId)) return
+      useStreamsStore.setState((s) => {
+        if (!s.streamingThreads.has(threadId)) return {}
+        const next = new Set(s.streamingThreads)
+        next.delete(threadId)
+        return { streamingThreads: next }
+      })
+      // Silent terminal-flip of the live placeholder(s) — done→completed. No
+      // runError / banner / reconnecting copy (D-145-04). Per-thread only.
+      useStreamsStore
+        .getState()
+        .actions.setMessagesForBucket("chat", threadId, (prev) =>
+          prev.map((m) =>
+            m.role === "assistant" && m.runStatus === "streaming"
+              ? { ...m, runStatus: "completed" as const }
+              : m,
+          ),
+        )
+      lastEventAtRef.current.delete(threadId)
+    }
+
+    const probeThread = async (threadId: string) => {
+      let snapshot: ThreadSnapshot
+      try {
+        // READ-ONLY probe (reconcile-via-fetch, D-v2.5-03) — trust runs.status,
+        // never the local flag.
+        snapshot = await getSnapshot(threadId)
+      } catch {
+        // Fail-safe (mirrors _isTransientStreamEnd / reconciler Pitfall 6): never
+        // finalize on an unverifiable read — the next tick / tab-focus retries.
+        return
+      }
+      const stillStreaming = snapshot.active_runs.some((r) => r.status === "streaming")
+      if (stillStreaming) {
+        // No-op: refresh the clock so a long, legitimately-silent reasoning gap is
+        // not re-probed on every tick (one cheap read, then quiet).
+        lastEventAtRef.current.set(threadId, Date.now())
+        return
+      }
+      finalizeThreadSilently(threadId)
+    }
+
+    const tick = () => {
+      const streaming = useStreamsStore.getState().streamingThreads
+      if (streaming.size === 0) return
+      const now = Date.now()
+      for (const threadId of streaming) {
+        // A thread mid-send owns its own streaming-end write (send-path finally).
+        if (sendingThreadsRef.current.has(threadId)) continue
+        const last = lastEventAtRef.current.get(threadId) ?? 0
+        if (now - last <= WATCHDOG_INACTIVITY_MS) continue
+        // Stamp optimistically so a slow probe is not re-fired on the next tick.
+        lastEventAtRef.current.set(threadId, now)
+        void probeThread(threadId)
+      }
+    }
+
+    const intervalId = setInterval(tick, WATCHDOG_TICK_MS)
+    return () => clearInterval(intervalId)
   }, [])
 
   // ---- useEffect #2b (092-07 Facet C): Continue producer re-subscribe ----
