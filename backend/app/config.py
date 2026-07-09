@@ -535,6 +535,12 @@ DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 300
 _LLM_CALL_TIMEOUT_MIN_S: int = 1
 _LLM_CALL_TIMEOUT_MAX_S: int = 3600
 
+# WR-02 (Phase 145 review): the minimum periodic stale-sweep tick. A near-zero
+# interval (an operator env typo like RUN_STALE_SWEEP_INTERVAL_SECONDS=0) would spin
+# the sweep in a tight loop hammering Redis SET NX + Postgres — reject it at boot,
+# mirroring the _LLM_CALL_TIMEOUT_MIN_S defense-in-depth.
+_RUN_STALE_SWEEP_INTERVAL_MIN_S: int = 5
+
 
 def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) -> int:
     """Resolve the per-LLM-call deadline (seconds) for a given model.
@@ -1007,6 +1013,36 @@ class Settings(BaseSettings):
     # Clamped in reconcile_orphaned_runs to [0, stale_timeout] (a run younger than the
     # stale window can never be stale). Config field → tunable without a deploy.
     run_start_grace_seconds: int = 60
+
+    @model_validator(mode="after")
+    def _validate_run_stale_sweep_bounds(self) -> "Settings":
+        """WR-02 (Phase 145 review) — defense-in-depth bounds on the two stale-sweep
+        knobs, mirroring the ``_LLM_CALL_TIMEOUT_MIN_S``/``_MAX_S`` discipline: an
+        operator env typo must fail LOUD at boot, never silently DoS the sweep or
+        false-kill live runs.
+
+        - ``run_stale_sweep_interval_seconds`` < 5: a near-zero tick would spin the
+          periodic sweep in a tight loop hammering Redis ``SET NX`` + Postgres.
+        - ``run_stale_sweep_timeout_seconds`` < ``ask_user_max_timeout_seconds``: a
+          threshold below the 1800s ask_user ceiling (D-145-07) would terminalize a
+          legitimately-waiting ask_user run (or a long silent-reasoning turn) as
+          ``failed`` — the exact false-kill this phase exists to prevent.
+        """
+        if self.run_stale_sweep_interval_seconds < _RUN_STALE_SWEEP_INTERVAL_MIN_S:
+            raise ValueError(
+                "run_stale_sweep_interval_seconds must be >= "
+                f"{_RUN_STALE_SWEEP_INTERVAL_MIN_S} (got "
+                f"{self.run_stale_sweep_interval_seconds}) — a near-zero tick would spin "
+                "the periodic sweep in a tight loop."
+            )
+        if self.run_stale_sweep_timeout_seconds < self.ask_user_max_timeout_seconds:
+            raise ValueError(
+                f"run_stale_sweep_timeout_seconds ({self.run_stale_sweep_timeout_seconds}) "
+                "must be >= ask_user_max_timeout_seconds "
+                f"({self.ask_user_max_timeout_seconds}) — a lower threshold would "
+                "false-kill a legitimately-waiting ask_user run (D-145-07)."
+            )
+        return self
 
     # Phase 091 — harness per-phase caps (D-12: derive from existing knobs, do
     # NOT invent arbitrary numbers). Both a STEP cap and a WALL-CLOCK cap are
