@@ -313,6 +313,38 @@ async def lifespan(app_instance):
 
     asyncio.create_task(_sweep_expired_templates())
 
+    # Phase 145 (FND-01 / D-145-06 / D-145-08) — PERIODIC stream-age orphan sweep. The
+    # boot reconciler above heals restart-orphans ONCE; this INTERVAL task corrects a
+    # LYING runs.status that appears WHILE the app runs — a producer that dies mid-stream
+    # on a still-up worker (broken SSE / crashed task) leaves runs.status='streaming'
+    # forever, and under D-145-02 the run STAYS in runs:active so membership is blind
+    # (145-REPRO Direction B). reconcile_orphaned_runs' stream-age oracle catches it. This
+    # caller (a) EXCLUDES cap_paused (legitimately quiet, re-attachable — Pitfall 3) and
+    # (b) uses a SHORT lock_ttl=90 (< the 120s tick) so exactly ONE WORKER_COUNT=2 worker
+    # sweeps per tick and the SET NX guard self-expires before the next tick (D-145-08).
+    # Same shape as _sweep_expired_templates (while True + asyncio.sleep), NOT folded into
+    # resume_stranded_workflows (boot-only, re-drives — wrong semantics). Best-effort
+    # background task: a slow/failed sweep never blocks the app (logs + the next tick re-runs).
+    async def _reconcile_orphans_periodic():
+        while True:
+            try:
+                from app.services.run_reconciler import reconcile_orphaned_runs
+                from app.dependencies import get_redis, get_supabase
+                count = await reconcile_orphaned_runs(
+                    pool=await get_pg_pool(),
+                    redis=get_redis(),
+                    supabase=get_supabase(),
+                    lock_ttl=90,
+                    include_cap_paused=False,
+                )
+                if count:
+                    logger.info("Periodic run reconciler closed %d orphan(s)", count)
+            except Exception:
+                logger.exception("Periodic run reconciler failed (app continues)")
+            await asyncio.sleep(settings.run_stale_sweep_interval_seconds)
+
+    asyncio.create_task(_reconcile_orphans_periodic())
+
     yield
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
