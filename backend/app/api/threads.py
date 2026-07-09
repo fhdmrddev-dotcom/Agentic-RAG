@@ -39,6 +39,12 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_run, finalize_run, insert_assistant_message
+# Phase 145-03 (D-145-09) — the atomic run-lifecycle owner (Plan 02). The chat-run
+# START register + every TRUE terminal route through these co-writers so
+# runs.status and its runs:active/runs_by_thread mirrors move in ONE unit and can
+# never drift (BUG-260709-01 / 145-REPRO Direction B). The SSE transport
+# (sentinel XADD / EXPIRE / get_snapshot / RUN_TASKS) stays in this file.
+from app.services.run_lifecycle import register_run_start, finalize_run_terminal
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
 # imports are cycle-safe (db/workflows.py imports only models). run_workflow +
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
@@ -1102,43 +1108,42 @@ async def send_message(
             _resolved_provider = _user_settings.active_provider
 
     try:
-        # Phase 073 D-073-04 SITE #1 — runs INSERT flips to asyncpg.
-        # _resolved_provider is guaranteed non-None at this line by the
-        # if/else chain above (Pitfall 6 — provider column is NOT NULL).
-        await insert_run(
-            await get_pg_pool(),
+        # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
+        # atomic co-write via the run_lifecycle owner (was: an insert_run here + a
+        # separate ZADD ×2 block). Status + runs:active can no longer drift: on
+        # success run_id ∈ runs:active ⇔ runs.status == 'streaming'. The owner reuses
+        # the shared db.runs.insert_run writer (Phase 073 parity) + a time.time()
+        # started-at score (the ordering 062's active-runs endpoint ZRANGEBYSCOREs).
+        # _resolved_provider is guaranteed non-None at this line by the if/else chain
+        # above (Pitfall 6 — provider column is NOT NULL).
+        await register_run_start(
+            pool=await get_pg_pool(),
+            redis=redis,
             run_id=run_id,
             thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
             user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
-            status="streaming",
             model=_resolved_model,
             provider=_resolved_provider,
             spawned_by_worker=str(os.getpid()),
         )
-
-        # ZADD sorted-set indexes (REDIS-SETUP.md key conventions). Score is
-        # the started_at unix timestamp so 062's active-runs endpoint can
-        # ZRANGEBYSCORE for time-window queries.
-        _started_score = time_mod.time()
-        try:
-            await redis.zadd(f"runs_by_thread:{thread_id}", {str(run_id): _started_score})
-            await redis.zadd("runs:active", {str(run_id): _started_score})
-        except Exception:
-            logger.exception("ZADD failed for run %s; continuing (passive cleanup at query time)", run_id)
     except Exception:
-        # Spawn-failure cleanup (RESEARCH.md Q2): don't leave orphan runs row + ZADD entries.
+        # Spawn-failure cleanup (RESEARCH.md Q2): don't leave an orphan runs row +
+        # mirror entries. Route through the owner so the failed-status write + both
+        # ZREMs are the SAME atomic co-write (was: a supabase UPDATE + a separate
+        # ZREM ×2). A completed_at datetime replaces the legacy "now()" string,
+        # symmetric with the finalize path (WR-01 discipline).
         try:
-            await aexec(supabase.table("runs").update({
-                "status": "failed", "error": "spawn_failed",
-                "completed_at": "now()",
-            }).eq("run_id", str(run_id)))
+            await finalize_run_terminal(
+                pool=await get_pg_pool(),
+                redis=redis,
+                run_id=run_id,
+                thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                status="failed",
+                error="spawn_failed",
+                completed_at=datetime.now(timezone.utc),
+            )
         except Exception:
-            logger.exception("Failed to mark spawn-failed run row")
-        try:
-            await redis.zrem("runs:active", str(run_id))
-            await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
-        except Exception:
-            pass
+            logger.exception("Failed to finalize spawn-failed run %s", run_id)
         raise
 
     # ── Phase 092 MODE-01 — kickoff: create the workflow run + set the anchor ──
@@ -1681,9 +1686,19 @@ async def send_message(
                                 "runs.usage missing for run=%s provider=%s model=%s",
                                 run_id, _resolved_provider, _resolved_model,
                             )
-                        await finalize_run(
-                            await get_pg_pool(),
+                        # Phase 145-03 (D-145-09) — the terminal runs.status write +
+                        # both ZREMs are now ONE atomic co-write via the owner (was:
+                        # finalize_run here + a separate ZREM ×2 at old step 5). The
+                        # 075.4-03 ordering holds: the owner writes status FIRST then
+                        # ZREMs; the terminal sentinel (step 3) + EXPIRE (step 4) below
+                        # still run AFTER this call. Deep _terminal_status is always a
+                        # TRUE terminal here (cap_disposition is tracked separately —
+                        # see the LOCK-2/S6 gate above), so this is unconditional.
+                        await finalize_run_terminal(
+                            pool=await get_pg_pool(),
+                            redis=redis,
                             run_id=run_id,
+                            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
                             status=_terminal_status,
                             error=_terminal_error,
                             completed_at=datetime.now(timezone.utc),
@@ -1692,7 +1707,7 @@ async def send_message(
                             output_tokens=_output_tokens_total,
                         )
                     except BaseException:
-                        logger.exception("runs row UPDATE failed for run %s", run_id)
+                        logger.exception("runs row finalize+ZREM failed for run %s", run_id)
 
                     # 3. TERMINAL SENTINEL XADD — MUST come AFTER finalize_run
                     # (Plan 075.4-03 race fix) AND BEFORE EXPIRE (Pitfall 2).
@@ -1716,12 +1731,10 @@ async def send_message(
                     except BaseException:
                         logger.exception("EXPIRE failed for run %s", run_id)
 
-                    # 5. ZREM sorted-set indexes
-                    try:
-                        await redis.zrem("runs:active", str(run_id))
-                        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
-                    except BaseException:
-                        logger.exception("ZREM failed for run %s", run_id)
+                    # 5. ZREM sorted-set indexes — MOVED into the finalize_run_terminal
+                    # owner above (Phase 145-03 / D-145-09): the terminal mirror removal
+                    # now co-writes atomically with the runs.status UPDATE, so status +
+                    # runs:active can no longer drift (BUG-260709-01, 145-REPRO Dir B).
 
                     # 6. Phase 092-05 F2: a HARNESS run that escapes via
                     # exception/timeout/cancel never reached run_workflow's own
@@ -2173,19 +2186,42 @@ async def spawn_continuation_run(
                     except BaseException:
                         logger.exception("RUN-01b reconciler failed for run %s", run_id)
 
-                try:
-                    await finalize_run(
-                        await get_pg_pool(),
-                        run_id=run_id,
-                        status=_terminal_status,
-                        error=_terminal_error,
-                        completed_at=datetime.now(timezone.utc),
-                        message_id=UUID(_msg_id) if _msg_id else None,
-                        input_tokens=_in_tok,
-                        output_tokens=_out_tok,
-                    )
-                except BaseException:
-                    logger.exception("Continuation runs UPDATE failed for run %s", run_id)
+                # Phase 145-03 (D-145-09) — TRUE terminals route the runs.status write
+                # + both ZREMs through the atomic owner (was: finalize_run here + a
+                # separate gated ZREM ×2 below). cap_paused is NON-terminal +
+                # re-attachable: it MUST keep its runs:active membership, so it still
+                # writes its status via the shared finalize_run DIRECTLY (NOT the owner,
+                # which would ZREM) — mirroring the old != "cap_paused" skip gate exactly.
+                if _terminal_status != "cap_paused":
+                    try:
+                        await finalize_run_terminal(
+                            pool=await get_pg_pool(),
+                            redis=redis,
+                            run_id=run_id,
+                            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                            status=_terminal_status,
+                            error=_terminal_error,
+                            completed_at=datetime.now(timezone.utc),
+                            message_id=UUID(_msg_id) if _msg_id else None,
+                            input_tokens=_in_tok,
+                            output_tokens=_out_tok,
+                        )
+                    except BaseException:
+                        logger.exception("Continuation finalize+ZREM failed for run %s", run_id)
+                else:
+                    try:
+                        await finalize_run(
+                            await get_pg_pool(),
+                            run_id=run_id,
+                            status=_terminal_status,
+                            error=_terminal_error,
+                            completed_at=datetime.now(timezone.utc),
+                            message_id=UUID(_msg_id) if _msg_id else None,
+                            input_tokens=_in_tok,
+                            output_tokens=_out_tok,
+                        )
+                    except BaseException:
+                        logger.exception("Continuation cap_paused status write failed for run %s", run_id)
                 # cap_paused is NON-terminal — NO terminal sentinel (Landmine 6).
                 # The agent_loop already emitted the non-terminal cap_paused event.
                 if _terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE:
@@ -2203,13 +2239,10 @@ async def spawn_continuation_run(
                 except BaseException:
                     logger.exception("Continuation EXPIRE failed for run %s", run_id)
                 # cap_paused keeps the run in the active sorted sets (re-attachable);
-                # a true terminal status ZREMs them.
-                if _terminal_status != "cap_paused":
-                    try:
-                        await redis.zrem("runs:active", str(run_id))
-                        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
-                    except BaseException:
-                        logger.exception("Continuation ZREM failed for run %s", run_id)
+                # a true terminal status ZREMs them — that ZREM now lives INSIDE the
+                # finalize_run_terminal owner above (Phase 145-03 / D-145-09), so the
+                # standalone runs:active removal that used to live here is gone. The
+                # cap_paused branch above (plain finalize_run) deliberately skips it.
 
             try:
                 await asyncio.shield(_finalize())
