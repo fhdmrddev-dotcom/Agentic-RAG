@@ -981,6 +981,21 @@ class Settings(BaseSettings):
     task_per_run_concurrency: int = 3
     task_global_concurrency: int = 20
 
+    # Phase 145 (FND-01, D-145-06/07/08) — run staleness sweep (Direction B: a
+    # dead-producer chat run whose Postgres runs.status still reads 'streaming' but
+    # whose run:{id} Redis stream stopped growing). STALE_TIMEOUT KILLS such a run,
+    # so it MUST EXCEED the longest legit SILENT gap of a LIVE producer: the ask_user
+    # wait ceiling (ask_user_max_timeout_seconds=1800) > the silent-reasoning ceiling
+    # (~900s). Operator-ratified generous default = 2400s (40 min) so a live-but-quiet
+    # run (ask_user-waiting / long o-series) is NEVER false-killed (145-REPRO A2). A
+    # SHORTER threshold (e.g. the pre-trace "2-5 min") would kill a waiting ask_user
+    # run — do not lower without re-checking that ceiling. run_stale_sweep_interval is
+    # the periodic tick; the guard TTL (90s) is set < this tick so exactly one
+    # WORKER_COUNT=2 worker sweeps per tick. Config fields → tunable without a deploy
+    # (project dynamic-settings direction); env override is free via pydantic-settings.
+    run_stale_sweep_timeout_seconds: int = 2400
+    run_stale_sweep_interval_seconds: int = 120
+
     # Phase 091 — harness per-phase caps (D-12: derive from existing knobs, do
     # NOT invent arbitrary numbers). Both a STEP cap and a WALL-CLOCK cap are
     # enforced on every phase (a hanging phase fails cleanly at its timeout).
