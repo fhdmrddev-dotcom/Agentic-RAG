@@ -19,8 +19,11 @@ Proves the load-bearing behaviors of the guarded sweep
   5. ``test_fresh_stream_not_flipped``: a recent ``last-generated-id`` → NEVER flipped.
   6. ``test_present_in_active_but_stale_is_orphan`` (**the CRUX**): a run PRESENT in the
      ``runs:active`` mirror BUT with a stale stream → STILL flipped (membership is blind).
-  7. ``test_missing_stream_is_orphan``: ``xinfo_stream`` raises ``no such key`` +
-     non-terminal PG row → orphan → flipped (Pitfall 5).
+  7. ``test_missing_stream_is_orphan``: a PAST-GRACE run whose ``xinfo_stream`` raises
+     ``no such key`` + non-terminal PG row → orphan → flipped (Pitfall 5).
+  7b. ``test_fresh_started_at_not_swept_even_with_missing_stream`` (**CR-02**): a
+     just-started run (``started_at`` within the grace window) with NO stream yet is
+     NOT flipped — the producer may not have written its first ``_emit``/``XADD`` yet.
   8. ``test_cap_paused_not_swept_periodically``: a ``cap_paused`` row with
      ``include_cap_paused=False`` (the periodic sweep) → NOT flipped (Pitfall 3).
   9. ``test_redis_error_skips_not_flips``: a NON-"no such key" ``ResponseError`` on the
@@ -35,6 +38,7 @@ recording fake honoring the ``eval_runs`` select/update chain; the asyncpg ``poo
 fake honoring ``fetch`` (the non-terminal ``runs`` query, status-filtered) + ``execute``
 (``finalize_run``).
 """
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
@@ -47,6 +51,13 @@ _FAKE_TIME = (1_000_000, 0)
 _NOW_MS = _FAKE_TIME[0] * 1000 + _FAKE_TIME[1] // 1000  # 1_000_000_000
 # A short, explicit test STALE_TIMEOUT (real default is 2400_000 ms; tests pin it).
 _STALE_MS = 100_000  # 100 s
+
+# CR-02 START-GRACE anchors (grounded on runs.started_at, the app/DB clock — separate
+# from the redis fake clock above). A chat row seeded with _OLD_STARTED_AT is safely
+# PAST any grace window (so the stream oracle applies); one seeded with
+# _YOUNG_STARTED_AT is INSIDE the grace window (so a missing stream is NOT a false-kill).
+_OLD_STARTED_AT = datetime.now(timezone.utc) - timedelta(hours=1)
+_YOUNG_STARTED_AT = datetime.now(timezone.utc)
 
 
 # ── A tiny in-memory async fake Redis (membership + guard + stream-age + drop) ──
@@ -180,10 +191,11 @@ class _FakePool:
         self.executed: list[tuple] = []     # (sql, params) recorded per finalize_run
 
     async def fetch(self, sql, *params):
-        # Emulates: SELECT run_id, thread_id FROM runs WHERE status = ANY($1::text[]).
+        # Emulates: SELECT run_id, thread_id, started_at FROM runs WHERE status = ANY(...).
         # Honors the status-list bind so include_cap_paused=False actually excludes
         # cap_paused rows (Pitfall 3). Rows without a "status" key are dropped by the
-        # filter — every chat row the tests seed carries an explicit status.
+        # filter — every chat row the tests seed carries an explicit status AND a
+        # started_at (the CR-02 start-grace reads row["started_at"]).
         if params and isinstance(params[0], (list, tuple)):
             allowed = set(params[0])
             return [r for r in self.rows if r.get("status") in allowed]
@@ -224,7 +236,7 @@ async def test_set_nx_guard_returns_zero_when_held():
     chat_id = uuid4()
     supabase = _FakeSupabase(rows=[{"id": eval_id, "status": "running"}])
     redis = _FakeRedis(active={}, lock_held=True)   # guard already held by the racing sibling
-    pool = _FakePool(rows=[{"run_id": chat_id, "thread_id": uuid4(), "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": chat_id, "thread_id": uuid4(), "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(pool=pool, redis=redis, supabase=supabase)
 
@@ -244,7 +256,7 @@ async def test_orphaned_chat_run_flipped_to_failed():
     thread_id = uuid4()
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})            # stream NOT seeded → xinfo 'no such key' → orphan
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(pool=pool, redis=redis, supabase=supabase)
 
@@ -266,7 +278,7 @@ async def test_stale_stream_flipped_to_failed():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})
     redis.seed_stream(run_id, _NOW_MS - (_STALE_MS + 1))   # age = STALE+1 ms → stale
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase, stale_timeout_ms=_STALE_MS
@@ -285,7 +297,7 @@ async def test_fresh_stream_not_flipped():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})
     redis.seed_stream(run_id, _NOW_MS)   # age = 0 → fresh
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase, stale_timeout_ms=_STALE_MS
@@ -307,7 +319,7 @@ async def test_present_in_active_but_stale_is_orphan():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={str(run_id): 1.0})           # PRESENT in the mirror
     redis.seed_stream(run_id, _NOW_MS - (_STALE_MS + 1))    # yet its stream is stale
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase, stale_timeout_ms=_STALE_MS
@@ -320,13 +332,16 @@ async def test_present_in_active_but_stale_is_orphan():
 
 @pytest.mark.asyncio
 async def test_missing_stream_is_orphan():
-    """xinfo raises 'no such key' + a non-terminal PG row → orphan → flipped (Pitfall 5)."""
+    """A PAST-GRACE run whose xinfo raises 'no such key' → orphan → flipped (Pitfall 5).
+
+    The started_at is OLD (_OLD_STARTED_AT), so the CR-02 start-grace does NOT apply —
+    a missing stream on an aged run is a genuine dead-producer orphan."""
     run_id = uuid4()
     thread_id = uuid4()
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={str(run_id): 1.0})   # even present-in-mirror is irrelevant now
     # no seed_stream → xinfo_stream raises ResponseError('no such key')
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase, stale_timeout_ms=_STALE_MS
@@ -334,6 +349,32 @@ async def test_missing_stream_is_orphan():
 
     assert n == 1
     assert pool.executed[0][1][1] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_fresh_started_at_not_swept_even_with_missing_stream():
+    """CR-02 START-GRACE: a JUST-STARTED run with no stream yet is NOT flipped.
+
+    register_run_start lands BEFORE title-gen + the producer's first _emit, so a brand-new
+    run legitimately has no run:{id} stream for a few seconds. Pre-fix, the missing-stream
+    branch treated that as an immediate orphan and false-killed a live run. With the grace
+    period, a run whose started_at is within grace_ms is skipped (returns not-orphan) even
+    though its stream is missing — the aged case is still caught by test_missing_stream."""
+    run_id = uuid4()
+    thread_id = uuid4()
+    supabase = _FakeSupabase(rows=[])
+    redis = _FakeRedis(active={str(run_id): 1.0})
+    # no seed_stream → xinfo_stream WOULD raise 'no such key' — but grace short-circuits it.
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _YOUNG_STARTED_AT}])
+
+    n = await reconcile_orphaned_runs(
+        pool=pool, redis=redis, supabase=supabase,
+        stale_timeout_ms=_STALE_MS, grace_ms=60_000,  # 60s grace; the run is ~0s old
+    )
+
+    assert n == 0                    # too young to judge → NOT flipped (never false-kill)
+    assert pool.executed == []       # no finalize_run fired
+    assert redis.deleted == []       # its (about-to-exist) stream was NOT dropped
 
 
 @pytest.mark.asyncio
@@ -347,7 +388,7 @@ async def test_cap_paused_not_swept_periodically():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})
     redis.seed_stream(run_id, _NOW_MS - (_STALE_MS + 1))    # stale — WOULD flip if included
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "cap_paused"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "cap_paused", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase,
@@ -367,7 +408,7 @@ async def test_redis_error_skips_not_flips():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})
     redis.seed_error_stream(run_id)     # xinfo raises a WRONGTYPE ResponseError (a real fault)
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": thread_id, "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     n = await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase, stale_timeout_ms=_STALE_MS
@@ -385,7 +426,7 @@ async def test_periodic_lock_ttl_forwarded():
     supabase = _FakeSupabase(rows=[])
     redis = _FakeRedis(active={})
     redis.seed_stream(run_id, _NOW_MS)     # fresh → no flips; we only assert the guard TTL
-    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": uuid4(), "status": "streaming"}])
+    pool = _FakePool(rows=[{"run_id": run_id, "thread_id": uuid4(), "status": "streaming", "started_at": _OLD_STARTED_AT}])
 
     await reconcile_orphaned_runs(
         pool=pool, redis=redis, supabase=supabase,

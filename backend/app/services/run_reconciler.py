@@ -21,7 +21,11 @@ MISSING, or whose ``last-generated-id`` is older than STALE_TIMEOUT
 a live-but-quiet run is never killed — D-145-07), is terminalized to ``failed`` via
 ``run_lifecycle.finalize_run_terminal`` (co-writing the ZREM). Age is grounded on the
 Redis clock (``redis.time()``) — no app↔Redis skew (Pitfall 4). A live long run keeps
-its stream fresh; a dead producer's stream goes stale. If liveness can't be verified (a
+its stream fresh; a dead producer's stream goes stale. START-GRACE (CR-02): a run whose
+``runs.started_at`` is younger than ``settings.run_start_grace_seconds`` (60s) is SKIPPED
+by the missing-stream branch — a just-started run may not have written its first
+``_emit``/``XADD`` yet (the title-gen + provider-TTFT window), so judging it on a missing
+stream would false-kill a genuinely-live run. If liveness can't be verified (a
 NON-"no such key" Redis fault on the age read) the row is SKIPPED, never flipped — the
 safe default (Pitfall 6). ``cap_paused`` is the legitimate, re-attachable iteration-cap
 pause: the PERIODIC sweep EXCLUDES it (``include_cap_paused=False``, Pitfall 3); the
@@ -92,6 +96,7 @@ async def reconcile_orphaned_runs(
     redis,
     supabase,
     stale_timeout_ms: int | None = None,
+    grace_ms: int | None = None,
     lock_ttl: int | None = None,
     include_cap_paused: bool = True,
 ) -> int:
@@ -113,6 +118,11 @@ async def reconcile_orphaned_runs(
     """
     if stale_timeout_ms is None:
         stale_timeout_ms = settings.run_stale_sweep_timeout_seconds * 1000
+    if grace_ms is None:
+        grace_ms = settings.run_start_grace_seconds * 1000
+    # CR-02: a run younger than the stale window can never be stale — keep the grace
+    # within [0, stale_timeout] (defensive, mirrors the LLM_CALL_TIMEOUT bounds).
+    grace_ms = max(0, min(grace_ms, stale_timeout_ms))
     if lock_ttl is None:
         lock_ttl = _RECONCILE_LOCK_TTL_S
 
@@ -127,6 +137,7 @@ async def reconcile_orphaned_runs(
         pool,
         redis,
         stale_timeout_ms=stale_timeout_ms,
+        grace_ms=grace_ms,
         include_cap_paused=include_cap_paused,
     )
     if flipped:
@@ -187,7 +198,7 @@ async def _reconcile_eval_runs(redis, supabase) -> int:
     return flipped
 
 
-async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, include_cap_paused) -> int:
+async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, grace_ms, include_cap_paused) -> int:
     """Finalize STALE-STREAM non-terminal companion ``runs`` rows → ``failed`` (D-145-06).
 
     The chat orphan oracle is STREAM-AGE, not ``runs:active`` membership (D-145-02 makes
@@ -198,13 +209,15 @@ async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, include_cap_pau
     ``include_cap_paused`` gates the candidate status set: the BOOT sweep keeps
     ``cap_paused`` coverage; the PERIODIC sweep passes ``False`` to EXCLUDE it — a
     legitimately-paused Continue run has a quiet stream and must not be killed (Pitfall 3).
-    Selects ``run_id`` AND ``thread_id`` (the owner ZREMs ``runs_by_thread:{tid}``).
-    asyncpg is natively async — no threadpool.
+    Selects ``run_id``, ``thread_id`` AND ``started_at`` — the owner ZREMs
+    ``runs_by_thread:{tid}``, and ``started_at`` grounds the CR-02 start-grace so a
+    just-started run (no first ``_emit`` yet) is never false-killed. asyncpg is natively
+    async — no threadpool.
     """
     statuses = list(_NON_TERMINAL_CHAT_STATUSES) if include_cap_paused else ["streaming"]
     try:
         rows = await pool.fetch(
-            "SELECT run_id, thread_id FROM runs WHERE status = ANY($1::text[])",
+            "SELECT run_id, thread_id, started_at FROM runs WHERE status = ANY($1::text[])",
             statuses,
         )
     except Exception:
@@ -215,8 +228,10 @@ async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, include_cap_pau
     for row in rows:
         run_id = row["run_id"]
         try:
-            if not await _is_chat_orphan(redis, run_id, stale_timeout_ms):
-                continue  # fresh stream → genuinely live-but-quiet (never false-kill)
+            if not await _is_chat_orphan(
+                redis, run_id, stale_timeout_ms, row["started_at"], grace_ms
+            ):
+                continue  # too young OR fresh stream → live-but-quiet (never false-kill)
 
             await finalize_run_terminal(
                 pool=pool,
@@ -237,17 +252,36 @@ async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, include_cap_pau
     return flipped
 
 
-async def _is_chat_orphan(redis, run_id, stale_timeout_ms) -> bool:
-    """True iff the ``run:{run_id}`` stream is MISSING or its last event is older than
-    ``stale_timeout_ms`` (STREAM-AGE, D-145-06). This catches the dead-producer orphan
-    that D-145-02 leaves PRESENT in ``runs:active`` (membership is now blind for chat).
+def _to_utc(dt: datetime) -> datetime:
+    """Normalize a possibly-naive Postgres timestamp to an aware UTC datetime. asyncpg
+    returns aware datetimes for a ``timestamptz`` column; be defensive for a naive value
+    so the CR-02 age math never raises on a naive/aware subtraction."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
-    - Missing stream (``ResponseError('no such key')``) + a non-terminal PG row → orphan
-      (Pitfall 5). Age is grounded on the Redis clock (``redis.time()``) — no app↔Redis
-      skew (Pitfall 4).
+
+async def _is_chat_orphan(redis, run_id, stale_timeout_ms, started_at, grace_ms) -> bool:
+    """True iff the ``run:{run_id}`` stream is MISSING or its last event is older than
+    ``stale_timeout_ms`` (STREAM-AGE, D-145-06) — BUT only once the run is past its
+    START-GRACE. This catches the dead-producer orphan that D-145-02 leaves PRESENT in
+    ``runs:active`` (membership is now blind for chat) without false-killing a live run.
+
+    - START-GRACE (CR-02): a run younger than ``grace_ms`` (grounded on ``started_at``)
+      is NEVER an orphan — its producer may not have written its first ``_emit``/``XADD``
+      yet (the title-gen + provider-TTFT window between ``register_run_start`` and the
+      first stream event). This guards the whole predicate (a run that young can't be
+      stale either), so it is the first check.
+    - Missing stream (``ResponseError('no such key')``) + a past-grace non-terminal PG row
+      → orphan (Pitfall 5). Age is grounded on the Redis clock (``redis.time()``) — no
+      app↔Redis skew (Pitfall 4).
     - ANY OTHER exception (a real Redis fault) PROPAGATES to the per-row handler, which
       logs + SKIPS the row — never flip on unverifiable liveness (Pitfall 6, the safe default).
     """
+    if grace_ms and started_at is not None:
+        age_ms = (datetime.now(timezone.utc) - _to_utc(started_at)).total_seconds() * 1000
+        if age_ms < grace_ms:
+            return False    # too young to judge — the producer may not have emitted yet (CR-02)
     try:
         info = await redis.xinfo_stream(f"run:{run_id}")
     except ResponseError as e:

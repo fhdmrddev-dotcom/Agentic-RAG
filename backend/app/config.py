@@ -995,6 +995,18 @@ class Settings(BaseSettings):
     # (project dynamic-settings direction); env override is free via pydantic-settings.
     run_stale_sweep_timeout_seconds: int = 2400
     run_stale_sweep_interval_seconds: int = 120
+    # CR-02 (Phase 145 review) — start-grace floor for the periodic sweep. The
+    # missing-stream ⇒ orphan branch must NOT fire on a just-started run that has not
+    # written its first stream event yet: register_run_start (Postgres INSERT + mirror
+    # ZADDs) lands BEFORE auto-title-generation (a blocking LLM call on the first
+    # message of a new thread) and BEFORE agent_runner's first _emit/XADD creates the
+    # run:{id} stream. A sweep tick inside that title-gen + provider-TTFT window would
+    # false-kill a genuinely-live run. A run younger than this grace is SKIPPED by the
+    # missing-stream branch; the stale-stream branch (2400s) still handles the aged
+    # case. 60s covers the realistic title-gen round-trip + slow-provider TTFT budget.
+    # Clamped in reconcile_orphaned_runs to [0, stale_timeout] (a run younger than the
+    # stale window can never be stale). Config field → tunable without a deploy.
+    run_start_grace_seconds: int = 60
 
     # Phase 091 — harness per-phase caps (D-12: derive from existing knobs, do
     # NOT invent arbitrary numbers). Both a STEP cap and a WALL-CLOCK cap are
