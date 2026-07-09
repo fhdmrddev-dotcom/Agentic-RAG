@@ -41,9 +41,12 @@ running app is byte-identical — this module is dead code until wired.
 """
 from __future__ import annotations
 
+import logging
 import time
 
 from app.db.runs import finalize_run, insert_run
+
+logger = logging.getLogger(__name__)
 
 # The derived liveness mirror (CLAUDE.md run-buffer key conventions). Same constant
 # name as run_reconciler.py:61 so the owner and the sweep speak of the same set.
@@ -71,8 +74,11 @@ async def register_run_start(
     ordering ``threads.py`` uses today). On success the chat-scoped invariant holds:
     ``run_id ∈ runs:active  ⇔  runs.status == 'streaming'``.
 
-    Extracted SHAPE of ``threads.py:1108-1127``. Thin: the DB write's exceptions
-    propagate (callers own best-effort framing); no sentinel/EXPIRE here.
+    Extracted SHAPE of ``threads.py:1108-1127``. Thin: the DB INSERT is the FATAL,
+    authoritative write and its exceptions propagate (callers own spawn-failure
+    framing); the two mirror ZADDs are BEST-EFFORT — a transient Redis blip is logged,
+    never raised (CR-01) — so a mirror hiccup never fails the send. No sentinel/EXPIRE
+    here.
     """
     await insert_run(
         pool,
@@ -86,8 +92,22 @@ async def register_run_start(
         parent_run_id=parent_run_id,
     )
     _score = time.time()
-    await redis.zadd(f"runs_by_thread:{thread_id}", {str(run_id): _score})
-    await redis.zadd(_ACTIVE_SET_KEY, {str(run_id): _score})
+    # CR-01 (Phase 145 review): the two mirror ZADDs are BEST-EFFORT. The Postgres
+    # INSERT above is the fatal, authoritative write (D-145-01: ``runs.status`` is
+    # AUTHORITATIVE, ``runs:active`` is a DERIVED mirror). A transient Redis blip on
+    # the mirror must NOT escalate into a spawn failure → user-facing 500 → a run
+    # churned ``streaming`` → ``failed`` for a purely-cosmetic mirror write. This
+    # matches the module's own best-effort-Redis posture around the finalizer; the
+    # stale-stream sweep reconciles any run left out of the mirror.
+    try:
+        await redis.zadd(f"runs_by_thread:{thread_id}", {str(run_id): _score})
+        await redis.zadd(_ACTIVE_SET_KEY, {str(run_id): _score})
+    except Exception:
+        logger.exception(
+            "register_run_start: mirror ZADD failed for run %s (status write already "
+            "succeeded; continuing)",
+            run_id,
+        )
 
 
 async def finalize_run_terminal(

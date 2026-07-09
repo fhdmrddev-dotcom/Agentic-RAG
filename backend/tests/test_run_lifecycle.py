@@ -76,6 +76,55 @@ class _FakeRedis:
         return n
 
 
+class _FailingZaddRedis(_FakeRedis):
+    """A redis double whose ``zadd`` ALWAYS raises — to prove the mirror write is
+    best-effort (CR-01). ``zrem`` is inherited unchanged; only the START ZADD path is
+    exercised here."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.zadd_attempts = 0
+
+    async def zadd(self, key, mapping, *a, **k):
+        self.zadd_attempts += 1
+        raise ConnectionError("simulated transient Redis failure")
+
+
+@pytest.mark.asyncio
+async def test_register_run_start_mirror_zadd_failure_is_best_effort():
+    """CR-01 (Phase 145 review): a transient ``redis.zadd`` failure AFTER the
+    authoritative Postgres INSERT must NOT propagate. ``runs:active`` is a DERIVED
+    mirror (D-145-01) — a mirror blip is best-effort, never fatal, so the run stays
+    ``streaming`` in Postgres and the send is never turned into a 500 / ``failed`` run.
+    Pre-fix, the un-wrapped ZADD raised straight out of ``register_run_start`` →
+    spawn-failure → user-facing 500."""
+    run_id = uuid4()
+    thread_id = uuid4()
+    user_id = uuid4()
+    pool = _FakePool()
+    redis = _FailingZaddRedis()
+
+    # Must NOT raise despite the ZADD failure (the whole point of CR-01).
+    await register_run_start(
+        pool=pool,
+        redis=redis,
+        run_id=run_id,
+        thread_id=thread_id,
+        user_id=user_id,
+        model="gpt-x",
+        provider="openai",
+    )
+
+    # The authoritative status write still fired with status='streaming'.
+    assert len(pool.executed) == 1
+    sql, params = pool.executed[-1]
+    assert "INSERT INTO runs" in sql
+    assert params[0] == run_id
+    assert params[3] == "streaming"
+    # The mirror ZADD was ATTEMPTED (and raised) — proving best-effort swallow, not skip.
+    assert redis.zadd_attempts >= 1
+
+
 @pytest.mark.asyncio
 async def test_register_cowrites_status_and_active():
     """ONE register_run_start → insert_run(status='streaming') AND ZADD runs:active AND
