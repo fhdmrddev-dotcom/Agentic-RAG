@@ -21,8 +21,12 @@ findings:
   warning: 2
   info: 1
   total: 5
-status: issues_found
+status: resolved
+resolved: 2026-07-09
 ---
+
+> **RESOLUTION (2026-07-09):** All 5 findings fixed + tested, atomic commits on `develop`:
+> CR-01 `47ccbf67` (best-effort mirror ZADDs) · CR-02 `06035f6b` (start-grace `run_start_grace_seconds`=60s vs the missing-stream false-kill) · WR-01 `11080aa4` (watchdog derives honest persisted status) · WR-02 `b817fd30` (config bounds validator) · IN-01 `a7b64365` (dead imports). New regression tests: best-effort-ZADD, fresh-run-not-swept, watchdog-honest-status. 19 backend unit + watchdog/transient vitest green, no new regressions. Two logic changes (CR-02 60s grace vs slow-model TTFT; WR-01 snapshot enrichment) flagged for the operator's live UAT eyeball.
 
 # Phase 145: Code Review Report
 
