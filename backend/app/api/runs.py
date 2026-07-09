@@ -1163,27 +1163,33 @@ async def cancel_run(
     thread_id = row["thread_id"]
     stream_key = f"run:{run_id}"
 
-    # 1. UPDATE Postgres. Best-effort per D-062-13 — primary durability is
-    # the original happy-path cancel; zombie heal is a recovery surface,
-    # not a primary write. If Postgres UPDATE fails here, still return 204
-    # (the operator sees the failure in logger.exception output).
-    # WR-01 fix: Python-side ISO-8601 timestamp instead of the literal string
-    # "now()". PostgREST sends update payloads as JSON over the wire; "now()"
-    # arrives as a JSON string and timestamptz only treats the bare token 'now'
-    # (no parens) as a special literal. The "now()" form may store a literal
-    # string, return NULL, or error depending on column/version — silently
-    # degrading the zombie-heal contract. Symmetric with _shielded_finalize.
+    # 1. Atomic terminal co-write (Phase 145-03 / D-145-14 writer parity). The
+    # runs.status='cancelled' UPDATE + both mirror ZREMs are now ONE call via the
+    # run_lifecycle owner (was: a supabase UPDATE here + a separate ZREM ×2 at old
+    # step 3), so a healed zombie can't leave runs.status terminal while runs:active
+    # still lists it — the drift this phase closes. NO new cancel logic: only the
+    # WRITER is swapped, the semantics are unchanged. Best-effort per D-062-13 — a
+    # failure still returns 204 (logged); status lands FIRST (before the synthetic
+    # sentinel below), preserving the 075.4-03 ordering. The owner reuses the shared
+    # db.runs.finalize_run writer (parity with the happy-path _shielded_finalize) + a
+    # real datetime completed_at (the WR-01-correct form the supabase path used). Local
+    # imports keep the owner/pool off the /runs module-load path (runs.py style).
     try:
-        await aexec(
-            supabase.table("runs").update({
-                "status": "cancelled",
-                "error": "cancelled_by_user",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("run_id", str(run_id))
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        from app.services.run_lifecycle import finalize_run_terminal  # noqa: PLC0415
+        pool = await get_pg_pool()
+        await finalize_run_terminal(
+            pool=pool,
+            redis=redis,
+            run_id=run_id,
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            status="cancelled",
+            error="cancelled_by_user",
+            completed_at=datetime.now(timezone.utc),
         )
     except Exception:
         logger.exception(
-            "Zombie heal Postgres UPDATE failed for run %s", run_id
+            "Zombie heal finalize (cancel) failed for run %s", run_id
         )
 
     # Phase 092 (092-03 / SC#2, MODE-02) — clear the per-thread workflow lock
@@ -1240,21 +1246,10 @@ async def cancel_run(
                 "Zombie heal sentinel XADD failed for run %s", run_id
             )
 
-    # 3. ZREM both sorted sets — keeps active-runs listing honest even
-    # though the producer never got to run its own ZREMs. Each in its own
-    # try block per D-062-13 (don't let one failure mask the other).
-    try:
-        await redis.zrem("runs:active", str(run_id))
-    except (RedisError, OSError):
-        logger.exception(
-            "Zombie heal ZREM runs:active failed for run %s", run_id
-        )
-    try:
-        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
-    except (RedisError, OSError):
-        logger.exception(
-            "Zombie heal ZREM runs_by_thread failed for run %s", run_id
-        )
+    # 3. ZREM both sorted sets — MOVED into the finalize_run_terminal owner at step 1
+    # (Phase 145-03 / D-145-14): the mirror removal now co-writes atomically with the
+    # runs.status='cancelled' UPDATE, so a healed zombie can't leave runs.status
+    # terminal while runs:active still lists it. No standalone removal remains here.
 
     # 4. EXPIRE 60s (failed/cancelled bucket per D-061-04). Lets attached
     # consumers drain the buffer before it disappears.
