@@ -24,23 +24,41 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ToolCall } from "@/types"
 
-const { mockGetSnapshot } = vi.hoisted(() => ({
+const {
+  mockGetSnapshot,
+  mockGetMessages,
+  mockPostMessage,
+  mockSubscribeToRun,
+  mockGetActiveRuns,
+  mockCancelRun,
+  mockGetThreadWorkflow,
+} = vi.hoisted(() => ({
   mockGetSnapshot: vi.fn(),
+  mockGetMessages: vi.fn(),
+  mockPostMessage: vi.fn(),
+  mockSubscribeToRun: vi.fn(),
+  mockGetActiveRuns: vi.fn(),
+  mockCancelRun: vi.fn(),
+  mockGetThreadWorkflow: vi.fn(),
 }))
 
 // Match the mocking strategy from src/__tests__/hooks/useMessages.test.ts —
 // stub @/lib/api fully (no importActual, which would trip the eager Supabase
-// client load that fails without VITE_SUPABASE_URL).
+// client load that fails without VITE_SUPABASE_URL). Phase 145-05: the
+// postMessage/subscribeToRun/getThreadWorkflow stubs are now controllable
+// (hoisted refs) so the D-145-10 render test below can drive a real
+// send → reader_done → reattach sequence.
 vi.mock("@/lib/api", () => ({
   getSnapshot: mockGetSnapshot,
-  // Stub the other named exports the SUT module imports — only types are
-  // needed at compile time; the function bodies are never called by the
-  // _isTransientStreamEnd helper under test.
-  getMessages: vi.fn(),
-  postMessage: vi.fn(),
-  subscribeToRun: vi.fn(),
-  getActiveRuns: vi.fn(),
-  cancelRun: vi.fn(),
+  getMessages: mockGetMessages,
+  postMessage: mockPostMessage,
+  subscribeToRun: mockSubscribeToRun,
+  getActiveRuns: mockGetActiveRuns,
+  cancelRun: mockCancelRun,
+  getThreadWorkflow: mockGetThreadWorkflow,
+  getThreadTodos: vi.fn().mockResolvedValue([]),
+  getThreadTasks: vi.fn().mockResolvedValue([]),
+  ApiError: class ApiError extends Error {},
 }))
 
 // Match useMessages.test.ts: stub supabase auth so module load does not try to
@@ -58,7 +76,15 @@ vi.mock("@/lib/supabase", () => ({
 }))
 
 // IMPORTANT: import AFTER the mocks so the SUT picks up mocked getSnapshot.
-import { _isTransientStreamEnd, _reattachAfterTransient } from "@/providers/StreamsProvider"
+import { renderHook, act, waitFor } from "@testing-library/react"
+import { createElement, type ReactNode } from "react"
+import {
+  _isTransientStreamEnd,
+  _reattachAfterTransient,
+  StreamsProvider,
+  useStreamActions,
+} from "@/providers/StreamsProvider"
+import { useStreamsStore } from "@/stores/streamsStore"
 import type { ThreadSnapshot } from "@/lib/api"
 import type { MutableRefObject } from "react"
 
@@ -232,5 +258,101 @@ describe("_isTransientStreamEnd (Phase 075.1 Plan 01)", () => {
     expect(reattach).toHaveBeenCalledTimes(1)
     // Critical: ONLY ONE getSnapshot call across the full flow.
     expect(mockGetSnapshot).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 145-05 (D-145-10, FND-01) — a transient reattach RESTORES streamingThreads
+//
+// BUG-260707-01 root cause: the sendMessage `finally` (StreamsProvider.tsx:2020)
+// unconditionally deletes threadId from streamingThreads when the awaited
+// subscribeToRun resolves at a transient stream-end; the reattach callback
+// (:1852) re-adds it. Because subscribeToRun fires onTerminal WITHOUT await and
+// returns immediately, the finally-delete lands BEFORE the reattach-readd → nets
+// to "present". Without the re-add, isStreaming (= streamingThreads.has(tid))
+// reads false for the REST of a still-live run → the composer flips Stop→Send and
+// the 👍/👎 feedback appear mid-run. Phase 145-05 preserves this restore so the
+// composer/feedback stay HONEST until runs.status is terminal (no premature
+// "done" affordances mid-run). This renders the provider (unlike the pure-helper
+// tests above) to prove the streamingThreads membership end-to-end.
+// ─────────────────────────────────────────────────────────────────────────────
+function renderProvider() {
+  return renderHook(() => useStreamActions(), {
+    wrapper: ({ children }: { children: ReactNode }) =>
+      createElement(StreamsProvider, null, children),
+  })
+}
+
+describe("Phase 145-05 (D-145-10) — transient reattach keeps streamingThreads", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    useStreamsStore.setState({
+      bucketsBySurface: new Map(),
+      viewedThreadId: null,
+      streamingThreads: new Set<string>(),
+      fallbackNotices: new Map<string, string>(),
+      reconcileErrors: new Map<string, Error>(),
+      loadingThreads: new Set<string>(),
+      subscriptionsByThread: new Map<string, Set<string>>(),
+    })
+    mockGetMessages.mockResolvedValue([])
+    mockGetActiveRuns.mockResolvedValue([])
+    mockCancelRun.mockResolvedValue(undefined)
+    mockGetThreadWorkflow.mockResolvedValue({ locked: false })
+    mockPostMessage.mockResolvedValue({ run_id: RUN_ID, message_id: "real-user-msg" })
+    // First getSnapshot (the setViewingThread reconcile) → no active runs, so the
+    // reconcile-derive is a no-op. Later getSnapshot calls (the transient probe
+    // inside onTerminal) → the run is STILL streaming, so reader_done is treated
+    // as transient and the reattach fires.
+    mockGetSnapshot
+      .mockResolvedValueOnce({ messages: [], active_runs: [], since_cursors: {} })
+      .mockResolvedValue({
+        messages: [],
+        active_runs: [
+          { run_id: RUN_ID, started_at: new Date().toISOString(), status: "streaming" },
+        ],
+        since_cursors: { [RUN_ID]: "0" },
+      })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("keeps the thread in streamingThreads after a reader_done → reattach (composer stays Stop; feedback stays hidden)", async () => {
+    // 1st subscribeToRun = the initial stream: fire onTerminal WITHOUT await (like
+    // api.ts), then resolve so sendMessage's `await subscribeToRun` finally runs.
+    // 2nd call = the reattach: stays open (the run is still streaming).
+    let subCalls = 0
+    mockSubscribeToRun.mockImplementation(
+      async (_rid: string, _since: string, cb: { onTerminal?: (k: string, e?: string) => void }) => {
+        subCalls += 1
+        if (subCalls === 1) {
+          cb.onTerminal?.("reader_done")
+          return
+        }
+        return new Promise<void>(() => {})
+      },
+    )
+
+    const { result } = renderProvider()
+
+    // Thread must be viewed to enter the stream pool (isThreadInStreamPool gates
+    // both the initial subscribe and the reattach).
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+    await act(async () => {
+      await result.current.sendMessage(THREAD_ID, "run code that fails then retries")
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(2))
+
+    // THE INVARIANT (D-145-10): still "streaming" after the transient reattach, so
+    // isStreaming stays true → composer keeps Stop, feedback thumbs stay hidden.
+    await waitFor(() => {
+      expect(useStreamsStore.getState().streamingThreads.has(THREAD_ID)).toBe(true)
+    })
   })
 })
