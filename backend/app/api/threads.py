@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import time as time_mod
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -38,7 +37,7 @@ from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotRespon
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import insert_run, finalize_run, insert_assistant_message
+from app.db.runs import finalize_run, insert_assistant_message
 # Phase 145-03 (D-145-09) — the atomic run-lifecycle owner (Plan 02). The chat-run
 # START register + every TRUE terminal route through these co-writers so
 # runs.status and its runs:active/runs_by_thread mirrors move in ONE unit and can
