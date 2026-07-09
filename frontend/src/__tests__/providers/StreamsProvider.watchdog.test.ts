@@ -174,7 +174,9 @@ describe("Phase 145-05 — inactivity watchdog (fake timers)", () => {
   })
 
   it("watchdog silent-finalizes on terminal snapshot (D-145-03/04)", async () => {
-    // getSnapshot probe returns a TERMINAL snapshot (no streaming run).
+    // getSnapshot probe returns a TERMINAL snapshot (no streaming run) with NO
+    // persisted messages — so the WR-01 honest-derive has nothing to read and falls
+    // back to "completed".
     mockGetSnapshot.mockResolvedValue(snapshotWithRun(false))
 
     const { unmount } = renderProvider()
@@ -190,12 +192,40 @@ describe("Phase 145-05 — inactivity watchdog (fake timers)", () => {
 
     // Stop clears (streamingThreads no longer holds the thread) …
     expect(useStreamsStore.getState().streamingThreads.has(THREAD_ID)).toBe(false)
-    // … and the placeholder runStatus flipped to "completed" (silent terminal-flip).
+    // … and the placeholder runStatus flipped to "completed" (the fallback, since the
+    // snapshot carried no persisted run_status).
     const bucket =
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
     expect(bucket.find((m) => m.runId === RUN_ID)?.runStatus).toBe("completed")
     // No banner / reconnecting copy: the message carries no runError.
     expect(bucket.find((m) => m.runId === RUN_ID)?.runError).toBeUndefined()
+    unmount()
+  })
+
+  it("watchdog derives the HONEST terminal status from snapshot.messages, not hardcoded 'completed' (WR-01)", async () => {
+    // The run actually FAILED in the background. The SAME getSnapshot the probe uses
+    // carries that truth in snapshot.messages (enriched run_status) — so the silent
+    // finalize must flip the placeholder to "failed", never a blanket "completed".
+    mockGetSnapshot.mockResolvedValue({
+      messages: [{ ...streamingPlaceholder(), runStatus: "failed" }],
+      active_runs: [],
+      since_cursors: {},
+    } as ThreadSnapshot)
+
+    const { unmount } = renderProvider()
+    act(() => {
+      seedStreamingThread()
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ADVANCE_PAST_TICK_MS)
+    })
+
+    expect(useStreamsStore.getState().streamingThreads.has(THREAD_ID)).toBe(false)
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    // Honest terminal status — NOT the hardcoded "completed".
+    expect(bucket.find((m) => m.runId === RUN_ID)?.runStatus).toBe("failed")
     unmount()
   })
 

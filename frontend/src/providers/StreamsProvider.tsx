@@ -2701,7 +2701,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // The visibility/focus belt (#2) now heals Direction A on tab-focus for free,
   // because reconcile() derives streamingThreads.
   useEffect(() => {
-    const finalizeThreadSilently = (threadId: string) => {
+    const finalizeThreadSilently = (threadId: string, snapshot?: ThreadSnapshot) => {
       // Pitfall 1: never finalize a thread with an in-flight send.
       if (sendingThreadsRef.current.has(threadId)) return
       useStreamsStore.setState((s) => {
@@ -2710,16 +2710,29 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         next.delete(threadId)
         return { streamingThreads: next }
       })
-      // Silent terminal-flip of the live placeholder(s) — done→completed. No
-      // runError / banner / reconnecting copy (D-145-04). Per-thread only.
+      // Silent terminal-flip of the live placeholder(s). No runError / banner /
+      // reconnecting copy (D-145-04). Per-thread only.
+      //
+      // WR-01 (Phase 145 review): derive the HONEST terminal status from the persisted
+      // run_status the SAME getSnapshot already fetched (snapshot.messages, enriched via
+      // _enrich_messages_with_runs) instead of hardcoding "completed". A run that
+      // genuinely failed / was cancelled / timed out while its thread was backgrounded
+      // must not be shown as a successful "completed" turn — that cuts against the
+      // phase's lifecycle-honesty goal. Fall back to "completed" only when the persisted
+      // status is unknown or still reads "streaming" (a snapshot inconsistency — we still
+      // must not leave the placeholder live).
       useStreamsStore
         .getState()
         .actions.setMessagesForBucket("chat", threadId, (prev) =>
-          prev.map((m) =>
-            m.role === "assistant" && m.runStatus === "streaming"
-              ? { ...m, runStatus: "completed" as const }
-              : m,
-          ),
+          prev.map((m) => {
+            if (m.role !== "assistant" || m.runStatus !== "streaming") return m
+            const persisted = snapshot?.messages.find((pm) => pm.runId === m.runId)
+            const finalStatus =
+              persisted?.runStatus && persisted.runStatus !== "streaming"
+                ? persisted.runStatus
+                : ("completed" as const)
+            return { ...m, runStatus: finalStatus }
+          }),
         )
       lastEventAtRef.current.delete(threadId)
     }
@@ -2742,7 +2755,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         lastEventAtRef.current.set(threadId, Date.now())
         return
       }
-      finalizeThreadSilently(threadId)
+      // WR-01: pass the just-fetched snapshot so the finalize picks the HONEST persisted
+      // terminal status (failed / cancelled / timed_out) instead of a blanket "completed".
+      finalizeThreadSilently(threadId, snapshot)
     }
 
     const tick = () => {
