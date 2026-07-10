@@ -6,8 +6,13 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+// Phase 146 (ADMIN-01 / D-07): the operator probe is hosted ONCE at App level
+// (single mount probe — Pitfall 4). It drives RENDERING ONLY: isOperator threads
+// to the nav (the probe-gated shield) and identity threads to the Control Room.
+// The backend 404 gate stays the sole authority; a forged flag reveals nothing.
+import { useOperatorProbe } from "@/hooks/useOperatorProbe"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -36,6 +41,11 @@ function App() {
   // callers land in Studio · Triggering — no standalone Tuner surface remains.
   const handleTuneSkill = (skillId: string) => handleOpenStudio(skillId, "triggering")
 
+  // Phase 146 (ADMIN-01 / D-07): one probe per app mount. isOperator gates the
+  // shield (render-only); identity feeds the Control Room band. A non-operator's
+  // probe yields null → isOperator false → the nav stays byte-identical to today.
+  const { isOperator, identity: operatorIdentity } = useOperatorProbe()
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -55,6 +65,8 @@ function App() {
           onSignOut={signOut}
           activeView={activeView}
           onNavigate={setActiveView}
+          isOperator={isOperator}
+          operatorIdentity={operatorIdentity}
           prefillMessage={prefillMessage}
           onSetPrefillMessage={setPrefillMessage}
           studioSkillId={studioSkillId}

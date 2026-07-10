@@ -16,7 +16,7 @@ import {
   MessageSquare,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
   Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
-  AlertCircle, Square,
+  AlertCircle, Square, Shield,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { Folder, Thread } from "@/types"
@@ -29,6 +29,12 @@ import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
 interface Props {
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. When true,
+  // the amber operator shield renders at the rail bottom; when false/loading it
+  // renders NOTHING (no placeholder, no reserved space) — the rail is byte-identical
+  // to today for every non-operator. The shield lives OUTSIDE the shared NAV_ITEMS
+  // array (a regression test locks that), so the array never leaks the surface.
+  isOperator: boolean
   onSignOut: () => void
   threads: Thread[]
   selectedThread: Thread | null
@@ -45,6 +51,7 @@ interface Props {
 export function NavPanel({
   activeView,
   onNavigate,
+  isOperator,
   onSignOut,
   threads,
   selectedThread,
@@ -450,8 +457,46 @@ export function NavPanel({
               </button>
             )
 
+            // Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield. Amber
+            // lucide Shield (distinct from Governance's ShieldCheck), same footer-
+            // button + collapsed-tooltip idiom. Active-highlights when in the Control
+            // Room. Rendered ONLY when isOperator — see the probe-gated block below.
+            const isControlRoom = activeView === "control-room"
+            const shieldButtonContent = (
+              <button
+                onClick={() => onNavigate("control-room")}
+                aria-current={isControlRoom ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 h-10 px-2.5 transition-colors rounded-lg focus-visible:outline-none",
+                  isCollapsed ? "w-10" : "w-full",
+                  isControlRoom
+                    ? "bg-amber-500/15 text-amber-400 font-medium"
+                    : "text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10"
+                )}
+              >
+                <Shield className="w-5 h-5 shrink-0" />
+                <span className={cn(
+                  "text-sm whitespace-nowrap transition-opacity duration-200",
+                  isCollapsed ? "opacity-0" : "opacity-100"
+                )}>
+                  Control Room
+                </span>
+              </button>
+            )
+
             return (
               <>
+                {/* Probe-gated operator shield — nothing rendered for non-operators
+                    (byte-identical rail; the D-07 non-discoverable contract). */}
+                {isOperator && (
+                  isCollapsed ? (
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>{shieldButtonContent}</TooltipTrigger>
+                      <TooltipContent side="right" className="ml-2">Control Room</TooltipContent>
+                    </Tooltip>
+                  ) : shieldButtonContent
+                )}
+
                 {isCollapsed ? (
                   <Tooltip delayDuration={0}>
                     <TooltipTrigger asChild>{themeButtonContent}</TooltipTrigger>

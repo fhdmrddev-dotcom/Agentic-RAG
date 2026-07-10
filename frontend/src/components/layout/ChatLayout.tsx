@@ -11,13 +11,17 @@ import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { GovernancePage } from "@/pages/GovernancePage"
 import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
+// Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
+// (governance/skill-studio precedent), reachable only via the probe-gated shield.
+import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
+import type { OperatorIdentity } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus } from "lucide-react"
+import { MessageSquare, Plus, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
 // shared NAV_ITEMS const (incl. the Workflows home + its distinct icon) — the
 // local NAV_ITEMS_MOBILE triplicate is gone (NavPanel already consumes it; this
@@ -32,6 +36,11 @@ interface Props {
   onSignOut: () => void
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. isOperator
+  // gates the shield (nav + mobile drawer); operatorIdentity feeds the Control Room
+  // band. Non-operators get isOperator=false → nav stays byte-identical to today.
+  isOperator: boolean
+  operatorIdentity: OperatorIdentity | null
   prefillMessage: string | null
   onSetPrefillMessage: (msg: string | null) => void
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio focused
@@ -50,7 +59,7 @@ interface Props {
   onTuneSkill: (skillId: string) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
   const {
     threads,
     selectedThread,
@@ -148,6 +157,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
       <NavPanel
         activeView={activeView}
         onNavigate={onNavigate}
+        isOperator={isOperator}
         onSignOut={onSignOut}
         threads={threads}
         selectedThread={selectedThread}
@@ -254,6 +264,25 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
                 </button>
               )
             })}
+            {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield —
+                rendered OUTSIDE NAV_ITEMS (a SEPARATE element, never in the shared
+                array) so a non-operator's drawer is byte-identical. Amber Shield,
+                distinct from Governance's ShieldCheck; only when isOperator. */}
+            {isOperator && (
+              <button
+                aria-label="Control Room"
+                aria-current={activeView === "control-room" ? "page" : undefined}
+                onClick={() => { onNavigate("control-room"); setDrawerOpen(false) }}
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  activeView === "control-room"
+                    ? "bg-amber-500/15 text-amber-400"
+                    : "text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10",
+                )}
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -341,6 +370,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
               onTabChange={onStudioTabChange}
               onBack={() => onNavigate("skills")}
             />
+          ) : activeView === "control-room" ? (
+            // Phase 146 (ADMIN-01 / D-07): the Control Room full-surface mounts here
+            // (additive branch BEFORE the trailing KnowledgeHealthPage else — the
+            // governance/skill-studio precedent). It is reachable ONLY via the
+            // probe-gated shield (NavPanel footer + the mobile drawer); operatorIdentity
+            // feeds the band, onBack returns to chat. The reachability triad (App union
+            // + this mount + the shield action) is owned in-phase (the built-but-
+            // unreachable lesson).
+            <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
           ) : (
             <KnowledgeHealthPage />
           )}
