@@ -3495,3 +3495,76 @@ export async function streamTunerRun(
     }
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 146 (ADMIN-01) — Control Room admin data layer.
+//
+// SECURITY NOTE (Pitfall 13 / D-07): these client functions decide RENDERING
+// ONLY. The backend `require_operator` router gate (Plan 02) is the sole
+// authority — a non-operator's `GET /admin/me` returns a byte-identical 404
+// {"detail":"Not Found"} (non-discoverable, 404-not-403), so the surface never
+// reveals it exists. A forged `isOperator=true` in the browser reveals nothing
+// and reaches no data: every /admin call is independently 404-gated server-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The operator identity returned by `GET /admin/me` (Plan 02). */
+export interface OperatorIdentity {
+  id: string
+  email: string
+  granted_at: string
+}
+
+/** The four raw backpressure signals from `GET /admin/backpressure` (Plan 02).
+ *  The Control Room maps each to a plain label (Server capacity · Agents working
+ *  · Database connections · Work spread) behind the "⌥ Technical names" toggle. */
+export interface BackpressureSignals {
+  anyio_threadpool_depth: { borrowed: number; total: number }
+  redis_active_runs: number
+  postgres_pool_in_use: number
+  per_worker_run_count: number
+}
+
+/** One append-only `operator_audit_log` row from `GET /admin/audit` (Plan 02) —
+ *  the recent-actions ledger feed. `label` is the human sentence; `is_write`
+ *  drives the ✎ write mark. */
+export interface OperatorAuditRow {
+  id: string
+  action: string
+  label: string
+  is_write: boolean
+  target_type: string | null
+  target_id: string | null
+  created_at: string
+}
+
+/** The operator probe. Calls `GET /admin/me`; a 404 means "not an operator" →
+ *  resolves to `null` so the caller renders NOTHING (the D-07 non-discoverable
+ *  contract — a non-operator's nav stays byte-identical to today). Returns the
+ *  operator identity on 200. Mirrors the `getTunerLatest` 404→null idiom.
+ *  RENDER-ONLY: never a security boundary (see SECURITY NOTE above). */
+export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/me`, { headers })
+  if (res.status === 404) return null
+  if (!res.ok) throw new ApiError("Failed to load the operator identity.", res.status)
+  return (await res.json()) as OperatorIdentity
+}
+
+/** Read the four live backpressure/health signals (`GET /admin/backpressure`).
+ *  Plain authed GET — the router gate returns 404 to non-operators. */
+export async function getBackpressure(): Promise<BackpressureSignals> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/backpressure`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load system health.", res.status)
+  return (await res.json()) as BackpressureSignals
+}
+
+/** Read the recent operator-actions ledger feed (`GET /admin/audit`). Plain
+ *  authed GET; `limit` optionally caps how many rows come back. */
+export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow[]> {
+  const headers = await getAuthHeaders()
+  const qs = limit != null ? `?limit=${encodeURIComponent(limit)}` : ""
+  const res = await fetch(`${API_BASE}/admin/audit${qs}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the operator audit feed.", res.status)
+  return (await res.json()) as OperatorAuditRow[]
+}
