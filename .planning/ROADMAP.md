@@ -103,7 +103,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 146-05-PLAN.md — 061-B/062-A leaf components: OperatorBand, HealthSignals, LockedTab, TechnicalNamesToggle, RecentActionsCard
+- [x] 146-05-PLAN.md — 061-B/062-A leaf components: OperatorBand, HealthSignals, LockedTab, TechnicalNamesToggle, RecentActionsCard
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

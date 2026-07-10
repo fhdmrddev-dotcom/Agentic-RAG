@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-10T22:11:11.513Z"
+last_updated: "2026-07-10T22:25:04.157Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 26
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 146 (operator-foundation) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-07-10
 
@@ -339,6 +339,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 146 P01 | 9min | 3 tasks | 3 files |
 | Phase 146 P02 | 11min | 3 tasks | 8 files |
 | Phase 146 P146-04 | 2min | 2 tasks | 3 files |
+| Phase 146 P05 | 3min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -412,6 +413,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 146-02: require_operator is a ROUTER-level gate returning a byte-identical 404 on non-membership (non-discoverable, sole authority, no RLS backstop); old BACKPRESSURE_ADMIN_USER_IDS + dev fail-open deleted (D-02), OPERATOR_EMAILS replaces it.
 - [Phase ?]: Phase 146-02: operator_audit_floor is a per-action yield-dependency (probe-EXEMPT) writing one append-only row per gated action; membership seam is asyncpg (patch _pg_pool in tests, not the supabase mock — Pitfall 6).
 - [Phase ?]: 146-04: operator probe is render-only (getOperatorProbe 404→null); backend require_operator 404 gate stays the sole authority (Pitfall 13)
+- [Phase 146]: 146-05: shipped the five Control Room presentational leaves (OperatorBand/HealthSignals/LockedTab/TechnicalNamesToggle/RecentActionsCard) — sketch winners 061-B + 062-A, pure prop-driven leaves typed against the Plan-04 api.ts contract, composed by the Plan-06 shell
+- [Phase 146]: 146-05: LockedTab keeps NO phase-number token in shipped copy OR source comments (T-146-10 grep treats any 'phase 1xx' substring as a leak); amber operator zone uses Tailwind amber-* tokens (StatusPill precedent), not a bespoke warning utility
 
 ## Operator Next Steps
 
