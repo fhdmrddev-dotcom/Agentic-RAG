@@ -425,7 +425,7 @@ Plans:
 - [x] `143-01-PLAN.md` — `category` schema contract on `WorkflowDefinition` + Wave-0 RED test backstops (executed 2026-07-10, 3/3 tasks)
 
 **Wave 1** *(blocked on Wave 0 completion)*:
-- [ ] `143-02-PLAN.md` — `list_starter_workflows` + additive `owned_only` de-dupe + `GET /workflows/starters` + `?scope=mine`
+- [x] `143-02-PLAN.md` — `list_starter_workflows` + additive `owned_only` de-dupe + `GET /workflows/starters` + `?scope=mine` (executed 2026-07-10, 2/2 tasks; 4 RED backstops GREEN)
 - [ ] `143-03-PLAN.md` — Compliance Gap Report template + migration 094 (transformed, distinct slugs) + `seed-starters.py` storage seed
 
 **Wave 2** *(blocked on Wave 1 completion)*:
@@ -488,7 +488,7 @@ Plans:
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
-| 143. Starter Workflow Library (STRETCH) | 1/5 | In Progress | - |
+| 143. Starter Workflow Library (STRETCH) | 2/5 | In Progress | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 6/6 | Complete (SC#10 UAT 6/6) | 2026-07-10 |
 
