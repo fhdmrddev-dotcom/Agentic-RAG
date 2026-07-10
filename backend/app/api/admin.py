@@ -1,66 +1,64 @@
-"""Admin operations -- backpressure metrics (Phase 078, WORKER-LIFT-04).
+"""Admin operations — operator-gated backpressure + identity probe + audit feed.
 
-Ships the four bottleneck signals as a JSON primitive for the v3.1 ops
-dashboard. Auth gated via BACKPRESSURE_ADMIN_USER_IDS env var:
-- Production (ENVIRONMENT=production): fail-closed (403 when var unset)
-- Dev/local (default): fail-open (any authenticated user)
+Every route here inherits the router-level ``require_operator`` gate (Phase 146,
+ADMIN-01): a non-operator JWT gets a byte-identical 404 on ALL of them — the
+surface is non-discoverable (see tests/test_146_operator_gate.py). The gate lives
+at the ROUTER level so a future /admin endpoint can never forget it; there is NO
+RLS backstop (the backend runs on the service-role key), so this gate is the sole
+authority.
 
-JSON shape is additive-only (D-078-08) -- v3.1 can add fields without
-breaking existing consumers.
+Endpoints:
+- GET /admin/backpressure — the four Phase-078 bottleneck signals (shape unchanged,
+  D-078-06/08 additive-only); audit-floor attached (recorded operator action).
+- GET /admin/me — operator identity probe; floor-EXEMPT (mount probes must not spam
+  the ledger — Pitfall 4 / D-04).
+- GET /admin/audit — recent operator actions feed for the Control Room ledger;
+  audit-floor attached (viewing the ledger is itself a recorded action).
 """
 import logging
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request
 
-from app.config import settings
-from app.dependencies import get_current_user, get_redis, _pg_pool
+from app.dependencies import (
+    _pg_pool,
+    get_redis,
+    operator_audit_floor,
+    require_operator,
+)
+from app.services.operator_service import (
+    get_operator_record,
+    get_recent_operator_audit,
+)
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _check_backpressure_auth(current_user: dict = Depends(get_current_user)) -> dict:
-    """Validate caller against BACKPRESSURE_ADMIN_USER_IDS allow-list.
-
-    D-078-07: fail-closed in production when the env var is unset/empty;
-    fail-open in dev so testing works without config.
-    """
-    env = settings.environment.lower()
-    is_production = env in ("production", "prod")
-    allow_ids_raw = settings.backpressure_admin_user_ids.strip()
-
-    if not allow_ids_raw:
-        if is_production:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin endpoint not configured",
-            )
-        # Dev/local: fail-open -- no restriction
-        return current_user
-
-    allowed = {uid.strip() for uid in allow_ids_raw.split(",") if uid.strip()}
-    if current_user["id"] not in allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized",
-        )
-    return current_user
+# The single load-bearing security line: default-deny at the router (Pattern 1).
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_operator)],
+)
 
 
 @router.get("/backpressure")
 async def get_backpressure(
-    _user: dict = Depends(_check_backpressure_auth),
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
 ):
-    """Return worker backpressure metrics for the v3.1 ops dashboard.
+    """Return worker backpressure metrics for the ops dashboard.
 
-    D-078-06: four signals -- anyio_threadpool_depth, redis_active_runs,
+    D-078-06: four signals — anyio_threadpool_depth, redis_active_runs,
     postgres_pool_in_use, per_worker_run_count.
-    D-078-08: JSON shape is additive-only -- v3.1 can add fields
-    (uptime_seconds, sandbox_active_sessions, memory_rss_mb) without
-    breaking existing consumers.
+    D-078-08: JSON shape is additive-only — consumers can add fields
+    (uptime_seconds, sandbox_active_sessions, memory_rss_mb) without breaking.
+
+    Phase 146: gated by the router-level require_operator; the audit floor records
+    this view under the plain label "Viewed system health" (action "health.view").
     """
+    request.state.audit_label = "Viewed system health"
+    request.state.audit_action = "health.view"
+
     # 1. AnyIO thread-pool depth
     limiter = anyio.to_thread.current_default_thread_limiter()
     anyio_borrowed = limiter.borrowed_tokens
@@ -97,3 +95,37 @@ async def get_backpressure(
         "postgres_pool_in_use": pg_in_use,
         "per_worker_run_count": per_worker_run_count,
     }
+
+
+@router.get("/me")
+async def get_operator_me(request: Request):
+    """Operator identity probe — floor-EXEMPT (Pitfall 4).
+
+    The router gate already 404'd non-operators; operators get their identity
+    ``{id, email, granted_at}`` for the Control Room band. NO operator_audit_floor
+    attached — the frontend probes this on EVERY app mount, and logging it would
+    fill the ledger with non-actions (D-04: every ledger row is a deliberate human
+    action).
+    """
+    op = request.state.operator  # set by require_operator (router gate)
+    record = await get_operator_record(op["id"])
+    granted_at = record.get("granted_at") if record else None
+    return {"id": op["id"], "email": op["email"], "granted_at": granted_at}
+
+
+@router.get("/audit")
+async def get_operator_audit_feed(
+    request: Request,
+    limit: int = 50,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Recent operator actions feed for the Control Room ledger card.
+
+    Reads the latest N ``operator_audit_log`` rows (created_at DESC). Floor-attached —
+    viewing the ledger is itself a recorded operator action (plain label "Viewed
+    recent actions" / action "audit.view").
+    """
+    request.state.audit_label = "Viewed recent actions"
+    request.state.audit_action = "audit.view"
+    entries = await get_recent_operator_audit(limit=limit)
+    return {"entries": entries}

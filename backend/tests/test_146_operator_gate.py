@@ -60,3 +60,35 @@ def test_backpressure_reachable_for_operator(client, auth_headers, mock_asyncpg_
     res = client.get("/admin/backpressure", headers=auth_headers)
     assert res.status_code == 200
     assert "anyio_threadpool_depth" in res.json()
+
+
+def test_audit_floor_writes_once(client, auth_headers, mock_asyncpg_pool, mock_builder, monkeypatch):
+    """A gated ACTION endpoint writes exactly ONE audit row; the /admin/me probe writes ZERO.
+
+    Drive the operator branch via the asyncpg pool mock (NOT the require_operator
+    override) so the real gate sets request.state.operator and the floor teardown
+    actually fires. The audit WRITE goes through the injected shared Supabase mock.
+    """
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    mock_asyncpg_pool.set_fetchrow_result({"user_id": "op-1"})  # operator present
+
+    # Action endpoint (/admin/backpressure) -> floor writes exactly one row.
+    res = client.get("/admin/backpressure", headers=auth_headers)
+    assert res.status_code == 200
+    op_inserts = [
+        c for c in mock_builder.insert.call_args_list
+        if c.args and isinstance(c.args[0], dict) and "action" in c.args[0] and "label" in c.args[0]
+    ]
+    assert len(op_inserts) == 1, "a gated action endpoint must write exactly one operator_audit_log row"
+    assert op_inserts[0].args[0]["action"] == "health.view"
+    assert op_inserts[0].args[0]["label"] == "Viewed system health"
+
+    # Probe (/admin/me) is floor-EXEMPT -> ZERO audit rows (Pitfall 4).
+    mock_builder.reset_mock()
+    probe = client.get("/admin/me", headers=auth_headers)
+    assert probe.status_code == 200
+    probe_inserts = [
+        c for c in mock_builder.insert.call_args_list
+        if c.args and isinstance(c.args[0], dict) and "action" in c.args[0]
+    ]
+    assert len(probe_inserts) == 0, "the /admin/me mount probe must not write an audit row"
