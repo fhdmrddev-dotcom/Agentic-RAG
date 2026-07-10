@@ -1207,13 +1207,38 @@ export async function listPublishedWorkflows(
    *  (or passing null) returns the full owner-scoped published list unchanged. */
   projectFolderId?: string | null,
   signal?: AbortSignal,
+  /** Phase 143 (WF-01 / D-143-2b): the Workflows-page Published shelf opts into
+   *  `scope: "mine"` so the backend AND-narrows to `created_by = me` (dropping the
+   *  bare `is_global`), de-duping the curated Starters + the mig-061 dev scaffolds
+   *  that now render in their own Starters shelf. EVERY other caller (the composer
+   *  Harness picker, the WorkspacePanel run-soul recovery) OMITS it and keeps the
+   *  byte-identical global-OR-mine feed those surfaces depend on (Pitfall 3). */
+  opts?: { scope?: "mine" },
 ): Promise<PublishedWorkflow[]> {
   const headers = await getAuthHeaders()
-  const url = projectFolderId
-    ? `${API_BASE}/workflows/published?project_folder_id=${encodeURIComponent(projectFolderId)}`
+  // Preserve the existing project_folder_id encoding byte-for-byte; append scope only
+  // when the caller opts in (default-off — no behavior change for existing callers).
+  const params: string[] = []
+  if (projectFolderId) params.push(`project_folder_id=${encodeURIComponent(projectFolderId)}`)
+  if (opts?.scope) params.push(`scope=${encodeURIComponent(opts.scope)}`)
+  const url = params.length
+    ? `${API_BASE}/workflows/published?${params.join("&")}`
     : `${API_BASE}/workflows/published`
   const res = await fetch(url, { headers, signal })
   if (!res.ok) throw new Error(`Failed to list published workflows (status ${res.status})`)
+  return (await res.json()) as PublishedWorkflow[]
+}
+
+/** Phase 143 (WF-01 / D-143-2) — GET /workflows/starters. The curated Starters-shelf
+ *  feed: `is_global` published definitions carrying `definition.category = 'starter'`
+ *  (a server-side JSONB-path predicate, `list_starter_workflows`). No project/user
+ *  scope — curated globals are world-readable by the mig-056 SELECT policy, so this
+ *  is a clone of listPublishedWorkflows with NO query params. The Workflows page
+ *  renders these on top; "Use this starter" forks a fresh owned copy off each row. */
+export async function listStarterWorkflows(signal?: AbortSignal): Promise<PublishedWorkflow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/starters`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list starter workflows (status ${res.status})`)
   return (await res.json()) as PublishedWorkflow[]
 }
 
