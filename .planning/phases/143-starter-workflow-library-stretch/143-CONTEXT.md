@@ -69,9 +69,13 @@ the existing generic primitives (same phase types, same run path). The deliverab
   1. **Risk Register** — promote from `pm-risk-register` (copy its `definition` JSONB).
   2. **Weekly Status Report** — promote from `pm-weekly-status-report` (copy its `definition` JSONB).
   3. **Compliance Gap Report** — author **fresh** per SEED-084.
-- **D-143-3a (all 3 are KB→document, NOT template-fill):** All three read the bound knowledge base
-  and produce a document. **None requires a user-uploaded template** — which is exactly why the
-  run-time template-upload gap (deferred) does NOT block this phase.
+- **D-143-3a (REVISED post-research 2026-07-10 — all 3 are template-fill; keep the →document path):**
+  Research (`143-RESEARCH.md` Pitfall 1) found `render_template` is the **only** registered emitter —
+  there is **no template-free file-producing path**, so every "→document" starter IS template-fill.
+  The intended reading of "no template needed" is **no *run-time uploaded* template** (that gap =
+  SEED-110, deferred) — the template is instead **bound in the definition**. Operator confirmed
+  2026-07-10: **keep real documents** (faithful to WF-01's "produce a document"), NOT chat-answer
+  starters. See D-143-4b for the transform + storage-seed this requires.
 - **D-143-3b ("promote" = copy into a seed, not flip user rows):** `pm-risk-register` /
   `pm-weekly-status-report` are `created_by=<the user>`, `is_global=false`. "Promote" means **copy
   their definition JSONB into the seed migration** as a system-owned (`created_by = <system seed
@@ -107,6 +111,38 @@ the existing generic primitives (same phase types, same run path). The deliverab
   fork/versioning UX, empty-state + discovery, and how they distinguish official/curated vs
   user-made. Findings inform the shelf layout, the fork affordance copy, and the `category` taxonomy
   — they do NOT expand scope beyond the one shelf section.
+
+### Post-Research Reconciliation (added 2026-07-10 after `143-RESEARCH.md`)
+- **D-143-4b (promote = transform + storage seed, NOT a verbatim copy):** "Promote" copies each source
+  row's `definition` JSONB **with transforms**: (1) strip `project_folder_id` and every per-phase
+  `folder_scope` (so retrieval runs over the *forker's own* KB, not the operator's private "PM Demo
+  Project" folder); (2) re-home each `.docx` template to the **seed-system-user** Storage prefix
+  (`00000000-…-01/_library/<slug>.docx`) and repoint `assets[].asset_id` there; (3) set the curation
+  fields (`created_by=<seed user>`, `is_global=true`, `status='published'`, `category='starter'`).
+  Because a SQL migration **cannot place Storage bytes**, this phase ALSO ships a **Python storage-seed
+  script** (mirror `scripts/seed-pm-pack.py:upload_template`) that uploads the 3 re-homed templates via
+  a service-role client. Two committed source templates already exist at `scripts/pm-pack/templates/`
+  (Risk Register, Weekly Status); the **Compliance Gap Report `.docx` must be authored fresh** via a
+  `make_pm_templates.py`-style python-docx builder (Pitfall-4-safe: one Jinja tag per run/cell,
+  `{%tr %}` loop in dedicated rows). Idempotent seed = fixed uuid + `ON CONFLICT (id) DO NOTHING`
+  (never UPDATE a published row — immutability trigger raises `23514`).
+- **D-143-2b (scoped narrowing — do NOT blanket-narrow the shared helper):** D-143-2a's "drop the bare
+  `is_global`" must NOT be applied to the shared `list_published_workflows` helper — it also feeds the
+  composer Harness picker, the run-surface soul (`WorkspacePanel.tsx`), and `threads.py` kickoff, all of
+  which NEED global rows (Pitfall 3). Instead add an **additive `owned_only`/`scope=mine` param**
+  (default off, keeps every existing caller byte-identical) used ONLY by the Workflows-page Published
+  shelf; the Starters shelf gets its own `list_starter_workflows` / `GET /workflows/starters`.
+- **D-143-7 (citation policy = strict):** All 3 starters keep `citation_policy: strict` +
+  `citations_required(on_failure=fail_run)` (operator confirmed 2026-07-10) — an honest failure on an
+  empty/mismatched KB over a fabricated deliverable. UAT (D-143-4a) runs each starter against a
+  populated KB (the PM demo corpus is the natural fixture).
+- **D-143-8 (curated-vs-mine visual + fork CTA copy — from D-143-6 competitor synthesis, in-scope):**
+  Add a small **"Starter"/"Official" chip** on the starter card (reuse existing pill chrome — Glean's
+  verified-badge analog) so curated ≠ user-made is visible at a glance; use **"Use this starter"** as
+  the fork-affordance copy (Zapier's clone-CTA analog) rather than "Fork/Tweak". No new card component
+  (G-2 waived). Shelf order: **Starters (top) → Published (mine) → Drafts & seeds** (folds
+  BUG-260628-01); keep the Build-card discoverable (Drafts shelf, optionally a header "Build a
+  workflow" affordance — minor UX, Claude's discretion).
 
 ### Claude's Discretion
 - Exact slug-suffix scheme (short hash vs counter) and the exact Builder header caption for a forked
