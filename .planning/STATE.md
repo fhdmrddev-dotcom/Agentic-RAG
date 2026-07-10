@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.2
-milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
-status: Awaiting next milestone
-last_updated: "2026-07-10T13:50:59.438Z"
-last_activity: 2026-07-10 — Milestone v3.2 completed and archived
+milestone: v3.3
+milestone_name: Operator UX
+status: planning
+last_updated: "2026-07-10T16:26:21.247Z"
+last_activity: 2026-07-10
 progress:
-  total_phases: 30
-  completed_phases: 24
-  total_plans: 120
-  completed_plans: 121
-  percent: 80
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: Milestone v3.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-10 — Milestone v3.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-10 — Milestone v3.3 started
 
 ### Quick Tasks Completed
 
