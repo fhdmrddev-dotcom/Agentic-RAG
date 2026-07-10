@@ -82,19 +82,33 @@
 **Depends on**: Nothing (first phase of v3.3; builds on shipped v3.2 substrate — `admin.py` router, `/admin/backpressure`, the `app_settings` TTL cache)
 **Requirements**: ADMIN-01
 **Success Criteria** (what must be TRUE):
+
   1. A user listed in `operator_users` can open `/admin` and see the shell; a non-operator hitting any `/admin` route gets a **404** (not a 403 — non-discoverable).
   2. Every operator action writes a row to `operator_audit_log` (who / what / when).
   3. The existing `/admin/backpressure` endpoint is reachable only behind the `require_operator` gate.
   4. A normal user's JWT returns 404 on every `/admin` route (regression-tested), and `operator_users` is a system-level, org-agnostic principal with `org_id` stubs added where cheap.
+
 **Plans**: 6 plans (4 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 146-01-PLAN.md — Migrations 095 (operator_users + operator_audit_log, RLS deny-all) + 096 (org_id stub sweep) + [BLOCKING] live apply + full-schema regen
 - [ ] 146-02-PLAN.md — require_operator router-level gate (byte-identical 404) + audit floor + delete BACKPRESSURE_ADMIN_USER_IDS + /admin/me probe + /admin/audit feed + gate regression suite
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 146-03-PLAN.md — OPERATOR_EMAILS idempotent lifespan seed (ON CONFLICT, WORKER_COUNT=2-safe) + seed tests
 - [ ] 146-04-PLAN.md — Frontend data layer: getOperatorProbe (404→null) / getBackpressure / getOperatorAudit + useOperatorProbe hook + test
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 146-05-PLAN.md — 061-B/062-A leaf components: OperatorBand, HealthSignals, LockedTab, TechnicalNamesToggle, RecentActionsCard
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 146-06-PLAN.md — ControlRoomPage + AuditTab assembly, ↻ Refresh ledger beat, reachability triad (ActiveView + ChatLayout branch + probe-gated shield outside NAV_ITEMS) + NAV_ITEMS regression test
+
 **UI hint**: yes
 
 ### Phase 147: Operator Control Plane
@@ -103,10 +117,12 @@ Plans:
 **Depends on**: Phase 146 (needs `require_operator` + the `/admin` shell + `operator_audit_log`)
 **Requirements**: ADMIN-02, FLAG-01
 **Success Criteria** (what must be TRUE):
+
   1. An operator sees live health for Redis, Supabase, and the sandbox, plus the backpressure metrics, rendered in the `/admin` shell.
   2. An operator sees active runs (thread / user / model / elapsed) and can Kill a run, which cancels it (delegating to the existing `cancel_run` zombie-heal path).
   3. An operator can toggle per-feature kill-switches (web search, sandbox, self-improve, workflows) and the disabled capability stops working for all users (fail-closed).
   4. An operator can enable maintenance/read-only mode and end users see the platform become read-only, on the existing `app_settings` TTL-cached substrate (no new flag infrastructure).
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -116,10 +132,12 @@ Plans:
 **Depends on**: Phase 146 (needs the operator gate + shell + audit substrate)
 **Requirements**: ADMIN-03, VIS-01
 **Success Criteria** (what must be TRUE):
+
   1. An operator can browse `audit_log` with action-type + date-range filters, pagination, and CSV export of the filtered set.
   2. An operator can list users with last-active and disable/enable a user; a disabled user cannot access the app.
   3. Advanced features (eval studio, model management, trigger tuner) are hidden from end users and visible only to operators — enforced at the API layer (a non-operator API call is refused, not merely UI-hidden), per a per-feature visibility map.
   4. Cross-user read paths in the admin browser are explicitly filtered (no full-tenant leak on the service-role client).
+
 **Plans**: TBD
 **Note**: "Sign in as user" impersonation ships only if scoped cheaply (dual-identity audit); otherwise it is deferred to STRETCH with a named re-open trigger.
 **UI hint**: yes
@@ -130,10 +148,12 @@ Plans:
 **Depends on**: Phase 146 (operator-gated write path); the read path (`model_capabilities_overrides`, `get_model_capability_async`) is already live from migration 053
 **Requirements**: MODEL-01, MODEL-02
 **Success Criteria** (what must be TRUE):
+
   1. An operator can edit a model's capabilities (enable/disable, max tokens, timeout, native tools, deprecated) from the admin shell and the change takes effect on the next request with no restart (existing TTL cache).
   2. An operator can run live model discovery, which queries each provider's `/models` and proposes new/changed/vanished models for confirmation.
   3. Discovery never auto-enables a capability the provider's `/models` endpoint did not return (propose-only — reproducing the silent no-tools bug is barred).
   4. A non-operator cannot reach the model-write path.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -143,10 +163,12 @@ Plans:
 **Depends on**: Phase 146 (key management is operator-gated); pairs with Phase 149 as the Track-3 settings-management work
 **Requirements**: SEC-01
 **Success Criteria** (what must be TRUE):
+
   1. A provider API key saved through Settings is stored encrypted at rest (app-layer `cryptography` Fernet/AESGCM), not as plaintext in `app_settings`.
   2. Saving a key is round-trip verified — a failed save surfaces an error instead of silently succeeding.
   3. When a key is supplied via env var, the platform still works without any DB-stored secret (env-fallback precedence preserved; a DB read is never mandatory for a secret env can supply).
   4. Existing deployments and local dev continue to function with no manual key re-entry required.
+
 **Plans**: TBD
 
 ### Phase 151: Agent File Tools
@@ -155,10 +177,12 @@ Plans:
 **Depends on**: None (code-independent of the admin/model tracks; both tools register in the flat `_TOOL_REGISTRY` without touching `threads.py`). Sequenced here per the researched build order and the Glean/Beam UX gate.
 **Requirements**: FILE-02, FILE-01
 **Success Criteria** (what must be TRUE):
+
   1. The agent can call `fetch_document_file` to stream a KB document's ORIGINAL bytes into the sandbox working directory (owner/RLS-scoped, size-capped) and then convert/render/operate on the real file instead of reconstructing from text.
   2. The agent can call `attach_skill_file` to save a file it created onto a skill it owns (reusing `skill_files` + bucket), and cannot write to global/built-in skills.
   3. A user can hand the agent an existing template file mid-conversation and the agent attaches it to the skill.
   4. Neither tool can read or write another user's documents or skills (owner-scope enforced, proven cross-user), and both hold across providers (SC#10).
+
 **Plans**: TBD
 **Note**: Internal build order FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload/threat pattern). Each carries its own threat model.
 
@@ -168,9 +192,11 @@ Plans:
 **Depends on**: Phase 151 (WFIN-01 reuses the upload/threat-model pattern established by FILE-01)
 **Requirements**: WFIN-01, WFIN-02, WFIN-03
 **Success Criteria** (what must be TRUE):
+
   1. From the Run modal a user can upload a file (e.g. a docx template) as a run input; it is stored with untrusted provenance (`kind='template_input'`), size/MIME-allowlisted, and is never routed to the Jinja engine.
   2. From the Run modal a user can point the workflow's retrieval at a chosen KB folder (author-time default + per-run override) reusing the Phase-098 server-side scope resolver, so the model cannot widen scope; behavior is identical across providers.
   3. A user can delete a workflow with a safe cascade (definitions / versions / runs disposition made explicit at discuss) behind a confirmation, leaving no orphaned runs or threads.
+
 **Plans**: TBD
 **Note**: The SEED-112 scope-control shape (definition-time field vs run-input selector vs both) is a discuss-phase/sketch decision, Glean/Beam-informed (the milestone-level research directive is satisfied; the control shape is not yet locked).
 **UI hint**: yes
@@ -181,10 +207,12 @@ Plans:
 **Depends on**: None hard (agent-loop retrieval + `MessageItem`); sequenced late deliberately because it is the milestone's largest lift and the only track touching G-5 hot files under active churn.
 **Requirements**: CITE-01
 **Success Criteria** (what must be TRUE):
+
   1. A grounded claim shows an inline citation marker keyed to the run's ACTUAL retrieval set (set-membership, never a post-hoc LLM re-ask).
   2. Clicking a marker opens the source passage.
   3. Claims without a marker read as general knowledge (absence-as-signal) — no fabricated attributions (Pitfall 14).
   4. Inline markers render consistently across all providers (SC#10) and Deep Mode stays byte-identical where unchanged.
+
 **Plans**: TBD
 **Note**: G-2 sketch-first is mandatory (live UI, "feels like"); the set-membership attribution design must be nailed down before coding.
 **UI hint**: yes
@@ -195,9 +223,11 @@ Plans:
 **Depends on**: Phases 146-153 (relabels across the net-new admin + Run-modal + citation surfaces plus existing surfaces)
 **Requirements**: LANG-01
 **Success Criteria** (what must be TRUE):
+
   1. Everyday users see plain-language labels across the app; technical terms appear only behind an admin/advanced reveal.
   2. Relabels are display-only — underlying enum values, API contracts, and audit action names are unchanged (verified; Pitfall 15), and Deep Mode stays byte-identical.
   3. An operator/advanced user can flip the reveal and see the technical vocabulary.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -207,9 +237,11 @@ Plans:
 **Depends on**: Phases 146-154 (audits all net-new surfaces once they exist and are stable — sequenced last by design)
 **Requirements**: A11Y-01
 **Success Criteria** (what must be TRUE):
+
   1. All net-new v3.3 surfaces (admin shell, Run-modal inputs, citation UI) pass an automated `axe-core` scan with zero violations.
   2. Each net-new surface is fully operable via keyboard (manual walkthrough) at WCAG 2.1 AA.
   3. The worst pre-existing offenders (contrast tokens, unlabeled icon buttons) are fixed in the same pass.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -219,9 +251,11 @@ Plans:
 **Depends on**: Nothing hard; gated behind CORE (ships only if CORE lands clean and budget remains)
 **Requirements**: POLISH-01 (STRETCH)
 **Success Criteria** (what must be TRUE):
+
   1. With the nav collapsed, New Chat stays reachable.
   2. The thread list supports search.
   3. Threads are grouped by date and/or folder.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -231,9 +265,11 @@ Plans:
 **Depends on**: Nothing hard (docs + reference config); gated behind CORE
 **Requirements**: DEPLOY-01 (STRETCH)
 **Success Criteria** (what must be TRUE):
+
   1. Solo/Team/Enterprise env-var + `docker-compose.prod.yml` reference configurations exist and are documented.
   2. An `OPERATOR.md` runbook supersedes the recovered VPS guides and walks an operator through a production stand-up.
   3. Following the runbook with a preset produces a working deployment (smoke-verified).
+
 **Plans**: TBD
 
 ### Phase 158: First-Run Install Wizard (STRETCH)
@@ -242,9 +278,11 @@ Plans:
 **Depends on**: Phase 157 (the wizard drives the presets); gated behind CORE — the milestone's biggest single lift, so the first to be cut if capacity is tight
 **Requirements**: DEPLOY-02 (STRETCH)
 **Success Criteria** (what must be TRUE):
+
   1. A browser flow at `/setup` walks environment detect → preset pick → Supabase/Redis bind → bootstrap operator → provider keys → smoke test.
   2. The wizard is idempotent and locks out after finalize.
   3. A non-developer can complete setup end-to-end without hand-editing files.
+
 **Plans**: TBD
 **UI hint**: yes
 
