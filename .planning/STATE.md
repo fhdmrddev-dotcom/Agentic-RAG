@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
+status: roadmapped
 last_updated: "2026-07-10T16:26:21.247Z"
 last_activity: 2026-07-10
 progress:
-  total_phases: 0
+  total_phases: 13
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v3.2 SHIPPED 2026-07-10 (16 phases / 81 plans; FILE-01 → v3.3). Planning next milestone → `/gsd:new-milestone` (v3.3 Operator UX; workflow-file cluster SEED-110/112 + FILE-01).
+**Current focus:** v3.3 Operator UX — roadmap created 2026-07-10 (13 phases: CORE 146-155 + STRETCH 156-158; 19 requirements, 100% mapped). Next → `/gsd:plan-phase 146` (Operator Foundation — G-2 sketch-gated admin shell).
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started — roadmap created (Phase 146 next to plan)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-10 — Milestone v3.3 started
+Status: Roadmap created — ready to plan Phase 146
+Last activity: 2026-07-10 — v3.3 roadmap created (13 phases: CORE 146-155 + STRETCH 156-158; 19 reqs, 100% mapped)
 
 ### Quick Tasks Completed
 
@@ -102,6 +102,45 @@ Items acknowledged and deferred at the **v3.2 milestone close on 2026-07-10** (4
 **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — the one undelivered requirement; **deferred → v3.3** (gated STRETCH, not executed). Rolls forward with the workflow-file cluster (SEED-110 template upload, SEED-112 folder-scope).
 
 **Open `surface: Agentic-RAG` reports (roll forward into the v3.3 UAT blast radius):** BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03, BUG-260708-01/-02, BUG-260710-01/-02 (nav/display + provider-polish), plus the deferred agent-loop / todo-loop notes. Cross-check at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.3, created 2026-07-10)
+
+Numbering continues from v3.2's last phase (145) → **CORE Phases 146-155**, then **STRETCH Phases 156-158** (gated behind CORE — ship only if CORE lands clean; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 precedent). **Phase 144 is BURNED** (held the deferred v3.2 FILE-01 phase, never executed, archived to `.planning/milestones/v3.2-phases/`; FILE-01 gets a fresh number — Phase 151). 144/145 are never reused. Scope source: `.planning/REQUIREMENTS.md` (19 reqs — 16 CORE + 3 STRETCH). Research: `.planning/research/SUMMARY.md`.
+
+**CORE (committed) — Phases 146-155:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 146 | Operator Foundation | ADMIN-01 | 4 | **G-2 sketch**; threat model (service-role / no-RLS-backstop, default-deny 404); one-way-door `operator_users` schema; `org_id` stubs; UI hint |
+| 147 | Operator Control Plane | ADMIN-02, FLAG-01 | 4 | **SC#10** (active-runs + Kill); **G-2 sketch**; fail-closed kill-switches; UI hint |
+| 148 | Governance — Audit, Users & Feature Visibility | ADMIN-03, VIS-01 | 4 | threat model (cross-user reads); **G-2 sketch**; VIS-01 API-enforced; impersonation → STRETCH/named-trigger; UI hint |
+| 149 | Model Registry & Discovery | MODEL-01, MODEL-02 | 4 | **SC#10**; **G-2 sketch**; propose-not-auto-enable; read path already live (mig 053); UI hint |
+| 150 | Secrets at Rest | SEC-01 | 4 | threat model (secrets); app-layer `cryptography` (NOT pgsodium); env-fallback preserved; round-trip-verified |
+| 151 | Agent File Tools | FILE-02, FILE-01 | 4 | **SC#10** (new agent tools); threat model FILE-01 (WRITE) + FILE-02 (RAG→sandbox); order FILE-02→FILE-01 |
+| 152 | Workflow Run Inputs | WFIN-01, WFIN-02, WFIN-03 | 3 | **SC#10**; **G-2 sketch** (Run modal); threat model WFIN-01 (upload/SSTI); SEED-112 scope-shape = discuss/sketch; UI hint |
+| 153 | Inline Citations | CITE-01 | 4 | **G-2 sketch** (mandatory); **G-5** (`MessageItem.tsx`/`StreamsProvider.tsx`); **SC#10**; Pitfall 14 (set-membership); UI hint |
+| 154 | Plain-Language Layer | LANG-01 | 3 | Pitfall 15 (no enum/API/audit break; Deep byte-identical); extends Phase-124 two-door; UI hint |
+| 155 | Accessibility Sweep — WCAG AA | A11Y-01 | 3 | LAST (audits all net-new surfaces); new dev deps `@axe-core/playwright` + `eslint-plugin-jsx-a11y`; UI hint |
+
+**STRETCH (gated behind CORE) — Phases 156-158:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 156 | Everyday UX Polish | POLISH-01 | 3 | — (SEED-045 anchors; gated on CORE); UI hint |
+| 157 | Deployment Presets & Runbook | DEPLOY-01 | 3 | — (docs/config; gated on CORE) |
+| 158 | First-Run Install Wizard | DEPLOY-02 | 3 | 157 (uses presets); biggest lift → first to cut; UI hint |
+
+- **Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Sequencing rationale:** Operator foundation FIRST (146 — ADMIN-01 keystone; locks the v3.4 one-way-door role schema). Model registry + discovery early (149 — highest ROI, read path live since mig 053); secrets-at-rest (150) as the separable Track-3 security sub-phase. Workflow file cluster with internal order FILE-02 (read) → FILE-01 (write, reference threat pattern) in 151, then WFIN-01+WFIN-02 together on the shared run-input channel + WFIN-03 (safe delete) in 152. UX track last: CITE-01 (153, largest lift, G-5 hot files, G-2 sketch), LANG-01 (154, app-wide relabel), A11Y-01 (155, audits everything last).
+- **SC#10 (cross-provider mandate):** 147 (active-runs/Kill), 149 (model-registry UI state → provider routing), 151 (two new agent tools), 152 (run-input channel + folder scope), 153 (inline citations).
+- **UI hint:** 146, 147, 148, 149, 152, 153, 154, 155 (CORE) + 156, 158 (STRETCH).
+- **G-2 sketch-gated:** 146, 147, 148, 149, 152, 153 (+ 156 if visual). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **Threat models (new WRITE/upload surfaces):** FILE-01 + FILE-02 (151), WFIN-01 (152); plus the standing admin-isolation threat model on 146/148 (service-role, no RLS backstop).
+- **G-5 hot files:** `MessageItem.tsx` + `StreamsProvider.tsx` (153 inline citations — do NOT regress the shared render path); `threads.py` stays untouched (new agent tools register in the flat `_TOOL_REGISTRY`).
+- **Red line:** never fork the shared path — provider differences at the gateway/adapter/sanitizer boundary (D-14). Deep Mode byte-identical; no new runtime.
+- **Reported-bugs:** 10 open `surface: Agentic-RAG` reports roll into the v3.3 UAT blast radius; cross-check at each `/gsd:discuss-phase`. v3.2 verification debt (140/141/142/143) must not regress.
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.3 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Research base: `.planning/research/SUMMARY.md`.
 
 ## Roadmap shape (v3.2, created 2026-06-28)
 

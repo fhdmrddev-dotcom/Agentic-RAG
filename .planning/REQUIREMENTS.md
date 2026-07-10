@@ -77,30 +77,32 @@ Explicitly excluded from v3.3. Documented so we don't relitigate.
 
 ## Traceability
 
-Which phases cover which requirements. Filled by roadmap creation.
+Which phases cover which requirements. Filled by roadmap creation (2026-07-10). CORE = Phases 146-155; STRETCH = Phases 156-158 (gated behind CORE).
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| FILE-01 | — | Pending |
-| FILE-02 | — | Pending |
-| WFIN-01 | — | Pending |
-| WFIN-02 | — | Pending |
-| WFIN-03 | — | Pending |
-| ADMIN-01 | — | Pending |
-| ADMIN-02 | — | Pending |
-| ADMIN-03 | — | Pending |
-| FLAG-01 | — | Pending |
-| VIS-01 | — | Pending |
-| MODEL-01 | — | Pending |
-| MODEL-02 | — | Pending |
-| SEC-01 | — | Pending |
-| DEPLOY-01 | — | Pending |
-| DEPLOY-02 | — | Pending |
-| CITE-01 | — | Pending |
-| LANG-01 | — | Pending |
-| POLISH-01 | — | Pending |
-| A11Y-01 | — | Pending |
+| Requirement | Phase | Track | Status |
+|-------------|-------|-------|--------|
+| ADMIN-01 | Phase 146 (CORE) | Admin Shell | Pending |
+| ADMIN-02 | Phase 147 (CORE) | Admin Shell | Pending |
+| FLAG-01 | Phase 147 (CORE) | Admin Shell | Pending |
+| ADMIN-03 | Phase 148 (CORE) | Admin Shell | Pending |
+| VIS-01 | Phase 148 (CORE) | Admin Shell | Pending |
+| MODEL-01 | Phase 149 (CORE) | Model & Settings | Pending |
+| MODEL-02 | Phase 149 (CORE) | Model & Settings | Pending |
+| SEC-01 | Phase 150 (CORE) | Model & Settings | Pending |
+| FILE-02 | Phase 151 (CORE) | Workflow & File Inputs | Pending |
+| FILE-01 | Phase 151 (CORE) | Workflow & File Inputs | Pending |
+| WFIN-01 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
+| WFIN-02 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
+| WFIN-03 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
+| CITE-01 | Phase 153 (CORE) | Trust & Friendliness UX | Pending |
+| LANG-01 | Phase 154 (CORE) | Trust & Friendliness UX | Pending |
+| A11Y-01 | Phase 155 (CORE) | Trust & Friendliness UX | Pending |
+| POLISH-01 | Phase 156 (STRETCH) | Trust & Friendliness UX | Pending |
+| DEPLOY-01 | Phase 157 (STRETCH) | Deployment & Packaging | Pending |
+| DEPLOY-02 | Phase 158 (STRETCH) | Deployment & Packaging | Pending |
+
+**Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 orphaned; every requirement → exactly one phase.
 
 ---
 *Requirements defined: 2026-07-10*
-*Last updated: 2026-07-10*
+*Last updated: 2026-07-10 (traceability filled at roadmap creation — v3.3 Phases 146-158)*

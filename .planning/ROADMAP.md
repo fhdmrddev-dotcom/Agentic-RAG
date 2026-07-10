@@ -16,7 +16,274 @@
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
 - ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
 - ✅ **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-145 (CORE 132-137 + inserts 134.1/137.1/137.2; STRETCH 138-143+145 shipped; 144/FILE-01 deferred → v3.3) (shipped 2026-07-10). Skill Eval Studio (eval persistence + versions + with-vs-without runner + honest verdicts + ratings + self-improve loop + publish gate + Evals panel) · built-in skill-creator · STRETCH honesty phases · run-lifecycle foundation (FND-01) · Starter Workflow Library (WF-01).
-- 📋 **v3.3 Operator UX** → **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
+- 🚧 **v3.3 Operator UX** — Phases 146-158 (CORE 146-155 + STRETCH 156-158) — IN PROGRESS (started 2026-07-10). Operator/admin tier + dynamic model/secrets management + workflow file-inputs + Glean/Beam-informed trust/friendliness UX. Roadmap created 2026-07-10; 19 reqs (16 CORE + 3 STRETCH), 100% mapped.
+- 📋 **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
+
+---
+
+## v3.3 Operator UX — 🚧 IN PROGRESS (started 2026-07-10)
+
+**Numbering:** continues from v3.2's last phase (145) → **CORE Phases 146-155**, then **STRETCH Phases 156-158** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 precedent). *Phase 144 is BURNED — it held the deferred v3.2 FILE-01 phase (never executed, archived to `.planning/milestones/v3.2-phases/` with a DEFERRED label); FILE-01 gets a fresh number in v3.3 (Phase 151). 144/145 are never reused.*
+
+**Goal:** Make the platform operable and configurable by a non-developer admin from the UI — while closing the workflow/skill file-input gaps deferred from v3.2 and aligning the everyday UX to what Glean/Beam do well (simple, accurate, plain-language).
+
+**Scope source:** `.planning/REQUIREMENTS.md` (19 requirements — 16 CORE + 3 STRETCH). Research base: `.planning/research/SUMMARY.md` (4-dimension + a mandatory Glean/Beam competitor study; supersedes the stale `PRDs/v3.2-operator-ux.md` internals — D-PRD business decisions hold). Authoritative version map: `PRDs/SEQUENCE.md`.
+
+**Red lines (every phase):**
+
+- **No RLS backstop on `/admin`** — the backend runs on the Supabase service-role key, so every operator route enforces isolation in application code (a missing `WHERE user_id =` filter is a full-tenant leak, not a scoped one). `require_operator` is default-deny at router level; non-operators get **404** (non-discoverable), and every `/admin` route carries a 404-regression test for a normal user's JWT.
+- **Operator role is a one-way door vs the v3.4 multi-tenancy RLS rewrite** — `operator_users` is a system-level, org-agnostic principal (NOT a JWT claim, NOT `is_admin`); ship `org_id` stub columns where cheap, never schema shapes that fight the rewrite.
+- **Provenance→engine boundary holds** — a run-time uploaded template is provenance-stamped (`kind='template_input'`) and structurally barred from the Jinja/`docxtpl` engine (SSTI); library-promotion is never implicit.
+- **Discovery proposes, humans confirm** — live model discovery never auto-enables a capability the provider's `/models` endpoint didn't return (only 2 of 8 providers return capability metadata).
+- **Shared path never forks** — Deep Mode stays byte-identical; provider differences stay at the gateway/adapter boundary (D-14).
+
+### Phase Table (CORE) — Phases 146-155
+
+| Phase | Name | Goal (one-line) | Requirements | SC# | Flags |
+|-------|------|-----------------|--------------|-----|-------|
+| 146 | Operator Foundation | A designated operator reaches a gated `/admin` surface no ordinary user can discover, and every operator action is recorded | ADMIN-01 | 4 | **G-2 sketch** (admin shell); **threat model** (service-role / no-RLS-backstop, default-deny 404); one-way-door `operator_users` schema; `org_id` stubs; UI hint |
+| 147 | Operator Control Plane | An operator watches system health + active runs, kills a runaway run, and disables a misbehaving capability or enters maintenance mode | ADMIN-02, FLAG-01 | 4 | **SC#10** (active-runs + Kill touch run/stream state); **G-2 sketch** (live control panel); fail-closed kill-switches; UI hint |
+| 148 | Governance — Audit, Users & Feature Visibility | An operator investigates the audit trail, manages user access, and controls which advanced features end users can see | ADMIN-03, VIS-01 | 4 | **threat model** (cross-user reads, no RLS backstop); **G-2 sketch** (audit/user browser); VIS-01 API-layer enforced (not UI-only); impersonation slice → STRETCH / named-trigger; UI hint |
+| 149 | Model Registry & Discovery | An operator edits model capabilities and runs live discovery — no restart, no silent capability guesses | MODEL-01, MODEL-02 | 4 | **SC#10** (capability changes affect provider routing); **G-2 sketch** (model-mgmt UI); propose-not-auto-enable; read path already live (mig 053); UI hint |
+| 150 | Secrets at Rest | Provider API keys in the DB are encrypted at rest while local dev + existing deployments keep working unchanged | SEC-01 | 4 | **threat model** (secrets at rest); app-layer `cryptography` (NOT pgsodium); env-fallback precedence preserved; round-trip-verified saves |
+| 151 | Agent File Tools | The agent pulls a real KB file into its sandbox to operate on it, and attaches files to a skill it's authoring | FILE-02, FILE-01 | 4 | **SC#10** (new agent tools in the loop); **threat model** FILE-01 (WRITE surface) + FILE-02 (RAG→sandbox exfil / size-cap / path); internal order FILE-02 (read) → FILE-01 (write) |
+| 152 | Workflow Run Inputs | A user feeds a workflow run a file + chooses its KB scope at launch, and can safely delete a workflow | WFIN-01, WFIN-02, WFIN-03 | 3 | **SC#10** (run-input channel + folder scope affect retrieval/routing); **G-2 sketch** (Run modal); **threat model** WFIN-01 (upload/SSTI provenance); SEED-112 scope-shape = discuss/sketch decision (Perplexity 3-way toggle reference); UI hint |
+| 153 | Inline Citations | Chat answers show per-claim citation markers keyed to the run's actual retrieval set, with click-through to source | CITE-01 | 4 | **G-2 sketch** (mandatory); **G-5** (`MessageItem.tsx` / `StreamsProvider.tsx`); **SC#10**; Pitfall 14 (set-membership, never post-hoc re-ask); UI hint |
+| 154 | Plain-Language Layer | User-facing surfaces speak plain language with technical terms behind an advanced reveal — no contract breaks | LANG-01 | 3 | Pitfall 15 (never break enum/API/audit contracts; Deep byte-identical); extends the Phase-124 two-door pattern app-wide; UI hint |
+| 155 | Accessibility Sweep — WCAG AA | Every net-new v3.3 surface passes axe-core + manual keyboard AA, and the worst pre-existing offenders are fixed | A11Y-01 | 3 | sequenced **LAST** (audits all net-new surfaces once stable); new dev-only deps `@axe-core/playwright` + `eslint-plugin-jsx-a11y`; UI hint |
+
+### Phase Table (STRETCH — gated behind CORE) — Phases 156-158
+
+| Phase | Name | Goal (one-line) | Requirements | SC# | Depends |
+|-------|------|-----------------|--------------|-----|---------|
+| 156 | Everyday UX Polish | Collapsed nav keeps New Chat reachable and the thread list gets search + date/folder grouping | POLISH-01 (STRETCH) | 3 | — (SEED-045 anchors; gated on CORE); G-2 sketch if visual; UI hint |
+| 157 | Deployment Presets & Runbook | An operator stands up a production deployment from documented Solo/Team/Enterprise preset bundles + an `OPERATOR.md` runbook | DEPLOY-01 (STRETCH) | 3 | — (docs/config; gated on CORE) |
+| 158 | First-Run Install Wizard | A non-developer operator completes first-run setup through an idempotent, lock-after-finalize browser wizard at `/setup` | DEPLOY-02 (STRETCH) | 3 | 157 (uses the presets); the milestone's biggest lift → first to cut; UI hint |
+
+### Phase Checklist
+
+- [ ] **Phase 146: Operator Foundation** — `operator_users` + default-deny `require_operator` (404) + `operator_audit_log` + `/admin` route tree + RBAC on `/admin/backpressure` + `org_id` stubs (ADMIN-01)
+- [ ] **Phase 147: Operator Control Plane** — health/backpressure + active-runs-with-Kill + per-feature kill-switches + maintenance/read-only mode (ADMIN-02, FLAG-01)
+- [ ] **Phase 148: Governance — Audit, Users & Feature Visibility** — audit browser (filter/paginate/CSV) + user list disable/enable + API-enforced feature greenlists (ADMIN-03, VIS-01)
+- [ ] **Phase 149: Model Registry & Discovery** — write UI over `model_capabilities_overrides` + `model_discovery_service` propose-only (MODEL-01, MODEL-02)
+- [ ] **Phase 150: Secrets at Rest** — app-layer `cryptography` envelope encryption of `app_settings` key columns + env-fallback + round-trip-verified saves (SEC-01)
+- [ ] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01)
+- [ ] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03)
+- [ ] **Phase 153: Inline Citations** — per-claim markers keyed to the run's real retrieval set + click-through + absence-as-signal (CITE-01)
+- [ ] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01)
+- [ ] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01)
+- [ ] **Phase 156 (STRETCH): Everyday UX Polish** — collapsed-nav New Chat + thread-list search + date/folder grouping (POLISH-01)
+- [ ] **Phase 157 (STRETCH): Deployment Presets & Runbook** — Solo/Team/Enterprise env + `docker-compose.prod.yml` + `OPERATOR.md` (DEPLOY-01)
+- [ ] **Phase 158 (STRETCH): First-Run Install Wizard** — `/setup` browser flow, idempotent, lock-after-finalize (DEPLOY-02)
+
+### Phase 146: Operator Foundation
+
+**Goal**: A designated operator can reach a gated `/admin` surface that no ordinary user can even discover, and every operator action is recorded — with the operator-role schema deliberately shaped so the v3.4 multi-tenancy RLS rewrite is not poisoned.
+**Depends on**: Nothing (first phase of v3.3; builds on shipped v3.2 substrate — `admin.py` router, `/admin/backpressure`, the `app_settings` TTL cache)
+**Requirements**: ADMIN-01
+**Success Criteria** (what must be TRUE):
+  1. A user listed in `operator_users` can open `/admin` and see the shell; a non-operator hitting any `/admin` route gets a **404** (not a 403 — non-discoverable).
+  2. Every operator action writes a row to `operator_audit_log` (who / what / when).
+  3. The existing `/admin/backpressure` endpoint is reachable only behind the `require_operator` gate.
+  4. A normal user's JWT returns 404 on every `/admin` route (regression-tested), and `operator_users` is a system-level, org-agnostic principal with `org_id` stubs added where cheap.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 147: Operator Control Plane
+
+**Goal**: An operator can watch system health and running work, kill a runaway run, disable a misbehaving capability, and put the platform into maintenance/read-only mode.
+**Depends on**: Phase 146 (needs `require_operator` + the `/admin` shell + `operator_audit_log`)
+**Requirements**: ADMIN-02, FLAG-01
+**Success Criteria** (what must be TRUE):
+  1. An operator sees live health for Redis, Supabase, and the sandbox, plus the backpressure metrics, rendered in the `/admin` shell.
+  2. An operator sees active runs (thread / user / model / elapsed) and can Kill a run, which cancels it (delegating to the existing `cancel_run` zombie-heal path).
+  3. An operator can toggle per-feature kill-switches (web search, sandbox, self-improve, workflows) and the disabled capability stops working for all users (fail-closed).
+  4. An operator can enable maintenance/read-only mode and end users see the platform become read-only, on the existing `app_settings` TTL-cached substrate (no new flag infrastructure).
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 148: Governance — Audit, Users & Feature Visibility
+
+**Goal**: An operator can investigate what happened and govern who can do and see what — browse the audit trail, manage user access, and hide advanced/technical features from end users at the API layer.
+**Depends on**: Phase 146 (needs the operator gate + shell + audit substrate)
+**Requirements**: ADMIN-03, VIS-01
+**Success Criteria** (what must be TRUE):
+  1. An operator can browse `audit_log` with action-type + date-range filters, pagination, and CSV export of the filtered set.
+  2. An operator can list users with last-active and disable/enable a user; a disabled user cannot access the app.
+  3. Advanced features (eval studio, model management, trigger tuner) are hidden from end users and visible only to operators — enforced at the API layer (a non-operator API call is refused, not merely UI-hidden), per a per-feature visibility map.
+  4. Cross-user read paths in the admin browser are explicitly filtered (no full-tenant leak on the service-role client).
+**Plans**: TBD
+**Note**: "Sign in as user" impersonation ships only if scoped cheaply (dual-identity audit); otherwise it is deferred to STRETCH with a named re-open trigger.
+**UI hint**: yes
+
+### Phase 149: Model Registry & Discovery
+
+**Goal**: An operator can manage model capabilities from the admin shell and discover new provider models — without a server restart and without silently guessing capabilities the provider never returned.
+**Depends on**: Phase 146 (operator-gated write path); the read path (`model_capabilities_overrides`, `get_model_capability_async`) is already live from migration 053
+**Requirements**: MODEL-01, MODEL-02
+**Success Criteria** (what must be TRUE):
+  1. An operator can edit a model's capabilities (enable/disable, max tokens, timeout, native tools, deprecated) from the admin shell and the change takes effect on the next request with no restart (existing TTL cache).
+  2. An operator can run live model discovery, which queries each provider's `/models` and proposes new/changed/vanished models for confirmation.
+  3. Discovery never auto-enables a capability the provider's `/models` endpoint did not return (propose-only — reproducing the silent no-tools bug is barred).
+  4. A non-operator cannot reach the model-write path.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 150: Secrets at Rest
+
+**Goal**: Provider API keys stored in the database are encrypted at rest, while local dev and existing deployments keep working with no manual key re-entry.
+**Depends on**: Phase 146 (key management is operator-gated); pairs with Phase 149 as the Track-3 settings-management work
+**Requirements**: SEC-01
+**Success Criteria** (what must be TRUE):
+  1. A provider API key saved through Settings is stored encrypted at rest (app-layer `cryptography` Fernet/AESGCM), not as plaintext in `app_settings`.
+  2. Saving a key is round-trip verified — a failed save surfaces an error instead of silently succeeding.
+  3. When a key is supplied via env var, the platform still works without any DB-stored secret (env-fallback precedence preserved; a DB read is never mandatory for a secret env can supply).
+  4. Existing deployments and local dev continue to function with no manual key re-entry required.
+**Plans**: TBD
+
+### Phase 151: Agent File Tools
+
+**Goal**: The agent can materialize a real KB file into its sandbox to faithfully convert/render/operate on it, and can attach files it creates (or a template the user hands it mid-conversation) to a skill it owns — each reusing an existing owner-scope resolver, never inventing a new one.
+**Depends on**: None (code-independent of the admin/model tracks; both tools register in the flat `_TOOL_REGISTRY` without touching `threads.py`). Sequenced here per the researched build order and the Glean/Beam UX gate.
+**Requirements**: FILE-02, FILE-01
+**Success Criteria** (what must be TRUE):
+  1. The agent can call `fetch_document_file` to stream a KB document's ORIGINAL bytes into the sandbox working directory (owner/RLS-scoped, size-capped) and then convert/render/operate on the real file instead of reconstructing from text.
+  2. The agent can call `attach_skill_file` to save a file it created onto a skill it owns (reusing `skill_files` + bucket), and cannot write to global/built-in skills.
+  3. A user can hand the agent an existing template file mid-conversation and the agent attaches it to the skill.
+  4. Neither tool can read or write another user's documents or skills (owner-scope enforced, proven cross-user), and both hold across providers (SC#10).
+**Plans**: TBD
+**Note**: Internal build order FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload/threat pattern). Each carries its own threat model.
+
+### Phase 152: Workflow Run Inputs
+
+**Goal**: A user can feed a workflow run a file and choose its knowledge scope at launch from the Run modal, and can safely delete a workflow — all through one shared run-input channel wired into `create_workflow_run.inputs`.
+**Depends on**: Phase 151 (WFIN-01 reuses the upload/threat-model pattern established by FILE-01)
+**Requirements**: WFIN-01, WFIN-02, WFIN-03
+**Success Criteria** (what must be TRUE):
+  1. From the Run modal a user can upload a file (e.g. a docx template) as a run input; it is stored with untrusted provenance (`kind='template_input'`), size/MIME-allowlisted, and is never routed to the Jinja engine.
+  2. From the Run modal a user can point the workflow's retrieval at a chosen KB folder (author-time default + per-run override) reusing the Phase-098 server-side scope resolver, so the model cannot widen scope; behavior is identical across providers.
+  3. A user can delete a workflow with a safe cascade (definitions / versions / runs disposition made explicit at discuss) behind a confirmation, leaving no orphaned runs or threads.
+**Plans**: TBD
+**Note**: The SEED-112 scope-control shape (definition-time field vs run-input selector vs both) is a discuss-phase/sketch decision, Glean/Beam-informed (the milestone-level research directive is satisfied; the control shape is not yet locked).
+**UI hint**: yes
+
+### Phase 153: Inline Citations
+
+**Goal**: Chat answers show per-claim citation markers tied to what the agent actually retrieved this run, with click-through to the source passage, and claims without a marker read as general knowledge (the converged industry pattern).
+**Depends on**: None hard (agent-loop retrieval + `MessageItem`); sequenced late deliberately because it is the milestone's largest lift and the only track touching G-5 hot files under active churn.
+**Requirements**: CITE-01
+**Success Criteria** (what must be TRUE):
+  1. A grounded claim shows an inline citation marker keyed to the run's ACTUAL retrieval set (set-membership, never a post-hoc LLM re-ask).
+  2. Clicking a marker opens the source passage.
+  3. Claims without a marker read as general knowledge (absence-as-signal) — no fabricated attributions (Pitfall 14).
+  4. Inline markers render consistently across all providers (SC#10) and Deep Mode stays byte-identical where unchanged.
+**Plans**: TBD
+**Note**: G-2 sketch-first is mandatory (live UI, "feels like"); the set-membership attribution design must be nailed down before coding.
+**UI hint**: yes
+
+### Phase 154: Plain-Language Layer
+
+**Goal**: User-facing surfaces speak plain language, with technical terms tucked behind an admin/advanced reveal — extending the Phase-124 two-door pattern app-wide — without breaking any enum/API/audit contract.
+**Depends on**: Phases 146-153 (relabels across the net-new admin + Run-modal + citation surfaces plus existing surfaces)
+**Requirements**: LANG-01
+**Success Criteria** (what must be TRUE):
+  1. Everyday users see plain-language labels across the app; technical terms appear only behind an admin/advanced reveal.
+  2. Relabels are display-only — underlying enum values, API contracts, and audit action names are unchanged (verified; Pitfall 15), and Deep Mode stays byte-identical.
+  3. An operator/advanced user can flip the reveal and see the technical vocabulary.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 155: Accessibility Sweep — WCAG AA
+
+**Goal**: Every net-new v3.3 surface passes automated and manual accessibility checks at WCAG 2.1 AA, and the worst pre-existing app-wide offenders are fixed in the same pass.
+**Depends on**: Phases 146-154 (audits all net-new surfaces once they exist and are stable — sequenced last by design)
+**Requirements**: A11Y-01
+**Success Criteria** (what must be TRUE):
+  1. All net-new v3.3 surfaces (admin shell, Run-modal inputs, citation UI) pass an automated `axe-core` scan with zero violations.
+  2. Each net-new surface is fully operable via keyboard (manual walkthrough) at WCAG 2.1 AA.
+  3. The worst pre-existing offenders (contrast tokens, unlabeled icon buttons) are fixed in the same pass.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 156: Everyday UX Polish (STRETCH)
+
+**Goal**: The everyday chat navigation stays convenient and threads are easy to find — the two confirmed SEED-045 anchors plus triaged minor-enhancement umbrella items that fit the phase.
+**Depends on**: Nothing hard; gated behind CORE (ships only if CORE lands clean and budget remains)
+**Requirements**: POLISH-01 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. With the nav collapsed, New Chat stays reachable.
+  2. The thread list supports search.
+  3. Threads are grouped by date and/or folder.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 157: Deployment Presets & Runbook (STRETCH)
+
+**Goal**: An operator can stand up a production deployment from documented preset bundles and a runbook that supersedes the recovered VPS guides.
+**Depends on**: Nothing hard (docs + reference config); gated behind CORE
+**Requirements**: DEPLOY-01 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. Solo/Team/Enterprise env-var + `docker-compose.prod.yml` reference configurations exist and are documented.
+  2. An `OPERATOR.md` runbook supersedes the recovered VPS guides and walks an operator through a production stand-up.
+  3. Following the runbook with a preset produces a working deployment (smoke-verified).
+**Plans**: TBD
+
+### Phase 158: First-Run Install Wizard (STRETCH)
+
+**Goal**: A non-developer operator can complete first-run setup through a browser wizard instead of editing files by hand.
+**Depends on**: Phase 157 (the wizard drives the presets); gated behind CORE — the milestone's biggest single lift, so the first to be cut if capacity is tight
+**Requirements**: DEPLOY-02 (STRETCH)
+**Success Criteria** (what must be TRUE):
+  1. A browser flow at `/setup` walks environment detect → preset pick → Supabase/Redis bind → bootstrap operator → provider keys → smoke test.
+  2. The wizard is idempotent and locks out after finalize.
+  3. A non-developer can complete setup end-to-end without hand-editing files.
+**Plans**: TBD
+**UI hint**: yes
+
+### Progress (v3.3)
+
+**Execution order:** 146 → 147 → 148 → 149 → 150 → 151 → 152 → 153 → 154 → 155, then STRETCH 156 → 157 → 158 (gated behind CORE).
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 146. Operator Foundation | 0/? | Not started | - |
+| 147. Operator Control Plane | 0/? | Not started | - |
+| 148. Governance — Audit, Users & Feature Visibility | 0/? | Not started | - |
+| 149. Model Registry & Discovery | 0/? | Not started | - |
+| 150. Secrets at Rest | 0/? | Not started | - |
+| 151. Agent File Tools | 0/? | Not started | - |
+| 152. Workflow Run Inputs | 0/? | Not started | - |
+| 153. Inline Citations | 0/? | Not started | - |
+| 154. Plain-Language Layer | 0/? | Not started | - |
+| 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
+| 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
+| 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
+| 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
+
+**Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+
+**Sequencing rationale (research-corroborated — SUMMARY.md "Implications for Roadmap", independently by ARCHITECTURE + PITFALLS):**
+
+- **Operator foundation FIRST (146):** ADMIN-01 is the keystone — every admin-gated write (model registry, kill-switch, audit browser, feature visibility) needs `require_operator` + `operator_audit_log` to exist first, and it locks the v3.4 one-way-door role-schema decision, so it is scoped deliberately, not rushed.
+- **Model registry + discovery early (149):** the highest-ROI/lowest-cost closure — the read path (`model_capabilities_overrides`, `get_model_capability_async`) is already live (mig 053); only the write UI + a discovery service are missing. Secrets-at-rest (150) is the separable Track-3 security sub-phase.
+- **Workflow file-input cluster with an internal build order:** FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload pattern) in 151; then WFIN-01 + WFIN-02 ship TOGETHER on the shared run-input channel with WFIN-03 (safe delete) riding the cluster in 152.
+- **UX track last:** CITE-01 (153) is the largest single lift, touches the G-5 hot files (`MessageItem.tsx` / `StreamsProvider.tsx`), and is G-2 sketch-gated — safest once the rest of the milestone's surfaces are stable. LANG-01 (154) then relabels app-wide, and A11Y-01 (155) audits every net-new surface last.
+
+**SC#10 (cross-provider mandate):** flagged on every phase touching streaming / agent loop / provider routing / UI state — the two new agent tools (151), the run-input channel + folder scope (152), inline citations (153), the model-registry UI state (149), and the operator control-plane active-runs/Kill (147).
+
+**UI hint:** 146, 147, 148, 149, 152, 153, 154, 155 (CORE) + 156, 158 (STRETCH).
+
+**G-2 sketch-gated (`/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`):** 146 (admin shell), 147 (live control panel), 148 (audit/user browser), 149 (model-mgmt UI), 152 (Run-modal controls), 153 (inline citations — mandatory), and 156 if visual. `sketch-findings-agentic-rag` already names the composer, the workflow run surface, and Settings model pickers; extend it for the admin shell + Run modal + inline-citation surfaces.
+
+**Dedicated threat models (new WRITE/upload surfaces):** FILE-01 (151, agent→skill WRITE), FILE-02 (151, RAG→sandbox bridge), WFIN-01 (152, run-time upload / SSTI provenance boundary). Plus the standing admin-isolation threat model on 146/148 (service-role, no RLS backstop).
+
+**G-5 hot files (audit at discuss-phase):** `frontend/src/components/chat/MessageItem.tsx` + `frontend/src/providers/StreamsProvider.tsx` (inline citations, 153 — re-run replay/render tests; do NOT regress the shared render path). `backend/app/api/threads.py` stays untouched — the two new agent tools register in the flat `_TOOL_REGISTRY` (`tool_dispatcher.py`).
+
+**Red line:** never fork the shared path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime.
+
+**Reported-bugs:** 10 open `surface: Agentic-RAG` reports roll into the v3.3 UAT blast radius (nav/display + provider-polish); cross-check at each `/gsd:discuss-phase` per the reported-bugs mandate. Verification debt riding from v3.2 (140/141/142/143 live-UAT gaps) must not regress.
+
+Roadmap detail: this section. Requirements + traceability: `.planning/REQUIREMENTS.md`. Research base: `.planning/research/SUMMARY.md`.
 
 ---
 
