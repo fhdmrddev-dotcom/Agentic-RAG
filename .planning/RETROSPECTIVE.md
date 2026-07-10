@@ -518,6 +518,39 @@ Turned the product's incidental document handling into a first-class, metadata-d
 
 ---
 
+## Milestone: v3.2 — Skill Eval Studio + Self-Improving
+
+**Shipped:** 2026-07-10
+**Phases:** 16 (132–145; 144 deferred → v3.3) | **Plans:** 81
+
+### What Was Built
+The v3.1 Skill Trigger Tuner became a full Skill Eval Studio: persistent eval test cases + immutable skill versions, a with-skill-vs-without eval runner with a dual-arm LLM judge + honest per-provider verdicts + human ratings, a human-in-the-loop self-improvement loop, a publish gate, and the Evals·Triggering·Versions panel. Plus a built-in read-only skill-creator, STRETCH honesty phases (run-end honesty, smart-dispatch skill pre-filter, run-scoped template resolver, non-Python skill honesty), the FND-01 run-lifecycle foundation (`runs.status` authoritative + `threads.py` G-5 extraction, live SC#10 6/6), and a curated Starter Workflow Library (3 KB→document starters proven live end-to-end).
+
+### What Worked
+- **SC#10 cross-provider UAT as a first-class gate** kept catching real bugs before ship (133 routing bug, 145 run-lifecycle 6/6, the WF-01 live walkthrough).
+- **The operator FOUNDATION pivot (2026-07-09)** — pausing feature work for the run-lifecycle honesty + `threads.py` G-5 extraction (145) paid down the highest-firing hot-file debt before more features piled onto it.
+- **Code-review-then-fix caught real blockers** the executor's own tests missed (142's 2 T-142-01 blockers, 139's kind-blind CR-01, 143's seed-id collision found in the live apply).
+- **Trusted-seed + live-UAT for WF-01** — the strict citation gate + judge gauntlet proved the starters produce grounded, cited docs (not fabrications) end-to-end.
+
+### What Was Inefficient
+- **STRETCH phases accumulated verification debt** — 140/141/142/143 all shipped code but carry pending/partial live UATs (embed 429, cross-provider smoke, held-partial, A1+empty-folder). Status labels lagged the real work.
+- **Hand-picked seed uuids collided** (mig 094 risk-register `…00c1` = existing `eval_coverage`) → a silent `ON CONFLICT` partial apply caught only during live UAT.
+- **SDK milestone/roadmap tracking quirks recurred** (stale progress-table rows; `milestone.complete` inflated counts by pulling in unarchived v3.1 phase dirs) → hand-fixed each time.
+
+### Patterns Established
+- **FOUNDATION-before-features** as an explicit operator lever between feature waves (G-5 paydown).
+- **Deferred ideas → SEEDs with concrete re-open triggers + MUST-surface-at-new-milestone** (SEED-108/109/110/112).
+- **Live Chrome-MCP walkthrough** as the WF-01 acceptance proof (fork → publish gauntlet → cited `.docx`), not just wire-format checks.
+
+### Key Lessons
+- Any `is_global` seed migration MUST query the live short-suffix uuid space before picking "fixed" ids — `ON CONFLICT (id)` hides collisions as silent partial applies.
+- `full-schema.sql` is schema-only; seed DATA lives in the numbered migrations — a data-only migration is a no-op for the bootstrap artifact.
+- The strict citation gate + a fast model = retries; a stronger default model runs smoother (SEED-082 tunable-gate lever).
+
+### Cost Observations
+- Model mix: predominantly Opus (execution + orchestration).
+- 656 commits over ~12 days; one operator pivot (FOUNDATION pass) mid-milestone.
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
