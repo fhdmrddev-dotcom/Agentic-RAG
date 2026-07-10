@@ -96,6 +96,15 @@ def reset_mocks():
     app.dependency_overrides[get_current_user] = lambda: mock_user_data
     app.dependency_overrides[get_supabase] = lambda: _supabase
 
+    # Phase 146 (ADMIN-01): clear any leaked require_operator override so the
+    # operator-present branch of one test never contaminates the next. Guarded —
+    # require_operator lands in Plan 02; before then the import is absent (RED).
+    try:
+        from app.dependencies import require_operator as _require_operator
+        app.dependency_overrides.pop(_require_operator, None)
+    except Exception:
+        pass
+
     # Reset the execute result
     _execute_result.reset_mock()
     _execute_result.data = []
@@ -160,6 +169,30 @@ def mock_execute_result():
 def mock_builder():
     """Expose the shared builder mock for side_effect configuration."""
     return _builder
+
+
+@pytest.fixture
+def operator_override():
+    """Phase 146 (ADMIN-01) — force the operator-present branch of the /admin gate.
+
+    Overrides ``require_operator`` -> a fake operator identity so a test reaches a
+    gated endpoint without a live ``operator_users`` row. Yields the identity; pops
+    the override on teardown so it never contaminates a later test (belt-and-braces
+    with the guarded pop in ``reset_mocks``).
+
+    NOTE: overriding ``require_operator`` bypasses ``request.state.operator = ...``, so
+    the audit floor teardown sees no operator and writes nothing. To exercise the
+    real gate + floor write path, drive the operator branch via the asyncpg pool mock
+    (``set_fetchrow_result({...})``) instead of this override.
+    """
+    from app.dependencies import require_operator
+
+    identity = {"id": "op-1", "email": "op@x.co"}
+    app.dependency_overrides[require_operator] = lambda: identity
+    try:
+        yield identity
+    finally:
+        app.dependency_overrides.pop(require_operator, None)
 
 
 # ═══════════════════════════════════════════════════════════════════════
