@@ -86,7 +86,15 @@
   2. Every operator action writes a row to `operator_audit_log` (who / what / when).
   3. The existing `/admin/backpressure` endpoint is reachable only behind the `require_operator` gate.
   4. A normal user's JWT returns 404 on every `/admin` route (regression-tested), and `operator_users` is a system-level, org-agnostic principal with `org_id` stubs added where cheap.
-**Plans**: TBD
+**Plans**: 6 plans (4 waves)
+
+Plans:
+- [ ] 146-01-PLAN.md — Migrations 095 (operator_users + operator_audit_log, RLS deny-all) + 096 (org_id stub sweep) + [BLOCKING] live apply + full-schema regen
+- [ ] 146-02-PLAN.md — require_operator router-level gate (byte-identical 404) + audit floor + delete BACKPRESSURE_ADMIN_USER_IDS + /admin/me probe + /admin/audit feed + gate regression suite
+- [ ] 146-03-PLAN.md — OPERATOR_EMAILS idempotent lifespan seed (ON CONFLICT, WORKER_COUNT=2-safe) + seed tests
+- [ ] 146-04-PLAN.md — Frontend data layer: getOperatorProbe (404→null) / getBackpressure / getOperatorAudit + useOperatorProbe hook + test
+- [ ] 146-05-PLAN.md — 061-B/062-A leaf components: OperatorBand, HealthSignals, LockedTab, TechnicalNamesToggle, RecentActionsCard
+- [ ] 146-06-PLAN.md — ControlRoomPage + AuditTab assembly, ↻ Refresh ledger beat, reachability triad (ActiveView + ChatLayout branch + probe-gated shield outside NAV_ITEMS) + NAV_ITEMS regression test
 **UI hint**: yes
 
 ### Phase 147: Operator Control Plane
@@ -246,7 +254,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 146. Operator Foundation | 0/? | Not started | - |
+| 146. Operator Foundation | 0/6 | Planned | - |
 | 147. Operator Control Plane | 0/? | Not started | - |
 | 148. Governance — Audit, Users & Feature Visibility | 0/? | Not started | - |
 | 149. Model Registry & Discovery | 0/? | Not started | - |
