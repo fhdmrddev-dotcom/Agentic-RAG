@@ -1,7 +1,9 @@
 ---
 phase: 145-run-lifecycle-honesty-threads-py-extraction-stretch
 verified: 2026-07-09T16:03:14Z
-status: human_needed
+status: passed
+human_verified: 2026-07-10
+human_verification_result: "6/6 SC#10 UAT passed (145-HUMAN-UAT.md) — Dir A self-heal (OpenAI), Dir B orphan cleanup (live integration, all 4 predicate branches), cross-provider Stop (6 providers cancelled+ZREM), multi-tool (42s/70s no false-sweep), parallel-thread isolation (144s∥13s overlap), long silent gap (24.9s live inter-event gap survived the 20s watchdog). 2 display-honesty findings filed + deferred: BUG-260710-01, BUG-260710-02. Google 429 = infra."
 score: 8/8 automated must-haves verified
 overrides_applied: 0
 deferred:
