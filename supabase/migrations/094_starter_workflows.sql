@@ -36,9 +36,16 @@
 -- pm-* slugs would collide with the operator's existing rows (ON CONFLICT (id) does NOT
 -- catch a slug/version conflict).
 --
--- Idempotent: each INSERT has a FIXED uuid (00000000-...-00c1/c2/c3) + ON CONFLICT (id)
--- DO NOTHING — re-applying is a no-op (never UPDATE a published row: the immutability
--- trigger raises 23514).
+-- Idempotent: each INSERT has a FIXED uuid + ON CONFLICT (id) DO NOTHING — re-applying is
+-- a no-op (never UPDATE a published row: the immutability trigger raises 23514).
+--
+-- ID NAMESPACE (collision fix, Phase 143 apply): the short-suffix seed-id space
+-- (00000000-...-00b1..00c3) is ALREADY occupied by prior seed migrations —
+-- ...00b1-b4 = the mig 061 scaffolds, and ...00c1 = the `eval_coverage` eval seed.
+-- risk-register therefore uses ...0094c1 (mig-094-namespaced) to avoid the silent
+-- ON CONFLICT (id) skip against eval_coverage. weekly-status-report (...00c2) and
+-- compliance-gap-report (...00c3) landed cleanly on first apply and keep their ids
+-- (changing a landed row's id would duplicate its slug and raise 23505 on re-run).
 --
 -- APPLY DISCIPLINE (CLAUDE.md): apply this file by pasting it into the Supabase SQL
 -- editor for the local project — never via the destructive CLI sync/reset commands (they
@@ -51,7 +58,7 @@
 -- ============================================================
 INSERT INTO public.workflow_definitions (id, slug, version, name, status, definition, created_by, is_global)
 VALUES (
-  '00000000-0000-0000-0000-0000000000c1',
+  '00000000-0000-0000-0000-0000000094c1',
   'risk-register', 1, 'Risk Register', 'published',
   '{
     "slug": "risk-register",
