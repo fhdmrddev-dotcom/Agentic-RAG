@@ -74,7 +74,7 @@
 - [x] **Phase 142: Non-Python Skill-Script Honesty (STRETCH)** — honest "can't execute this skill type" signal (SRH-01) — complete 2026-07-08 (5/5 plans; runtime-gap classifier G-A/G-B/G-C + reactive reshape + per-run repeat-guard + proactive execute_code capability facts + honest read_skill_file/load_skill + import note; code-review found 2 T-142-01 blockers, both fixed root-cause + independently re-verified; 87 tests + 11 adversarial; 0 regressions vs baseline-60 rot; verification human_needed — 3 live cross-provider narration rows in 142-HUMAN-UAT.md via /gsd:verify-work 142)
 - [ ] **Phase 143: Starter Workflow Library (STRETCH)** — fork-able is_global starter-workflow shelf (WF-01)
 - [ ] **Phase 144: Agent-Driven Skill File Attachment (STRETCH)** — new `attach_skill_file` tool + endpoint so the agent can attach files it creates, and a user can hand it a template mid-chat (FILE-01, SEED-104)
-- [ ] **Phase 145: Run-Lifecycle Honesty + `threads.py` Extraction (STRETCH · FOUNDATION — execute NEXT, before 143/144)** — make Redis `runs:active` authoritative + reconcile-on-reconnect so the frontend running-badge/Stop derive deterministically in BOTH directions (no phantom "running", no missing Stop on a live run); extract the run-lifecycle out of `threads.py` into a tested module (overdue G-5 paydown) (FND-01; folds BUG-260709-01 + BUG-260702-02; SC#10). Operator pivot 2026-07-09: foundation pass before more features.
+- [x] **Phase 145: Run-Lifecycle Honesty + `threads.py` Extraction (STRETCH · FOUNDATION)** — Postgres `runs.status` authoritative + Redis `runs:active` derived mirror + reconcile-on-reconnect so the frontend Stop/running derive deterministically in BOTH directions; run-lifecycle extracted out of `threads.py` into `run_lifecycle.py` (overdue G-5 paydown) (FND-01; folds BUG-260709-01 + BUG-260702-02; SC#10) — **complete 2026-07-10** (6/6 plans; executed autonomously 2026-07-09 + code-review 2 blockers/3 fixed [CR-01/CR-02/WR-01/WR-02] + secured `threats_open:0` [22/22] + **live SC#10 UAT 6/6 passed** — Dir A self-heal, Dir B orphan cleanup [live integration vs real reconciler, 4 predicate branches], cross-provider Stop [6 providers cancelled+ZREM], multi-tool 42s/70s, parallel-thread 144s∥13s, 24.9s live silent-gap survived; 2 display findings filed+deferred BUG-260710-01/02; Google 429=infra). Operator pivot 2026-07-09: foundation pass before more features. Deferred (not gaps): 3 live-infra integration tests + cross-worker cancel + 5-writer eval/tuner migration → SEED-109.
 
 ### Phase Details
 
@@ -476,7 +476,7 @@ Plans:
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
 | 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
-| 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 0/TBD | Not started (execute NEXT) | - |
+| 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 6/6 | Complete (SC#10 UAT 6/6) | 2026-07-10 |
 
 ### Guardrails firing (v3.2)
 
