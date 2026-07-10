@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-10T22:03:20.081Z"
+last_updated: "2026-07-10T22:11:11.513Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 26
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 146 (operator-foundation) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-07-10
 
@@ -338,6 +338,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 143 P04 | 6min | 2 tasks | 3 files |
 | Phase 146 P01 | 9min | 3 tasks | 3 files |
 | Phase 146 P02 | 11min | 3 tasks | 8 files |
+| Phase 146 P146-04 | 2min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -410,6 +411,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 146-01]: org_id stubs on documents/folders/threads/skills with NO index — harness_audit shape per D-05, not the DM-era indexed shape
 - [Phase ?]: Phase 146-02: require_operator is a ROUTER-level gate returning a byte-identical 404 on non-membership (non-discoverable, sole authority, no RLS backstop); old BACKPRESSURE_ADMIN_USER_IDS + dev fail-open deleted (D-02), OPERATOR_EMAILS replaces it.
 - [Phase ?]: Phase 146-02: operator_audit_floor is a per-action yield-dependency (probe-EXEMPT) writing one append-only row per gated action; membership seam is asyncpg (patch _pg_pool in tests, not the supabase mock — Pitfall 6).
+- [Phase ?]: 146-04: operator probe is render-only (getOperatorProbe 404→null); backend require_operator 404 gate stays the sole authority (Pitfall 13)
 
 ## Operator Next Steps
 

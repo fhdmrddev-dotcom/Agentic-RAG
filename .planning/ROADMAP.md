@@ -99,7 +99,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 146-03-PLAN.md — OPERATOR_EMAILS idempotent lifespan seed (ON CONFLICT, WORKER_COUNT=2-safe) + seed tests
-- [ ] 146-04-PLAN.md — Frontend data layer: getOperatorProbe (404→null) / getBackpressure / getOperatorAudit + useOperatorProbe hook + test
+- [x] 146-04-PLAN.md — Frontend data layer: getOperatorProbe (404→null) / getBackpressure / getOperatorAudit + useOperatorProbe hook + test
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
