@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-10T21:33:02.416Z"
+last_updated: "2026-07-10T21:54:20.675Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 26
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 146 (operator-foundation) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-07-10
 
@@ -337,6 +337,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 143 P03 | 6min | 3 tasks | 4 files |
 | Phase 143 P04 | 6min | 2 tasks | 3 files |
 | Phase 146 P01 | 9min | 3 tasks | 3 files |
+| Phase 146 P02 | 11min | 3 tasks | 8 files |
 
 ## Decisions
 
@@ -407,6 +408,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 146-01]: operator_users carries NO org_id (D-06 org-agnostic principal) — protects the v3.4 one-way door
 - [Phase 146-01]: operator_audit_log.action is free-text with NO CHECK (A4); actor is PLAIN uuid NO FK (tamper-resistant, mig-059 idiom)
 - [Phase 146-01]: org_id stubs on documents/folders/threads/skills with NO index — harness_audit shape per D-05, not the DM-era indexed shape
+- [Phase ?]: Phase 146-02: require_operator is a ROUTER-level gate returning a byte-identical 404 on non-membership (non-discoverable, sole authority, no RLS backstop); old BACKPRESSURE_ADMIN_USER_IDS + dev fail-open deleted (D-02), OPERATOR_EMAILS replaces it.
+- [Phase ?]: Phase 146-02: operator_audit_floor is a per-action yield-dependency (probe-EXEMPT) writing one append-only row per gated action; membership seam is asyncpg (patch _pg_pool in tests, not the supabase mock — Pitfall 6).
 
 ## Operator Next Steps
 
