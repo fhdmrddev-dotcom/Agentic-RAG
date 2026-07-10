@@ -65,7 +65,7 @@ created: 2026-07-10
 
 - [ ] Wave-0 assertion test pinning the 404 byte-shape (gated `/admin` 404 == genuine unknown-route 404) per RESEARCH Assumption A1 — authored in Plan 02 Task 1 (`tests/test_146_operator_gate.py::test_admin_404_matches_unknown_route_404`), turned green in Plan 02 Task 3
 - [ ] `tests/test_146_operator_gate.py` scaffolded RED before the gate lands (Plan 02 Task 1: route-enumeration + byte-identity + operator-present; floor-write/probe-exempt added in 02-T3)
-- [ ] `conftest.py` `require_operator` override helper + `mock_execute_result.data=[]` non-operator branch (Plan 02 Task 1)
+- [ ] `conftest.py` `require_operator` override helper (operator-present) + non-operator branch via patching `app.dependencies._pg_pool` → `mock_asyncpg_pool` with `set_fetchrow_result(None)` (Plan 02 Task 1)
 - [ ] `tests/test_146_operator_seed.py` (Plan 03 Task 2 — recorder-pool idiom)
 - [ ] Frontend: `useOperatorProbe.test.ts` (Plan 04 Task 2) + `nav-items.test.ts` shield-absent regression (Plan 06 Task 3)
 

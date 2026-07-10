@@ -412,7 +412,7 @@ COMMENT ON COLUMN public.documents.org_id IS 'Forward-compat (D-PRD-02/D-11): or
 
 ### Pitfall 6: The conftest global `get_current_user` override hiding the gate in tests
 **What goes wrong:** `backend/tests/conftest.py:80` globally overrides `get_current_user` → a fixed mock user. A naive test would make every request look authenticated *and* can't easily express "non-operator." If `require_operator` isn't decomposed, you can't drive the membership branch from the shared mock.
-**How to avoid:** Split the membership check into a small overridable sub-dependency (`is_operator` / `get_operator`) that queries via the shared Supabase mock builder, so tests set `mock_execute_result.data = []` → 404, or `= [{…}]` → pass (exactly the `test_audit.py` idiom). Provide `app.dependency_overrides[require_operator]` for the operator-present path. See Validation Architecture.
+**How to avoid:** Split the membership check into a small seam (`is_operator`) reading via the asyncpg pool; tests patch `app.dependencies._pg_pool` with the `mock_asyncpg_pool` recorder — `set_fetchrow_result(None)` → 404, `set_fetchrow_result({…})` → pass (the `tests/unit/test_lifespan.py:35` idiom; the supabase-py `mock_execute_result` builder mock has NO effect on the asyncpg path — unmocked, the read would hit the REAL local Postgres). Provide `app.dependency_overrides[require_operator]` for the operator-present path. See Validation Architecture.
 **Warning signs:** A test that can only assert 200s because it can't express a non-operator.
 
 ## Code Examples
@@ -432,8 +432,9 @@ def _admin_paths():
             seen.append(path)
     return seen
 
-def test_every_admin_route_404s_for_non_operator(client, auth_headers, mock_execute_result):
-    mock_execute_result.data = []           # operator_users lookup returns no row → non-operator
+def test_every_admin_route_404s_for_non_operator(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    mock_asyncpg_pool.set_fetchrow_result(None)   # operator_users lookup → no row → non-operator
     for path in _admin_paths():
         # substitute path params with a throwaway uuid so the route matches
         url = path.replace("{run_id}", "00000000-0000-0000-0000-000000000000")
@@ -445,8 +446,9 @@ def test_every_admin_route_404s_for_non_operator(client, auth_headers, mock_exec
 
 ### Byte-identity assertion (pin FastAPI's default 404 shape — Wave 0)
 ```python
-def test_admin_404_matches_unknown_route_404(client, auth_headers, mock_execute_result):
-    mock_execute_result.data = []
+def test_admin_404_matches_unknown_route_404(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    mock_asyncpg_pool.set_fetchrow_result(None)
     gated = client.get("/admin/backpressure", headers=auth_headers)   # exists, gated
     unknown = client.get("/admin/__definitely_not_a_route__", headers=auth_headers)  # unknown
     assert gated.status_code == unknown.status_code == 404
@@ -489,22 +491,25 @@ def test_backpressure_reachable_for_operator(client, auth_headers):
 | A6 | Auth users' email in `auth.users` is stored lowercased; case-insensitive match is correct for the seed | Pattern 3 | LOW — `lower(email)=ANY(...)` is safe regardless; worst case an unmatched email logs a warning and re-seeds next restart. |
 | A7 | Emails in `OPERATOR_EMAILS` with no `auth.users` row are skipped-with-warning (not an error), seeded on a later restart once the user signs up | Pattern 3 | LOW — matches D-01 "env is bootstrap-only"; a first operator must sign up before/at bootstrap. Document in OPERATOR runbook. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **405 method-mismatch strictness (A2).**
+1. **RESOLVED: 405 method-mismatch strictness (A2).**
    - What we know: correct-method hits 404 cleanly; wrong-method hits 405+Allow, revealing path existence.
    - What's unclear: whether D-09 scenario 1 ("indistinguishable from a nonexistent route") demands all-method parity.
    - Recommendation: accept for 146 (option a), document as known residual; add catch-all only if discuss-phase tightens the contract.
+   - **Resolution (adopted at planning):** option (a) accepted — the residual is registered as T-146-03 (Severity: LOW — path-existence disclosure only; no data or operator-capability exposure) in the plan threat models; D-09 #1 tests correct-method hits.
 
-2. **Probe endpoint naming + whether it returns identity or bare 200.**
+2. **RESOLVED: Probe endpoint naming + whether it returns identity or bare 200.**
    - What we know: `GET /admin/me` 404s non-operators; 200 for operators; floor-exempt.
    - What's unclear: should it return `{id,email,granted_at}` (so the band can show identity without a second call) or bare 200?
    - Recommendation: return the operator identity payload — the 061-B band needs "identity" anyway; one call, not two.
+   - **Resolution (adopted at planning):** `GET /admin/me` returns the identity payload `{id,email,granted_at}` and is floor-exempt (Plan 146-02 Task 3).
 
-3. **org_id sweep breadth (A3).**
+3. **RESOLVED: org_id sweep breadth (A3).**
    - What we know: four unambiguous roots. Children inherit via FK.
    - What's unclear: v3.4 org-scoping of `user_memory` / eval history.
    - Recommendation: keep to the four roots; note the optionals for the v3.4 planner.
+   - **Resolution (adopted at planning):** sweep = the four unambiguous roots (documents/folders/threads/skills) in migration 096; user_memory/eval/tuner deferred to the v3.4 planner (Plan 146-01 Task 2).
 
 ## Environment Availability
 
@@ -547,7 +552,7 @@ def test_backpressure_reachable_for_operator(client, auth_headers):
 ### Wave 0 Gaps
 - [ ] `tests/test_146_operator_gate.py` — covers ADMIN-01 gate/404/audit-floor (route-enumeration + byte-identity + operator-present + floor-write + probe-exempt)
 - [ ] `tests/test_146_operator_seed.py` — covers the idempotent multi-worker seed
-- [ ] `conftest.py` addition (or per-test helper): an override for `require_operator` (operator-present) and confirmation the shared `mock_execute_result.data=[]` drives the non-operator branch. No new framework install — pytest + the existing mock builder suffice.
+- [ ] `conftest.py` addition (or per-test helper): an override for `require_operator` (operator-present) and the non-operator branch via patching `app.dependencies._pg_pool` → `mock_asyncpg_pool` with `set_fetchrow_result(None)`. No new framework install — pytest + the existing asyncpg recorder fixture suffice.
 - [ ] Frontend: a vitest for `useOperatorProbe` (200→isOperator true, 404→false) and that the shield is absent from `NAV_ITEMS`.
 
 ### G-4 / SC#10 note

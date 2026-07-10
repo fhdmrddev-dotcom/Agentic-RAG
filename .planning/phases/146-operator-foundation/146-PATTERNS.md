@@ -365,9 +365,9 @@ def test_list_audit_logs_returns_paginated(client, auth_headers, mock_execute_re
     res = client.get("/audit-logs?page=1&page_size=50", headers=auth_headers)
     assert res.status_code == 200
 ```
-**Drive the non-operator branch** by `mock_execute_result.data = []` (operator_users lookup returns no row → 404). **Drive the operator-present branch** via `app.dependency_overrides[require_operator] = lambda: {"id": "op-1", …}` (conftest `dependency_overrides` idiom, `conftest.py:80`). Tests to author (RESEARCH Code Examples): route-enumeration 404 (`test_every_admin_route_404s_for_non_operator`), byte-identity vs unknown route (`test_admin_404_matches_unknown_route_404`), operator-reachable (`test_backpressure_reachable_for_operator`), floor-writes-once-but-probe-does-not (assert on the shared Supabase mock `insert` call).
+**Drive the non-operator branch** by patching `app.dependencies._pg_pool` → `mock_asyncpg_pool` with `set_fetchrow_result(None)` (CORRECTED at plan-check: the membership read is asyncpg via `get_pg_pool()` — the supabase builder mock has NO effect on it; `tests/unit/test_lifespan.py:35` idiom). **Drive the operator-present branch** via `app.dependency_overrides[require_operator] = lambda: {"id": "op-1", …}` (conftest `dependency_overrides` idiom, `conftest.py:80`). Tests to author (RESEARCH Code Examples): route-enumeration 404 (`test_every_admin_route_404s_for_non_operator`), byte-identity vs unknown route (`test_admin_404_matches_unknown_route_404`), operator-reachable (`test_backpressure_reachable_for_operator`), floor-writes-once-but-probe-does-not (assert on the shared Supabase mock `insert` call).
 
-**Note conftest global override (Pitfall 6):** `conftest.py:80` globally overrides `get_current_user` → a fixed mock user. Decompose the membership check into an overridable `is_operator`/`get_operator` sub-dep (`dependencies.py`) so the non-operator branch is expressible via the shared mock (`mock_execute_result.data = []`).
+**Note conftest global override (Pitfall 6):** `conftest.py:80` globally overrides `get_current_user` → a fixed mock user. Decompose the membership check into an overridable `is_operator`/`get_operator` sub-dep (`dependencies.py`) so the non-operator branch is expressible via the patched asyncpg mock pool (`set_fetchrow_result(None)`); `mock_execute_result` stays for audit-WRITE assertions only (the write path is supabase-py).
 
 ---
 
@@ -386,7 +386,7 @@ def test_list_audit_logs_returns_paginated(client, auth_headers, mock_execute_re
 app.dependency_overrides[get_current_user] = lambda: mock_user_data
 app.dependency_overrides[get_supabase] = lambda: _supabase
 ```
-Add a `require_operator` override helper (operator-present path) and confirm the shared `mock_execute_result.data=[]` drives the non-operator branch. No new framework — pytest + the existing mock builder suffice. The autouse `reset_mocks` fixture (`conftest.py:86-134`) must restore any new override so tests don't contaminate each other.
+Add a `require_operator` override helper (operator-present path) and confirm patching `app.dependencies._pg_pool` → `mock_asyncpg_pool` (`set_fetchrow_result(None)`) drives the non-operator branch. No new framework — pytest + the existing asyncpg recorder fixture suffice. The autouse `reset_mocks` fixture (`conftest.py:86-134`) must restore any new override so tests don't contaminate each other.
 
 ---
 
