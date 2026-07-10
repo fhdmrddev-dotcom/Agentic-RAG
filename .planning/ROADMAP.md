@@ -426,10 +426,10 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*:
 - [x] `143-02-PLAN.md` — `list_starter_workflows` + additive `owned_only` de-dupe + `GET /workflows/starters` + `?scope=mine` (executed 2026-07-10, 2/2 tasks; 4 RED backstops GREEN)
-- [ ] `143-03-PLAN.md` — Compliance Gap Report template + migration 094 (transformed, distinct slugs) + `seed-starters.py` storage seed
+- [x] `143-03-PLAN.md` — Compliance Gap Report template + migration 094 (transformed, distinct slugs) + `seed-starters.py` storage seed (executed 2026-07-10, 3/3 tasks)
 
 **Wave 2** *(blocked on Wave 1 completion)*:
-- [ ] `143-04-PLAN.md` — `listStarterWorkflows` + Starters shelf (top) + `onUseStarter` fresh-copy fork + section reorder (BUG-260628-01) + Starter chip
+- [x] `143-04-PLAN.md` — `listStarterWorkflows` + Starters shelf (top) + `onUseStarter` fresh-copy fork + section reorder (BUG-260628-01) + Starter chip (executed 2026-07-10, 2/2 tasks; 3 frontend RED backstops GREEN)
 
 **Wave 3** *(blocked on Wave 2 completion)*:
 - [ ] `143-05-PLAN.md` — [BLOCKING] operator apply (SQL editor) + templates upload + full-schema regen; live SC-d / A1 / empty-KB UAT
@@ -488,7 +488,7 @@ Plans:
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
-| 143. Starter Workflow Library (STRETCH) | 3/5 | In Progress | - |
+| 143. Starter Workflow Library (STRETCH) | 4/5 | In Progress | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 6/6 | Complete (SC#10 UAT 6/6) | 2026-07-10 |
 
