@@ -1,5 +1,29 @@
 # Milestones
 
+## v3.2 Skill Eval Studio + Self-Improving (Shipped: 2026-07-10)
+
+**Phases completed:** 16 phases (132, 133, 134, 134.1, 135, 136, 137, 137.1, 137.2, 138, 139, 140, 141, 142, 143, 145), 81 plans. Phase 144 (FILE-01) deferred → v3.3.
+
+**Delivered:** The Skill Trigger Tuner grew into a full Skill Eval Studio — persistent eval test cases + immutable versions, an eval runner (with-skill vs without-skill, dual-arm LLM judge, honest per-provider verdicts, human ratings), a publish gate, and the Evals·Triggering·Versions panel — plus a human-in-the-loop self-improvement loop, a built-in skill-creator, a run-lifecycle honesty foundation, and a curated Starter Workflow Library.
+
+**Key accomplishments:**
+
+- **Skill Eval Studio (CORE — EVAL-01..05, VER-01, PANEL-01):** persistent per-skill test cases + immutable version snapshots (mig 079), an eval runner that runs each case with-skill vs without-skill with an inline dual-arm LLM judge, honest per-provider PASS/FAIL/not-measured verdicts, human thumbs ratings, and the Skill Evals panel (Evals · Triggering · Versions) mounted in the Skills UI.
+- **Eval production-clean (137.1, EVAL-05):** automated cross-provider engine smoke sweep, one-click matrix runs (N providers in parallel + per-config mean±σ / Δ skill-lift aggregation + deterministic analyst notes), determinate run progress, advisory judge `case_feedback`, per-arm wall-clock duration, and a judge-model Settings knob.
+- **Built-in skill-creator (137.2, CREATE-01):** every user (local + cloud) gets a read-only, undeletable, "Built-in"-badged skill-creator whose platform-native instructions run the full loop — interview → RAG research → `save_skill` → eval cases → eval → proposals/Tuner → publish gate — and never claim capabilities the runtime lacks.
+- **Self-improvement loop (SI-01, SI-02, GATE-01):** eval results + Tuner signal propose an instruction-body (or description-only) diff → the human reviews and approves → a new immutable version is created and auto-re-evaled before promotion; publishing a skill is blocked until at least one eval has passed. Never auto-applied.
+- **STRETCH honesty + foundation:** run-end honesty (RUN-01/138 — no dead baseline cards, todos marked "ended with open todos"), smart-dispatch skill relevance pre-filter within a configurable token budget (TRIG-02/140, mig 091 `skill_embeddings` + `match_skills`), run-scoped `template_input` resolver (COLL-02/141, mig 092), non-Python skill-script honesty (SRH-01/142), and the FND-01 run-lifecycle foundation (145) — Postgres `runs.status` authoritative + a derived `runs:active` Redis mirror + the overdue `threads.py` G-5 extraction, with live SC#10 UAT 6/6.
+- **Starter Workflow Library (WF-01/143):** a curated `is_global` Starters shelf on the Workflows page with a fresh-copy fork (new slug + v1 draft), and 3 KB→document starters (Risk Register, Weekly Status Report, Compliance Gap Report) authored as trusted seed content (mig 094, strict citation gates) — proven live end-to-end (fork → judge-approved 8-stage publish gauntlet → cited `.docx` with 17 real citations, the strict gate rejecting uncited output).
+
+### Known Gaps
+
+- **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — deferred → v3.3 (gated STRETCH, not executed). Rolls forward alongside the workflow-file cluster (SEED-110 run-time template upload, SEED-112 per-workflow folder-scope).
+- **Verification debt (code shipped, live UAT pending/partial):** 140 (blocked on an embed 429), 141 (cross-provider render smoke), 142 (held-partial), 143 (non-operator A1 + dedicated empty-folder tests).
+
+**Known deferred items at close:** 47 open artifacts per the pre-close audit — 9 seeds (intentional), 22 quick-tasks (mostly stale/"missing" artifacts), 10 UAT gaps, 5 verification gaps, 1 todo (see STATE.md → Deferred Items).
+
+---
+
 ## v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers (Shipped: 2026-06-28)
 
 **Phases completed:** 9 shipped phases (CORE: 120, 121, 122, 123, 123.1, 124; STRETCH: 127, 128, 129), 40 plans. STRETCH phases 125, 126, 130, 131 gated/not started → deferred to backlog.
