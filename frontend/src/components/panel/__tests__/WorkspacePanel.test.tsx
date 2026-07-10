@@ -21,12 +21,33 @@
  * we assert COMPOSITION against the controlled props.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
+// Phase 124-03 Task 1 (WUX-01, G-5): read the WorkspacePanel SOURCE via Vite's
+// ?raw loader to assert the new run-soul wiring is a pure additive SIBLING — it
+// must NOT import PhaseCard nor thread any soul atom into the live timeline.
+import workspacePanelSource from "@/components/panel/WorkspacePanel?raw"
 import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
+import type { ThreadWorkflowState, PublishedWorkflow } from "@/lib/api"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
+
+// Phase 124-03 Task 1 (WUX-01, A2): the run soul sources the published definition
+// ADDITIVELY by id — getThreadWorkflow gives the run frame's definition_slug, then
+// listPublishedWorkflows recovers the SAME owner-scoped PublishedWorkflow.definition
+// the library card reads. Mock both so the run-soul effect resolves deterministically
+// (default: no slug / empty list → the soul renders its honest empty-states).
+const getThreadWorkflow = vi.fn()
+const listPublishedWorkflows = vi.fn()
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...actual,
+    getThreadWorkflow: (...a: unknown[]) => getThreadWorkflow(...a),
+    listPublishedWorkflows: (...a: unknown[]) => listPublishedWorkflows(...a),
+  }
+})
 
 const useTodos = vi.fn()
 const useWorkspaceFiles = vi.fn()
@@ -153,10 +174,53 @@ function renderPanel({ state = "open", onToggle = vi.fn(), onExpand = vi.fn() }:
   )
 }
 
+/** A published-definition fixture for the run-soul by-id read (A2). */
+const SOUL_SLUG = "weekly-status"
+const soulPublished: PublishedWorkflow = {
+  id: "pub-1",
+  slug: SOUL_SLUG,
+  name: "Weekly Status",
+  definition: {
+    name: "Weekly Status",
+    slug: SOUL_SLUG,
+    business_requirement: "Summarize the week's progress for stakeholders.",
+    phases: [
+      { slug: "gather", phase_index: 0, name: "Gather", config: { phase_type: "llm_agent" } },
+      { slug: "emit", phase_index: 1, name: "Emit", config: { phase_type: "llm_emit", citation_policy: "strict" } },
+    ],
+  } as unknown as PublishedWorkflow["definition"],
+}
+
+/** Point the run-soul reads at a definition (slug match) or at an empty source. */
+function setRunSoulSource(opts: { slug?: string | null; published?: PublishedWorkflow[] } = {}) {
+  getThreadWorkflow.mockResolvedValue({
+    thread_id: "thread-1",
+    mode: "harness",
+    locked: true,
+    active_workflow_run_id: "wr-1",
+    run_status: "running",
+    definition_slug: opts.slug ?? SOUL_SLUG,
+    definition_name: "Weekly Status",
+    current_phase_slug: null,
+    current_phase_index: null,
+    total_phases: 2,
+    lock_is_stale: false,
+    cap_paused: false,
+    continues_used: 0,
+    continues_remaining: 3,
+  } as ThreadWorkflowState)
+  listPublishedWorkflows.mockResolvedValue(opts.published ?? [soulPublished])
+}
+
 describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
   beforeEach(() => {
     setViewport(1280) // desktop default
     setHooks({})
+    // Default the run-soul reads to a no-slug frame so the soul effect resolves to
+    // its honest empty-state and never leaks an unhandled rejection in tests that
+    // don't exercise the timeline. Run-soul-specific tests override via setRunSoulSource.
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
   })
 
   it("renders a complementary landmark labelled 'Agent workspace'", () => {
@@ -318,6 +382,83 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     setHooks({ todos: mockTodos, phases: [], lock: null })
     renderPanel({ state: "open" })
     expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+  })
+
+  // ── Phase 124-03 Task 1 (WUX-01, D-07/D-08, sketch 046-A ②) — the run soul
+  //    header. An ADDITIVE SIBLING section ABOVE the live Workflow timeline; it
+  //    reads the DEFINITION only (sourced by-id, A2) and is gated to harness runs
+  //    so Deep / no-run threads never see it (D-08). PhaseTimeline / PhaseCard stay
+  //    byte-identical (the G-5 red line, asserted by git diff + the source-grep). ──
+  it("mounts the run soul header (WorkflowSoul scale=run) as a sibling when a harness run holds the lock", async () => {
+    setRunSoulSource({})
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    // The soul mounts; once the by-id read resolves it shows the workflow's purpose.
+    const soul = await screen.findByTestId("workflow-soul")
+    expect(soul).toHaveAttribute("data-scale", "run")
+    await waitFor(() =>
+      expect(screen.getByText(/Summarize the week's progress/i)).toBeInTheDocument(),
+    )
+  })
+
+  it("renders the run soul section ABOVE the live Workflow timeline (DOM order — additive sibling)", async () => {
+    setRunSoulSource({})
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    const soul = await screen.findByTestId("workflow-soul")
+    const timeline = screen.getByTestId("phase-timeline")
+    // The soul section precedes the timeline section in document order.
+    expect(soul.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("sources the run soul definition via the additive by-id read (getThreadWorkflow → listPublishedWorkflows), NOT live run-state phases", async () => {
+    setRunSoulSource({})
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    await screen.findByTestId("workflow-soul")
+    // The sibling-only read fires; the soul derives from the published definition.
+    expect(getThreadWorkflow).toHaveBeenCalledWith("thread-1", expect.anything())
+    await waitFor(() => expect(listPublishedWorkflows).toHaveBeenCalled())
+  })
+
+  it("does NOT mount the run soul header for a Deep / no-run thread (gated to showTimeline — D-08)", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("workflow-soul")).not.toBeInTheDocument()
+  })
+
+  it("the run soul falls back to its honest draft empty-state when no published definition matches the run slug", async () => {
+    // A draft test-run: the slug exists but the published list has no match.
+    setRunSoulSource({ slug: "unpublished-draft", published: [] })
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    const soul = await screen.findByTestId("workflow-soul")
+    expect(soul).toBeInTheDocument()
+    // The purpose atom is always rendered — honest empty-state, never hidden (D-03).
+    await waitFor(() =>
+      expect(screen.getByText(/draft · purpose not declared yet/i)).toBeInTheDocument(),
+    )
+  })
+
+  // G-5 SOURCE-GREP (the additive-sibling discipline survives refactors): the
+  // WorkspacePanel's run-soul wiring must NOT import PhaseCard and must NOT thread a
+  // soul atom into the live PhaseTimeline. The ONLY PhaseTimeline reference allowed
+  // is the existing unchanged <PhaseTimeline threadId={threadId} /> mount.
+  it("the WorkspacePanel SOURCE does not import or thread the run soul into PhaseCard (G-5)", () => {
+    // No import of the live PhaseCard component anywhere (it is a PhaseTimeline internal).
+    expect(workspacePanelSource).not.toMatch(/from\s+["']\.\/PhaseCard["']/)
+    // The run soul is wired through WorkflowSoul (the additive sibling), not via a
+    // new PhaseTimeline prop — PhaseTimeline is still mounted with ONLY threadId.
+    expect(workspacePanelSource).toMatch(/<WorkflowSoul\s+def=/)
+    expect(workspacePanelSource).toMatch(/<PhaseTimeline threadId=\{threadId\} \/>/)
   })
 
   // Phase 094 WR-01 (D-06 / SC#6) — the batch Sub-results section surfaces the

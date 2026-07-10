@@ -1697,6 +1697,15 @@ def ingest_document(
                     user_settings=app_settings,
                 ))
                 emitted = result.get("emitted")
+                if not emitted:
+                    # Never let a metadata extraction silently yield None — surface the
+                    # forced-emit failure reason (model_failed_to_emit vs provider_error)
+                    # plus the resolved model/provider so the cause is diagnosable.
+                    log.warning(
+                        "metadata extraction produced no emission "
+                        "(model=%s provider=%s failure=%s) -> metadata=None",
+                        model, provider, result.get("failure"),
+                    )
                 # D-111-3 (WR-01 fix): use the dedicated helper, which POPS the public
                 # `confidence` field out of the dump and renames it to the nested
                 # `_confidence` key. Hand-rolling `metadata_dict["_confidence"] = ...`
@@ -1912,17 +1921,28 @@ def ingest_document(
             except Exception:  # noqa: BLE001 — classification NEVER blocks ingestion (mirror the metadata degrade)
                 log.warning("classification rule-eval failed; skipping suggestion", exc_info=True)
 
+        # chunk_count = TOTAL searchable rows for the document (text chunks +
+        # image-description chunks inserted by multimodal_service.extract_and_store_images).
+        # This write happens AFTER multimodal insert, so a count(*) is authoritative and
+        # self-correcting regardless of how many image chunks were added — the UI now
+        # reflects the real chunk total (e.g. 433), not text-only density (410). Falls
+        # back to len(chunks) if the count read fails so it can NEVER block completion.
+        # Consistent across /upload, /reingest, /reextract (all hit this write site).
+        try:
+            _count_resp = (
+                supabase.table("document_chunks")
+                .select("id", count="exact", head=True)
+                .eq("document_id", document_id)
+                .execute()
+            )
+            _total_chunk_count = _count_resp.count if _count_resp.count is not None else len(chunks)
+        except Exception:  # noqa: BLE001 — count read NEVER blocks completion
+            log.warning("chunk_count total recount failed; using text-chunk count", exc_info=True)
+            _total_chunk_count = len(chunks)
+
         supabase.table("documents").update({
             "status": "completed",
-            # Phase 072.1 Gap 3 closure documentation — chunk_count is TEXT-chunks-only.
-            # Image-description chunks (inserted by multimodal_service.extract_and_store_images
-            # at line ~507) are NOT counted here. This is intentional: the UI's
-            # documents-list "chunk count" represents the document's text density,
-            # not its total searchable-row count. Operators wanting the total can
-            # SELECT count(*) FROM document_chunks WHERE document_id=? directly.
-            # Consistent across /upload, /reingest, /reextract (all paths hit this
-            # ingest_document write site).
-            "chunk_count": len(chunks),
+            "chunk_count": _total_chunk_count,
             "metadata": metadata_dict,
             "full_markdown": text,
             # Phase 071 D-071-08 — populate extractor lineage column for new ingests.

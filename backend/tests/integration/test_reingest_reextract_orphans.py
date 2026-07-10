@@ -10,8 +10,8 @@ this test locks the `/reextract -> /reingest` orphan-free invariant on chunks.
 Asserts:
   - After `/reextract` then `/reingest`, document_chunks contains ONLY the
     latest batch (no orphans from the prior op).
-  - `documents.chunk_count` matches actual text-chunk count for the document
-    (text-only semantics — documented in ingest_document at line ~1413).
+  - `documents.chunk_count` matches the actual TOTAL document_chunks count
+    (text + image-description chunks — count(*) taken after multimodal insert).
   - Calling `/reingest` twice in a row leaves the chunk count stable
     (idempotent — fix didn't introduce a regression on the steady-state).
 
@@ -359,18 +359,20 @@ def test_reextract_then_reingest_leaves_no_orphan_chunks(
             text_chunks_after_reingest = _count_text_chunks(supabase, doc_id)
             chunk_count_after_reingest = _get_chunk_count(supabase, doc_id)
 
-            # Primary orphan-free invariant: documents.chunk_count must match
-            # the actual text-chunk row count for this doc. Before the fix:
-            # documents.chunk_count = len(new_chunks) but document_chunks
-            # contained the OLD + NEW rows -> mismatch. After the fix:
-            # /reingest's cascade deletes the old rows before the new ones
-            # are INSERTed, so chunk_count == text-chunk count.
-            assert chunk_count_after_reingest == text_chunks_after_reingest, (
+            # Primary orphan-free invariant: documents.chunk_count must match the
+            # actual TOTAL document_chunks row count (text + image-description chunks)
+            # for this doc. chunk_count is now a count(*) taken after the multimodal
+            # insert (documents.py), so it reflects real searchable rows, not text-only
+            # density. Before the cascade fix: chunk_count = len(new_chunks) but
+            # document_chunks held OLD + NEW rows -> mismatch. After the fix: /reingest's
+            # cascade deletes old rows before new ones are INSERTed, so chunk_count ==
+            # total row count. (text_chunks_after_reingest retained for the diagnostic msg.)
+            assert chunk_count_after_reingest == chunks_after_reingest, (
                 f"Phase 072.1 Gap 3 / BUG-260517-01 invariant: "
                 f"documents.chunk_count ({chunk_count_after_reingest}) must match "
-                f"actual text-chunk count ({text_chunks_after_reingest}). "
+                f"actual TOTAL chunk count ({chunks_after_reingest}). "
                 f"Mismatch indicates either chunk_count drift OR orphan accumulation. "
-                f"Total chunks (incl. image-desc): {chunks_after_reingest}. "
+                f"Text chunks only: {text_chunks_after_reingest}. "
                 f"Pre-/reingest chunk count: {chunks_after_reextract}."
             )
 

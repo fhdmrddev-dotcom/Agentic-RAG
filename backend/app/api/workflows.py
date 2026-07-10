@@ -16,7 +16,7 @@ from uuid import UUID
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -26,6 +26,7 @@ from app.db.workflows import (
     delete_workflow_definition,
     list_draft_workflows,
     list_published_workflows,
+    list_starter_workflows,
     update_workflow_definition,
 )
 from app.models.harness import WorkflowDefinition
@@ -103,7 +104,8 @@ class DraftRow(BaseModel):
 
 @router.get("/published", response_model=list[PublishedWorkflow])
 async def get_published_workflows(
-    project_folder_id: UUID | None = Query(None),
+    project_folder_id: UUID | None = None,
+    scope: str | None = None,
     current_user: dict = Depends(get_current_user),
 ) -> list[PublishedWorkflow]:
     """List the published workflow definitions the user may start (D-01 picker feed).
@@ -120,6 +122,14 @@ async def get_published_workflows(
     (it lives in the db-layer WHERE); the project filter can only narrow, never
     widen, the result (T-098-09). Omitting it returns the full published list
     unchanged (backward compatible).
+
+    SCOPED SHELF (Phase 143 / WF-01, D-143-2a): the optional ``scope`` query param
+    threads ``owned_only=(scope == "mine")`` into the db helper. The Workflows-page
+    Published shelf passes ``?scope=mine`` to see ONLY the caller's own published
+    rows (the curated globals now live in the Starters shelf — no double-render);
+    ANY other value (including omitting it — the composer picker / run-soul default)
+    keeps ``owned_only=False`` so the global rows still appear. The comparison is a
+    pure-Python ``== "mine"`` — ``scope`` is NEVER interpolated into SQL (V5).
     """
     pool = await get_pg_pool()
     user_id = current_user["id"]
@@ -127,7 +137,38 @@ async def get_published_workflows(
         pool,
         user_id=UUID(user_id) if isinstance(user_id, str) else user_id,
         project_folder_id=project_folder_id,
+        owned_only=(scope == "mine"),
     )
+    return [
+        PublishedWorkflow(
+            id=r["id"],
+            slug=r["slug"],
+            name=r["name"],
+            definition=_coerce_definition(r.get("definition")),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/starters", response_model=list[PublishedWorkflow])
+async def get_starter_workflows(
+    current_user: dict = Depends(get_current_user),
+) -> list[PublishedWorkflow]:
+    """List the curated global starters — the Starters shelf feed (Phase 143 / WF-01).
+
+    Delegates to ``list_starter_workflows`` (``status='published' AND is_global=true
+    AND definition->>'category'='starter'``) and maps each row through the existing
+    ``PublishedWorkflow`` + ``_coerce_definition`` shape the Published shelf uses. The
+    rows are UNSCOPED curated globals — ``is_global`` published rows are world-readable
+    (T-143-01, mig-056 SELECT policy), so no per-user filter is needed; ``category=
+    'starter'`` narrows to curated (the 5 mig-061 dev scaffolds lack the marker and are
+    excluded — D-143-2a).
+
+    Declared as an explicit STATIC ``/starters`` segment BEFORE any ``/{definition_id}``
+    route (the ``/drafts`` precedent) so a future path param can never shadow it.
+    """
+    pool = await get_pg_pool()
+    rows = await list_starter_workflows(pool)
     return [
         PublishedWorkflow(
             id=r["id"],

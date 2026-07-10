@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-30T20:11:19.485Z",
+  "phase": "133",
+  "phase_name": "eval-runner-with-skill-vs-without-skill",
+  "phase_dir": ".planning/phases/133-eval-runner-with-skill-vs-without-skill",
+  "plan": 5,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "boundary": "clean-phase-boundary",
+  "completed_tasks": [
+    {"id": "133", "name": "Eval Runner (EVAL-02) — all 5 plans", "status": "done", "commit": "12bdd6ee"},
+    {"id": "133-verify", "name": "VERIFICATION passed + live SC#10 cross-provider UAT", "status": "done", "commit": "306dd2d4"},
+    {"id": "post-133-a", "name": "Register claude-sonnet-5 (live /models)", "status": "done", "commit": "362672fb"},
+    {"id": "post-133-b", "name": "Capture eval follow-up bugs BUG-260701-01 + SEED-100", "status": "done", "commit": "79b7a4ed"}
+  ],
+  "remaining_tasks": [
+    {"id": "next-1", "name": "/gsd:secure-phase 133 (retroactive threat verification)", "status": "not_started"},
+    {"id": "next-2", "name": "Phase 134 (EVAL-03/04)", "status": "not_started"},
+    {"id": "next-3", "name": "2 OPTIONAL operator lived-glances on Phase 133 (thin-UI live-progress render + parallel-thread feel)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Backend RESTART (not just --reload) to load claude-sonnet-5 into MODEL_CAPABILITIES", "context": "config.py change 362672fb only takes effect on a full restart", "blocking": false},
+    {"action": "2 optional operator lived-glances on Phase 133 thin UI", "context": "engine isolation already confirmed; these are non-blocking polish glances", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Pausing at a clean phase boundary, not mid-task", "rationale": "Phase 133 fully EXECUTED + VERIFIED passed; all phase work committed", "phase": "133"}
+  ],
+  "stray_changes_triage": {
+    "status": "resolved",
+    "committed": {"commit": "80cd2f37", "what": "Phase 127 (WUX-03): phase_type threaded to historical timeline (threads.py, thread.py, StreamsProvider.tsx, PhaseCard.tsx) + energized publish-gauntlet spine (PublishGauntlet.tsx + test); 24/24 tests green"},
+    "reverted": {"file": "backend/README.md", "what": "deletion reverted (lost sandbox-setup notes); untracked backend/RUN-BACKEND.md cheat-sheet left in place for operator to decide"},
+    "left_as_noise": "screenshots/skill-creator* deletions, supabase/snippets/Untitled query *.sql, supabase/.temp, backend/scripts/115_*.json, backend/settings_override.json.migrated, scripts/ UAT scratch, .claude/ GSD framework update (342 files)"
+  },
+  "next_action": "Stray-changes triage DONE. Pick: /gsd:secure-phase 133 (close out 133) OR Phase 134 (EVAL-03/04) OR /gsd:complete-milestone later.",
+  "context_notes": "Session was /clear'd then /gsd:pause-work invoked at a clean boundary. No mid-task state. Stray uncommitted source changes were triaged and resolved (see stray_changes_triage). Two eval follow-up bugs are open: BUG-260630-01 (DeepSeek reasoning_content 400) + BUG-260701-01 (assistant-prefill 400 on sonnet-5/4.6+ family); both folded into SEED-100 (dedicated production-clean eval phase)."
+}

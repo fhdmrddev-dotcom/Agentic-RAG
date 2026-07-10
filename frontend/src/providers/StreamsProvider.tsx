@@ -102,6 +102,9 @@ import {
   deriveWorkspacePanel,
   type DerivedPanelItem,
 } from "@/lib/workspacePanel"
+// BUG-260626-01 (+ sibling): collapse same-runId temp/persisted twins at the
+// bucket-read seam so useDerivedPanel's flat-map doesn't double-count a run.
+import { dedupMessagesByRunId } from "@/lib/dedupMessages"
 // Phase 092-07 (Facet C): the Continue affordance (MessageItem) fires this signal
 // with the FRESH producer_run_id from the /continue 200 body; the provider
 // re-subscribes that thread's producer stream (additive, per-thread keyed).
@@ -139,6 +142,17 @@ const EMPTY_DERIVED: DerivedPanelItem[] = []
 // threads keep executing server-side; returning to one re-attaches via the
 // EXISTING reconcile path with replay from the retained cursor (D-11).
 const STREAM_POOL_SIZE = 3
+
+// ── Phase 145-05 (FND-01, D-145-03/04/05) — client inactivity watchdog ──────────
+// ONE shared setInterval (~5s tick) sweeps the streamingThreads set; a per-thread
+// inactivity window N (~20s) that RESETS on every stream event decides when to
+// fire the READ-ONLY getSnapshot probe. The window is short/tunable because the
+// watchdog only RECONCILES, never kills (D-145-05) — the authoritative kill of a
+// dead producer is the backend stale-sweep (STALE_TIMEOUT=2400s), NOT this belt.
+// A false fire during a legit silent-reasoning gap is one cheap read that returns
+// "still streaming" → no-op (threat T-145-05-02: accept).
+const WATCHDOG_TICK_MS = 5_000 // shared-interval tick cadence
+const WATCHDOG_INACTIVITY_MS = 20_000 // per-thread N: quiet-for-this-long → probe
 
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
@@ -272,6 +286,59 @@ export async function _reattachAfterTransient(
   const since = lastSeenOffsetRef.current.get(runId) ?? "0"
   reattach(runId, since)
   return true
+}
+
+/**
+ * Phase 138-04 (RUN-01 live-surfacing) — reconcile the Workspace TODOS panel on
+ * a genuinely-clean run terminal so the 138-02 backend-committed
+ * "(run ended — not completed)" marker surfaces LIVE, with NO thread-switch and
+ * NO refresh (VERIFICATION.md must-have #5 / Scenario B).
+ *
+ * The 138-02 finalizer writes the marker to the todos table BEFORE the clean
+ * terminal sentinel fires (DB-verified twice via psycopg2), so a fetch-on-
+ * terminal guarantees the marker appears live — robust regardless of whether the
+ * finalize-time `todo_updated` SSE was delivered/applied. This is the project's
+ * own architecture rule (CLAUDE.md D-v2.5-03): Realtime is a best-effort hint,
+ * NOT a source of truth — always reconcile via fetch. The GET is the source of
+ * truth, so we ALWAYS re-fetch on a clean terminal (never gated on whether the
+ * local todos store is non-empty or the SSE landed).
+ *
+ * Mirrors the `onRunCompleted` fire-and-forget workspace-refetch analog
+ * (~950 below): reuse the existing `getThreadTodos` GET + `replaceTodosForThread`
+ * store action (NO new fetch machinery, NO new route/component/package — the
+ * marker rides on `content`, D-01, so TodosSection is untouched). No
+ * AbortController: the write is keyed by the captured owning `threadId`, so a
+ * resolve that lands after a thread-switch updates its OWN thread's slot and
+ * never corrupts the viewed thread (Pitfall 6).
+ *
+ * Clean-completion gate: only "done"/"reader_done" reconcile — this mirrors the
+ * 138-02 two-clause finalizer gate (the marker is written ONLY on a genuinely-
+ * clean completion; on cancelled/error/timed_out nothing changed on the backend,
+ * so there is nothing to surface). Best-effort: the fetch+replace is wrapped so
+ * the helper NEVER throws — a callers' fire-and-forget invocation cannot reject
+ * into the byte-locked onTerminal handler.
+ *
+ * Exported for unit tests (mirrors `_isTransientStreamEnd` / `_reattachAfterTransient`
+ * export-for-tests pattern; driven directly in StreamsProvider.test.tsx).
+ */
+export async function _reconcileTodosOnTerminal(
+  threadId: string,
+  kind: "done" | "error" | "cancelled" | "timed_out" | "reader_done",
+): Promise<void> {
+  // Clean-completion gate FIRST: on a non-clean terminal the backend wrote
+  // nothing, so there is nothing to surface — no fetch, no store write.
+  if (kind !== "done" && kind !== "reader_done") return
+  try {
+    // ALWAYS fetch on a clean terminal — the GET is the source of truth
+    // (D-v2.5-03), never gated on the best-effort todo_updated SSE.
+    const todos = await getThreadTodos(threadId)
+    useStreamsStore.getState().actions.replaceTodosForThread(threadId, todos)
+  } catch (err) {
+    // Best-effort self-heal — a failed/slow refetch is non-fatal (the panel's
+    // own thread-switch/mount reconcile remains the floor). Never throw into
+    // the fire-and-forget terminal caller.
+    console.error("Phase 138-04 todos terminal reconcile failed:", err)
+  }
 }
 
 function makeTempId() {
@@ -680,14 +747,14 @@ export function makeStreamCallbacks(opts: {
       )
     },
     onCodeExecutionStart: undefined,
-    onCodeExecuting: (toolIndex: number, elapsedSeconds: number) => {
+    onCodeExecuting: (toolIndex: number, elapsedSeconds: number, phase?: string) => {
       void toolIndex
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
             tc.name === "execute_code" && tc.status === "running"
-              ? { ...tc, elapsedSeconds }
+              ? { ...tc, elapsedSeconds, ...(phase ? { codePhase: phase } : {}) }
               : tc,
           )
           return { ...m, tool_calls: updated }
@@ -1065,6 +1132,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
   // lockstep) still drives the composer's OWN-thread disable + Stop button.
   const sendingThreadsRef = useRef<Set<string>>(new Set())
+  // Phase 145-05 (D-145-05): per-thread last-stream-event epoch-ms. Stamped on
+  // every streamingThreads add (send / reattach / reconcile-derive) and reset on
+  // each stream event (onCursor); read by the inactivity watchdog (useEffect #3)
+  // to decide when a quiet run warrants a read-only getSnapshot probe. An absent
+  // entry reads as "immediately stale" (probe on the next tick) — safe, because
+  // the probe is read-only and no-ops when the run is still streaming.
+  const lastEventAtRef = useRef<Map<string, number>>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
@@ -1178,6 +1252,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       })
       callbacks.onCursor = (msId: string) => {
         lastSeenOffsetRef.current.set(producerRunId, msId)
+        // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+        lastEventAtRef.current.set(threadId, Date.now())
       }
       const originalOnTerminal = callbacks.onTerminal
       callbacks.onTerminal = (kind, errorPayload) => {
@@ -1355,7 +1431,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   // double-render on reload). The untyped-temp branch below is untouched
                   // (it protects the 075.7 pre-stamp optimistic-placeholder race).
                   return (
-                    subscriptionsRef.current.has(m.runId) ||
+                    // BUG-260626-01: also require the DB to NOT yet hold this runId.
+                    // After a transient-done→reattach re-adds the runId to
+                    // subscriptionsRef, the bare subscription survival kept the
+                    // completed temp even once its persisted twin arrived in the
+                    // snapshot → two same-runId rows → duplicate React key
+                    // (MessageList `run-${runId}`) → duplicated GENERATED FILES
+                    // panels / source-doc bleed. Drop the temp the moment its
+                    // persisted twin exists. Harness is unaffected (its persisted
+                    // answer returns runId=undefined, so dbRunIds never holds it;
+                    // the streaming arm still governs harness temps).
+                    (subscriptionsRef.current.has(m.runId) && !dbRunIds.has(m.runId)) ||
                     (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
                   )
                 }
@@ -1374,6 +1460,41 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
 
             const activeRuns = snapshot.active_runs
+
+            // ── Phase 145-05 (U7 / Pattern 2 / D-145-01, FND-01) ──────────────
+            // Reconcile-DERIVE streamingThreads from the AUTHORITATIVE
+            // snapshot.active_runs. Before this, streamingThreads was written ONLY
+            // by the send path (add :1715, reattach re-add :1852, finally-delete
+            // :2020) and reconcile() never touched it, so a missed-terminal SSE
+            // left a permanent phantom Stop until a full reload (RESEARCH A3).
+            // Deriving here makes the Stop button agree with runs.status in BOTH
+            // directions through the EXISTING selectors with zero call-site
+            // changes: Direction A (delete when no run is streaming) and Direction
+            // B (re-add when a still-active run is reconciled). runs.status is
+            // truth (D-v2.5-03 reconcile-via-fetch); the local flag never decides.
+            // Pitfall 1: the delete is guarded by sendingThreadsRef so an
+            // in-flight send is never clobbered (mirrors clearThreadBucket:1302).
+            // Per-thread only — never touches another thread's membership (D-145-13).
+            const hasStreamingRun = activeRuns.some((r) => r.status === "streaming")
+            const wasStreaming = useStreamsStore.getState().streamingThreads.has(threadId)
+            if (hasStreamingRun && !wasStreaming) {
+              lastEventAtRef.current.set(threadId, Date.now())
+              useStreamsStore.setState((s) => ({
+                streamingThreads: new Set(s.streamingThreads).add(threadId),
+              }))
+            } else if (
+              !hasStreamingRun &&
+              wasStreaming &&
+              !sendingThreadsRef.current.has(threadId)
+            ) {
+              useStreamsStore.setState((s) => {
+                const next = new Set(s.streamingThreads)
+                next.delete(threadId)
+                return { streamingThreads: next }
+              })
+              lastEventAtRef.current.delete(threadId)
+            }
+
             for (const run of activeRuns) {
               // Pitfall 3 cross-thread safety: only attach if this thread is still
               // the viewing thread when reconcile started.
@@ -1507,6 +1628,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 useStreamsStore.setState((s) => ({
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, run.run_id),
                 }))
+                // Phase 138-04 (RUN-01 live-surfacing): on the TRUE terminal
+                // (post transient-reattach return), fire-and-forget a todos
+                // reconcile so the 138-02 "(run ended — not completed)" marker
+                // surfaces LIVE with no thread-switch/refresh. Clean-completion
+                // gate lives in the helper; not awaited (never blocks teardown);
+                // best-effort (.catch belt-and-suspenders — the helper swallows).
+                void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
                 if (errorPayload === "buffer_expired") {
                   useStreamsStore
                     .getState()
@@ -1519,6 +1647,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
               callbacks.onCursor = (msId: string) => {
                 lastSeenOffsetRef.current.set(run.run_id, msId)
+                // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+                lastEventAtRef.current.set(threadId, Date.now())
               }
 
               subscribeToRun(
@@ -1641,6 +1771,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => ({
             streamingThreads: new Set(s.streamingThreads).add(threadId),
           }))
+          // Phase 145-05 (D-145-05): seed the watchdog activity clock at send.
+          lastEventAtRef.current.set(threadId, Date.now())
 
           const controller = new AbortController()
           abortControllerRef.current = controller
@@ -1763,9 +1895,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
+                      // BUG-260707-01: also RESTORE streamingThreads here. The
+                      // sendMessage `finally` (below) unconditionally deletes threadId
+                      // from streamingThreads when the awaited subscribeToRun resolves
+                      // at a transient stream-end. subscribeToRun calls onTerminal
+                      // WITHOUT await (api.ts) and returns immediately, so the finally
+                      // runs BEFORE this reattach body — delete-then-readd nets to
+                      // "present". Without this, isStreaming (= streamingThreads.has(
+                      // tid)) reads false for the REST of the reattached run, so the
+                      // composer flips Stop→Send and the 👍/👎 feedback buttons appear
+                      // mid-run (MessageItem.tsx:451). Mirrors the proven
+                      // subscriptionsByThread delete-then-readd lifecycle above.
                       useStreamsStore.setState((s) => ({
                         subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, rid),
+                        streamingThreads: new Set(s.streamingThreads).add(threadId),
                       }))
+                      // Phase 145-05 (D-145-05/10): a transient reattach counts as
+                      // fresh activity — reset the watchdog clock so the belt does
+                      // not immediately probe a run that just re-attached.
+                      lastEventAtRef.current.set(threadId, Date.now())
                       subscribeToRun(rid, since, callbacks, newController.signal).catch(
                         (err) => {
                           if (!(err instanceof Error && err.name === "AbortError")) {
@@ -1803,6 +1951,51 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
                 }))
               }
+              // Phase 138-04 (RUN-01 live-surfacing): same fire-and-forget todos
+              // reconcile as the reconcile-path onTerminal — surface the 138-02
+              // "(run ended — not completed)" marker LIVE on the true terminal
+              // (post transient-reattach return). Clean-completion gate lives in
+              // the helper; not awaited; best-effort (.catch — helper swallows).
+              void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
+              // BUG-260707-03 (final answer stays folded live): message.content is
+              // the ACCUMULATED narration+answer blob (onDelta only APPENDS — the
+              // :358 invariant), but the backend persists only the clean final
+              // answer (last iteration). While runStatus === "streaming" the
+              // StreamingNarration folds that blob to a gist; the final answer
+              // streams in as the blob's tail and is folded with it, only
+              // "resolving" on a later reload. On a clean Deep terminal, reconcile
+              // JUST this run's assistant content to the persisted answer so the
+              // fold gives way to a clean, separated answer LIVE (no reload). Scoped
+              // to the ONE message's content — preserves tool_calls / suggestions /
+              // output-files / runStatus, far lighter than a full loadMessages
+              // replace. Fire-and-forget; a slow/failed fetch just leaves the
+              // reload-time reconcile as the floor (D-v2.5-03: reconcile via fetch).
+              // Keyed by the OWNING threadId so a resolve landing after a
+              // thread-switch updates its own bucket, never the viewed thread.
+              if (kind === "done" || kind === "reader_done") {
+                const rid = registeredRunId
+                if (rid) {
+                  getMessages(threadId)
+                    .then((persisted) => {
+                      const answer = persisted.find(
+                        (m) => m.runId === rid && m.role === "assistant",
+                      )
+                      if (!answer) return
+                      useStreamsStore
+                        .getState()
+                        .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                          prev.map((m) =>
+                            m.runId === rid &&
+                            m.role === "assistant" &&
+                            m.content !== answer.content
+                              ? { ...m, content: answer.content }
+                              : m,
+                          ),
+                        )
+                    })
+                    .catch(() => {})
+                }
+              }
               // Phase 092 (SC#3 / MODE-02): a TERMINAL kind unlocks the thread
               // (the lock-clear is also authoritative server-side — finish_run
               // clears the anchor; the mount reconcile is the source of truth).
@@ -1823,6 +2016,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
             callbacks.onCursor = (msId: string) => {
               lastSeenOffsetRef.current.set(run_id, msId)
+              // Phase 145-05 (D-145-05): stream event → reset the watchdog clock.
+              lastEventAtRef.current.set(threadId, Date.now())
             }
 
             // Phase 096-05 (D-09): same gate as the slot reservation above —
@@ -1891,6 +2086,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               next.delete(threadId)
               return { streamingThreads: next }
             })
+            // Phase 145-05 (D-145-05): drop the watchdog clock in lockstep with the
+            // streamingThreads delete. On a TRANSIENT stream-end this runs BEFORE
+            // the reattach re-add (subscribeToRun fires onTerminal WITHOUT await),
+            // which re-stamps it — so a still-live reattached run keeps its clock.
+            lastEventAtRef.current.delete(threadId)
             // L-068-07 safety net: only delete if entry still present (catch
             // paths where onTerminal didn't fire).
             // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -2076,7 +2276,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     // stale duplicate of the just-fetched `data` answer → drop it (the
                     // answer is preserved in `data`). Deep is unaffected (its fetched msg
                     // carries runId, so it was already dropped via dbRunIds.has).
-                    (subscriptionsRef.current.has(m.runId) ||
+                    // BUG-260626-01: require !dbRunIds.has on the subscription arm
+                    // too, so a reattached completed temp is dropped the instant its
+                    // persisted twin is fetched (prevents the duplicate-runId →
+                    // duplicate-key duplicated-render). Harness unaffected (returns
+                    // runId=undefined → not in dbRunIds; streaming arm governs it).
+                    ((subscriptionsRef.current.has(m.runId) && !dbRunIds.has(m.runId)) ||
                       (!dbRunIds.has(m.runId) && m.runStatus === "streaming")),
                 )
                 return [...data, ...liveTempPlaceholders]
@@ -2480,6 +2685,100 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // ---- useEffect #3 (Phase 145-05, D-145-03/04/05, FND-01): inactivity watchdog ----
+  // ONE shared setInterval (~5s) sweeps the streamingThreads set. For each thread
+  // whose last stream event is older than the inactivity window N (~20s, reset on
+  // every onCursor + streamingThreads add), fire a READ-ONLY getSnapshot probe —
+  // the _isTransientStreamEnd-style active_runs check (:194-236), NOT the full
+  // reconcile() action (which re-derives buckets + re-attaches; RESEARCH
+  // anti-pattern). On a confirmed-terminal verdict, SILENTLY finalize (D-145-04):
+  // delete the thread from streamingThreads (guarded by sendingThreadsRef —
+  // Pitfall 1) AND flip the live placeholder's runStatus to "completed" via the
+  // done→completed branch of the terminal-flip map (:1562 / :1873). No banner, no
+  // "reconnecting" state. While still streaming it is a no-op (fixes the phantom
+  // Stop with the tab open — U7). The watchdog only RECONCILES, never kills
+  // (D-145-05); the authoritative kill of a dead producer is the backend sweep.
+  // The visibility/focus belt (#2) now heals Direction A on tab-focus for free,
+  // because reconcile() derives streamingThreads.
+  useEffect(() => {
+    const finalizeThreadSilently = (threadId: string, snapshot?: ThreadSnapshot) => {
+      // Pitfall 1: never finalize a thread with an in-flight send.
+      if (sendingThreadsRef.current.has(threadId)) return
+      useStreamsStore.setState((s) => {
+        if (!s.streamingThreads.has(threadId)) return {}
+        const next = new Set(s.streamingThreads)
+        next.delete(threadId)
+        return { streamingThreads: next }
+      })
+      // Silent terminal-flip of the live placeholder(s). No runError / banner /
+      // reconnecting copy (D-145-04). Per-thread only.
+      //
+      // WR-01 (Phase 145 review): derive the HONEST terminal status from the persisted
+      // run_status the SAME getSnapshot already fetched (snapshot.messages, enriched via
+      // _enrich_messages_with_runs) instead of hardcoding "completed". A run that
+      // genuinely failed / was cancelled / timed out while its thread was backgrounded
+      // must not be shown as a successful "completed" turn — that cuts against the
+      // phase's lifecycle-honesty goal. Fall back to "completed" only when the persisted
+      // status is unknown or still reads "streaming" (a snapshot inconsistency — we still
+      // must not leave the placeholder live).
+      useStreamsStore
+        .getState()
+        .actions.setMessagesForBucket("chat", threadId, (prev) =>
+          prev.map((m) => {
+            if (m.role !== "assistant" || m.runStatus !== "streaming") return m
+            const persisted = snapshot?.messages.find((pm) => pm.runId === m.runId)
+            const finalStatus =
+              persisted?.runStatus && persisted.runStatus !== "streaming"
+                ? persisted.runStatus
+                : ("completed" as const)
+            return { ...m, runStatus: finalStatus }
+          }),
+        )
+      lastEventAtRef.current.delete(threadId)
+    }
+
+    const probeThread = async (threadId: string) => {
+      let snapshot: ThreadSnapshot
+      try {
+        // READ-ONLY probe (reconcile-via-fetch, D-v2.5-03) — trust runs.status,
+        // never the local flag.
+        snapshot = await getSnapshot(threadId)
+      } catch {
+        // Fail-safe (mirrors _isTransientStreamEnd / reconciler Pitfall 6): never
+        // finalize on an unverifiable read — the next tick / tab-focus retries.
+        return
+      }
+      const stillStreaming = snapshot.active_runs.some((r) => r.status === "streaming")
+      if (stillStreaming) {
+        // No-op: refresh the clock so a long, legitimately-silent reasoning gap is
+        // not re-probed on every tick (one cheap read, then quiet).
+        lastEventAtRef.current.set(threadId, Date.now())
+        return
+      }
+      // WR-01: pass the just-fetched snapshot so the finalize picks the HONEST persisted
+      // terminal status (failed / cancelled / timed_out) instead of a blanket "completed".
+      finalizeThreadSilently(threadId, snapshot)
+    }
+
+    const tick = () => {
+      const streaming = useStreamsStore.getState().streamingThreads
+      if (streaming.size === 0) return
+      const now = Date.now()
+      for (const threadId of streaming) {
+        // A thread mid-send owns its own streaming-end write (send-path finally).
+        if (sendingThreadsRef.current.has(threadId)) continue
+        const last = lastEventAtRef.current.get(threadId) ?? 0
+        if (now - last <= WATCHDOG_INACTIVITY_MS) continue
+        // Stamp optimistically so a slow probe is not re-fired on the next tick.
+        lastEventAtRef.current.set(threadId, now)
+        void probeThread(threadId)
+      }
+    }
+
+    const intervalId = setInterval(tick, WATCHDOG_TICK_MS)
+    return () => clearInterval(intervalId)
+  }, [])
+
   // ---- useEffect #2b (092-07 Facet C): Continue producer re-subscribe ----
   // The Continue affordance fires requestProducerResubscribe(threadId, producerId)
   // on a Harness /continue 200 (the backend minted a fresh producer runs row).
@@ -2634,7 +2933,13 @@ export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
   )
   return useMemo(() => {
     if (!threadId) return EMPTY_DERIVED
-    const allToolCalls = messages.flatMap((m) => m.tool_calls ?? [])
+    // BUG-260626-01 sibling: in the live/just-completed window the bucket holds
+    // BOTH a `temp-…` placeholder and its persisted twin for the same runId.
+    // Flat-mapping tool_calls across both double-counts the run (dedupToolCalls
+    // can't merge them — the temp copy carries clientKey, the DB-reconstructed
+    // copy doesn't), so the derived todos render each step twice. Collapse the
+    // twin first with the SAME helper MessageList uses (keeps the persisted row).
+    const allToolCalls = dedupMessagesByRunId(messages).flatMap((m) => m.tool_calls ?? [])
     if (!shouldPopulate(allToolCalls)) return EMPTY_DERIVED
     return deriveWorkspacePanel(allToolCalls)
   }, [threadId, messages])
@@ -2760,7 +3065,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
     .map((r): Phase => ({
       slug: r.slug,
       phaseIndex: r.phase_index,
-      phaseType: "unknown",
+      phaseType: r.phase_type ?? "unknown",
       status: DB_PHASE_STATUS[r.status] ?? "done",
       subAgents: [],
       pendingAsk: null,

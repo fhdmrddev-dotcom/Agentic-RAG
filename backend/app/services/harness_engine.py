@@ -224,8 +224,8 @@ async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
         # insert_assistant_message (db/runs.py). $N placeholders only (T-096-03-03).
         await pool.execute(
             """
-            INSERT INTO messages (thread_id, user_id, role, content, tool_calls)
-            VALUES ($1, $2, 'system', '', $3)
+            INSERT INTO messages (thread_id, user_id, role, content, tool_calls, origin)
+            VALUES ($1, $2, 'system', '', $3, $4)
             """,
             _tid,
             r["user_id"],
@@ -235,6 +235,9 @@ async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
                 "expired": True,
                 "response_text": None,
             }],
+            # CTX-01 (T-120-04 / T-120-06): harness ask_user expiry row — origin is a
+            # positional $4 bind (NEVER f-stringed: no injection surface).
+            "harness",
         )
         logger.info(
             "expired pending ask_user prompt tcid=%s for terminal run %s",
@@ -445,6 +448,7 @@ async def _surface_final_answer(ctx, run_id: UUID, stream_run_id, redis, pool) -
             confidence_level=_conf.get("level"),
             confidence_avg_similarity=_conf.get("avg_similarity"),
             confidence_disclaimer=_conf.get("disclaimer"),
+            origin="harness",  # CTX-01 (T-120-04): this is a workflow row — never replay it in Deep.
         )
         return str(_inserted_id) if _inserted_id else None
     except Exception as e:
@@ -515,6 +519,7 @@ async def _surface_failure_message(ctx, run_id: UUID, reason, pool) -> str | Non
             thread_id=UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
             user_id=UUID(_user_id) if isinstance(_user_id, str) else _user_id,
             content=content,
+            origin="harness",  # CTX-01 (T-120-04): workflow failure row — never replay it in Deep.
         )
         return str(_inserted_id) if _inserted_id else None
     except Exception as e:
@@ -892,6 +897,8 @@ async def _resolve_failure_with_ask_user(
                         "user_id": current_user.get("id"),
                         "role": "system",
                         "content": prompt,
+                        # CTX-01 (T-120-04): harness disposition ask_user prompt — workflow row.
+                        "origin": "harness",
                         "tool_calls": [
                             {
                                 "kind": "ask_user_prompt",

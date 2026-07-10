@@ -600,6 +600,12 @@ async def run_task_sub_agent(
         # the parent's pinned-outputs panel would briefly show files that
         # belong to the sub-agent and vice versa.
         previous_files_in_run={},
+        # Phase 142 (SRH-01 / D-06 / Pitfall 6 / T-142-05) — a FRESH set(), NOT the
+        # parent's run-scoped set. A sub-agent's failed soffice/markitdown call must
+        # not short-circuit a legitimately-different parent context (or a sibling
+        # sub-agent). This is the ONE run-scoped repeat-guard field that is fresh-
+        # per-sub-agent (mirror previous_files_in_run={} above) rather than propagated.
+        dead_gap_tokens_in_run=set(),
         # D-085-12 — non-null parent_run_id makes _handle_task short-circuit
         # inside the sub-agent's own dispatch chain. 1-level nesting cap.
         parent_run_id=parent_ctx.run_id,
@@ -634,6 +640,14 @@ async def run_task_sub_agent(
         # caller — the dataclass default) keeps the gate a literal no-op =>
         # byte-identical Deep dispatch.
         skill_snapshot=parent_ctx.skill_snapshot,
+        # Phase 135 (135-02 / SI-01) — propagate the DRAFT instructions override onto
+        # the SUB-agent ctx (the SAME structural-unreachability class as the 096-02
+        # phase_whitelist + 099 skill_snapshot fixes above): a re-eval whose WITH arm
+        # dispatches the `task` tool must keep measuring the DRAFT inside the sub-agent,
+        # not silently revert to the LIVE skill (Pitfall #1). None (every Deep-Mode /
+        # tasks caller — the dataclass default) keeps it a literal no-op => byte-identical
+        # Deep dispatch.
+        skill_instructions_override=parent_ctx.skill_instructions_override,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).

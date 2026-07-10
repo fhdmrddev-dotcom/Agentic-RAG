@@ -1,43 +1,48 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Document Management — ✅ SHIPPED 2026-06-21
+milestone: v3.2
+milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
 status: Awaiting next milestone
-last_updated: "2026-06-21T16:56:42.626Z"
-last_activity: 2026-06-21 — Milestone v3.0 completed and archived
+last_updated: "2026-07-10T13:50:59.438Z"
+last_activity: 2026-07-10 — Milestone v3.2 completed and archived
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 46
-  completed_plans: 46
-  percent: 100
+  total_phases: 30
+  completed_phases: 24
+  total_plans: 120
+  completed_plans: 121
+  percent: 80
 ---
 
 # Project State
 
-> **Scope note:** **v3.0 Document Management SHIPPED + archived 2026-06-21 (last phase 119); no milestone is active — next is v3.1 Workflow + Skill Eval Studio (`/gsd:new-milestone`).** Scope was SEED-005 Tier A (metadata enrichment → metadata-driven views/"virtual folders" → document relationships → auto-classification → governance health) delivered as a first-class product surface; full close-out in `.planning/milestones/` + `MILESTONES.md` + `RETROSPECTIVE.md`. It was chosen over resuming Skill Studio (the original v3.0 PRD), which the v2.7–2.9 pivot largely superseded; Skill Studio deferred → v3.1, re-scoped as a Workflow+Skill Eval Studio. The v3.x PRD roadmap was re-sequenced 2026-06-15 — authoritative map: `.planning/PRDs/SEQUENCE.md`. The prior milestone (v2.9 Workflow Studio) shipped + archived 2026-06-15; its detail is in `.planning/milestones/` + `MILESTONES.md`. v2.9 STRETCH 105–109 remain backlog carry-forwards. **Everything below the Current Position block is v2.9-and-earlier accumulated context, retained per the milestone-transition convention.**
+> **Scope note:** **v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived 2026-07-10** (started 2026-06-28; close-out in `.planning/milestones/v3.2-ROADMAP.md` + `MILESTONES.md`; FILE-01/Phase 144 deferred → v3.3). Roadmap created: CORE Phases 132-137 + STRETCH Phases 138-143 (gated behind CORE — v2.9 105-109 / v3.1 125-131 precedent). Numbering continues from v3.1's last phase (131). Scope source: `.planning/REQUIREMENTS.md` (8 CORE + 6 STRETCH); brief `.planning/PRDs/v3.1-skill-studio-eval.md`. **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers SHIPPED + archived 2026-06-28** (CORE 120-124+123.1; STRETCH 127/128/129 shipped, 125/126/130/131 deferred as carry-forwards now folded into v3.2 STRETCH; close-out in `.planning/milestones/v3.1-ROADMAP.md` + `MILESTONES.md`). The v3.x PRD roadmap (authoritative map: `.planning/PRDs/SEQUENCE.md`) is unchanged. **Everything below the "Roadmap shape (v3.2...)" block is v3.1-and-earlier accumulated context, retained per the milestone-transition convention.**
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-21 — v3.0 Document Management milestone COMPLETE + archived)
+See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Planning next milestone — v3.1 Workflow + Skill Eval Studio (run `/gsd:new-milestone`)
+**Current focus:** v3.2 SHIPPED 2026-07-10 (16 phases / 81 plans; FILE-01 → v3.3). Planning next milestone → `/gsd:new-milestone` (v3.3 Operator UX; workflow-file cluster SEED-110/112 + FILE-01).
 
 ## Current Position
 
-Phase: Milestone v3.0 complete
+Phase: Milestone v3.2 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-06-21 — Milestone v3.0 completed and archived
+Last activity: 2026-07-10 — Milestone v3.2 completed and archived
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260611-irx | Per-process log filename — fix Windows multi-worker RotatingFileHandler rollover crash (WinError 32) | 2026-06-11 | `b5e916e2` | [260611-irx-worker-log-rotation-pid](./quick/260611-irx-worker-log-rotation-pid/) |
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260611-irx | Per-process log filename — fix Windows multi-worker RotatingFileHandler rollover crash (WinError 32) | 2026-06-11 | `b5e916e2` | | [260611-irx-worker-log-rotation-pid](./quick/260611-irx-worker-log-rotation-pid/) |
+| 260630-226 | Chat tool-card live-state de-duplication — active tools rest as the unified essence line (Variant B merged pill, body click-to-expand) + remove 3 loose duplicate lines below the run card (SEED-098) | 2026-06-30 | `e3ff8623` | | [260630-226-chat-tool-card-live-state-de-duplication](./quick/260630-226-chat-tool-card-live-state-de-duplication/) |
+| 260705-hz1 | Fix SEED-102 — reverse the load_skill name-collision tie-break so an is_system built-in wins over a same-named owned row (`_handle_load_skill`, tool_dispatcher.py) + regression test | 2026-07-05 | `244668f0` | Verified — 19/19 green (independently re-confirmed after a mid-session tool outage cleared); plan-checked 0 blockers (2 passes); scope-contained (`git show --stat` = exactly 2 files) | [260705-hz1-fix-seed-102-reverse-the-name-collision-](./quick/260705-hz1-fix-seed-102-reverse-the-name-collision-/) |
+| 260705-nfu | Fix silent data-loss bug in skill ZIP import — one colliding flattened filename (e.g. duplicate `__init__.py` from different folders) used to throw an unhandled exception that killed the rest of the upload loop, silently dropping every later file (confirmed live: the real imported docx skill was missing 6 files, incl. its whole templates/ folder). `_upload_skill_files` is now per-file resilient (try/except, logs, returns errors) + `import_skill` de-dups colliding flattened names (`_dedup_flattened_name`) before upload; sync-path failures surface via the existing `errors` response channel, background-path failures are logged. Folder-tree fidelity itself stays unchanged/deferred. | 2026-07-05 | `0402fa6b` | Verified — 18/18 new+existing tests green + 37/37 across the full skills suite (independently re-run after Docker/backend came back up); plan-checked 0 blockers (2 passes, 1 trivial self-corrected); scope-contained to `skills.py` + its test file | [260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-](./quick/260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-/) |
 
 ### Recent Completed Phases
+
+**Phase 123 — Skill Triggering Quality (TRIG-01 / TRIG-03 / CTX-03) — COMPLETE (2026-06-26).** All 3 gates clear: secure-phase 29/29 threats CLOSED (threats_open 0, `fc17016b`) · validate-phase NYQUIST-COMPLIANT 12/12 Per-Task COVERED (148 backend + 40 frontend = 188 tests green, `06ae19dc`) · verify 12/12 must-haves + **SC#10 4-axis live UAT 4/4 PASS** (2026-06-26): Axis 1 cross-provider D-01 fidelity · Axis 2 multi-tool pin durability (surfaced+fixed render bugs BUG-260626-01/-04 — shared `dedupMessagesByRunId` helper, `2a48fea4`/`6ec8be77`, verified live) · Axis 3 parallel-thread isolation (3-run Redis snapshot, no pin leak) · Axis 4 long-message pin + honest `_TRIM_MARKER` eviction (forced real 8000-tok overflow). `123-VERIFICATION.md` flipped `human_needed` → `passed`; `123-HUMAN-UAT.md` status passed (4/4). **Deferred (NOT 123 blockers):** BUG-260626-02 (Phase-120 baseline leak into live final-emit) + BUG-260626-03 (run-end todo finalizer) → **SEED-094** (backend run-end honesty). Follow-up candidate: LangSmith not emitting since 2026-06-20 (raw-SDK `wrap_openai` path). **Next: Phase 124 (Workflow Studio UX) — G-2 sketch-gated; run `/gsd:sketch 124`.**
 
 **Phase 098 — Project Binding & Server-Side KB Scope Governance — COMPLETE (2026-06-10).** 5/5 plans. VERIFICATION verified (4/4 observable truths + 14 artifacts). HUMAN-UAT complete 6/6 (SC#10 cross-provider × multi-tool × parallel-thread × long-message + `scope_violation` observability + D-13 whitelist refusal). SECURE-PHASE `threats_open: 0` — 13 planned threats closed; WR-03 (fail-open scope → observable emit + kickoff fail-closed) + IN-01 (cycle guard) fixed in code, IN-02/IN-03 accepted (`098-SECURITY.md`). **Still OPEN (run-honesty UI polish, NOT security/scope):** BUG-260609-02 (SUB-RESULTS "Sub-task" loses desc on nav), BUG-260609-04 (phase card placeholder slug "phase-0"), 1-2s empty-bubble. **Next: `/gsd:plan-phase 099` (Workflow ↔ Skill Composition).**
 
@@ -84,19 +89,89 @@ _Historical — Phase 097 spike per-plan execution detail:_
 
 ## Deferred Items
 
-Items acknowledged and deferred at the **v3.0 milestone close on 2026-06-21** (37 total from the pre-close `audit-open` sweep). Triaged: none are v3.0 CORE blockers — they are status-label lag on phases that were live-UAT'd after their files were stamped, historical tracking cruft, a satisfied todo, and deferred-by-design seeds.
+Items acknowledged and deferred at the **v3.2 milestone close on 2026-07-10** (47 total from the pre-close `audit-open` sweep). Triaged: none are v3.2 CORE blockers — the CORE Skill Eval Studio (132-137 + inserts 137.1/137.2) shipped complete; the open items are intentional forward seeds, stale pre-GSD tracker cruft, and live-UAT / verification status-lag on delivered STRETCH phases.
 
 | Category | Count | Disposition |
 |----------|-------|-------------|
-| UAT gaps | 4 | 111 + 114 passed (0 open); 116 partial (3 SC#10 cross-provider rows — known non-blocking carry-forward); 119 partial (0 open scenarios). No real pending work. |
-| Verification gaps | 3 | 111.1 / 116 / 119 `human_needed` — bookkeeping status never flipped to `passed` after the live UAT was actually run (e.g. the 119 commits record "UAT 1-3 PASS live"). All three are secured + validated. |
-| Quick tasks | 19 | Orphaned tracker slugs (`[missing]`) from Mar–Jun 2026 — already-fixed bugs from v2.5–v2.9. Tracking cruft, not v3.0 work. |
-| Pending todos | 1 | `spike-nl-workflow-authoring` — satisfied (NL authoring shipped in Phase 103, v2.9). |
-| Unimplemented seeds | 10 | Deferred-by-design with re-open triggers: SEED-003/004/040/041/042/043/044/045/046/084. Future-milestone candidates. |
+| Unimplemented seeds | 9 | Deferred-by-design with re-open triggers (incl. SEED-108 RAG↔file bridge, SEED-109 eval/tuner run-lifecycle migration, SEED-110 workflow run-time template upload, SEED-112 per-workflow KB folder-scope). Future-milestone candidates — the SEED-110/112 workflow-file cluster surfaces at the v3.3 sweep. |
+| UAT gaps | 10 | Live-UAT status-lag on delivered phases: 140 (embed 429), 141 (cross-provider render smoke), 142 (held-partial), 143 (non-operator A1 + empty-folder — core proven live 2026-07-10). Code shipped; verification debt only. |
+| Verification gaps | 5 | `human_needed` bookkeeping never flipped to `passed` after the live UAT actually ran. No real pending work. |
+| Quick tasks | 22 | Orphaned `[missing]` tracker slugs (Mar–Jun 2026) — already-fixed bugs from v2.5–v3.1. Tracking cruft, not v3.2 work. |
+| Pending todos | 1 | Legacy spike todo — satisfied by shipped work. |
 
-**v2.9 STRETCH phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01)** remain backlog carry-forwards (next-milestone candidates).
+**FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — the one undelivered requirement; **deferred → v3.3** (gated STRETCH, not executed). Rolls forward with the workflow-file cluster (SEED-110 template upload, SEED-112 folder-scope).
 
-**Open `surface: Agentic-RAG` reports (roll forward, not folded into any v3.0 phase):** the carried v2.9 run-honesty / provider-polish reports (BUG-260609-02/-04, BUG-260610-01, BUG-260615-01, `general-chat-intermittent-silent-send-drop`, `minimax-m3-invalid-tool-args-400`, `setting-up-agent-hides-model-activity`) — carried into the next milestone's UAT blast radius (noted in RETROSPECTIVE).
+**Open `surface: Agentic-RAG` reports (roll forward into the v3.3 UAT blast radius):** BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03, BUG-260708-01/-02, BUG-260710-01/-02 (nav/display + provider-polish), plus the deferred agent-loop / todo-loop notes. Cross-check at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.2, created 2026-06-28)
+
+**CORE (committed) — Phases 132-137:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 132 | Skill Versioning + Eval Test-Case Persistence | VER-01, EVAL-01 | 4 | Schema/RLS foundation (~5 new tables); owner-scoped (skills precedent); no agent-loop/provider touch |
+| 133 | Eval Runner — With-Skill vs Without-Skill | EVAL-02 | 4 | SC#10; G-5 (net-new eval router — do NOT grow `threads.py`; consume `agent_loop.py`/gateway read-only); no new runtime |
+| 134 | Eval Results, Honest Verdict + Ratings | EVAL-03, EVAL-04 | 4 | SC#10 (per-provider verdict honesty, MP-03 precedent); UI hint (polished panel = 137) |
+| 135 | Self-Improvement Loop (SI-01) | SI-01 | 4 | SC#10; UI hint (diff review); human-in-the-loop; G-5 (consume agent_loop/gateway read-only) |
+| 136 | Skill Publish Gate (GATE-01) | GATE-01 | 3 | UI hint (publish-flow gate); future-publish-only |
+| 137 | Skill Evals Panel UI (PANEL-01) | PANEL-01 | 4 | **G-2 sketch**; UI hint; SC#10 (UI state); additive (no Skills-tab redesign) |
+
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 precedent) — Phases 138-144:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 138 | Run-End Honesty | RUN-01 | 3 | — (backend-only, small, can go early); G-5 (`agent_loop.py` finalizer); SEED-094 |
+| 139 | Self-Improve Proposer (description-only) | SI-02 | 3 | 135 |
+| 140 | Smart-Dispatch Relevance Pre-Filter | TRIG-02 | 3 | 123 (shipped); G-5 (catalog injection); SC#10 |
+| 141 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 (shipped) |
+| 142 | Non-Python Skill-Script Honesty | SRH-01 | 3 | 120 (off COLL-01 seam, shipped); DISC-01 Layer 1 |
+| 143 | Starter Workflow Library | WF-01 | 3 | — (Workflows page exists); SEED-084; UI hint |
+| 144 (added 2026-07-05) | Agent-Driven Skill File Attachment | FILE-01 | 4 | — (no hard dependency; `skill_files` table/bucket already exist); new WRITE-capable tool — needs its own threat model + SC#10 proof; SEED-104 (promoted from Phase 137.2's live SC#4 UAT) |
+
+- **Coverage:** 15/15 requirements mapped (8 CORE + 7 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Sequencing rationale:** VER-01 paired WITH EVAL-01 in the foundation (132) — test cases reference an immutable skill version. Strict eval chain 132 → 133 → 134 (persistence → runner → results). SI-01 (135) needs the full eval substrate (EVAL-02 + EVAL-03 + VER-01 + EVAL-04 ratings). GATE-01 (136) consumes the pass/fail verdict. PANEL-01 (137) lands LAST as the sketch-gated consolidation of the whole eval experience (depends EVAL-01..04 + VER-01). RUN-01 (138) is backend-only/small — the safest STRETCH to pull forward; it closes SEED-094.
+- **SC#10 (cross-provider mandate):** flagged on every phase touching streaming / agent loop / provider routing / UI state — headline three EVAL-02 (133), SI-01 (135), TRIG-02 (140), plus per-provider-display / UI-state phases 134, 137, 139.
+- **UI hint:** 134, 135, 136, 137 (CORE) + 139, 143 (STRETCH).
+- **G-2 sketch-gated:** 137 (PANEL-01). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **G-5 hot files (audit at discuss-phase):** `backend/app/api/threads.py` (firing → extraction STILL due — do NOT grow it; eval runner 133 + SI-01 135 = net-new routers, `skill_tuner.py` precedent), `backend/app/services/agent_loop.py` (RUN-01 138 finalizer/terminal; TRIG-02 140 catalog-injection; 133/135 consume read-only), catalog injection + `context_window.py` token budget (140).
+- **Red line:** never fork the shared path — provider differences at the gateway/adapter/sanitizer boundary (D-14). Deep Mode byte-identical; no new eval runtime (evals reuse the agent loop + provider gateway).
+- **Reported-bugs:** RUN-01 (138) closes SEED-094 (BUG-260626-02 baseline leak into final-emit + BUG-260626-03 run-end todo finalizer).
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.2 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Scope source: `.planning/PRDs/v3.1-skill-studio-eval.md`.
+
+## Roadmap shape (v3.1, created 2026-06-21)
+
+**CORE (committed) — Phases 120-124:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 120 | Collision Fix + Context Isolation | COLL-01, CTX-01 | 4 | G-5 (`threads.py`/`agent_loop.py`); SC#10 |
+| 121 | One Front Door for Workflows (IA) | IA-01 | 3 | G-2 sketch; UI hint; SC#10 |
+| 122 | Cross-Provider Trust & Honesty Parity | MP-01, MP-02, MP-03, TDP-01 | 5 | G-5 (gateway/adapter); SC#10 (eval axis, MP-03) |
+| 123 | Skill Triggering Quality | TRIG-01, TRIG-03, CTX-03 | 5 | G-5 (`context_window.py`/`agent_loop.py` trim); SC#10 |
+| 124 | Workflow Studio UX — Soul + Strict↔Loose | WUX-01, WUX-02 | 4 | G-2 sketch (both); UI hint; G-5 (`PhaseTimeline.tsx`/`PhaseCard.tsx`) |
+
+**STRETCH (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 precedent) — Phases 125-131:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 125 | Self-Improve Proposer (description-only) | SI-02 | 3 | 122 + 123 |
+| 126 | Smart-Dispatch Relevance Pre-Filter | TRIG-02 | 3 | 123 |
+| 127 | Gauntlet Pip-Strip + Quiet Idle Cards | WUX-03 | 2 | 124 (G-2 sketch; UI hint) |
+| 128 | Live Description Before tool_start | TDP-02 | 2 | 122 |
+| 129 | MiniMax/OpenRouter Arg Repair | MP-04 | 2 | 122 |
+| 130 | template_input Resolver Run-Scope | COLL-02 | 2 | 120 |
+| 131 | Non-Python Skill-Script Honesty | SRH-01 | 3 | 120 (off COLL-01 seam) |
+
+- **Coverage:** 19/19 requirements mapped (12 CORE + 7 STRETCH); 0 unmapped. Every requirement → exactly one phase. *(Phase 131 / SRH-01 folded in 2026-06-22 — SEED-044 Layer 1, the honesty precursor to v3.2 DISC-01; surfaced by a JS-skill-import investigation.)*
+- **Sequencing rationale:** COLL-01 (confirmed LIVE bug, Mechanism A) sequenced EARLIEST (Phase 120), paired with CTX-01 (same collision/context-isolation fix). MP-03 (per-provider scoreboard) lands in the SAME phase as MP-01/MP-02 (122) so the scoreboard substrate gates any MP-02 tier flip. TRIG-01 (headline skill-quality deliverable) gets its own phase (123) with TRIG-03 + CTX-03 as adjacent skill-triggering items. WUX-01/WUX-02 (G-2 sketch-gated UX re-skin) cluster in 124; IA-01 (also G-2/frontend) lands first in 121 as the "one front door" prerequisite the WUX re-skin builds on.
+- **SC#10 (cross-provider mandate, EVAL axis per MP-03):** flagged on every phase touching streaming / agent loop / provider routing / UI state — 120, 121, 122, 123, 124 (+ dependent STRETCH 125, 126, 128, 129).
+- **UI hint:** 121, 124 (CORE) + 125, 127 (STRETCH).
+- **G-2 sketch-gated:** 121 (IA-01), 124 (WUX-01/02) + 127 (WUX-03). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **G-5 hot files (audit at discuss-phase):** `backend/app/api/threads.py` (firing → extraction due; 120/121 thread/composer surface — do NOT grow it), `context_window.py`/`agent_loop.py` trim path (CTX-01 `_reconstruct_history` origin filter, CTX-03 trim-pin), `PhaseTimeline.tsx`/`PhaseCard.tsx` (shared with the live harness — re-run replay tests in 124/127), the gateway/adapter boundary (122/128/129).
+- **Red line:** never fork the shared path — provider differences stay at the gateway/adapter/sanitizer boundary (D-14). Deep Mode stays byte-identical; no new runtime.
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.1 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Scope source: `.planning/research/v3.1-skills-eval/CONSOLIDATED-SCOPE.md`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
@@ -167,6 +242,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ### Roadmap Evolution
 
+- **Phase 144 added (2026-07-05):** Agent-Driven Skill File Attachment (FILE-01) — new `attach_skill_file` tool + endpoint so the agent can attach files/scripts/assets it creates during skill authoring, and a user can hand the agent an existing template file mid-conversation for the agent to attach; reuses the existing `skill_files` table/bucket, no new storage surface. Promoted from SEED-104 (planted during Phase 137.2's live SC#4 UAT, deliberately deferred there to avoid a 3rd decimal insert onto the 137.x chain mid-verification). Appended to the end of v3.2 STRETCH (after Phase 143); needs its own threat model at discuss-phase (net-new WRITE-capable tool) + SC#10 cross-provider proof.
 - **Phase 111.1 INSERTED after Phase 111 (2026-06-15):** "Configurable / Multi-Provider Embeddings (incl. local Ollama + LM Studio)" — embedding-provider picker + local presets + re-embed-on-change lifecycle; new reqs **EMBED-01..06**; depends on Phase 111 (reuses its `lmstudio` provider plumbing); G-2 sketch fires (Settings UI). Lands before the DM read-path phases (113-119). Sourced from a 5-agent investigation (the `embedding-flexibility-scoping` workflow). **Decision:** keep embedding flexibility OUT of Phase 111 (different domain = retrieval substrate, not the metadata LLM; plus the fixed-`vector(1536)`/HNSW dimension + destructive-re-embed landmine) → its own phase. **Retires SEED-048.** **SEED-048 correction:** embeddings are NOT OpenAI-hardwired today — `embedding_model`/`embedding_base_url`/`embedding_api_key`/`embedding_dimensions` are already configurable Settings with UI controls (`SettingsPage.tsx:934-950`); what's missing = a provider picker, local presets, the re-embed lifecycle, and a fix for the `embed_chunks` `user_settings`-drop bug (folded in as EMBED-04). The 111.1 plan must VERIFY these findings against live code.
 
 **Open blockers:** None. (Resolved 2026-06-08: Phase 097 Plan 01 Task 3 human-action checkpoint — operator confirmed folder `75755ec9-5ba7-495b-ad93-7500011cf6f2` "Project Meridian — Risks" and ingested a synthetic risk corpus to ground it; `out/spike-config.json` written + committed `61025148`.)
@@ -177,6 +253,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Planned Phase:** 112 (metadata-enrichment-document-detail-panel-manual-edit) — 4 plans — 2026-06-17T20:46:10.826Z
 
+- Phase 123.1 inserted after Phase 123: Trigger Tuner design fidelity + UX polish (post-live-UAT gaps) (URGENT)
+
 ## Performance Metrics
 
 | Phase | Plan | Duration | Notes |
@@ -186,6 +264,39 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 118 P05 | 10min | 2 tasks | 5 files |
 | Phase 119 P01 | 11min | 2 tasks | 8 files |
 | Phase 119 P02 | 7min | 3 tasks | 7 files |
+| Phase 120 P01 | ~4min | 2 tasks (TDD) | 3 files |
+| Phase 120 P02 | ~25min | 2 tasks (1 TDD) | 8 files |
+| Phase 120 P03 | ~10min | 3 tasks | 2 files |
+| Phase 121 P01 | 6min | 2 tasks | 2 files |
+| Phase 121 P02 | ~12min | 2 tasks | 3 files |
+| Phase 122 P01 | 29min | 2 tasks | 4 files |
+| Phase 122 P04 | 5min | 2 tasks | 4 files |
+| Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
+| Phase 122 P03 | ~6min | 2 tasks | 3 files |
+| Phase 123 P01 | 9min | 2 tasks | 8 files |
+| Phase 123 P02 | 7min | 2 tasks | 3 files |
+| Phase 123 P03 | 12min | 2 tasks | 6 files |
+| Phase 123 P04 | 8min | 2 tasks | 3 files |
+| Phase 123 P05 | ~10min | 3 tasks (2 TDD) | 11 files |
+| Phase 123 P06 | ~30min | 2 tasks | 8 files |
+| Phase 123.1 P01 | ~20min | 3 tasks | 6 files |
+| Phase 123.1 P02 | 5min | 2 tasks | 4 files |
+| Phase 123.1 P03 | ~12min | 1 task (TDD) | 2 files |
+| Phase 123.1 P04 | 18min | 2 tasks | 4 files |
+| Phase 123.1 P05 | 11min | 4 tasks | 7 files |
+| Phase 123.1 P10 P10 | ~1min | 1 tasks | 2 files |
+| Phase 123.1 P06 | 7min | 2 tasks | 3 files |
+| Phase 123.1 P07 | ~12min | 2 tasks | 4 files |
+| Phase 123.1 P08 | ~10min | 2 tasks | 6 files |
+| Phase 123.1 P09 | ~6min | 1 tasks | 2 files |
+| Phase 132 P03 | ~30min | 3 tasks (1 human-verify gate) | 4 files |
+| Phase 138 P138-04 | 5min | 2 tasks | 2 files |
+| Phase 142 P04 | ~5min | 2 tasks | 2 files |
+| Phase 142 P02 | 8min | 3 tasks | 4 files |
+| Phase 142 P03 | 5min | 3 tasks | 3 files |
+| Phase 143 P02 | 9min | 2 tasks | 2 files |
+| Phase 143 P03 | 6min | 3 tasks | 4 files |
+| Phase 143 P04 | 6min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -198,6 +309,61 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 119]: Phase 119-01: masking != deletion (D-119-3) — an alive-but-unreadable target is masked, NOT broken; the existence probe is content-free (count only), no cross-user leak; DMF-03 non-gate confirmed (A8).
 - [Phase 119]: Phase 119-02: D-119-2 navigation triad owned in ONE plan (App.tsx ActiveView union + nav-items ShieldCheck entry + ChatLayout governance branch) — clicking Governance renders GovernancePage, not KnowledgeHealthPage; the Phase 118 built-but-unreachable lesson applied.
 - [Phase 119]: Phase 119-02: GovernanceRow is link-out-only (D-119-6) — clones only HealthDocumentRow chrome, imports no document-mutation helper; the whole row is a keyboard-operable button → DocumentDetailPanel. A5 lighter reuse: top-10 rows + honest backend total (no PaginationControls); D-119-9 initializedTabsRef no-refetch-loop guard carried verbatim into the 3-stacked-card page (Refresh clears it). Frontend-only, no migration/package/write path; threads.py untouched.
+- [Phase 120]: Phase 120-01 (COLL-01): Option 2 lazy seed in the execute_code handler (tool_dispatcher.py) chosen over Option 1 (eager seed in agent_loop.py) — keeps the G-5 hot file agent_loop.py untouched (it does not import sandbox_manager), the session already exists at :868, and the SAME handler serves Deep + Harness so one seed site covers both. Guard via ctx._output_baseline_seeded (per-RUN not per-cell); run_in_threadpool-wrapped (D-v2.5-01).
+- [Phase 120]: Phase 120-01 (COLL-01): snapshot_output_baseline SEEDS the existing SHA-256 hash-dedup baseline (no new filename heuristic — explicitly disproven by COLL-03-EVIDENCE §Refinement 1: the live 2 files shared ONE execution_id). D-120-02 honored — the helper never clears/deletes /sandbox/output/, is fully try/except-wrapped (empty/failure → {} = legacy behavior), and only stops RE-EMITTING pre-existing files. No schema/package change (stdlib hashlib/os/tempfile).
+- [Phase 120]: Phase 120-02 (CTX-01): migration 076 AUTHORED only (NOT applied — Plan 03 applies + regenerates full-schema.sql); `messages.origin text NOT NULL DEFAULT 'deep'` + CHECK, no new RLS policy (inherits thread-owner policy, precedent 050). The DEFAULT 'deep' is load-bearing — fills legacy rows so the Deep neq() filter avoids the NULL three-valued-logic drop (Pitfall 1).
+- [Phase 120]: Phase 120-02 (CTX-01): asymmetric origin filter extracted to module-level pure helper `_apply_origin_filter(history_q, agent_mode)` — Deep/Explorer neq('origin','harness') (replays deep + legacy), Harness eq('origin','harness') (strict, A1 defense-in-depth per D-120-06). A SINGLE shared WHERE clause (no per-provider fork); origin kept OUT of .select() projection (Pitfall 4) so _reconstruct_history is unchanged and pure-Deep threads return today's exact set (SC#4 byte-identical). Owner/thread .eq scope never relaxed (V4).
+- [Phase 120]: Phase 120-02 (CTX-01): every enumerated HARNESS insert site tags origin='harness' (db/runs.py shared helper kwarg, harness_engine success/failure persists + raw expiry INSERT positional $4 (never f-stringed, T-120-06) + disposition prompt, phase_types llm_human_input prompt); api/runs.py ask_user_response is mode-aware (default 'deep', 'harness' ONLY on the confirmed workflow_runs-fallback branch, A2 safe-direction). api/threads.py:1020 user row UNTOUCHED (G-5); full-schema.sql NOT touched.
+- [Phase 120]: Phase 120-03 (CTX-01): migration 076 APPLIED to the live DB (:54322) via psycopg2-direct (NOT db push/reset) — messages.origin NOT NULL DEFAULT 'deep'::text + messages_origin_check CHECK (origin IN ('deep','harness')) confirmed live; 658 legacy rows backfilled to 'deep', zero NULL (the load-bearing NULL-trap guard closed). full-schema.sql regenerated via scripts/regenerate-full-schema.sh (no --reset) — contains origin column at lines 615-616. Full Phase 120 test set green 21/21 (3 integration + 4 collision-regression + 14 origin-filter); the two prior PGRST204 test_093 failures (test_deep_runs_id_path_still_200, test_ask_user_answer_resolves_via_workflow_run_fallback) RESOLVED by the apply. The 3 test_sandbox_service TestHarvestOutputFiles failures are PRE-EXISTING (Phase 075.4 hash-keyed signature pivot, deferred-items.md), 0 net-new.
+- [Phase 120]: Phase 120-03 (CTX-01) Rule 1 fix: the live-DB origin CHECK probe (test_120_migration.py) omitted the NOT NULL user_id column, so the INSERT failed on user_id BEFORE the origin CHECK was reached — a VACUOUS probe. Reuse the throwaway auth.users id for FK + NOT NULL so the CHECK genuinely accepts deep/harness and rejects 'other'. Lesson: live-DB constraint probes must satisfy every NOT NULL sibling column or the target CHECK is never evaluated (commit 035295a1).
+- [Phase 121]: Phase 121-01 (IA-01): removed the Deep/Harness composer toggle + in-chat workflow picker → 2-pill composer (Model + General/Explorer); composer-stop is the post-removal Cancel (D-01, no new chrome); kickoffWorkflowId staging deleted as dead code but postMessage/doRun launch route untouched (SC#2/D-02); workflowLocked gating + mount reconcile + 409 banner preserved byte-identical (SC#3); tsc clean, no backend/migration (D-06/G-5).
+- [Phase 121]: Phase 121-02 (IA-01): SC oracles bound as isolated test-only assertions — SC#1 2-pill (workflow-mode-selector + workflow-picker null, agent-mode + Model present), Cancel-reachability D-01 (composer-stop click → onStop), SC#3 (workflowLocked disable + 'Workflow running — Cancel to switch back' placeholder; getThreadWorkflow locked:true mount-reconcile disables; 409 test b byte-unchanged), SC#2 (ChatLayout doRun → createThread + postMessage{workflowDefinitionId} + onNavigate('chat')); RunCard tests untouched + GREEN
+- [Phase ?]: Phase 121-02 (IA-01): reset workflowLockByThread in ChatAreaBanner beforeEach (Rule 1 test-isolation — the lock map is not mock-cleared so a locked reconcile bled into the next test); reconcile-lock mocks use mockResolvedValue not …Once because the mount reconcile effect can re-fire
+- [Phase 122]: 122-01 (MP-02): emit_tier Literal[force_strict|force|coerce] is the single source of truth on every MODEL_CAPABILITIES row (D-122-04); 55 rows migrated 14/36/5; 2 DeepSeek DEMOTED to force (strict inert without /beta base_url, Pitfall 3); registry miss -> coerce (default-SAFE D-122-05). Old bools kept deprecated-unread for 1-phase rollback (no derived view re-reading strict_json_schema).
+- [Phase 122]: 122-01 (MP-02): removed the hardcoded 'and provider == openai' strict gate (now tier-driven: json_schema response_format requested whenever strict_response_format is true) + the inert function-level DeepSeek strict loop in openai_service.py forcing branch; A4 preserved (OpenAI force_strict still emits json_schema response_format). Pitfall 5 seams (deepseek thinking-off, 111.1 local-provider) untouched; removed now-dead import copy (Rule 3).
+- [Phase ?]: Phase 122-04 (TDP-01): TDP-01 is a PROMPT problem not a schema problem — the execute_code.description schema field (openai_service.py:601-603) is already strong; the fix is ONE ungated provider-agnostic nudge bullet in the shared SYSTEM_PROMPT (D-122-08, SC#4), one additive string no logic in G-5 hot file agent_loop.py, pinned by a string-presence guard.
+- [Phase ?]: Phase 122-04 (TDP-01): NO Anthropic-specific extraction added — BUG-260528-03's stated cause is WRONG; tool_args_progress is already cross-provider in all 3 adapters, so the ungated SHARED-prompt nudge is the correct provider-agnostic lever (red line D-14 held, no shared-path fork).
+- [Phase ?]: Phase 122-04 (TDP-01): exported humanize() (one word, no behavior change) to assert the bare-name floor (?? name) directly — no MEANINGFUL_TOOLS member is also absent from PRETTY_TOOL_NAMES (only execute_code, which has its own branch), so deriveWorkspacePanel() alone cannot exercise the floor; PRETTY_TOOL_NAMES NOT pre-emptively extended (D-122-08 — only if SC#10 UAT surfaces a bare name).
+- [Phase 122]: 122-02 (MP-01): the force-coerce ladder lives IN forced_emit as a tier-scoped rung loop over _RUNGS_BY_TIER (force_strict→[strict_force,non_strict_force,coerce], force→[non_strict_force,coerce], coerce→[coerce]); a strict-400/truncation/no-emit DESCENDS to the next rung (continue) instead of short-circuiting to None (BUG-260615-01); all 4 consumers inherit it unchanged.
+- [Phase 122]: 122-02 (MP-01): emit_rung telemetry added to the success dict + identifier-only logger.info; the ladder NEVER mutates the registry (D-122-03, runtime auto-demotion rejected). The Phase-103 strict override is preserved by DEMOTING strict_force→non_strict_force when strict=False; honest-fail floor returns emit_rung=None + the last rung's failure reason. 111.1 :251-291 injection block untouched (Pitfall 5).
+- [Phase ?]: Phase 122-03 (MP-03): --forced-emit matrix is a DIRECT-CALL harness (imports forced_emit, drives it per provider x EASY/HARD schema) NOT body.model — body.model does not steer harness phases (Pitfall 6); no bearer/DB/agent-run (never writes), localhost gate in main() suffices, T-122-03-03 SQL surface N/A
+- [Phase ?]: Phase 122-03 (MP-03): HARD schema (optional-heavy + additionalProperties confidence object) is the strict-rung trip-wire (Pitfall 1) making the recovery axis non-vacuous; recovery=PASS on any ladder win, force=PASS only on the declared TOP rung, trigger=FAIL on provider_error but honest_fail still PASS; DOCUMENTED clears the gate (D-122-07); the operator grep-before-tier-flip ritual is the MP-03 gate (NOT CI, D-122-06)
+- [Phase ?]: Phase 123-01 (TRIG-03/D-01): LOAD_SKILL_POLICY lives in skill_lint.py (not agent_loop.py) so the Plan 03 Tuner classifier imports ONE source of truth — Pitfall 1 fidelity guard. agent_loop catalog note relaxed to fire load_skill on description match, reconciled with LOAD_SKILL_TOOL; owner-scoped catalog query preserved byte-for-byte.
+- [Phase ?]: Phase 123-01 (TRIG-03): lint_description is pure/never-raises/warn-never-block (D-09); wired into POST+PATCH /skills + agent save_skill via the existing owner-scoped .or_() sibling fetch (excludes edited skill on PATCH, degrades to [] on read failure). openai_service NOT modified — already D-01-aligned. ZERO migration/package. 11 test_threads_skills failures verified pre-existing.
+- [Phase 123]: 123-02 (CTX-03): trim_messages_to_fit gains a THIRD protected class — pinned load_skill groups (_extract_pinned_skill_groups) kept like the protected tail, de-duped to latest per skill, capped at PIN_BUDGET_FRACTION=1/3 of max_tokens, LRU-evict lowest-index over budget + honest _TRIM_MARKER; no-pins fast path = byte-identical pre-CTX-03 (G-5). Single trim path, no fork (D-14 RED LINE).
+- [Phase 123]: 123-02 (CTX-03): _reconstruct_history tags load_skill tool-results with _pinned_skill IN CODE (gated on tc.get('name')=='load_skill', skill name from args with tool_call_id fallback) — never sniffs the result JSON (D-13), never hoists to system prompt. _atomic_groups mirrors _remove_oldest_atomic so a pinned group keeps its assistant+tool_calls parent (Pitfall 2).
+- [Phase ?]: Phase 123-03 (TRIG-01): resolve_skill_builder_model (D-08) mirrors resolve_authoring_model — explicit setting (local id verbatim) -> first forced_emission default -> honest None; no paid-provider SPOF, decoupled from benchmark targets; surfaced on config.py Settings + UserEffectiveSettings.
+- [Phase ?]: Phase 123-03 (TRIG-01): skill_tuner_service is thin orchestration over forced_emit (no agent-loop/raw-SDK fork, D-14); build_candidates/classify_fires use FLAT single-typed schemas + non-empty system_prompt; classify_fires embeds the shared LOAD_SKILL_POLICY (Pitfall 1 fidelity); honest-fail -> [] / would_load=False.
+- [Phase ?]: Phase 123-03 (TRIG-01): pure scoring = deterministic 60/40 split + 3-repeat aggregate + pick_winner BY HELD-OUT (never train); every cell carries BOTH fires/no_false (042-A). configured_targets = presence-only probe, OpenRouter distinct from native deepseek/zhipu, N=1 clean baseline, local first-class. auto_seed does no I/O; fetch_owner_scoped_siblings carries the .or_(user_id.eq,is_global.eq.true) leak gate. ZERO migration/package.
+- [Phase ?]: Phase 123-04 (TRIG-01): net-new owner-scoped skill_tuner.py router (start/stream/results) over the Phase-061+ run-buffer; service-role + .or_(own,global) sole leak gate, 404 on cross-user; tuner_progress/tuner_provider_done/tuner_complete vocab never overloads chat events.
+- [Phase ?]: Phase 123-04 (TRIG-01): background run bounded on every axis (MAX_CASES=40/MAX_TARGETS=8/MAX_ITERATIONS<=5 + per-call get_per_call_timeout + one job per skill via _INFLIGHT_SKILLS->409); calls ONLY Plan-03 forced_emit service fns (D-14 red line); cases+scoreboard ephemeral at tuner_result:{run_id} run-buffer key, no DB schema change.
+- [Phase 132]: Phase 132-03 (EVAL-01/VER-01): thin SkillTestCasesSection mounted in SkillDetailPanel gated on savedSkillId — deliberately non-designed (--skip-ui scope fence; reuses Input/Textarea/Button, no tabs/panel chrome) so it does NOT pre-empt the Phase 137/PANEL-01/G-2 sketch-gated Evals panel. 4 wire-mirror TS types + 5 fetch-client funcs mirror the existing skill funcs (getAuthHeaders→fetch→typed cast); owner-scoping enforced server-side (Plan 02 .eq(user_id)). createTestCase seeds an empty row filled inline+Saved. Operator G-4 UAT verified: add/edit/delete persist across reload, version increments on instructions change but NOT on enabled/global toggle (D-02). Pre-existing tsc -b rot (29 errors, unchanged by this plan) deferred per SEED-056.
+- [Phase 123]: Phase 123-05 (TRIG-01): Trigger Tuner React surface + the reachability triad in ONE plan (App ActiveView 'skill-tuner' + tunerSkillId + onTuneSkill, ChatLayout skill-tuner mount branch, SkillsPage 'Tune triggers' entry action on the selected skill) — the Phase-118 built-but-unreachable lesson; SkillTunerPage is a focused full-surface entered WITH a skillId (GovernancePage/publish-gauntlet ActiveView no-router precedent).
+- [Phase 123]: Phase 123-05 (TRIG-01): ProviderScoreboard (no-analog, 042-A) derives its N columns PURELY from the server-returned cells — a provider the org doesn't run is simply absent so it never renders (a score you can't act on is fabricated); N=1 is the clean baseline (no degraded affordance), OpenRouter≠native zhipu/z-ai, EVERY cell shows BOTH fires (recall) + no-false (the false-fire rail), never a hidden aggregate (T-123-05-01).
+- [Phase 123]: Phase 123-05 (TRIG-01): author-confirm-not-auto-apply (042-A/D-03) — CandidateCard's Use→reveal-diff is NOT the write; updateSkill (PATCH /skills, re-lints) fires ONLY on explicit confirm. LiveRunCard: queued≠running (no fake percent, 043-A) + never-vanishing elapsed timer derived from a stable start-ts (the 095 lesson, frozen on terminal) + reconcile-on-return (terminal 'done' re-reads GET results, SSE tuner_complete a best-effort hint per D-v2.5-03). CaseEditor 60/40 split bar mirrors backend split_held_out. ZERO package/migration; chat subscribeToRun untouched (purpose-built streamTunerRun tuner_* reader). 14/14 vitest, tsc clean.
+- [Phase ?]: Phase 123-06 (TRIG-03/TRIG-01): inline never-block lint in the SHARED SkillForm under Description (covers modal + 3-pane); 'Tune this' reuses the verified Plan-05 onTuneSkill navigator (D-12); onSave widened to Promise<Skill|void> to capture lint_warnings.
+- [Phase ?]: Phase 123-06 [Rule 3]: wired skill_builder_model through the /settings router (FullSettingsResponse + SettingsUpdate + handler) + api.ts — Plan 03 added the field+resolver but NOT the router surface; the picker spans cloud+local (no paid-provider SPOF, test-proven). ZERO migration/package.
+- [Phase ?]: Phase 123.1-01 (D-07): tuner_runs durable latest-per-skill persistence — on_conflict=skill_id latest-wins upsert (UNIQUE(skill_id), one row/skill) in run_in_threadpool (D-v2.5-01), best-effort try/except ALONGSIDE the Redis stash; survives a Redis flush/refresh (closes BUG-260624-01 HIGH #3). user_id=last-runner attribution, NOT an access gate.
+- [Phase ?]: Phase 123.1-01 (D-05/D-08): two owner-gated GET routes — /tuner/runs/latest (registered BEFORE /runs/{run_id} so the literal beats the UUID converter; 404 cross-user owner-OR-global; rehydration-on-open) + /tuner/cases/seeded (provenance seeded/sibling never 'held'; owner-scoped sibling leak gate intact). seed_cases_with_provenance is a NEW fn over the unchanged string-only auto_seed_cases (run path untouched). Frontend getTunerLatest 404->null + getSeededCases. ZERO new pkg; red line held.
+- [Phase ?]: Phase 123.1-02 (D-02/D-12): ProviderScoreboard restored to sketch-041 vertical full-width rows (was a cramped grid, BUG-260624-01 HIGH #1); per-row magnitude bar + leading combined score from the server TunerCell.score (previously unused), both honest sub-scores kept visible; server-score-only; unchanged API so Plan 04 reuses it for the D-04 standalone block.
+- [Phase ?]: Phase 123.1-02 (D-11): CandidateCard descriptions line-clamp-3 with a shared useState Show more/less toggle across the header AND both diff-confirm sides (diff-current/diff-new); held-out score + Use action are siblings (never clamped) so a ~1500-char description never buries them (BUG-260624-01 MED #5); CandidateCard tests split into CandidateCard.test.tsx.
+- [Phase ?]: Phase 123.1-03 (D-09/D-10): Skill-builder picker now derives options from configured providers[].models across ALL providers (grouped as optgroups via PROVIDER_META labels w/ id fallback), replacing the hardcoded SKILL_BUILDER_MODEL_OPTIONS — strong models (Sonnet/Opus, GPT-pro) selectable. Auto value="" default kept pre-selected (NOT forced) + custom-persisted "(current)" branch guarded by a builderConfiguredModels Set (no duplicate row). IN-02 placeholder local ids (lm-studio/qwen3, openai-compat/local-model) removed — local models come from real providers. SOFT amber "unverified" hint mirrors the Active-Model chip via verified_models; NEVER hard-disables an option; A4 honored (no new forced_emission_models field, verified_models signal reused). Stored field/contract (app_settings.skill_builder_model) + resolver unchanged. No-SPOF footer rewritten to a provider-derived line. 7/7 vitest, tsc clean.
+- [Phase 123.1]: Phase 123.1-04 (D-03/D-04/D-05/D-06/D-07/D-12): integration wave wired Plan-01 GET routes + Plan-02 ProviderScoreboard into SkillTunerPage. Mount reconcile-via-fetch effect: getSeededCases hydrates the editor with real seeded/sibling provenance (editable before run, startRun POST-body unchanged so edits run verbatim); getTunerLatest rehydrates the durable scoreboard on open (null/404 = graceful empty, no error); getSettings resolves the configured-target count (has_key && non-empty models, mirroring backend configured_targets). held tag RESOLVED by DROPPING it from the EditorCase union (split bar owns train/held-out). D-04 standalone block = scoreboard.candidates.find(c=>c.is_baseline) rendered via the Plan-02 component. Layout widened to 360px config rail + full-width results. previewModelCount precedence: in-flight targets -> persisted target_count -> live configured count. subscribeToRun untouched (WR-06 red line).
+- [Phase ?]: Phase 123.1-05 (BUG-260624-01 #1): MAX_SEEDED_SHOULD_NOT=8 caps the sibling-sourced should_not inside auto_seed_cases (the SOLE place) so the run path + editor seed share ONE capped set (editor shows exactly what runs); a pure post-fetch slice of the already-owner-scoped fetch_owner_scoped_siblings output — never re-reads DB / never widens scope. Generic off-topic baseline ALWAYS kept in full.
+- [Phase ?]: Phase 123.1-05 (D-honesty): GET /tuner/cases/seeded returns top-level total = uncapped sibling count (derived from len(sibling_descs), not the capped base); CaseEditor cap banner shows 'showing N of M — capped' ONLY when total > shown sibling-provenance count (never silent); 'show all N' is an honest disclosure, never fabricates the withheld cases.
+- [Phase ?]: Phase 123.1-05 (sketch 045-B): pre-run layout = full-width single-column stack (description -> CaseEditor -> run bar) driven off existing runPhase + scoreboard (no new mode machine); editor stays mounted so author can re-edit + re-run; results render full-width below; ProviderScoreboard/LiveRunCard/CandidateCard reused untouched.
+- [Phase 123.1]: 123.1-10 (TT-10): silenced the langsmith logger to ERROR at module scope next to the asyncio suppressor (scoped to langsmith only; ERROR-and-above still surfaces; tracing not disabled) + documented an optional commented-out LANGSMITH_TRACING_SAMPLING_RATE knob in .env.example (no Settings field — the client reads it from os.environ via load_dotenv)
+- [Phase 123.1]: 123.1-06 (TT-05/12/15): tuner build_cell renders an empty axis as the unmeasured sentinel None (frontend 'n/a'), never a fabricated 1.0; an all-error column (every classify raised) is measured=False + EXCLUDED from the persisted target_count; cell_score returns the single stored cell['score'] verbatim (no recompute drift). _score_axis floor + held-out math + gateway untouched.
+- [Phase ?]: Phase 123.1-07: TT-07 — _run_tuner_job emits stage='provider_start' (provider+model) at each column start via the tuner's OWN _emit_tuner (not the shared runs.py consumer); the frontend onProgress flips the matching lane queued->running on it
+- [Phase ?]: Phase 123.1-07: TT-08 — DELETE cancel route is owner-verify THEN run<->skill bind (404 cross-user/foreign run_id, mirrors CR-01), sets a TTL'd tuner_cancel:{run_id} flag + releases the inflight claim; job checks the flag at candidate AND provider loop tops, skips winner/stash/durable upsert when cancelled, still runs its finally cleanup
+- [Phase ?]: 123.1-08 (TT-12 render half): unmeasured tuner cell renders 'could not measure' from the server measured/null sentinel, never a fabricated 0.00 or 1.00 axis
+- [Phase ?]: 123.1-08 (TT-16): reconnect-exhaustion keeps 'still running' ONLY when durable getTunerLatest.run_id === active run; a null/404 or previous-run row still hits the retained 'Lost connection' terminal (no stuck run)
+- [Phase ?]: Phase 123.1-09: TT-11 — removed both decorative w-16 shrink-0 bg-sidebar rails (SkillsPage + SkillTunerPage); content keeps existing px-8 so it sits flush against the real NavPanel; real NavPanel (ChatLayout.tsx:289) untouched; tsc clean
+- [Phase ?]: Phase 123.1-09: the SkillTunerPage rail survived the 123.1-05/07/08 restructure (relocated to lines 494-495) and was still present — removed here as the primary path, not the reconcile fallback the plan anticipated
+- [Phase ?]: 138-04: TODOS panel reconciles LIVE on a clean run terminal via _reconcileTodosOnTerminal (fetch-on-terminal per D-v2.5-03); reuse-only, clean-completion-gated, best-effort, additive-only on G-5 StreamsProvider.tsx. Closes VERIFICATION must-have #5 code side; live UAT owned by 138-05.
+- [Phase ?]: 143-02: owned_only additive default-off param on list_published_workflows (Published shelf narrows to mine; picker/WorkspacePanel/threads.py keep globals default — D-143-2b); Starters shelf = own list_starter_workflows curated-globals query + GET /workflows/starters
+- [Phase ?]: Phase 143 Plan 03: 3 curated starters authored as seed migration 094 with DISTINCT slugs (pm-* would UNIQUE-collide); promote = TRANSFORM (strip folder binding+scope, re-home template to seed _library, category='starter', keep strict citation gates); storage bytes via scripts/seed-starters.py --upload
+- [Phase ?]: Phase 143 scope-narrowing threaded as a 3rd positional options param on listPublishedWorkflows (not a 2nd-arg options object) so WorkspacePanel's signal-as-2nd-arg call stays byte-identical (D-143-2b)
 
 ## Operator Next Steps
 

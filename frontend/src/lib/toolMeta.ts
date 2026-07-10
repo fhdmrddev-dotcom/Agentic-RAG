@@ -85,7 +85,12 @@ export function outerBannerLabel(
   if (activeTool.name === "web_search") return "Searching the web…"
   if (activeTool.name === "analyze_document") return "Analyzing document…"
   if (activeTool.name === "execute_code") {
-    return activeTool.status === "preparing" ? "Preparing code…" : "Running code…"
+    if (activeTool.status === "preparing") return "Preparing code…"
+    // SAND (silence fix): honest sub-phase during the otherwise-silent sandbox
+    // setup window, from the code_executing `phase` field the backend emits.
+    if (activeTool.codePhase === "starting_sandbox") return "Starting sandbox…"
+    if (activeTool.codePhase === "installing_libraries") return "Installing libraries…"
+    return "Running code…"
   }
   if (activeTool.name === "load_skill") {
     const skillName = (activeTool.args?.skill_name as string | undefined) ?? ""

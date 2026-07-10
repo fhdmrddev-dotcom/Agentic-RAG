@@ -5,6 +5,7 @@ import { MessageSkeleton } from "./MessageSkeleton"
 import { RunStatusStrip } from "./RunStatusStrip"
 import { useFollowScroll } from "@/hooks/useFollowScroll"
 import { unifiedStepCount } from "@/lib/stepCount"
+import { dedupMessagesByRunId } from "@/lib/dedupMessages"
 import type { Message } from "@/types"
 
 interface Props {
@@ -147,6 +148,18 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
   const chipStepCount = streamingMessage ? unifiedStepCount(streamingMessage) : 0
   const chipElapsed = formatFloatingElapsed(streamingMessage?.created_at) ?? ""
 
+  // BUG-260626-01: collapse same-runId duplicates before render. In the
+  // live/just-completed window of a multi-run thread the chat bucket can
+  // transiently hold TWO assistant messages with the same runId — the
+  // in-place-completed `temp-…` placeholder AND the persisted/reconciled row.
+  // Both are keyed `run-${runId}` below, so React would duplicate/omit subtrees
+  // (duplicated GENERATED FILES panels + source-doc bleed). The shared
+  // dedupMessagesByRunId keeps the persisted (non-`temp-`) row so the key is
+  // always unique; the SAME helper de-doubles useDerivedPanel's workspace todos
+  // (BUG-260626-01 sibling). Order-preserving; a no-op for single runs and for
+  // rows without a runId (harness answers, user rows).
+  const renderMessages = dedupMessagesByRunId(messages)
+
   return (
     <ScrollArea className="flex-1">
       <div ref={containerRef} className="relative space-y-1 px-6 py-6 max-w-4xl mx-auto">
@@ -159,9 +172,9 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
         {isLoading && messages.length === 0 ? (
           <MessageSkeleton />
         ) : (
-          messages.map((msg, idx) => {
+          renderMessages.map((msg, idx) => {
             const isLastAssistant =
-              msg.role === "assistant" && idx === messages.length - 1
+              msg.role === "assistant" && idx === renderMessages.length - 1
             return (
               <MessageItem
                 key={msg.role === "assistant" && msg.runId ? `run-${msg.runId}` : msg.id}

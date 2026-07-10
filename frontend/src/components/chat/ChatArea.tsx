@@ -15,14 +15,10 @@ import {
 import {
   getProviders,
   getThreadWorkflow,
-  listPublishedWorkflows,
   ApiError,
-  type PublishedWorkflow,
 } from "@/lib/api"
-import type { Folder, Message, Thread } from "@/types"
-import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
-import { toolLabel } from "@/lib/toolMeta"
-import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
+import type { Folder, Thread } from "@/types"
+import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
 
 interface Provider {
   id: string
@@ -63,13 +59,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
-  // Phase 092 (MODE-01 — D-01/D-02): Deep/Harness toggle + published-workflow
-  // picker state. workflowMode toggles the composer between the Deep agent loop
-  // (General/Explorer) and the Harness picker; selectedWorkflowId is the staged
-  // kickoff id sent as workflow_definition_id on the next send.
-  const [workflowMode, setWorkflowMode] = useState<"deep" | "harness">("deep")
-  const [publishedWorkflows, setPublishedWorkflows] = useState<PublishedWorkflow[]>([])
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
   // (BUG-260523-01 close), MessageList streaming prop, and reconcile/
@@ -140,10 +129,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   useEffect(() => {
     setAgentMode("default")
     setScopeFolderId(null)
-    // Phase 092: reset the picker on thread switch — the mount reconcile below
-    // re-derives the true Harness/Deep state from GET /threads/{id}/workflow.
-    setWorkflowMode("deep")
-    setSelectedWorkflowId(null)
   }, [thread?.id])
 
   useEffect(() => {
@@ -160,13 +145,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           setSelectedModel(preferred)
         }
       })
-      .catch(console.error)
-  }, [])
-
-  // Phase 092 (D-01): load the published-workflow picker feed once on mount.
-  useEffect(() => {
-    listPublishedWorkflows()
-      .then(setPublishedWorkflows)
       .catch(console.error)
   }, [])
 
@@ -325,19 +303,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       // dropped — the empty-until-end-of-run user-observable failure.
       setViewingThread(activeThread.id)
     }
-    // Phase 092 (D-02): a Harness send carries the picked workflow id as the
-    // kickoff field; a Deep send omits it (byte-identical). Stage-then-clear so
-    // a workflow only starts once per pick.
-    const kickoffWorkflowId =
-      workflowMode === "harness" && selectedWorkflowId ? selectedWorkflowId : undefined
-    if (kickoffWorkflowId) {
-      // Phase 094 (PANEL-08): entering Harness Mode auto-opens the workspace
-      // panel to the phase timeline (the ChatLayout expand seam is already
-      // subscribed via subscribeOpenPanel). Fire ONLY on the harness branch —
-      // a Deep send must NOT force the panel open. Scoped to the panel-open
-      // seam so Plan 05's mode-label edit on this file layers cleanly.
-      requestOpenPanel()
-    }
     await sendMessage(
       activeThread.id,
       content,
@@ -345,15 +310,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onTitleUpdate,
       agentMode,
       selectedProvider || undefined,
-      kickoffWorkflowId,
     )
-    if (kickoffWorkflowId) {
-      // The workflow is now running; clear the staged pick so the next send is
-      // a normal turn (the lock — derived from the mount/SSE reconcile — keeps
-      // the picker disabled while the run is live).
-      setSelectedWorkflowId(null)
-    }
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, workflowMode, selectedWorkflowId])
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -406,18 +364,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         }
         onClearPrefill?.()
       }}
-      workflowMode={workflowMode}
-      onWorkflowModeChange={setWorkflowMode}
-      // Phase 094 (D-02 — server truth): the DISPLAYED mode badge derives from
-      // workflowLocked (reconciled from active_workflow_run_id at :161-167),
-      // never the stale launch-toggle useState. A running Harness workflow shows
-      // "Harness" regardless of what the local toggle was set to — kills
-      // finding #5. The launch toggle (workflowMode) still drives the dropdown
-      // selection + the :307 kickoff staging, unchanged.
-      displayedMode={workflowLocked ? "harness" : "deep"}
-      publishedWorkflows={publishedWorkflows}
-      selectedWorkflowId={selectedWorkflowId}
-      onWorkflowSelect={setSelectedWorkflowId}
       workflowLocked={workflowLocked}
     />
   )
@@ -567,72 +513,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         showSuggestions={agentMode !== "explorer"}
         onResume={onResume}
       />
-      {/* Phase 076.1 D-03: Sticky elapsed timer above input box during active runs.
-          Sits between the message list and input, visible regardless of scroll
-          position (outside the ScrollArea). Auto-hides when isStreaming becomes
-          false (run completes). */}
-      {isStreaming && (() => {
-        const activeMsg = messages.findLast(m => m.role === "assistant")
-        return activeMsg ? <StickyTimerBar message={activeMsg} /> : null
-      })()}
       {inputBar}
-    </div>
-  )
-}
-
-// Phase 076.1 D-03/D-09: Sticky timer bar above input box during active runs.
-// Content: elapsed time + step count + file count + tool description.
-// T-076.1-06 mitigation: single 250ms setInterval with clearInterval on unmount.
-function StickyTimerBar({ message }: { message: Message }) {
-  const toolCalls = message.tool_calls ?? []
-  const completedCount = toolCalls.filter(tc => tc.status === "done").length
-  const activeTool = toolCalls.find(tc => tc.status === "preparing" || tc.status === "running")
-  const stepNumber = completedCount + (activeTool ? 1 : 0)
-
-  // Cumulative file count across all completed tool calls (SPEC Req 8).
-  // Count output_files from tc.result JSON parsing.
-  const fileCount = toolCalls.reduce((sum, tc) => {
-    if (tc.status === "done" && tc.result) {
-      try {
-        const parsed = JSON.parse(tc.result)
-        if (parsed.output_files) return sum + parsed.output_files.length
-      } catch { /* not JSON or no output_files */ }
-    }
-    return sum
-  }, 0)
-
-  // Tool description: model's own description or tool name fallback.
-  // T-076.1-05 mitigation: rendered as text content (React auto-escapes), not dangerouslySetInnerHTML.
-  const description = activeTool?.args?.description
-    || (activeTool?.name ? toolLabel(activeTool.name) : null)
-    || "working..."
-
-  // Elapsed time from component mount (aligns with run start).
-  const [elapsed, setElapsed] = useState(0)
-  const mountRef = useRef(Date.now())
-  useEffect(() => {
-    const interval = setInterval(() => setElapsed(Date.now() - mountRef.current), 250)
-    return () => clearInterval(interval)
-  }, [message.id])
-
-  const mins = Math.floor(elapsed / 60000)
-  const secs = Math.floor((elapsed % 60000) / 1000)
-  const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`
-
-  return (
-    <div className="flex items-center gap-2 px-4 py-1.5 text-xs font-mono text-muted-foreground border-t border-border/50 bg-background/80 backdrop-blur-sm">
-      <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
-      <span className="tabular-nums">{timeStr}</span>
-      <span className="opacity-40">.</span>
-      <span>Step {stepNumber}</span>
-      {fileCount > 0 && (
-        <>
-          <span className="opacity-40">.</span>
-          <span>{fileCount} {fileCount === 1 ? 'file' : 'files'}</span>
-        </>
-      )}
-      <span className="opacity-40">.</span>
-      <span className="truncate flex-1">{description}</span>
     </div>
   )
 }

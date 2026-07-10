@@ -27,6 +27,7 @@ const {
   mockPublish,
   mockListFolders,
   mockListSkills,
+  mockListStarters,
 } = vi.hoisted(() => ({
   mockListPublished: vi.fn(),
   mockListDrafts: vi.fn(),
@@ -36,11 +37,13 @@ const {
   mockPublish: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
+  mockListStarters: vi.fn(),
 }))
 
 // Mock the api seam. The page consumes listPublishedWorkflows + listDraftWorkflows
 // + createWorkflowDraft; the hosted Builder consumes generate/create/update +
 // listFolders/listSkills (103-ux folder/skill name maps); the Gauntlet consumes publish.
+// Phase 143 (WF-01): the Starters shelf consumes listStarterWorkflows (RED until Plan 04).
 vi.mock("@/lib/api", () => ({
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
@@ -50,6 +53,7 @@ vi.mock("@/lib/api", () => ({
   publishWorkflow: mockPublish,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  listStarterWorkflows: mockListStarters,
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
@@ -121,10 +125,37 @@ const draftRow = {
   },
 }
 
+/**
+ * Phase 143 (WF-01) — a curated starter (is_global published, category='starter').
+ * A two-phase KB→document def: retrieve (llm_agent) → emit (llm_emit strict). The
+ * fresh-copy fork (D-143-1) mints a NEW suffixed slug + v1 off this seeded slug.
+ */
+const starterRow = {
+  id: "starter-1",
+  slug: "risk-register",
+  name: "Risk Register",
+  definition: {
+    slug: "risk-register",
+    version: 1,
+    name: "Risk Register",
+    status: "published",
+    category: "starter",
+    phases: [
+      { slug: "retrieve", phase_index: 0, config: { phase_type: "llm_agent" } },
+      {
+        slug: "emit",
+        phase_index: 1,
+        config: { phase_type: "llm_emit", citation_policy: "strict" },
+      },
+    ],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockListPublished.mockResolvedValue([strictPublished, loosePublished])
   mockListDrafts.mockResolvedValue([draftRow])
+  mockListStarters.mockResolvedValue([starterRow])
   mockCreateDraft.mockResolvedValue({ id: "new-draft", version: 3 })
   // The hosted Builder fetches folders + skills on mount (103-ux name maps).
   mockListFolders.mockResolvedValue(folders)
@@ -145,7 +176,12 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
     await waitFor(() => expect(mockListPublished).toHaveBeenCalled())
     mockListPublished.mockClear()
     fireEvent.click(screen.getByText("DBA Chapters"))
-    await waitFor(() => expect(mockListPublished).toHaveBeenCalledWith("folder-aaa"))
+    // Phase 143 (D-143-2a): the Workflows-page Published shelf now opts into scope:"mine"
+    // (mine-only de-dupe). The project folder id stays the FIRST arg; scope rides in the
+    // 3rd options arg so the composer picker / WorkspacePanel (no scope) stay unchanged.
+    await waitFor(() =>
+      expect(mockListPublished).toHaveBeenCalledWith("folder-aaa", undefined, { scope: "mine" }),
+    )
   })
 
   it("latest-wins: a STALE earlier response never paints over the current selection", async () => {
@@ -172,23 +208,30 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
   })
 })
 
-describe("WorkflowsPage — drafts-above-published shelves + build-card", () => {
-  it("the Drafts shelf renders ABOVE the Published shelf (DOM order)", async () => {
+describe("WorkflowsPage — published-above-drafts shelves + build-card", () => {
+  it("the Published shelf renders ABOVE the Drafts shelf (DOM order — BUG-260628-01 fold, D-143-5)", async () => {
+    // Phase 143 (D-143-5): the sections are reordered Starters → Published → Drafts so
+    // runnable published/starters are no longer buried under drafts (this replaces the
+    // old drafts-above-published contract; the full 3-shelf order is asserted in the
+    // Starters-shelf block below).
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const drafts = await screen.findByTestId("drafts-shelf")
-    const published = screen.getByTestId("published-shelf")
-    // compareDocumentPosition: FOLLOWING (4) means `published` comes after `drafts`.
-    expect(drafts.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const published = await screen.findByTestId("published-shelf")
+    const drafts = screen.getByTestId("drafts-shelf")
+    // compareDocumentPosition: FOLLOWING (4) means `drafts` comes after `published`.
+    expect(published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it("the dashed build-card is present in the drafts shelf and opens the Builder", async () => {
+  it("the dashed build-card is present in the drafts shelf and opens the two-door chooser (WUX-02)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     const buildCard = within(draftsShelf).getByTestId("build-card")
     expect(buildCard).toBeInTheDocument()
     fireEvent.click(buildCard)
-    // The Builder host renders the describe-first empty screen (its hint testid).
-    expect(await screen.findByTestId("describe-hint")).toBeInTheDocument()
+    // A fresh build now forks at the Studio authoring ENTRY into the two-door chooser
+    // (047-A) — Describe & run vs Author & govern — NOT the describe screen directly.
+    expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
+    expect(screen.getByTestId("door-card-describe")).toBeInTheDocument()
+    expect(screen.getByTestId("door-card-govern")).toBeInTheDocument()
   })
 
   it("NO draft card exposes a Run affordance; published cards DO", async () => {
@@ -204,25 +247,39 @@ describe("WorkflowsPage — drafts-above-published shelves + build-card", () => 
   })
 })
 
-describe("WorkflowsPage — client-derived tier badge (D10, no extra fetch)", () => {
-  it("a strict-policy def renders a different tier badge than a draft-policy def", async () => {
+describe("WorkflowsPage — card renders the shared WorkflowSoul (WUX-01, D10, no extra fetch)", () => {
+  it("a published card renders a WorkflowSoul (the card-scale soul + its derived tier chip)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    const strictBadge = within(cards[0]).getByTestId("tier-badge")
-    const looseBadge = within(cards[1]).getByTestId("tier-badge")
-    expect(strictBadge.getAttribute("data-tier")).toBe("STRICT")
-    expect(looseBadge.getAttribute("data-tier")).toBe("LOOSE")
-    expect(strictBadge.getAttribute("data-tier")).not.toBe(looseBadge.getAttribute("data-tier"))
-    // The badge is derived: listPublishedWorkflows was the ONLY fetch (no per-badge call).
+    // The shared soul mounts at card scale (replacing the old TierBadge/PhaseChain trio).
+    const soul = within(cards[0]).getByTestId("workflow-soul")
+    expect(soul.getAttribute("data-scale")).toBe("card")
+    // And it carries the soul's derived tier chip + glyph-dot spine.
+    expect(within(cards[0]).getByTestId("soul-tier")).toBeInTheDocument()
+    expect(within(cards[0]).getByTestId("soul-spine")).toBeInTheDocument()
+    // The OLD ad-hoc trio is gone from the card body.
+    expect(within(cards[0]).queryByTestId("tier-badge")).not.toBeInTheDocument()
+    expect(within(cards[0]).queryByTestId("phase-chain")).not.toBeInTheDocument()
+  })
+
+  it("a strict-policy def renders a different soul tier chip than a draft-policy def (derived, no per-card fetch)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const cards = await screen.findAllByTestId("published-card")
+    const strictTier = within(cards[0]).getByTestId("soul-tier")
+    const looseTier = within(cards[1]).getByTestId("soul-tier")
+    expect(strictTier.getAttribute("data-tier")).toBe("STRICT")
+    expect(looseTier.getAttribute("data-tier")).toBe("LOOSE")
+    expect(strictTier.getAttribute("data-tier")).not.toBe(looseTier.getAttribute("data-tier"))
+    // The tier is derived: listPublishedWorkflows was the ONLY fetch (no per-card call).
     expect(mockListPublished).toHaveBeenCalledTimes(1)
   })
 })
 
-describe("WorkflowsPage — tier badge picks the STRICTEST emit policy (WR-03, order-independent)", () => {
+describe("WorkflowsPage — soul tier picks the STRICTEST emit policy (WR-03, order-independent)", () => {
   it("a [flag, strict, partial] multi-emit def derives STRICT regardless of phase order", async () => {
     // Old logic only overwrote on 'strict' after the first emit set the policy, so a
-    // 'partial' following a 'flag' was dropped and order mattered. The fix uses a
-    // deterministic stricter-wins comparison: the strict emit must win here.
+    // 'partial' following a 'flag' was dropped and order mattered. The shared soulData
+    // derivation uses a deterministic stricter-wins comparison: the strict emit wins.
     const multiEmit = {
       id: "pub-multi",
       slug: "multi-emit",
@@ -241,7 +298,7 @@ describe("WorkflowsPage — tier badge picks the STRICTEST emit policy (WR-03, o
     mockListPublished.mockResolvedValue([multiEmit])
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const card = await screen.findByTestId("published-card")
-    expect(within(card).getByTestId("tier-badge").getAttribute("data-tier")).toBe("STRICT")
+    expect(within(card).getByTestId("soul-tier").getAttribute("data-tier")).toBe("STRICT")
   })
 })
 
@@ -276,6 +333,23 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     fireEvent.click(screen.getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
     expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp")
+  })
+
+  it("D-01: the library-card Run path stays the Phase-121 launch (onLaunch), NOT wrapped by the door fork", async () => {
+    // The two-door fork lives at the Studio authoring ENTRY only. The published-card
+    // Run must reach onLaunch (doRun → createThread → postMessage → create_workflow_run)
+    // directly — it is never routed through WorkflowDoorSwitch. Asserting Run still
+    // opens the run modal + calls onLaunch (and does NOT mount the door chooser) pins it.
+    const onLaunch = vi.fn().mockResolvedValue(undefined)
+    render(<WorkflowsPage folders={folders} onLaunch={onLaunch} />)
+    const cards = await screen.findAllByTestId("published-card")
+    fireEvent.click(within(cards[0]).getByTestId("published-run"))
+    // The run modal opens (the Phase-121 launch surface), NOT the two-door chooser.
+    expect(await screen.findByTestId("run-modal")).toBeInTheDocument()
+    expect(screen.queryByTestId("workflow-doors")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("run-confirm"))
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
+    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "")
   })
 
   it("WR-05: a double-tap of Run creates ONLY ONE launch (in-flight guard)", async () => {
@@ -337,6 +411,48 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
   })
 })
 
+describe("WorkflowsPage — Starters shelf (WF-01, D-143-1/2/5/8) [RED until Plan 04]", () => {
+  it("renders the Starters shelf with the curated card, its Starter/Official chip, and a Use-this-starter control", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const shelf = await screen.findByTestId("starters-shelf")
+    // The seeded curated starter renders as a card inside the shelf.
+    const card = within(shelf).getByTestId("starter-card")
+    expect(within(card).getByText("Risk Register")).toBeInTheDocument()
+    // The curated-vs-mine visual distinction (D-143-8, Glean verified-badge analog).
+    expect(within(card).getByText(/starter|official/i)).toBeInTheDocument()
+    // The fork affordance ("Use this starter", Zapier clone-CTA analog).
+    expect(within(card).getByTestId("use-starter")).toBeInTheDocument()
+  })
+
+  it("onUseStarter forks a FRESH copy: new suffixed slug + v1 + draft (INSERT, never UPDATE the frozen starter)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const shelf = await screen.findByTestId("starters-shelf")
+    fireEvent.click(within(shelf).getByTestId("use-starter"))
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    const forked = mockCreateDraft.mock.calls[0][0]
+    // D-143-1: a brand-new owned identity — a NEW auto-suffixed slug off "risk-register".
+    expect(forked.slug).toMatch(/^risk-register-[a-z0-9]{6}$/)
+    expect(forked.version).toBe(1) // v1, NOT the same-slug Tweak's N+1
+    expect(forked.status).toBe("draft")
+    // It is an INSERT (createWorkflowDraft) — the frozen published starter is NEVER UPDATEd.
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  it("folds BUG-260628-01 (SC-e): section order is Starters → Published → Drafts (runnable no longer buried under drafts)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const starters = await screen.findByTestId("starters-shelf")
+    const published = screen.getByTestId("published-shelf")
+    const drafts = screen.getByTestId("drafts-shelf")
+    // compareDocumentPosition FOLLOWING (4): starters precedes published precedes drafts.
+    expect(
+      starters.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+})
+
 describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)", () => {
   it("Open passes the draft's definition + id → the Builder shows its steps, not the describe box", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
@@ -350,11 +466,12 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
     expect(mockCreateDraft).not.toHaveBeenCalled()
   })
 
-  it("the build-card opens a TRUE fresh build (the describe screen, no initial)", async () => {
+  it("the build-card opens a TRUE fresh build (the 'both' door chooser, no initial)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     fireEvent.click(within(draftsShelf).getByTestId("build-card"))
-    expect(await screen.findByTestId("describe-hint")).toBeInTheDocument()
+    // Fresh build → the chooser, NOT an already-loaded definition's spine nodes.
+    expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
     expect(screen.queryByTestId("spine-node-draft")).not.toBeInTheDocument()
   })
 })
@@ -362,10 +479,11 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
 describe("WorkflowsPage — back-nav refreshes the library lists", () => {
   it("the ← Workflows back button refetches drafts + published", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    // Enter the Builder via a fresh build (does not itself refetch).
+    // Enter the Builder host via a fresh build (does not itself refetch). The fresh
+    // build opens the two-door chooser.
     const draftsShelf = await screen.findByTestId("drafts-shelf")
     fireEvent.click(within(draftsShelf).getByTestId("build-card"))
-    await screen.findByTestId("describe-hint")
+    await screen.findByTestId("workflow-doors")
     mockListDrafts.mockClear()
     mockListPublished.mockClear()
     // Back to the library → both lists refresh (newly-created drafts appear w/o F5).

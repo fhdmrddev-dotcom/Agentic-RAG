@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 052 — Living Step-Flow: Quiet Idle, Alive Active (energized)</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+  :root {
+    --neon-cyan: hsl(190 95% 60%);
+    --neon-violet: hsl(266 90% 70%);
+    --neon-gold: hsl(43 96% 62%);
+    --grad-energy: linear-gradient(100deg, var(--color-primary), var(--color-accent-violet) 45%, var(--neon-cyan));
+  }
+  body {
+    background:
+      radial-gradient(1000px 520px at 78% -12%, hsl(239 100% 82% / .06), transparent),
+      radial-gradient(760px 480px at 4% 112%, hsl(266 90% 66% / .055), transparent),
+      var(--color-bg);
+    background-attachment: fixed; padding-bottom: 80px;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .3;
+    background-image: linear-gradient(hsl(220 30% 50% / .035) 1px, transparent 1px), linear-gradient(90deg, hsl(220 30% 50% / .035) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(circle at 60% 30%, #000, transparent 80%); mask-image: radial-gradient(circle at 60% 30%, #000, transparent 80%);
+  }
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 30px 22px 40px; }
+  .page-h { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-2xl); margin: 6px 0 2px; }
+  .grad-text { background: var(--grad-energy); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .page-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 20px; max-width: 64ch; }
+
+  /* a mock right-side panel so the step list reads in its REAL home (the workspace panel) */
+  .panel {
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: hsl(220 40% 6% / .75);
+    box-shadow: var(--shadow-lg); overflow: hidden; backdrop-filter: blur(6px);
+  }
+  .panel-head { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+  .panel-head .ph-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 8px 1px var(--color-warning); }
+  .panel-head .ph-title { font-weight: 600; }
+  .panel-head .ph-x { margin-left: auto; color: var(--color-text-dim); font-family: var(--font-mono); font-size: 11px; }
+  .panel-body { padding: 14px; }
+
+  /* ── SOUL HEADER (shipped Phase 124 · scale="run") — shown so 052 sits UNDER it ── */
+  .soul { border: 1px dashed hsl(258 90% 66% / .4); border-radius: var(--radius-md); background: hsl(258 90% 66% / .05); padding: 13px 14px; position: relative; }
+  .soul .tag124 { position: absolute; top: -9px; right: 10px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .04em; color: var(--neon-violet); background: var(--color-bg); border: 1px solid hsl(258 90% 66% / .4); border-radius: var(--radius-full); padding: 1px 8px; }
+  .soul .purpose { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); line-height: 1.4; }
+  .soul .needs { margin-top: 5px; font-size: 11px; color: var(--color-text-muted); }
+  .soul .needs .mono { color: var(--color-text); }
+  .soul .minispine { margin-top: 10px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .soul .mdot { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; border: 1px solid var(--color-border); background: var(--color-surface); }
+  .soul .mdot iconify-icon { font-size: 15px; }
+  .soul .mdot.emit { border-color: hsl(258 90% 66% / .5); box-shadow: 0 0 10px hsl(258 90% 66% / .2); }
+  .soul .msep { color: var(--color-text-dim); font-size: 10px; }
+  .soul .footrow { margin-top: 11px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .soul .tier { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; border: 1px solid hsl(43 96% 62% / .45); color: var(--neon-gold); border-radius: var(--radius-full); padding: 3px 10px; }
+  .soul .out { font-size: 11px; color: var(--color-text-muted); } .soul .out .mono { color: var(--color-text); }
+
+  /* run meta line (PhaseTimeline header: Phase i/N + agents) */
+  .runmeta { display: flex; align-items: center; gap: 8px; margin: 14px 2px 6px; flex-wrap: wrap; }
+  .runmeta .chip { font-family: var(--font-mono); font-size: 11px; background: var(--color-primary-dim); color: var(--color-primary); border-radius: var(--radius-sm); padding: 2px 8px; }
+  .runmeta .doing { font-size: 12px; color: var(--color-text-muted); }
+
+  /* ─────────────────── VERTICAL LIVING SPINE ─────────────────── */
+  .vspine { display: flex; flex-direction: column; list-style: none; margin: 4px 0 0; padding: 0; }
+  .vrow { display: flex; gap: 13px; min-height: 60px; }
+  .vrail { position: relative; width: 44px; flex: none; }
+  .seg { position: absolute; left: 50%; width: 2px; transform: translateX(-50%); background: var(--color-border); }
+  .seg.top { top: 0; height: 50%; } .seg.bot { top: 50%; height: 50%; }
+  .seg.done { background: linear-gradient(var(--color-success), hsl(142 71% 55%)); }
+  .seg.flow { background: linear-gradient(var(--color-border), var(--color-warning)); overflow: visible; }
+  .seg.flow .vcomet { position: absolute; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; background: var(--neon-cyan); box-shadow: 0 0 10px 2px var(--neon-cyan); animation: vcomet 1.25s linear infinite; }
+  @keyframes vcomet { 0% { top: -6px; opacity: 0; } 25% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+  .vnode { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; background: var(--color-surface); border: 1.5px solid var(--color-border); z-index: 1; transition: all var(--dur-base) var(--ease-out); }
+  .vnode iconify-icon { font-size: 22px; filter: saturate(.5) opacity(.5); transition: filter var(--dur-base); }
+  .vnode .nbadge { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 800; }
+
+  .vrow.done .vnode { border-color: hsl(142 71% 45% / .5); box-shadow: 0 0 14px hsl(142 71% 45% / .14); }
+  .vrow.done .vnode iconify-icon { filter: none; }
+  .vrow.done .nbadge { background: var(--color-success); color: #04210f; }
+
+  .vrow.run .vnode { border-color: var(--color-warning); background: var(--color-warning-dim); box-shadow: 0 0 24px hsl(38 92% 60% / .34); }
+  .vrow.run .vnode iconify-icon { filter: none; animation: floaty 2.2s ease-in-out infinite; }
+  .vrow.run .vnode::before { content: ""; position: absolute; inset: -5px; border-radius: 17px; border: 2px solid var(--color-warning); animation: aura 1.5s var(--ease-out) infinite; }
+  @keyframes aura { 0% { transform: scale(.9); opacity: .8; } 100% { transform: scale(1.5); opacity: 0; } }
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+  .vrow.pause .vnode { border-color: var(--color-warning); background: var(--color-warning-dim); box-shadow: 0 0 20px hsl(38 92% 60% / .26); }
+  .vrow.pause .vnode iconify-icon { filter: none; }
+  .vrow.fail .vnode { border-color: var(--color-danger); background: var(--color-danger-dim); box-shadow: 0 0 20px hsl(0 72% 51% / .26); }
+  .vrow.fail .vnode iconify-icon { filter: none; }
+  .vrow.fail .nbadge { background: var(--color-danger); color: #fff; }
+  .vrow.pending .vnode { opacity: .62; }
+
+  /* ── the card ── */
+  .pcard { flex: 1 1 auto; min-width: 0; align-self: center; border-radius: var(--radius-md); border: 1px solid transparent; padding: 9px 12px; transition: all var(--dur-base) var(--ease-out); }
+  .vrow.pending .pcard { opacity: .6; }                                  /* QUIET idle */
+  .vrow.run .pcard { background: linear-gradient(100deg, hsl(38 92% 60% / .12), transparent 80%); border-color: hsl(38 92% 60% / .4); border-left: 3px solid var(--color-warning); box-shadow: 0 0 30px hsl(38 92% 60% / .1); }
+  .vrow.pause .pcard { background: hsl(38 92% 60% / .1); border-color: var(--color-warning); border-left: 3px solid var(--color-warning); }
+  .vrow.fail .pcard { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / .4); border-left: 3px solid var(--color-danger); }
+
+  .pc-l1 { display: flex; align-items: center; gap: 8px; }
+  .pc-title { font-weight: 600; font-size: var(--text-sm); color: var(--color-text); min-width: 0; }
+  .vrow.pending .pc-title { color: var(--color-text-muted); font-weight: 500; }
+  .nn { font-family: var(--font-mono); font-size: 8px; font-weight: 700; color: var(--neon-violet); background: hsl(258 90% 66% / .14); border: 1px solid hsl(258 90% 66% / .35); border-radius: var(--radius-sm); padding: 0 4px; cursor: help; }
+  .statuspill { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; flex: none; }
+  .statuspill .g { font-size: 12px; }
+  .sp-pending { color: var(--color-text-dim); } .sp-run { color: var(--color-warning); } .sp-done { color: var(--color-success); } .sp-fail { color: hsl(0 80% 78%); } .sp-pause { color: var(--color-warning); }
+  .sp-run .bars { width: 26px; height: 4px; border-radius: 3px; overflow: hidden; background: hsl(38 92% 60% / .25); }
+  .sp-run .bars > i { display: block; height: 100%; width: 35%; background: var(--color-warning); border-radius: 3px; animation: indet 1.3s ease-in-out infinite; }
+  @keyframes indet { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+  .pc-l2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .pc-slug { color: var(--color-text-dim); }
+
+  /* LINE 3 — running ONLY: the honest activity line + which AI engine */
+  .pc-l3 { display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: var(--text-xs); color: var(--color-warning); flex-wrap: wrap; }
+  .pc-l3 .actdot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning); box-shadow: 0 0 7px 1px var(--color-warning); animation: dotBounce 1.4s infinite; flex: none; }
+  .pc-l3 .actbuild { position: relative; overflow: hidden; }
+  .pc-l3 b { color: var(--neon-gold); font-weight: 700; }
+  .pc-l3 .build-sheen { display: inline-block; background: linear-gradient(90deg, var(--color-warning), var(--neon-gold), var(--color-warning)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 2.2s linear infinite; }
+
+  .gate-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; font-family: var(--font-mono); font-size: 9px; color: var(--neon-violet); border: 1px solid hsl(258 90% 66% / .4); padding: 1px 7px; border-radius: var(--radius-sm); background: hsl(258 90% 66% / .08); }
+
+  /* engine chip (which AI runs this step) */
+  .engine-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 3px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-surface-hi); }
+  .engine-mark { width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; flex: none; box-shadow: 0 0 10px -3px currentColor; }
+  .engine-mark svg { width: 18px; height: 18px; display: block; }
+  .engine-mark.real { background: #fff; box-shadow: none; }
+  .engine-mark.real iconify-icon { font-size: 13px; }
+  .engine-name { font-family: var(--font-mono); font-size: 10px; color: var(--color-text); }
+
+  /* done = folded essence (click to expand) */
+  .pc-done-essence { display: flex; align-items: center; gap: 8px; }
+  .pc-expand { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); margin-left: auto; }
+
+  /* failure block (honest taxonomy) */
+  .failblk { margin-top: 8px; border: 1px solid hsl(0 72% 51% / .45); border-radius: var(--radius-md); background: hsl(0 72% 51% / .1); padding: 9px 11px; }
+  .failblk .fr { font-size: 12px; font-weight: 600; color: hsl(0 80% 80%); }
+  .failblk .fw { margin-top: 3px; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
+
+  .legend { margin-top: 18px; font-size: 11px; color: var(--color-text-dim); display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 2px 0; border-top: 1px solid var(--color-border-soft); }
+  .legend b { color: var(--color-text-muted); font-weight: 600; }
+
+  /* today (before) */
+  .today-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: 11px 13px; margin-bottom: 8px; }
+  .today-card .th { display: flex; align-items: center; gap: 8px; }
+  .today-card .tl { font-size: 11px; color: var(--color-text-muted); }
+  .today-card .ted { margin-top: 6px; font-size: 12px; color: var(--color-text-muted); font-style: italic; }
+  .note-amber { margin: 0 0 14px; font-size: 12px; color: var(--color-warning); }
+
+  /* calm anchor */
+  body.calm body::before { animation: none; }
+  body.calm .vcomet, body.calm .vrow.run .vnode iconify-icon, body.calm .vrow.run .vnode::before, body.calm .build-sheen, body.calm .pc-l3 .actdot { animation: none; }
+  body.calm .grad-text { background: none; color: var(--color-primary); -webkit-text-fill-color: var(--color-primary); }
+  body.calm .vrow.run .vnode, body.calm .vrow.run .pcard { box-shadow: none; }
+  body.calm .pc-l3 .build-sheen { color: var(--color-warning); }
+
+  .life { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 18px; }
+  .life .ll { font-size: 11px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: .07em; margin-right: 4px; }
+  .life button { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; transition: all var(--dur-fast); }
+  .life button:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .life button.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">052 · Step-flow</span>
+  <button class="variant-tab active" data-v="a" onclick="setVariant('a')">A · Density-by-status <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" onclick="setVariant('b')">B · Uniform-quiet</button>
+  <button class="variant-tab" data-v="c" onclick="setVariant('c')">C · Spine-led tail</button>
+  <button class="variant-tab" data-v="today" onclick="setVariant('today')">▣ Today (before)</button>
+</div>
+
+<div class="wrap">
+  <h1 class="page-h">The run, <span class="grad-text">alive where it's happening</span></h1>
+  <p class="page-sub">The live step list in the workspace panel. Steps that haven't started sit quiet and still; the step running now glows, shows what it's doing and which AI engine is on it, with energy flowing into it; finished steps settle to a calm one-line. It sits UNDER the workflow "soul" header shipped in Phase 124.</p>
+
+  <div class="life">
+    <span class="ll">Run state</span>
+    <button data-s="start" class="on" onclick="setStage('start')">1 · Start (all idle)</button>
+    <button data-s="running" onclick="setStage('running')">2 · Running</button>
+    <button data-s="pause" onclick="setStage('pause')">3 · Needs you</button>
+    <button data-s="done" onclick="setStage('done')">4 · Done</button>
+    <button data-s="fail" onclick="setStage('fail')">5 · Failed</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="ph-dot"></span><span class="ph-title">Workspace</span>
+      <span class="ph-x" id="panel-mode">Harness · running</span>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+  </div>
+
+  <div class="legend">
+    <span><b>Quiet at rest</b> — idle steps: dim, still, no type-lecture, no animation (SC#2).</span>
+    <span><b>Alive where it matters</b> — only the active step glows + flows + names its AI engine.</span>
+    <span><b>Honesty kept</b> — status = glyph+word+colour · running-only activity · gate chip only if a real validator exists · failed-as-failed.</span>
+    <span><b>Provider marks</b> — REAL logos where Iconify has them (DeepSeek/Claude/Gemini); Kimi/GLM/MiniMax are placeholders. The build uses the installed <span class="mono" style="color:var(--color-text)">@lobehub/icons</span> for all 8.</span>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <button onclick="document.body.classList.toggle('calm')" title="Toggle calm vs energized">⚡ Calm⇄Energized</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'" title="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* provider engine marks (shared with sketch 051) — featuring the Asian-tech natives */
+const PROVIDERS = {
+  deepseek: { name: "DeepSeek", color: "#4D6BFE", bg: "linear-gradient(135deg,#3b54e0,#6f8bff)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 9c3.5 1 5.5 3 7 6 .6-4 3-6.5 7-7-3 .2-5 1.4-7 4-1-2.3-2.6-3.2-4-3z" fill="#fff"/><circle cx="16.5" cy="8.5" r="1" fill="#fff"/></svg>` },
+  kimi:     { name: "Kimi", color: "#6F4CF0", bg: "linear-gradient(135deg,#161324,#4b3aa6)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M16.5 15.5A6 6 0 1 1 10 6.2a4.7 4.7 0 1 0 6.5 9.3z" fill="#fff"/></svg>` },
+  glm:      { name: "GLM", color: "#19B5A6", bg: "linear-gradient(135deg,#0f8f86,#2fe0cf)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v8l-7 4-7-4V7z" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M9 14h6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>` },
+  minimax:  { name: "MiniMax", color: "#F0414B", bg: "linear-gradient(135deg,#d62a35,#ff6a72)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 17V8l3.5 5L12 8l3.5 5L19 8v9" stroke="#fff" stroke-width="1.7" fill="none" stroke-linejoin="round" stroke-linecap="round"/></svg>` },
+  claude:   { name: "Claude", color: "#D97757", bg: "linear-gradient(135deg,#c75f3e,#e89274)",
+    svg: `<svg viewBox="0 0 24 24" fill="none"><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"/></g></svg>` },
+};
+// Real brand logos from Iconify's `logos` set where it HAS them; the rest are hand-built
+// placeholders. ⚠ THE REAL BUILD USES THE INSTALLED @lobehub/icons FOR ALL 8 PROVIDERS
+// (Phase 128 / sketch 048) — these mockup marks are NOT the shipped art.
+const PROVIDER_LOGO = { deepseek: "logos:deepseek-icon", claude: "logos:claude-icon", gemini: "logos:google-gemini" };
+function engineChip(key) {
+  const p = PROVIDERS[key];
+  const logo = PROVIDER_LOGO[key];
+  const mark = logo
+    ? `<span class="engine-mark real"><iconify-icon icon="${logo}"></iconify-icon></span>`
+    : `<span class="engine-mark mock" style="background:${p.bg};color:${p.color}" title="placeholder logo — the build uses the installed @lobehub/icons">${p.svg}</span>`;
+  return `<span class="engine-chip">${mark}<span class="engine-name">${p.name}</span></span>`;
+}
+
+/* phase-type 3D icons — the SAME fluent-emoji language as the gauntlet (051). NOTE: today the
+   shipped soul spine uses flat glyphs ⚙✎🤖⛓☺◆; this proposes the 3D set as the shared upgrade. */
+const PTYPE = {
+  programmatic:     { label: "Server step",     icon: "fluent-emoji:gear",                   fb: "⚙️" },
+  llm_single:       { label: "AI write step",   icon: "fluent-emoji:memo",                   fb: "📝" },
+  llm_agent:        { label: "AI agent step",   icon: "fluent-emoji:robot",                  fb: "🤖" },
+  llm_batch_agents: { label: "Parallel agents", icon: "fluent-emoji:busts-in-silhouette",    fb: "👥" },
+  llm_human_input:  { label: "Needs you",       icon: "fluent-emoji:raised-hand",            fb: "✋" },
+  llm_emit:         { label: "Deliverable",     icon: "fluent-emoji:package",                fb: "📦" },
+};
+
+/* the storyboard — the published "Vendor-risk portfolio review" (same as sketch 022) */
+const PHASES = [
+  { slug: "load_kb",            name: "Load the Vendors KB",         type: "programmatic",     engine: null,       activity: "Reading <b>218 documents</b> from the Vendors KB" },
+  { slug: "research_vendors",   name: "Research each vendor",        type: "llm_agent",        engine: "deepseek", activity: 'Searching the <b>Procurement KB</b> for breach history' },
+  { slug: "score_vendors",      name: "Score each vendor on risk",   type: "llm_batch_agents", engine: "deepseek", activity: "<b>14 agents</b> scoring vendors in parallel" },
+  { slug: "draft_brief",        name: "Draft the committee brief",   type: "llm_single",       engine: "claude",   activity: "Writing the executive summary" },
+  { slug: "confirm_escalations",name: "Confirm escalations",         type: "llm_human_input",  engine: null,       activity: "Waiting for your answer" },
+  { slug: "emit_docx",          name: "Produce committee_brief.docx",type: "llm_emit",         engine: "claude",   gate: "cited · structure", activity: "Filling <b>committee_brief.docx</b>" },
+];
+
+/* run-state → per-phase status + the active index */
+function statuses(s) {
+  switch (s) {
+    case "start":   return { st: ["pending","pending","pending","pending","pending","pending"], active: -1 };
+    case "running": return { st: ["done","done","run","pending","pending","pending"], active: 2 };
+    case "pause":   return { st: ["done","done","done","done","pause","pending"], active: 4 };
+    case "done":    return { st: ["done","done","done","done","done","done"], active: -1 };
+    case "fail":    return { st: ["done","done","done","fail","pending","pending"], active: 3 };
+  }
+}
+const PILL = { pending:{g:"○",t:"Locked",c:"sp-pending"}, run:{g:"●",t:"Running",c:"sp-run"}, done:{g:"✓",t:"Complete",c:"sp-done"}, fail:{g:"✕",t:"Failed",c:"sp-fail"}, pause:{g:"☺",t:"Needs you",c:"sp-pause"} };
+
+/* ── soul header (shipped Phase 124, scale="run") — rendered so 052 sits UNDER it ── */
+function soulHeader() {
+  const dots = PHASES.map(p => {
+    const m = PTYPE[p.type];
+    return `<span class="mdot ${p.type === "llm_emit" ? "emit" : ""}" title="${p.name}"><iconify-icon icon="${m.icon}">${m.fb}</iconify-icon></span>`;
+  }).join('<span class="msep">·</span>');
+  return `<div class="soul">
+    <span class="tag124">soul · shipped Phase 124</span>
+    <div class="purpose">Produce a cited vendor-risk brief for the procurement committee.</div>
+    <div class="needs">needs <span class="mono">kickoff_prompt</span> · reads <span class="mono">Vendors KB</span></div>
+    <div class="minispine">${dots}</div>
+    <div class="footrow">
+      <span class="tier">🔒 Strict</span>
+      <span class="out">produces: <span class="mono">committee_brief.docx</span> (cited)</span>
+    </div>
+  </div>`;
+}
+
+function statusPill(st) {
+  const p = PILL[st];
+  const bars = st === "run" ? `<span class="bars"><i></i></span>` : "";
+  return `<span class="statuspill ${p.c}"><span class="g" aria-hidden="true">${p.g}</span>${p.t}${bars}</span>`;
+}
+
+/* one phase row, variant A = density-by-status */
+function rowA(p, st, i, total, isLast) {
+  const m = PTYPE[p.type];
+  const segTop = i === 0 ? "" : (st === "run" || st === "pause" ? `<span class="seg top flow"><span class="vcomet"></span></span>` : `<span class="seg top ${(statuses(S).st[i-1] === "done") ? "done" : ""}"></span>`);
+  const segBot = isLast ? "" : `<span class="seg bot ${st === "done" ? "done" : ""}"></span>`;
+  const badge = st === "done" ? `<span class="nbadge">✓</span>` : st === "fail" ? `<span class="nbadge">!</span>` : "";
+
+  let body;
+  if (st === "done") {
+    body = `<div class="pc-l1 pc-done-essence">
+        <span class="pc-title">${p.name}</span>
+        ${statusPill(st)}
+        <span class="pc-expand">expand ▸</span>
+      </div>`;
+  } else if (st === "pending") {
+    body = `<div class="pc-l1"><span class="pc-title">${p.name}</span>${statusPill(st)}</div>`;
+  } else {
+    // running / pause / fail — full attention
+    body = `<div class="pc-l1">
+        <span class="pc-title">${p.name}</span>
+        <span class="nn" title="phase.name — a human title; NET-NEW on the wire (a Phase-103 authoring output).">NET-NEW</span>
+        ${statusPill(st)}
+      </div>
+      <div class="pc-l2"><span>Phase ${i + 1} of ${total} · ${m.label}</span> · <span class="pc-slug">${p.slug}</span></div>`;
+    if (st === "run" || st === "pause") {
+      body += `<div class="pc-l3"><span class="actdot"></span><span class="build-sheen">${p.activity}</span>${p.engine ? engineChip(p.engine) : ""}</div>`;
+    }
+    if (st === "fail") {
+      body += `<div class="failblk"><div class="fr">A validation gate failed after 1 attempt; the run halted.</div><div class="fw">phase: ${p.slug} → gate · attempt 1</div></div>`;
+    }
+    if (p.gate && (st === "run" || st === "pause")) body += `<span class="gate-chip">⛨ ${p.gate}</span>`;
+  }
+
+  return `<li class="vrow ${st}">
+    <div class="vrail">${segTop}${segBot}<span class="vnode"><iconify-icon icon="${m.icon}">${m.fb}</iconify-icon>${badge}</span></div>
+    <div class="pcard">${body}</div>
+  </li>`;
+}
+
+/* variant B = uniform-quiet (one line everywhere; active adds only the activity line) */
+function rowB(p, st, i, total, isLast) {
+  const m = PTYPE[p.type];
+  const segTop = i === 0 ? "" : (st === "run" || st === "pause" ? `<span class="seg top flow"><span class="vcomet"></span></span>` : `<span class="seg top ${(statuses(S).st[i-1] === "done") ? "done" : ""}"></span>`);
+  const segBot = isLast ? "" : `<span class="seg bot ${st === "done" ? "done" : ""}"></span>`;
+  const badge = st === "done" ? `<span class="nbadge">✓</span>` : st === "fail" ? `<span class="nbadge">!</span>` : "";
+  let body = `<div class="pc-l1"><span class="pc-title">${p.name}</span>${statusPill(st)}</div>`;
+  if (st === "run" || st === "pause") body += `<div class="pc-l3"><span class="actdot"></span>${p.activity}${p.engine ? engineChip(p.engine) : ""}</div>`;
+  if (st === "fail") body += `<div class="failblk"><div class="fr">A validation gate failed after 1 attempt; the run halted.</div><div class="fw">phase: ${p.slug} → gate</div></div>`;
+  return `<li class="vrow ${st}" style="min-height:50px"><div class="vrail">${segTop}${segBot}<span class="vnode"><iconify-icon icon="${m.icon}">${m.fb}</iconify-icon>${badge}</span></div><div class="pcard">${body}</div></li>`;
+}
+
+/* variant C = spine-led tail: idle phases collapse to bare glyph-dots (no card); only
+   done + active render as cards. The not-yet-run future reads as a quiet dotted tail. */
+function renderC(s) {
+  const { st } = statuses(s);
+  const total = PHASES.length;
+  let html = '<ol class="vspine">';
+  PHASES.forEach((p, i) => {
+    const status = st[i];
+    const isLast = i === total - 1;
+    const m = PTYPE[p.type];
+    if (status === "pending") {
+      const segTop = i === 0 ? "" : `<span class="seg top ${st[i-1] === "done" ? "done" : ""}"></span>`;
+      const segBot = isLast ? "" : `<span class="seg bot"></span>`;
+      html += `<li class="vrow pending" style="min-height:40px"><div class="vrail">${segTop}${segBot}<span class="vnode" style="width:30px;height:30px"><iconify-icon icon="${m.icon}" style="font-size:16px">${m.fb}</iconify-icon></span></div>
+        <div class="pcard" style="padding:5px 12px"><span class="pc-title" style="font-size:12px">${p.name}</span></div></li>`;
+    } else {
+      html += rowA(p, status, i, total, isLast);
+    }
+  });
+  return html + "</ol>";
+}
+
+function renderRows(s, rowFn) {
+  const { st } = statuses(s);
+  const total = PHASES.length;
+  let html = '<ol class="vspine">';
+  PHASES.forEach((p, i) => html += rowFn(p, st[i], i, total, i === total - 1));
+  return html + "</ol>";
+}
+
+function runMeta(s) {
+  const { st, active } = statuses(s);
+  const doneCount = st.filter(x => x === "done").length;
+  const cur = active >= 0 ? active + 1 : (s === "done" ? PHASES.length : 0);
+  let doing = "Setting up…";
+  if (s === "done") doing = "Workflow complete";
+  else if (s === "fail") doing = "Run failed during draft_brief.";
+  else if (s === "pause") doing = "Paused — confirm_escalations needs you.";
+  else if (active >= 0) doing = `${PHASES[active].slug} — running`;
+  const agents = (s === "running") ? `<span class="doing">· 14 agents</span>` : "";
+  return `<div class="runmeta"><span class="chip">Phase ${Math.max(cur, doneCount)} / ${PHASES.length}</span><span class="doing">${doing}</span>${agents}</div>`;
+}
+
+function renderToday() {
+  const rows = PHASES.slice(0, 4).map((p, i) => {
+    const m = PTYPE[p.type];
+    return `<div class="today-card"><div class="th"><span style="opacity:.6">${m.fb}</span>
+      <span class="tl">Phase ${i + 1} · ${m.label}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--color-text-dim)">${i < 2 ? "✓ Complete" : i === 2 ? "● Running" : "○ Locked"}</span></div>
+      <div style="font-size:13px;font-weight:600;margin-top:2px">${p.slug}</div>
+      <div class="ted">${m.label === "Server step" ? "A fixed server function ran — no AI." : m.label === "AI agent step" ? "An AI agent using allowed tools, looping until done." : m.label === "Parallel agents" ? "Many AI agents at once, results merged." : "One AI message — think/write."}</div>
+    </div>`;
+  }).join("");
+  return `<div class="note-amber">▣ Today’s shipped step cards — for contrast. Every row repeats its type label + an explainer line (“chatty at rest”), reads slug-first, and flat glyphs.</div>${rows}`;
+}
+
+let V = "a", S = "start";
+function render() {
+  const body = document.getElementById("panel-body");
+  document.getElementById("panel-mode").textContent =
+    S === "done" ? "Harness · done" : S === "fail" ? "Harness · failed" : S === "pause" ? "Harness · needs you" : S === "start" ? "Harness · starting" : "Harness · running";
+  if (V === "today") { body.innerHTML = renderToday(); return; }
+  let spine;
+  if (V === "a") spine = renderRows(S, rowA);
+  else if (V === "b") spine = renderRows(S, rowB);
+  else spine = renderC(S);
+  body.innerHTML = soulHeader() + runMeta(S) + spine;
+}
+function setVariant(v) {
+  V = v;
+  document.querySelectorAll(".variant-tab").forEach(t => t.classList.toggle("active", t.dataset.v === v));
+  document.querySelector(".life").style.display = (v === "today") ? "none" : "flex";
+  render();
+}
+function setStage(s) {
+  S = s;
+  document.querySelectorAll(".life button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
+  render();
+}
+render();
+</script>
+</body>
+</html>

@@ -132,6 +132,48 @@ def _accumulate_chunk_usage(
     return input_total + _i, (output_total or 0) + _o
 
 
+# The char DeepSeek uses in its native tool-call markup is the fullwidth vertical
+# bar U+FF5C (｜), NOT the ASCII pipe (this file is UTF-8). The opener below begins
+# a "<｜｜DSML｜｜tool_calls>" block that DeepSeek can leak into visible content.
+_DSML_OPENER = "<｜｜DSML｜｜"
+
+
+def _strip_deepseek_tool_markup(
+    text: str, pending: str, leaking: bool
+) -> tuple[str, str, bool]:
+    """Suppress DeepSeek native tool-call markup that leaked into VISIBLE content.
+
+    DeepSeek sometimes emits a tool call as plain text using its
+    ``<｜｜DSML｜｜tool_calls>…`` markup instead of the structured ``tool_calls``
+    delta (observed on long tool-chains — thread 5a86a9fd, 2026-07-08, where ~16 KB
+    of raw markup rendered in the chat). Our normalizer treats ``delta.content`` as
+    visible assistant text, so the markup leaked verbatim. Once the opener appears we
+    drop everything from it onward; any prose BEFORE it is preserved untouched.
+
+    This ONLY stops the dirty content — it does NOT re-parse the markup into a real
+    tool call, so the leaked tool does not execute (re-parse is a tracked follow-up).
+    Provider-scoped: the caller invokes this for ``deepseek`` only, so every other
+    provider's visible content stays byte-identical.
+
+    Returns ``(visible_out, new_pending, new_leaking)``. ``pending`` carries a short
+    trailing fragment that could be the opener split across streaming chunks.
+    Pure/side-effect-free — see ``test_openai_compat_dsml_strip.py``.
+    """
+    if leaking:
+        return "", "", True
+    buf = pending + text
+    idx = buf.find(_DSML_OPENER)
+    if idx != -1:
+        return buf[:idx], "", True
+    # No full opener yet — hold back the longest tail that is a prefix of the opener
+    # (it may arrive split across chunks). Everything before that tail is emitted.
+    max_tail = min(len(_DSML_OPENER) - 1, len(buf))
+    for k in range(max_tail, 0, -1):
+        if _DSML_OPENER.startswith(buf[-k:]):
+            return buf[:-k], buf[-k:], False
+    return buf, "", False
+
+
 class _ClosableEventStream:
     """A SYNC iterator of canonical ``GatewayEvent`` dicts wrapping the raw OpenAI
     ``Stream``, with a ``.close`` that delegates to the underlying stream.
@@ -180,6 +222,12 @@ class _ClosableEventStream:
         # BUG-260526-02: Kimi/Moonshot <think> tag state machine — adapter-local
         # stream state (one stream = one think-block tracker).
         _in_think_block: bool = False
+        # DeepSeek native tool-call markup can leak into the VISIBLE content channel
+        # on long tool-chains (thread 5a86a9fd, 2026-07-08). Per-stream state for
+        # suppressing it — see _strip_deepseek_tool_markup. deepseek-only; inert
+        # for every other provider (the caller gates on active_provider_name).
+        _dsml_leaking: bool = False
+        _dsml_pending: str = ""
         _announced_tools: set[int] = set()
         # Phase 075.6 Plan 01 / Req #3 / RESEARCH L1 / L-4: OpenAI-native and
         # OpenRouter share this normalizer (both go through the OpenAI Python SDK
@@ -259,6 +307,16 @@ class _ClosableEventStream:
                                 _remaining = ""
                     if _reasoning:
                         yield {"type": "reasoning_delta", "content": _reasoning}
+                    # DeepSeek-only: suppress native tool-call markup that leaked
+                    # into the visible channel (never re-render a raw <｜｜DSML｜｜…>
+                    # block). No-op for moonshot/minimax/zhipu — their markup differs
+                    # and this opener will simply never match.
+                    if active_provider_name == "deepseek":
+                        _visible, _dsml_pending, _dsml_leaking = (
+                            _strip_deepseek_tool_markup(
+                                _visible, _dsml_pending, _dsml_leaking
+                            )
+                        )
                     if _visible:
                         yield {"type": "delta", "content": _visible}
                 else:

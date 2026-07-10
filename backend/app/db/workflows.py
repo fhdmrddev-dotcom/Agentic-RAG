@@ -157,7 +157,11 @@ async def create_workflow_run(
 
 
 async def list_published_workflows(
-    pool: asyncpg.Pool, *, user_id: UUID, project_folder_id: UUID | None = None
+    pool: asyncpg.Pool,
+    *,
+    user_id: UUID,
+    project_folder_id: UUID | None = None,
+    owned_only: bool = False,
 ) -> list[dict]:
     """Published workflow definitions visible to a user (the picker feed).
 
@@ -181,22 +185,69 @@ async def list_published_workflows(
     INDEX ``$N`` — a code-derived int — is f-string-built). When omitted the
     query is byte-identical to the pre-098 full published list (backward
     compatible).
+
+    SCOPED NARROWING (Phase 143 / WF-01, D-143-2b): the additive keyword-only
+    ``owned_only`` flag (default ``False``) narrows the predicate to the caller's
+    OWN published rows (``created_by = $1``, dropping the bare ``is_global``) so
+    the Workflows-page Published shelf stops double-rendering the curated globals
+    that now live in their own Starters shelf (D-143-2a end state). This is a
+    SCOPED narrowing, NOT a blanket change: the DEFAULT ``owned_only=False`` keeps
+    the exact ``(is_global = true OR created_by = $1)`` predicate every OTHER caller
+    relies on — the composer Harness picker, ``WorkspacePanel`` run-soul, and
+    ``threads.py`` kickoff all NEED the global rows (Pitfall 3). Mirrors the
+    ``is_golden_run=False`` keyword-only precedent: default OFF = byte-identical.
     """
-    sql = (
-        # Phase 103-06 (REQ-7 D9/D10): the Workflows page card derives the
-        # client-side strictness tier (deriveTier) + the phase-type chain from the
-        # REAL definition JSONB, so the list additionally returns ``definition``.
-        # This is purely ADDITIVE — the pre-103 id/slug/name picker callers ignore
-        # the extra column (asyncpg's pool codec decodes the JSONB to a dict).
-        "SELECT id, slug, name, definition FROM workflow_definitions "
-        "WHERE status = 'published' AND (is_global = true OR created_by = $1)"
-    )
+    if owned_only:
+        # D-143-2b — the Workflows-page Published shelf only; drop the bare
+        # is_global so curated globals live solely in the Starters shelf.
+        sql = (
+            "SELECT id, slug, name, definition FROM workflow_definitions "
+            "WHERE status = 'published' AND created_by = $1"
+        )
+    else:
+        sql = (
+            # Phase 103-06 (REQ-7 D9/D10): the Workflows page card derives the
+            # client-side strictness tier (deriveTier) + the phase-type chain from
+            # the REAL definition JSONB, so the list additionally returns
+            # ``definition``. This is purely ADDITIVE — the pre-103 id/slug/name
+            # picker callers ignore the extra column (asyncpg's pool codec decodes
+            # the JSONB to a dict).
+            "SELECT id, slug, name, definition FROM workflow_definitions "
+            "WHERE status = 'published' AND (is_global = true OR created_by = $1)"
+        )
     params: list = [user_id]
     if project_folder_id is not None:
         params.append(str(project_folder_id))  # definition->>'key' returns TEXT → bind str
         sql += f" AND definition->>'project_folder_id' = ${len(params)}"
     sql += " ORDER BY name"
     rows = await pool.fetch(sql, *params)
+    return [dict(r) for r in rows]
+
+
+async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
+    """Curated global starters — the Starters shelf feed (Phase 143 / WF-01, D-143-2).
+
+    Returns the ``status='published' AND is_global=true`` definitions carrying the
+    JSONB curation marker ``definition->>'category' = 'starter'`` — the 3 seeded
+    starters (Plan 03), NOT the 5 mig-061 dev scaffolds (which lack the marker so
+    they are excluded from this shelf, D-143-2a). Mirrors the
+    ``definition->>'project_folder_id'`` JSONB-path precedent in
+    ``list_published_workflows``.
+
+    NO user scope: ``is_global`` published rows are world-readable by the mig-056
+    SELECT policy (T-143-01 — no private row can appear); ``category='starter'``
+    narrows to curated. The ``'starter'`` literal is a CONSTANT predicate, not user
+    input, so it is a ``$``-free literal — the ``$N``-only binding rule (T-073-02 /
+    T-091-03) applies only to user-supplied values, of which this query has none
+    (V5 — no injection surface). Returns the id/slug/name/definition the shelf card
+    needs (mirrors ``list_published_workflows``' additive ``definition`` column).
+    """
+    rows = await pool.fetch(
+        "SELECT id, slug, name, definition FROM workflow_definitions "
+        "WHERE status = 'published' AND is_global = true "
+        "AND definition->>'category' = 'starter' "
+        "ORDER BY name"
+    )
     return [dict(r) for r in rows]
 
 

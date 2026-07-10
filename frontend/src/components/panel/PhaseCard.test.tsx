@@ -160,3 +160,94 @@ describe("PhaseCard — GAP-C does not regress a plain non-emit phase  [owner: 1
     expect(screen.getByText("Complete")).toBeInTheDocument()
   })
 })
+
+// ── Phase 127-03 (WUX-03 / SC#2) — density-by-status: quiet idle / bloom active /
+//    fold done, the shared 3D glyph, and the running-only honest engine chip. These
+//    are the NEW density contracts; every assertion above stays green UNCHANGED (the
+//    visual-only proof that the re-skin did not touch the data model or a11y scaffold). ──
+const LLM_AGENT_ONELINER = "An AI agent using allowed tools, looping until done."
+
+describe("PhaseCard — 127-03 density-by-status (WUX-03 / SC#2)  [owner: 127-03]", () => {
+  it("a pending (idle) card is QUIET — no type one-liner, no activity line, no motion", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ phaseType: "llm_agent", status: "pending" })} position={0} />,
+    )
+    // No type-lecture one-liner on idle (it belongs only to the active step).
+    expect(screen.queryByText(LLM_AGENT_ONELINER)).not.toBeInTheDocument()
+    // No running-only activity line.
+    expect(container.querySelector("[data-activity-line]")).toBeNull()
+    // No pulse / animation class anywhere on a quiet idle card.
+    expect(container.querySelector('[class*="animate-"]')).toBeNull()
+  })
+
+  it("a running (active) card BLOOMS — it renders the running-only activity line", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ phaseType: "llm_agent", status: "running" })} position={0} />,
+    )
+    expect(container.querySelector("[data-activity-line]")).toBeInTheDocument()
+    // The active step shows its one-liner context (a DIFFERENT line from the activity line).
+    expect(screen.getByText(LLM_AGENT_ONELINER)).toBeInTheDocument()
+  })
+
+  it("the running activity line renders the engine chip ONLY when a real provider exists", () => {
+    // A real sub-agent provider → a brand mark (svg) renders in the activity line.
+    const withProvider = render(
+      <PhaseCard
+        phase={fillPhase({
+          phaseType: "llm_agent",
+          status: "running",
+          subAgents: [
+            {
+              sub_run_id: "s1",
+              parent_run_id: "p1",
+              status: "running",
+              model: "claude-opus-4-8",
+              provider: "anthropic",
+            },
+          ],
+        })}
+        position={0}
+      />,
+    )
+    const line = withProvider.container.querySelector("[data-activity-line]")
+    expect(line).toBeInTheDocument()
+    expect(line?.querySelector("svg")).toBeInTheDocument()
+    withProvider.unmount()
+
+    // No provider (subAgents: []) → the chip is honestly-ABSENT (no Bot on the live card).
+    const noProvider = render(
+      <PhaseCard
+        phase={fillPhase({ phaseType: "llm_agent", status: "running", subAgents: [] })}
+        position={0}
+      />,
+    )
+    const line2 = noProvider.container.querySelector("[data-activity-line]")
+    expect(line2).toBeInTheDocument()
+    expect(line2?.querySelector("svg")).toBeNull()
+  })
+
+  it("a done card FOLDS to a one-line essence — no type one-liner, no activity line", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ phaseType: "llm_agent", status: "done" })} position={0} />,
+    )
+    expect(screen.queryByText(LLM_AGENT_ONELINER)).not.toBeInTheDocument()
+    expect(container.querySelector("[data-activity-line]")).toBeNull()
+    expect(screen.getByText("Complete")).toBeInTheDocument()
+  })
+
+  it("renders the shared 3D phase-type glyph for a known type, unicode fallback for an unknown type", () => {
+    // Known type → the 3D mark (an svg) renders in the header <h3>.
+    const known = render(
+      <PhaseCard phase={fillPhase({ phaseType: "llm_agent", status: "pending" })} position={0} />,
+    )
+    expect(known.container.querySelector("h3")?.querySelector("svg")).toBeInTheDocument()
+    known.unmount()
+    // Unknown type → phaseGlyph returns null → the unicode "•" fallback, no svg glyph.
+    const unknown = render(
+      <PhaseCard phase={fillPhase({ phaseType: "some_future_type", status: "pending" })} position={0} />,
+    )
+    const head = unknown.container.querySelector("h3")
+    expect(head?.textContent).toContain("•")
+    expect(head?.querySelector("svg")).toBeNull()
+  })
+})

@@ -1,19 +1,58 @@
 import { useState, useRef } from "react"
-import { Plus, Zap, Upload, Loader2 } from "lucide-react"
+import { Plus, Zap, Upload, Loader2, FlaskConical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSkills } from "@/hooks/useSkills"
 import { useAuth } from "@/hooks/useAuth"
+import { useResizablePanel } from "@/hooks/useResizablePanel"
 import { SkillCard } from "@/components/skills/SkillCard"
 import { SkillDetailPanel } from "@/components/skills/SkillFormDialog"
-import { exportSkill, importSkillZip } from "@/lib/api"
+import { exportSkill, importSkillZip, type SkillImportResult } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
 interface Props {
   onTryInChat?: (skillName: string) => void
+  // Phase 123-05 (TRIG-01 / sketch 041-A): opens the focused Skill Studio for a skill
+  // (entered WITH a skillId). Threaded from ChatLayout → App's handleTuneSkill, which now
+  // REDIRECTS to Studio · Triggering (the Trigger Tuner is absorbed as the Triggering
+  // tab — no orphan surface). The existing "Tune triggers" button below is unchanged.
+  onTuneSkill?: (skillId: string) => void
+  // Phase 137-06 (PANEL-01 / sketch 057 MAP): the Studio navigators, accepted here so
+  // ChatLayout's pass-through typechecks and Plan 07 can drill them to the slim detail
+  // panel that owns the sole studio-entry button. Deliberately NOT destructured or
+  // consumed in this plan (no duplicate entry button lives in SkillsPage — Plan 07 owns
+  // it); leaving them undestructured avoids a noUnusedLocals error while keeping the
+  // interface ready.
+  onOpenStudio?: (skillId: string, tab?: "evals" | "triggering" | "versions") => void
+  onReviewEvals?: (skillId: string) => void
 }
 
-export function SkillsPage({ onTryInChat }: Props) {
+/**
+ * Phase 142 (SRH-01 / SC#1 / D-08): build the muted import-result line. Pure — so it can
+ * be unit-tested without mounting the whole page. When the result carries non-blocking
+ * honesty notes[] (a bundled non-Python script the sandbox can't run), the note text is
+ * appended to the SAME muted line — no new component (D-09), stays `isError: false`.
+ * Exported for SkillsPage.import.test.tsx; handleImport MUST call it so the test exercises
+ * the real render path.
+ */
+export function buildImportMessage(result: SkillImportResult): { text: string; isError: boolean } {
+  const created = result.created.length
+  const failed = result.errors.length
+  if (created === 0) {
+    return { text: "No skills were imported.", isError: true }
+  }
+  let text =
+    failed > 0
+      ? `${created} skill${created > 1 ? "s" : ""} imported, ${failed} failed - check your ZIP.`
+      : `${created} skill${created > 1 ? "s" : ""} imported.`
+  // Append any non-blocking script-honesty notes onto the existing muted line (D-09).
+  if (result.notes?.length) {
+    text += result.notes.map((n) => ` Note: ${n.note}`).join("")
+  }
+  return { text, isError: false }
+}
+
+export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEvals }: Props) {
   const { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal } = useSkills()
   const { user } = useAuth()
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
@@ -22,14 +61,28 @@ export function SkillsPage({ onTryInChat }: Props) {
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<{ text: string; isError: boolean } | null>(null)
 
-  const handleSave = async (body: SkillCreate | SkillUpdate) => {
+  // Sketch 046-C: the detail rail is resizable. It defaults to the standard
+  // 384px side-rail width (consistent with every other panel at rest); dragging
+  // the left-edge handle widens it for editing long instructions, and the width
+  // is remembered. minWidth keeps it from collapsing below the form's needs;
+  // maxWidth keeps it from swallowing the skill list.
+  const { width: panelWidth, isResizing, separatorProps } = useResizablePanel({
+    storageKey: "skills-detail-panel-width",
+    defaultWidth: 384,
+    minWidth: 340,
+    maxWidth: 760,
+  })
+
+  const handleSave = async (body: SkillCreate | SkillUpdate): Promise<Skill> => {
     if (selectedSkill) {
-      await updateSkill(selectedSkill.id, body as SkillUpdate)
-      // Panel stays open after edit — user sees updated state
-    } else {
-      await createSkill(body as SkillCreate)
-      setIsCreatingNew(false) // close after new skill created
+      // Panel stays open after edit — user sees updated state + any lint warnings.
+      // Return the saved skill so SkillDetailPanel can surface its lint_warnings
+      // (Phase 123-06 / TRIG-03 — the inline never-block warning + "Tune this").
+      return updateSkill(selectedSkill.id, body as SkillUpdate)
     }
+    const created = await createSkill(body as SkillCreate)
+    setIsCreatingNew(false) // close after new skill created
+    return created
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,15 +92,7 @@ export function SkillsPage({ onTryInChat }: Props) {
     setImportMessage(null)
     try {
       const result = await importSkillZip(file)
-      const created = result.created.length
-      const failed = result.errors.length
-      if (failed > 0 && created > 0) {
-        setImportMessage({ text: `${created} skill${created > 1 ? "s" : ""} imported, ${failed} failed - check your ZIP.`, isError: false })
-      } else if (created > 0) {
-        setImportMessage({ text: `${created} skill${created > 1 ? "s" : ""} imported.`, isError: false })
-      } else {
-        setImportMessage({ text: "No skills were imported.", isError: true })
-      }
+      setImportMessage(buildImportMessage(result))
       await loadSkills()
     } catch (err) {
       setImportMessage({ text: err instanceof Error ? err.message : "Import failed", isError: true })
@@ -60,11 +105,8 @@ export function SkillsPage({ onTryInChat }: Props) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Pane 1: Decorative left — tonal depth anchor */}
-      <div className="w-16 shrink-0 bg-sidebar" />
-
-      {/* Pane 2: Center — page header + scrollable skill list */}
+    <div className={cn("flex h-full overflow-hidden", isResizing && "select-none")}>
+      {/* Center — page header + scrollable skill list (sits flush against the real NavPanel) */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden border-r border-border/10">
         {/* Page header */}
         <div className="px-8 pt-8 pb-6 flex items-center justify-between shrink-0">
@@ -132,6 +174,7 @@ export function SkillsPage({ onTryInChat }: Props) {
                   onToggleGlobal={toggleGlobal}
                   onTryInChat={onTryInChat ?? (() => {})}
                   onExport={exportSkill}
+                  onReviewEvals={onReviewEvals}
                 />
               ))}
             </div>
@@ -139,20 +182,56 @@ export function SkillsPage({ onTryInChat }: Props) {
         </div>
       </div>
 
-      {/* Pane 3: Right — inline detail/create panel */}
+      {/* Drag handle — widen the detail rail for editing long instructions (sketch
+          046-C). Doubles as the seam between the list and the panel; keyboard users
+          can focus it and use ←/→ to resize. */}
       <div
-        className="w-96 shrink-0 border-l border-border/10 overflow-y-auto bg-card/30"
+        {...separatorProps}
+        aria-label="Resize skill details panel"
+        className={cn(
+          "w-1.5 shrink-0 cursor-col-resize touch-none bg-border/10 transition-colors",
+          "hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none",
+          isResizing && "bg-primary/60",
+        )}
+      />
+
+      {/* Pane 3: Right — resizable inline detail/create panel */}
+      <div
+        className="shrink-0 overflow-y-auto bg-card/30"
+        style={{ width: panelWidth }}
         role="region"
         aria-label="Skill details"
         aria-live="polite"
       >
         {selectedSkill || isCreatingNew ? (
-          <SkillDetailPanel
-            skill={selectedSkill}
-            onSave={handleSave}
-            onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
-            currentUserId={user?.id}
-          />
+          <div className="flex flex-col h-full">
+            {/* Phase 123-05 (TRIG-01 / sketch 041-A): the "Tune triggers" entry
+                action — opens the focused Trigger Tuner for THIS skill (only on a
+                saved skill, never while creating). This is the reachability entry
+                point: onTuneSkill(id) → App's tunerSkillId setter +
+                onNavigate('skill-tuner'). */}
+            {selectedSkill && onOpenStudio && (
+              <div className="px-6 pt-4 shrink-0">
+                <Button
+                  size="sm"
+                  className="w-full justify-center gap-2"
+                  onClick={() => onOpenStudio(selectedSkill.id, "evals")}
+                >
+                  <FlaskConical className="h-4 w-4" />
+                  Open Studio
+                </Button>
+              </div>
+            )}
+            <div className="flex-1 min-h-0">
+              <SkillDetailPanel
+                skill={selectedSkill}
+                onSave={handleSave}
+                onDiscard={() => { setSelectedSkill(null); setIsCreatingNew(false) }}
+                currentUserId={user?.id}
+                onTuneSkill={onTuneSkill}
+              />
+            </div>
+          </div>
         ) : (
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full text-center px-6">

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 058 — Matrix Launch &amp; Rows</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  /* ── Page scaffold ─────────────────────────────────────────── */
+  .stage { max-width: 1180px; margin: 0 auto; padding: 20px; transition: max-width var(--dur-base) var(--ease-out); }
+  .context-strip {
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    padding: 10px 20px; border-bottom:1px solid var(--color-border-soft);
+    background: var(--color-bg-elev1); font-size: var(--text-xs);
+  }
+  .context-strip .q { color: var(--color-text-muted); max-width: 720px; }
+  .sim-controls { margin-left:auto; display:flex; gap:6px; }
+  .sim-btn {
+    background: var(--color-accent); color: var(--color-text); border:1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 4px 10px; font-size: var(--text-xs); cursor:pointer;
+    font-family: var(--font-sans); transition: all var(--dur-fast) var(--ease-out);
+  }
+  .sim-btn:hover { border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .sim-btn.primary { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  /* ── Studio shell (locked 053-A / 057-A language) ──────────── */
+  .studio {
+    border:1px solid var(--color-border); border-radius: var(--radius-lg);
+    background: var(--color-surface); overflow:hidden; box-shadow: var(--shadow-md);
+  }
+  .studio-header {
+    display:flex; align-items:center; gap:12px; padding: 12px 18px;
+    border-bottom:1px solid var(--color-border-soft); background: var(--color-bg-elev1);
+  }
+  .back-link { color: var(--color-text-dim); font-size: var(--text-sm); text-decoration:none; cursor:pointer; }
+  .back-link:hover { color: var(--color-text); }
+  .skill-name { font-family: var(--font-headline); font-weight:700; font-size: var(--text-md); }
+  .ver-chip { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); background: var(--color-muted); padding:2px 7px; border-radius: var(--radius-full); }
+  .live-chip { font-size:9px; font-weight:700; letter-spacing:.08em; color: var(--color-success); background: var(--color-success-dim); padding:2px 8px; border-radius: var(--radius-full); }
+  .gate-strip { margin-left:auto; font-size: var(--text-xs); color: var(--color-text-muted); display:flex; align-items:center; gap:6px; }
+  .gate-strip .ok { color: var(--color-success); }
+  .studio-tabs { display:flex; gap:2px; padding: 0 14px; border-bottom:1px solid var(--color-border-soft); background: var(--color-bg-elev1); }
+  .studio-tab {
+    padding: 9px 14px; font-size: var(--text-sm); color: var(--color-text-muted); cursor:pointer;
+    border-bottom:2px solid transparent; background:none; border-top:none; border-left:none; border-right:none;
+    font-family: var(--font-sans);
+  }
+  .studio-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight:600; }
+  .tab-body { padding: 16px 18px 22px; }
+
+  /* ── RunBar ────────────────────────────────────────────────── */
+  .runbar-wrap { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .runbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .runbar select {
+    background: var(--color-bg); color: var(--color-text); border:1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 5px 8px; font-size: var(--text-xs); font-family: var(--font-sans);
+  }
+  .runbar select:disabled { opacity:.45; }
+  .btn {
+    display:inline-flex; align-items:center; gap:6px; border-radius: var(--radius-sm); cursor:pointer;
+    font-size: var(--text-xs); font-weight:600; padding: 6px 12px; font-family: var(--font-sans);
+    border:1px solid transparent; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-primary { background: var(--color-primary-strong); color:#fff; }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn-matrix { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .btn-matrix:hover:not(:disabled) { background: var(--color-primary-glow); color:#fff; }
+  .runbar .sep { width:1px; height:20px; background: var(--color-border); margin: 0 4px; }
+  .gatefeeder-note { font-size: var(--text-xs); color: var(--color-text-muted); display:flex; align-items:center; gap:6px; }
+  .gatefeeder-note select { padding: 3px 6px; }
+  .claim-note {
+    font-size: 11px; color: var(--color-warning); background: var(--color-warning-dim);
+    border:1px solid hsl(38 92% 60% / 0.25); border-radius: var(--radius-sm); padding: 5px 10px;
+    display:none; align-items:center; gap:6px;
+  }
+  .claim-note.on { display:flex; }
+
+  /* provider chip toggles (variant C launcher) */
+  .chip-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .prov-chip {
+    display:inline-flex; align-items:center; gap:6px; padding: 4px 10px 4px 5px;
+    border:1px solid var(--color-border); border-radius: var(--radius-full);
+    background: var(--color-bg); cursor:pointer; font-size:11px; color: var(--color-text);
+    transition: all var(--dur-fast) var(--ease-out); font-family: var(--font-sans);
+  }
+  .prov-chip.off { opacity:.35; }
+  .prov-chip:hover { border-color: var(--color-primary-glow); }
+  .prov-chip.gatef { border-color: var(--color-warning); box-shadow: 0 0 0 1px hsl(38 92% 60% / 0.3); }
+
+  /* matrix popover (variant B launcher) */
+  .pop-anchor { position:relative; }
+  .matrix-pop {
+    position:absolute; top: calc(100% + 6px); left:0; z-index:50; width: 320px;
+    background: var(--color-surface-hi); border:1px solid var(--color-border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 12px;
+    display:none; animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .matrix-pop.open { display:block; }
+  .matrix-pop h4 { margin:0 0 8px; font-size: var(--text-xs); text-transform:uppercase; letter-spacing:.07em; color: var(--color-text-dim); }
+  .pop-row { display:flex; align-items:center; gap:8px; padding: 4px 2px; font-size: var(--text-xs); }
+  .pop-row input[type=checkbox], .pop-row input[type=radio] { accent-color: var(--color-primary-strong); }
+  .pop-row .m { font-family: var(--font-mono); font-size:10px; color: var(--color-text-dim); margin-left:auto; }
+  .pop-foot { border-top:1px solid var(--color-border-soft); margin-top:8px; padding-top:10px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--color-text-muted); }
+
+  /* ── Run rows (real RunHistory anatomy) ────────────────────── */
+  .history { display:flex; flex-direction:column; gap:8px; }
+  .h-label { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color: var(--color-text-dim); margin: 10px 0 2px; }
+  .run-row {
+    display:flex; align-items:center; gap:10px; width:100%;
+    border:1px solid var(--color-border); background: var(--color-bg);
+    padding: 9px 12px; border-radius: var(--radius-md); cursor:pointer; text-align:left;
+    color: var(--color-text); font-family: var(--font-sans); font-size: var(--text-xs);
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+  .run-row:hover { border-color: var(--color-primary-glow); }
+  .run-row.open { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+  .run-body {
+    border:1px solid var(--color-border); border-top:none; background: var(--color-muted);
+    border-radius: 0 0 var(--radius-md) var(--radius-md); padding: 10px 12px 12px; font-size: var(--text-xs);
+  }
+  .pmark {
+    width:18px; height:18px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:800; color:#fff; flex:none; font-family: var(--font-mono);
+  }
+  .model-name { font-weight:600; }
+  .ver { font-family: var(--font-mono); font-size:10px; color: var(--color-text-dim); }
+  .rollup { margin-left:auto; display:flex; align-items:center; gap:10px; font-weight:600; font-size:11px; white-space:nowrap; }
+  .rollup .dur { font-family: var(--font-mono); font-weight:400; color: var(--color-text-dim); font-size:10px; }
+  .ok-t { color: var(--color-success); } .mix-t { color: var(--color-warning); } .bad-t { color: var(--color-danger); }
+  .run-t { color: var(--color-primary); display:inline-flex; align-items:center; gap:6px; }
+  .pulse-dot { width:6px; height:6px; border-radius:50%; background: var(--color-primary); animation: brandPulse 1.5s infinite; }
+  .gate-chip {
+    font-size:9px; font-weight:700; letter-spacing:.05em; padding: 2px 8px; border-radius: var(--radius-full);
+    background: var(--color-warning-dim); color: var(--color-warning); border:1px solid hsl(38 92% 60% / 0.3);
+    white-space:nowrap;
+  }
+  .delta { font-family: var(--font-mono); font-size:10px; font-weight:600; }
+  .delta.pos { color: var(--color-success); } .delta.small { color: var(--color-text-muted); }
+
+  /* live per-row progress */
+  .row-live { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+  .row-live .lbl { display:flex; justify-content:space-between; font-size:10px; color: var(--color-text-muted); font-family: var(--font-mono); }
+  .ubar { height:3px; border-radius:2px; background: var(--color-primary-dim); overflow:hidden; }
+  .ubar > i { display:block; height:100%; background: linear-gradient(90deg, var(--color-primary-strong), var(--color-accent-violet)); border-radius:2px; transition: width .35s var(--ease-out); }
+
+  /* per-case stub in an expanded run body */
+  .case-line { display:flex; gap:8px; align-items:baseline; padding: 4px 0; border-top:1px dashed var(--color-border-soft); }
+  .case-line:first-child { border-top:none; }
+  .case-line .cp { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color: var(--color-text); }
+  .vchip { font-size:9px; font-weight:700; padding:1px 7px; border-radius: var(--radius-full); white-space:nowrap; }
+  .v-pass { background: var(--color-success-dim); color: var(--color-success); }
+  .v-fail { background: var(--color-danger-dim); color: var(--color-danger); }
+  .v-nm  { background: var(--color-muted); color: var(--color-text-muted); border:1px solid var(--color-border); }
+  .nm-note { font-size:10px; color: var(--color-text-muted); font-family: var(--font-mono); background: var(--color-bg); border:1px solid var(--color-border-soft); border-radius: var(--radius-sm); padding: 6px 8px; margin-top:6px; }
+
+  /* ── Variant A: grouped matrix card ────────────────────────── */
+  .matrix-card { border:1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow:hidden; }
+  .matrix-card.live { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+  .mx-head {
+    display:flex; align-items:center; gap:10px; padding: 11px 14px; cursor:pointer;
+    background: var(--color-bg-elev1); font-size: var(--text-xs); width:100%; border:none; text-align:left;
+    color: var(--color-text); font-family: var(--font-sans);
+  }
+  .mx-head:hover { background: var(--color-accent); }
+  .mx-glyph { font-size:13px; color: var(--color-primary); }
+  .mx-title { font-weight:700; }
+  .mx-meta { font-family: var(--font-mono); font-size:10px; color: var(--color-text-dim); }
+  .mx-gate-line { font-size:11px; color: var(--color-text-muted); padding: 0 14px 9px; background: var(--color-bg-elev1); border-bottom:1px solid var(--color-border-soft); }
+  .mx-gate-line b { color: var(--color-warning); font-weight:600; }
+  .mx-subrows { display:flex; flex-direction:column; gap:6px; padding: 10px 14px; }
+  .mx-foot { border-top:1px solid var(--color-border-soft); background: var(--color-bg-elev1); padding: 10px 14px 12px; }
+
+  /* aggregation strip + analyst notes (shared A/B) */
+  .agg-title { font-size:10px; text-transform:uppercase; letter-spacing:.09em; color: var(--color-text-dim); margin-bottom:6px; display:flex; gap:10px; align-items:baseline;}
+  .agg-title .leg { text-transform:none; letter-spacing:0; font-size:10px; color: var(--color-text-dim); margin-left:auto; }
+  .agg-grid { display:grid; grid-template-columns: minmax(150px,1.4fr) 1fr .5fr .4fr; gap: 2px 12px; font-size:11px; align-items:baseline; }
+  .agg-grid .h { font-size:9px; text-transform:uppercase; letter-spacing:.07em; color: var(--color-text-dim); padding-bottom:2px; }
+  .agg-grid .cfg { display:flex; align-items:center; gap:6px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .agg-grid .mono10 { font-family: var(--font-mono); font-size:10px; }
+  .nohist { color: var(--color-text-dim); font-style:italic; }
+  .notes { margin-top:12px; border-top:1px dashed var(--color-border-soft); padding-top:10px; }
+  .notes h5 { margin:0 0 6px; font-size:10px; text-transform:uppercase; letter-spacing:.09em; color: var(--color-text-dim); font-weight:600; }
+  .notes h5 span { color: var(--color-text-dim); text-transform:none; letter-spacing:0; font-weight:400; }
+  .note-line { display:flex; gap:8px; font-size:11px; color: var(--color-text-muted); padding: 3px 0; line-height:1.5; }
+  .note-line .tag { flex:none; font-size:9px; font-weight:700; letter-spacing:.04em; padding:1px 7px; border-radius: var(--radius-full); margin-top:2px; }
+  .tag-ndc { background: var(--color-primary-dim); color: var(--color-primary); }
+  .tag-flaky { background: var(--color-warning-dim); color: var(--color-warning); }
+  .tag-time { background: var(--color-muted); color: var(--color-text-muted); border:1px solid var(--color-border); }
+
+  /* ── Variant B: flat rows on group spine ───────────────────── */
+  .spine-group { position:relative; display:flex; flex-direction:column; gap:6px; padding-left: 16px; }
+  .spine-group::before {
+    content:''; position:absolute; left:4px; top:10px; bottom:10px; width:2px;
+    background: linear-gradient(180deg, var(--color-primary-glow), var(--color-primary-dim)); border-radius:1px;
+  }
+  .spine-cap { display:flex; align-items:center; gap:8px; font-size:10px; font-family: var(--font-mono); color: var(--color-text-dim); padding: 2px 0; }
+  .spine-cap .g { color: var(--color-primary); font-family: var(--font-sans); font-weight:700; font-size:11px; }
+  .spine-row { position:relative; }
+  .spine-row::before { content:''; position:absolute; left:-12px; top:50%; width:9px; height:2px; background: var(--color-primary-dim); }
+  .sum-row {
+    display:flex; align-items:center; gap:10px; width:100%; border:1px dashed var(--color-border);
+    background: var(--color-bg-elev1); padding: 8px 12px; border-radius: var(--radius-md); cursor:pointer;
+    color: var(--color-text-muted); font-size:11px; font-family: var(--font-sans); text-align:left;
+  }
+  .sum-row:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+
+  /* ── Variant C: scoreboard grid ────────────────────────────── */
+  .grid-card { border:1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow:hidden; }
+  .grid-card.live { border-color: var(--color-primary-glow); }
+  table.mx { width:100%; border-collapse:collapse; font-size:11px; }
+  table.mx th {
+    text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:.08em; font-weight:600;
+    color: var(--color-text-dim); padding: 8px 10px; border-bottom:1px solid var(--color-border-soft);
+    background: var(--color-bg-elev1); white-space:nowrap;
+  }
+  table.mx th.num, table.mx td.num { text-align:right; }
+  table.mx td { padding: 7px 10px; border-bottom:1px solid var(--color-border-soft); vertical-align:middle; }
+  table.mx tr.crow { cursor:pointer; transition: background var(--dur-fast) var(--ease-out); }
+  table.mx tr.crow:hover { background: var(--color-accent); }
+  table.mx tr.crow.sel { background: var(--color-primary-dim); }
+  table.mx .cfg-cell { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  table.mx td .mono10, table.mx .mono10 { font-family: var(--font-mono); font-size:10px; }
+  tr.expand-tr td { background: var(--color-muted); padding: 10px 14px; }
+
+  @media (max-width: 767px) {
+    .agg-grid { grid-template-columns: 1fr .6fr; }
+    .agg-grid .hide-m { display:none; }
+    .rollup .dur { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Variant nav -->
+<div class="variant-nav">
+  <span class="label">Sketch 058 · Matrix Launch &amp; Rows</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a', event)">A: Grouped matrix card <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b', event)">B: Flat rows on a spine</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c', event)">C: Scoreboard grid</button>
+</div>
+
+<div class="context-strip">
+  <span class="q"><b>Design question:</b> one click fans this skill's eval across N providers as N parallel run rows (D-05 gate-feeder · D-07 history aggregation · D-08 deterministic analyst notes). How does the matrix group live inside the 055-B run history?</span>
+  <span class="sim-controls">
+    <button class="sim-btn primary" onclick="launchLive()">▶ Launch live matrix</button>
+    <button class="sim-btn" onclick="finishLive()">⏩ Finish now</button>
+    <button class="sim-btn" onclick="resetSim()">↺ Reset</button>
+  </span>
+</div>
+
+<div class="stage" id="stage">
+
+  <!-- ════════ VARIANT A — grouped matrix card ════════ -->
+  <div id="variant-a" class="variant">
+    <div class="studio">
+      <div class="studio-header">
+        <span class="back-link">‹ Skills</span>
+        <span class="skill-name">doc-summarizer</span>
+        <span class="ver-chip">v4</span><span class="live-chip">LIVE</span>
+        <span class="gate-strip"><span class="ok">✓</span> Gate met · eval passed on v4</span>
+      </div>
+      <div class="studio-tabs">
+        <button class="studio-tab active">Evals</button><button class="studio-tab">Triggering</button><button class="studio-tab">Versions</button>
+      </div>
+      <div class="tab-body">
+        <!-- Launcher A: one-click all-configured + inline gate-feeder select -->
+        <div class="runbar-wrap">
+          <div class="runbar">
+            <select aria-label="Provider" id="a-prov"><option>Anthropic</option><option>OpenAI</option><option>Google</option></select>
+            <select aria-label="Model"><option>claude-haiku-4-5</option></select>
+            <button class="btn btn-primary" id="a-runeval">▶ Run eval</button>
+            <span class="sep"></span>
+            <button class="btn btn-matrix" id="a-runmatrix" onclick="launchLive()">⧉ Run matrix (8 configured)</button>
+            <span class="gatefeeder-note">feeds gate:
+              <select aria-label="Gate feeder">
+                <option>Anthropic · claude-haiku-4-5 (your active provider)</option>
+                <option>OpenAI · gpt-5.4-mini</option><option>Google · gemini-3.5-flash</option>
+                <option>DeepSeek · deepseek-chat</option><option>Kimi · kimi-k2</option>
+                <option>GLM · glm-5.1</option><option>MiniMax · minimax-m2</option>
+                <option>OpenRouter · z-ai/glm-5.1</option>
+              </select>
+            </span>
+          </div>
+          <div class="claim-note" id="a-claim">⛭ One eval per skill — the live matrix holds this skill's run claim; new runs return 409 until it finishes.</div>
+        </div>
+
+        <div class="history" id="a-history"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ VARIANT B — flat rows on a group spine ════════ -->
+  <div id="variant-b" class="variant" style="display:none">
+    <div class="studio">
+      <div class="studio-header">
+        <span class="back-link">‹ Skills</span>
+        <span class="skill-name">doc-summarizer</span>
+        <span class="ver-chip">v4</span><span class="live-chip">LIVE</span>
+        <span class="gate-strip"><span class="ok">✓</span> Gate met · eval passed on v4</span>
+      </div>
+      <div class="studio-tabs">
+        <button class="studio-tab active">Evals</button><button class="studio-tab">Triggering</button><button class="studio-tab">Versions</button>
+      </div>
+      <div class="tab-body">
+        <!-- Launcher B: Run matrix ▾ opens a checkbox popover -->
+        <div class="runbar-wrap">
+          <div class="runbar">
+            <select aria-label="Provider"><option>Anthropic</option></select>
+            <select aria-label="Model"><option>claude-haiku-4-5</option></select>
+            <button class="btn btn-primary">▶ Run eval</button>
+            <span class="sep"></span>
+            <span class="pop-anchor">
+              <button class="btn btn-matrix" onclick="togglePop(event)">⧉ Run matrix ▾</button>
+              <div class="matrix-pop" id="b-pop">
+                <h4>Matrix configs</h4>
+                <div id="b-pop-rows"></div>
+                <div class="pop-foot">
+                  <span id="b-pop-count">8 configs · 3 cases · ≈56 LLM calls</span>
+                  <button class="btn btn-primary" style="margin-left:auto" onclick="closePop(); launchLive()">Launch</button>
+                </div>
+              </div>
+            </span>
+          </div>
+          <div class="claim-note" id="b-claim">⛭ One eval per skill — the live matrix holds this skill's run claim; new runs return 409 until it finishes.</div>
+        </div>
+
+        <div class="history" id="b-history"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ VARIANT C — scoreboard grid ════════ -->
+  <div id="variant-c" class="variant" style="display:none">
+    <div class="studio">
+      <div class="studio-header">
+        <span class="back-link">‹ Skills</span>
+        <span class="skill-name">doc-summarizer</span>
+        <span class="ver-chip">v4</span><span class="live-chip">LIVE</span>
+        <span class="gate-strip"><span class="ok">✓</span> Gate met · eval passed on v4</span>
+      </div>
+      <div class="studio-tabs">
+        <button class="studio-tab active">Evals</button><button class="studio-tab">Triggering</button><button class="studio-tab">Versions</button>
+      </div>
+      <div class="tab-body">
+        <!-- Launcher C: provider logo-chip toggles + gate select -->
+        <div class="runbar-wrap">
+          <div class="runbar">
+            <select aria-label="Provider"><option>Anthropic</option></select>
+            <select aria-label="Model"><option>claude-haiku-4-5</option></select>
+            <button class="btn btn-primary">▶ Run eval</button>
+            <span class="sep"></span>
+            <button class="btn btn-matrix" onclick="launchLive()">⧉ Run matrix</button>
+          </div>
+          <div class="chip-row" id="c-chips"></div>
+          <div class="claim-note" id="c-claim">⛭ One eval per skill — the live matrix holds this skill's run claim; new runs return 409 until it finishes.</div>
+        </div>
+
+        <div class="history" id="c-history"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Aether Deep Midnight</option>
+  </select>
+  <button onclick="setW(375)">📱</button>
+  <button onclick="setW(768)">▤</button>
+  <button onclick="setW(0)">🖥</button>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   Shared data — real wire-shaped, all honest states exercised.
+   Provider marks are sketch placeholders; the build uses the
+   single-source @lobehub/icons map (icon convention, decision 38).
+   ───────────────────────────────────────────────────────────── */
+const PROVIDERS = [
+  { id:'anthropic',  name:'Anthropic',  model:'claude-haiku-4-5',  mark:'A',  color:'#D97757' },
+  { id:'openai',     name:'OpenAI',     model:'gpt-5.4-mini',      mark:'O',  color:'#10a37f' },
+  { id:'google',     name:'Google',     model:'gemini-3.5-flash',  mark:'G',  color:'#4285F4' },
+  { id:'deepseek',   name:'DeepSeek',   model:'deepseek-chat',     mark:'D',  color:'#4D6BFE' },
+  { id:'moonshot',   name:'Kimi',       model:'kimi-k2',           mark:'K',  color:'#6E64F0' },
+  { id:'zhipu',      name:'GLM',        model:'glm-5.1',           mark:'Z',  color:'#3859FF' },
+  { id:'minimax',    name:'MiniMax',    model:'minimax-m2',        mark:'M',  color:'#F23F5D' },
+  { id:'openrouter', name:'OpenRouter', model:'z-ai/glm-5.1',      mark:'R',  color:'#8B5CF6' },
+];
+const CASES = [
+  { id:'c1', prompt:'Summarize the Q3 enterprise refund policy and cite its source document' },
+  { id:'c2', prompt:'A customer asks for a refund on day 50 — draft the reply' },
+  { id:'c3', prompt:'List the two exceptions to the standard refund window' },
+];
+// Units per config = cases × 2 arms + 1 judge step (137.1 discretion: judge = one unit).
+const UNITS = CASES.length * 2 + 1;
+
+// The finished matrix exemplar (yesterday). openrouter carries the honest
+// not_measured arm with a VERBATIM provider error (excluded, never failed).
+const FINISHED = [
+  { p:'anthropic',  gate:true, passed:3, measured:3, delta:+0.34, dur:'1:12', hist:{mean:.86, sd:.04, n:3},
+    cases:[['PASS ·0.88','FAIL ·0.42'],['PASS ·0.84','FAIL ·0.51'],['PASS ·0.86','PASS ·0.79']] },
+  { p:'openai',     passed:2, measured:3, delta:+0.21, dur:'0:58', hist:{mean:.81, sd:.11, n:3},
+    cases:[['PASS ·0.82','FAIL ·0.48'],['FAIL ·0.55','FAIL ·0.49'],['PASS ·0.83','PASS ·0.74']] },
+  { p:'google',     passed:3, measured:3, delta:+0.29, dur:'0:47', hist:{mean:.84, sd:null, n:1},
+    cases:[['PASS ·0.85','FAIL ·0.44'],['PASS ·0.81','FAIL ·0.58'], ['PASS ·0.86','PASS ·0.80']] },
+  { p:'deepseek',   passed:3, measured:3, delta:+0.31, dur:'1:36', hist:{mean:.83, sd:.05, n:2},
+    cases:[['PASS ·0.84','FAIL ·0.41'],['PASS ·0.80','FAIL ·0.55'],['PASS ·0.85','PASS ·0.77']] },
+  { p:'moonshot',   passed:2, measured:3, delta:+0.18, dur:'4:12', hist:{mean:.74, sd:.06, n:2},
+    cases:[['PASS ·0.78','FAIL ·0.52'],['FAIL ·0.49','FAIL ·0.46'],['PASS ·0.80','PASS ·0.71']] },
+  { p:'zhipu',      passed:3, measured:3, delta:+0.27, dur:'1:21', hist:{mean:.82, sd:.03, n:2},
+    cases:[['PASS ·0.83','FAIL ·0.47'],['PASS ·0.79','FAIL ·0.53'],['PASS ·0.84','PASS ·0.78']] },
+  { p:'minimax',    passed:2, measured:3, delta:+0.12, dur:'1:05', hist:{mean:.70, sd:.09, n:2},
+    cases:[['PASS ·0.72','FAIL ·0.55'],['FAIL ·0.51','FAIL ·0.50'],['PASS ·0.75','PASS ·0.72']] },
+  { p:'openrouter', passed:2, measured:2, notMeasured:1, delta:+0.25, dur:'1:44', hist:{mean:.78, sd:.07, n:2},
+    err:'402 Payment Required — insufficient OpenRouter credits (with-skill arm, case 3)',
+    cases:[['PASS ·0.80','FAIL ·0.45'],['PASS ·0.77','FAIL ·0.52'],['not measured','PASS ·0.70']] },
+];
+
+// D-08 deterministic analyst notes — fixed plain-language phrasing, never an LLM.
+const NOTES = [
+  { tag:'non-discriminating', cls:'tag-ndc',
+    text:'“List the two exceptions to the standard refund window” passed BOTH arms on all 8 configs — it doesn’t separate skill from no-skill. Consider a harder expected behavior.' },
+  { tag:'flaky variance', cls:'tag-flaky',
+    text:'gpt-5.4-mini: score stddev 0.11 across 3 runs (rule threshold 0.10). Single-run verdicts on this config deserve a re-run.' },
+  { tag:'time / score', cls:'tag-time',
+    text:'kimi-k2: slowest arm at 4:12 (3.5× the 1:12 median) for a mean 0.12 below the top config — time cost without a score gain.' },
+];
+
+// Older single runs — unchanged 055-B rows, must coexist with the matrix grammar.
+const SINGLES = [
+  { p:'anthropic', model:'claude-haiku-4-5', rollup:'3/3 passed', tone:'ok-t', when:'Jul 1', dur:'1:04' },
+  { p:'openai',    model:'gpt-5.4-mini',     rollup:'interrupted', tone:'', when:'Jun 30', dur:'' },
+];
+
+const byId = Object.fromEntries(PROVIDERS.map(p=>[p.id,p]));
+
+/* ── Sim state ── */
+let live = null, timer = null;
+const open = { a:{}, b:{}, c:{} };   // expansion state per variant
+let currentV = 'a';
+
+function mark(p, size) {
+  const pr = byId[p];
+  return `<span class="pmark" style="background:${pr.color};width:${size||18}px;height:${size||18}px">${pr.mark}</span>`;
+}
+function toneFor(cfg) {
+  if (cfg.measured > 0 && cfg.passed < cfg.measured) return 'bad-t';
+  if (cfg.notMeasured) return 'mix-t';
+  return 'ok-t';
+}
+function rollupTxt(cfg) {
+  let t = `${cfg.passed}/${cfg.measured} passed`;
+  if (cfg.notMeasured) t += ` · ${cfg.notMeasured} not measured`;
+  return t;
+}
+function deltaHtml(d) {
+  const cls = d >= 0.2 ? 'pos' : 'small';
+  return `<span class="delta ${cls}">Δ ${d>=0?'+':''}${d.toFixed(2)}</span>`;
+}
+
+/* per-config expanded body (case stub — the full body is the shipped 055-B detail) */
+function caseBody(cfg) {
+  const rows = CASES.map((c,i) => {
+    const [w, wo] = cfg.cases[i];
+    const chip = v => v === 'not measured'
+      ? `<span class="vchip v-nm">not measured</span>`
+      : `<span class="vchip ${v.startsWith('PASS')?'v-pass':'v-fail'}">${v}</span>`;
+    return `<div class="case-line"><span class="cp" title="${c.prompt}">${c.prompt}</span>
+      <span style="color:var(--color-text-dim);font-size:9px">with</span>${chip(w)}
+      <span style="color:var(--color-text-dim);font-size:9px">w/o</span>${chip(wo)}</div>`;
+  }).join('');
+  const nm = cfg.err ? `<div class="nm-note">↳ ${cfg.err} — excluded from the rollup, never counted as a fail.</div>` : '';
+  return `<div>${rows}${nm}
+    <p style="margin:8px 0 0;font-size:10px;color:var(--color-text-dim)">judge claude-opus-4-8 · full per-case detail = the existing run body (055-B)</p></div>`;
+}
+
+/* one 055-B-anatomy run row for a matrix config */
+function cfgRow(v, cfg, i, spined) {
+  const pr = byId[cfg.p];
+  const key = 'm'+i;
+  const isOpen = !!open[v][key];
+  const gate = cfg.gate ? `<span class="gate-chip">▣ feeds gate</span>` : '';
+  let right;
+  if (live && !live.done[i]) {
+    const u = live.units[i];
+    right = `<span class="row-live"><span class="lbl"><span>case ${Math.min(Math.ceil(u/2), CASES.length)}/${CASES.length} · ${u % 2 === 1 ? 'with arm' : 'without arm'}${u >= UNITS-1 ? ' · judge' : ''}</span><span>${u}/${UNITS}</span></span><span class="ubar"><i style="width:${Math.round(u/UNITS*100)}%"></i></span></span>
+      <span class="rollup"><span class="run-t"><span class="pulse-dot"></span>running</span></span>`;
+  } else {
+    right = `<span class="rollup">${deltaHtml(cfg.delta)}<span class="${toneFor(cfg)}">${rollupTxt(cfg)}</span><span class="dur">⏱ ${cfg.dur}</span></span>`;
+  }
+  const wrap = spined ? 'spine-row' : '';
+  return `<div class="${wrap}">
+    <button class="run-row ${isOpen?'open':''}" aria-expanded="${isOpen}" onclick="toggleRow('${v}','${key}')">
+      ${mark(cfg.p)}<span class="model-name">${pr.model}</span><span class="ver">ver 4f2a91c8</span>${gate}${right}
+    </button>
+    ${isOpen ? `<div class="run-body">${(live && !live.done[i]) ? liveBody() : caseBody(cfg)}</div>` : ''}
+  </div>`;
+}
+function liveBody() {
+  return `<p style="margin:4px 0;color:var(--color-text-muted)">Verdicts land when this arm finalizes — no mid-run pass/fail is shown.</p>`;
+}
+
+/* single (non-matrix) rows */
+function singleRow(v, s, i) {
+  const pr = byId[s.p]; const key = 's'+i; const isOpen = !!open[v][key];
+  const right = s.rollup === 'interrupted'
+    ? `<span class="rollup"><span style="color:var(--color-text-muted)">interrupted</span></span>`
+    : `<span class="rollup"><span class="${s.tone}">${s.rollup}</span><span class="dur">⏱ ${s.dur}</span></span>`;
+  return `<button class="run-row ${isOpen?'open':''}" onclick="toggleRow('${v}','${key}')">
+      ${mark(s.p)}<span class="model-name">${s.model}</span><span class="ver">ver 4f2a91c8</span>
+      <span class="ver" style="margin-left:2px">${s.when}</span>${right}
+    </button>${isOpen ? `<div class="run-body"><p style="margin:2px 0;color:var(--color-text-muted)">${s.rollup === 'interrupted' ? '⏸ This run was interrupted (the backend restarted mid-run). Nothing was measured, nothing was fabricated. <b style="color:var(--color-text)">Re-run</b>' : 'Existing 055-B expanded body — unchanged by this phase.'}</p></div>` : ''}`;
+}
+
+/* aggregation strip (D-07 — history-derived, stddev only at n ≥ 2) */
+function aggBlock() {
+  const rows = FINISHED.map(cfg => {
+    const pr = byId[cfg.p];
+    const hist = cfg.hist.n >= 2
+      ? `<span class="mono10">mean ${cfg.hist.mean.toFixed(2)} ±${cfg.hist.sd.toFixed(2)}</span> <span class="mono10" style="color:var(--color-text-dim)">(${cfg.hist.n} runs)</span>`
+      : `<span class="nohist">first run — no spread yet</span>`;
+    return `<div class="cfg">${mark(cfg.p,14)} <span>${pr.model}</span>${cfg.gate?' <span class="gate-chip" style="font-size:8px">▣</span>':''}</div>
+      <div>${hist}</div><div>${deltaHtml(cfg.delta)}</div><div class="mono10 hide-m" style="color:var(--color-text-dim)">⏱ ${cfg.dur}</div>`;
+  }).join('');
+  const notes = NOTES.map(n => `<div class="note-line"><span class="tag ${n.cls}">${n.tag}</span><span>${n.text}</span></div>`).join('');
+  return `<div class="agg-title">Across run history · per config <span class="leg">Δ = with − without mean judge score · ×1 run per config per click — spread accumulates from history</span></div>
+    <div class="agg-grid"><div class="h">config</div><div class="h">mean ± stddev</div><div class="h">Δ skill lift</div><div class="h hide-m">this run</div>${rows}</div>
+    <div class="notes"><h5>Analyst notes · <span>deterministic rules, not an LLM</span></h5>${notes}</div>`;
+}
+
+/* ── VARIANT A: grouped matrix card ── */
+function renderA() {
+  const el = document.getElementById('a-history');
+  const isLive = !!live;
+  const groupOpen = open.a['grp'] !== false; // default open
+  const headMeta = isLive
+    ? `<span class="mx-meta">${live.totalDone()}/${UNITS*8} units · 0:${String(live.sec).padStart(2,'0')}</span><span class="rollup" style="margin-left:auto"><span class="run-t"><span class="pulse-dot"></span>running</span></span>`
+    : `<span class="mx-meta">Jul 3 · 14:02 · slowest arm 4:12</span><span class="rollup" style="margin-left:auto"><span class="ok-t">7/8 configs clean</span><span class="mix-t">1 with a not-measured arm</span></span>`;
+  el.innerHTML = `
+    <div class="matrix-card ${isLive?'live':''}">
+      <button class="mx-head" aria-expanded="${groupOpen}" onclick="toggleRow('a','grp', true)">
+        <span class="mx-glyph">⧉</span><span class="mx-title">Matrix run</span>
+        <span class="mx-meta">8 configs · 3 cases</span>${headMeta}
+      </button>
+      <div class="mx-gate-line">Gate reads the <b>claude-haiku-4-5</b> arm only — the other 7 arms are analysis-only and never flip the publish gate.</div>
+      ${groupOpen ? `<div class="mx-subrows">${FINISHED.map((c,i)=>cfgRow('a',c,i,false)).join('')}</div>
+      <div class="mx-foot">${isLive ? '<p style="margin:0;font-size:11px;color:var(--color-text-muted)">Aggregation lands when the matrix finalizes.</p>' : aggBlock()}</div>` : ''}
+    </div>
+    <div class="h-label">Earlier runs</div>
+    ${SINGLES.map((s,i)=>singleRow('a',s,i)).join('')}`;
+}
+
+/* ── VARIANT B: flat rows on a spine ── */
+function renderB() {
+  const el = document.getElementById('b-history');
+  const isLive = !!live;
+  const sumOpen = !!open.b['sum'];
+  const cap = isLive
+    ? `⧉ <span class="g">matrix</span> · started just now · 8 arms · ${live.totalDone()}/${UNITS*8} units · gate → claude-haiku-4-5`
+    : `⧉ <span class="g">matrix</span> · Jul 3 14:02 · 8 arms · gate → claude-haiku-4-5 (others analysis-only)`;
+  el.innerHTML = `
+    <div class="spine-group">
+      <div class="spine-cap">${cap}</div>
+      ${FINISHED.map((c,i)=>cfgRow('b',c,i,true)).join('')}
+      <div class="spine-row">
+        <button class="sum-row" aria-expanded="${sumOpen}" onclick="toggleRow('b','sum')">
+          <span style="font-weight:700;color:var(--color-primary)">Σ</span>
+          <span>Across runs — mean ±stddev · Δ skill lift · analyst notes</span>
+          <span style="margin-left:auto;font-family:var(--font-mono);font-size:10px">${sumOpen?'▴':'▾'}</span>
+        </button>
+        ${sumOpen ? `<div class="run-body">${isLive ? '<p style="margin:0;color:var(--color-text-muted)">Aggregation lands when the matrix finalizes.</p>' : aggBlock()}</div>` : ''}
+      </div>
+    </div>
+    <div class="h-label">Earlier runs</div>
+    ${SINGLES.map((s,i)=>singleRow('b',s,i)).join('')}`;
+}
+
+/* ── VARIANT C: scoreboard grid ── */
+function renderC() {
+  const el = document.getElementById('c-history');
+  const isLive = !!live;
+  const rows = FINISHED.map((cfg,i) => {
+    const pr = byId[cfg.p];
+    const key = 'g'+i; const isOpen = !!open.c[key];
+    let runCell;
+    if (isLive && !live.done[i]) {
+      const u = live.units[i];
+      runCell = `<td colspan="1"><span class="ubar" style="width:90px;display:inline-block;vertical-align:middle"><i style="width:${Math.round(u/UNITS*100)}%"></i></span> <span class="mono10" style="color:var(--color-text-dim)">${u}/${UNITS}</span></td><td class="num mono10">—</td><td class="num mono10">—</td><td class="num mono10">—</td>`;
+    } else {
+      const hist = cfg.hist.n >= 2 ? `${cfg.hist.mean.toFixed(2)} ±${cfg.hist.sd.toFixed(2)} <span style="color:var(--color-text-dim)">(${cfg.hist.n})</span>` : `<span class="nohist">first run</span>`;
+      runCell = `<td><span class="${toneFor(cfg)}" style="font-weight:600">${rollupTxt(cfg)}</span></td>
+        <td class="num mono10">${hist}</td><td class="num">${deltaHtml(cfg.delta)}</td><td class="num mono10" style="color:var(--color-text-dim)">${cfg.dur}</td>`;
+    }
+    return `<tr class="crow ${isOpen?'sel':''}" onclick="toggleRow('c','${key}')">
+      <td><span class="cfg-cell">${mark(cfg.p,15)}<span>${pr.model}</span>${cfg.gate?'<span class="gate-chip">▣ feeds gate</span>':''}</span></td>
+      ${runCell}<td class="mono10" style="color:var(--color-text-dim)">${isOpen?'▴':'▾'}</td></tr>
+      ${isOpen ? `<tr class="expand-tr"><td colspan="6">${(isLive && !live.done[i]) ? liveBody() : caseBody(cfg)}</td></tr>` : ''}`;
+  }).join('');
+  el.innerHTML = `
+    <div class="grid-card ${isLive?'live':''}">
+      <div class="mx-gate-line" style="padding-top:10px;border-bottom:none">⧉ <b style="color:var(--color-primary)">Matrix run</b> · ${isLive ? `running · ${live.totalDone()}/${UNITS*8} units` : 'Jul 3 14:02'} · gate reads <b>claude-haiku-4-5</b> only — other arms analysis-only.</div>
+      <table class="mx">
+        <thead><tr><th>Config</th><th>This run</th><th class="num">Mean ±σ (history)</th><th class="num">Δ lift</th><th class="num">⏱</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="padding:10px 14px 12px">${isLive ? '' : `<div class="notes" style="margin-top:0;border-top:none;padding-top:0"><h5>Analyst notes · <span>deterministic rules, not an LLM</span></h5>${NOTES.map(n => `<div class="note-line"><span class="tag ${n.cls}">${n.tag}</span><span>${n.text}</span></div>`).join('')}</div>`}</div>
+    </div>
+    <div class="h-label">Earlier runs</div>
+    ${SINGLES.map((s,i)=>singleRow('c',s,i)).join('')}`;
+}
+
+/* ── render + expansion ── */
+function renderAll(){ renderA(); renderB(); renderC(); syncClaims(); populatePop(); populateChips(); }
+function toggleRow(v, key, defaultOpen) {
+  if (defaultOpen && open[v][key] === undefined) open[v][key] = false;
+  else open[v][key] = !open[v][key];
+  renderAll();
+}
+function showVariant(id, ev) {
+  currentV = id;
+  document.querySelectorAll('.variant').forEach(x => x.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  ev.target.classList.add('active');
+}
+
+/* ── live sim (G-4: watch a matrix run live) ── */
+function launchLive() {
+  if (live) return;
+  live = {
+    units: PROVIDERS.map(()=>0),
+    done:  PROVIDERS.map(()=>false),
+    sec: 0,
+    totalDone(){ return this.units.reduce((a,b)=>a+b,0); }
+  };
+  timer = setInterval(() => {
+    live.sec++;
+    // each config advances at its own cadence (kimi slowest, google fastest)
+    const pace = [2,2,3,2,1,2,2,2];
+    PROVIDERS.forEach((p,i) => {
+      if (live.done[i]) return;
+      if (live.sec % Math.max(1, 4-pace[i]) === 0 || pace[i] >= 2) live.units[i] = Math.min(UNITS, live.units[i] + 1);
+      if (live.units[i] >= UNITS) live.done[i] = true;
+    });
+    if (live.done.every(Boolean)) finishLive();
+    renderAll();
+  }, 700);
+  renderAll();
+}
+function finishLive() {
+  if (timer) clearInterval(timer);
+  timer = null; live = null;
+  renderAll();
+}
+function resetSim() {
+  if (timer) clearInterval(timer);
+  timer = null; live = null;
+  Object.keys(open).forEach(v => open[v] = {});
+  renderAll();
+}
+function syncClaims() {
+  ['a','b','c'].forEach(v => {
+    document.getElementById(v+'-claim').classList.toggle('on', !!live);
+  });
+  const on = !!live;
+  document.querySelectorAll('.runbar select, .runbar .btn').forEach(x => { x.disabled = on; });
+  document.querySelectorAll('.sim-controls .sim-btn').forEach(x => x.disabled = false);
+}
+
+/* ── variant B popover ── */
+function populatePop() {
+  const el = document.getElementById('b-pop-rows');
+  if (!el || el.dataset.filled) return;
+  el.dataset.filled = '1';
+  el.innerHTML = PROVIDERS.map((p,i)=>`
+    <label class="pop-row">
+      <input type="checkbox" checked> ${mark(p.id,14)} <span>${p.name}</span>
+      <span class="m">${p.model}</span>
+      <input type="radio" name="gatef" title="feeds gate" ${i===0?'checked':''}>
+    </label>`).join('') +
+    `<p style="margin:6px 2px 0;font-size:10px;color:var(--color-text-dim)">☑ include · ◉ feeds the publish gate (default: your active provider)</p>`;
+}
+function togglePop(ev) { ev.stopPropagation(); document.getElementById('b-pop').classList.toggle('open'); }
+function closePop() { document.getElementById('b-pop').classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('.pop-anchor')) closePop(); });
+
+/* ── variant C chips ── */
+function populateChips() {
+  const el = document.getElementById('c-chips');
+  if (!el || el.dataset.filled) return;
+  el.dataset.filled = '1';
+  el.innerHTML = `<span style="font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.07em">matrix configs:</span>` +
+    PROVIDERS.map((p,i)=>`<button class="prov-chip ${i===0?'gatef':''}" onclick="this.classList.toggle('off')" title="${i===0?'feeds the publish gate':'click to exclude'}">${mark(p.id,14)}${p.model}${i===0?' ▣':''}</button>`).join('') +
+    `<span style="font-size:10px;color:var(--color-text-dim)">amber ring = feeds gate</span>`;
+}
+
+/* viewport helper */
+function setW(w){ document.getElementById('stage').style.maxWidth = w ? w+'px' : '1180px'; }
+
+renderAll();
+</script>
+</body>
+</html>

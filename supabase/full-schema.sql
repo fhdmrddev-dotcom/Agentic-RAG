@@ -16,7 +16,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -37,14 +36,58 @@ SET row_security = off;
 -- Name: public; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA public;
+CREATE SCHEMA IF NOT EXISTS public;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
 --
 
-COMMENT ON SCHEMA public IS 'standard public schema';
+-- COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- Name: capture_skill_version(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.capture_skill_version() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  next_num integer;
+BEGIN
+  -- D-02: on UPDATE, capture a version ONLY when the content trifecta changes. A
+  -- toggle-only flip (is_enabled / is_global) MUST NOT version.
+  IF TG_OP = 'UPDATE' THEN
+    IF NOT (
+         NEW.name         IS DISTINCT FROM OLD.name
+      OR NEW.description  IS DISTINCT FROM OLD.description
+      OR NEW.instructions IS DISTINCT FROM OLD.instructions
+    ) THEN
+      RETURN NEW;  -- toggle-only / no content change → no version
+    END IF;
+  END IF;
+
+  -- COALESCE(MAX)+1 per skill; the UNIQUE(skill_id, version_number) constraint turns any
+  -- concurrent collision into a benign retryable 23505 (D-03-R3 / T-132-04).
+  SELECT COALESCE(MAX(version_number), 0) + 1
+    INTO next_num
+    FROM public.skill_versions
+   WHERE skill_id = NEW.id;
+
+  INSERT INTO public.skill_versions
+    (skill_id, user_id, version_number, name, description, instructions, source)
+  VALUES
+    (NEW.id, NEW.user_id, next_num, NEW.name, NEW.description, NEW.instructions, 'manual');
+    -- user_id = NEW.user_id (NOT auth.uid() — NULL under service-role, D-03-R3 / T-132-03).
+    -- source 'manual': the trigger cannot distinguish write paths (D-03-R1); the 5-value enum
+    -- stays for forward-compat (import/tuner/self_improve/backfill set by other paths).
+
+  RETURN NEW;
+END;
+$$;
 
 
 --
@@ -139,6 +182,37 @@ $$;
 
 
 --
+-- Name: match_skills(public.vector, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, name text, description text, similarity double precision)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT s.id, s.name, s.description,
+         CASE WHEN se.embedding IS NULL THEN NULL
+              ELSE 1 - (se.embedding <=> query_embedding) END AS similarity
+  FROM public.skills s
+  LEFT JOIN public.skill_embeddings se
+         ON se.skill_id = s.id
+        AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+  WHERE (s.user_id = match_user_id OR s.is_global = true)   -- BYTE-EXACT clone of today's catalog scope (V4)
+    AND s.is_enabled = true
+  ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
+END;
+$$;
+
+
+--
+-- Name: FUNCTION match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text) IS 'Cosine ranking of the owner+global enabled skill set against a query vector (TRIG-02, Phase 140). Mirrors match_document_chunks (mig 073). LEFT JOIN → NULL similarity for a skill with no current-model vector (fail-open keep, NULLS LAST). WHERE clause is the byte-exact clone of agent_loop.py:1207-1208; as a SECURITY DEFINER body it is the ONLY cross-user gate (T-140-01) — never widen it.';
+
+
+--
 -- Name: query_user_documents(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -202,6 +276,58 @@ CREATE FUNCTION public.set_updated_at() RETURNS trigger
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: skill_versions_block_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.skill_versions_block_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION
+    'skill_versions row % is append-only and immutable; insert a new version instead',
+    OLD.id
+    USING ERRCODE = 'check_violation';   -- SQLSTATE 23514, distinguishable in tests
+END;
+$$;
+
+
+--
+-- Name: stale_skill_embedding(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stale_skill_embedding() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NOT (
+       NEW.name        IS DISTINCT FROM OLD.name
+    OR NEW.description IS DISTINCT FROM OLD.description
+  ) THEN
+    RETURN NEW;  -- instructions/toggle-only change → vector stays valid, no invalidation
+  END IF;
+  DELETE FROM public.skill_embeddings WHERE skill_id = NEW.id;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: stale_skill_embedding_from_case(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stale_skill_embedding_from_case() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+BEGIN
+  DELETE FROM public.skill_embeddings WHERE skill_id = COALESCE(NEW.skill_id, OLD.skill_id);
+  RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
@@ -333,6 +459,9 @@ CREATE TABLE public.app_settings (
     extraction_provider text,
     confidence_bucket_high double precision DEFAULT 0.54,
     confidence_bucket_medium double precision DEFAULT 0.38,
+    skill_builder_model text DEFAULT ''::text NOT NULL,
+    harness_judge_model text DEFAULT ''::text NOT NULL,
+    skill_catalog_max_tokens integer DEFAULT 1500 NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -541,6 +670,140 @@ CREATE TABLE public.documents (
 
 
 --
+-- Name: eval_ratings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_ratings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    eval_result_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    rating text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT eval_ratings_rating_check CHECK ((rating = ANY (ARRAY['up'::text, 'down'::text])))
+);
+
+
+--
+-- Name: TABLE eval_ratings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_ratings IS 'Owner-scoped human-preference thumbs (EVAL-04, D-08/D-09). One thumbs up/down per (user, answer = an eval_results row), re-ratable (clear = DELETE the row). Minimal shape (id, eval_result_id, user_id, rating, created_at, updated_at) so Phase 135 can join verdict <-> rating for human-judge disagreement (D-09). Written via the service-role ratings endpoint (Plan 03) with an .eq("user_id") IDOR gate; owner-only RLS SELECT is defense-in-depth (T-134-01). NO client write policies (T-134-04). Both FKs ON DELETE CASCADE — no orphaned rating survives its parent (T-134-05).';
+
+
+--
+-- Name: eval_results; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_results (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    eval_run_id uuid NOT NULL,
+    test_case_id uuid,
+    user_id uuid NOT NULL,
+    variant text NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    output text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'completed'::text NOT NULL,
+    error text,
+    input_tokens integer,
+    output_tokens integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    verdict_state text DEFAULT 'not_measured'::text NOT NULL,
+    verdict_passed boolean,
+    verdict_score integer,
+    verdict_reason text,
+    judge_model text,
+    duration_ms integer,
+    case_feedback text,
+    CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
+    CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text]))),
+    CONSTRAINT eval_results_verdict_state_check CHECK ((verdict_state = ANY (ARRAY['graded'::text, 'not_measured'::text, 'judge_error'::text])))
+);
+
+
+--
+-- Name: TABLE eval_results; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_results IS 'One row per (test_case × variant) for an eval run (EVAL-02, D-08). variant is a CHECK-constrained with_skill/without_skill discriminator (D-04). Carries provider+model (D-02 — provider-keyed even though the run is single-provider, so multi-provider fan-out is additive). output holds the full final content; survives Redis TTL + a backend restart (D-06 / SC#3). test_case_id FKs skill_test_cases.id for exact case traceability (Phase-132 D-10); Phase 134 ratings FK eval_results.id (keep PK stable). Owner-only RLS SELECT defense-in-depth; service-role writes (bypasses RLS), app-code .eq("user_id") is the real gate (T-133-01). NO write policies (T-133-EoP).';
+
+
+--
+-- Name: COLUMN eval_results.verdict_state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.verdict_state IS 'OQ1 3-value verdict discriminator (D-06). graded = the judge ran and returned a verdict; not_measured = the arm errored/was empty and the judge was NEVER called (D-04); judge_error = the arm completed but the judge call itself failed. NOT NULL DEFAULT ''not_measured'' backfills the old Phase 133 rows to not_measured — accurate, they were never graded. verdict_passed/score are NULL unless graded (a not_measured/judge_error arm carrying a non-NULL verdict_passed is a bug).';
+
+
+--
+-- Name: COLUMN eval_results.duration_ms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.duration_ms IS 'EVAL-05e per-arm wall-clock in milliseconds (time.monotonic around the agent loop). NULL on pre-085 rows and on arms that never timed. Persisted in the SAME insert as the result row (never a follow-up UPDATE), alongside input_tokens / output_tokens.';
+
+
+--
+-- Name: COLUMN eval_results.case_feedback; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.case_feedback IS 'EVAL-05d advisory judge critique of the TEST CASE itself (is the case weak / non-discriminating / ambiguous?). Written from the schema-bound JudgeVerdict.case_feedback field. NEVER a verdict, NEVER a gate input, NEVER counted in rollup math — it renders visually distinct from PASS/FAIL. NULL on pre-085 rows and un-graded arms.';
+
+
+--
+-- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid,
+    skill_version_id uuid,
+    user_id uuid NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    status text DEFAULT 'running'::text NOT NULL,
+    case_count integer DEFAULT 0 NOT NULL,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    passed_count integer,
+    measured_count integer,
+    verdict_summary text,
+    matrix_group_id uuid,
+    feeds_gate boolean DEFAULT false NOT NULL,
+    CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
+);
+
+
+--
+-- Name: TABLE eval_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.eval_runs IS 'One durable row per eval run (EVAL-02, D-08). Single provider/model per run (D-01) — provider/model live here. status is a durable run-audit enum (035 precedent): a backend that dies mid-run leaves a recoverable running/interrupted row (D-06 / SC#3). id doubles as the stream run_id (companion public.runs row uses the same UUID). skill_version_id FKs skill_versions.id for exact instruction-snapshot traceability (Phase-132 D-10). Owner-only RLS SELECT is defense-in-depth; the service-role eval task writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-133-01). NO write policies — only the service-role task writes (T-133-EoP).';
+
+
+--
+-- Name: COLUMN eval_runs.verdict_summary; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.verdict_summary IS 'NON-AUTHORITATIVE default rollup (OQ2, D-07). Default rule: "pass" iff measured_count >= 1 AND passed_count == measured_count, else "fail". This is DERIVED TEXT, not a hard constraint — Phase 136 (GATE-01) owns the real publish threshold and MUST be able to override it WITHOUT a new migration. passed_count/measured_count count WITH-SKILL arms only (D-02/D-07); the without-skill verdict is stored per-arm for the A/B story + SI-01, not as a rollup denominator.';
+
+
+--
+-- Name: COLUMN eval_runs.matrix_group_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.matrix_group_id IS 'D-06 matrix grouping. The shared uuid identity for the N single-provider arms of one matrix run; NULL for a single run (pre-085 rows backfill NULL — accurate, they were never matrix runs). Indexed (idx_eval_runs_matrix_group_id) for the group readout.';
+
+
+--
+-- Name: COLUMN eval_runs.feeds_gate; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.feeds_gate IS 'D-05 gate-feeder flag. Exactly ONE arm per matrix_group_id is TRUE (default = the user''s active provider); single runs and every pre-085 row are false and their publish-gate read is UNCHANGED. The "feeds gate" chip is a LABEL on this flag — NEVER a second gate computation.';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -612,6 +875,8 @@ CREATE TABLE public.messages (
     confidence_avg_similarity double precision,
     confidence_disclaimer text,
     reasoning_content text,
+    origin text DEFAULT 'deep'::text NOT NULL,
+    CONSTRAINT messages_origin_check CHECK ((origin = ANY (ARRAY['deep'::text, 'harness'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
 
@@ -753,6 +1018,28 @@ CREATE TABLE public.sandbox_files (
 
 
 --
+-- Name: skill_embeddings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_embeddings (
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    embedding public.vector(1536),
+    embedding_model text,
+    embedding_dimensions integer,
+    source_text_hash text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_embeddings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_embeddings IS 'One embedding row per skill (TRIG-02, Phase 140). Sibling to skills, mirroring documents→document_chunks (mig 002) but with NO ANN index (skills are tens–hundreds of rows). Ships EMPTY (SQL cannot call the embedding API) — the skill_embedding_service backfill job (Plan 02) populates it; absence of a row == D-05 fail-open. Owner-only RLS (defense-in-depth); the service-role backfill writer bypasses RLS and hand-scopes .eq("user_id", …) (V4). embedding_model is the D-10 stale-model tag; source_text_hash is a non-crypto staleness fingerprint.';
+
+
+--
 -- Name: skill_files; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -769,6 +1056,148 @@ CREATE TABLE public.skill_files (
 
 
 --
+-- Name: skill_proposals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_proposals (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    base_skill_version_id uuid NOT NULL,
+    new_skill_version_id uuid,
+    re_eval_run_id uuid,
+    source_eval_run_id uuid,
+    user_id uuid NOT NULL,
+    proposed_instructions text,
+    rationale text DEFAULT ''::text NOT NULL,
+    evidence_summary text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'proposed'::text NOT NULL,
+    override_forced boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'instruction'::text NOT NULL,
+    proposed_description text,
+    scoreboard_snapshot jsonb,
+    source_tuner_run_id uuid,
+    CONSTRAINT skill_proposals_kind_check CHECK ((kind = ANY (ARRAY['instruction'::text, 'description'::text]))),
+    CONSTRAINT skill_proposals_kind_fields CHECK ((((kind = 'instruction'::text) AND (proposed_instructions IS NOT NULL) AND (proposed_description IS NULL)) OR ((kind = 'description'::text) AND (proposed_description IS NOT NULL) AND (proposed_instructions IS NULL)))),
+    CONSTRAINT skill_proposals_status_check CHECK ((status = ANY (ARRAY['proposed'::text, 'rejected'::text, 'approved'::text, 're_evaling'::text, 'promoted'::text, 'not_promoted'::text, 'interrupted'::text])))
+);
+
+
+--
+-- Name: TABLE skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_proposals IS 'One durable row per proposed skill-instruction edit (SI-01, D-07). proposed_instructions + rationale + evidence_summary + the 7-value lifecycle status (proposed/rejected/approved/re_evaling/promoted/not_promoted/interrupted). base_skill_version_id (NOT NULL) is what the diff is against; new_skill_version_id is INSERTed ONLY on approval (source=''self_improve'', Plan 05) so skill_versions history stays clean of unapproved drafts; rejections keep their audit trail here with new_skill_version_id NULL. source_eval_run_id = the run whose evidence drove the proposal (D-13 baseline); re_eval_run_id = the auto re-eval (D-12, Phase 136 can consume). override_forced records a D-06 force-promote-with-evidence. Owner-only RLS SELECT is defense-in-depth; the service-role SI-01 router writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-135-07). NO write policies — only the service-role router writes (T-135-01).';
+
+
+--
+-- Name: COLUMN skill_proposals.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.kind IS 'Discriminator (SI-02, D-11): ''instruction'' (SI-01 loop — proposed_instructions set) or ''description'' (SI-02 Trigger-Tuner-winner loop — proposed_description set). Enforced together with the presence invariant by the skill_proposals_kind_fields CHECK. Defaults ''instruction'' so pre-existing rows backfill correctly.';
+
+
+--
+-- Name: COLUMN skill_proposals.proposed_description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.proposed_description IS 'The proposed skill DESCRIPTION (SI-02) — the held-out per-provider WINNING description snapshotted from a Trigger Tuner run at propose-time. NULL for kind=''instruction'' rows. On approval it is written to skills.description (the 079/132 trigger versions it — no draft INSERT, no re-eval; D-07).';
+
+
+--
+-- Name: COLUMN skill_proposals.scoreboard_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.scoreboard_snapshot IS 'IMMUTABLE proposed-vs-current per-provider scoreboard cells, COPIED inline at propose-time (SI-02, RESEARCH Pitfall 1). This — NOT source_tuner_run_id — is the evidence the proposal card renders, because tuner_runs is a latest-wins singleton (UNIQUE(skill_id)) that mutates on re-run.';
+
+
+--
+-- Name: COLUMN skill_proposals.source_tuner_run_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.source_tuner_run_id IS 'PROVENANCE-ONLY FK to the tuner_runs row that produced this description proposal (ON DELETE SET NULL). The displayed evidence is scoreboard_snapshot (copied inline); this FK is audit lineage only and MUST NOT be read live for the scoreboard — the tuner_runs row is overwritten latest-wins on every re-run (RESEARCH Pitfall 1, Pattern 1).';
+
+
+--
+-- Name: CONSTRAINT skill_proposals_kind_fields ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON CONSTRAINT skill_proposals_kind_fields ON public.skill_proposals IS 'Kind-gated presence invariant (SI-02): an ''instruction'' row has proposed_instructions and no proposed_description; a ''description'' row has proposed_description and no proposed_instructions. DB-level integrity gate below the route validation (T-139-02).';
+
+
+--
+-- Name: skill_publish_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_publish_overrides (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    skill_version_id uuid,
+    user_id uuid NOT NULL,
+    gate_state text NOT NULL,
+    gate_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_publish_overrides IS 'One APPEND-ONLY row per skill force-publish past an unmet publish gate (GATE-01, D-01/D-02). gate_state = what the gate read at the moment of override (never_evaled/latest_failed/passed_on_older_version); gate_snapshot = the honest counts jsonb; created_at = the when. skill_version_id (nullable, SET NULL) pins which version was live when overridden. The gate compute reads the most-recent row per skill as PublishGate.last_override so the eval surface shows an honest "published without passing eval" status (D-02/D-06). Owner-only RLS SELECT is defense-in-depth; the service-role toggle handler writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-136-04). NO write policies — clients can never forge, mutate, or delete an override record (035/079/080/081/083 precedent).';
+
+
+--
+-- Name: skill_test_cases; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_test_cases (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    prompt text NOT NULL,
+    expected_behavior text DEFAULT ''::text NOT NULL,
+    order_index integer DEFAULT 0 NOT NULL,
+    name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE skill_test_cases; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_test_cases IS 'Editable eval test cases (EVAL-01, D-05). Bind to the SKILL via skill_id (NOT a version) so cases stay freely editable/deletable before any run (D-07). expected_behavior is free text, NOT an assertion (D-06); NO provider/model columns (D-08). Owner-only RLS (D-12). Stable id is the Phase 133 results FK target (D-10).';
+
+
+--
+-- Name: skill_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.skill_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    version_number integer NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    instructions text DEFAULT ''::text NOT NULL,
+    source text DEFAULT 'manual'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT skill_versions_source_check CHECK ((source = ANY (ARRAY['manual'::text, 'import'::text, 'tuner'::text, 'self_improve'::text, 'backfill'::text])))
+);
+
+
+--
+-- Name: TABLE skill_versions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills — toggles (is_enabled/is_global) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+
+
+--
 -- Name: skills; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -781,7 +1210,8 @@ CREATE TABLE public.skills (
     is_enabled boolean DEFAULT true NOT NULL,
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    is_system boolean DEFAULT false NOT NULL
 );
 
 
@@ -796,7 +1226,8 @@ CREATE TABLE public.threads (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     folder_id uuid,
-    active_workflow_run_id uuid
+    active_workflow_run_id uuid,
+    is_eval boolean DEFAULT false NOT NULL
 );
 
 
@@ -816,6 +1247,31 @@ CREATE TABLE public.todos (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT todos_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text])))
 );
+
+
+--
+-- Name: tuner_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tuner_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    skill_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    scoreboard jsonb DEFAULT '{}'::jsonb NOT NULL,
+    builder_model text DEFAULT ''::text NOT NULL,
+    target_count integer DEFAULT 0 NOT NULL,
+    case_count integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE tuner_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.tuner_runs IS 'Durable latest-per-skill Skill Trigger Tuner result (D-07). Exactly one row per skill (UNIQUE(skill_id) — upsert on_conflict=skill_id overwrites latest-wins). user_id = whoever last ran it; for a GLOBAL skill the SELECT-by-skill is identical for all global viewers (user_id is the last-runner attribution, NOT an access gate — T-123.1-05). Companion to the ephemeral Redis tuner_result:{run_id} stash — survives a Redis flush.';
 
 
 --
@@ -1011,6 +1467,7 @@ CREATE TABLE public.workspace_files (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     kind text,
     expires_at timestamp with time zone,
+    run_claim text,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
@@ -1029,6 +1486,13 @@ COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agen
 --
 
 COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
+
+
+--
+-- Name: COLUMN workspace_files.run_claim; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.run_claim IS 'Phase 141 (COLL-02). Run-context claim lineage for kind=''template_input'' rows: str(workflow_run_id) for a workflow phase, the ''deep'' sentinel for a Deep turn, NULL = unclaimed. Server-set on first resolve; the ''deep'' sentinel makes the cross-context block symmetric. Nullable, no default, no backfill (D-141-02/04).';
 
 
 --
@@ -1109,6 +1573,38 @@ ALTER TABLE ONLY public.document_views
 
 ALTER TABLE ONLY public.documents
     ADD CONSTRAINT documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_ratings eval_ratings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_ratings eval_ratings_result_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_result_user_unique UNIQUE (eval_result_id, user_id);
+
+
+--
+-- Name: eval_results eval_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_runs eval_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1200,11 +1696,59 @@ ALTER TABLE ONLY public.sandbox_files
 
 
 --
+-- Name: skill_embeddings skill_embeddings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_pkey PRIMARY KEY (skill_id);
+
+
+--
 -- Name: skill_files skill_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.skill_files
     ADD CONSTRAINT skill_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_proposals skill_proposals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_test_cases skill_test_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_versions skill_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: skill_versions skill_versions_skill_num_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_skill_num_unique UNIQUE (skill_id, version_number);
 
 
 --
@@ -1237,6 +1781,22 @@ ALTER TABLE ONLY public.todos
 
 ALTER TABLE ONLY public.todos
     ADD CONSTRAINT todos_thread_todo_unique UNIQUE (thread_id, todo_id);
+
+
+--
+-- Name: tuner_runs tuner_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tuner_runs tuner_runs_skill_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_skill_unique UNIQUE (skill_id);
 
 
 --
@@ -1503,6 +2063,69 @@ CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (d
 
 
 --
+-- Name: idx_eval_ratings_result_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_ratings_result_id ON public.eval_ratings USING btree (eval_result_id);
+
+
+--
+-- Name: idx_eval_ratings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_ratings_user_id ON public.eval_ratings USING btree (user_id);
+
+
+--
+-- Name: idx_eval_results_case_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_case_id ON public.eval_results USING btree (test_case_id);
+
+
+--
+-- Name: idx_eval_results_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_run_id ON public.eval_results USING btree (eval_run_id);
+
+
+--
+-- Name: idx_eval_results_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_user_id ON public.eval_results USING btree (user_id);
+
+
+--
+-- Name: idx_eval_runs_matrix_group_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_matrix_group_id ON public.eval_runs USING btree (matrix_group_id);
+
+
+--
+-- Name: idx_eval_runs_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_skill_id ON public.eval_runs USING btree (skill_id);
+
+
+--
+-- Name: idx_eval_runs_skill_version_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_skill_version_id ON public.eval_runs USING btree (skill_version_id);
+
+
+--
+-- Name: idx_eval_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_user_id ON public.eval_runs USING btree (user_id);
+
+
+--
 -- Name: idx_harness_audit_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1566,6 +2189,69 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_skill_embeddings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_embeddings_user_id ON public.skill_embeddings USING btree (user_id);
+
+
+--
+-- Name: idx_skill_proposals_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_proposals_skill_id ON public.skill_proposals USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_proposals_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_proposals_user_id ON public.skill_proposals USING btree (user_id);
+
+
+--
+-- Name: idx_skill_publish_overrides_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_publish_overrides_skill_id ON public.skill_publish_overrides USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_publish_overrides_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_publish_overrides_user_id ON public.skill_publish_overrides USING btree (user_id);
+
+
+--
+-- Name: idx_skill_test_cases_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_test_cases_skill_id ON public.skill_test_cases USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_test_cases_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_test_cases_user_id ON public.skill_test_cases USING btree (user_id);
+
+
+--
+-- Name: idx_skill_versions_skill_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_versions_skill_id ON public.skill_versions USING btree (skill_id);
+
+
+--
+-- Name: idx_skill_versions_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (user_id);
+
+
+--
 -- Name: idx_threads_active_workflow_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1573,10 +2259,24 @@ CREATE INDEX idx_threads_active_workflow_run ON public.threads USING btree (acti
 
 
 --
+-- Name: idx_threads_user_visible; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_threads_user_visible ON public.threads USING btree (user_id, updated_at DESC) WHERE (is_eval = false);
+
+
+--
 -- Name: idx_todos_thread; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_index);
+
+
+--
+-- Name: idx_tuner_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tuner_runs_user_id ON public.tuner_runs USING btree (user_id);
 
 
 --
@@ -1678,6 +2378,13 @@ CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (use
 
 
 --
+-- Name: eval_ratings eval_ratings_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_ratings_set_updated_at BEFORE UPDATE ON public.eval_ratings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: folders folders_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1706,10 +2413,52 @@ CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH R
 
 
 --
+-- Name: skill_proposals skill_proposals_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_proposals_set_updated_at BEFORE UPDATE ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_test_cases skill_test_cases_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_test_cases_set_updated_at BEFORE UPDATE ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_versions skill_versions_no_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_versions_no_update BEFORE UPDATE ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.skill_versions_block_mutation();
+
+
+--
+-- Name: skills skills_capture_version; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skills_capture_version AFTER INSERT OR UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.capture_skill_version();
+
+
+--
 -- Name: skills skills_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER skills_set_updated_at BEFORE UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skills stale_skill_embedding; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stale_skill_embedding AFTER UPDATE ON public.skills FOR EACH ROW EXECUTE FUNCTION public.stale_skill_embedding();
+
+
+--
+-- Name: skill_test_cases stale_skill_embedding_from_case; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stale_skill_embedding_from_case AFTER INSERT OR DELETE OR UPDATE ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.stale_skill_embedding_from_case();
 
 
 --
@@ -1899,6 +2648,70 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: eval_ratings eval_ratings_eval_result_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_eval_result_id_fkey FOREIGN KEY (eval_result_id) REFERENCES public.eval_results(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_ratings eval_ratings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_ratings
+    ADD CONSTRAINT eval_ratings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_eval_run_id_fkey FOREIGN KEY (eval_run_id) REFERENCES public.eval_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_test_case_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_test_case_id_fkey FOREIGN KEY (test_case_id) REFERENCES public.skill_test_cases(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_results eval_results_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_results
+    ADD CONSTRAINT eval_results_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.skill_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: eval_runs eval_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: folders folders_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2035,6 +2848,22 @@ ALTER TABLE ONLY public.sandbox_files
 
 
 --
+-- Name: skill_embeddings skill_embeddings_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_embeddings skill_embeddings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_embeddings
+    ADD CONSTRAINT skill_embeddings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: skill_files skill_files_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2048,6 +2877,118 @@ ALTER TABLE ONLY public.skill_files
 
 ALTER TABLE ONLY public.skill_files
     ADD CONSTRAINT skill_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_base_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_base_skill_version_id_fkey FOREIGN KEY (base_skill_version_id) REFERENCES public.skill_versions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_new_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_new_skill_version_id_fkey FOREIGN KEY (new_skill_version_id) REFERENCES public.skill_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_re_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_re_eval_run_id_fkey FOREIGN KEY (re_eval_run_id) REFERENCES public.eval_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_proposals skill_proposals_source_eval_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_source_eval_run_id_fkey FOREIGN KEY (source_eval_run_id) REFERENCES public.eval_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_source_tuner_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_source_tuner_run_id_fkey FOREIGN KEY (source_tuner_run_id) REFERENCES public.tuner_runs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_proposals skill_proposals_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_proposals
+    ADD CONSTRAINT skill_proposals_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_skill_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_skill_version_id_fkey FOREIGN KEY (skill_version_id) REFERENCES public.skill_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_publish_overrides
+    ADD CONSTRAINT skill_publish_overrides_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_test_cases skill_test_cases_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_test_cases skill_test_cases_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_test_cases
+    ADD CONSTRAINT skill_test_cases_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_versions skill_versions_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: skill_versions skill_versions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.skill_versions
+    ADD CONSTRAINT skill_versions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2088,6 +3029,22 @@ ALTER TABLE ONLY public.threads
 
 ALTER TABLE ONLY public.todos
     ADD CONSTRAINT todos_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: tuner_runs tuner_runs_skill_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_skill_id_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id) ON DELETE CASCADE;
+
+
+--
+-- Name: tuner_runs tuner_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tuner_runs
+    ADD CONSTRAINT tuner_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2201,6 +3158,13 @@ CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metada
 --
 
 CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE USING ((auth.uid() = user_id));
+
+
+--
+-- Name: skill_test_cases Users can delete own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE USING ((auth.uid() = user_id));
 
 
 --
@@ -2330,6 +3294,13 @@ CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSER
 
 
 --
+-- Name: skill_test_cases Users can insert own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: skills Users can insert own skills; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2449,6 +3420,13 @@ CREATE POLICY "Users can update own metadata_field_definitions" ON public.metada
 
 
 --
+-- Name: skill_test_cases Users can update own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE USING ((auth.uid() = user_id));
+
+
+--
 -- Name: skills Users can update own skills; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2556,6 +3534,48 @@ CREATE POLICY "Users can view own document_relationships" ON public.document_rel
 
 
 --
+-- Name: eval_ratings Users can view own eval ratings; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval ratings" ON eval_ratings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval ratings" ON public.eval_ratings IS 'Owner-only (D-08). Defense-in-depth: the service-role ratings endpoint bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080 precedent, T-134-01).';
+
+
+--
+-- Name: eval_results Users can view own eval results; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval results" ON eval_results; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval results" ON public.eval_results IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+
+
+--
+-- Name: eval_runs Users can view own eval runs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own eval runs" ON eval_runs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own eval runs" ON public.eval_runs IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+
+
+--
 -- Name: code_executions Users can view own executions; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -2577,10 +3597,73 @@ CREATE POLICY "Users can view own or global-folder documents" ON public.document
 
 
 --
+-- Name: skill_publish_overrides Users can view own publish overrides; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own publish overrides" ON skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own publish overrides" ON public.skill_publish_overrides IS 'Owner-only (D-02). Defense-in-depth: the service-role toggle handler bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081/083 precedent, T-136-04).';
+
+
+--
 -- Name: sandbox_files Users can view own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: skill_embeddings Users can view own skill embeddings; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill embeddings" ON skill_embeddings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill embeddings" ON public.skill_embeddings IS 'Owner-only SELECT. Defense-in-depth: the backfill writer runs as service-role (bypasses RLS) and hand-scopes .eq("user_id", …); the match_skills RPC WHERE clause is the real cross-user gate (V4).';
+
+
+--
+-- Name: skill_proposals Users can view own skill proposals; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill proposals" ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill proposals" ON public.skill_proposals IS 'Owner-only (D-07). Defense-in-depth: the service-role SI-01 router bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081 precedent, T-135-07).';
+
+
+--
+-- Name: skill_test_cases Users can view own skill test cases; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: skill_versions Users can view own skill versions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: POLICY "Users can view own skill versions" ON skill_versions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON POLICY "Users can view own skill versions" ON public.skill_versions IS 'Owner-only (NO is_global branch, D-12). Defense-in-depth: the service-role writer bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (077 precedent, D-03-R3).';
 
 
 --
@@ -2609,6 +3692,15 @@ CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT U
 --
 
 CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
+-- Name: tuner_runs Users can view tuner runs on own or global skills; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))));
 
 
 --
@@ -2664,6 +3756,24 @@ ALTER TABLE public.document_views ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_ratings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_ratings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_results; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_results ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: eval_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.eval_runs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: folders; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2747,10 +3857,40 @@ CREATE POLICY runs_select_own ON public.runs FOR SELECT USING ((auth.uid() = use
 ALTER TABLE public.sandbox_files ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: skill_embeddings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_embeddings ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: skill_files; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.skill_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_proposals; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_proposals ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_publish_overrides; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_publish_overrides ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_test_cases; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_test_cases ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: skill_versions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.skill_versions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: skills; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2805,6 +3945,12 @@ CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING
    FROM public.threads
   WHERE (threads.id = todos.thread_id))));
 
+
+--
+-- Name: tuner_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.tuner_runs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: user_memory; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2983,5 +4129,155 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict g2O8Tg0QocdP6ZfPdXNSYL0jxxIy3aKzwXia58W0YTpvjVVuldWAJVvjoDiSTfS
 
+
+-- ============================================================
+-- CROSS-SCHEMA SUPPLEMENT (storage buckets/policies, auth trigger,
+-- realtime publication) — appended by regenerate-full-schema.sh from
+-- scripts/full-schema-supplement.sql. See that file for maintenance notes.
+-- ============================================================
+
+-- ============================================================
+-- FULL-SCHEMA SUPPLEMENT — cross-schema bootstrap bits
+-- ============================================================
+-- pg_dump --schema=public (used by regenerate-full-schema.sh) captures the
+-- entire public schema (tables, functions, indexes, RLS on public tables) but
+-- CANNOT capture objects that live in other schemas or are global:
+--
+--   * storage buckets        (rows in storage.buckets)
+--   * storage RLS policies   (policies on storage.objects)
+--   * the signup trigger     (trigger on auth.users)
+--   * realtime memberships   (ALTER PUBLICATION supabase_realtime ...)
+--
+-- This file collects those bits so full-schema.sql is a TRUE one-paste
+-- bootstrap for a fresh Supabase project (cloud or local). It is appended to
+-- the generated dump by regenerate-full-schema.sh.
+--
+-- EVERYTHING HERE IS IDEMPOTENT — safe to run repeatedly (e.g. to patch an
+-- already-provisioned DB that predates a new bucket/realtime table).
+--
+-- MAINTENANCE: when a NEW migration adds a storage bucket, an auth.users
+-- trigger, or a realtime table, mirror it here (idempotently). Sources:
+--   storage  -> migrations 017 (skill-files), 029 (documents, sandbox-outputs),
+--               054 (workspace-files)
+--   auth     -> migration 001 (on_auth_user_created)
+--   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
+-- ============================================================
+
+
+-- ============================================================
+-- 1. pgvector — ensure the extension exists in public.
+--    (Belt-and-suspenders: the generator also injects this near the top so it
+--    precedes the public.vector column/index definitions. Harmless here.)
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+
+
+-- ============================================================
+-- 2. Storage buckets (all private) + RLS on storage.objects
+-- ============================================================
+
+-- documents — path: {user_id}/{document_id}/{filename}
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documents', 'documents', false) ON CONFLICT (id) DO NOTHING;
+
+-- sandbox-outputs — path: {user_id}/{execution_id}/{filename}
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('sandbox-outputs', 'sandbox-outputs', false) ON CONFLICT (id) DO NOTHING;
+
+-- skill-files — path: {user_id}/{...}
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('skill-files', 'skill-files', false) ON CONFLICT (id) DO NOTHING;
+
+-- workspace-files — path: {user_id}/{...}
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('workspace-files', 'workspace-files', false) ON CONFLICT (id) DO NOTHING;
+
+-- documents policies
+DROP POLICY IF EXISTS "Users can read own documents" ON storage.objects;
+CREATE POLICY "Users can read own documents" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "Users can upload to own documents folder" ON storage.objects;
+CREATE POLICY "Users can upload to own documents folder" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "Users can delete own documents" ON storage.objects;
+CREATE POLICY "Users can delete own documents" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- sandbox-outputs policies
+DROP POLICY IF EXISTS "Users can read own sandbox outputs" ON storage.objects;
+CREATE POLICY "Users can read own sandbox outputs" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "Users can upload to own sandbox outputs folder" ON storage.objects;
+CREATE POLICY "Users can upload to own sandbox outputs folder" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "Users can delete own sandbox outputs" ON storage.objects;
+CREATE POLICY "Users can delete own sandbox outputs" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- skill-files policies (read allows owner OR files belonging to a global skill)
+DROP POLICY IF EXISTS "Users can read own skill files" ON storage.objects;
+CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'skill-files'
+    AND (
+      (storage.foldername(name))[1] = (select auth.uid()::text)
+      OR EXISTS (
+        SELECT 1 FROM public.skill_files sf
+        JOIN public.skills s ON s.id = sf.skill_id
+        WHERE sf.file_path = name AND s.is_global = true
+      )
+    )
+  );
+DROP POLICY IF EXISTS "Users can upload to own skill files folder" ON storage.objects;
+CREATE POLICY "Users can upload to own skill files folder" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'skill-files' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "Users can delete own skill files" ON storage.objects;
+CREATE POLICY "Users can delete own skill files" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'skill-files' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- workspace-files policies
+DROP POLICY IF EXISTS "workspace_storage_select_own" ON storage.objects;
+CREATE POLICY "workspace_storage_select_own" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'workspace-files' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "workspace_storage_insert_own" ON storage.objects;
+CREATE POLICY "workspace_storage_insert_own" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'workspace-files' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+DROP POLICY IF EXISTS "workspace_storage_delete_own" ON storage.objects;
+CREATE POLICY "workspace_storage_delete_own" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'workspace-files' AND (storage.foldername(name))[1] = (select auth.uid()::text));
+
+
+-- ============================================================
+-- 3. Auth: auto-create a profile row on signup (trigger on auth.users)
+-- ============================================================
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (new.id, new.raw_user_meta_data->>'display_name');
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+
+-- ============================================================
+-- 4. Realtime: add tables to the supabase_realtime publication.
+--    Wrapped so re-runs (table already a member) don't error.
+-- ============================================================
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.documents;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.folders;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

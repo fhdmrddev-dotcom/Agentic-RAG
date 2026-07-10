@@ -159,6 +159,26 @@ class UserEffectiveSettings(BaseModel):
     extraction_window_cap: int = 32000      # head+tail sampler cap
     metadata_enrichment_mode: str = "enriched"  # enriched | legacy
 
+    # Phase 123 (D-08 / TRIG-01) — the skill-builder model for the Trigger Tuner.
+    # app_settings-only (env_attr=None readback below; CLAUDE.md "env vars are for
+    # secrets/infra only" — a model id is a VALUE). Empty => resolve_skill_builder_model()
+    # picks a strong registry default. Selectable across the full provider list incl.
+    # local; no paid-provider SPOF (D-08); decoupled from the benchmark targets. The
+    # Settings UI (Plan 06) reads/writes this field.
+    skill_builder_model: str = ""
+
+    # Phase 137.1-05 (EVAL-05f / D-11) — the ONE shared harness judge model id, resolved
+    # identically by the eval judge AND the publish judge via resolve_judge_model. app_settings-only
+    # (env_attr=None readback below; a model id is a VALUE, not a secret). Empty => the resolver
+    # picks the strong registry default (claude-opus-4-8). The Settings UI (Plan 10) reads/writes it.
+    harness_judge_model: str = ""
+
+    # Phase 140 (TRIG-02 / D-04) — global token budget for the "## Available Skills"
+    # catalog block. app_settings-only (env_attr=None readback below; a budget is a
+    # VALUE, not a secret). 0 = inject-all kill switch (D-04). Default 1500 keeps small
+    # catalogs byte-identical (D-03 bypass); resolved via resolve_skill_catalog_budget().
+    skill_catalog_max_tokens: int = 1500
+
     # Phase 111.1 — configurable / multi-provider embeddings (migration 073).
     # app_settings-only (env_attr=None readback below); app-config, NOT secrets.
     embedding_provider: str = ""            # D-06 explicit embedding provider (preset/picker)
@@ -514,6 +534,20 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         extraction_model=str(_val(row, "extraction_model", None, "")),
         extraction_window_cap=int(_val(row, "extraction_window_cap", None, 32000)),
         metadata_enrichment_mode=str(_val(row, "metadata_enrichment_mode", None, "enriched")),
+
+        # Phase 123 (D-08 / TRIG-01) — env_attr=None: app_settings-only, no env
+        # fallback (a model id is a VALUE, not a secret). Missing/None => "" =>
+        # resolve_skill_builder_model() picks a strong registry default.
+        skill_builder_model=str(_val(row, "skill_builder_model", None, "")),
+
+        # Phase 137.1-05 (EVAL-05f / D-11) — env_attr=None: app_settings-only (a model id is
+        # a VALUE, not a secret). Missing/None => "" => resolve_judge_model() picks the default.
+        harness_judge_model=str(_val(row, "harness_judge_model", None, "")),
+
+        # Phase 140 (TRIG-02 / D-04) — env_attr=None: app_settings-only, no env fallback
+        # (a budget is a VALUE, not a secret). Missing/None => 1500 default. 0 = inject-all
+        # kill switch; resolve_skill_catalog_budget() bounds-checks the untrusted value.
+        skill_catalog_max_tokens=int(_val(row, "skill_catalog_max_tokens", None, 1500)),
 
         # Phase 111.1 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None => defaults.

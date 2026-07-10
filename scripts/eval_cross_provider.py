@@ -1274,11 +1274,476 @@ def _run_workflow_matrix(args, token: str, conn, providers: list[tuple[str, str]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Forced-emit matrix — Phase 122 / MP-03 (D-122-06, D-122-07, SC#3).
+#
+# Provider becomes a FIRST-CLASS eval axis: per (provider x schema_difficulty) the
+# DIRECT-CALL harness drives the REAL forced_emit recovery ladder (Plan 122-02) and
+# scores the 4 axes (trigger / force / recovery / honest_fail) as PASS/FAIL/DOCUMENTED.
+#
+# Why direct-call (RESEARCH Open Q2 -> A3 / Pitfall 6): forced_emit resolves its tier
+# + rung ladder from the model's emit_tier (config registry), and the *requested* model
+# steers the shot directly — unlike harness phases, where body.model does NOT steer the
+# sub-agent (Pitfall 6). So we import forced_emit and call it per representative model.
+#
+# The HARD schema (optional-heavy + an additionalProperties confidence object) is the
+# LIVE trip-wire (Pitfall 1) that 400s the OpenAI-schema family on the strict rung —
+# it is what makes the `recovery` axis non-vacuous (a clean schema would always win on
+# the top rung, so recovery could never be exercised).
+#
+# This mode is localhost-gated (the gate fired in main() before any work), needs NO DB
+# connection and NO bearer token (it never WRITES), and the artifact carries model NAMES
+# + verdicts ONLY — never key material (Security: Information Disclosure).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The 4 axes (D-122-07). A cell verdict per axis is PASS / FAIL / DOCUMENTED.
+FORCED_EMIT_AXES: tuple[str, ...] = ("trigger", "force", "recovery", "honest_fail")
+
+# Per-difficulty schema_model + tool-parameter schema for the forced_emit shot. The
+# EASY schema is clean required-only; the HARD schema is optional-heavy and carries an
+# `additionalProperties` confidence object (the strict-rung trip-wire — Pitfall 1).
+# Built lazily inside the matrix so importing this module never imports the backend
+# (the structure-only test imports the scorer/writer without pulling pydantic in).
+
+
+def _forced_emit_schemas() -> dict[str, dict]:
+    """Return ``{difficulty: {"schema_model": <pydantic type>, "tools": [<tool def>]}}``.
+
+    EASY  — clean required-only fields (every model should win on its top rung).
+    HARD  — optional-heavy + an ``additionalProperties`` confidence object: the live
+            trip-wire that 400s the OpenAI-schema family on the STRICT rung (strict
+            mode requires every property in ``required`` AND forbids
+            ``additionalProperties``), forcing a descent to a lower rung. This is what
+            makes the ``recovery`` axis non-vacuous (Pitfall 1).
+
+    Imported lazily so this module stays import-light for the structure-only test.
+    """
+    from pydantic import BaseModel, ConfigDict, Field
+
+    class _EasyEmit(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        title: str
+        summary: str
+
+    class _HardConfidence(BaseModel):
+        # An open object — `additionalProperties` is True here, which the OpenAI strict
+        # rung forbids; this is the deliberate strict-rung trip-wire (Pitfall 1).
+        model_config = ConfigDict(extra="allow")
+        value: float | None = None
+
+    class _HardEmit(BaseModel):
+        # Optional-heavy: most fields nullable -> NOT all in `required` -> the OpenAI
+        # strict rung 400s, the ladder descends to non-strict-force / coerce.
+        model_config = ConfigDict(extra="allow")
+        title: str
+        summary: str | None = None
+        tags: list[str] | None = None
+        confidence: _HardConfidence | None = None
+        notes: dict | None = Field(default=None)
+
+    easy_tool = {
+        "type": "function",  # REQUIRED by the openai-compat tools API — without it
+        # openai/deepseek/moonshot/zhipu/minimax 400 ("missing tools[0].type"); native
+        # anthropic/google adapters read .function directly and tolerate its absence.
+        # Mirrors the production tool-registry shape (122 live-UAT fix).
+        "function": {
+            "name": "emit_easy",
+            "description": "Emit the structured easy field-map.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["title", "summary"],
+                "properties": {
+                    "title": {"type": "string"},
+                    "summary": {"type": "string"},
+                },
+            },
+        }
+    }
+    hard_tool = {
+        "type": "function",  # REQUIRED by the openai-compat tools API (see easy_tool).
+        "function": {
+            "name": "emit_hard",
+            "description": "Emit the structured hard field-map (optional-heavy).",
+            "parameters": {
+                "type": "object",
+                # The live trip-wire: an additionalProperties confidence object +
+                # optional fields NOT all in `required` (Pitfall 1).
+                "additionalProperties": True,
+                "required": ["title"],
+                "properties": {
+                    "title": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "confidence": {
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {"value": {"type": "number"}},
+                    },
+                    "notes": {"type": "object", "additionalProperties": True},
+                },
+            },
+        }
+    }
+    return {
+        "easy": {"schema_model": _EasyEmit, "emitter": "emit_easy", "tools": [easy_tool]},
+        "hard": {"schema_model": _HardEmit, "emitter": "emit_hard", "tools": [hard_tool]},
+    }
+
+
+# The single user message the forced shot must answer (cheap, deterministic; the point
+# is the EMISSION mechanics per provider, not the content quality).
+_FORCED_EMIT_PROMPT = (
+    "Produce a one-line title and a short summary describing a quarterly status "
+    "report. Emit the structured field-map via the tool."
+)
+
+# A NON-EMPTY system prompt is REQUIRED: the anthropic adapter stamps cache_control on
+# the system block, and an EMPTY system text block 400s ("cache_control cannot be set
+# for empty text blocks") — the forced rung raises and the ladder masks it by descending
+# to coerce, understating anthropic's true forced-emit capability. Real forced_emit
+# consumers (judge / llm_emit / metadata extraction) all pass a real system prompt, so
+# this mirrors production (122 live-UAT fix).
+_FORCED_EMIT_SYSTEM = (
+    "You are a precise data-extraction assistant. Use the provided tool to emit the "
+    "structured field-map exactly per the schema."
+)
+
+
+def score_forced_emit_axes(result: dict, declared_emit_tier: str) -> dict[str, str]:
+    """Score the 4 axes (D-122-07) from a forced_emit RESULT dict (the ladder's output:
+    ``emitted`` / ``emit_rung`` / ``forced`` / ``failure`` / ``recovered_from_narration``).
+
+    Pure — no I/O, no provider call. This is the function the structure-only test drives
+    with a synthetic result (no live keys). Each axis returns "PASS" / "FAIL" (a
+    DOCUMENTED override is applied by the caller, not here):
+
+      trigger     — did the shot attempt the forced/coerced emission at all (a non-None
+                    emission OR a recovered narration OR an honest model-level failure —
+                    i.e. NOT a provider_error/transport failure that means the model was
+                    never actually reached)?
+      force       — did the model win on the DECLARED TOP rung (its emit_tier's first
+                    rung — strict_force for force_strict, non_strict_force for force,
+                    coerce for coerce)?
+      recovery    — did a 400/no-emit on a higher rung recover via a LOWER rung (the
+                    winning rung is below the tier's top rung)? PASS if a real descent
+                    won; FAIL only if nothing won at all (a top-rung win is N/A here —
+                    represented as PASS because the ladder never NEEDED to recover).
+      honest_fail — when nothing succeeds, did the ladder return a clean ``_failure``
+                    (emitted is None AND a non-None failure reason) rather than a silent
+                    drop or a fabricated emission?
+    """
+    emitted = result.get("emitted")
+    emit_rung = result.get("emit_rung")
+    failure = result.get("failure")
+    won = emitted is not None
+
+    # The tier's ordered rung names (top rung first) — mirrors forced_emit._RUNGS_BY_TIER.
+    _rung_order_by_tier = {
+        "force_strict": ["strict_force", "non_strict_force", "coerce"],
+        "force": ["non_strict_force", "coerce"],
+        "coerce": ["coerce"],
+    }
+    rung_order = _rung_order_by_tier.get(declared_emit_tier, ["coerce"])
+    top_rung = rung_order[0]
+
+    axes: dict[str, str] = {}
+
+    # trigger: the model was actually reached and produced an emission OR an honest
+    # model-level failure (model_failed_to_emit). A provider_error means the shot never
+    # got a real answer from the model (transport/400 on EVERY rung) — that is a FAIL on
+    # trigger (the model never attempted) but is still honest_fail PASS below.
+    if won:
+        axes["trigger"] = "PASS"
+    elif failure == "model_failed_to_emit":
+        axes["trigger"] = "PASS"  # the model was reached; it declined/failed to emit
+    else:
+        axes["trigger"] = "FAIL"  # provider_error on every rung — never reached
+
+    # force: won on the tier's TOP rung.
+    axes["force"] = "PASS" if (won and emit_rung == top_rung) else "FAIL"
+
+    # recovery: either a top-rung win (no recovery NEEDED -> PASS) or a win on a lower
+    # rung after a higher one failed (recovery DID fire -> PASS). FAIL only when nothing
+    # won (the ladder went all the way to the honest-fail floor).
+    if won:
+        axes["recovery"] = "PASS"  # won somewhere on the ladder (top OR a lower rung)
+    else:
+        axes["recovery"] = "FAIL"
+
+    # honest_fail: when nothing won, a clean _failure (emitted None + a failure reason)
+    # is a PASS (never silent, never fabricated). When something won, the floor was not
+    # reached — represent as PASS (the honest-fail contract was not violated).
+    if won:
+        axes["honest_fail"] = "PASS"
+    else:
+        axes["honest_fail"] = "PASS" if (emitted is None and failure) else "FAIL"
+
+    return axes
+
+
+def _build_forced_emit_cell(
+    provider: str,
+    model: str,
+    difficulty: str,
+    result: dict,
+    declared_emit_tier: str,
+    *,
+    gated: bool,
+    documented: list[dict] | None = None,
+    outcome: str = "completed",
+) -> dict:
+    """Assemble one scoreboard cell (mirrors the RESEARCH "MP-03 scoreboard artifact
+    shape"). A DOCUMENTED entry is a known-limitation row: its presence clears the gate
+    for that axis (D-122-07) — the declared ``emit_tier`` already reflects that reality.
+    """
+    axes = score_forced_emit_axes(result, declared_emit_tier)
+    documented = documented or []
+    # A DOCUMENTED axis overrides its PASS/FAIL with "DOCUMENTED" — a known-limitation
+    # row inside the artifact that clears the gate (the declared tier reflects reality).
+    for d in documented:
+        ax = d.get("axis")
+        if ax in axes:
+            axes[ax] = "DOCUMENTED"
+    return {
+        "schema_difficulty": difficulty,
+        "provider": provider,
+        "model_effective": model,
+        "declared_emit_tier": declared_emit_tier,
+        "winning_rung": result.get("emit_rung"),
+        "axes": axes,
+        "documented": documented,
+        "outcome": outcome,  # completed / missing_api_key / provider_error
+        "gated": gated,      # D-122-07: native-7 gates; openrouter is best-effort
+    }
+
+
+def _cell_gate_ok(cell: dict) -> bool:
+    """A cell clears the gate when every axis is PASS or DOCUMENTED (a DOCUMENTED axis
+    is a known-limitation row whose declared emit_tier already reflects reality —
+    D-122-07). A single FAIL on any axis fails the cell."""
+    return all(v in ("PASS", "DOCUMENTED") for v in cell["axes"].values())
+
+
+async def _drive_forced_emit_cell(
+    provider: str, model: str, difficulty: str, spec: dict, *, gated: bool
+) -> dict:
+    """Drive ONE real forced_emit shot for (provider, model, difficulty) and score it.
+
+    Imports forced_emit + the config registry lazily (so module import stays light).
+    A provider with NO key is reported MISSING and never blocks the matrix.
+    """
+    from app.config import get_model_capability
+    from app.models.user_settings import (
+        load_app_settings_async,
+        override_provider,
+    )
+    from app.services.forced_emit import forced_emit
+
+    cap = get_model_capability(model) or {}
+    declared_emit_tier = cap.get("emit_tier", "coerce")
+
+    # Presence-only: a missing provider key -> MISSING row (never key VALUES printed).
+    key_env = _PROVIDER_KEY_ENV.get(provider, "")
+    if key_env and not os.getenv(key_env):
+        return _build_forced_emit_cell(
+            provider, model, difficulty,
+            {"emitted": None, "emit_rung": None, "failure": None, "forced": False},
+            declared_emit_tier, gated=gated, outcome="missing_api_key",
+        )
+
+    # Resolve a real settings object switched to the TARGET provider so forced_emit's
+    # adapters find the right key/base_url (the SAME override_provider helper the app
+    # uses; forced_emit's own cross-provider injection block is the second line of
+    # defense). If settings can't be loaded, pass None — forced_emit degrades honestly.
+    try:
+        base_settings = await load_app_settings_async()
+        user_settings = override_provider(base_settings, provider)
+    except Exception:
+        user_settings = None
+
+    try:
+        result = await forced_emit(
+            messages=[{"role": "user", "content": _FORCED_EMIT_PROMPT}],
+            model=model,
+            provider=provider,
+            emitter=spec["emitter"],
+            tools=spec["tools"],
+            user_settings=user_settings,
+            system_prompt=_FORCED_EMIT_SYSTEM,
+            schema_model=spec["schema_model"],
+        )
+    except Exception as e:  # noqa: BLE001 — an unexpected raise is an honest provider_error cell
+        # Identifier-only: NEVER the message content (could carry request/arg material).
+        print(f"    ! {provider}/{difficulty}: forced_emit raised {type(e).__name__}")
+        result = {"emitted": None, "emit_rung": None, "failure": "provider_error", "forced": False}
+        return _build_forced_emit_cell(
+            provider, model, difficulty, result, declared_emit_tier,
+            gated=gated, outcome="provider_error",
+        )
+
+    return _build_forced_emit_cell(
+        provider, model, difficulty, result, declared_emit_tier, gated=gated,
+    )
+
+
+def print_forced_emit_scoreboard(cells: list[dict]) -> None:
+    """Greppable per-cell scoreboard (EVAL_ROW / EVAL_SUMMARY markers — the phase-closure
+    diff ritual greps them). Native-7 cells gate; openrouter prints BEST-EFFORT; missing
+    keys print MISSING."""
+    print("\n## Cross-provider FORCED-EMIT scoreboard (real forced_emit ladder — MP-03)\n")
+    header = (
+        f"{'provider':<11} {'difficulty':<10} {'tier':<13} "
+        f"{'trigger':<9}{'force':<9}{'recovery':<10}{'honest':<9}"
+        f"{'rung':<18}{'gated':<6} RESULT"
+    )
+    print(header)
+    print("-" * len(header))
+    passed = gated_run = missing = 0
+    for c in cells:
+        ax = c["axes"]
+        if c["outcome"] == "missing_api_key":
+            verdict = "MISSING"
+            missing += 1
+        elif not c["gated"]:
+            verdict = "BEST-EFFORT-" + ("PASS" if _cell_gate_ok(c) else "FAIL")
+        else:
+            gated_run += 1
+            if _cell_gate_ok(c):
+                verdict = "PASS"
+                passed += 1
+            else:
+                verdict = "FAIL"
+        line = (
+            f"{c['provider']:<11} {c['schema_difficulty']:<10} "
+            f"{c['declared_emit_tier']:<13} "
+            f"{ax['trigger']:<9}{ax['force']:<9}{ax['recovery']:<10}{ax['honest_fail']:<9}"
+            f"{(c['winning_rung'] or '-'):<18}{('yes' if c['gated'] else 'no'):<6} {verdict}"
+        )
+        print(f"EVAL_ROW forced-emit {line}")
+    print("-" * len(header))
+    print(
+        f"EVAL_SUMMARY forced-emit {passed}/{gated_run} native-7 cells PASS "
+        f"({missing} MISSING; openrouter best-effort, never gating — D-122-07)"
+    )
+
+
+def emit_forced_emit_scoreboard(cells: list[dict], *, full_matrix: bool) -> None:
+    """Persist the per-cell forced-emit scoreboard as a versioned JSON + Markdown twin
+    under .planning/eval/ (D-122-06). MIRRORS ``emit_capability_table``: ``_eval_artifact_dir()``
+    + ``date.today().isoformat()`` stamp + a ``.json`` writer + an ``md_lines`` twin + the
+    two ``print(... written: ...)`` lines.
+
+    Emitted only for FULL runs (no --provider filter) so a one-off single-provider re-run
+    never clobbers a full scoreboard from the same day. The artifact carries model NAMES +
+    verdicts ONLY — never key material (Security: Information Disclosure).
+    """
+    if not full_matrix:
+        print(
+            "\n(forced-emit scoreboard NOT written — partial run; the MP-03 artifact "
+            "requires a full --forced-emit run with no --provider filter)"
+        )
+        return
+    import json
+    from datetime import date
+
+    out_dir = _eval_artifact_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = date.today().isoformat()
+
+    json_path = out_dir / f"forced-emit-scoreboard-{stamp}.json"
+    json_path.write_text(json.dumps(cells, indent=2) + "\n", encoding="utf-8")
+
+    md_lines = [
+        f"# Forced-emit scoreboard — {stamp} (real forced_emit ladder, MP-03)",
+        "",
+        "Provider as a first-class axis (D-122-06). Each cell drives the REAL "
+        "`forced_emit` recovery ladder per (provider x EASY/HARD schema) and scores "
+        "trigger / force / recovery / honest_fail as PASS / FAIL / DOCUMENTED. "
+        "A DOCUMENTED axis is a known-limitation row whose declared `emit_tier` already "
+        "reflects that reality — it CLEARS the gate. Generated by "
+        "`scripts/eval_cross_provider.py --forced-emit`. Operator greps this before "
+        "flipping any `emit_tier` (the tier-change gate).",
+        "",
+        "| provider | difficulty | tier | trigger | force | recovery | honest_fail "
+        "| rung | gated |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for c in cells:
+        ax = c["axes"]
+        md_lines.append(
+            "| {provider} | {diff} | {tier} | {trigger} | {force} | {recovery} "
+            "| {honest} | {rung} | {gated} |".format(
+                provider=c["provider"],
+                diff=c["schema_difficulty"],
+                tier=c["declared_emit_tier"],
+                trigger=ax["trigger"],
+                force=ax["force"],
+                recovery=ax["recovery"],
+                honest=ax["honest_fail"],
+                rung=c["winning_rung"] or "-",
+                gated="yes" if c["gated"] else "no",
+            )
+        )
+    # A documented-notes appendix (the known-limitation evidence rows).
+    documented_cells = [c for c in cells if c.get("documented")]
+    if documented_cells:
+        md_lines += ["", "## Documented (known-limitation) rows", ""]
+        for c in documented_cells:
+            for d in c["documented"]:
+                md_lines.append(
+                    f"- **{c['provider']} / {c['schema_difficulty']} / "
+                    f"{d.get('axis', '-')}** — {d.get('note', '')} "
+                    f"(evidence: {d.get('evidence', '-')})"
+                )
+    md_path = out_dir / f"forced-emit-scoreboard-{stamp}.md"
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    print(f"\nForced-emit scoreboard written: {json_path}")
+    print(f"Forced-emit scoreboard written: {md_path}")
+
+
+def run_forced_emit_matrix(args, providers: list[tuple[str, str]]) -> int:
+    """The --forced-emit entry (Phase 122 / MP-03): per (provider x {EASY, HARD} schema)
+    drive the REAL forced_emit ladder directly and score the 4 axes.
+
+    Direct-call harness — NO bearer token, NO DB connection, NO agent run (it never
+    WRITES). The localhost gate already fired in main(). Exit code: 0 = every native-7
+    cell that RAN cleared the gate; 2 = a native-7 cell failed; 1 = nothing ran (all
+    keys missing). openrouter never flips the exit code (D-122-07).
+    """
+    import asyncio
+
+    schemas = _forced_emit_schemas()
+    cells: list[dict] = []
+    for provider, model in providers:
+        gated = provider in NATIVE_7
+        for difficulty in ("easy", "hard"):
+            spec = schemas[difficulty]
+            print(f"  -> {provider}/{model} :: forced_emit [{difficulty}] ...")
+            cell = asyncio.run(
+                _drive_forced_emit_cell(provider, model, difficulty, spec, gated=gated)
+            )
+            cells.append(cell)
+
+    print_forced_emit_scoreboard(cells)
+    # D-122-06: persist the versioned scoreboard (full runs only — a partial --provider
+    # re-run never clobbers a full scoreboard from the same day).
+    emit_forced_emit_scoreboard(cells, full_matrix=args.provider is None)
+
+    driven = [c for c in cells if c["gated"] and c["outcome"] != "missing_api_key"]
+    if not driven:
+        print("\nNo native-7 forced-emit cell ran (all keys missing?) — nothing proven.")
+        return 1
+    return 0 if all(_cell_gate_ok(c) for c in driven) else 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Entry point — the 4-prompt x 4-provider matrix loop. Optional --provider /
 # --prompt run a single cell (lightweight re-run for the fold-gate). A no-backend
 # invocation exits cleanly with a connection message (no traceback / no values).
 # --workflow switches to the EVAL-01 workflow row type (one eval_coverage run
 # per provider) instead of the Deep-mode prompt matrix.
+# --forced-emit switches to the MP-03 forced-emit row type (direct-call harness
+# driving the real forced_emit ladder per provider x EASY/HARD schema).
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _parse_args(argv: list[str] | None):
@@ -1321,6 +1786,21 @@ def _parse_args(argv: list[str] | None):
              "--provider; --prompt is ignored in workflow mode. Native-7 rows "
              "are pass/fail; openrouter is best-effort, never gating (D-03).",
     )
+    parser.add_argument(
+        "--forced-emit",
+        dest="forced_emit",
+        action="store_true",
+        help="Run the FORCED-EMIT row type (Phase 122 MP-03) instead of the "
+             "Deep-mode prompt matrix: per provider x {EASY, HARD} schema, drive "
+             "the REAL forced_emit recovery ladder (Plan 122-02) directly (NOT via "
+             "body.model — Pitfall 6) and score the 4 axes "
+             "(trigger/force/recovery/honest_fail) PASS/FAIL/DOCUMENTED. The HARD "
+             "schema (optional-heavy + an additionalProperties confidence object) "
+             "is the live trip-wire (Pitfall 1) that makes the recovery axis "
+             "non-vacuous. Writes a dated forced-emit-scoreboard-<date>.{json,md} "
+             "artifact. Combinable with --provider; --prompt/--workflow are ignored. "
+             "Native-7 rows gate; openrouter is best-effort, never gating (D-03).",
+    )
     return parser.parse_args(argv)
 
 
@@ -1351,6 +1831,18 @@ def main(argv: list[str] | None = None) -> int:
     prompts = _selected_prompts(args)
     timeout_s = int(os.getenv("EVAL_RUN_TIMEOUT_S", DEFAULT_RUN_TIMEOUT_S))
     wf_timeout_s = int(os.getenv("EVAL_WORKFLOW_TIMEOUT_S", DEFAULT_WORKFLOW_TIMEOUT_S))
+
+    # Phase 122 (MP-03): the forced-emit matrix is a DIRECT-CALL harness — it imports
+    # forced_emit and drives it per (provider x schema) with NO bearer token / no DB
+    # connection / no agent run (it never WRITES anything). The localhost gate above
+    # has already fired; jump straight to the matrix. Native-7 gates; openrouter is
+    # best-effort (D-122-07). --prompt / --workflow are ignored in this mode.
+    if args.forced_emit:
+        print(
+            f"Running FORCED-EMIT rows (real forced_emit ladder, EASY+HARD schema): "
+            f"{len(providers)} provider(s) — direct-call (no backend HTTP / no DB writes).\n"
+        )
+        return run_forced_emit_matrix(args, providers)
 
     if args.workflow:
         print(

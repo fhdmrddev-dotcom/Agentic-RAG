@@ -175,7 +175,7 @@ const PRETTY_TOOL_NAMES: Record<string, string> = {
  * `Record<string, string>`; `description`/`code` live there but TS can't prove
  * it for nested reads — RESEARCH Pitfall 4).
  */
-function humanize(tc: ToolCall): string {
+export function humanize(tc: ToolCall): string {
   if (tc.name === "execute_code") {
     const args = tc.args as unknown as { description?: string; code?: string }
     const desc = args?.description

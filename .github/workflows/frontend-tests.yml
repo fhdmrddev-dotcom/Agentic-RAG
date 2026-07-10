@@ -16,7 +16,7 @@ name: frontend-tests
 
 on:
   push:
-    branches: [master, main, v2.5-dev]
+    branches: [master, main, develop, "release/**"]
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-tests.yml"

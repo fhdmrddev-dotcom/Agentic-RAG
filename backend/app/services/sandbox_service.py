@@ -359,3 +359,70 @@ def harvest_output_files(
             delta_entry["supersedes"] = prev["filename"]  # Plan 04 OutputFileCard reads this
         delta_files.append(delta_entry)
     return delta_files, current_files_dict
+
+
+def snapshot_output_baseline(session: object) -> dict[str, dict]:
+    """List + SHA-256 every file already in /sandbox/output/ at run start.
+
+    Phase 120 Plan 01 (COLL-01) — closes the confirmed LIVE cross-run collision
+    (Mechanism A): the per-run dedup baseline (``previous_files``) used to be
+    initialized EMPTY, so a prior workflow's leftover ``.docx`` re-emitted with
+    a later skill's real output (the 2-files bug on thread ``99af24d5``).
+
+    This returns the SAME ``{content_hash: meta}`` dict shape that
+    ``harvest_output_files`` consumes as ``previous_files``, so a seeded entry
+    collides on the SHA-256 key with any later harvest of the SAME bytes and is
+    naturally skipped by the existing ``if h in previous_files: continue`` dedup
+    branch. The harvest needs NO change — only the run-start SEED was missing.
+
+    Mirrors the ``harvest_output_files`` container-I/O idiom verbatim
+    (best-effort ``mkdir -p`` + ``copy_from_runtime`` + ``os.walk`` + sha256).
+    Reuses the already-imported ``hashlib`` / ``os`` / ``tempfile`` — no new
+    imports.
+
+    Best-effort: an empty ``/sandbox/output/`` (or a copy failure) returns
+    ``{}`` — identical to today's behavior; this NEVER raises into the run and
+    NEVER clears/deletes files on disk (D-120-02). Callers MUST wrap with
+    ``run_in_threadpool`` (D-v2.5-01 — this does blocking container I/O).
+
+    Args:
+        session: the per-thread sandbox session
+            (``sandbox_manager.get_or_create(thread_id)``).
+
+    Returns:
+        dict keyed by SHA-256 content hash → meta dict
+        (``{"filename", "url", "size", "iteration"}``); ``iteration == -1``
+        marks a pre-run baseline entry. ``url`` is ``None`` (a pre-run file was
+        never uploaded by this run).
+    """
+    baseline: dict[str, dict] = {}
+    try:
+        # Ensure /sandbox/output exists before copying (mirrors harvest idiom).
+        try:
+            session.execute_command("mkdir -p /sandbox/output")
+        except Exception:
+            pass  # best-effort; copy_from_runtime will 404 if it truly doesn't exist
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # No trailing slash — Docker's get_archive is strict about this.
+            session.copy_from_runtime("/sandbox/output", tmpdir)
+            for root, _dirs, files in os.walk(tmpdir):
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    with open(fpath, "rb") as f:
+                        data = f.read()
+                    # SHA-256 content hash is the authoritative dedup key —
+                    # identical to harvest_output_files so a seeded baseline
+                    # entry collides with the later harvest of the same bytes.
+                    content_hash = hashlib.sha256(data).hexdigest()
+                    baseline[content_hash] = {
+                        "filename": fname,
+                        "url": None,
+                        "size": len(data),
+                        "iteration": -1,  # -1 = pre-run baseline
+                    }
+    except Exception as e:
+        # No baseline = legacy behavior; never blocks the run (D-120-02: we
+        # only stop RE-EMITTING pre-existing files, we never destroy them).
+        logger.warning("snapshot_output_baseline failed (returning {}): %s", e)
+    return baseline

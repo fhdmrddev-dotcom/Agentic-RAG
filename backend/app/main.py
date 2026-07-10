@@ -20,6 +20,18 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # gracefully at the ASGI layer, so these warnings are noise.
 logging.getLogger("asyncio").setLevel(logging.ERROR)
 
+# Phase 123.1 TT-10 — Suppress the LangSmith background-uploader 429 flood.
+# Once the monthly unique-trace quota is exceeded, the langsmith client's
+# background ingest thread emits a repeating "Failed to multipart ingest runs:
+# ... 429 Client Error: Too Many Requests" WARNING. This is upload-retry noise,
+# NOT the latency path — it does not slow the run (audit TT-06), it just drowns
+# the backend log during the exact tuner/heavy runs an operator needs to read.
+# ERROR-and-above (auth failure, hard client error) still surfaces; this is
+# scoped to the langsmith logger only — app/uvicorn/asyncio logging is unchanged.
+# To throttle the uploads at the source, set LANGSMITH_TRACING_SAMPLING_RATE in
+# backend/.env (documented in .env.example) — no code change required.
+logging.getLogger("langsmith").setLevel(logging.ERROR)
+
 logger = logging.getLogger(__name__)
 
 # Phase 093 D-20 — opt-in backend file log-sink. Runs AFTER load_dotenv (so
@@ -256,6 +268,29 @@ async def lifespan(app_instance):
 
     asyncio.create_task(_resume_stranded())
 
+    # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
+    # restart kills the in-process task driving a run, its terminal DB transition is
+    # never written and the row is stranded non-terminal forever (the user sees a run
+    # "running" with no error/timeout/recovery). This sweep honestly terminalizes
+    # orphans (eval → interrupted, chat → failed) + drops their stale Redis streams,
+    # guarded by a single-shot SET NX so WORKER_COUNT=2 never double-sweeps (mirrors
+    # _resume_stranded). Best-effort BACKGROUND task: a slow or failed sweep never
+    # blocks startup (logs + the app continues). Additive — NOT in threads.py (G-5),
+    # no agent-loop touch (D-14).
+    async def _reconcile_orphans():
+        try:
+            from app.services.run_reconciler import reconcile_orphaned_runs
+            from app.dependencies import get_redis, get_supabase
+            count = await reconcile_orphaned_runs(
+                pool=await get_pg_pool(), redis=get_redis(), supabase=get_supabase()
+            )
+            if count:
+                logger.info("Run reconciler closed %d orphaned run(s)", count)
+        except Exception:
+            logger.exception("Run reconciler failed (app continues)")
+
+    asyncio.create_task(_reconcile_orphans())
+
     # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
     # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
     # the app continues; the NEXT cadence re-runs). Idempotent by construction
@@ -277,6 +312,38 @@ async def lifespan(app_instance):
             await asyncio.sleep(15 * 60)   # D-07 ~15 min cadence
 
     asyncio.create_task(_sweep_expired_templates())
+
+    # Phase 145 (FND-01 / D-145-06 / D-145-08) — PERIODIC stream-age orphan sweep. The
+    # boot reconciler above heals restart-orphans ONCE; this INTERVAL task corrects a
+    # LYING runs.status that appears WHILE the app runs — a producer that dies mid-stream
+    # on a still-up worker (broken SSE / crashed task) leaves runs.status='streaming'
+    # forever, and under D-145-02 the run STAYS in runs:active so membership is blind
+    # (145-REPRO Direction B). reconcile_orphaned_runs' stream-age oracle catches it. This
+    # caller (a) EXCLUDES cap_paused (legitimately quiet, re-attachable — Pitfall 3) and
+    # (b) uses a SHORT lock_ttl=90 (< the 120s tick) so exactly ONE WORKER_COUNT=2 worker
+    # sweeps per tick and the SET NX guard self-expires before the next tick (D-145-08).
+    # Same shape as _sweep_expired_templates (while True + asyncio.sleep), NOT folded into
+    # resume_stranded_workflows (boot-only, re-drives — wrong semantics). Best-effort
+    # background task: a slow/failed sweep never blocks the app (logs + the next tick re-runs).
+    async def _reconcile_orphans_periodic():
+        while True:
+            try:
+                from app.services.run_reconciler import reconcile_orphaned_runs
+                from app.dependencies import get_redis, get_supabase
+                count = await reconcile_orphaned_runs(
+                    pool=await get_pg_pool(),
+                    redis=get_redis(),
+                    supabase=get_supabase(),
+                    lock_ttl=90,
+                    include_cap_paused=False,
+                )
+                if count:
+                    logger.info("Periodic run reconciler closed %d orphan(s)", count)
+            except Exception:
+                logger.exception("Periodic run reconciler failed (app continues)")
+            await asyncio.sleep(settings.run_stale_sweep_interval_seconds)
+
+    asyncio.create_task(_reconcile_orphans_periodic())
 
     yield
 
@@ -372,9 +439,15 @@ async def lifespan(app_instance):
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
+# FRONTEND_URL may hold one origin or a comma-separated list (e.g.
+# "https://superrag.cloud,https://agentic-rag-rho.vercel.app"). Split + strip
+# so multiple production origins can be allowed without a code change; a single
+# value stays valid (one-element list).
+_allowed_origins = [o.strip() for o in settings.frontend_url.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=_allowed_origins,
     allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
@@ -402,7 +475,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -424,6 +497,10 @@ app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-fo
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
 app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
+app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Skill Trigger Tuner (bounded background run over the run-buffer + tuner_* SSE + held-out scoreboard)
+app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
+app.include_router(evals.router)  # Phase 133 EVAL-02 — owner-scoped eval runner control surface (POST kickoff + GET results/list; companion runs row reuses runs.py stream/cancel)
+app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eval surface (POST engine-sweep + GET engine-health + GET /evals/runs/{id} skill-less readout; matrix launch stays on evals.router)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

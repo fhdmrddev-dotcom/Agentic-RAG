@@ -53,3 +53,11 @@ camelot-py[base]>=1.0.0,<2.0.0
 # google-genai >= 1.55.0 includes automatic thought_signature handling for
 # Gemini 3 function calling.
 google-genai>=1.55.0
+
+# Previously-undeclared direct imports — installed transitively in the local
+# venv but missing from the clean Docker image (surfaced by the Coolify cloud
+# build, 2026-06-28). Pinned at the working local versions.
+jsonschema>=4.26.0          # harness validators (app/services/harness/validators.py)
+docxtpl>=0.20.2             # trusted-path template-fill engine (template_render_service.py); pulls jinja2
+jinja2>=3.1.6               # template rendering
+PyYAML>=6.0.3               # skill manifest parsing (app/api/skills.py)

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 025 — Re-embed Confirm Gate</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 56px; }
+  .stage { max-width: 720px; margin: 0 auto; padding: var(--space-8) var(--space-6) 120px; }
+  .page-head { margin-bottom: var(--space-6); }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0 0 var(--space-2); }
+  .page-head p { color: var(--color-text-muted); margin: 0; font-size: var(--text-sm); }
+
+  /* Mini settings strip that triggers the gate */
+  .trigger-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: var(--space-5);
+  }
+  .trigger-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+  .trigger-row .lbl { font-size: var(--text-sm); font-weight: 600; min-width: 120px; }
+  select {
+    flex: 1; background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text); font-family: var(--font-sans);
+    font-size: var(--text-sm); padding: 9px 12px; appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%237b88a8' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+  }
+  select:focus { outline: none; border-color: var(--color-primary-strong); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  .changed-note { font-size: var(--text-xs); color: var(--color-warning); margin-bottom: var(--space-4); display: none; align-items: center; gap: 6px; }
+  .changed-note.show { display: flex; }
+  .btn {
+    border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text);
+    border-radius: var(--radius-md); padding: 9px 18px; font-size: var(--text-sm); font-weight: 600;
+    cursor: pointer; font-family: var(--font-sans); transition: all var(--dur-fast) var(--ease-out);
+  }
+  .btn:hover { border-color: var(--color-primary-glow); }
+  .btn.primary { background: var(--color-primary-strong); border-color: var(--color-primary-strong); color: hsl(226 60% 8%); }
+  .btn.primary:hover:not(:disabled) { box-shadow: var(--shadow-glow-primary); }
+  .btn.danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+  .btn.danger:hover:not(:disabled) { box-shadow: 0 0 20px hsl(0 72% 51% / 0.4); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .replay-hint { margin-top: var(--space-5); font-size: var(--text-xs); color: var(--color-text-dim); }
+  .replay-hint button {
+    background: none; border: 1px dashed var(--color-border); color: var(--color-text-muted);
+    padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-mono); font-size: 11px;
+  }
+  .replay-hint button:hover { color: var(--color-text); border-color: var(--color-primary-glow); }
+
+  /* ─── Modal scaffold (shared) ─── */
+  .overlay {
+    position: fixed; inset: 0; background: hsl(216 50% 2% / 0.72);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; z-index: 500; padding: 20px;
+  }
+  .overlay.show { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .modal {
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl); width: 100%; max-width: 480px; overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .modal-danger-rail { height: 3px; background: linear-gradient(90deg, var(--color-danger), var(--color-warning)); }
+  .modal-body { padding: var(--space-6); }
+  .modal-icon {
+    width: 44px; height: 44px; border-radius: var(--radius-md); display: grid; place-items: center;
+    background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.3); margin-bottom: var(--space-4);
+    font-size: 22px;
+  }
+  .modal h2 { font-family: var(--font-headline); font-size: var(--text-lg); margin: 0 0 var(--space-2); }
+  .modal .lede { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 var(--space-5); }
+  .modal .lede b { color: var(--color-text); }
+
+  /* the consequence list */
+  .consequences { list-style: none; margin: 0 0 var(--space-5); padding: 0; }
+  .consequences li {
+    display: flex; gap: var(--space-3); align-items: flex-start;
+    padding: var(--space-3) 0; border-top: 1px solid var(--color-border-soft); font-size: var(--text-sm);
+  }
+  .consequences li .ci { flex-shrink: 0; width: 18px; text-align: center; }
+  .consequences li b { color: var(--color-text); }
+  .ci.warn { color: var(--color-warning); }
+  .ci.info { color: var(--color-primary); }
+  .ci.time { color: var(--color-text-muted); }
+
+  .fact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-5); }
+  .fact {
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+  }
+  .fact .fk { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); margin-bottom: 3px; }
+  .fact .fv { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text); }
+  .fact .fv.big { font-size: var(--text-lg); font-weight: 700; }
+
+  .modal-foot { display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-2); }
+
+  /* type-to-confirm */
+  .confirm-input-wrap { margin-bottom: var(--space-5); }
+  .confirm-input-wrap label { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
+  .confirm-input-wrap label code { color: var(--color-warning); font-family: var(--font-mono); }
+  .confirm-input-wrap input {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text); font-family: var(--font-mono);
+    font-size: var(--text-sm); padding: 10px 12px;
+  }
+  .confirm-input-wrap input:focus { outline: none; border-color: var(--color-danger); box-shadow: 0 0 0 3px var(--color-danger-dim); }
+  .confirm-input-wrap input.match { border-color: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-dim); }
+
+  /* acknowledge checklist */
+  .ack-list { margin: 0 0 var(--space-5); padding: 0; list-style: none; }
+  .ack-item {
+    display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: var(--space-2);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out); font-size: var(--text-sm);
+  }
+  .ack-item:hover { border-color: var(--color-primary-glow); }
+  .ack-item.checked { background: var(--color-primary-dim); border-color: var(--color-primary-strong); }
+  .ack-box {
+    width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--color-border);
+    flex-shrink: 0; display: grid; place-items: center; transition: all var(--dur-fast); margin-top: 1px;
+  }
+  .ack-item.checked .ack-box { background: var(--color-primary-strong); border-color: var(--color-primary-strong); }
+  .ack-box svg { opacity: 0; transition: opacity var(--dur-fast); }
+  .ack-item.checked .ack-box svg { opacity: 1; }
+  .ack-item b { color: var(--color-text); }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--color-primary-strong); color: hsl(226 60% 8%); font-weight: 600;
+    padding: 10px 20px; border-radius: var(--radius-full); font-size: var(--text-sm);
+    opacity: 0; pointer-events: none; transition: all var(--dur-base) var(--ease-out); z-index: 600;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .pitch {
+    margin-top: var(--space-6); padding: var(--space-4); border-radius: var(--radius-md);
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border-soft);
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6;
+  }
+  .pitch b { color: var(--color-text); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 025 · Re-embed Gate</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Type-to-confirm</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Acknowledge-checklist</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Review-then-confirm</button>
+  <button class="variant-tab active" onclick="showVariant('synth', event)">Synthesis: C + A's facts <span class="star">★</span></button>
+</div>
+
+<!-- Each variant shares the same trigger card; only the modal differs -->
+
+<!-- ───────── SYNTHESIS ───────── -->
+<div id="variant-synth" class="variant">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Change the embedding model</h1>
+      <p>The recommended gate: C's <b>weight-not-friction</b> frame (danger rail, forceful copy, deliberate two-step) — restored to A's <b>full 4-fact grid</b> so all five required facts are unmissable. Serious without irreversibility-theatre.</p>
+    </div>
+    <div class="trigger-card">
+      <div class="trigger-row">
+        <span class="lbl">Embedding model</span>
+        <select id="s-sel" onchange="document.getElementById('s-changed').classList.add('show')">
+          <option value="small">OpenAI · text-embedding-3-small (current)</option>
+          <option value="large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="local">LM Studio (local) · bge-m3</option>
+        </select>
+      </div>
+      <div class="changed-note" id="s-changed"><span>●</span> Changed — saving will re-embed your library</div>
+      <button class="btn primary" onclick="openModal('synth')">Save changes</button>
+    </div>
+    <div class="pitch"><b>Synthesis — C frame + A's facts.</b> Friction is proportional to a rare, reversible, resumable act: the modal's design weight commands attention, the 4-fact grid (chunks · ETA · target model · runs-in-background) makes consequences concrete, and the consequence list keeps the recall-dip + irreversibility honest. No typing, no checkboxes — the two-step open-then-confirm is the deliberate beat. Type-to-confirm (A) is reserved for genuinely irreversible destruction; this is not that.</div>
+  </div>
+</div>
+
+<!-- ───────── VARIANT A ───────── -->
+<div id="variant-a" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Change the embedding model</h1>
+      <p>You picked a new model and pressed <b>Save</b>. Before anything destructive happens, the gate must get your attention about the consequences (contract D-03).</p>
+    </div>
+    <div class="trigger-card">
+      <div class="trigger-row">
+        <span class="lbl">Embedding model</span>
+        <select id="a-sel" onchange="document.getElementById('a-changed').classList.add('show')">
+          <option value="small">OpenAI · text-embedding-3-small (current)</option>
+          <option value="large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="local">LM Studio (local) · bge-m3</option>
+        </select>
+      </div>
+      <div class="changed-note" id="a-changed"><span>●</span> Changed — saving will re-embed your library</div>
+      <button class="btn primary" onclick="openModal('a')">Save changes</button>
+    </div>
+    <div class="pitch"><b>Variant A — hardest stop.</b> Lists every consequence, then disables the confirm button until you type the model name. Borrowed from GitHub repo-delete / Vercel-style destructive gates. Highest friction; impossible to fat-finger.</div>
+  </div>
+</div>
+
+<!-- ───────── VARIANT B ───────── -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Change the embedding model</h1>
+      <p>Same trigger — but the gate makes you tick each consequence before Confirm enables. You read every line without typing.</p>
+    </div>
+    <div class="trigger-card">
+      <div class="trigger-row">
+        <span class="lbl">Embedding model</span>
+        <select id="b-sel" onchange="document.getElementById('b-changed').classList.add('show')">
+          <option value="small">OpenAI · text-embedding-3-small (current)</option>
+          <option value="large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="local">LM Studio (local) · bge-m3</option>
+        </select>
+      </div>
+      <div class="changed-note" id="b-changed"><span>●</span> Changed — saving will re-embed your library</div>
+      <button class="btn primary" onclick="openModal('b')">Save changes</button>
+    </div>
+    <div class="pitch"><b>Variant B — acknowledge each line.</b> Every consequence is a checkbox; Confirm stays disabled until all are ticked. Forces a deliberate read of each consequence; loud without punishing. Like a destructive-migration acknowledgement.</div>
+  </div>
+</div>
+
+<!-- ───────── VARIANT C ───────── -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="stage">
+    <div class="page-head">
+      <h1>Change the embedding model</h1>
+      <p>Same trigger — the gate states every consequence forcefully with design weight, and a single deliberate two-step confirm. No typing, no checkboxes.</p>
+    </div>
+    <div class="trigger-card">
+      <div class="trigger-row">
+        <span class="lbl">Embedding model</span>
+        <select id="c-sel" onchange="document.getElementById('c-changed').classList.add('show')">
+          <option value="small">OpenAI · text-embedding-3-small (current)</option>
+          <option value="large">OpenAI · text-embedding-3-large (3072)</option>
+          <option value="local">LM Studio (local) · bge-m3</option>
+        </select>
+      </div>
+      <div class="changed-note" id="c-changed"><span>●</span> Changed — saving will re-embed your library</div>
+      <button class="btn primary" onclick="openModal('c')">Save changes</button>
+    </div>
+    <div class="pitch"><b>Variant C — weight, not friction.</b> Attention comes from a forceful, well-composed modal (danger rail, consequence list, big chunk count) and a deliberate two-step. Lowest friction of the three, but still unmistakably serious. The "modal reserved for must-decide moments" rule (Decision #13) is honored.</div>
+  </div>
+</div>
+
+<!-- ─────────────────────── MODAL A: type-to-confirm ─────────────────────── -->
+<div class="overlay" id="modal-a">
+  <div class="modal">
+    <div class="modal-danger-rail"></div>
+    <div class="modal-body">
+      <div class="modal-icon">⚠</div>
+      <h2>Re-embed your entire library?</h2>
+      <p class="lede">Switching to <b>text-embedding-3-large</b> rebuilds the search index from scratch. This affects every document.</p>
+
+      <div class="fact-grid">
+        <div class="fact"><div class="fk">Chunks to re-embed</div><div class="fv big">4,212</div></div>
+        <div class="fact"><div class="fk">Estimated time</div><div class="fv big">~6 min</div></div>
+        <div class="fact"><div class="fk">Target model</div><div class="fv">3-large · 3072d</div></div>
+        <div class="fact"><div class="fk">Runs</div><div class="fv">in background</div></div>
+      </div>
+
+      <ul class="consequences">
+        <li><span class="ci warn">▼</span><span><b>Search quality dips</b> until the job finishes — recently-changed chunks drop out of results, then recover.</span></li>
+        <li><span class="ci info">↻</span><span><b>Resumable &amp; non-destructive.</b> Old vectors are kept until each replacement is written; an interrupted run picks up where it stopped.</span></li>
+        <li><span class="ci time">⇄</span><span><b>Reversible only by switching back</b> + re-embedding again — there is no instant undo.</span></li>
+      </ul>
+
+      <div class="confirm-input-wrap">
+        <label>Type <code>text-embedding-3-large</code> to confirm</label>
+        <input type="text" id="a-confirm" placeholder="model name" oninput="aCheck(this)" autocomplete="off">
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('a')">Cancel</button>
+        <button class="btn danger" id="a-go" disabled onclick="doReembed('a')">Re-embed now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────── MODAL B: acknowledge-checklist ─────────────────────── -->
+<div class="overlay" id="modal-b">
+  <div class="modal">
+    <div class="modal-danger-rail"></div>
+    <div class="modal-body">
+      <div class="modal-icon">⚠</div>
+      <h2>Confirm embedding change</h2>
+      <p class="lede">Changing to <b>text-embedding-3-large</b> re-embeds <b>4,212 chunks</b> (~6 min, in the background). Please acknowledge each point.</p>
+
+      <ul class="ack-list" id="b-acks">
+        <li class="ack-item" onclick="bToggle(this)">
+          <span class="ack-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+          <span>I understand <b>4,212 chunks</b> will be re-embedded with text-embedding-3-large.</span>
+        </li>
+        <li class="ack-item" onclick="bToggle(this)">
+          <span class="ack-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+          <span><b>Search recall dips</b> until the job finishes, then fully recovers.</span>
+        </li>
+        <li class="ack-item" onclick="bToggle(this)">
+          <span class="ack-box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+          <span>This is <b>reversible only</b> by switching back and re-embedding again.</span>
+        </li>
+      </ul>
+
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('b')">Cancel</button>
+        <button class="btn primary" id="b-go" disabled onclick="doReembed('b')">Confirm &amp; re-embed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────── MODAL C: review-then-confirm ─────────────────────── -->
+<div class="overlay" id="modal-c">
+  <div class="modal">
+    <div class="modal-danger-rail"></div>
+    <div class="modal-body">
+      <div class="modal-icon">⚠</div>
+      <h2>This will re-embed your library</h2>
+      <p class="lede">Switching to <b>text-embedding-3-large</b> rebuilds the vectors for every document in your knowledge base.</p>
+
+      <div class="fact-grid">
+        <div class="fact"><div class="fk">Chunks</div><div class="fv big">4,212</div></div>
+        <div class="fact"><div class="fk">ETA</div><div class="fv big">~6 min</div></div>
+      </div>
+
+      <ul class="consequences">
+        <li><span class="ci warn">▼</span><span><b>Search quality dips</b> until the job finishes (runs in the background, resumable).</span></li>
+        <li><span class="ci time">⇄</span><span><b>Reversible only</b> by switching back + re-embedding again — no instant undo.</span></li>
+      </ul>
+
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('c')">Cancel</button>
+        <button class="btn danger" onclick="doReembed('c')">Re-embed now →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────── MODAL SYNTH: C frame + A's 4-fact grid ★ ─────────────── -->
+<div class="overlay" id="modal-synth">
+  <div class="modal">
+    <div class="modal-danger-rail"></div>
+    <div class="modal-body">
+      <div class="modal-icon">⚠</div>
+      <h2>This will re-embed your library</h2>
+      <p class="lede">Switching to <b>text-embedding-3-large</b> rebuilds the search vectors for every document in your knowledge base.</p>
+
+      <div class="fact-grid">
+        <div class="fact"><div class="fk">Chunks to re-embed</div><div class="fv big">4,212</div></div>
+        <div class="fact"><div class="fk">Estimated time</div><div class="fv big">~6 min</div></div>
+        <div class="fact"><div class="fk">Target model</div><div class="fv">3-large · 3072d</div></div>
+        <div class="fact"><div class="fk">Runs</div><div class="fv">in background</div></div>
+      </div>
+
+      <ul class="consequences">
+        <li><span class="ci warn">▼</span><span><b>Search quality dips</b> until the job finishes — recently-changed chunks drop out of results, then recover.</span></li>
+        <li><span class="ci info">↻</span><span><b>Resumable &amp; non-destructive.</b> Old vectors are kept until each replacement is written; an interrupted run picks up where it stopped.</span></li>
+        <li><span class="ci time">⇄</span><span><b>Reversible only by switching back</b> + re-embedding again — there is no instant undo.</span></li>
+      </ul>
+
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('synth')">Cancel</button>
+        <button class="btn danger" onclick="doReembed('synth')">Re-embed now →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>025</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<div class="toast" id="toast">Re-embed started — search is catching up…</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  e.target.classList.add('active');
+}
+function openModal(id) { document.getElementById('modal-' + id).classList.add('show'); }
+function closeModal(id) { document.getElementById('modal-' + id).classList.remove('show'); }
+
+// A: type-to-confirm
+function aCheck(el) {
+  const ok = el.value.trim() === 'text-embedding-3-large';
+  el.classList.toggle('match', ok);
+  document.getElementById('a-go').disabled = !ok;
+}
+// B: checklist
+function bToggle(el) {
+  el.classList.toggle('checked');
+  const all = [...document.querySelectorAll('#b-acks .ack-item')].every(i => i.classList.contains('checked'));
+  document.getElementById('b-go').disabled = !all;
+}
+function doReembed(id) {
+  closeModal(id);
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+  // reset triggers
+  if (id === 'a') { document.getElementById('a-confirm').value=''; document.getElementById('a-confirm').classList.remove('match'); document.getElementById('a-go').disabled=true; }
+  if (id === 'b') { document.querySelectorAll('#b-acks .ack-item').forEach(i=>i.classList.remove('checked')); document.getElementById('b-go').disabled=true; }
+}
+// close on overlay click
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('show'); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show')); });
+</script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { GovernancePage } from "@/pages/GovernancePage"
+import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -33,9 +34,23 @@ interface Props {
   onNavigate: (view: ActiveView) => void
   prefillMessage: string | null
   onSetPrefillMessage: (msg: string | null) => void
+  // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio focused
+  // full-surface — its selected skill + active tab + the navigators, all owned by App
+  // (per-view state) so the reachability triad (ActiveView union + the mount branch
+  // below + the SkillsPage entry action) is owned in-phase. `onOpenStudio` /
+  // `onReviewEvals` drill through to SkillsPage (the slim detail panel — Plan 07 — hosts
+  // the sole studio-entry button). `onTuneSkill` is preserved: the shipped "Tune
+  // triggers" + lint "Tune this →" handoff now auto-lands in Studio · Triggering via
+  // App's redirect (the Trigger Tuner is absorbed as the Triggering tab — no orphan).
+  studioSkillId: string | null
+  studioTab: StudioTab
+  onOpenStudio: (skillId: string, tab?: StudioTab) => void
+  onReviewEvals: (skillId: string) => void
+  onStudioTabChange: (tab: StudioTab) => void
+  onTuneSkill: (skillId: string) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
   const {
     threads,
     selectedThread,
@@ -282,7 +297,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
           {activeView === "documents" ? (
             <IngestionPage onNavigate={onNavigate} />
           ) : activeView === "skills" ? (
-            <SkillsPage onTryInChat={handleTryInChat} />
+            <SkillsPage
+              onTryInChat={handleTryInChat}
+              onTuneSkill={onTuneSkill}
+              onOpenStudio={onOpenStudio}
+              onReviewEvals={onReviewEvals}
+            />
           ) : activeView === "settings" ? (
             <SettingsPage />
           ) : activeView === "workflows" ? (
@@ -305,6 +325,22 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             // surface is reachable; the Phase 118 built-but-unreachable lesson).
             // Self-fetches the 3 governance signals — no props; three-homes, no router.
             <GovernancePage />
+          ) : activeView === "skill-studio" ? (
+            // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio
+            // focused full-surface mounts here (additive branch BEFORE the trailing
+            // KnowledgeHealthPage else — mirrors the governance/tuner precedent). It is
+            // entered WITH a skillId — via the slim detail panel's "Open studio" (Plan
+            // 07) or the "Tune triggers"/lint redirect (→ tab=triggering). The persistent
+            // header + Evals/Triggering/Versions tabs live inside; the Trigger Tuner is
+            // absorbed as the Triggering tab; "‹ Skills" returns. The reachability triad
+            // (App union + this mount + the navigators) is owned in-phase (the Phase-118
+            // built-but-unreachable lesson).
+            <SkillStudioPage
+              skillId={studioSkillId}
+              tab={studioTab}
+              onTabChange={onStudioTabChange}
+              onBack={() => onNavigate("skills")}
+            />
           ) : (
             <KnowledgeHealthPage />
           )}

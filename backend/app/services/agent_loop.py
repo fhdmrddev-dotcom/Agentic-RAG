@@ -50,6 +50,7 @@ from app.services.openai_service import (
     EXPLORER_SYSTEM_PROMPT,
     CallingMode,
     get_tools,
+    embed_texts,
 )
 # Phase 092.5 Wave 4 (D-04): create_adaptive_streaming_chat + normalize_finish_reason
 # moved BEHIND the gateway — the OpenAI-compat adapter
@@ -73,7 +74,25 @@ from app.services.context_window import (
     trim_messages_to_fit,
     estimate_messages_tokens,
     resolve_context_budget,
+    estimate_tokens,
 )
+# Phase 123-01 (D-01): the relaxed "## Available Skills" catalog-note policy lives
+# in skill_lint as the single source of truth, so this runtime note and the Plan 03
+# Tuner classifier measure the SAME production policy (Pitfall 1 fidelity guard).
+from app.services.skill_lint import LOAD_SKILL_POLICY
+# Phase 140 (TRIG-02): the smart-dispatch relevance pre-filter consumables. The three
+# Plan 03 pure contracts (budget resolver, trim/assemble fn, pin-scan) plus the private
+# `_block` — reused here as the fits-budget gate so the embed is skipped BYTE-IDENTICALLY
+# to the pure fn's own internal gate (Pitfall 1: never embed on the fast path). Plus the
+# Plan 02 fire-and-forget self-heal for NULL-sim skills (Blocker-1). Wired STRICTLY inside
+# the `skill_catalog_override is None` branch below (D-06 — the eval seam stays byte-exact).
+from app.services.skill_catalog_filter import (
+    resolve_skill_catalog_budget,
+    build_skill_catalog_block,
+    _recently_loaded_skill_names,
+    _block as _skill_catalog_block,
+)
+from app.services.skill_embedding_service import kick_skill_backfill
 
 if TYPE_CHECKING:
     import asyncpg
@@ -82,6 +101,77 @@ if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Phase 129 D-01 / D-03 (MP-04): MiniMax truncated-tool-args repair primitives
+# ---------------------------------------------------------------------------
+# These are pure, side-effect-free helpers so the guard's decision logic is
+# unit-testable in isolation (test_129_minimax_argrepair.py) WITHOUT driving the
+# full streaming agent loop. The inline seam in run_agent_loop delegates to them.
+
+# The corrective nudge injected on a re-ask (drop the bad turn, ask the model to
+# re-emit complete arguments; suggest splitting large code across calls — Open Q3).
+MINIMAX_ARGREPAIR_NUDGE = (
+    "Your previous tool call's arguments were truncated or invalid JSON "
+    "(the model hit its output token limit mid-argument). Re-emit the tool call "
+    "with complete, well-formed arguments. If the code is large, split it across "
+    "multiple smaller execute_code calls so no single call exceeds the output budget."
+)
+
+
+def _minimax_args_all_valid(tool_calls: list[dict]) -> bool:
+    """True iff EVERY tool_call's `arguments` string is well-formed JSON.
+
+    The MiniMax truncation failure mode: the model runs out of output budget
+    mid-`arguments` and emits a truncated (therefore invalid) JSON string, yet
+    still reports finish_reason="tool_calls" (so the existing length guards never
+    fire — Pitfall 2). We validate the args JSON DIRECTLY here, independent of
+    finish_reason. A truncated arg CANNOT be coerced (never brace-balance /
+    re-escape — that fabricates a partial dispatch, violating D-01); the caller
+    re-asks instead. Mirrors the stdlib coercion precedent at
+    tool_dispatcher.py:2450 (write_todos, BUG-260529-01).
+    """
+    for tc in tool_calls:
+        try:
+            json.loads(tc["arguments"])
+        except (ValueError, TypeError):
+            return False
+    return True
+
+
+def minimax_argrepair_decision(
+    resolved_provider: str,
+    tool_calls: list[dict],
+    argrepair_retries: int,
+    argrepair_pending: bool,
+) -> str:
+    """Decide what the round-trip seam should do for a buffered tool-call turn.
+
+    Pure decision function (no I/O) — the single source of truth for the D-01
+    ladder. Returns one of:
+
+      - "ok"         : append the assistant tool_calls turn unchanged (happy path
+                       AND every non-MiniMax provider — D-14 RED LINE).
+      - "reask"      : MiniMax args invalid + re-ask budget remaining → drop the
+                       bad turn, inject the corrective nudge, continue (bounded to
+                       ONE re-ask via argrepair_retries < 1).
+      - "honest_fail": MiniMax args invalid + budget exhausted → surface the
+                       existing bad_request copy and end the run (never a silent
+                       swallow, never a fabricated dispatch).
+      - "recovered"  : a prior re-ask just succeeded (this turn's MiniMax args are
+                       valid AND argrepair_pending was set) → emit the quiet
+                       tool_args_recovered signal, then append.
+
+    RED LINE (D-14): for any non-MiniMax provider this always returns "ok" — the
+    guard NEVER fires for openai/anthropic/google (test_non_minimax_unaffected).
+    """
+    if resolved_provider != "minimax":
+        return "ok"
+    if _minimax_args_all_valid(tool_calls):
+        return "recovered" if argrepair_pending else "ok"
+    # Invalid args under MiniMax.
+    return "reask" if argrepair_retries < 1 else "honest_fail"
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +207,22 @@ class RunContext:
     # hashable/immutable; the loop reads it as the first dispatch round.
     resume_dropped_tool_calls: bool = False
     dropped_tool_calls: tuple = ()
+    # Phase 133 (133-02 / EVAL-02) — ADDITIVE skill-catalog override for the
+    # honest eval A/B. OFF by default (None) at EVERY existing call site → Deep
+    # Mode byte-identical (the 092 default-off precedent above). None = query the
+    # DB (current behavior, D-14 red line); () = inject NOTHING (WITHOUT arm,
+    # D-04 — the `if enabled_skills:` guard short-circuits); (skill, ...) = inject
+    # EXACTLY these skills (WITH arm, D-03), no DB query. A frozen tuple keeps the
+    # dataclass hashable/immutable; each dict needs only `name` + `description`.
+    skill_catalog_override: tuple[dict, ...] | None = None
+    # Phase 135 (135-02 / SI-01) — ADDITIVE default-off skill-INSTRUCTIONS override
+    # for the honest DRAFT re-eval (RESEARCH Pitfall #1). OFF by default (None) at
+    # EVERY existing call site → Deep Mode byte-identical (the skill_catalog_override
+    # default-off discipline above). None => _handle_load_skill queries the DB live
+    # (current behavior, D-14/D-16 red line); a map {skill_name: instructions} =>
+    # _handle_load_skill returns the DRAFT instructions for that skill (for the
+    # re-eval) instead of the live skills-row body, WITHOUT touching the live skill.
+    skill_instructions_override: dict[str, str] | None = None
 
 
 @dataclass
@@ -498,7 +604,10 @@ SYSTEM_PROMPT = (
     "for file creation. Also for calculations and data analysis that require Python. "
     "Always pass `libraries` for non-stdlib packages. "
     "Pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename}. "
-    "Write output files to /sandbox/output/ and list them in `output_files`.\n"
+    "Write output files to /sandbox/output/ and list them in `output_files`. "
+    "ALWAYS set `description` to a short, specific label of what the code produces "
+    "(e.g. 'Generating Q3 revenue chart', 'Creating the risk-register .docx'), never a generic phrase "
+    "like 'Run code' — the user sees this label live in their workspace panel.\n"
     "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
     "- **save_skill / read_skill_file** → skill management\n"
     "- **query_tables** → structured table data from documents: 'show me the revenue table from Q3 Report', "
@@ -720,6 +829,31 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
 # (``test_chunk_handler_provider_aware.py``) imports it from the new home.
 
 
+def _apply_origin_filter(history_q, agent_mode: str):
+    """CTX-01 (D-120-06): apply the ASYMMETRIC, provider-agnostic origin filter.
+
+    A row-level WHERE pre-filter on ``messages.origin`` that isolates Deep and Harness
+    history go-forward in a SHARED thread:
+
+      - Deep / Explorer (``agent_mode != "harness"``): ``neq('origin','harness')`` —
+        replays deep + legacy rows (migration 076 fills legacy NULLs to 'deep' so the
+        ``neq`` keeps them; the three-valued-logic trap is avoided), but NEVER a
+        workflow row.
+      - Harness (``agent_mode == "harness"``): ``eq('origin','harness')`` — strict,
+        defense-in-depth (A1: the harness does not reconstruct via ``messages`` today;
+        this is the one place ``agent_mode`` is evaluated against the history read).
+
+    This is ADDITIVE: it only NARROWS within the already-owner/thread-scoped query — it
+    never relaxes ``.eq('thread_id')`` / ``.eq('user_id')`` (V4). It is a SINGLE shared
+    clause (no per-provider fork): the same filtered set feeds every provider, so a
+    pure-Deep thread returns today's exact set — Deep Mode byte-identical (SC#4). The
+    builder is mutated/returned in place (supabase-py chains return the same builder).
+    """
+    if agent_mode != "harness":
+        return history_q.neq("origin", "harness")
+    return history_q.eq("origin", "harness")
+
+
 def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
     """
     Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
@@ -780,11 +914,23 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                 })
                 # 2. Tool result messages (one per tool call)
                 for tc in tool_calls_data:
-                    messages.append({
+                    tool_msg = {
                         "role": "tool",
                         "tool_call_id": tc["tool_call_id"],
                         "content": tc.get("result") or "",
-                    })
+                    }
+                    # Phase 123-02 CTX-03 — tag load_skill tool-results as pinned so
+                    # context_window.trim_messages_to_fit keeps them out of the trim
+                    # window (a loaded skill stays available for the rest of the
+                    # session). The flag is set HERE in code, identified by the parent
+                    # tool_call name being load_skill — NEVER by sniffing the tool-result
+                    # content JSON (D-13 anti-pattern / D-14 no-fork). The flag value is
+                    # the skill name (for de-dupe), derived from the call args with a
+                    # stable fallback to the tool_call_id so de-dupe still works.
+                    if tc.get("name") == "load_skill":
+                        skill_name = (tc.get("args") or {}).get("skill_name") or tc["tool_call_id"]
+                        tool_msg["_pinned_skill"] = skill_name
+                    messages.append(tool_msg)
                 # 3. Assistant text response (only if content is non-empty)
                 if msg.get("content"):
                     messages.append({
@@ -977,6 +1123,13 @@ async def run_agent_loop(
     supabase = ctx.supabase
     _resolved_model = ctx.resolved_model
     _resolved_provider = ctx.resolved_provider
+    # Phase 133 (EVAL-02) — additive default-off skill-catalog override (None =
+    # DB query / Deep byte-identical; () = inject nothing; (skill,) = inject only).
+    skill_catalog_override = ctx.skill_catalog_override
+    # Phase 135 (SI-01) — additive default-off skill-INSTRUCTIONS override (None =
+    # DB live / Deep byte-identical; {skill_name: instructions} = the DRAFT re-eval,
+    # Pitfall #1). Passed into BOTH ToolContext builds below (primary + resume).
+    skill_instructions_override = ctx.skill_instructions_override
     # --- Category C callables (passed, not imported) ---
     # The moved body calls _emit / _spawn by those names; alias the params.
     _emit = emit
@@ -1020,14 +1173,19 @@ async def run_agent_loop(
         # so the scope note is not injected with a confusing "/" root path.
         scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
-    # Load full message history (includes just-inserted user message)
-    history_resp = await aexec(
+    # Load full message history (includes just-inserted user message).
+    # CTX-01 (D-120-06): build the query, then apply the ASYMMETRIC origin pre-filter
+    # so a Deep turn never replays a workflow's rows (and vice-versa). origin is a pure
+    # WHERE clause — kept OUT of the .select() projection (Pitfall 4) and ADDITIVE on
+    # top of the owner/thread scope (.eq thread_id + .eq user_id are never relaxed, V4).
+    _history_q = (
         supabase.table("messages")
         .select("role, content, tool_calls, reasoning_content")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
-        .order("created_at")
     )
+    _history_q = _apply_origin_filter(_history_q, body.agent_mode)
+    history_resp = await aexec(_history_q.order("created_at"))
 
     # Select system prompt, tools, and iteration limit based on agent mode
     if body.agent_mode == "explorer":
@@ -1053,25 +1211,120 @@ async def run_agent_loop(
 
     # Inject enabled skills catalog (General Mode only) — SKIL-09
     if body.agent_mode != "explorer":
-        _skills_resp = await aexec(
-            supabase.table("skills")
-            .select("name, description")
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-            .eq("is_enabled", True)
-            .order("name")
-        )
-        enabled_skills = _skills_resp.data or []
+        # Phase 133 (EVAL-02): change ONLY the data source. None = the existing
+        # DB query (Deep Mode byte-identical, SC#4 / D-14); a tuple = the eval
+        # arms drive exactly these skills (D-03 WITH = target-only; D-04 WITHOUT
+        # = empty → the `if enabled_skills:` guard below short-circuits).
+        if skill_catalog_override is None:
+            # Phase 140 (TRIG-02): now also SELECT `id` — the match_skills RPC and the
+            # D-02 pin set key on skill id (avoids the SEED-102 owner/global name
+            # collision). Scope/order are byte-identical to today (owner+global enabled,
+            # name-ordered) so Deep Mode stays unchanged when the catalog fits budget.
+            _skills_resp = await aexec(
+                supabase.table("skills")
+                .select("id, name, description")
+                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .eq("is_enabled", True)
+                .order("name")
+            )
+            enabled_skills = _skills_resp.data or []
+        else:
+            enabled_skills = list(skill_catalog_override)
 
         if enabled_skills:
-            catalog_lines = "\n".join(
-                f"- **{s['name']}**: {s['description']}" for s in enabled_skills
-            )
-            catalog_note = (
-                f"\n\n## Available Skills\n"
-                f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
-                f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
-                f"description similarity — wait for an explicit request:\n{catalog_lines}"
-            )
+            if skill_catalog_override is None:
+                # Phase 140 (TRIG-02) smart-dispatch relevance pre-filter — lives STRICTLY
+                # inside this override-None (live DB) branch so the eval-tuple path below
+                # stays byte-identical and NEVER embeds, ranks, or kicks (D-06 eval seam).
+                # ② settings-resolved global token budget (0/disable => inject-all, D-04).
+                budget = resolve_skill_catalog_budget(user_settings)
+                # ④ D-02 always-keep set: skills load_skill-ed earlier in THIS thread stay
+                # listed regardless of relevance rank (id-keyed → SEED-102-safe).
+                _pinned_names = _recently_loaded_skill_names(history_resp.data)
+                pinned_recent_ids = {
+                    s["id"] for s in enabled_skills if s["name"] in _pinned_names
+                }
+                # ③ Budget gate FIRST (Pitfall 1): the fits-budget fast path makes ZERO
+                # embed call and is byte-identical to today. `_skill_catalog_block` is the
+                # pure fn's own block builder, so this gate matches its internal gate
+                # exactly — no divergence between "we embedded" and "it trimmed".
+                sim_by_id: dict | None = None
+                _full_block = _skill_catalog_block(
+                    sorted(enabled_skills, key=lambda s: s["name"])
+                )
+                if budget > 0 and estimate_tokens(_full_block, user_settings.llm_model) > budget:
+                    try:
+                        # Embed the turn OFF the event loop (SEED-065 / D-v2.5-01).
+                        q_vec = (await run_in_threadpool(embed_texts, [body.content], user_settings=user_settings))[0]
+                        # Rank owner+global enabled skills by cosine in pgvector. The RPC
+                        # WHERE clause is the byte-exact clone of today's catalog scope
+                        # (V4 — no cross-user leak) and filters the CURRENT embedding model
+                        # (D-10 stale guard); a vector-less skill returns similarity NULL.
+                        _ranked = await aexec(
+                            supabase.rpc(
+                                "match_skills",
+                                {
+                                    "query_embedding": q_vec,
+                                    "match_user_id": current_user["id"],
+                                    "p_embedding_model": getattr(
+                                        user_settings, "embedding_model", ""
+                                    )
+                                    or "text-embedding-3-small",
+                                },
+                            )
+                        )
+                        sim_by_id = {
+                            r["id"]: r["similarity"] for r in (_ranked.data or [])
+                        }
+                        # Blocker-1 self-heal: any in-scope skill the RPC returned with a
+                        # missing/NULL similarity has a stale/absent vector — fire the
+                        # fire-and-forget backfill so it re-vectorizes within ~one turn.
+                        # It returns immediately, is NEVER awaited, and swallows its own
+                        # failures (off the hot path), so no extra guard is needed here.
+                        _stale_ids = [
+                            s["id"]
+                            for s in enabled_skills
+                            if sim_by_id.get(s["id"]) is None
+                        ]
+                        if _stale_ids:
+                            kick_skill_backfill(
+                                supabase,
+                                current_user["id"],
+                                user_settings,
+                                only_skill_ids=_stale_ids,
+                            )
+                    except Exception:
+                        # D-05 fail-open: any embed/RPC failure degrades to inject-all-up-
+                        # to-budget (sim_by_id=None => trim by name only), never crashing or
+                        # emptying the catalog. build_skill_catalog_block runs OUTSIDE this
+                        # try/except (it is None-safe) so the note is ALWAYS emitted.
+                        logger.warning(
+                            "skill pre-filter embed/rank failed; failing open",
+                            exc_info=True,
+                        )
+                        sim_by_id = None
+                # ⑤ Assemble the note (pure, None-safe): fits => byte-identical, over budget
+                # => keep pinned/recent + top-similarity, name-sorted display, honest
+                # _CATALOG_TRIM_MARKER (SC#1 + SC#3 / D-14).
+                catalog_note = build_skill_catalog_block(
+                    enabled_skills,
+                    budget,
+                    user_settings.llm_model,
+                    pinned_recent_ids,
+                    sim_by_id,
+                )
+            else:
+                # Eval-tuple branch (D-06): byte-identical to today — no budget, no embed,
+                # no rank, no kick. The eval arms drive exactly these skills.
+                catalog_lines = "\n".join(
+                    f"- **{s['name']}**: {s['description']}" for s in enabled_skills
+                )
+                # D-01: relaxed, description-driven load_skill firing — reconciled with
+                # LOAD_SKILL_TOOL.description via the shared LOAD_SKILL_POLICY constant.
+                catalog_note = (
+                    f"\n\n## Available Skills\n"
+                    f"The following skills are available. {LOAD_SKILL_POLICY}\n{catalog_lines}"
+                )
             active_system_prompt = active_system_prompt + catalog_note
 
         # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
@@ -1173,6 +1426,16 @@ async def run_agent_loop(
     _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
     _message_persisted = False  # guard against double-insert
     _empty_retries = 0  # tracks empty-response retries across all iterations
+    # Phase 129 D-01 / D-03 (MP-04): run-scoped single-shot counter for the
+    # MiniMax truncated-tool-args re-ask. SEPARATE from _provider_retries
+    # (:1508, the transient-error budget that resets per-iteration) — Pitfall 3:
+    # a code-heavy MiniMax run that also hits a transient 503 must NOT burn its
+    # arg-repair budget on the transient path, or vice-versa. Mirrors the
+    # _empty_retries single-shot shape (top-of-run init, max 1).
+    _minimax_argrepair_retries = 0
+    # Set when a prior iteration dropped a bad MiniMax tool-call turn and re-asked;
+    # used to emit the quiet `tool_args_recovered` signal once the re-ask succeeds.
+    _minimax_argrepair_pending = False
 
     async def _persist_assistant_message() -> str | None:
         """Insert the assistant message row. Idempotent — only runs once.
@@ -1314,6 +1577,20 @@ async def run_agent_loop(
         # affordance. Plan 04 Wave 0 historical context:
         # B-260519-11 + BUG-260514-01 (per-run cumulative state).
         _previous_files_in_run: dict[str, dict] = {}
+        # RUN-01a — content-hashes genuinely new to THIS run. Threaded by-reference
+        # exactly like _previous_files_in_run (init here → both ctx builds → mutated
+        # in the dispatcher's harvest delta-merge → read at the final_output_files
+        # emit). The final emit filters against this so baseline/leftover files
+        # re-harvested with fresh URLs (BUG-260626-02) never leak into the aggregate.
+        _new_file_hashes_in_run: set[str] = set()
+        # Phase 142 (SRH-01 / D-06) — run-scoped repeat-guard set. Init ONCE per
+        # run (OUTSIDE the iteration loop), threaded by-reference into BOTH
+        # ToolContext builds below exactly like _new_file_hashes_in_run so a
+        # PERMANENT runtime gap that fired on iteration N short-circuits the same
+        # dead call on iteration N+1 (Pitfall 1 — a fresh ctx is built every
+        # iteration; setattr would not survive). Sub-agents get a FRESH set()
+        # (task_service) so a sub-agent's dead call never blocks the parent.
+        _dead_gap_tokens_in_run: set[str] = set()
 
         # Phase 085 D-085-15 — per-run task() concurrency semaphore.
         # Initialized ONCE per top-level run (outside the iteration loop) so
@@ -1364,10 +1641,16 @@ async def run_agent_loop(
                 spawn=_spawn,
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
+                new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
+                dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
                 available_tools=[rc["name"] for rc in _resume_calls],
+                # Phase 135 (SI-01) — a RESUMED re-eval must keep measuring the
+                # DRAFT, not silently revert to the live skill (Pitfall #1 / D-05).
+                # None on every Deep/normal resume => byte-identical load_skill.
+                skill_instructions_override=skill_instructions_override,
             )
             for _ti, rc in enumerate(_resume_calls):
                 _tool_name = rc["name"]
@@ -1987,6 +2270,101 @@ async def run_agent_loop(
             # --- Tool execution round ---
             tool_calls = list(tool_calls_buffer.values())
 
+            # Phase 129 D-01 / D-03 (MP-04): MiniMax truncated-tool-args guard.
+            # RED LINE (D-14): the ENTIRE guard is gated on the RESOLVED provider
+            # identity (_resolved_provider, set from ctx.resolved_provider at
+            # :1023) — NOT the model string (D-09 #3 / BUG-260616-01: slash-gating
+            # on `org/model` ids misfired). For non-MiniMax round-trips
+            # (openai/anthropic/google) this branch is skipped entirely and the
+            # `messages.append` below is byte-identical to today.
+            #
+            # Root cause (run 2c711ee4, output_tokens=8192 = the cap): MiniMax-M3
+            # truncates a large `execute_code.code` arg mid-stream, producing an
+            # invalid (truncated) JSON `arguments` string, and reports
+            # finish_reason="tool_calls" anyway (Pitfall 2 — the length guards at
+            # :1975/:1983 never fire). The 400 only happens on the NEXT request
+            # (the round-trip re-send below), so we validate PROACTIVELY here,
+            # before the append, independent of finish_reason.
+            #
+            # A truncated arg CANNOT be coerced into validity (Anti-pattern: never
+            # brace-balance / re-escape — that fabricates a partial dispatch,
+            # violating D-01). Only a fresh re-ask is honest: drop the bad turn,
+            # inject a corrective user nudge, `continue` (mirrors the
+            # prose-before-code recovery at :1998-2008), bounded to ONE re-ask via
+            # the run-scoped _minimax_argrepair_retries counter. Still-malformed
+            # after the one re-ask → honest-fail via the existing
+            # `message_for_kind("bad_request")` copy (never a silent swallow).
+            # The decision logic is the pure helper minimax_argrepair_decision
+            # (defined at module scope, unit-pinned by test_129_minimax_argrepair).
+            # For every non-MiniMax provider it returns "ok" and this block is a
+            # no-op (the messages.append below is byte-identical to today).
+            _argrepair_decision = minimax_argrepair_decision(
+                _resolved_provider,
+                tool_calls,
+                _minimax_argrepair_retries,
+                _minimax_argrepair_pending,
+            )
+            if _argrepair_decision == "reask":
+                # One-shot re-ask: do NOT append the malformed tool_calls turn.
+                # Inject a corrective nudge and continue the loop so MiniMax
+                # re-emits the tool call with complete arguments. Mirrors the
+                # prose-before-code recovery shape at :1998-2008.
+                _minimax_argrepair_retries += 1
+                _minimax_argrepair_pending = True
+                messages.append({
+                    "role": "user",
+                    "content": MINIMAX_ARGREPAIR_NUDGE,
+                })
+                logger.warning(
+                    "minimax_argrepair: iteration %d (thread %s) — "
+                    "truncated/invalid tool-call arguments detected; "
+                    "dropping the bad turn and re-asking once",
+                    iteration, thread_id,
+                )
+                # Reset the per-iteration accumulators we are discarding along
+                # with the bad turn (mirrors the reset at :2076-2081).
+                full_content = ""
+                full_reasoning_content = ""
+                continue
+            elif _argrepair_decision == "honest_fail":
+                # Re-ask budget exhausted and still malformed: honest-fail with
+                # the existing fixed `bad_request` copy. No raw 400 detail
+                # interpolation for this known kind (Information-Disclosure
+                # control T-095.1-01-02 / T-129-06). Never a silent swallow,
+                # never a fabricated/partial dispatch (T-129-05). Mirrors the
+                # finish_reason=="length" honest-fail shape at :1975-1981.
+                _argrepair_fail_msg = message_for_kind("bad_request")
+                full_content += _argrepair_fail_msg
+                await _emit(redis, run_id, 'delta', content=_argrepair_fail_msg)
+                await _emit(
+                    redis, run_id, 'error',
+                    message='minimax tool-call arguments still invalid after re-ask',
+                )
+                logger.warning(
+                    "minimax_argrepair: iteration %d (thread %s) — re-ask "
+                    "exhausted, tool-call arguments still invalid; "
+                    "honest-failing with bad_request copy",
+                    iteration, thread_id,
+                )
+                break
+            elif _argrepair_decision == "recovered":
+                # The re-ask recovered: this iteration's MiniMax args are valid
+                # after a prior _minimax_argrepair_retries increment. Surface a
+                # quiet, Deep-side honesty signal (Phase-122 family) on the run
+                # SSE channel BEFORE the normal append. This is the Deep agent
+                # loop's own _emit (threads.py:152 → one XADD on run:{run_id}),
+                # NOT the harness forced_emit substrate the Deep loop bypasses
+                # (forced_emit.py:74). The event is a quiet audit signal, not a
+                # user-facing error delta — the FE can ignore unknown events; no
+                # new FE handler required (Open Q1).
+                _minimax_argrepair_pending = False
+                await _emit(
+                    redis, run_id, 'tool_args_recovered',
+                    provider=_resolved_provider, iteration=iteration,
+                )
+            # "ok" → fall through to the normal append (happy path + every
+            # non-MiniMax provider).
+
             messages.append({
                 "role": "assistant",
                 "tool_calls": [
@@ -2047,6 +2425,8 @@ async def run_agent_loop(
                 spawn=_spawn,
                 model=body.model or settings.llm_model,
                 previous_files_in_run=_previous_files_in_run,
+                new_file_hashes_in_run=_new_file_hashes_in_run,  # RUN-01a — same by-reference share
+                dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service
@@ -2061,6 +2441,10 @@ async def run_agent_loop(
                     t["function"]["name"]
                     for t in (active_tools or get_tools(user_settings))
                 ],
+                # Phase 135 (SI-01) — carry the DRAFT instructions override so the
+                # re-eval WITH arm measures the draft's instructions (Pitfall #1).
+                # None on every Deep/normal caller => byte-identical load_skill.
+                skill_instructions_override=skill_instructions_override,
             )
 
             for tool_index, tc in enumerate(tool_calls):
@@ -2187,50 +2571,66 @@ async def run_agent_loop(
             # silent dead anchor (RESEARCH dead-link root #1). The flag is
             # presentation-only and never feeds the owner-fenced re-sign
             # download path (T-095-05-01).
-            _emit_metas = list(_previous_files_in_run.values())
-            # Phase 095 Plan 09 Task 2 (GAP-095-02 / WR-02) — compute the hero set
-            # ONCE over the COMPLETE run file set. This is the single source of
-            # truth shared by BOTH the live emit (below) AND the post-loop re-stamp
-            # of the persisted execute_code rows, so live == reload (a multi-cell
-            # reload heroes the same single file as the live run).
-            _hero_set = _select_hero_filenames(_emit_metas, body.content)
+            # RUN-01a — filter the aggregate emit to content-hashes genuinely new to
+            # THIS run. _previous_files_in_run is keyed by SHA-256 content-hash (the
+            # KEY is the hash; meta dicts carry none — read identity from .items()).
+            # On a reused sandbox session a baseline/leftover file is re-harvested with
+            # a fresh real URL, so filtering on `iteration == -1` is INSUFFICIENT (that
+            # marker is overwritten before this emit runs — BUG-260626-02). The
+            # run-scoped _new_file_hashes_in_run accumulator only accreted hashes that
+            # the per-cell harvest deltas flagged as new, so filtering against it
+            # excludes every baseline/leftover file — consistent with what the per-cell
+            # delta panels already showed live. An empty result => this run surfaced
+            # only leftovers => emit NOTHING (correct — no dead "Download unavailable"
+            # cards, no re-surfaced prior-run files).
+            _emit_metas = [
+                meta for _h, meta in _previous_files_in_run.items()
+                if _h in _new_file_hashes_in_run
+            ]
+            if _emit_metas:
+                # Phase 095 Plan 09 Task 2 (GAP-095-02 / WR-02) — compute the hero set
+                # ONCE over the COMPLETE run file set. This is the single source of
+                # truth shared by BOTH the live emit (below) AND the post-loop re-stamp
+                # of the persisted execute_code rows, so live == reload (a multi-cell
+                # reload heroes the same single file as the live run).
+                _hero_set = _select_hero_filenames(_emit_metas, body.content)
 
-            # Re-stamp the persisted execute_code rows against the canonical
-            # ``_hero_set`` (the per-cell persist above stamped a False placeholder
-            # over the PARTIAL cumulative list). Each row's output_files ``is_hero``
-            # is recomputed from the complete-set hero, re-serialized, written back.
-            # Guarded: a truncated/non-JSON fallback ``result`` (the per-cell
-            # ``except`` path) is skipped gracefully.
-            for _tc in persisted_tool_calls:
-                if _tc.get("name") != "execute_code":
-                    continue
-                try:
-                    _pr = json.loads(_tc["result"])
-                    _of_rows = _pr.get("output_files")
-                    if not isinstance(_of_rows, list):
+                # Re-stamp the persisted execute_code rows against the canonical
+                # ``_hero_set`` (the per-cell persist above stamped a False placeholder
+                # over the PARTIAL cumulative list). Each row's output_files ``is_hero``
+                # is recomputed from the complete-set hero, re-serialized, written back.
+                # Guarded: a truncated/non-JSON fallback ``result`` (the per-cell
+                # ``except`` path) is skipped gracefully.
+                for _tc in persisted_tool_calls:
+                    if _tc.get("name") != "execute_code":
                         continue
-                    _pr["output_files"] = [
-                        {**_of, "is_hero": _of.get("filename") in _hero_set}
-                        for _of in _of_rows
-                    ]
-                    _tc["result"] = json.dumps(_pr)
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    continue
+                    try:
+                        _pr = json.loads(_tc["result"])
+                        _of_rows = _pr.get("output_files")
+                        if not isinstance(_of_rows, list):
+                            continue
+                        _pr["output_files"] = [
+                            {**_of, "is_hero": _of.get("filename") in _hero_set}
+                            for _of in _of_rows
+                        ]
+                        _tc["result"] = json.dumps(_pr)
+                    except (json.JSONDecodeError, TypeError, KeyError):
+                        continue
 
-            await _emit(
-                redis,
-                run_id,
-                'final_output_files',
-                files=[
-                    {
-                        "filename": meta["filename"],
-                        "url": meta.get("url") or "",
-                        "size": meta["size"],
-                        "is_hero": meta["filename"] in _hero_set,
-                    }
-                    for meta in _emit_metas
-                ],
-            )
+                await _emit(
+                    redis,
+                    run_id,
+                    'final_output_files',
+                    files=[
+                        {
+                            "filename": meta["filename"],
+                            "url": meta.get("url") or "",
+                            "size": meta["size"],
+                            "is_hero": meta["filename"] in _hero_set,
+                        }
+                        for meta in _emit_metas
+                    ],
+                )
 
         # Fallback: if the loop ended with no content produced, emit a safe message
         if not full_content:

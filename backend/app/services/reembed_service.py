@@ -111,13 +111,17 @@ async def reembed_job(
 
             # RESUMABLE READ: re-select the still-stale chunks each pass. RLS scope
             # eq(user_id) (V4 — the service-role client bypasses RLS, so the app scopes
-            # by hand). neq(embedding_model, current) == the IS DISTINCT FROM stale
-            # predicate (D-10). Threadpool-wrapped (never block the loop).
+            # by hand). Stale == IS DISTINCT FROM the current model, which MUST also match
+            # embedding_model IS NULL — chunks that failed to embed at ingestion (e.g. a
+            # transient provider error) keep a NULL model. A bare neq() excludes NULL in SQL
+            # (NULL != 'x' is NULL, not TRUE), so those chunks were counted as "remaining" by
+            # reembed_progress yet never selectable here -> stranded forever. or_(is.null,neq)
+            # restores the true IS DISTINCT FROM stale predicate (D-10). Threadpool-wrapped.
             batch = await run_in_threadpool(
                 lambda: supabase.table("document_chunks")
                 .select("id, content")
                 .eq("user_id", user_id)
-                .neq("embedding_model", current)
+                .or_(f'embedding_model.is.null,embedding_model.neq."{current}"')
                 .limit(limit)
                 .execute()
             )

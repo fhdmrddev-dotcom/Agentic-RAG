@@ -16,6 +16,7 @@
  * MessageItem.tsx already exercises. No tailwind.config.js change needed.
  */
 
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 
 export type ToolStatus = "preparing" | "running" | "done" | "interrupted" | "failed"
@@ -28,6 +29,16 @@ export interface StatusPillProps {
   runningLabel?: string
   /** Custom done label (e.g., "4 results") — overrides the literal "done". */
   doneLabel?: string
+  /**
+   * SEED-098 Change 1 (Variant B merged pill): epoch ms when the running tool
+   * started. When provided AND status === "running", the pill renders a LIVE
+   * ticking duration inside the SAME chip (`running · 3.2s`) — merging the verb
+   * and the elapsed timer into one chip (no separate ElapsedTimer span). When
+   * absent the pill is byte-identical to today (just the verb word). The ticker
+   * is internal (setInterval 250ms, mirrors ToolCallPanel's ElapsedTimer
+   * cadence) and is torn down on unmount / when the tool stops running.
+   */
+  liveStartedAt?: number
 }
 
 function formatDuration(ms: number): string {
@@ -43,7 +54,18 @@ const VARIANTS: Record<ToolStatus, string> = {
   failed: "bg-destructive/15 text-destructive",
 }
 
-export function StatusPill({ status, duration, runningLabel, doneLabel }: StatusPillProps) {
+export function StatusPill({ status, duration, runningLabel, doneLabel, liveStartedAt }: StatusPillProps) {
+  // SEED-098 Change 1 (Variant B merged pill): live elapsed ticker for the
+  // running chip. The hook is ALWAYS called (Rules of Hooks) but the interval
+  // is only armed when status === "running" AND liveStartedAt is provided, so
+  // the absent-liveStartedAt path stays byte-identical to today.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (status !== "running" || liveStartedAt == null) return
+    const t = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(t)
+  }, [status, liveStartedAt])
+
   // Pill copy contract (D5):
   //   preparing/running → verb ("running" | runningLabel)
   //   done → "done · {duration}" or "{doneLabel} · {duration}" (duration omitted if undefined)
@@ -53,7 +75,10 @@ export function StatusPill({ status, duration, runningLabel, doneLabel }: Status
   if (status === "preparing") {
     label = runningLabel ?? "preparing"
   } else if (status === "running") {
-    label = runningLabel ?? "running"
+    const base = runningLabel ?? "running"
+    // Merged live chip: verb · live-elapsed (Variant B). Only when liveStartedAt
+    // is provided — otherwise just the verb (today's behavior, unchanged).
+    label = liveStartedAt != null ? `${base} · ${formatDuration(now - liveStartedAt)}` : base
   } else if (status === "done") {
     const base = doneLabel ?? "done"
     label = duration != null && duration > 0 ? `${base} · ${formatDuration(duration)}` : base

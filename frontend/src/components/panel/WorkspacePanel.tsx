@@ -53,6 +53,17 @@ import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
 import { PhaseTimeline } from "./PhaseTimeline"
 import { BatchResultList } from "./BatchResultList"
+// Phase 124-03 Task 1 (WUX-01, D-07/D-08, sketch 046-A ② run-header) — the run
+// soul header. This is an ADDITIVE SIBLING of the live PhaseTimeline section
+// (the G-5 red line): WorkflowSoul is a fresh presentational component that reads
+// the DEFINITION only; PhaseTimeline / PhaseCard are NOT imported here for it, NOT
+// given a new prop, and NOT threaded with any soul atom. The run soul sources the
+// published definition ADDITIVELY by id (A2) — getThreadWorkflow gives the run
+// frame's definition_slug, listPublishedWorkflows gives the SAME owner-scoped
+// WorkflowDefinitionJSON the library card already reads (PublishedWorkflow.definition).
+import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
+import type { DefShape } from "@/components/workflows/soulData"
+import { getThreadWorkflow, listPublishedWorkflows } from "@/lib/api"
 
 export type PanelState = "open" | "rail"
 
@@ -69,6 +80,68 @@ function useIsMobile(): boolean {
     return () => window.removeEventListener("resize", onResize)
   }, [])
   return isMobile
+}
+
+/**
+ * Phase 124-03 Task 1 (WUX-01, D-07/D-08, A2) — the run-surface soul header.
+ *
+ * An ADDITIVE SIBLING of the live PhaseTimeline (the G-5 red line): it reads the
+ * DEFINITION only and renders <WorkflowSoul scale="run">. It must NEVER:
+ *  - consume usePhases(threadId) for live phase state,
+ *  - render an elapsed timer or a per-phase slug (would re-open BUG-260610-01 /
+ *    BUG-260609-04 — those belong to the live timeline, not the soul),
+ *  - read PhaseCard / PhaseTimeline internals or add a prop to either.
+ *
+ * Definition sourcing (A2): the run frame (ThreadWorkflowState) carries only
+ * definition_slug + run-state phases, NOT the authored definition. So we do a
+ * sibling-only additive read — getThreadWorkflow → definition_slug, then
+ * listPublishedWorkflows → the SAME owner-scoped PublishedWorkflow.definition JSONB
+ * the library card already consumes (no new endpoint, no widened fields, RLS
+ * unchanged — T-124-12 accept). A draft test-run with a null business_requirement
+ * is covered by WorkflowSoul's honest "draft · purpose not declared yet" empty-state.
+ */
+function RunSoul({ threadId }: { threadId: string | null }) {
+  const [def, setDef] = useState<DefShape | null>(null)
+
+  useEffect(() => {
+    if (!threadId) {
+      setDef(null)
+      return
+    }
+    let cancelled = false
+    const ctrl = new AbortController()
+    void (async () => {
+      try {
+        // 1) The run frame — the only thing that names which published definition
+        //    this thread's run is executing (definition_slug). Run-state only.
+        const frame = await getThreadWorkflow(threadId, ctrl.signal)
+        const slug = frame.definition_slug
+        if (!slug) {
+          if (!cancelled) setDef(null)
+          return
+        }
+        // 2) The published list — the SAME owner-scoped read the card uses; match
+        //    the run frame's slug to recover the full authored definition JSONB.
+        const published = await listPublishedWorkflows(undefined, ctrl.signal)
+        const match = published.find((w) => w.slug === slug)
+        if (!cancelled) setDef((match?.definition as DefShape | undefined) ?? null)
+      } catch {
+        // A reconcile/list miss is non-fatal — the soul falls back to its honest
+        // empty-states (no purpose / chat output) rather than crashing the panel.
+        if (!cancelled) setDef(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+      ctrl.abort()
+    }
+  }, [threadId])
+
+  return (
+    <div className="px-1">
+      <WorkflowSoul def={def} scale="run" />
+    </div>
+  )
 }
 
 export interface WorkspacePanelProps {
@@ -180,6 +253,19 @@ export function WorkspacePanel({
               </p>
             )}
           </PanelSection>
+
+          {/* Phase 124-03 Task 1 (WUX-01, D-07/D-08, sketch 046-A ②): the run soul
+              header — an ADDITIVE SIBLING section ABOVE the live Workflow timeline.
+              It reads the DEFINITION only (purpose · tier · glyph-dot spine · needs ·
+              output) via a sibling-only by-id read; it never touches the timeline's
+              live phase state. Gated to the SAME showTimeline condition (harness runs
+              only) so Deep / no-run threads never see it — Deep stays byte-identical,
+              no shared-path fork (D-08). The PhaseTimeline section below is UNCHANGED. */}
+          {showTimeline && (
+            <PanelSection title="This workflow">
+              <RunSoul threadId={threadId} />
+            </PanelSection>
+          )}
 
           {/* Phase 094 (PANEL-08): the harness phase-timeline — the 5th section,
               mounted only for a harness run (server-truth lock) OR when phases

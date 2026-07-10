@@ -26,6 +26,74 @@ write the table — a one-off single-provider re-run must never clobber a full
 table from the same day. Re-running the full matrix on the same date overwrites
 that date's files (latest full run wins; git history keeps the prior state).
 
+## Forced-emit scoreboard (Phase 122 / MP-03 — the tier-change gate)
+
+A FULL `--forced-emit` run (no `--provider` filter) writes a second pair of
+artifacts that make **provider a first-class axis** — they score whether each
+provider can actually emit on its declared `emit_tier` rung:
+
+```bash
+backend/venv/Scripts/python.exe scripts/eval_cross_provider.py --forced-emit
+```
+
+- `forced-emit-scoreboard-<YYYY-MM-DD>.json` — one cell per `(provider ×
+  {easy, hard} schema)`, machine-diffable
+- `forced-emit-scoreboard-<YYYY-MM-DD>.md` — the same data as a human-readable
+  table
+
+This mode is a **direct-call harness**: it imports the production `forced_emit`
+ladder (Plan 122-02) and drives it per provider — NOT via `body.model`, which
+does not steer harness phases (Pitfall 6). It needs no bearer token and no DB
+connection (it never WRITES); it is still localhost-gated like every other mode.
+
+Each cell scores 4 axes as **PASS / FAIL / DOCUMENTED**:
+
+| Axis | Meaning |
+|---|---|
+| `trigger` | the model was actually reached and attempted the emission (a non-`provider_error` outcome) |
+| `force` | the model won on its DECLARED TOP rung (the `emit_tier`'s first rung) |
+| `recovery` | a strict-400 / no-emit recovered via a LOWER rung instead of going dark (the HARD schema makes this non-vacuous — see below) |
+| `honest_fail` | when nothing succeeded, the ladder returned a clean `_failure` (never silent, never fabricated) |
+
+**The HARD schema is the live trip-wire (Pitfall 1):** it is optional-heavy and
+carries an `additionalProperties` confidence object, which 400s the OpenAI-schema
+family on the STRICT rung — forcing a descent to a lower rung. Without it the
+`recovery` axis could never be exercised (a clean schema always wins on the top
+rung). The EASY schema is clean required-only.
+
+**`DOCUMENTED` clears the gate (D-122-07):** a `DOCUMENTED` axis is an explicit
+known-limitation row inside the artifact (a `documented[]` entry with a note +
+evidence link) whose declared `emit_tier` **already reflects that measured
+reality** — so it is NOT a silent skip and it CLEARS the gate. A `FAIL` with no
+documented note fails the cell.
+
+**native-7 GATES; OpenRouter is best-effort and never gates** (D-122-07) — one
+representative model per provider. Partial runs (`--forced-emit --provider
+deepseek`) print the scoreboard but do NOT write the artifact (a single-provider
+re-run must never clobber a full scoreboard from the same day).
+
+### The forced-emit grep ritual (operator gate — D-122-06)
+
+MANDATORY GATE before flipping any `emit_tier` in `MODEL_CAPABILITIES`. This is
+the *measured* substitute for assuming a tier change is safe — "no silent tier
+flip" (SC#3):
+
+1. Run the full forced-emit eval: `backend/venv/Scripts/python.exe
+   scripts/eval_cross_provider.py --forced-emit`
+2. Extract the scoreboard: `... --forced-emit | grep 'EVAL_ROW forced-emit'`
+   (and `grep 'EVAL_SUMMARY forced-emit'`)
+3. Grep the latest dated scoreboard for the provider whose tier you intend to
+   change: confirm its `force` / `recovery` axes support the new tier (or carry a
+   `DOCUMENTED` row that justifies it)
+4. Attach the scoreboard + the dated artifact to the phase's VALIDATION.md as the
+   MP-03 evidence
+
+This is **NOT** an automated pytest gate — live cross-provider keys in CI mean
+secrets + cost + flakiness (rejected, D-122-06). A separate structure-only pytest
+(`backend/tests/unit/test_eval_forced_emit.py`, fake gateway, no live keys) proves
+the writer / scoring / localhost-gate; only the operator's live run proves the
+providers.
+
 ## JSON schema (one object per provider)
 
 ```json

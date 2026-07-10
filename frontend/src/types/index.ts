@@ -1,3 +1,9 @@
+// Phase 139 (SI-02): reuse the tuner's cell-bearing candidate as the winner /
+// baseline member of a description proposal's inline scoreboard snapshot. This is
+// a type-only import (verbatimModuleSyntax) — fully elided at compile, so the
+// api.ts ↔ types circular *type* reference creates no runtime import cycle.
+import type { TunerCandidate } from "@/lib/api"
+
 export interface Thread {
   id: string
   user_id: string
@@ -53,6 +59,12 @@ export interface ToolCall {
    * counter next to the spinner. Replaced by the post-completion duration badge
    * (`executionDurationMs`) once execution completes. */
   elapsedSeconds?: number
+  /** SAND (silence fix): current sub-phase of an execute_code step, from the
+   * `code_executing` SSE `phase` field — 'starting_sandbox' | 'installing_libraries'
+   * | 'running'. Drives the honest header label ("Starting sandbox…", "Installing
+   * libraries…") so the pre-execution setup window (container spin-up + pip
+   * install) is no longer shown as an indeterminate "Running code…". */
+  codePhase?: string
   /** D-067-03: 0-based iteration index from iteration_start SSE event. Used by
    * ToolCallPanel to render "Step N" gradient dividers between iteration groups.
    * Undefined for tool calls loaded from DB (historical messages — no divider). */
@@ -461,6 +473,17 @@ export interface Document {
   image_count?: number
 }
 
+/** Phase 123-06 (TRIG-03) — one save-time description-lint warning, mirroring the
+ *  backend `skill_lint.lint_description()` `{code, message}` shape (Plan 01).
+ *  `code` is the specific reason (`name_echo` / `no_trigger_verb` / `too_short` /
+ *  `too_long` / `generic` / `duplicate` / `empty`); `message` is the human reason
+ *  string the inline warning renders verbatim. The lint is WARN-NEVER-BLOCK (D-09):
+ *  the save already succeeded — these are advisory. */
+export interface SkillLintWarning {
+  code: string
+  message: string
+}
+
 export interface Skill {
   id: string
   user_id: string
@@ -469,8 +492,17 @@ export interface Skill {
   instructions: string
   is_enabled: boolean
   is_global: boolean
+  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it)
   created_at: string
   updated_at: string
+  /** Phase 123-06 (TRIG-03) — the optional save-time lint warnings the
+   *  POST/PATCH /skills response carries (`SkillResponse.lint_warnings`, Plan 01).
+   *  Advisory only — the save already succeeded (warn-never-block, D-09). Empty/
+   *  absent => healthy (silent-when-healthy). The shared `SkillForm` holds the
+   *  returned warnings in local state after a save resolves and renders them
+   *  inline under the Description textarea (sketch 044-A), each with a one-click
+   *  "Tune this" handoff into the Trigger Tuner. */
+  lint_warnings?: SkillLintWarning[]
 }
 
 export interface SkillCreate {
@@ -495,6 +527,313 @@ export interface SkillFile {
   file_size: number
   mime_type: string
   created_at: string
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 132 Plan 03 (EVAL-01 / VER-01) — eval test-case + version-history wire
+// mirrors. Mirror the backend Pydantic shapes BYTE-FOR-BYTE (snake_case):
+//   skill_test_case.py → TestCaseCreate / TestCaseUpdate / TestCaseResponse
+//   skill_version.py   → SkillVersionResponse (read-only — trigger-created)
+// `expected_behavior` is free text (D-06); there are NO provider/model fields
+// (D-08). These back the THIN 132 foundation surface; the designed Evals panel
+// is Phase 137 (PANEL-01, G-2).
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface TestCase {
+  id: string
+  skill_id: string
+  user_id: string
+  prompt: string
+  expected_behavior: string
+  order_index: number
+  name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TestCaseCreate {
+  prompt: string
+  expected_behavior?: string
+  order_index?: number
+  name?: string | null
+}
+
+export interface TestCaseUpdate {
+  prompt?: string
+  expected_behavior?: string
+  order_index?: number
+  name?: string | null
+}
+
+export interface SkillVersion {
+  id: string
+  skill_id: string
+  user_id: string
+  version_number: number
+  name: string
+  description: string
+  instructions: string
+  source: string
+  created_at: string
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 133 Plan 05 (EVAL-02) — eval-runner wire mirrors (snake_case, no reshape).
+// Mirror migration 080 (eval_runs / eval_results) + the Plan 04 route payloads.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/runs response (202 kickoff — D-06). */
+export interface EvalRunKickoff {
+  run_id: string
+  skill_id: string
+  skill_version_id: string
+  provider: string
+  model: string
+  case_count: number
+}
+
+/** A durable eval_runs row (migration 080). status mirrors the run-audit enum. */
+export interface EvalRun {
+  id: string
+  skill_id: string
+  skill_version_id: string
+  user_id: string
+  provider: string
+  model: string
+  status: "running" | "completed" | "failed" | "cancelled" | "interrupted"
+  case_count: number
+  error: string | null
+  created_at: string
+  completed_at: string | null
+  // Phase 134 (EVAL-03 / D-07) — additive verdict rollup columns (migration 081).
+  // Honest count: passed_count of measured_count with-skill cases passed. NULL on
+  // old (pre-081) runs and on error/cancel paths. verdict_summary is the optional
+  // default rollup label; Phase 136 (GATE-01) owns the real publish threshold.
+  passed_count: number | null
+  measured_count: number | null
+  verdict_summary: string | null
+  // Phase 137.1 (EVAL-05 / migration 085) — matrix grouping + gate-feeder flag.
+  // matrix_group_id groups the N single-provider arms of one matrix run (NULL on a
+  // single run). feeds_gate marks the ONE arm whose rows feed the publish gate (D-05;
+  // false on single runs and every pre-085 row — their gate read is unchanged).
+  matrix_group_id: string | null
+  feeds_gate: boolean
+}
+
+/** A durable eval_results row — one per (test_case × variant) (migration 080). */
+export interface EvalResult {
+  id: string
+  eval_run_id: string
+  test_case_id: string
+  user_id: string
+  variant: "with_skill" | "without_skill"
+  provider: string
+  model: string
+  output: string
+  status: "completed" | "failed" | "timed_out" | "cancelled"
+  error: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  created_at: string
+  // Phase 134 (EVAL-03 / D-04, D-06) — additive per-arm verdict columns (migration
+  // 081), written in the SAME insert by the independent LLM judge. verdict_state is
+  // "graded" only for a completed/non-empty arm; an errored/empty arm is honestly
+  // "not_measured" (NEVER a fabricated pass/fail — EVAL-03 SC#1), and a completed
+  // arm whose judge shot failed is "judge_error". verdict_passed/score are NULL
+  // unless graded. All fields NULL on old (pre-081) rows.
+  verdict_state: "graded" | "not_measured" | "judge_error" | null
+  verdict_passed: boolean | null
+  verdict_score: number | null
+  verdict_reason: string | null
+  judge_model: string | null
+  // Phase 134 (EVAL-04 / D-09) — the CALLER's own thumbs rating on this answer,
+  // attached by get_eval_run from an owner-scoped eval_ratings read. null = unrated.
+  rating: "up" | "down" | null
+  // Phase 137.1 (EVAL-05 / migration 085) — per-arm wall-clock (EVAL-05e; NULL on
+  // pre-085 rows) + advisory judge critique of the CASE (EVAL-05d). case_feedback is
+  // NEVER a verdict and never enters rollup math — it renders visually distinct from
+  // PASS/FAIL. Both NULL on old rows / un-graded arms.
+  duration_ms: number | null
+  case_feedback: string | null
+}
+
+/** GET /skills/{id}/evals/runs/{runId} response — the durable readout. */
+export interface EvalRunReadout {
+  eval_run: EvalRun
+  eval_results: EvalResult[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 137.1 (EVAL-05) — matrix runs, engine smoke-sweep health, and run-history
+// aggregation wire mirrors. Snake_case, no reshape — these mirror the Plan 04/05/07
+// route payloads the Studio + Settings consume. All owner-scoped SERVER-SIDE (thin
+// client, not itself a security boundary).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/matrix response (202 kickoff). One matrix run fans N
+ *  single-provider arms under ONE matrix_group_id; each arm is a normal EvalRunKickoff
+ *  and streams via subscribeToRun. Exactly one arm has feeds_gate=true (D-05). */
+export interface MatrixRunKickoff {
+  matrix_group_id: string
+  arms: EvalRunKickoff[]
+}
+
+/** One provider/model tile on the engine-health board (D-02 / 060-A). `healthy` is the
+ *  honest smoke-sweep outcome; `error` is the VERBATIM provider error string when
+ *  unhealthy (a missing key is an honest ✗, not a blocker); `run_id` deep-links to that
+ *  arm's run detail; `last_swept_at` is the ISO timestamp of the sweep (null if never). */
+export interface EngineHealthTile {
+  provider: string
+  model: string
+  healthy: boolean
+  error: string | null
+  run_id: string | null
+  last_swept_at: string | null
+}
+
+/** GET /evals/engine-health response — the per-provider ✓/✗ board (skill-less smoke
+ *  sweep, D-02). `swept_at` is the board-level sweep timestamp (null before the first
+ *  sweep). */
+export interface EngineHealthBoard {
+  tiles: EngineHealthTile[]
+  swept_at: string | null
+}
+
+/** One (provider, model) aggregation row over an eval run's HISTORY (D-07). `with_mean`
+ *  / `without_mean` are the mean pass-rates; `with_stddev` is NULL at run_count<2 (no
+ *  spread from a single run — the honest "first run" floor); `delta` = with_mean −
+ *  without_mean; `analyst_notes` are DETERMINISTIC backend-computed lines (D-08, never an
+ *  LLM paragraph). */
+export interface EvalConfigAgg {
+  provider: string
+  model: string
+  run_count: number
+  with_mean: number
+  without_mean: number
+  with_stddev: number | null
+  delta: number
+  analyst_notes: string[]
+}
+
+/** GET /skills/{id}/evals/aggregate response — mean±stddev/delta over accumulated run
+ *  history, grouped per (provider, model). Empty `configs` = no history yet. */
+export interface EvalAggregate {
+  configs: EvalConfigAgg[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 136 (GATE-01) — skill publish gate. Exact mirror of the backend
+// `PublishGate` Pydantic model (Plan 01 `app.models.skill`): a server-computed
+// read-model over eval_runs ⋈ skill_versions ⋈ skills. The client NEVER computes
+// `met` — it renders this and echoes `override` (D-07). Flat interface + nullable
+// fields + status-union deliberately mirrors EvalRun / PromotionGate above.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /skills/{id}/publish-gate response. `state` is the honest publish
+ *  readiness: "passed" (met), or one of three honest unmet reasons. `measured`/
+ *  `passed`/`passing_run_id` are the numeric evidence (NULL when nothing honest
+ *  to show); `reason` is the human-readable line; `last_override` carries the
+ *  most-recent owner-visible force-publish record (D-01/D-02) or null. */
+export interface PublishGate {
+  met: boolean
+  state: "never_evaled" | "latest_failed" | "passed_on_older_version" | "passed"
+  measured: number | null
+  passed: number | null
+  passing_run_id: string | null
+  reason: string
+  last_override: { gate_state: string; created_at: string } | null
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 135 (SI-01) — self-improvement proposal lifecycle. Mirrors the LOCKED
+// backend response contract (Plans 04/05): a proposal captures the base vs the
+// LLM-proposed skill instructions plus its rationale, then rides an approve →
+// re-eval → promote/not-promote gate. FLAT interface + status-union + nullable
+// style deliberately mirrors EvalRun above.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The promotion-gate honest counts + pass conditions (D-13). Owned by the
+ *  backend `PromotionGate` model (Plan 04's eval_run.py); Plan 05 populates it on
+ *  the terminal promoted / not_promoted transition. `passed` is the overall
+ *  verdict; `no_regression`/`improved` are its two conditions; the five counts
+ *  are the honest with-skill tallies (never fabricated — cases whose judge could
+ *  not measure land in `excluded_not_measured`, not in a pass/fail bucket). */
+export interface PromotionGate {
+  passed: boolean
+  no_regression: boolean
+  improved: boolean
+  prev_pass: number
+  prev_fail: number
+  still_pass: number
+  newly_pass: number
+  excluded_not_measured: number
+}
+
+/** Phase 139 (SI-02) — the inline per-provider scoreboard a `kind='description'`
+ *  proposal carries as PRE-approval evidence (D-04/D-10). This is the EXACT
+ *  top-level shape 139-02's writer persists — literally `{ winner, baseline,
+ *  run_id }` — NOT a `TunerScoreboard` (whose `candidates[]` + `winner_index`
+ *  shape has no top-level `.winner`/`.baseline`, so the card could not read them
+ *  off it). `winner`/`baseline` reuse the tuner's cell-bearing `TunerCandidate`
+ *  so the description card can feed their `cells` straight into `ProviderScoreboard`;
+ *  `baseline` is null when the tuner run had no baseline candidate. */
+export interface DescriptionScoreboardSnapshot {
+  winner: TunerCandidate
+  baseline: TunerCandidate | null
+  run_id: string
+}
+
+/** A durable skill_proposals row (migration 083; description fields migration 090).
+ *  Mirrors the LOCKED backend response shape; the client computes the base→proposed
+ *  diff itself (lineDiff). Nullable ids are set as the proposal advances (new
+ *  version + re-eval run appear on approve/promote); `gate` is null until the
+ *  terminal gate verdict. `kind` discriminates SI-01 instruction rows from SI-02
+ *  description rows. */
+export interface SkillProposal {
+  id: string
+  skill_id: string
+  /** Which proposal family this row is. `instruction` = SI-01 (an
+   *  instructions-body diff, migration 083); `description` = SI-02 (a
+   *  trigger-description diff sourced from a Trigger Tuner run, migration 090). */
+  kind: "instruction" | "description"
+  base_skill_version_id: string
+  new_skill_version_id: string | null
+  re_eval_run_id: string | null
+  source_eval_run_id: string | null
+  // For a `kind='description'` row these instruction fields may be empty strings —
+  // the diff the card renders lives in proposed_description/base_description instead.
+  proposed_instructions: string
+  base_instructions: string
+  rationale: string
+  evidence_summary: string
+  // Phase 139 (SI-02) description-proposal fields — null on a `kind='instruction'`
+  // row. The description card renders lineDiff(base_description, proposed_description)
+  // + a ProviderScoreboard from scoreboard_snapshot; source_tuner_run_id is the
+  // provenance FK back to the Trigger Tuner run that produced the winner (D-09/D-10).
+  proposed_description: string | null
+  base_description: string | null
+  source_tuner_run_id: string | null
+  scoreboard_snapshot: DescriptionScoreboardSnapshot | null
+  status:
+    | "proposed"
+    | "rejected"
+    | "approved"
+    | "re_evaling"
+    | "promoted"
+    | "not_promoted"
+    | "interrupted"
+  override_forced: boolean
+  // Populated by Plan 05 on promoted / not_promoted (D-13); null otherwise.
+  gate?: PromotionGate | null
+  created_at: string
+  updated_at: string
+}
+
+/** POST approve / rerun response — the updated proposal plus the companion
+ *  re-eval run_id the client subscribes to (rides the existing eval_* SSE). */
+export interface ProposalApproveResult {
+  proposal: SkillProposal
+  re_eval_run_id: string
 }
 
 // ────────────────────────────────────────────────────────────────────────────

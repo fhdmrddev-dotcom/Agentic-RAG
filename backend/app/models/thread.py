@@ -57,6 +57,7 @@ class WorkflowPhaseState(BaseModel):
     slug: str
     phase_index: int
     status: str
+    phase_type: str | None = None
 
 
 class ThreadWorkflowState(BaseModel):

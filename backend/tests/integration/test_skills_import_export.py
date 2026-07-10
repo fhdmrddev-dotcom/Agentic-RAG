@@ -3,6 +3,7 @@
 Requirements covered: OPEN-01, OPEN-02, OPEN-03, OPEN-04, OPEN-05, OPEN-06
 """
 import io
+import logging
 import zipfile
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
@@ -370,3 +371,239 @@ class TestImportSkill:
             files={"file": ("big.zip", large_bytes, "application/zip")},
         )
         assert response.status_code == 413
+
+    # ── Phase 142 (SRH-01 / SC#1 / D-08): non-blocking import note ────────────────
+    # A skill that bundles a non-Python script still imports SUCCESSFULLY; the response
+    # carries an additive, OPTIONAL `notes[]` entry so the user learns at import time
+    # that the skill has a step the sandbox can't run yet (D-10 = the G-B static
+    # ZIP-extension scan, the only import-time-knowable signal). The note goes on BOTH
+    # the sync (201) and the background (202) response bodies (Pitfall 5). An all-Python
+    # ZIP produces no note.
+
+    def test_import_note_for_js(self, client, auth_headers, mock_builder):
+        """A .js-bundling skill imports (201) with a non-blocking notes[] entry. (SC#1/D-08)"""
+        zip_bytes = _make_zip({
+            "SKILL.md": _valid_skill_md(name="JS Skill"),
+            "helper.js": "console.log('hi')",
+        })
+        # The skills INSERT needs .data[0]; the single file INSERT ignores its return, so a
+        # single return_value (not a call-counted side_effect) is safest.
+        mock_builder.execute.return_value = _make_result([_skill_row(name="JS Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        # Import SUCCEEDS — the note never blocks (D-08).
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["created"]) == 1
+        assert "notes" in data, "the additive notes[] key must be present (Pitfall 5)"
+        notes = data["notes"]
+        assert len(notes) == 1
+        assert notes[0]["skill"] == "JS Skill"
+        assert "helper.js" in notes[0]["note"]
+        assert "can't run" in notes[0]["note"]
+
+    def test_no_note_for_all_python(self, client, auth_headers, mock_builder):
+        """An all-Python ZIP imports (201) with NO honesty note (empty or absent). (SC#1)"""
+        zip_bytes = _make_zip({
+            "SKILL.md": _valid_skill_md(name="Py Skill"),
+            "util.py": "x = 1",
+        })
+        mock_builder.execute.return_value = _make_result([_skill_row(name="Py Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["created"]) == 1
+        # A pure-Python bundle must not trigger a false honesty note.
+        assert not data.get("notes")
+
+    def test_note_on_background_path(self, client, auth_headers, mock_builder):
+        """The 202 background branch ALSO carries notes[] for a script bundle. (SC#1 Pitfall 5)"""
+        # 20 .py + 1 .js == 21 files > 20 -> the has_background JSONResponse (202) branch.
+        entries = {"skill-x/SKILL.md": _valid_skill_md(name="BG JS Skill")}
+        for i in range(20):
+            entries[f"skill-x/f{i:02d}.py"] = f"x = {i}"
+        entries["skill-x/runner.js"] = "console.log(1)"
+        zip_bytes = _make_zip(entries)
+        mock_builder.execute.return_value = _make_result([_skill_row(name="BG JS Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        # 202 = the background branch; the note MUST ride along here too (Pitfall 5).
+        assert response.status_code == 202
+        data = response.json()
+        assert "notes" in data
+        assert data["notes"][0]["skill"] == "BG JS Skill"
+        assert any("runner.js" in n["note"] for n in data["notes"])
+
+
+# ── Collision / resilience regression tests (quick 260705-nfu) ─────────────────
+
+class TestImportCollisionResilience:
+    """Regression tests for the silent skill-import data-loss bug (quick 260705-nfu).
+
+    A ZIP whose companion files flatten to the same basename used to collide on one
+    storage path; the second colliding upload raised, and because ``_upload_skill_files``
+    had NO per-file try/except that unhandled exception aborted the ENTIRE loop — every
+    file later in ZIP order was silently dropped (a real docx skill imported only the
+    files preceding its second colliding ``__init__.py``). Two fixes are proven here:
+    de-dup colliding flattened names (Test A) + a resilient per-file loop that also
+    surfaces failures (Test B sync path / Test C background path).
+    """
+
+    def test_colliding_flattened_names_both_survive(self, client, auth_headers, mock_builder):
+        """Two files that flatten to the SAME basename upload under DISTINCT paths.
+
+        Pre-fix failure mode: ``pkg_a/__init__.py`` and ``pkg_b/__init__.py`` both flatten
+        to ``__init__.py`` -> one identical storage_path -> ``set(paths)`` has size 1 (the
+        second upload collides on / clobbers the first). This test is RED against the old
+        code because it asserts ``len(set(paths)) == 2``. Post-fix, ``_dedup_flattened_name``
+        renames the second to ``__init__2.py``, yielding two distinct storage paths.
+        """
+        zip_bytes = _make_zip({
+            "skill-x/SKILL.md": _valid_skill_md(name="Collide Skill"),
+            "skill-x/pkg_a/__init__.py": "a = 1",
+            "skill-x/pkg_b/__init__.py": "b = 2",
+        })
+        # Robust: the skills INSERT needs .data[0]; the two skill_files inserts ignore their
+        # return, so a single return_value (not a call-counted side_effect) is safest.
+        mock_builder.execute.return_value = _make_result([_skill_row(name="Collide Skill")])
+
+        response = client.post(
+            "/skills/import",
+            headers=auth_headers,
+            files={"file": ("skill.zip", zip_bytes, "application/zip")},
+        )
+        assert response.status_code == 201
+
+        paths = [
+            c.kwargs["path"]
+            for c in _supabase.storage.from_.return_value.upload.call_args_list
+        ]
+        assert len(paths) == 2, f"Expected 2 uploads, got {paths}"
+        assert len(set(paths)) == 2, f"Colliding basenames must get DISTINCT paths, got {paths}"
+
+    def test_one_upload_failure_does_not_abort_the_loop(
+        self, client, auth_headers, mock_builder, caplog
+    ):
+        """A single file's upload failure is caught + logged; files AFTER it still upload.
+
+        Real pre-fix failure mode: ``_upload_skill_files`` had no try/except, so b.py's
+        RuntimeError BOTH aborted the loop (c.py + every later file silently dropped) AND —
+        because conftest's ``TestClient(app)`` uses the default
+        ``raise_server_exceptions=True`` — propagated straight out of ``client.post(...)``.
+        The OLD code makes this test ERROR with a raised exception (no ``response`` is ever
+        assigned), NOT a status-code FAIL: an unhandled route exception under this TestClient
+        config never becomes a 500 response — it escapes the request call itself. Post-fix,
+        the exception is caught, the loop continues, and the failure is surfaced in the
+        response ``errors`` list.
+        """
+        zip_bytes = _make_zip({
+            "skill-x/SKILL.md": _valid_skill_md(name="Resilient Skill"),
+            "skill-x/a.py": "a = 1",
+            "skill-x/b.py": "b = 2",
+            "skill-x/c.py": "c = 3",
+        })
+        mock_builder.execute.return_value = _make_result([_skill_row(name="Resilient Skill")])
+
+        upload_mock = _supabase.storage.from_.return_value.upload
+        try:
+            # a.py ok, b.py fails (the documented duplicate-storage-path failure), c.py ok.
+            upload_mock.side_effect = [
+                None,
+                RuntimeError("simulated duplicate storage path"),
+                None,
+            ]
+            with caplog.at_level(logging.WARNING):
+                response = client.post(
+                    "/skills/import",
+                    headers=auth_headers,
+                    files={"file": ("skill.zip", zip_bytes, "application/zip")},
+                )
+        finally:
+            # The autouse reset does NOT clear storage-mock side_effects — restore it here
+            # or it leaks into the next test.
+            upload_mock.side_effect = None
+
+        assert response.status_code == 201
+        # All three files attempted despite b.py failing (pre-fix: loop aborts at b.py -> 2).
+        assert upload_mock.call_count == 3
+        paths = [c.kwargs["path"] for c in upload_mock.call_args_list]
+        assert any(p.endswith("c.py") for p in paths), (
+            f"c.py (after the failure) must still upload, got {paths}"
+        )
+        # The failure is surfaced through the response errors channel...
+        errors = response.json()["errors"]
+        assert len(errors) >= 1
+        assert any("b.py" in e.get("error", "") for e in errors)
+        # ...and logged server-side.
+        assert any(
+            "b.py" in r.getMessage()
+            for r in caplog.records
+            if r.levelno == logging.WARNING
+        )
+
+    def test_background_path_is_resilient_and_logs_failures(
+        self, client, auth_headers, mock_builder, caplog
+    ):
+        """The backgrounded path (file_count > 20) runs the same resilient loop + logs.
+
+        Proves the per-file try/except also protects the background branch — which the
+        sync-path Tests A/B never exercise. Pre-fix, the un-guarded background task's
+        exception aborted the loop (every file after the failure dropped) and — since the
+        task runs inside ``client.post(...)`` under ``raise_server_exceptions=True`` —
+        propagated out and ERRORed the request call (same fail-vs-error distinction as
+        Test B). Post-fix, the task swallows the single failure per-file, so ``client.post``
+        returns normally (a 202) and every file is still attempted; the failure lives ONLY
+        in the log (no response channel remains once the 202 body is sent).
+        """
+        entries = {"skill-x/SKILL.md": _valid_skill_md(name="Background Skill")}
+        for i in range(21):  # f00.py .. f20.py -> 21 files > 20 -> background branch
+            entries[f"skill-x/f{i:02d}.py"] = f"x = {i}"
+        zip_bytes = _make_zip(entries)
+        mock_builder.execute.return_value = _make_result([_skill_row(name="Background Skill")])
+
+        upload_mock = _supabase.storage.from_.return_value.upload
+        calls = {"n": 0}
+
+        def _flaky_upload(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 11:  # the 11th upload = f10.py, a middle file
+                raise RuntimeError("simulated background upload failure")
+            return None
+
+        try:
+            upload_mock.side_effect = _flaky_upload
+            with caplog.at_level(logging.WARNING):
+                response = client.post(
+                    "/skills/import",
+                    headers=auth_headers,
+                    files={"file": ("skill.zip", zip_bytes, "application/zip")},
+                )
+        finally:
+            upload_mock.side_effect = None
+
+        # 202 = the has_background JSONResponse branch; body message names the background upload.
+        assert response.status_code == 202
+        assert "background" in response.json()["message"]
+        # Starlette runs BackgroundTasks synchronously after building the response, so by the
+        # time client.post returns the task has already executed — every file (incl. the ten
+        # AFTER the failing f10.py) was still attempted.
+        assert upload_mock.call_count == 21
+        # The ONLY failure channel for the background path is the log.
+        assert any(
+            "f10.py" in r.getMessage()
+            for r in caplog.records
+            if r.levelno == logging.WARNING
+        )

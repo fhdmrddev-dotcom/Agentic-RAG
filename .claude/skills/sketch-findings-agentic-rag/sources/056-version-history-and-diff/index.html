@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 056 — Version History & Diff</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body{ padding-top:52px; }
+  .wrap{ max-width:1100px; margin:0 auto; padding:24px 28px 80px; }
+  .vhead h2{ font-family:var(--font-headline); font-weight:700; font-size:var(--text-xl); margin:0; }
+  .vhead p{ color:var(--color-text-muted); font-size:var(--text-sm); margin:6px 0 18px; max-width:860px; line-height:1.55; }
+  .mono{ font-family:var(--font-mono); }
+  .callout{ border-left:3px solid var(--color-primary); background:var(--color-primary-dim); padding:11px 14px; border-radius:0 var(--radius-md) var(--radius-md) 0; font-size:var(--text-xs); color:var(--color-text-muted); line-height:1.55; margin-bottom:18px; max-width:860px; }
+  .callout b{ color:var(--color-primary); }
+
+  .frame{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-bg); padding:16px 18px; max-width:680px; box-shadow:var(--shadow-md); }
+  .fh{ font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--color-text-dim); font-weight:700; margin-bottom:14px; }
+  .btn{ font-family:var(--font-sans); font-size:var(--text-xs); font-weight:500; border-radius:var(--radius-md); padding:6px 12px; cursor:pointer; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); display:inline-flex; align-items:center; gap:6px; }
+  .btn:hover{ background:var(--color-accent); }
+
+  .live{ font-size:9px; background:var(--color-success-dim); color:var(--color-success); border-radius:var(--radius-full); padding:1px 8px; font-weight:700; letter-spacing:.04em; }
+  .provchip{ font-size:9px; border-radius:var(--radius-full); padding:1px 8px; font-weight:600; }
+  .provchip.prop{ background:var(--color-primary-dim); color:var(--color-primary); }
+  .provchip.edit{ background:var(--color-muted); color:var(--color-text-muted); }
+  .provchip.force{ background:var(--color-warning-dim); color:var(--color-warning); }
+  .provchip.created{ background:var(--color-muted); color:var(--color-text-dim); }
+  .evbind{ font-size:9px; font-family:var(--font-mono); }
+  .evbind.pass{ color:var(--color-success); } .evbind.fail{ color:var(--color-danger); }
+  .evbind.mixed{ color:var(--color-warning); } .evbind.none{ color:var(--color-text-dim); }
+
+  /* unified diff */
+  .diff{ border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-bg-elev1); font-family:var(--font-mono); font-size:10px; line-height:1.7; overflow-x:auto; margin-top:9px; }
+  .diff .dh{ padding:6px 12px; border-bottom:1px solid var(--color-border-soft); color:var(--color-text-dim); font-size:9px; }
+  .diff .dl{ padding:0 12px; white-space:pre; color:var(--color-text-muted); }
+  .diff .add{ background:hsl(142 71% 45% / 0.12); color:hsl(142 60% 70%); }
+  .diff .del{ background:hsl(0 72% 51% / 0.12); color:hsl(0 70% 72%); }
+
+  /* A: timeline rail */
+  .tl{ position:relative; padding-left:26px; }
+  .tl::before{ content:''; position:absolute; left:8px; top:8px; bottom:8px; width:2px; background:var(--color-border); }
+  .tlrow{ position:relative; padding:8px 0 10px; cursor:pointer; }
+  .tlrow .nd{ position:absolute; left:-26px; top:12px; width:18px; height:18px; border-radius:50%; background:var(--color-surface); border:2px solid var(--color-border); display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--color-text-dim); }
+  .tlrow.islive .nd{ border-color:var(--color-success); color:var(--color-success); }
+  .tlrow:hover .head{ background:var(--color-accent); }
+  .tlrow .head{ display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:var(--radius-md); border:1px solid var(--color-border-soft); background:var(--color-bg-elev1); }
+  .tlrow .vn{ font-family:var(--font-mono); font-weight:700; font-size:var(--text-xs); }
+  .tlrow .dt{ margin-left:auto; font-size:9px; color:var(--color-text-dim); flex-shrink:0; }
+  .tlrow .car{ font-size:9px; color:var(--color-text-dim); transition:transform .18s var(--ease-out); }
+  .tlrow.open .car{ transform:rotate(90deg); }
+  .tlrow .body{ display:none; }
+  .tlrow.open .body{ display:block; animation:fadeSlideUp .2s var(--ease-out); }
+
+  /* B: table + compare picker */
+  .vtable{ width:100%; border-collapse:collapse; font-size:var(--text-xs); }
+  .vtable th{ text-align:left; font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--color-text-dim); font-weight:700; padding:6px 8px; border-bottom:1px solid var(--color-border); }
+  .vtable td{ padding:8px; border-bottom:1px solid var(--color-border-soft); }
+  .cmpbar{ display:flex; align-items:center; gap:9px; margin:14px 0 4px; font-size:var(--text-xs); color:var(--color-text-muted); }
+  .cmpbar select{ background:var(--color-bg-elev1); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:5px 9px; color:var(--color-text); font-family:var(--font-mono); font-size:var(--text-xs); }
+
+  /* C: story cards */
+  .vcard{ border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); padding:13px 15px; margin-bottom:11px; }
+  .vcard.islive{ border-color:hsl(142 71% 45% / 0.4); }
+  .vcard .ch{ display:flex; align-items:center; gap:9px; }
+  .vcard .vn{ font-family:var(--font-mono); font-weight:700; font-size:var(--text-sm); }
+  .vcard .dt{ margin-left:auto; font-size:10px; color:var(--color-text-dim); }
+  .vcard .story{ font-size:var(--text-xs); color:var(--color-text-muted); margin-top:6px; line-height:1.55; }
+  .vcard .story b{ color:var(--color-text); }
+  .gatebox{ display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-bg-elev1); padding:8px 12px; }
+  .gatebox .g{ font-size:9px; color:var(--color-text-dim); }
+  .gatebox .g b{ display:block; font-size:var(--text-xs); color:var(--color-text); font-family:var(--font-mono); margin-top:1px; }
+  .gatebox .g.ok b{ color:var(--color-success); }
+  .gatebox .g.bad b{ color:var(--color-danger); }
+  .showlnk{ font-size:10px; color:var(--color-primary); cursor:pointer; margin-top:9px; display:inline-block; }
+  .showlnk:hover{ text-decoration:underline; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav" style="position:fixed;top:0;left:0;right:0;height:52px;">
+  <span class="label">056 · Version history &amp; diff</span>
+  <button class="variant-tab" onclick="showVariant('a',event)">A: Timeline + inline diff</button>
+  <button class="variant-tab active" onclick="showVariant('b',event)">B: Table + compare picker ★</button>
+  <button class="variant-tab" onclick="showVariant('c',event)">C: Provenance story cards</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ===================== VARIANT A ===================== -->
+  <div id="variant-a" class="variant" style="display:none">
+    <div class="vhead">
+      <h2>A — Timeline rail + inline unified diff</h2>
+      <p>Versions as a vertical timeline, newest on top, LIVE badged. Each row carries its <b>provenance chip</b>
+        (✨ promoted / ✎ edited / ⚡ forced / ⊕ created) and its <b>eval binding</b> (what was measured ON that
+        version). Clicking a version unfolds the <b>unified diff vs its previous version</b> in-column (005-A) —
+        the story of the skill, one change at a time.</p>
+    </div>
+    <div class="callout"><b>Try it:</b> open v7 — the promoted improvement's diff shows the worded-ratings→numeric
+      mapping + the off-topic guard being added. Then open v5 — a force-promoted change whose gate FAILED (the amber
+      chip is the honesty mark; the record never softens).</div>
+    <div class="frame">
+      <div class="fh">Versions · Risk Register Builder</div>
+      <div class="tl" id="aTl"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VARIANT B ===================== -->
+  <div id="variant-b" class="variant">
+    <div class="vhead">
+      <h2>B — Table + compare picker</h2>
+      <p>A compact scan-first table (version · origin · eval · date) with an explicit <b>Compare v[x] ↔ v[y]</b>
+        picker beneath — any-to-any comparison, not just adjacent. The diff renders once, below the table, at full
+        frame width. Densest of the three; the diff is a tool you point, not a story you scroll.</p>
+    </div>
+    <div class="callout"><b>Try it:</b> compare v4 ↔ v7 to see three versions' worth of accumulated change in one
+      diff — the thing A's adjacent-only unfold can't do.</div>
+    <div class="frame">
+      <div class="fh">Versions · Risk Register Builder</div>
+      <table class="vtable">
+        <thead><tr><th>Version</th><th>Origin</th><th>Eval on this version</th><th>Date</th></tr></thead>
+        <tbody id="bRows"></tbody>
+      </table>
+      <div class="cmpbar">
+        Compare
+        <select id="bFrom" onchange="bDiff()"><option>v4</option><option>v5</option><option selected>v6</option></select>
+        ↔
+        <select id="bTo" onchange="bDiff()"><option selected>v7</option><option>v6</option><option>v5</option></select>
+      </div>
+      <div id="bDiffBox"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VARIANT C ===================== -->
+  <div id="variant-c" class="variant" style="display:none">
+    <div class="vhead">
+      <h2>C — Provenance story cards</h2>
+      <p>Each version is a card <b>led by its story</b> — "Promoted from an approved improvement" with the full
+        <span class="mono">PromotionGate</span> counts resting on the version it created (the 135 proposal's terminal
+        home), "Edited by you", "Force-promoted despite a failed gate". The diff is on-demand per card. Richest
+        provenance; tallest surface.</p>
+    </div>
+    <div class="callout"><b>Try it:</b> v7's card carries the promotion gate counts (no regression · +1 newly
+      passing · 0 excluded) — the proposal's verdict lives permanently where its outcome lives. v5 shows the
+      force-promote with its failing counts preserved (D-13: evidence never softens).</div>
+    <div style="max-width:680px;" id="cCards"></div>
+  </div>
+</div>
+
+<script>
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(v=>v.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  ev.target.classList.add('active');
+}
+
+/* ── version data (real SkillVersion + provenance semantics) ── */
+const VERS = [
+  { v:'v7', live:true, prov:'prop', provTxt:'✨ promoted', date:'Jul 2',
+    ev:{cls:'pass', txt:'3/3 passed · claude-haiku'},
+    story:'<b>Promoted from an approved improvement.</b> Rationale: "map worded likelihood/impact ratings to numeric scores so L×I computes; add an explicit off-topic guard." Re-eval passed the promotion gate.',
+    gate:{ passed:true, rows:[['no regression','yes','ok'],['newly passing','+1','ok'],['still passing','2','ok'],['excluded (not measured)','0','']] },
+    diff:{ from:'v6', lines:[
+      ['ctx','  1. Search the project folder for risk workshop docs'],
+      ['ctx','     and prior registers.'],
+      ['del','- 2. Build a likelihood × impact table for each risk.'],
+      ['add','+ 2. Build a likelihood × impact table for each risk,'],
+      ['add','+    mapping worded ratings (High/Med/Low) to numeric'],
+      ['add','+    scores (3/2/1) before computing L×I.'],
+      ['ctx','  3. Cite every row\'s source chunk id.'],
+      ['add','+ 4. If the request is not about risks, do NOT engage'],
+      ['add','+    this format — answer plainly.'],
+    ]}},
+  { v:'v6', prov:'edit', provTxt:'✎ edited', date:'Jul 1',
+    ev:{cls:'mixed', txt:'1/2 passed · 1 judge error · gemini'},
+    story:'<b>Edited by you.</b> Tightened the citation instruction.',
+    diff:{ from:'v5', lines:[
+      ['ctx','  2. Build a likelihood × impact table for each risk.'],
+      ['del','- 3. Cite sources where possible.'],
+      ['add','+ 3. Cite every row\'s source chunk id.'],
+    ]}},
+  { v:'v5', prov:'force', provTxt:'⚡ force-promoted', date:'Jul 1',
+    ev:{cls:'fail', txt:'gate failed · promoted anyway'},
+    story:'<b>Force-promoted despite a failed gate</b> (override recorded). The re-eval regressed one case; you chose to promote anyway.',
+    gate:{ passed:false, rows:[['no regression','NO','bad'],['newly passing','0',''],['still passing','1','bad'],['excluded (not measured)','0','']] },
+    diff:{ from:'v4', lines:[
+      ['ctx','  1. Search the project folder for risk workshop docs.'],
+      ['add','+ 1b. Also search prior registers for carried-over risks.'],
+      ['ctx','  2. Build a likelihood × impact table for each risk.'],
+    ]}},
+  { v:'v4', prov:'edit', provTxt:'✎ edited', date:'Jun 30',
+    ev:{cls:'none', txt:'never evaled'},
+    story:'<b>Edited by you.</b>',
+    diff:{ from:'v3', lines:[
+      ['del','- 1. Search the KB for risk documents.'],
+      ['add','+ 1. Search the project folder for risk workshop docs.'],
+    ]}},
+  { v:'v3', prov:'edit', provTxt:'✎ edited', date:'Jun 29',
+    ev:{cls:'mixed', txt:'2/3 passed · claude-haiku'},
+    story:'<b>Edited by you.</b>',
+    diff:{ from:'v2', lines:[
+      ['add','+ 3. Cite sources where possible.'],
+    ]}},
+  { v:'v1', prov:'created', provTxt:'⊕ created', date:'Jun 28',
+    ev:{cls:'none', txt:'never evaled'},
+    story:'<b>Created.</b>', diff:null },
+];
+
+function diffHtml(d, toV){
+  if(!d) return '';
+  return `<div class="diff"><div class="dh">${d.from} → ${toV} · instructions</div>`
+    + d.lines.map(l=>`<div class="dl ${l[0]==='add'?'add':l[0]==='del'?'del':''}">${l[1]}</div>`).join('')
+    + `</div>`;
+}
+function gateHtml(g){
+  if(!g) return '';
+  return `<div class="gatebox">${g.rows.map(r=>`<div class="g ${r[2]}">${r[0]}<b>${r[1]}</b></div>`).join('')}</div>`;
+}
+
+/* A: timeline */
+function aRender(){
+  document.getElementById('aTl').innerHTML = VERS.map((V,i)=>`
+    <div class="tlrow ${V.live?'islive':''}" id="tlr${i}" onclick="aToggle(${i})">
+      <div class="nd">${V.live?'●':''}</div>
+      <div class="head">
+        <span class="car">▶</span>
+        <span class="vn">${V.v}</span>
+        ${V.live?'<span class="live">LIVE</span>':''}
+        <span class="provchip ${V.prov}">${V.provTxt}</span>
+        <span class="evbind ${V.ev.cls}">${V.ev.txt}</span>
+        <span class="dt">${V.date}</span>
+      </div>
+      <div class="body">${V.diff?diffHtml(V.diff,V.v):'<div style="font-size:10px;color:var(--color-text-dim);padding:8px 2px;">initial version — no diff</div>'}</div>
+    </div>`).join('');
+}
+function aToggle(i){ document.getElementById('tlr'+i).classList.toggle('open'); }
+aRender();
+
+/* B: table + compare */
+document.getElementById('bRows').innerHTML = VERS.map(V=>`
+  <tr>
+    <td><span class="vn mono" style="font-weight:700;">${V.v}</span> ${V.live?'<span class="live">LIVE</span>':''}</td>
+    <td><span class="provchip ${V.prov}">${V.provTxt}</span></td>
+    <td><span class="evbind ${V.ev.cls}">${V.ev.txt}</span></td>
+    <td style="color:var(--color-text-dim);font-size:10px;">${V.date}</td>
+  </tr>`).join('');
+function bDiff(){
+  const from=document.getElementById('bFrom').value, to=document.getElementById('bTo').value;
+  /* demo: cumulative v4↔v7 diff, else the target version's own diff */
+  let lines;
+  if(from==='v4' && to==='v7'){
+    lines=[
+      ['ctx','  1. Search the project folder for risk workshop docs.'],
+      ['add','+ 1b. Also search prior registers for carried-over risks.'],
+      ['del','- 2. Build a likelihood × impact table for each risk.'],
+      ['add','+ 2. Build a likelihood × impact table for each risk,'],
+      ['add','+    mapping worded ratings (High/Med/Low) to numeric'],
+      ['add','+    scores (3/2/1) before computing L×I.'],
+      ['del','- 3. Cite sources where possible.'],
+      ['add','+ 3. Cite every row\'s source chunk id.'],
+      ['add','+ 4. If the request is not about risks, do NOT engage'],
+      ['add','+    this format — answer plainly.'],
+    ];
+  } else {
+    const tv = VERS.find(x=>x.v===to);
+    lines = tv && tv.diff ? tv.diff.lines : [['ctx','  (no change between these versions)']];
+  }
+  document.getElementById('bDiffBox').innerHTML =
+    `<div class="diff"><div class="dh">${from} → ${to} · instructions</div>`
+    + lines.map(l=>`<div class="dl ${l[0]==='add'?'add':l[0]==='del'?'del':''}">${l[1]}</div>`).join('') + '</div>';
+}
+bDiff();
+
+/* C: story cards */
+document.getElementById('cCards').innerHTML = VERS.map((V,i)=>`
+  <div class="vcard ${V.live?'islive':''}">
+    <div class="ch">
+      <span class="vn">${V.v}</span>
+      ${V.live?'<span class="live">LIVE</span>':''}
+      <span class="provchip ${V.prov}">${V.provTxt}</span>
+      <span class="evbind ${V.ev.cls}" style="margin-left:2px;">${V.ev.txt}</span>
+      <span class="dt">${V.date}</span>
+    </div>
+    <div class="story">${V.story}</div>
+    ${gateHtml(V.gate)}
+    ${V.diff?`<span class="showlnk" onclick="cToggle(${i})">Show changes</span><div id="cd${i}" style="display:none;">${diffHtml(V.diff,V.v)}</div>`:''}
+  </div>`).join('');
+function cToggle(i){
+  const d=document.getElementById('cd'+i);
+  d.style.display = d.style.display==='none'?'block':'none';
+}
+</script>
+</body>
+</html>

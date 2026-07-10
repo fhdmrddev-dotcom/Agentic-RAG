@@ -31,9 +31,10 @@ from app.services.retrieval_service import search_documents, resolve_document_id
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
 from app.services.audit_service import write_audit_entry
-from app.services.sandbox_service import sandbox_manager, harvest_output_files
+from app.services.sandbox_service import sandbox_manager, harvest_output_files, snapshot_output_baseline
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
+from app.services.skill_lint import lint_description
 # Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
 # resolve core IN-PROCESS (no FastAPI self-call). ``ViewFilter`` + the two view/field
 # services are cycle-safe at module level (they import only pydantic/dependencies/db).
@@ -89,6 +90,20 @@ class ToolContext:
     spawn: Callable  # reference to _spawn
     model: str = ""  # user's selected model (for sub-agent routing)
     previous_files_in_run: dict | None = None  # sandbox output file tracking across execute_code calls
+    new_file_hashes_in_run: set | None = None  # RUN-01a — content-hashes genuinely new to THIS run (run-scoped accumulator)
+    # Phase 142 (SRH-01 / D-06) — run-scoped repeat-guard. The set of KNOWN_MISSING
+    # gap tokens (soffice / markitdown / a lost `scripts/office/*` path / a JS
+    # marker) that have already FAILED this run with a PERMANENT runtime gap.
+    # By-reference run-scoped accumulator (mirrors new_file_hashes_in_run): init
+    # once in agent_loop.py, threaded into BOTH ToolContext builds, FRESH set() for
+    # sub-agents (task_service — a sub-agent's dead call must not block the parent).
+    # None on EVERY unwired (harness/eval/test/duck-typed) caller => the reshape
+    # `.add` and the pre-flight membership check are literal no-ops (D-14
+    # byte-identical Deep). Binary/module/JS tokens are bounded by the fixed
+    # allowlist; a G-A entry is a NARROWED bundled-skill-tree path (a
+    # `scripts/`|`assets/`|`resources/`-prefixed relative miss — WR-01), so the set
+    # grows only with genuinely-lost helper paths, never arbitrary model input (T-142-04).
+    dead_gap_tokens_in_run: set | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
@@ -129,6 +144,15 @@ class ToolContext:
     # per_run_task_semaphore) to avoid importing the harness model on the
     # dispatcher hot path.
     skill_snapshot: Any = None  # SkillSnapshot | None — kept Any to avoid a model import on the dispatcher hot path
+    # Phase 135 (135-02 / SI-01) — ADDITIVE default-off skill-INSTRUCTIONS override
+    # for the honest DRAFT re-eval (RESEARCH Pitfall #1). None on EVERY Deep-mode /
+    # normal caller => _handle_load_skill returns row["instructions"] byte-identical.
+    # A map {skill_name: instructions} (set ONLY by the re-eval WITH-arm RunContext,
+    # threaded through both agent_loop ToolContext builds + the task_service sub_ctx)
+    # => _handle_load_skill returns the DRAFT instructions for that skill WITHOUT
+    # touching the live skills row. Same additive-default-off discipline as
+    # phase_whitelist / workflow_run_id / skill_snapshot above.
+    skill_instructions_override: dict[str, str] | None = None
 
 
 @dataclass
@@ -652,18 +676,48 @@ async def _handle_analyze_document(args: dict, ctx: ToolContext) -> ToolResult:
     )
 
 
+# Phase 142 (SRH-01 / D-05 / D-05b) — the proactive per-skill runtime note ridden
+# along the load_skill RESULT (the load_skill-flag half of the D-05 proactive home).
+# Names the non-Python script file(s) a skill bundles that the Python-only sandbox
+# cannot run. Model-facing, advisory only — mirrors save_skill's lint_warnings.
+_SKILL_RUNTIME_NOTE = (
+    "This skill bundles non-Python script file(s) ({names}) that this Python-only "
+    "sandbox cannot execute. Their content may still guide you; do not try to run "
+    "them as programs."
+)
+
+
+def _skill_runtime_note(file_names: list[str]) -> str | None:
+    """Return an advisory note naming any bundled non-Python script files, else None.
+
+    Pure: scans each filename's extension against the shared Plan-01 ``SCRIPT_EXTS``
+    allowlist. Non-blocking by contract — the caller computes this defensively and
+    NEVER lets it fail a load (the ``lint_warnings`` posture). Returns ``None`` when
+    the file list is all-Python / non-script (nothing to warn about).
+    """
+    offending = [
+        name for name in file_names
+        if os.path.splitext(name)[1].lstrip(".").lower() in SCRIPT_EXTS
+    ]
+    if not offending:
+        return None
+    return _SKILL_RUNTIME_NOTE.format(names=", ".join(offending))
+
+
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     skill_name = args.get("skill_name", "")
     # Emit skill_activated SSE event immediately (SKIL-12)
     await ctx.emit(ctx.redis, ctx.run_id, 'skill_activated', skill_name=skill_name)
-    # Resolve skill -- prefer user-owned over global when names conflict
+    # Resolve skill -- on a name collision the most-authoritative row wins:
+    # system > global > owned (SEED-102). is_system DESC pins a protected built-in
+    # above any same-named owned row; is_global DESC is the secondary tie-break.
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
         .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
         .eq("name", skill_name)
         .eq("is_enabled", True)
-        .order("is_global")
+        .order("is_system", desc=True).order("is_global", desc=True)
     )
     skill_row = _skill_resp.data
     if not skill_row:
@@ -695,11 +749,31 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     )
     files_data = _files_resp.data or []
     file_names = [f["filename"] for f in files_data]
-    return ToolResult(result=json.dumps({
+    # Phase 135 (135-02 / SI-01) — Pitfall #1 fix: return the DRAFT instructions
+    # when the re-eval passed a skill_instructions_override map containing THIS
+    # skill's name; else the live DB row's body (byte-identical Deep). getattr so a
+    # duck-typed ctx stub predating the field still works (096 workflow_run_id
+    # precedent). Keyed on skill_name — the SAME value `.eq("name", ...)` looked up.
+    override = getattr(ctx, "skill_instructions_override", None)
+    instructions = row["instructions"]
+    if override is not None and skill_name in override:
+        instructions = override[skill_name]
+    result_payload = {
         "name": row["name"],
-        "instructions": row["instructions"],
+        "instructions": instructions,
         "files": file_names,
-    }))
+    }
+    # D-05b — attach a non-blocking runtime note when the skill bundles a script the
+    # Python-only sandbox cannot execute. Computed defensively (the save_skill
+    # lint_warnings posture): any failure degrades to no note, and the key is added
+    # ONLY when present so the all-Python result stays byte-identical. Never blocks.
+    try:
+        runtime_note = _skill_runtime_note(file_names)
+    except Exception:
+        runtime_note = None
+    if runtime_note is not None:
+        result_payload["runtime_note"] = runtime_note
+    return ToolResult(result=json.dumps(result_payload))
 
 
 async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
@@ -718,6 +792,26 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         .limit(1)
     )
     existing = existing_resp.data[0] if existing_resp.data else None
+
+    # TRIG-03 (D-09/D-10/Pitfall 6): lint the description, owner-scoped, NEVER block.
+    # The save always proceeds; warnings ride along as a non-fatal note so the agent
+    # can mention them. A read failure degrades to an empty sibling list.
+    lint_warnings: list[dict] = []
+    try:
+        siblings_resp = await aexec(
+            ctx.supabase.table("skills")
+            .select("id, description")
+            .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        )
+        siblings = [
+            r.get("description", "")
+            for r in (siblings_resp.data or [])
+            if not existing or str(r.get("id")) != str(existing["id"])
+        ]
+        lint_warnings = lint_description(name, description, siblings)
+    except Exception:
+        lint_warnings = []
+
     if existing:
         row = existing
         await aexec(
@@ -726,7 +820,9 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
                 "instructions": instructions,
             }).eq("id", row["id"]).eq("user_id", ctx.current_user["id"])
         )
-        return ToolResult(result=json.dumps({"status": "updated", "name": name}))
+        return ToolResult(result=json.dumps(
+            {"status": "updated", "name": name, "lint_warnings": lint_warnings}
+        ))
     else:
         await aexec(
             ctx.supabase.table("skills").insert({
@@ -736,7 +832,20 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
                 "instructions": instructions,
             })
         )
-        return ToolResult(result=json.dumps({"status": "created", "name": name}))
+        return ToolResult(result=json.dumps(
+            {"status": "created", "name": name, "lint_warnings": lint_warnings}
+        ))
+
+
+# Phase 142 (SRH-01 / SC#3 / D-11) — the honest caveat prepended to a decoded
+# non-Python script (an ext in the shared SCRIPT_EXTS). read_skill_file stops
+# mislabeling script text as unreadable "binary"; the model is told the file is
+# reference-only, not runnable here. PLAIN TEXT (not json) — matches the .py/.md
+# text-return contract so the model reads it as source, not an error object.
+_SCRIPT_REF_CAVEAT = (
+    "[reference only — '{filename}' is a {ext} script; this sandbox runs Python only "
+    "and cannot execute it. Read it for reference; do not attempt to run it.]\n\n"
+)
 
 
 def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:
@@ -775,6 +884,15 @@ def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:
         return "\n".join(slides)
     elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
         return raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+    elif ext in SCRIPT_EXTS:
+        # SC#3 / D-11 — non-Python scripts (.js/.sh/...) ARE text: decode them as
+        # honest reference source with a "not executable in this sandbox" caveat,
+        # replacing the misleading "binary — upload a text version" else-branch below.
+        # This lives in the SHARED decoder, so the live read (_handle_read_skill_file
+        # live path) and the 099 snapshot read inherit the identical string for free
+        # (byte-symmetry / Pitfall 3). SCRIPT_EXTS is the Plan-01 single source.
+        source = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+        return _SCRIPT_REF_CAVEAT.format(filename=filename, ext=ext) + source
     else:
         # Unrecognized or binary type
         return json.dumps({
@@ -858,14 +976,81 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
 
     code = args.get("code", "")
     libraries = args.get("libraries") or []
+
+    # Phase 142 (SRH-01 / D-06) — PRE-FLIGHT repeat-guard. If a PERMANENT runtime
+    # gap already fired on a token THIS run and the incoming code references it
+    # again, short-circuit BEFORE acquiring the sandbox. This structurally caps the
+    # BUG-260707-02 soffice/markitdown retry loop at <=1 real dead sandbox call per
+    # token, even for a weak model that ignores the honest framing. Guarded
+    # `is not None` => a literal no-op for every unwired (Deep/harness/eval/test)
+    # caller, so no sandbox event fires and Deep behavior stays byte-identical.
+    # Tokens are drawn only from the fixed KNOWN_MISSING allowlist (or a narrowed
+    # bundled-tree G-A path captured from stderr). CR-02: binary/module IDENTIFIERS
+    # (`node`, `soffice`, `markitdown`) are matched at WORD BOUNDARIES and JS/path
+    # tokens by containment via `_code_references_dead_token` — a bare substring
+    # inside a larger word (`annotate`, `node_list`, `network_xyz`) never re-blocks
+    # legitimate code for the rest of the run.
+    if ctx.dead_gap_tokens_in_run is not None:
+        _dead_token = next(
+            (t for t in ctx.dead_gap_tokens_in_run
+             if t and _code_references_dead_token(code, t)),
+            None,
+        )
+        if _dead_token is not None:
+            # WR-02: bracket the short-circuit with the SAME code_execution
+            # start/complete SSE pair the normal path emits (:998 / :1335), so the
+            # UI code-card for this call RESOLVES instead of spinning forever with
+            # no matching complete event. Every other exit path from this handler
+            # (timeout abort, exception) already emits a complete. Safe for unwired
+            # callers — the whole block is gated on `dead_gap_tokens_in_run is not
+            # None`, so Deep/eval/duck-typed ctx never reach it (byte-identical D-14).
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_start',
+                           code_preview=code[:200])
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete',
+                           exit_code=1, duration_ms=0, output_files=[])
+            _short_circuit = _repeat_blocked_result(_dead_token)
+            return ToolResult(result=_short_circuit, llm_content=_short_circuit)
+
     # Emit start event (SAND-04)
     await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_start', code_preview=code[:200])
+    # SAND (silence fix): setup-window clock for the honest phase labels below
+    # ('starting sandbox' / 'installing libraries'). Everything between here and
+    # the drain loop (container bring-up + pip install) used to run blocking on
+    # the event loop and emit NOTHING — the real dead-air the user perceived.
+    _setup_started = time_mod.time()
 
     # Use the previous_files_in_run dict from ctx for cross-call file tracking
     _previous_files_in_run = ctx.previous_files_in_run if ctx.previous_files_in_run is not None else {}
 
     try:
-        session = sandbox_manager.get_or_create(ctx.thread_id)
+        # SAND (silence fix): honest 'starting sandbox' phase for the container
+        # spin-up window + threadpool the blocking create/attach so it never
+        # freezes the event loop (D-v2.5-01). A NEW-thread container build is
+        # 15-22s that used to be silent dead-air, also stalling SSE flush for
+        # every run on the worker.
+        await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
+                       tool_index=ctx.tool_index,
+                       elapsed_seconds=round(time_mod.time() - _setup_started, 1),
+                       phase='starting_sandbox')
+        session = await run_in_threadpool(sandbox_manager.get_or_create, ctx.thread_id)
+
+        # Phase 120 (COLL-01) — run-scope the harvest by SEEDING the per-run
+        # dedup baseline ONCE with a SHA-256 snapshot of every file already in
+        # /sandbox/output/ at run start. This excludes any pre-existing file
+        # (e.g. a prior workflow's leftover .docx) from this run's emitted
+        # delta — the harvest's existing `if h in previous_files: continue`
+        # dedup does the rest. D-120-01: per-RUN scope, NOT per-cell — guard so
+        # a multi-cell run seeds only on the FIRST cell (the per-cell
+        # accumulation `_previous_files_in_run.update(_iter_files)` below stays
+        # unchanged). D-120-02: NO /sandbox/output/ clear — we only stop
+        # re-emitting, never destroy files. D-v2.5-01: run_in_threadpool is
+        # MANDATORY — the snapshot does blocking container I/O. The same handler
+        # serves BOTH Deep and Harness, so this one seed site covers both.
+        if not getattr(ctx, "_output_baseline_seeded", False):
+            _baseline = await run_in_threadpool(snapshot_output_baseline, session)
+            _previous_files_in_run.update(_baseline)
+            ctx._output_baseline_seeded = True
+
         loop = asyncio.get_running_loop()
         sandbox_queue: asyncio.Queue = asyncio.Queue()
 
@@ -882,9 +1067,9 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                 {"type": "stderr_chunk", "content": chunk, "captured_at": time_mod.time()}
             )
 
-        # Ensure /sandbox/output exists
+        # Ensure /sandbox/output exists (threadpool — blocking container I/O, D-v2.5-01)
         try:
-            session.execute_command("mkdir -p /sandbox/output")
+            await run_in_threadpool(session.execute_command, "mkdir -p /sandbox/output")
         except Exception:
             pass
 
@@ -945,7 +1130,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _tmp_fp.write(wrapped_code)
             _local_tmp_path = _tmp_fp.name
         try:
-            session.copy_to_runtime(_local_tmp_path, code_file)
+            await run_in_threadpool(session.copy_to_runtime, _local_tmp_path, code_file)
         finally:
             try:
                 _os_local.unlink(_local_tmp_path)
@@ -954,8 +1139,15 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
 
         # Install libraries
         if libraries:
+            # SAND (silence fix): honest 'installing libraries' phase for the pip
+            # window + threadpool the blocking install (matplotlib/pandas/etc.
+            # can be many seconds) so it never freezes the event loop (D-v2.5-01).
+            await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
+                           tool_index=ctx.tool_index,
+                           elapsed_seconds=round(time_mod.time() - _setup_started, 1),
+                           phase='installing_libraries')
             try:
-                session.install(libraries=libraries)
+                await run_in_threadpool(session.install, libraries=libraries)
             except Exception as _install_err:
                 logger.warning(
                     "sandbox library install failed thread=%s err=%s",
@@ -1046,7 +1238,8 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     }))
                 if now - _last_output_at >= _HEARTBEAT_INTERVAL_S:
                     await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
-                                   tool_index=_tool_index, elapsed_seconds=round(elapsed, 1))
+                                   tool_index=_tool_index, elapsed_seconds=round(elapsed, 1),
+                                   phase='running')
                 if now - _heartbeat_last >= 10.0:
                     await ctx.emit(ctx.redis, ctx.run_id, 'keepalive')
                     _heartbeat_last = now
@@ -1142,6 +1335,16 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                 _previous_files_in_run,
                 ctx.iteration,
             )
+            # RUN-01a: content-hashes present THIS cell that weren't already tracked
+            # are genuinely new to the run. Compute the set difference BEFORE the
+            # .update() below so (a) baseline hashes seeded at ~929 (already in
+            # _previous_files_in_run.keys() because the baseline seed runs earlier
+            # in this same handler on the first cell) are excluded, and (b) cross-cell
+            # regenerations (a hash already tracked from an earlier cell) are excluded —
+            # matching the per-cell delta_files "not new" semantics. Guarded on the
+            # None default so sub-agent/harness ctx builds stay byte-identical (D-14).
+            if ctx.new_file_hashes_in_run is not None:
+                ctx.new_file_hashes_in_run |= (set(_iter_files) - _previous_files_in_run.keys())
             _previous_files_in_run.update(_iter_files)
             output_file_list = delta_files
 
@@ -1161,14 +1364,38 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             "stderr": exec_result.stderr or "",
         })
         # Strip signed URLs from LLM context
-        llm_content = json.dumps({
+        _llm_payload = {
             "status": exec_status,
             "exit_code": actual_exit_code,
             "duration_ms": duration_ms,
             "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
             "stdout": exec_result.stdout or "",
             "stderr": exec_result.stderr or "",
-        })
+        }
+        # Phase 142 (SRH-01 / D-06) — POST-HOC reshape. Classify the completed
+        # failure against the fixed KNOWN_MISSING allowlist; on a HIT append a
+        # PERMANENT-framed `runtime_gap` note to the MODEL-facing llm_content (so a
+        # weak model can't misread a bare stderr as transient) AND record the token
+        # in the run-scoped repeat-guard set (guarded `is not None` => no-op when
+        # unwired). On a MISS (T-142-01) stdout/stderr pass through UNCHANGED — a
+        # real error still reaches the model. `tool_result` (the persisted/UI copy)
+        # is left untouched: only the model-facing view carries the honest note.
+        # CR-01(1a): classify ONLY an actual FAILURE. A successful exit-0 run is
+        # NEVER reshaped and NEVER records a repeat-guard token — even if its stdout
+        # happens to print a string like "node not found". All three real gap
+        # classes always exit non-zero (or get bumped to 1 above when an exit-0 run
+        # prints a Python error marker to stdout), so gating on failure loses no
+        # true positive while removing the successful-run false-reshape path.
+        _gap = None
+        if actual_exit_code != 0:
+            _gap = _classify_runtime_gap(
+                code, exec_result.stdout or "", exec_result.stderr or "", actual_exit_code
+            )
+        if _gap is not None:
+            _llm_payload["runtime_gap"] = _gap
+            if ctx.dead_gap_tokens_in_run is not None:
+                ctx.dead_gap_tokens_in_run.add(_gap["token"])
+        llm_content = json.dumps(_llm_payload)
         ctx.spawn(write_audit_entry(
             user_id=ctx.current_user["id"],
             action_type="code.execute",
@@ -1826,6 +2053,294 @@ def _safe_out_filename(raw: str | None, template_ext: str) -> str:
     return f"deliverable.{ext}"
 
 
+# ---------------------------------------------------------------------------
+# Phase 142 (SRH-01) — non-Python skill-script runtime-gap honesty.
+#
+# `_classify_runtime_gap` is the single correctness-critical piece of Phase 142:
+# it decides WHETHER a completed sandbox failure is one of three KNOWN runtime
+# gaps (G-A missing bundled file / G-B non-Python script / G-C missing binary or
+# module) and, if so, WHICH permanent-framed honest message to surface. It is a
+# PURE function (four string/int args -> dict | None). Nothing calls it in this
+# plan — Plan 02 wires it into the completed-run result builder + the per-run
+# repeat-guard; on its own it changes no runtime behavior.
+#
+# DESIGN LAW (threat T-142-01 — the most important property in the phase):
+# NEVER reshape on error-type or exit-code ALONE. A hit requires a token from a
+# FIXED allowlist NAMED by the shell as missing (`<tok>: not found` / a
+# FileNotFoundError exec of it), or present with a 124/127 exit, OR a
+# `No module named '<mod>'` for a known module, OR a JS-exclusive token on a
+# NON-COMMENT `code` line together with a Python SyntaxError, OR a missing
+# RELATIVE path under a known skill-bundle subdir (`scripts/`|`assets/`|`resources/`).
+# The POST-HOC caller additionally gates on a NON-ZERO exit so a successful run is
+# never reshaped. Everything else returns None so a genuine ValueError / a genuine
+# missing /sandbox/output file / a real SyntaxError / a recoverable relative miss
+# still reaches the model unchanged.
+# Proven by test_142_runtime_gap.py::test_non_gap_passthrough. This mirrors the
+# "distrust a model/sandbox string, match a FIXED set, safe default on non-match"
+# posture of _safe_out_filename above.
+
+# Fixed allowlists (single source — Plans 02/03/05 import these). Tokens are the
+# bounded key space for GAP_MESSAGES and the repeat-guard set, so there is no
+# attacker-controlled key growth (threat T-142-04).
+KNOWN_MISSING_BINARIES = frozenset({
+    "soffice", "libreoffice", "pandoc", "pdftoppm", "pdfinfo",
+    "node", "npm", "npx", "extract-text",
+})
+KNOWN_MISSING_MODULES = frozenset({"markitdown"})
+# CR-01(1c): JS-exclusive markers for the G-B (non-Python script) branch. `"let "`
+# was REMOVED — Python has no `let`, but the substring is too common in ordinary
+# English inside comments/strings ("let me…", "let's…") to be a safe JS signal and
+# collided with the repeat-guard. The remaining markers are JS-only constructs.
+JS_TOKENS = ("const ", "=>", "require(", "console.log",
+             "export default", "function*")
+
+# WR-01: the ONLY missing-path shape that classifies as a lost, flattened
+# skill-tree helper (G-A). A relative path under one of these known skill-bundle
+# subdirs (e.g. `scripts/office/convert.py`) is the flattened-tree signal. ANY
+# other relative miss (`data/input.json`, `config/settings.yaml`) is a RECOVERABLE
+# user error and passes through (None) so the model can create the dir / fix it.
+_SKILL_BUNDLE_DIRS = ("scripts/", "assets/", "resources/")
+
+# Shared script-extension set — consumed by D-11 decode (Plan 03), the D-05b
+# load_skill flag (Plan 03), and the SC#1 import note (Plan 05). Single source;
+# import from here.
+SCRIPT_EXTS = frozenset({
+    "js", "ts", "jsx", "tsx", "mjs", "cjs", "sh", "bash",
+    "rb", "go", "rs", "php", "pl", "lua", "ps1", "bat",
+})
+
+# Permanent-framed reshape wording per gap. Each: names the gap, says it cannot
+# become available, says do NOT retry, and offers the in-sandbox forward action
+# (tone modeled on BUG-260707-02-pptx-skill-instructions-sandbox-aware.md).
+_MSG_SOFFICE = ("LibreOffice (`soffice`) is not installed in this sandbox and cannot be "
+    "installed here. Do NOT retry. Build or QA the presentation/document in-memory with "
+    "python-pptx / python-docx / openpyxl, or tell the user this conversion is unavailable.")
+_MSG_NODE = ("This sandbox runs Python only — Node.js/npm/npx are not installed and cannot "
+    "be installed here. Do NOT retry as JavaScript. Re-implement the step in Python, or tell "
+    "the user JavaScript execution is unavailable.")
+GAP_MESSAGES = {
+    "soffice": _MSG_SOFFICE,
+    "libreoffice": _MSG_SOFFICE,
+    "node": _MSG_NODE,
+    "npm": _MSG_NODE,
+    "npx": _MSG_NODE,
+    "pandoc": ("pandoc is not installed in this sandbox and cannot be installed here. Do NOT "
+        "retry. Work with the source format directly using python-docx / pypdf / openpyxl, or "
+        "tell the user document conversion is unavailable."),
+    "pdftoppm": ("Poppler (`pdftoppm`) is not installed in this sandbox and cannot be installed "
+        "here. Do NOT retry. Read PDF text with pypdf instead of rasterizing pages, or tell the "
+        "user PDF-to-image rendering is unavailable."),
+    "pdfinfo": ("Poppler (`pdfinfo`) is not installed in this sandbox and cannot be installed "
+        "here. Do NOT retry. Inspect the PDF with pypdf, or tell the user this is unavailable."),
+    "extract-text": ("The `extract-text` helper is not installed in this sandbox and cannot be "
+        "installed here. Do NOT retry. Extract text in-memory with pypdf / python-docx / "
+        "python-pptx, or tell the user."),
+    "markitdown": ("`markitdown` is not installed in this sandbox and cannot be installed here. "
+        "Do NOT retry. Read the document in-memory with python-docx / python-pptx / openpyxl / "
+        "pypdf, or tell the user this conversion is unavailable."),
+}
+# Class-level messages for G-B (JS) and G-A (missing bundled file), keyed by class not token:
+GAP_MESSAGES_JS = _MSG_NODE
+GAP_MESSAGES_MISSING_FILE = ("A bundled skill script at '{path}' was not found in the sandbox. "
+    "Nested helper scripts (e.g. `scripts/office/*`) do not resolve here — the skill's folder "
+    "tree is flattened on import. Do NOT retry the same path. Do the equivalent work in-memory "
+    "with the Python libraries available, or tell the user.")
+
+# Precompiled extractors (reuse the module-level `re` alias bound above). The
+# module regex runs on a lowercased haystack; the path regex runs on the ORIGINAL
+# stderr (IGNORECASE) so the captured path keeps its real case for the message.
+_NO_MODULE_RE = _re_filename.compile(r"no module named ['\"]?([\w\.\-]+)")
+_MISSING_PATH_RE = _re_filename.compile(
+    r"no such file or directory:\s*['\"]([^'\"]+)['\"]", _re_filename.IGNORECASE
+)
+
+# CR-01(1b): a MISSING BINARY only classifies as G-C when the shell NAMES it as
+# missing — `<tok>: not found`, `<tok>: command not found`, or a FileNotFoundError
+# exec of EXACTLY that token — anchored to a left token boundary. A bare
+# co-occurrence of the token with the words "not found" (a `ValueError` printing
+# `config node 'db' not found`, which yields `node 'db' not found` NOT
+# `node: not found`) is NOT a gap and passes through (None). One precompiled regex
+# per fixed-allowlist token — no attacker-controlled key growth (T-142-04).
+_BINARY_GAP_RES = {
+    _btok: _re_filename.compile(
+        rf"(?<![\w/-]){_re_filename.escape(_btok)}:\s*(?:command\s+)?not found"
+        rf"|no such file or directory:\s*['\"]{_re_filename.escape(_btok)}['\"]",
+        _re_filename.IGNORECASE,
+    )
+    for _btok in KNOWN_MISSING_BINARIES
+}
+
+
+def _strip_py_line_comments(code: str) -> str:
+    """CR-01(1c) — drop each line's unquoted ``#…`` tail so a Python COMMENT can
+    never supply a JS token to the G-B check (``# let me handle a => b``). Quote
+    tracking is per-line and deliberately simple: on the rare edge it over-strips
+    (a ``#`` inside a triple-quoted string spanning lines), it only removes MORE
+    text, which can only SUPPRESS a G-B hit — the safe-default (pass-through)
+    direction, so it never causes a false reshape."""
+    out_lines: list[str] = []
+    for line in code.splitlines():
+        quote: str | None = None
+        cut = len(line)
+        i = 0
+        n = len(line)
+        while i < n:
+            ch = line[i]
+            if quote is not None:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = None
+            elif ch in ("'", '"'):
+                quote = ch
+            elif ch == "#":
+                cut = i
+                break
+            i += 1
+        out_lines.append(line[:cut])
+    return "\n".join(out_lines)
+
+
+def _classify_runtime_gap(
+    code: str, stdout: str, stderr: str, exit_code: int
+) -> dict | None:
+    """Classify a completed sandbox failure as one of the three known runtime
+    gaps, or None (pass-through — a real error the model must still see).
+
+    Returns ``{"class": "G-A"|"G-B"|"G-C", "token": <str>, "message": <str>}``
+    on a hit; ``None`` otherwise. Pure — no I/O. See the DESIGN LAW comment above:
+    a hit ALWAYS requires a fixed-allowlist token NAMED as missing (or the
+    JS-token+SyntaxError combination, or a bundled-skill-tree missing path) —
+    never error-type or exit code alone. Safe default (``None``) on any non-match,
+    exactly like ``_safe_out_filename`` returns ``deliverable.<ext>`` on a bad name.
+    """
+    code_s = code or ""
+    out_l = f"{stdout or ''}\n{stderr or ''}".lower()
+    all_l = f"{code_s.lower()}\n{out_l}"
+    shell_exit = exit_code in (124, 127)
+
+    # (a) G-C missing binary. Two disjoint signals, BOTH requiring a fixed-
+    #     allowlist token — NEVER exit code alone:
+    #       * a 124/127 exit with the token anywhere in code+output — a hung/killed
+    #         binary leaves its name only in the executed code (the timeout stderr
+    #         is our own abort message); OR
+    #       * the shell NAMING the token as missing — `<tok>: not found`,
+    #         `<tok>: command not found`, or a FileNotFoundError exec of EXACTLY
+    #         that token — via the precise per-token regex (CR-01 1b). A bare
+    #         co-occurrence of the token with the words "not found"
+    #         (`config node 'db' not found`) is NOT a gap → falls through to None.
+    for tok in sorted(KNOWN_MISSING_BINARIES):
+        if shell_exit and tok in all_l:
+            return {"class": "G-C", "token": tok, "message": GAP_MESSAGES[tok]}
+        if _BINARY_GAP_RES[tok].search(out_l):
+            return {"class": "G-C", "token": tok, "message": GAP_MESSAGES[tok]}
+
+    # (b) G-C missing module — `No module named '<mod>'` for a KNOWN module only
+    #     (a genuine `No module named some_pip_pkg` the user could install via
+    #     libraries=[...] is NOT reshaped as permanent).
+    m = _NO_MODULE_RE.search(out_l)
+    if m:
+        mod = m.group(1)
+        if mod in KNOWN_MISSING_MODULES:
+            return {"class": "G-C", "token": mod, "message": GAP_MESSAGES[mod]}
+
+    # (c) G-B non-Python script — a JS-exclusive token on a NON-COMMENT `code`
+    #     line AND a Python SyntaxError in stderr. Both required (a bare
+    #     SyntaxError passes through). CR-01 1c: line-comments are stripped first
+    #     so a `# let me handle a => b` note cannot masquerade as JS, and `"let "`
+    #     is no longer a token (so `print("let there be light")` + SyntaxError
+    #     passes through as None).
+    if "syntaxerror" in out_l:
+        code_no_comments = _strip_py_line_comments(code_s)
+        for jtok in JS_TOKENS:
+            if jtok in code_no_comments:
+                return {"class": "G-B", "token": jtok, "message": GAP_MESSAGES_JS}
+
+    # (d) G-A missing BUNDLED skill helper — a not-found RELATIVE path under a
+    #     known skill-bundle subdir (`scripts/` | `assets/` | `resources/`): the
+    #     lost flattened skill-tree signal. WR-01: a genuine missing relative USER
+    #     path (`data/input.json`, `config/settings.yaml`) is RECOVERABLE — create
+    #     the dir / fix the path — so it passes through (None); only bundle-prefixed
+    #     relative paths are reshaped as a permanent lost-tree gap. A genuine
+    #     absolute /sandbox/output/*.csv (starts with '/') also passes through.
+    #     Recording only these narrowed paths keeps the repeat-guard set from
+    #     growing on arbitrary model-supplied paths (T-142-04 reconciliation).
+    pm = _MISSING_PATH_RE.search(stderr or "")
+    if pm:
+        path = pm.group(1).strip()
+        if not path.startswith("/") and any(
+            path.startswith(prefix) for prefix in _SKILL_BUNDLE_DIRS
+        ):
+            return {
+                "class": "G-A",
+                "token": path,
+                "message": GAP_MESSAGES_MISSING_FILE.format(path=path),
+            }
+
+    return None
+
+
+# Phase 142 (SRH-01 / D-06) — pre-flight repeat-guard support. A recorded dead
+# token is one of: a KNOWN_MISSING binary/module (keys GAP_MESSAGES), a JS marker
+# (GAP_MESSAGES_JS), or a lost flattened-tree G-A path (GAP_MESSAGES_MISSING_FILE).
+# Map it back to its permanent-framed wording without re-running the classifier.
+def _message_for_dead_token(token: str) -> str:
+    if token in GAP_MESSAGES:
+        return GAP_MESSAGES[token]
+    if token in JS_TOKENS:
+        return GAP_MESSAGES_JS
+    return GAP_MESSAGES_MISSING_FILE.format(path=token)
+
+
+# Phase 142 (SRH-01 / D-06) — pre-flight repeat-guard MATCH (CR-02). Decide whether
+# a newly-submitted `code` re-references an already-dead token this run. A binary/
+# module IDENTIFIER (`node`, `soffice`, `markitdown`, `extract-text`) is matched at
+# WORD BOUNDARIES so a substring inside a larger word (`annotate`, `node_list`,
+# `network_xyz`) never re-blocks legitimate code; a JS marker (`const `, `=>`, …) or
+# a G-A bundled-tree path (contains `/`) is distinctive enough to keep containment.
+# RESIDUAL ACCEPTED EDGE: a later cell that uses a variable literally named after a
+# missing binary at a real word boundary (e.g. `node = 1`) is still blocked — rare,
+# and the cost is one blocked benign cell, not the multi-round retry loop this guard
+# exists to cap.
+def _code_references_dead_token(code: str, token: str) -> bool:
+    if token in KNOWN_MISSING_BINARIES or token in KNOWN_MISSING_MODULES:
+        return _re_filename.search(
+            rf"\b{_re_filename.escape(token)}\b", code, _re_filename.IGNORECASE
+        ) is not None
+    return token.lower() in code.lower()
+
+
+_REPEAT_BLOCKED_NOTE = (
+    "You already attempted this in the current run and it failed with a PERMANENT "
+    "runtime gap — it will not succeed on retry. Stop retrying; use the in-sandbox "
+    "alternative described above, or tell the user this is unavailable."
+)
+
+
+def _repeat_blocked_result(token: str) -> str:
+    """Build the short-circuit tool-result JSON for the pre-flight repeat-guard.
+
+    Error-shaped (``status='error'`` + non-zero ``exit_code``) so the model treats
+    it as a failed call, carrying the same permanent-framed message plus the
+    "already attempted this run" line. No sandbox is touched to produce it.
+    """
+    return json.dumps({
+        "status": "error",
+        "exit_code": 1,
+        "duration_ms": 0,
+        "output_files": [],
+        "stdout": "",
+        "stderr": "",
+        "runtime_gap": {
+            "token": token,
+            "message": _message_for_dead_token(token),
+            "repeat_blocked": True,
+            "note": _REPEAT_BLOCKED_NOTE,
+        },
+    })
+
+
 async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     """Phase 101 (TMPL-02 / TMPL-03) — fill a template into a real deliverable.
 
@@ -1865,7 +2380,7 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     # CLEAN in the backend venv — the heavy libs (docxtpl/...) are only SHIPPED into
     # the sandbox via _RENDER_DRIVER_SRC, never executed in-process here (Pitfall 4).
     from app.services.template_render_service import check_coverage, select_engine
-    from app.services.template_asset_service import resolve_template_source
+    from app.services.template_asset_service import own_claim_for_ctx, resolve_template_source
 
     import json as _json_local
     import os as _os_local
@@ -1952,12 +2467,19 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
                 "message": f"Invalid `asset` reference: {exc}",
             }))
 
+    # Phase 141 (COLL-02): run-scope the ephemeral (Branch 2) resolve. own_claim is
+    # SERVER-DERIVED from ctx.workflow_run_id (None→'deep', else str(W)) — NEVER from the
+    # model's tool args (D-141 / Tampering). Correct for all three ctx shapes that reach
+    # here: Deep (None→'deep'), workflow sub-agent (inherited W→str(W)), and the emit
+    # re-dispatch (_ProducerStreamCtx whose workflow_run_id is stamped in the harness).
+    own_claim = own_claim_for_ctx(ctx)
     src = await resolve_template_source(
         pool=ctx.pool,
         supabase=ctx.supabase,
         thread_id=ctx.thread_id,
         user_id=ctx.current_user["id"],
         asset_ref=asset_ref,
+        own_claim=own_claim,
     )
     if src.get("error"):
         # Run-honesty (D-05/D-10): relay the clean resolver error, never a traceback.

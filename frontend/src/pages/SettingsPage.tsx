@@ -19,6 +19,8 @@ import {
 } from "@/components/settings/ProviderPicker"
 import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
+import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
+import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -33,6 +35,15 @@ const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLab
   openrouter: { label: "OpenRouter (experimental)", defaultBase: "openrouter.ai",                     keyLabel: "API Key" },
   ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
 }
+
+// Phase 123.1-03 (D-09 / D-10) — the skill-builder model picker no longer uses a
+// hardcoded cheap-only list. It now derives its options from the user's CONFIGURED
+// per-provider models (the same `providers[].models` source the chat picker reads) so
+// the operator can pick STRONG models (Sonnet/Opus, GPT-pro, Gemini-Pro), and so the
+// LOCAL options come from the user's real providers (Ollama / LM Studio / OpenAI-compat)
+// instead of placeholder ids (IN-02). A cheap-but-capable default stays pre-selected via
+// the value="" Auto option (not forced); a custom persisted value is still selectable;
+// and a SOFT amber hint (never a hard block) shows when a chosen model is unverified.
 
 // ── Small reusable components ─────────────────────────────────────────────────
 
@@ -553,6 +564,10 @@ export function SettingsPage() {
   const [subAgentModel, setSubAgentModel] = useState("")
   const [subAgentModelError, setSubAgentModelError] = useState<string | null>(null)
   const [resolvedSubAgentModel, setResolvedSubAgentModel] = useState("")
+  // Phase 123 (D-08 / TRIG-01) — the skill-builder model knob. "" = unset (the
+  // resolver falls back to a strong default, surfaced as resolvedSkillBuilderModel).
+  const [skillBuilderModel, setSkillBuilderModel] = useState("")
+  const [resolvedSkillBuilderModel, setResolvedSkillBuilderModel] = useState("")
   const [llmMaxOutputTokens, setLlmMaxOutputTokens] = useState(0)
   const [openrouterToolStrategy, setOpenrouterToolStrategy] = useState<"quality" | "native" | "xml">("quality")
 
@@ -609,6 +624,8 @@ export function SettingsPage() {
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
     setSubAgentModel(data.sub_agent_model ?? "")
     setResolvedSubAgentModel(data.resolved_sub_agent_model ?? "")
+    setSkillBuilderModel(data.skill_builder_model ?? "")
+    setResolvedSkillBuilderModel(data.resolved_skill_builder_model ?? "")
     setLlmMaxOutputTokens(data.llm_max_output_tokens ?? 0)
     setOpenrouterToolStrategy(data.openrouter_tool_strategy ?? "quality")
     // Phase 075.3 D-075.3-13: defensive ?? so an old backend response without
@@ -641,6 +658,7 @@ export function SettingsPage() {
         context_window_max_tokens: contextWindowMaxTokens,
         sub_agent_max_output_tokens: subAgentMaxOutputTokens,
         sub_agent_model: subAgentModel,
+        skill_builder_model: skillBuilderModel,
         llm_max_output_tokens: llmMaxOutputTokens,
         openrouter_tool_strategy: openrouterToolStrategy,
       }
@@ -766,6 +784,21 @@ export function SettingsPage() {
   }
 
   const activeModels = providerStates.find((p) => p.id === activeProvider)?.models ?? ""
+
+  // Phase 123.1-03 (D-09) — the skill-builder picker options derive from the user's
+  // CONFIGURED per-provider models across ALL providers (not just the active one),
+  // grouped per provider as <optgroup>s. Mirrors how the chat picker splits the
+  // comma-separated `Models` lists. Empty providers fall out (no empty optgroup).
+  const builderModelGroups = providerStates
+    .map((ps) => ({
+      provider: ps.id,
+      label: PROVIDER_META[ps.id]?.label ?? ps.id,
+      models: ps.models.split(",").map((m) => m.trim()).filter(Boolean),
+    }))
+    .filter((g) => g.models.length > 0)
+  // The flat set of all configured model ids — used by the custom-persisted-value guard
+  // so a stored id that IS configured doesn't also render as a duplicate "(current)" row.
+  const builderConfiguredModels = new Set(builderModelGroups.flatMap((g) => g.models))
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8">
@@ -995,6 +1028,77 @@ export function SettingsPage() {
                 </FieldRow>
               </SectionCard>
 
+              {/* Phase 123.1-03 (D-09 / D-10) — Skill-builder model.
+                  The model that WRITES candidate descriptions + seeds the Trigger
+                  Tuner's benchmark cases. Now driven by the user's CONFIGURED
+                  per-provider models (the chat-picker source) so STRONG models are
+                  selectable; LOCAL options come from real providers (no paid-provider
+                  SPOF, no placeholder ids). DECOUPLED from the benchmark TARGETS (the
+                  builder writes, the targets measure). The Auto default stays
+                  pre-selected (not forced); an unverified pick gets a SOFT amber hint,
+                  never a hard block. */}
+              <SectionCard
+                title="Skill Trigger Tuner"
+                description="The model that writes candidate descriptions and seeds benchmark cases when you tune a skill's triggers."
+              >
+                <div className="flex flex-col gap-1.5 py-2">
+                  <label htmlFor="skill-builder-model" className="text-sm text-muted-foreground">
+                    Skill-builder model
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="skill-builder-model"
+                      value={skillBuilderModel}
+                      onChange={(e) => setSkillBuilderModel(e.target.value)}
+                      className="flex-1 h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">
+                        Auto · {resolvedSkillBuilderModel || "strong default"} (recommended)
+                      </option>
+                      {/* If the persisted value isn't one of the configured models
+                          (e.g. a custom / removed id), keep it selectable so the
+                          round-trip never drops it (D-10). */}
+                      {skillBuilderModel && !builderConfiguredModels.has(skillBuilderModel) && (
+                        <option value={skillBuilderModel}>{skillBuilderModel} (current)</option>
+                      )}
+                      {/* D-09: configured per-provider models, grouped as optgroups. */}
+                      {builderModelGroups.map((g) => (
+                        <optgroup key={g.provider} label={g.label}>
+                          {g.models.map((m) => (
+                            <option key={`${g.provider}:${m}`} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {/* D-10: SOFT amber hint when the chosen builder model isn't in the
+                        verified registry — mirrors the Active-Model "unverified" chip.
+                        NEVER a hard block / disabled option. */}
+                    {skillBuilderModel && !verifiedModels.has(skillBuilderModel) && (
+                      <span
+                        className="shrink-0 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full ghost-border"
+                        title="This model isn't in our verified registry. It may lack structured-output / forced-emission support the builder relies on — it's still selectable; the run will fall back gracefully if it can't emit."
+                      >
+                        unverified
+                      </span>
+                    )}
+                  </div>
+                  {/* Always-on no-SPOF footer + the explicit decoupled-from-targets note. */}
+                  <div className="mt-1.5 flex items-center gap-2 rounded-md border border-border/40 bg-muted/20 px-2.5 py-1.5 text-[10px] font-mono text-muted-foreground">
+                    <span className="text-emerald-400">{"🔒"}</span>
+                    <span>
+                      {`${skillBuilderModel || resolvedSkillBuilderModel || "claude-haiku-4-5"} · your configured models · no single-point-of-failure`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    The builder <span className="italic">writes</span> candidates; the benchmark
+                    targets <span className="italic">measure</span> firing — independent settings,
+                    decoupled by design.
+                  </p>
+                </div>
+              </SectionCard>
+
               {/* Save AI Model button */}
               <div className="flex justify-end">
                 <Button
@@ -1007,6 +1111,14 @@ export function SettingsPage() {
                   {savedAI ? "Saved!" : savingAI ? "Saving\u2026" : "Save AI Model"}
                 </Button>
               </div>
+
+              {/* Phase 137.1 (EVAL-05 / 060-A) — eval engine health + the independent
+                  judge model. Self-contained infra cards that live OUTSIDE the AI Model
+                  save cycle: the board self-fetches + sweeps on demand; the judge picker
+                  self-persists via setJudgeModel. Registry-only judge options come from
+                  the verified-models registry the page already loads. */}
+              <EngineHealthCard />
+              <JudgeModelPicker registryModels={[...verifiedModels]} />
             </div>
           </TabsContent>
 

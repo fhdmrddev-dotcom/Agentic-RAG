@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 037 — Classification Rule Builder &amp; List</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  body { padding-top: 52px; }
+  .app { display: flex; height: calc(100vh - 52px); }
+  .nav-rail { width: 52px; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding-top: var(--space-4); flex-shrink: 0; }
+  .nav-rail .ni { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center;
+    color: var(--color-text-dim); font-size: 17px; cursor: pointer; }
+  .nav-rail .ni.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* sidebar with Folders + Views + Classification rules (the dedicated home) */
+  .sidebar { width: 230px; background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+    overflow: auto; padding: var(--space-3) var(--space-2); flex-shrink: 0; }
+  .nav-group { margin-bottom: var(--space-4); }
+  .nav-group .gh { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-dim);
+    padding: var(--space-2) var(--space-3) var(--space-1); }
+  .nav-row { display: flex; align-items: center; gap: var(--space-2); padding: 6px var(--space-3); border-radius: var(--radius-sm);
+    font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; }
+  .nav-row:hover { background: var(--color-accent); color: var(--color-text); }
+  .nav-row.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .nav-row .ic { width: 16px; text-align: center; }
+  .nav-row .cnt { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+
+  .main { display: grid; flex: 1; min-width: 0; }
+  .main.split { grid-template-columns: minmax(0,1fr) 420px; }
+  .body-col { min-width: 0; overflow: auto; padding: var(--space-5) var(--space-6) var(--space-12); }
+  .page-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .page-head h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0; font-weight: 700; }
+  .page-head .cnt { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted);
+    background: var(--color-accent); padding: 1px 8px; border-radius: var(--radius-full); }
+  .page-head .ml { margin-left: auto; }
+  .btn { font-family: inherit; font-size: var(--text-sm); font-weight: 600; border-radius: var(--radius-md);
+    padding: 7px 14px; cursor: pointer; border: 1px solid transparent; transition: all var(--dur-fast); }
+  .btn-primary { background: var(--color-primary-strong); color: #07081f; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; color: var(--color-text-muted); border-color: var(--color-border); }
+  .btn-ghost:hover { background: var(--color-muted); color: var(--color-text); }
+  .sub-intro { color: var(--color-text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); max-width: 60ch; }
+
+  /* ── Rule list rows ── */
+  .rule-list { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+  .rule-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-soft); transition: background var(--dur-fast); }
+  .rule-row:last-child { border-bottom: none; }
+  .rule-row:hover { background: var(--color-muted); }
+  .rule-row.disabled { opacity: 0.55; }
+  .enable-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success-dim); }
+  .rule-row.disabled .enable-dot { background: var(--color-text-dim); box-shadow: none; }
+  .rule-name { font-weight: 600; font-size: var(--text-sm); display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; min-width: 120px; }
+  .gpill { font-family: var(--font-mono); font-size: 9px; font-weight: 600; background: var(--color-accent-violet);
+    color: #fff; padding: 1px 6px; border-radius: var(--radius-full); letter-spacing: 0.03em; }
+  .rule-cond { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .rule-arrow { color: var(--color-text-dim); flex-shrink: 0; }
+  .rule-action { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); flex-shrink: 0; white-space: nowrap; }
+  .rule-action .fchip { font-family: var(--font-mono); font-size: 11px; background: var(--color-warning-dim); color: var(--color-warning);
+    padding: 2px 9px; border-radius: var(--radius-full); }
+  .rule-action .tchip { font-family: var(--font-mono); font-size: 11px; background: hsl(258 90% 66% / 0.14); color: var(--color-accent-violet);
+    padding: 2px 9px; border-radius: var(--radius-full); }
+  /* toggle switch */
+  .switch { width: 34px; height: 19px; border-radius: 999px; background: var(--color-accent); position: relative;
+    cursor: pointer; flex-shrink: 0; transition: background var(--dur-base); border: 1px solid var(--color-border); }
+  .switch.on { background: var(--color-success); }
+  .switch::after { content: ''; position: absolute; top: 1px; left: 1px; width: 15px; height: 15px; border-radius: 50%;
+    background: #fff; transition: transform var(--dur-base) var(--ease-out); }
+  .switch.on::after { transform: translateX(15px); }
+  .kebab { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 16px; padding: 2px 6px;
+    border-radius: var(--radius-sm); flex-shrink: 0; }
+  .kebab:hover { background: var(--color-accent); color: var(--color-text); }
+
+  .empty-state { text-align: center; padding: var(--space-16) var(--space-6); color: var(--color-text-muted); }
+  .empty-state .big { font-size: 32px; margin-bottom: var(--space-3); }
+
+  /* ── Builder (panel + page + inline share these atoms) ── */
+  .builder { background: var(--color-surface); }
+  .builder.panel { border-left: 1px solid var(--color-border); overflow: auto; }
+  .b-inner { padding: var(--space-4) var(--space-5) var(--space-12); }
+  .b-head { display: flex; align-items: center; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-4); }
+  .b-head .ttl { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); }
+  .b-head .x { margin-left: auto; background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 14px; }
+  .field { margin-bottom: var(--space-4); }
+  .field > label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); margin-bottom: var(--space-2); }
+  .inp { width: 100%; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 8px 11px; color: var(--color-text); font-family: inherit; font-size: var(--text-sm); }
+  .inp:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+
+  /* condition chip strip (029-A) */
+  .clause-lbl { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
+  .clause-lbl b { color: var(--color-text); font-weight: 600; }
+  .chip-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: var(--space-3);
+    background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .cond-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--color-accent); border: 1px solid var(--color-border);
+    border-radius: var(--radius-full); padding: 3px 5px 3px 10px; font-size: var(--text-xs); }
+  .cond-chip select, .cond-chip input { background: transparent; border: none; color: var(--color-text); font-family: inherit;
+    font-size: var(--text-xs); cursor: pointer; }
+  .cond-chip input { width: 90px; cursor: text; }
+  .cond-chip select:focus, .cond-chip input:focus { outline: none; }
+  .cond-chip .op { color: var(--color-primary); }
+  .cond-chip .rm { background: none; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 12px; padding: 0 3px; border-radius: 3px; }
+  .cond-chip .rm:hover { color: hsl(0 80% 80%); }
+  .add-cond { background: none; border: 1px dashed var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-full);
+    padding: 3px 11px; font-size: var(--text-xs); cursor: pointer; font-family: inherit; }
+  .add-cond:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  .all-match { font-size: 10px; color: var(--color-text-dim); margin-top: 6px; }
+
+  /* action radio */
+  .radio-row { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .radio-row input[type=radio] { accent-color: var(--color-primary); }
+  .radio-row label { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); cursor: pointer; }
+  .radio-row .pick { margin-left: auto; }
+  .radio-row.off .pick { opacity: 0.4; pointer-events: none; }
+  select.inp { cursor: pointer; }
+
+  /* scope segmented */
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .seg button { background: var(--color-bg); border: none; color: var(--color-text-muted); font-family: inherit; font-size: var(--text-sm);
+    padding: 6px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .scope-help { font-size: 10px; color: var(--color-text-dim); margin-top: 6px; }
+
+  /* live preview (029 live-count) */
+  .preview { margin: var(--space-4) 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+    background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+  .preview .pl { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); font-weight: 600; }
+  .preview .pl .n { font-family: var(--font-mono); color: var(--color-primary); }
+  .preview .honest { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; display: flex; gap: 6px; align-items: flex-start; }
+  .preview .honest b { color: var(--color-warning); }
+
+  .b-actions { display: flex; gap: var(--space-2); justify-content: flex-end; padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
+
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); padding: var(--space-2) var(--space-3);
+    border-left: 2px solid var(--color-accent-violet); margin: var(--space-3) var(--space-6); background: hsl(258 90% 66% / 0.06); }
+  .note b { color: var(--color-accent-violet); }
+
+  /* inline-expand (variant C) */
+  .rule-row.editing { background: var(--color-bg); display: block; }
+  .inline-editor { padding: var(--space-4) 0 var(--space-2); border-top: 1px dashed var(--color-border); margin-top: var(--space-3); }
+  .rule-row.editing .rule-summary { display: flex; align-items: center; gap: var(--space-3); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">037 · Rule Builder &amp; List</span>
+  <button class="variant-tab active" onclick="show('a',event)">A · List + side-panel builder<span class="star">★</span>Selected</button>
+  <button class="variant-tab" onclick="show('b',event)">B · Full-page builder</button>
+  <button class="variant-tab" onclick="show('c',event)">C · Inline-expand rows</button>
+</div>
+
+<!-- ════════════════════ VARIANT A ════════════════════ -->
+<div id="variant-a" class="variant">
+  <div class="note">Rules live on a <b>dedicated surface reached from Documents</b> (peer to Folders + Views). Authoring opens in the same <b>right-side push/split panel</b> the app already uses for detail (027) and workflow phase forms (103) — condition chip strip (029-A) → action → scope → live "would match N" preview.</div>
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📁</div><div class="ni">⚙️</div></div>
+    <div class="sidebar scrollbar-thin">
+      <div class="nav-group"><div class="gh">Folders</div>
+        <div class="nav-row"><span class="ic">📁</span> All documents <span class="cnt">248</span></div>
+        <div class="nav-row"><span class="ic">📁</span> Finance <span class="cnt">31</span></div>
+        <div class="nav-row"><span class="ic">📁</span> Legal <span class="cnt">18</span></div>
+      </div>
+      <div class="nav-group"><div class="gh">Views</div>
+        <div class="nav-row"><span class="ic">🔻</span> Reports <span class="cnt">11</span></div>
+      </div>
+      <div class="nav-group"><div class="gh">Automation</div>
+        <div class="nav-row active"><span class="ic">⚙️</span> Classification rules <span class="cnt">4</span></div>
+      </div>
+    </div>
+    <div class="main" id="a-main">
+      <div class="body-col scrollbar-thin">
+        <div class="page-head"><h1>Classification rules</h1><span class="cnt">4</span>
+          <span class="ml"></span><button class="btn btn-primary" onclick="openPanel()">+ New rule</button></div>
+        <p class="sub-intro">When a document is uploaded, enabled rules check its metadata and <b>suggest</b> a folder or tag — never moving it silently. You accept or dismiss each suggestion.</p>
+        <div class="rule-list" id="a-list"></div>
+      </div>
+      <!-- panel injected here when open -->
+      <div class="builder panel" id="a-panel" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ VARIANT B ════════════════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="note">New rule opens a <b>full-page builder</b> — more room for many conditions and a preview rendered as a real document list. Trade-off: it leaves the list context (heavier than the in-place panel; against the app's no-router/state-switch grain).</div>
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📁</div><div class="ni">⚙️</div></div>
+    <div class="sidebar scrollbar-thin">
+      <div class="nav-group"><div class="gh">Automation</div>
+        <div class="nav-row active"><span class="ic">⚙️</span> Classification rules <span class="cnt">4</span></div></div>
+    </div>
+    <div class="main">
+      <div class="body-col scrollbar-thin" id="b-page"><!-- list or builder --></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ VARIANT C ════════════════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="note">Each rule row <b>expands in place</b> to edit — no panel, no page change. Compact, but the chip strip + action + preview crowd a list row (the 035 audit rejected inline-expand for the link picker for the same reason).</div>
+  <div class="app">
+    <div class="nav-rail"><div class="ni">💬</div><div class="ni active">📁</div><div class="ni">⚙️</div></div>
+    <div class="sidebar scrollbar-thin">
+      <div class="nav-group"><div class="gh">Automation</div>
+        <div class="nav-row active"><span class="ic">⚙️</span> Classification rules <span class="cnt">4</span></div></div>
+    </div>
+    <div class="main">
+      <div class="body-col scrollbar-thin">
+        <div class="page-head"><h1>Classification rules</h1><span class="cnt">4</span></div>
+        <p class="sub-intro">Click a rule to expand and edit it inline.</p>
+        <div class="rule-list" id="c-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-root" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:9998;display:flex;flex-direction:column;gap:8px;align-items:center;"></div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVp(460)">📱</button>
+  <button onclick="setVp(0)">🖥</button>
+</div>
+
+<script>
+function show(v,e){ document.querySelectorAll('.variant').forEach(x=>x.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+v).style.display='block'; e.target.classList.add('active'); }
+function setVp(w){ document.querySelectorAll('.app').forEach(a=>{ a.style.maxWidth=w?w+'px':''; a.style.margin=w?'0 auto':''; }); }
+function toast(msg){ const t=document.createElement('div');
+  t.style.cssText='background:var(--color-surface-hi);border:1px solid var(--color-border);box-shadow:var(--shadow-lg);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--color-text);animation:fadeSlideUp .25s ease;';
+  t.innerHTML=msg; document.getElementById('toast-root').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2600); }
+
+// ───── grounded rule data (classification_rules, CLASS-01) ─────
+const RULES = [
+  { id:'r1', name:'Invoices',  enabled:true,  global:false, cond:'document_type is "invoice"', kind:'folder', target:'/Finance/Invoices', matches:12 },
+  { id:'r2', name:'Contracts', enabled:true,  global:true,  cond:'title contains "agreement" AND document_type is "contract"', kind:'folder', target:'/Legal/Contracts', matches:7 },
+  { id:'r3', name:'Brand assets', enabled:true, global:false, cond:'tag is "brand"', kind:'tag', target:'brand-reviewed', matches:23 },
+  { id:'r4', name:'Old drafts', enabled:false, global:false, cond:'status is "draft" AND date older than 90 days', kind:'tag', target:'wip', matches:4 },
+];
+
+function actionHTML(r){ return r.kind==='folder'
+  ? `<span class="rule-action">📁<span class="fchip">${r.target}</span></span>`
+  : `<span class="rule-action">🏷<span class="tchip">${r.target}</span></span>`; }
+
+function rowHTML(r, onclick){ return `
+  <div class="rule-row ${r.enabled?'':'disabled'}" data-id="${r.id}">
+    <span class="enable-dot"></span>
+    <span class="rule-name">${r.name}${r.global?'<span class="gpill" title="Global — visible to all users">G</span>':''}</span>
+    <span class="rule-cond">${r.cond}</span>
+    <span class="rule-arrow">→</span>
+    ${actionHTML(r)}
+    <span class="switch ${r.enabled?'on':''}" title="Enable / disable" onclick="event.stopPropagation();toggleRule('${r.id}',this)"></span>
+    <button class="kebab" title="Edit / delete" onclick="event.stopPropagation();${onclick||''}">⋯</button>
+  </div>`; }
+
+function toggleRule(id, el){ const r=RULES.find(x=>x.id===id); r.enabled=!r.enabled;
+  el.classList.toggle('on'); el.closest('.rule-row').classList.toggle('disabled', !r.enabled);
+  toast(r.enabled?('▶ <b>'+r.name+'</b> enabled — will suggest on new uploads'):('⏸ <b>'+r.name+'</b> disabled')); }
+
+// ── Variant A: list + side-panel builder ──
+function renderA(){ document.getElementById('a-list').innerHTML = RULES.map(r=>rowHTML(r, `openPanel('${r.id}')`)).join(''); }
+function openPanel(id){
+  const r = id? RULES.find(x=>x.id===id) : null;
+  document.getElementById('a-main').classList.add('split');
+  const p=document.getElementById('a-panel'); p.style.display='block'; p.innerHTML = builderHTML(r,'a');
+  wireBuilder('a', r);
+}
+function closePanel(){ document.getElementById('a-main').classList.remove('split'); document.getElementById('a-panel').style.display='none'; }
+
+// ── Variant B: full-page ──
+function renderB(){ document.getElementById('b-page').innerHTML = `
+  <div class="page-head"><h1>Classification rules</h1><span class="cnt">4</span>
+    <span class="ml"></span><button class="btn btn-primary" onclick="bOpen()">+ New rule</button></div>
+  <p class="sub-intro">When a document is uploaded, enabled rules suggest a folder or tag — never moving it silently.</p>
+  <div class="rule-list">${RULES.map(r=>rowHTML(r,`bOpen('${r.id}')`)).join('')}</div>`; }
+function bOpen(id){ const r=id?RULES.find(x=>x.id===id):null;
+  document.getElementById('b-page').innerHTML = `<div style="max-width:680px">
+    <div class="page-head" style="margin-bottom:var(--space-4)"><button class="btn btn-ghost" onclick="renderB()">← Rules</button>
+      <h1 style="font-size:var(--text-lg)">${r?'Edit rule':'New rule'}</h1></div>
+    ${builderHTML(r,'b',true)}</div>`;
+  wireBuilder('b', r); }
+
+// ── Variant C: inline expand ──
+function renderC(){ document.getElementById('c-list').innerHTML = RULES.map(r=>`
+  <div class="rule-row ${r.enabled?'':'disabled'}" data-id="${r.id}" onclick="cExpand('${r.id}',this)">
+    <span class="enable-dot"></span>
+    <span class="rule-name">${r.name}${r.global?'<span class="gpill">G</span>':''}</span>
+    <span class="rule-cond">${r.cond}</span><span class="rule-arrow">→</span>${actionHTML(r)}
+    <span class="switch ${r.enabled?'on':''}" onclick="event.stopPropagation();toggleRule('${r.id}',this)"></span>
+    <button class="kebab" onclick="event.stopPropagation()">⋯</button>
+  </div>`).join(''); }
+function cExpand(id, el){ const r=RULES.find(x=>x.id===id);
+  if(el.classList.contains('editing')){ el.classList.remove('editing'); renderC(); return; }
+  document.querySelectorAll('#c-list .rule-row.editing').forEach(x=>x.classList.remove('editing'));
+  el.classList.add('editing');
+  el.innerHTML = `<div class="rule-summary"><span class="enable-dot"></span><span class="rule-name">${r.name}${r.global?'<span class="gpill">G</span>':''}</span>
+    <span class="rule-cond">${r.cond}</span><span class="rule-arrow">→</span>${actionHTML(r)}
+    <button class="kebab" onclick="event.stopPropagation();cExpand('${id}',this.closest('.rule-row'))">✕</button></div>
+    <div class="inline-editor">${builderBody(r,'c')}</div>`;
+  wireBuilder('c', r);
+}
+
+// ── shared builder markup ──
+function builderHTML(r, ns, page){
+  return `<div class="b-inner">
+    <div class="b-head"><span class="ttl">${r?'Edit rule':'New rule'}</span>
+      ${page?'':`<button class="x" onclick="closePanel()">✕</button>`}</div>
+    ${builderBody(r, ns)}</div>`;
+}
+function builderBody(r, ns){
+  const conds = r ? r.cond.split(' AND ') : ['document_type is "invoice"'];
+  const kind = r? r.kind : 'folder';
+  return `
+    <div class="field"><label>Rule name</label>
+      <input class="inp" id="${ns}-name" value="${r?r.name:''}" placeholder="e.g. Invoices"></div>
+
+    <div class="field">
+      <div class="clause-lbl"><b>When</b> a document matches</div>
+      <div class="chip-strip" id="${ns}-chips">
+        ${conds.map((c,i)=>condChip(c,i,ns)).join('')}
+        <button class="add-cond" onclick="addCond('${ns}')">＋ condition</button>
+      </div>
+      <div class="all-match">All conditions must match (AND)</div>
+    </div>
+
+    <div class="field">
+      <div class="clause-lbl"><b>Then suggest</b></div>
+      <div class="radio-row ${kind==='folder'?'':'off'}" id="${ns}-rf">
+        <label><input type="radio" name="${ns}-act" ${kind==='folder'?'checked':''} onclick="pickAct('${ns}','folder')"> 📁 Move to folder</label>
+        <span class="pick"><select class="inp" style="width:200px"><option>/Finance/Invoices</option><option>/Legal/Contracts</option><option>/Marketing/Assets</option></select></span>
+      </div>
+      <div class="radio-row ${kind==='tag'?'':'off'}" id="${ns}-rt">
+        <label><input type="radio" name="${ns}-act" ${kind==='tag'?'checked':''} onclick="pickAct('${ns}','tag')"> 🏷 Add tag</label>
+        <span class="pick"><input class="inp" style="width:200px" placeholder="tag name" value="${kind==='tag'?r.target:''}"></span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Scope</label>
+      <div class="seg">
+        <button class="${r&&r.global?'':'on'}" onclick="seg(this)">👤 Only me</button>
+        <button class="${r&&r.global?'on':''}" onclick="seg(this)">🌐 Global <span class="gpill">G</span></button>
+      </div>
+      <div class="scope-help">Global rules apply for everyone (owner-only edit). Private rules are yours alone.</div>
+    </div>
+
+    <div class="preview" id="${ns}-preview">
+      <div class="pl">📊 Would match <span class="n" id="${ns}-n">${r?r.matches:12}</span> of 248 existing documents
+        <button class="btn btn-ghost" style="margin-left:auto;padding:3px 10px;font-size:11px" onclick="recount('${ns}')">Re-check</button></div>
+      <div class="honest">⚠ <span><b>Existing documents aren't moved.</b> Rules suggest on <b>new uploads</b> only — this count is a preview to help you tune the conditions.</span></div>
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:var(--space-5)">
+      <span class="switch on" onclick="this.classList.toggle('on')"></span>
+      <span style="font-size:var(--text-sm)">Enabled — start suggesting on the next upload</span>
+    </div>
+
+    <div class="b-actions">
+      <button class="btn btn-ghost" onclick="${ns==='a'?'closePanel()':ns==='b'?'renderB()':'renderC()'}">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRule('${ns}')">${r?'Save changes':'Create rule'}</button>
+    </div>`;
+}
+const FIELDS=['document_type','title','vendor','status','tag','language','date'];
+const OPS=['is','contains','is not','older than','within next'];
+function condChip(c, i, ns){
+  // parse "field op value" loosely for display defaults
+  const m = c.match(/^(\S+)\s+(is not|is|contains|older than|within next)\s+"?([^"]*)"?$/) || [null,'document_type','is','invoice'];
+  return `<span class="cond-chip">
+    <select>${FIELDS.map(f=>`<option ${f===m[1]?'selected':''}>${f}</option>`).join('')}</select>
+    <select class="op">${OPS.map(o=>`<option ${o===m[2]?'selected':''}>${o}</option>`).join('')}</select>
+    <input value="${m[3]||''}" placeholder="value">
+    <button class="rm" onclick="this.closest('.cond-chip').remove()">✕</button>
+  </span>`;
+}
+function addCond(ns){ const strip=document.getElementById(ns+'-chips'); const btn=strip.querySelector('.add-cond');
+  const span=document.createElement('span'); span.innerHTML=condChip('document_type is ',99,ns); strip.insertBefore(span.firstElementChild, btn); }
+function pickAct(ns, kind){ document.getElementById(ns+'-rf').classList.toggle('off', kind!=='folder');
+  document.getElementById(ns+'-rt').classList.toggle('off', kind!=='tag'); }
+function seg(b){ b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); }
+function recount(ns){ const n=document.getElementById(ns+'-n'); n.textContent = Math.floor(8+Math.abs(Math.sin(ns.charCodeAt(0)+n.textContent*1))*30); }
+function saveRule(ns){ const nm=document.getElementById(ns+'-name').value||'Untitled rule';
+  toast('✓ Rule <b>'+nm+'</b> saved · suggests on new uploads');
+  if(ns==='a'){closePanel();renderA();} else if(ns==='b'){renderB();} else {renderC();} }
+function wireBuilder(ns, r){ /* hooks already inline; placeholder for parity */ }
+
+renderA(); renderB(); renderC();
+</script>
+</body>
+</html>

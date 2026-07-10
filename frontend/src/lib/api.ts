@@ -1,9 +1,13 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure, MetadataFieldDef, ViewFilter, SavedView, RelType, RelatedDocumentsResponse, Relationship, ClassificationRule, TestCase, TestCaseCreate, TestCaseUpdate, SkillVersion, EvalRunKickoff, EvalRunReadout, EvalRun, SkillProposal, ProposalApproveResult, PublishGate, MatrixRunKickoff, EngineHealthBoard, EvalAggregate } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
   errors: Array<{ skill: string; error: string }>
+  // Phase 142 (SRH-01 / SC#1 / D-08): non-blocking honesty notes — one per imported
+  // skill that bundles a non-Python script. OPTIONAL so existing consumers keep
+  // compiling and ignore it (additive, Pitfall 5).
+  notes?: Array<{ skill: string; note: string }>
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
@@ -303,7 +307,7 @@ export interface StreamCallbacks {
    * the hook handler updates tool_calls[N].elapsedSeconds for the matching execute_code
    * tool with status==='running'. Strictly additive — does NOT replace post-completion
    * line emit (`onCodeStdout` / `onCodeStderr` still fire after `code_execution_complete`). */
-  onCodeExecuting?: (toolIndex: number, elapsedSeconds: number) => void
+  onCodeExecuting?: (toolIndex: number, elapsedSeconds: number, phase?: string) => void
   onCodeStdout?: (content: string) => void
   onCodeStderr?: (content: string) => void
   onCodeExecutionComplete?: (
@@ -410,6 +414,28 @@ export interface StreamCallbacks {
    *  payload {phase, phase_index, status?, failure?}. Panel-only (writes
    *  phasesByThread); the branch carries NO return (cursor still advances). */
   onPhaseSubstep?: (p: { phase: string; phaseIndex: number; status?: EmitSubStep; failure?: EmitFailure }) => void
+  /** Phase 133 Plan 05 (EVAL-02) — eval-runner progress events on the reused
+   *  run-stream client (Pattern 3 — the eval run wrote a companion public.runs
+   *  row, so the existing chat-run reattach machinery carries these). NON-terminal
+   *  progress (no `return`); the run still closes with a single chat terminal
+   *  AFTER eval_complete. Payloads are FLAT (eval_runner_service.py:
+   *  {test_case_id, variant} / {test_case_id, variant, status} / {status}).
+   *  Panel-only, provider-agnostic — the Deep dispatch above is byte-identical. */
+  onEvalCaseStarted?: (p: { testCaseId: string; variant: string }) => void
+  onEvalCaseDone?: (p: { testCaseId: string; variant: string; status: string }) => void
+  onEvalComplete?: (p: { status: string }) => void
+  /** Phase 134 Plan 04 (EVAL-03) — additive live verdict event, emitted after the
+   *  independent judge grades an arm (D-05). FLAT payload {test_case_id, variant,
+   *  verdict_state, verdict_passed}. Optional live reflection only — the durable
+   *  readout (getEvalRun on onEvalComplete/terminal) stays authoritative. Sits with
+   *  the other additive eval branches: NON-terminal (no `return`, cursor advances),
+   *  Deep/harness dispatch untouched (Pattern 3). */
+  onEvalVerdict?: (p: {
+    testCaseId: string
+    variant: string
+    verdictState: string
+    verdictPassed: boolean | null
+  }) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -620,7 +646,7 @@ export async function subscribeToRun(
         // + elapsed_seconds. Inserted before code_stdout to keep heartbeat dispatch
         // contiguous with execution-lifecycle events.
         else if (t === "code_executing" && callbacks.onCodeExecuting)
-          callbacks.onCodeExecuting(parsed.tool_index as number, parsed.elapsed_seconds as number)
+          callbacks.onCodeExecuting(parsed.tool_index as number, parsed.elapsed_seconds as number, parsed.phase as string | undefined)
         else if (t === "code_stdout" && callbacks.onCodeStdout)
           callbacks.onCodeStdout(parsed.content as string)
         else if (t === "code_stderr" && callbacks.onCodeStderr)
@@ -802,6 +828,36 @@ export async function subscribeToRun(
             phaseIndex: parsed.phase_index as number,
             status: parsed.status as EmitSubStep | undefined,
             failure: parsed.failure as EmitFailure | undefined,
+          })
+        // Phase 133 Plan 05 (EVAL-02) — eval-runner progress branches. They sit
+        // with the other additive panel-event branches (NO return → cursor still
+        // advances) and read the FLAT eval_runner_service payloads verbatim. The
+        // Deep/harness dispatch above is untouched (Pattern 3 — these ride the
+        // reused run-stream client for free via the companion runs row).
+        else if (t === "eval_case_started" && callbacks.onEvalCaseStarted)
+          callbacks.onEvalCaseStarted({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+          })
+        else if (t === "eval_case_done" && callbacks.onEvalCaseDone)
+          callbacks.onEvalCaseDone({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+            status: parsed.status as string,
+          })
+        else if (t === "eval_complete" && callbacks.onEvalComplete)
+          callbacks.onEvalComplete({ status: parsed.status as string })
+        // Phase 134 Plan 04 (EVAL-03) — additive live verdict branch. Reads the FLAT
+        // eval_runner_service payload verbatim (parsed.test_case_id / variant /
+        // verdict_state / verdict_passed). NON-terminal → NO return (cursor still
+        // advances, exactly like eval_case_done above); the Deep/harness dispatch is
+        // untouched. Durable readout remains authoritative (T-134-13).
+        else if (t === "eval_verdict" && callbacks.onEvalVerdict)
+          callbacks.onEvalVerdict({
+            testCaseId: parsed.test_case_id as string,
+            variant: parsed.variant as string,
+            verdictState: parsed.verdict_state as string,
+            verdictPassed: parsed.verdict_passed as boolean | null,
           })
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
@@ -1109,6 +1165,7 @@ export interface WorkflowPhaseState {
   slug: string
   phase_index: number
   status: string
+  phase_type?: string
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py
@@ -1150,13 +1207,38 @@ export async function listPublishedWorkflows(
    *  (or passing null) returns the full owner-scoped published list unchanged. */
   projectFolderId?: string | null,
   signal?: AbortSignal,
+  /** Phase 143 (WF-01 / D-143-2b): the Workflows-page Published shelf opts into
+   *  `scope: "mine"` so the backend AND-narrows to `created_by = me` (dropping the
+   *  bare `is_global`), de-duping the curated Starters + the mig-061 dev scaffolds
+   *  that now render in their own Starters shelf. EVERY other caller (the composer
+   *  Harness picker, the WorkspacePanel run-soul recovery) OMITS it and keeps the
+   *  byte-identical global-OR-mine feed those surfaces depend on (Pitfall 3). */
+  opts?: { scope?: "mine" },
 ): Promise<PublishedWorkflow[]> {
   const headers = await getAuthHeaders()
-  const url = projectFolderId
-    ? `${API_BASE}/workflows/published?project_folder_id=${encodeURIComponent(projectFolderId)}`
+  // Preserve the existing project_folder_id encoding byte-for-byte; append scope only
+  // when the caller opts in (default-off — no behavior change for existing callers).
+  const params: string[] = []
+  if (projectFolderId) params.push(`project_folder_id=${encodeURIComponent(projectFolderId)}`)
+  if (opts?.scope) params.push(`scope=${encodeURIComponent(opts.scope)}`)
+  const url = params.length
+    ? `${API_BASE}/workflows/published?${params.join("&")}`
     : `${API_BASE}/workflows/published`
   const res = await fetch(url, { headers, signal })
   if (!res.ok) throw new Error(`Failed to list published workflows (status ${res.status})`)
+  return (await res.json()) as PublishedWorkflow[]
+}
+
+/** Phase 143 (WF-01 / D-143-2) — GET /workflows/starters. The curated Starters-shelf
+ *  feed: `is_global` published definitions carrying `definition.category = 'starter'`
+ *  (a server-side JSONB-path predicate, `list_starter_workflows`). No project/user
+ *  scope — curated globals are world-readable by the mig-056 SELECT policy, so this
+ *  is a clone of listPublishedWorkflows with NO query params. The Workflows page
+ *  renders these on top; "Use this starter" forks a fresh owned copy off each row. */
+export async function listStarterWorkflows(signal?: AbortSignal): Promise<PublishedWorkflow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/starters`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list starter workflows (status ${res.status})`)
   return (await res.json()) as PublishedWorkflow[]
 }
 
@@ -1513,17 +1595,488 @@ export async function toggleSkillEnabled(id: string): Promise<Skill> {
   return res.json() as Promise<Skill>
 }
 
-export async function toggleSkillGlobal(id: string): Promise<Skill> {
+/** Phase 136 (GATE-01): a typed carrier for the structured 409 publish-gate
+ *  refusal. Holds the server-computed `PublishGate` so the dialog can render the
+ *  SAME honest counts/reason the server used — the client never recomputes `met`
+ *  (D-07). Mirrors the ApiError idiom (a named Error with a typed field). */
+export class PublishGateError extends Error {
+  readonly gate: PublishGate
+  constructor(gate: PublishGate) {
+    super(gate.reason || "This skill can't be published yet — its eval gate isn't met.")
+    this.gate = gate
+    this.name = "PublishGateError"
+  }
+}
+
+export async function toggleSkillGlobal(id: string, override?: boolean): Promise<Skill> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/skills/${id}/toggle-global`, {
     method: "PATCH",
     headers,
+    // Only the private→global publish direction sends a body ({ override }); the
+    // ungated global→private unshare direction (no arg) sends none — unchanged.
+    ...(override !== undefined ? { body: JSON.stringify({ override }) } : {}),
   })
   if (!res.ok) {
     if (res.status === 403) throw new Error("Only the skill owner can toggle global status")
+    if (res.status === 409) {
+      // Structured publish-gate refusal — detail is an OBJECT { error, gate }, NOT
+      // a string (do NOT route through proposalError's string path). Surface the
+      // gate via a typed error so the dialog renders the server's honest evidence.
+      let gate: PublishGate | undefined
+      try {
+        const j = (await res.json()) as { detail?: { error?: string; gate?: PublishGate } }
+        gate = j?.detail?.gate
+      } catch {
+        /* non-JSON / malformed 409 body — fall through to the generic message */
+      }
+      if (gate) throw new PublishGateError(gate)
+      throw new Error("This skill can't be published yet — its eval gate isn't met.")
+    }
     throw new Error("Failed to update skill.")
   }
   return res.json() as Promise<Skill>
+}
+
+/** GET /skills/{id}/publish-gate — the server-computed publish read-model the
+ *  PublishGateDialog renders before a private→global share (D-05). Owner-scoped
+ *  server-side (404 cross-user). Mirrors getEvalRun's getAuthHeaders→fetch→typed
+ *  json cast; the client never computes `met` (D-07). */
+export async function getPublishGate(skillId: string): Promise<PublishGate> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/publish-gate`, { headers })
+  if (!res.ok) throw new Error("Failed to load publish gate.")
+  return res.json() as Promise<PublishGate>
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 132 Plan 03 (EVAL-01 / VER-01) — eval test-case CRUD + read-only version
+// history client. Mirrors the listSkills/createSkill/updateSkill/deleteSkill
+// pattern above (getAuthHeaders → fetch → typed json cast). Owner-scoping is
+// enforced SERVER-SIDE on every route (Plan 02 `.eq("user_id", …)`); this is a
+// thin client and not itself a security boundary. Backs the THIN 132 foundation
+// surface — the designed Evals panel is Phase 137 (PANEL-01, G-2).
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function listTestCases(skillId: string): Promise<TestCase[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/test-cases`, { headers })
+  if (!res.ok) throw new Error("Failed to load test cases.")
+  return res.json() as Promise<TestCase[]>
+}
+
+export async function createTestCase(skillId: string, body: TestCaseCreate): Promise<TestCase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/test-cases`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to create test case.")
+  return res.json() as Promise<TestCase>
+}
+
+export async function updateTestCase(caseId: string, body: TestCaseUpdate): Promise<TestCase> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/test-cases/${caseId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update test case.")
+  return res.json() as Promise<TestCase>
+}
+
+export async function deleteTestCase(caseId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/test-cases/${caseId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete test case.")
+}
+
+export async function listSkillVersions(skillId: string): Promise<SkillVersion[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/versions`, { headers })
+  if (!res.ok) throw new Error("Failed to load version history.")
+  return res.json() as Promise<SkillVersion[]>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 133 Plan 05 (EVAL-02) — eval-runner client. These mirror the existing
+// fetch + getAuthHeaders() shape; the eval run writes a companion public.runs row
+// (Plan 04, Pattern 3) so the chat-run stream client (subscribeToRun) reattaches
+// with ZERO new stream code. The DURABLE readout always comes from getEvalRun
+// (the DB) so it renders after the Redis buffer TTL expires (D-06 / SC#3).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/runs — kick off a bounded with/without eval run.
+ *  Returns the run_id immediately (202, non-blocking — D-06); the run_id doubles
+ *  as the stream run_id you pass to subscribeToRun. Model validation is the
+ *  backend's job (registry check — Plan 04). */
+export async function startEvalRun(
+  skillId: string,
+  body: { provider: string; model: string },
+): Promise<EvalRunKickoff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let detail = `Failed to start eval run (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<EvalRunKickoff>
+}
+
+/** GET /skills/{id}/evals/runs/{runId} — the DURABLE owner-scoped readout
+ *  (eval_run row + the per-(case × variant) eval_results rows). */
+export async function getEvalRun(skillId: string, runId: string): Promise<EvalRunReadout> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs/${runId}`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval run.")
+  return res.json() as Promise<EvalRunReadout>
+}
+
+/** GET /skills/{id}/evals/runs — owner-scoped eval runs, newest-first. The
+ *  skill-scoped analog of getActiveRuns for reattach discovery: a row whose
+ *  status is still 'running' is a live run to reattach to via subscribeToRun
+ *  (the thin client has no ephemeral eval thread_id to feed getActiveRuns —
+ *  see SUMMARY deviation). */
+export async function listEvalRuns(skillId: string): Promise<EvalRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/runs`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval runs.")
+  return res.json() as Promise<EvalRun[]>
+}
+
+/** PUT /skills/{id}/evals/results/{resultId}/rating — set or CLEAR the caller's
+ *  thumbs rating on ONE eval answer (EVAL-04). Owner-gated server-side (.eq(user_id)
+ *  → 404 cross-user, T-134-11); the client cannot forge another user's rating. Pass
+ *  null to clear (re-ratable — D-08). Mirrors startEvalRun's fetch + getAuthHeaders()
+ *  + error-detail extraction shape. Returns the persisted rating; the caller should
+ *  re-load the durable readout (getEvalRun) so thumbs state stays derived from the DB,
+ *  never a separate stale store (respects the BUG-260701-02 skill-switch reset). */
+export async function rateEvalResult(
+  skillId: string,
+  resultId: string,
+  rating: "up" | "down" | null,
+): Promise<{ eval_result_id: string; rating: string | null }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/evals/results/${resultId}/rating`,
+    {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ rating }),
+    },
+  )
+  if (!res.ok) {
+    let detail = `Failed to rate eval answer (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<{ eval_result_id: string; rating: string | null }>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 137.1 (EVAL-05) — matrix runs, engine smoke-sweep health, and run-history
+// aggregation client. THIN wrappers over the Plan 04/05/07 routes; they mirror the
+// existing eval fetch + getAuthHeaders() shape and carry NO backend logic. Owner-
+// scoping is enforced SERVER-SIDE on every route (404 cross-user); this is a thin
+// client and not itself a security boundary. Each matrix arm rides the existing
+// eval_* SSE via subscribeToRun (its run_id), and the DURABLE readout still comes
+// from getEvalRun / getEvalRunById (the DB) after the Redis buffer TTL expires.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/evals/matrix — kick off a matrix run (N single-provider arms
+ *  under one matrix_group_id; D-06). `gate_provider` designates the arm whose rows
+ *  feed the publish gate (D-05; defaults server-side to the user's active provider
+ *  when omitted). Returns the group id + per-arm kickoffs (202, non-blocking). */
+export async function startMatrixRun(
+  skillId: string,
+  body: { gate_provider?: string } = {},
+): Promise<MatrixRunKickoff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/matrix`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let detail = `Failed to start matrix run (status ${res.status}).`
+    try {
+      const j = (await res.json()) as { detail?: string }
+      if (j?.detail) detail = j.detail
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new Error(detail)
+  }
+  return res.json() as Promise<MatrixRunKickoff>
+}
+
+/** POST /evals/engine-sweep — kick the skill-less cross-provider smoke sweep (D-02).
+ *  Returns the refreshed engine-health board (each provider ✓/✗ with its verbatim
+ *  error). Skill-less by design — the built-in in-memory fixture persists arms with
+ *  NULL skill_id (migration 085), so the sweep never pollutes a user's run history. */
+export async function runEngineSweep(): Promise<EngineHealthBoard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/engine-sweep`, { method: "POST", headers })
+  if (!res.ok) throw new Error("Failed to run engine sweep.")
+  return res.json() as Promise<EngineHealthBoard>
+}
+
+/** GET /evals/engine-health — the per-provider ✓/✗ smoke-sweep board (D-02 / 060-A).
+ *  A missing provider key renders as an honest ✗ with its verbatim error, never a
+ *  blocker. `swept_at` is null before the first sweep. */
+export async function getEngineHealth(): Promise<EngineHealthBoard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/engine-health`, { headers })
+  if (!res.ok) throw new Error("Failed to load engine health.")
+  return res.json() as Promise<EngineHealthBoard>
+}
+
+/** GET /evals/runs/{runId} — the SKILL-LESS run readout (D-02). Same run+results
+ *  shape as the skill-scoped getEvalRun, but keyed only by run_id so a NULL-skill
+ *  smoke-sweep arm (migration 085) is readable without a skill_id in the path.
+ *  Owner-scoped server-side (404 cross-user). */
+export async function getEvalRunById(runId: string): Promise<EvalRunReadout> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/evals/runs/${runId}`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval run.")
+  return res.json() as Promise<EvalRunReadout>
+}
+
+/** GET /skills/{id}/evals/aggregate — mean±stddev/delta over the accumulated eval-run
+ *  history, grouped per (provider, model) (D-07). stddev is null at run_count<2; the
+ *  analyst_notes are deterministic backend-computed lines (D-08). Empty configs = no
+ *  history yet. */
+export async function getEvalAggregate(skillId: string): Promise<EvalAggregate> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/evals/aggregate`, { headers })
+  if (!res.ok) throw new Error("Failed to load eval aggregate.")
+  return res.json() as Promise<EvalAggregate>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 135 (SI-01) — self-improvement proposal lifecycle helpers.
+//
+// The whole propose → review → approve → re-eval → promote/not-promote loop.
+// All authorization is enforced server-side (owner gate, 404-not-403 for cross-
+// user — Plans 04/05, T-135-01); these helpers only carry getAuthHeaders() and
+// never trust client state for authorization. The re-eval rides the EXISTING
+// eval_* SSE via the companion `re_eval_run_id` — subscribe with subscribeToRun,
+// no new demux branch. Each helper copies the startEvalRun fetch + getAuthHeaders
+// + error-detail-extraction shape.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Shared detail-extracting error for the proposal helpers (mirrors startEvalRun). */
+async function proposalError(res: Response, fallback: string): Promise<Error> {
+  let detail = `${fallback} (status ${res.status}).`
+  try {
+    // FastAPI 422 responses return `detail` as an ARRAY of objects, not a
+    // string — assign only when it's actually a string, else keep the generic
+    // fallback so validation errors never render as "[object Object]" (WR-04).
+    const j = (await res.json()) as { detail?: unknown }
+    if (typeof j?.detail === "string") detail = j.detail
+  } catch {
+    /* non-JSON body — keep the generic message */
+  }
+  return new Error(detail)
+}
+
+/** POST /skills/{id}/proposals — propose an improved instructions revision from
+ *  a source eval run. Returns the fresh `proposed` SkillProposal. */
+export async function proposeImprovement(
+  skillId: string,
+  sourceEvalRunId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/proposals`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ source_eval_run_id: sourceEvalRunId }),
+  })
+  if (!res.ok) throw await proposalError(res, "Failed to propose improvement")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** GET /skills/{id}/proposals — owner-scoped proposals for the skill. */
+export async function listProposals(skillId: string): Promise<SkillProposal[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/proposals`, { headers })
+  if (!res.ok) throw await proposalError(res, "Failed to load proposals")
+  return res.json() as Promise<SkillProposal[]>
+}
+
+/** GET /skills/{id}/proposals/{proposalId} — one proposal (durable readout). */
+export async function getProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}`,
+    { headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to load proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/approve — accept the proposal and
+ *  kick off the companion re-eval. Returns the updated proposal + the
+ *  `re_eval_run_id` to subscribe to (rides the existing eval_* SSE). */
+export async function approveProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<ProposalApproveResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/approve`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to approve proposal")
+  return res.json() as Promise<ProposalApproveResult>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/rerun — re-run the re-eval (e.g.
+ *  after an interrupted run). Returns the updated proposal + a fresh
+ *  `re_eval_run_id`. */
+export async function rerunProposalReeval(
+  skillId: string,
+  proposalId: string,
+): Promise<ProposalApproveResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/rerun`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to re-run proposal re-eval")
+  return res.json() as Promise<ProposalApproveResult>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/reject — dismiss the proposal. */
+export async function rejectProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/reject`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to reject proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/proposals/{proposalId}/force-promote — operator override
+ *  that promotes despite a failed gate (`override_forced` is recorded). */
+export async function forcePromoteProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/proposals/${proposalId}/force-promote`,
+    // Send an explicit empty JSON body — a body-less POST 422s against the
+    // force-promote route (CR-01, belt-and-suspenders per REVIEW.md). Content-Type
+    // is already application/json via getAuthHeaders().
+    { method: "POST", headers, body: JSON.stringify({}) },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to force-promote proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 139 (SI-02) — description-proposal wires. These mirror the SI-01 proposal
+// helpers above but hit the `/description-proposals` routes. Additive, D-13: no
+// shared-path change, reuse getAuthHeaders() + proposalError. A description
+// proposal wraps a Trigger Tuner run's held-out winning DESCRIPTION in the
+// propose→review-diff→approve→immutable-version lifecycle — there is NO
+// post-approval re-eval (D-07), so approve returns a PLAIN SkillProposal (not the
+// ProposalApproveResult / re_eval_run_id shape the SI-01 approve carries).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** POST /skills/{id}/description-proposals — propose a new trigger description
+ *  from a Trigger Tuner run's held-out per-provider winner. Body carries the
+ *  tuner run's `run_id`; the `source_tuner_run_id` provenance FK is derived
+ *  server-side from `tuner_runs.id`. Returns the fresh `proposed` SkillProposal
+ *  (`kind='description'`). */
+export async function proposeDescription(
+  skillId: string,
+  runId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals`,
+    { method: "POST", headers, body: JSON.stringify({ run_id: runId }) },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to propose description")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** GET /skills/{id}/description-proposals — owner-scoped description proposals for
+ *  the skill, newest-first. Returns the most recent row (or null when none) for
+ *  rehydration-on-open of the Triggering-tab proposal card. */
+export async function getLatestDescriptionProposal(
+  skillId: string,
+): Promise<SkillProposal | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals`,
+    { headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to load description proposals")
+  const rows = (await res.json()) as SkillProposal[]
+  return rows.length > 0 ? rows[0] : null
+}
+
+/** POST /skills/{id}/description-proposals/{proposalId}/approve — accept the
+ *  proposal, writing skills.description (which the 079 trigger versions). Returns
+ *  a PLAIN SkillProposal — there is no companion re-eval run (D-07), so this does
+ *  NOT return the ProposalApproveResult / re_eval_run_id shape the SI-01 approve
+ *  carries. */
+export async function approveDescriptionProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals/${proposalId}/approve`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to approve description proposal")
+  return res.json() as Promise<SkillProposal>
+}
+
+/** POST /skills/{id}/description-proposals/{proposalId}/reject — dismiss the
+ *  description proposal. Returns the updated SkillProposal. */
+export async function rejectDescriptionProposal(
+  skillId: string,
+  proposalId: string,
+): Promise<SkillProposal> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/skills/${skillId}/description-proposals/${proposalId}/reject`,
+    { method: "POST", headers },
+  )
+  if (!res.ok) throw await proposalError(res, "Failed to reject description proposal")
+  return res.json() as Promise<SkillProposal>
 }
 
 export interface ProviderInfo {
@@ -1569,6 +2122,20 @@ export interface FullAppSettings {
   sub_agent_max_output_tokens: number
   sub_agent_model: string
   resolved_sub_agent_model: string
+  // Phase 123 (D-08 / TRIG-01) — the skill-builder model knob (the model that
+  // WRITES candidate descriptions + seeds Tuner cases). `skill_builder_model` is
+  // the raw setting ("" => unset); `resolved_skill_builder_model` is the strong
+  // default the resolver picks when unset (null only if no forceable default
+  // exists — the honest-None floor). Decoupled from the benchmark targets.
+  skill_builder_model: string
+  resolved_skill_builder_model: string | null
+  // Phase 137.1 (EVAL-05 / D-11, D-12) — the INDEPENDENT judge model knob (the model
+  // that grades eval answers + the publish gate). `harness_judge_model` is the raw
+  // setting ("" => unset); `resolved_harness_judge_model` is the strong registry
+  // default the resolver picks when unset (claude-opus-4-8; null only if no forceable
+  // default exists). Mirrors the skill_builder_model pair above; ONE resolver (D-11).
+  harness_judge_model: string
+  resolved_harness_judge_model: string | null
   llm_max_output_tokens: number
   openrouter_tool_strategy: "quality" | "native" | "xml"
   // Phase 075.3 D-075.3-13: registry-known model_ids — frontend uses this set
@@ -1624,6 +2191,11 @@ export interface SettingsUpdate {
   context_window_max_tokens?: number
   sub_agent_max_output_tokens?: number
   sub_agent_model?: string
+  // Phase 123 (D-08) — the skill-builder model id (any provider incl. local; no SPOF).
+  skill_builder_model?: string
+  // Phase 137.1 (D-12) — the independent judge model id (registry-validated server-side;
+  // "" clears back to the resolver default). Any provider incl. local — no SPOF.
+  harness_judge_model?: string
   llm_max_output_tokens?: number
   openrouter_tool_strategy?: "quality" | "native" | "xml"
 }
@@ -1654,6 +2226,26 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     throw new Error("Failed to save settings")
   }
   return res.json() as Promise<FullAppSettings>
+}
+
+// Phase 137.1 (EVAL-05 / D-11, D-12) — independent judge-model get/set. THIN wrappers
+// over getSettings / updateSettings (harness_judge_model is part of the settings
+// contract, not a dedicated endpoint — mirrors the skill_builder_model wiring). The
+// picker offers ONLY registry-known models (validated server-side, D-12); the effective
+// judge (resolve_judge_model → claude-opus-4-8 default) is shown when unset.
+
+/** Read the effective judge model. `judge_model` is the raw setting ("" => unset);
+ *  `resolved_judge_model` is the strong default the resolver picks (null only if no
+ *  forceable default exists — the honest-None floor). */
+export async function getJudgeModel(): Promise<{ judge_model: string; resolved_judge_model: string | null }> {
+  const s = await getSettings()
+  return { judge_model: s.harness_judge_model, resolved_judge_model: s.resolved_harness_judge_model }
+}
+
+/** Set the independent judge model (registry-validated server-side — D-12). Pass ""
+ *  to clear back to the resolver default. Returns the full refreshed settings. */
+export async function setJudgeModel(model: string): Promise<FullAppSettings> {
+  return updateSettings({ harness_judge_model: model })
 }
 
 // Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
@@ -2622,4 +3214,284 @@ export async function publishWorkflow(
   if (res.status === 404) return { kind: "not_found" }
   if (res.status === 409) return { kind: "already_published" }
   throw new Error(`Failed to publish workflow (status ${res.status})`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 123-05 (TRIG-01) — Skill Trigger Tuner client calls.
+//
+// Mirror the Plan-04 router contract (backend/app/api/skill_tuner.py):
+//   POST   /skills/{id}/tuner/runs           → kick off a BOUNDED background run, get a run_id
+//   GET    /skills/{id}/tuner/runs/{run}/stream  → live tuner_* SSE progress
+//   GET    /skills/{id}/tuner/runs/{run}     → the held-out scoreboard once complete
+//
+// The per-provider cell shape (`{ provider, model, axes: { fires, no_false }, score }`)
+// is the ProviderScoreboard render input (042-A — BOTH sub-scores present, never a
+// hidden aggregate). The scoreboard is N-column = the org's configured targets; the
+// candidate set is held-out-scored and the author picks the winner by held-out (D-03).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A benchmark target column = a provider + its representative model (043-A run config). */
+export interface TunerTarget {
+  provider: string
+  model: string
+}
+
+/** One (client-held) benchmark case: a user prompt + whether the skill SHOULD fire on it
+ *  (the should-NOT cases are the false-fire rail). Cases are ephemeral / never persisted. */
+export interface TunerCase {
+  prompt: string
+  should_fire: boolean
+}
+
+/** A single per-provider scoreboard cell. BOTH sub-scores carry the honest unmeasured
+ *  sentinel from 123.1-06 (TT-05/TT-12): `fires` = should-trigger recall, `no_false`
+ *  = should-NOT precision — each is `null` when that axis had NO cases to score (the
+ *  frontend renders "n/a"), NEVER a fabricated `1.0`. `score` is the server-computed
+ *  combined cell score (the mean of the MEASURED axes) and is `null` when the cell is
+ *  WHOLLY unmeasured. `measured` is `false` (and `error_count > 0`) when every classify
+ *  call for the cell RAISED — an all-error column that the scoreboard must render
+ *  honestly as "could not measure", distinct from a measured `0.00`. `error_count` is the
+ *  count of classify calls that raised. (`measured`/`error_count` are optional so a
+ *  legacy cell that predates 123.1-06 still types — a missing `measured` is treated as
+ *  measured, and `score == null` is the unmeasured signal regardless.) */
+export interface TunerCell {
+  provider: string
+  model: string
+  axes: { fires: number | null; no_false: number | null }
+  score: number | null
+  measured?: boolean
+  error_count?: number
+}
+
+/** One scored candidate description: its held-out score + the per-provider cells. */
+export interface TunerCandidate {
+  index: number
+  description: string
+  cells: TunerCell[]
+  held_out_score: number
+  is_baseline: boolean
+}
+
+/** The held-out scoreboard returned by GET results (and carried on tuner_complete). */
+export interface TunerScoreboard {
+  skill_id: string
+  candidates: TunerCandidate[]
+  winner_index: number | null
+  winner_description: string | null
+}
+
+/** The POST /runs response (run kicked off; reconcile via /stream + /results). */
+export interface StartTunerRunResponse {
+  run_id: string
+  skill_id: string
+  targets: TunerTarget[]
+  case_count: number
+  n: number
+}
+
+export interface StartTunerRunBody {
+  cases?: TunerCase[]
+  targets?: TunerTarget[]
+  n?: number
+}
+
+/** Kick off a bounded background tuning run; the response carries the run_id to
+ *  stream + reconcile (D-06 non-blocking). 409 means a run is already in flight. */
+export async function startTunerRun(
+  skillId: string,
+  body: StartTunerRunBody = {},
+): Promise<StartTunerRunResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (res.status === 409) {
+    throw new ApiError("A tuning run is already in progress for this skill.", 409)
+  }
+  if (!res.ok) throw new ApiError("Failed to start the tuning run. Please try again.", res.status)
+  return (await res.json()) as StartTunerRunResponse
+}
+
+/** Read the held-out scoreboard once the run completes. A 404 means the run is
+ *  still in progress (or its ephemeral buffer expired) — the caller polls or relies
+ *  on the tuner_complete SSE event. Throws ApiError(404) so the caller can branch. */
+export async function getTunerResults(
+  skillId: string,
+  runId: string,
+): Promise<TunerScoreboard> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/${runId}`, { headers })
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 404 ? "Tuner run not complete or result expired." : "Failed to load tuner results.",
+      res.status,
+    )
+  }
+  return (await res.json()) as TunerScoreboard
+}
+
+/** REALLY cancel an in-flight tuning run (Phase 123.1-07 / TT-08). Issues a DELETE so the
+ *  background job stops at its next loop checkpoint (no more paid provider calls) and the
+ *  in-flight claim is released immediately (a retry no longer 409s). Best-effort from the
+ *  caller's view: on a non-ok response it throws an ApiError so the caller CAN log it, but the
+ *  caller still transitions the UI to idle (the run is being cancelled server-side regardless,
+ *  and the local SSE is aborted). */
+export async function cancelTunerRun(skillId: string, runId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/${runId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ApiError("Failed to cancel the tuning run on the server.", res.status)
+  }
+}
+
+/** The DURABLE latest tuner result for a skill (Phase 123.1 / D-07 — survives a Redis flush /
+ *  refresh). Returned by GET .../tuner/runs/latest; the `scoreboard` is the same TunerScoreboard
+ *  shape carried on `tuner_complete`, plus attribution fields. */
+export interface LatestTunerRun {
+  skill_id: string
+  run_id: string
+  scoreboard: TunerScoreboard
+  builder_model: string
+  target_count: number
+  case_count: number
+  updated_at: string
+}
+
+/** One seeded benchmark case carrying its provenance (Phase 123.1 / D-05): `"seeded"` =
+ *  this skill's own description/paraphrase or the generic off-topic set; `"sibling"` = an
+ *  owner-scoped sibling skill's description (the false-fire rail). NEVER `"held"`. */
+export interface SeededCase {
+  prompt: string
+  provenance: string
+}
+
+/** The seeded-cases response — should_fire (recall rail) + should_not (false-fire rail), each
+ *  carrying provenance so the editor can show + edit them before a run (fixes WR-05).
+ *  `total` (Phase 123.1-05 / BUG-260624-01 #1) is the FULL uncapped sibling-sourced should_not
+ *  count; `should_not` is capped (MAX_SEEDED_SHOULD_NOT) so the editor shows an honest
+ *  "showing N of M — capped" banner whenever `total` exceeds the shown sibling count. */
+export interface SeededCasesResponse {
+  should_fire: SeededCase[]
+  should_not: SeededCase[]
+  total: number
+}
+
+/** Read the DURABLE latest tuner result for a skill (D-07 rehydration-on-open). Unlike
+ *  `getTunerResults` (per-run-id, ephemeral Redis), this survives a refresh. A 404 means NO
+ *  run has ever completed for this skill yet → resolves to `null` (the caller renders the
+ *  empty / never-run state), NOT a thrown error. */
+export async function getTunerLatest(skillId: string): Promise<LatestTunerRun | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/runs/latest`, { headers })
+  if (res.status === 404) return null
+  if (!res.ok) throw new ApiError("Failed to load the latest tuner result.", res.status)
+  return (await res.json()) as LatestTunerRun
+}
+
+/** Read the already-computed seeded benchmark cases (with provenance) so the editor can show +
+ *  edit them before a run (D-05 / WR-05). Owner-scoped on the server (404 cross-user). */
+export async function getSeededCases(skillId: string): Promise<SeededCasesResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/tuner/cases/seeded`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the seeded tuner cases.", res.status)
+  return (await res.json()) as SeededCasesResponse
+}
+
+/** Tuner-specific SSE events (the Plan-04 vocab — NEVER chat event types). The
+ *  terminal `done` / `error` sentinel breaks the consumer (mirrors the shared
+ *  replay_tail_consumer contract). */
+export interface TunerStreamCallbacks {
+  /** tuner_progress — stage-carrying progress (building_candidates / candidate_scored …). */
+  onProgress?: (data: Record<string, unknown>) => void
+  /** tuner_provider_done — one provider cell finished for a candidate. */
+  onProviderDone?: (data: { candidate_index: number; provider: string; model: string; cell: TunerCell }) => void
+  /** tuner_complete — the full scoreboard (non-terminal progress carrying the result). */
+  onComplete?: (scoreboard: TunerScoreboard) => void
+  /** the terminal sentinel — 'done' on success, 'error' (with reason) on failure. */
+  onTerminal: (status: "done" | "error", reason?: string) => void
+}
+
+/** Open GET /skills/{id}/tuner/runs/{run}/stream and dispatch tuner_* events.
+ *
+ *  A focused, purpose-built SSE reader (not the chat subscribeToRun) — it speaks ONLY
+ *  the tuner vocab + the done/error terminal. Bearer auth attaches via getAuthHeaders +
+ *  fetch (the native EventSource can't send headers — same rationale as subscribeToRun).
+ *  `since` is "0" (full replay is idempotent; React reconciles duplicate progress as a
+ *  no-op). The caller passes an AbortSignal to cancel (leave-and-reconcile-on-return). */
+export async function streamTunerRun(
+  skillId: string,
+  runId: string,
+  callbacks: TunerStreamCallbacks,
+  since = "0",
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const url = `${API_BASE}/skills/${skillId}/tuner/runs/${runId}/stream?since=${encodeURIComponent(since)}`
+  const res = await fetch(url, { headers, signal })
+
+  if (res.status === 404) {
+    callbacks.onTerminal("error", "run_not_found")
+    return
+  }
+  if (res.status === 503) {
+    callbacks.onTerminal("error", "streaming_unavailable")
+    return
+  }
+  if (!res.ok) throw new Error(`Failed to open tuner stream (status ${res.status})`)
+  if (!res.body) throw new Error("No response body on tuner stream")
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  while (true) {
+    let done: boolean, value: Uint8Array | undefined
+    try {
+      ;({ done, value } = await reader.read())
+    } catch {
+      // AbortError (caller-initiated cancel via signal) — silent return. The run
+      // keeps computing server-side; the author reconciles on return.
+      return
+    }
+    if (done) {
+      // Reader closed without an explicit terminal — defensive done so the UI
+      // reconciles via GET results rather than hanging.
+      callbacks.onTerminal("done")
+      return
+    }
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split("\n")
+    buffer = lines.pop() ?? ""
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue
+      const raw = line.slice(5).trim()
+      if (!raw) continue
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        continue
+      }
+      const t = parsed.type as string
+      if (t === "tuner_progress") callbacks.onProgress?.(parsed)
+      else if (t === "tuner_provider_done")
+        callbacks.onProviderDone?.(
+          parsed as unknown as { candidate_index: number; provider: string; model: string; cell: TunerCell },
+        )
+      else if (t === "tuner_complete")
+        callbacks.onComplete?.(parsed.scoreboard as TunerScoreboard)
+      else if (t === "done") {
+        callbacks.onTerminal("done")
+        return
+      } else if (t === "error") {
+        callbacks.onTerminal("error", (parsed.error ?? parsed.message) as string | undefined)
+        return
+      }
+    }
+  }
 }

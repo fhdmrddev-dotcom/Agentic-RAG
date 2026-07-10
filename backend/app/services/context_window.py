@@ -67,6 +67,14 @@ _TRIM_MARKER = (
     "Some prior context may be missing.]"
 )
 
+# Phase 123-02 CTX-03 (A3 default — Claude's-discretion-tunable). Pinned load_skill
+# tool-result groups are kept out of the trim loop as a THIRD protected class
+# (alongside the system message and the reserve_recent tail), but they are capped
+# at this fraction of max_tokens so pinning can never starve the recent-message
+# budget (T-123-02-01 / Pitfall 5). Over budget → evict the least-recently-loaded
+# pinned skill + insert the honest _TRIM_MARKER (never silent — D-14).
+PIN_BUDGET_FRACTION = 1.0 / 3
+
 
 def resolve_context_budget(active_provider: str, model: str = "") -> int:
     """Return context budget for main agent based on active model and provider.
@@ -189,6 +197,22 @@ def trim_messages_to_fit(
         system_msg = None
         rest = messages[:]
 
+    trimmed_any = False
+
+    # Phase 123-02 CTX-03 — pull pinned load_skill groups out of `rest` as a THIRD
+    # protected class (kept like the protected tail, never entered into the trimmable
+    # removal loop). This happens BEFORE the protected-tail split so a skill loaded
+    # near the front of the conversation still survives. The atomic-group partition
+    # MIRRORS _remove_oldest_atomic's grouping rules so a pinned group always carries
+    # its assistant+tool_calls parent alongside its tool-result (Pitfall 2 — never an
+    # orphaned tool message). De-dupe to the latest group per skill, cap total pinned
+    # at PIN_BUDGET_FRACTION * max_tokens, and evict the least-recently-loaded pinned
+    # group on overflow with the honest _TRIM_MARKER (D-14 — never silent).
+    pinned_groups, rest, pin_trimmed = _extract_pinned_skill_groups(rest, max_tokens)
+    pinned_msgs = [m for group in pinned_groups for m in group]
+    if pin_trimmed:
+        trimmed_any = True
+
     # Protected tail — always kept
     if reserve_recent > 0 and len(rest) > reserve_recent:
         protected = rest[-reserve_recent:]
@@ -197,11 +221,11 @@ def trim_messages_to_fit(
         protected = rest[:]
         trimmable = []
 
-    trimmed_any = False
-
     # Keep trimming until we fit or there's nothing left to trim
     while trimmable:
-        candidate_messages = _build_candidate(system_msg, trimmable, protected, trimmed_any)
+        candidate_messages = _build_candidate(
+            system_msg, trimmable, protected, trimmed_any, pinned_msgs
+        )
         if estimate_messages_tokens(candidate_messages) <= max_tokens:
             break
 
@@ -218,7 +242,7 @@ def trim_messages_to_fit(
     # D-078-02: no error raised — always return a valid list that fits.
     if not trimmable:
         while len(protected) > 1:
-            candidate = _build_candidate(system_msg, [], protected, True)
+            candidate = _build_candidate(system_msg, [], protected, True, pinned_msgs)
             if estimate_messages_tokens(candidate) <= max_tokens:
                 break
             n_removed = _remove_oldest_atomic(protected)
@@ -226,7 +250,107 @@ def trim_messages_to_fit(
                 break
             trimmed_any = True
 
-    return _build_candidate(system_msg, trimmable, protected, trimmed_any)
+    return _build_candidate(system_msg, trimmable, protected, trimmed_any, pinned_msgs)
+
+
+def _atomic_groups(rest: list[dict]) -> list[list[dict]]:
+    """Partition `rest` into atomic message groups, MIRRORING _remove_oldest_atomic.
+
+    An atomic group is:
+    - A single user/assistant message (without tool_calls), or
+    - An assistant message with tool_calls PLUS all immediately following tool-role
+      messages that reference those tool_call IDs, or
+    - A lone tool-role message (parent already absent — kept as its own group so it
+      is never silently merged into an unrelated turn).
+    """
+    groups: list[list[dict]] = []
+    i = 0
+    n = len(rest)
+    while i < n:
+        msg = rest[i]
+        role = msg.get("role", "")
+        if role == "assistant" and msg.get("tool_calls"):
+            tool_ids = {tc.get("id") for tc in msg["tool_calls"] if tc.get("id")}
+            group = [msg]
+            j = i + 1
+            while j < n and rest[j].get("role") == "tool" and rest[j].get("tool_call_id") in tool_ids:
+                group.append(rest[j])
+                j += 1
+            groups.append(group)
+            i = j
+        else:
+            groups.append([msg])
+            i += 1
+    return groups
+
+
+def _extract_pinned_skill_groups(
+    rest: list[dict],
+    max_tokens: int,
+) -> tuple[list[list[dict]], list[dict], bool]:
+    """Phase 123-02 CTX-03 — pull pinned load_skill groups out of `rest`.
+
+    A group is "pinned" if it contains a tool-result message carrying the
+    ``_pinned_skill`` flag (set in agent_loop._reconstruct_history — never by
+    sniffing the tool-result JSON). The flag value is the skill name, used for
+    de-dupe. Returns ``(pinned_groups, remaining_rest, trimmed_any)``:
+
+    - ``pinned_groups`` — kept verbatim out of the trim loop, in original order.
+    - ``remaining_rest`` — every non-pinned group (plus de-duped/evicted pinned
+      groups demoted back) flattened in original order, ready for the existing
+      protected-tail split + trimmable removal loop.
+    - ``trimmed_any`` — True if any pinned group was demoted (de-dupe or LRU
+      eviction), so the caller inserts the honest _TRIM_MARKER.
+
+    De-dupe keeps the LATEST group per skill name (Pitfall 3). The summed token
+    estimate of the surviving pinned groups is capped at PIN_BUDGET_FRACTION *
+    max_tokens; over budget, the least-recently-loaded (lowest original index)
+    pinned group is evicted back into ``remaining_rest`` until the cap holds
+    (T-123-02-01 — pinning never starves the recent-message budget).
+    """
+    groups = _atomic_groups(rest)
+
+    # Identify pinned groups and the skill each pins.
+    pinned_idx_to_skill: dict[int, str] = {}
+    for gi, group in enumerate(groups):
+        for m in group:
+            if m.get("role") == "tool" and m.get("_pinned_skill"):
+                pinned_idx_to_skill[gi] = m["_pinned_skill"]
+                break
+
+    if not pinned_idx_to_skill:
+        # Fast path — no pins present → behavior is byte-identical to pre-CTX-03.
+        return [], rest, False
+
+    trimmed_any = False
+
+    # De-dupe: keep only the LATEST group index per skill name; older duplicates
+    # are demoted back into the trimmable pool.
+    latest_idx_by_skill: dict[str, int] = {}
+    for gi in sorted(pinned_idx_to_skill):
+        latest_idx_by_skill[pinned_idx_to_skill[gi]] = gi
+    kept_idx = set(latest_idx_by_skill.values())
+    if len(kept_idx) < len(pinned_idx_to_skill):
+        trimmed_any = True
+
+    # Budget cap (LRU eviction): evict least-recently-loaded (lowest index) pinned
+    # groups until the surviving pins fit within PIN_BUDGET_FRACTION * max_tokens.
+    pin_budget = int(PIN_BUDGET_FRACTION * max_tokens)
+    surviving = sorted(kept_idx)
+    while surviving:
+        pinned_flat = [m for gi in surviving for m in groups[gi]]
+        if estimate_messages_tokens(pinned_flat) <= pin_budget:
+            break
+        # Evict the least-recently-loaded (lowest original index) pinned group.
+        surviving.pop(0)
+        trimmed_any = True
+
+    surviving_set = set(surviving)
+    pinned_groups = [groups[gi] for gi in surviving]
+    remaining_rest = [
+        m for gi, group in enumerate(groups) if gi not in surviving_set for m in group
+    ]
+    return pinned_groups, remaining_rest, trimmed_any
 
 
 def _build_candidate(
@@ -234,8 +358,14 @@ def _build_candidate(
     trimmable: list[dict],
     protected: list[dict],
     add_marker: bool,
+    pinned: list[dict] | None = None,
 ) -> list[dict]:
-    """Assemble the messages list from components."""
+    """Assemble the messages list from components.
+
+    Phase 123-02 CTX-03: pinned load_skill groups are placed right after the
+    system message (and the trim marker, if any) and BEFORE the trimmable +
+    protected sections — kept like the protected tail, never trimmed.
+    """
     result: list[dict] = []
     if system_msg:
         result.append(system_msg)
@@ -243,6 +373,8 @@ def _build_candidate(
         # Only add marker if there WAS something trimmed (trimmable can still have content
         # but it was partially trimmed, or it was completely cleared)
         result.append({"role": "user", "content": _TRIM_MARKER})
+    if pinned:
+        result.extend(pinned)
     result.extend(trimmable)
     result.extend(protected)
     return result

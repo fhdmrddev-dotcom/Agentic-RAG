@@ -6,7 +6,7 @@ name: backend-tests
 
 on:
   push:
-    branches: [master, main, v2.5-dev]
+    branches: [master, main, develop, "release/**"]
     paths:
       - "backend/**"
       - "supabase/migrations/**"

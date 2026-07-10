@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 039 — Signal Row &amp; Fix Action</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 52px; }
+  .stage { max-width: 880px; margin: 0 auto; padding: 28px 24px 90px; transition: max-width .2s; }
+  .stage.with-panel { max-width: 1240px; }
+  .split { display: grid; grid-template-columns: 1fr; gap: 0; transition: grid-template-columns .25s var(--ease-out); }
+  .split.open { grid-template-columns: minmax(0,1fr) 412px; gap: 18px; }
+
+  h1 { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); margin: 0 0 3px; }
+  .sub { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: 18px; }
+
+  .card { background: hsl(220 30% 7% / 0.5); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); margin-bottom: 16px; overflow: hidden; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px 9px; }
+  .card-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-headline); font-weight: 700; font-size: var(--text-base); }
+  .card-title svg { width: 16px; height: 16px; }
+  .card-count { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .ico-rel { color: var(--color-accent-violet); } .ico-cls { color: var(--color-primary); } .ico-meta { color: var(--color-warning); }
+
+  .rows > * + * { border-top: 1px solid var(--color-border-soft); }
+
+  /* shared row atoms */
+  .fico { width: 15px; height: 15px; color: var(--color-text-dim); flex-shrink: 0; }
+  .fname { font-size: var(--text-sm); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reason { font-size: var(--text-xs); color: var(--color-text-dim); flex-shrink: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+  .chip svg { width: 11px; height: 11px; }
+  .chip.danger { background: var(--color-danger-dim); color: hsl(0 80% 80%); }
+  .chip.med { background: var(--color-warning-dim); color: var(--color-warning); }
+  .chip.neutral { background: var(--color-muted); color: var(--color-text-muted); }
+
+  /* Variant A — inline verb buttons */
+  .rowA { display: flex; align-items: center; gap: 12px; padding: 11px 16px; transition: background var(--dur-fast); }
+  .rowA:hover { background: hsl(220 30% 11% / 0.45); }
+  .fix-primary { display: inline-flex; align-items: center; gap: 6px; background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 5px 12px; font-size: var(--text-xs); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); font-family: var(--font-sans); flex-shrink: 0; }
+  .fix-primary:hover { background: var(--color-primary-glow); color: var(--color-text); }
+  .fix-primary svg { width: 13px; height: 13px; }
+  .fix-secondary { background: transparent; border: 1px solid transparent; color: var(--color-text-dim); border-radius: var(--radius-sm); padding: 5px 9px; font-size: var(--text-xs); cursor: pointer; flex-shrink: 0; transition: all var(--dur-fast); }
+  .fix-secondary:hover { color: var(--color-text-muted); background: var(--color-accent); }
+
+  /* Variant B — quiet clickable row */
+  .rowB { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background var(--dur-fast); }
+  .rowB:hover { background: hsl(220 30% 11% / 0.5); }
+  .rowB.sel { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); }
+  .rowB .chev { width: 15px; height: 15px; color: var(--color-text-dim); flex-shrink: 0; transition: transform var(--dur-fast); }
+  .rowB:hover .chev { transform: translateX(2px); color: var(--color-text-muted); }
+
+  /* Variant C — hybrid: row + one action + expand */
+  .rowC-wrap { transition: background var(--dur-fast); }
+  .rowC { display: flex; align-items: center; gap: 12px; padding: 11px 16px; }
+  .rowC-wrap:hover { background: hsl(220 30% 11% / 0.4); }
+  .expand-btn { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-dim); border-radius: var(--radius-sm); width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all var(--dur-fast); }
+  .expand-btn:hover { color: var(--color-text-muted); background: var(--color-accent); }
+  .expand-btn svg { width: 14px; height: 14px; transition: transform var(--dur-base) var(--ease-out); }
+  .rowC-wrap.open .expand-btn svg { transform: rotate(90deg); }
+  .rowC-detail { display: none; padding: 0 16px 14px 43px; }
+  .rowC-wrap.open .rowC-detail { display: block; animation: fadeSlideUp .2s var(--ease-out); }
+  .ctx-line { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--color-text-muted); padding: 7px 11px; background: var(--color-muted); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); }
+  .ctx-line .mono { font-family: var(--font-mono); color: var(--color-text); }
+  .ctx-actions { display: flex; gap: 8px; margin-top: 9px; }
+
+  .spacer { flex: 1; }
+
+  /* detail panel (Variant B) */
+  .panel { background: hsl(220 30% 7% / 0.7); border: 1px solid var(--color-border); border-radius: var(--radius-md); display: none; flex-direction: column; align-self: start; position: sticky; top: 70px; max-height: calc(100vh - 92px); overflow: hidden; }
+  .split.open .panel { display: flex; }
+  .panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .panel-head .fname { font-weight: 600; }
+  .panel-close { margin-left: auto; background: transparent; border: none; color: var(--color-text-dim); cursor: pointer; font-size: 18px; line-height: 1; }
+  .panel-close:hover { color: var(--color-text); }
+  .panel-body { overflow-y: auto; padding: 6px 0; }
+  .psec { border-bottom: 1px solid var(--color-border-soft); }
+  .psec-head { display: flex; align-items: center; gap: 8px; padding: 11px 16px; font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); }
+  .psec-head .badge { margin-left: auto; font-size: 10px; background: var(--color-warning-dim); color: var(--color-warning); padding: 1px 7px; border-radius: 99px; }
+  .psec.flash { animation: secflash 1.2s var(--ease-out); }
+  @keyframes secflash { 0%,100% { background: transparent; } 25% { background: var(--color-primary-dim); } }
+  .psec-body { padding: 0 16px 14px; }
+  .field-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--color-border-soft); }
+  .field-row:last-child { border-bottom: none; }
+  .field-k { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .field-v { font-size: var(--text-sm); display: flex; align-items: center; gap: 8px; }
+  .field-v.low { font-style: italic; color: var(--color-text-muted); }
+  .panel-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--text-xs); cursor: pointer; font-family: var(--font-sans); }
+  .panel-btn:hover { background: var(--color-primary-glow); color: var(--color-text); }
+  .panel-btn svg { width: 13px; height: 13px; }
+
+  /* receipts + empty */
+  .receipt { font-size: var(--text-xs); padding: 0 16px 9px 43px; display: flex; align-items: center; gap: 6px; }
+  .receipt.ok { color: var(--color-success); } .receipt.queue { color: var(--color-primary); }
+  .receipt svg { width: 13px; height: 13px; }
+  .empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 16px; }
+  .empty svg { width: 28px; height: 28px; color: var(--color-success); opacity: .85; margin-bottom: 9px; }
+  .empty .h { font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
+  .empty .b { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 3px; max-width: 250px; }
+
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 6px; display: flex; gap: 7px; align-items: flex-start; }
+  .note svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 1px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin: -6px 0 16px; font-size: var(--text-xs); color: var(--color-text-dim); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; } .dot.rel { background: var(--color-accent-violet); } .dot.cls { background: var(--color-primary); } .dot.meta { background: var(--color-warning); }
+  .resolving { animation: resolveOut .5s var(--ease-out) forwards; }
+  @keyframes resolveOut { to { opacity: 0; transform: translateX(10px); height: 0; padding-top: 0; padding-bottom: 0; } }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 039 · Signal Row &amp; Fix Action</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Inline verb buttons <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Row → shared detail panel</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Hybrid (action + expand)</button>
+</div>
+
+<svg style="display:none"><defs>
+  <symbol id="i-rel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+  <symbol id="i-cls" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></symbol>
+  <symbol id="i-meta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+</defs></svg>
+
+<!-- ════════ VARIANT A — inline verb buttons ════════ -->
+<div id="variant-a" class="variant">
+  <div class="stage">
+    <h1>Signal rows — inline verb buttons</h1>
+    <div class="sub">Each row carries the fix it needs. The button's <em>verb matches the signal</em>; a quiet "Open" is always there to just view.</div>
+    <div class="legend"><span><span class="dot rel"></span> relationship</span><span><span class="dot cls"></span> classification</span><span><span class="dot meta"></span> metadata</span></div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div><span class="card-count">3 links</span></div>
+      <div class="rows">
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="reason">supersedes</span><span class="chip danger">→ missing</span><span class="spacer"></span><button class="fix-primary" data-verb="open"><svg><use href="#i-ext"/></svg> Open links</button><button class="fix-secondary">Open doc</button></div>
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Vendor-MSA-Acme-2026.pdf</span><span class="reason">attached_to</span><span class="chip danger">→ no access</span><span class="spacer"></span><button class="fix-primary" data-verb="open"><svg><use href="#i-ext"/></svg> Open links</button><button class="fix-secondary">Open doc</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified documents</div><span class="card-count">7 documents</span></div>
+      <div class="rows">
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><span class="spacer"></span><button class="fix-primary" data-verb="classify"><svg><use href="#i-cls"/></svg> Classify</button><button class="fix-secondary">Open doc</button></div>
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Untitled draft.docx</span><span class="chip neutral">no rule matched</span><span class="spacer"></span><button class="fix-primary" data-verb="classify"><svg><use href="#i-cls"/></svg> Classify</button><button class="fix-secondary">Open doc</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div><span class="card-count">12 documents</span></div>
+      <div class="rows">
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="reason">author</span><span class="chip danger">Low · 0.31</span><span class="spacer"></span><button class="fix-primary" data-verb="reextract"><svg><use href="#i-refresh"/></svg> Re-extract</button><button class="fix-secondary">Open doc</button></div>
+        <div class="rowA"><svg class="fico"><use href="#i-file"/></svg><span class="fname">meeting_minutes.pdf</span><span class="reason">document_type</span><span class="chip med">Med · 0.54</span><span class="spacer"></span><button class="fix-primary" data-verb="reextract"><svg><use href="#i-refresh"/></svg> Re-extract</button><button class="fix-secondary">Open doc</button></div>
+      </div>
+    </div>
+
+    <div class="note"><svg><use href="#i-meta"/></svg><span>Async vs sync honesty: <b>Re-extract</b> resolves to "<em>Re-extraction queued</em>" (the row fades on a later re-fetch), not a fake "Fixed". <b>Classify</b> opens the accept flow — it never silently moves the file (CLASS-02).</span></div>
+  </div>
+</div>
+
+<!-- ════════ VARIANT B — quiet row → shared detail panel ════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="stage with-panel">
+    <h1>Quiet rows → the shared detail panel</h1>
+    <div class="sub">The row is just a pointer. Clicking opens the same 112/117/118 document detail panel — scrolled to the relevant section — and the fix happens where the user already edits.</div>
+    <div class="split" id="bsplit">
+      <div>
+        <div class="card">
+          <div class="card-head"><div class="card-title"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div><span class="card-count">3 links</span></div>
+          <div class="rows">
+            <div class="rowB" data-doc="deck" data-sec="rel" onclick="openPanel(this,'deck','rel')"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="reason">supersedes</span><span class="chip danger">→ missing</span><span class="spacer"></span><svg class="chev"><use href="#i-chev"/></svg></div>
+            <div class="rowB" data-doc="msa" data-sec="rel" onclick="openPanel(this,'msa','rel')"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Vendor-MSA-Acme-2026.pdf</span><span class="reason">attached_to</span><span class="chip danger">→ no access</span><span class="spacer"></span><svg class="chev"><use href="#i-chev"/></svg></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified documents</div><span class="card-count">7 documents</span></div>
+          <div class="rows">
+            <div class="rowB" data-doc="inv" data-sec="cls" onclick="openPanel(this,'inv','cls')"><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><span class="spacer"></span><svg class="chev"><use href="#i-chev"/></svg></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div><span class="card-count">12 documents</span></div>
+          <div class="rows">
+            <div class="rowB" data-doc="rep" data-sec="meta" onclick="openPanel(this,'rep','meta')"><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="reason">author</span><span class="chip danger">Low · 0.31</span><span class="spacer"></span><svg class="chev"><use href="#i-chev"/></svg></div>
+          </div>
+        </div>
+        <div class="note"><svg><use href="#i-check"/></svg><span>One source of truth: no list-level mutations to keep in sync. The row resolves via the panel's own <b>re-fetch</b> on close (not optimistic) — exactly the 117/118 lock.</span></div>
+      </div>
+
+      <!-- the shared detail panel -->
+      <aside class="panel" id="bpanel">
+        <div class="panel-head"><svg class="fico"><use href="#i-file"/></svg><span class="fname" id="ptitle">document</span><button class="panel-close" onclick="closePanel()">×</button></div>
+        <div class="panel-body">
+          <div class="psec" id="psec-meta">
+            <div class="psec-head"><svg class="ico-meta" style="width:14px;height:14px"><use href="#i-meta"/></svg> Metadata</div>
+            <div class="psec-body">
+              <div class="field-row"><span class="field-k">title</span><span class="field-v">Annual Report 2024 <span class="chip med">High · 0.91</span></span></div>
+              <div class="field-row"><span class="field-k">author</span><span class="field-v low">⚠ uncertain <span class="chip danger">Low · 0.31</span></span></div>
+              <div style="margin-top:10px"><button class="panel-btn"><svg><use href="#i-refresh"/></svg> Re-extract metadata</button> <button class="panel-btn" style="background:transparent;color:var(--color-text-muted);border-color:var(--color-border)"><svg><use href="#i-edit"/></svg> Edit author</button></div>
+            </div>
+          </div>
+          <div class="psec" id="psec-rel">
+            <div class="psec-head"><svg class="ico-rel" style="width:14px;height:14px"><use href="#i-rel"/></svg> Relationships <span class="badge">1 broken</span></div>
+            <div class="psec-body">
+              <div class="field-row"><span class="field-k">supersedes</span><span class="field-v low">linked document (no access / missing)</span></div>
+              <div style="margin-top:10px"><button class="panel-btn">＋ Fix / re-link</button></div>
+            </div>
+          </div>
+          <div class="psec" id="psec-cls">
+            <div class="psec-head"><svg class="ico-cls" style="width:14px;height:14px"><use href="#i-cls"/></svg> Classification</div>
+            <div class="psec-body">
+              <div class="field-v" style="color:var(--color-text-muted)">No rule matched on upload. Suggest a folder?</div>
+              <div style="margin-top:10px"><button class="panel-btn"><svg><use href="#i-cls"/></svg> Classify…</button></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ VARIANT C — hybrid: row + one action + expand ════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="stage">
+    <h1>Hybrid — one-tap fix, expand for context</h1>
+    <div class="sub">The common fix is one tap inline; the <b>expand caret</b> reveals <em>why</em> it's flagged (which link is dangling, which rule would catch it) without leaving the page; deep edits still go to the panel.</div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div><span class="card-count">12 documents</span></div>
+      <div class="rows">
+        <div class="rowC-wrap">
+          <div class="rowC"><button class="expand-btn" onclick="toggleC(this)"><svg><use href="#i-chev"/></svg></button><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="reason">author</span><span class="chip danger">Low · 0.31</span><span class="spacer"></span><button class="fix-primary" data-verb="reextract"><svg><use href="#i-refresh"/></svg> Re-extract</button></div>
+          <div class="rowC-detail">
+            <div class="ctx-line">Field <span class="mono">author</span> extracted as <span class="mono">"Unknown"</span> · confidence <span class="mono">0.31</span> · sampled from page 1 of 48</div>
+            <div class="ctx-actions"><button class="fix-secondary" style="border-color:var(--color-border)">Open detail panel</button><button class="fix-secondary" style="border-color:var(--color-border)">Edit author by hand</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div><span class="card-count">3 links</span></div>
+      <div class="rows">
+        <div class="rowC-wrap">
+          <div class="rowC"><button class="expand-btn" onclick="toggleC(this)"><svg><use href="#i-chev"/></svg></button><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="reason">supersedes</span><span class="chip danger">→ missing</span><span class="spacer"></span><button class="fix-primary" data-verb="open"><svg><use href="#i-ext"/></svg> Open</button></div>
+          <div class="rowC-detail">
+            <div class="ctx-line">Outgoing link <span class="mono">supersedes → Q2-Board-Deck.pptx</span> — target was deleted on Jun 14. The link still points at the old id.</div>
+            <div class="ctx-actions"><button class="fix-secondary" style="border-color:var(--color-border)">Remove this link</button><button class="fix-secondary" style="border-color:var(--color-border)">Re-link to another doc</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified documents</div><span class="card-count">7 documents</span></div>
+      <div class="rows">
+        <div class="rowC-wrap">
+          <div class="rowC"><button class="expand-btn" onclick="toggleC(this)"><svg><use href="#i-chev"/></svg></button><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><span class="spacer"></span><button class="fix-primary" data-verb="classify"><svg><use href="#i-cls"/></svg> Classify</button></div>
+          <div class="rowC-detail">
+            <div class="ctx-line">No active rule matched. Closest: <span class="mono">"Invoices → Finance"</span> needs <span class="mono">document_type is invoice</span> — this doc's type is <span class="mono">empty</span>.</div>
+            <div class="ctx-actions"><button class="fix-secondary" style="border-color:var(--color-border)">Suggest Finance folder</button><button class="fix-secondary" style="border-color:var(--color-border)">Edit the rule</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><svg><use href="#i-meta"/></svg><span>Best of both: a one-tap fix for the obvious case, in-place provenance for the "wait, why?" case, panel for real editing — without three round-trips.</span></div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>039</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="vp(390)">📱</button><button onclick="vp(768)">▢</button><button onclick="vp(0)">🖥</button>
+</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  if (e) e.target.classList.add('active');
+}
+
+// Variant A — honest fix receipts + row resolves on async
+document.querySelectorAll('#variant-a .fix-primary').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const verb = btn.getAttribute('data-verb');
+    const row = btn.closest('.rowA');
+    if (verb === 'reextract') {
+      btn.innerHTML = '⟳ Queued'; btn.disabled = true; btn.style.opacity = '.7';
+      const r = document.createElement('div'); r.className = 'receipt queue';
+      r.innerHTML = '<svg><use href="#i-refresh"/></svg> Re-extraction queued — this row clears when it finishes';
+      r.style.paddingLeft = '16px'; row.after(r);
+      setTimeout(() => { row.classList.add('resolving'); setTimeout(() => { row.remove(); r.remove(); }, 600); }, 1600);
+    } else {
+      const orig = btn.innerHTML; btn.textContent = verb === 'classify' ? 'Opening classify…' : 'Opening…';
+      btn.disabled = true; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1100);
+    }
+  });
+});
+
+// Variant B — open the shared panel scrolled to the section
+const PT = { deck: 'Q3-Board-Deck-FINAL.pptx', msa: 'Vendor-MSA-Acme-2026.pdf', inv: 'scan_2026-06-19_invoice.pdf', rep: '2024_annual_report_scan.pdf' };
+function openPanel(rowEl, doc, sec) {
+  document.getElementById('bsplit').classList.add('open');
+  document.querySelectorAll('#variant-b .rowB').forEach(r => r.classList.remove('sel'));
+  rowEl.classList.add('sel');
+  document.getElementById('ptitle').textContent = PT[doc] || doc;
+  const target = document.getElementById('psec-' + sec);
+  document.querySelectorAll('#bpanel .psec').forEach(s => s.classList.remove('flash'));
+  // flash + scroll the relevant section
+  setTimeout(() => { target.classList.add('flash'); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 120);
+}
+function closePanel() {
+  document.getElementById('bsplit').classList.remove('open');
+  document.querySelectorAll('#variant-b .rowB').forEach(r => r.classList.remove('sel'));
+}
+
+// Variant C — expand + same honest fix receipts
+function toggleC(btn) { btn.closest('.rowC-wrap').classList.toggle('open'); }
+document.querySelectorAll('#variant-c .fix-primary').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const verb = btn.getAttribute('data-verb');
+    const wrap = btn.closest('.rowC-wrap');
+    if (verb === 'reextract') {
+      btn.innerHTML = '⟳ Queued'; btn.disabled = true; btn.style.opacity = '.7';
+      const r = document.createElement('div'); r.className = 'receipt queue';
+      r.innerHTML = '<svg><use href="#i-refresh"/></svg> Re-extraction queued';
+      wrap.querySelector('.rowC').after(r);
+      setTimeout(() => { wrap.classList.add('resolving'); setTimeout(() => wrap.remove(), 600); }, 1600);
+    } else {
+      const orig = btn.innerHTML; btn.textContent = verb === 'classify' ? 'Opening classify…' : 'Opening…';
+      btn.disabled = true; setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1100);
+    }
+  });
+});
+document.querySelectorAll('.fix-secondary').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); const o = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = o, 700); }));
+
+function vp(w) { document.querySelectorAll('.stage').forEach(s => { s.style.maxWidth = w ? w + 'px' : ''; }); }
+</script>
+</body>
+</html>

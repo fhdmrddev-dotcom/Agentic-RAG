@@ -84,4 +84,24 @@ describe("StatusPill", () => {
     expect(pill.textContent).toMatch(/interrupted/)
     expect(pill.textContent).toMatch(/2\.5s/)
   })
+
+  // SEED-098 Change 1 (Variant B merged pill): when running AND liveStartedAt is
+  // provided, the pill carries a live ticking duration inside the SAME chip
+  // (`running · 3.2s`). When liveStartedAt is absent, behavior is byte-identical
+  // to today (just the verb word).
+  it("running with liveStartedAt: live duration inside the same chip", () => {
+    render(<StatusPill status="running" liveStartedAt={Date.now() - 3200} />)
+    const pill = screen.getByTestId("status-pill")
+    expect(pill).toHaveAttribute("data-status", "running")
+    expect(pill.textContent).toMatch(/running/i)
+    expect(pill.textContent).toMatch(/·/)
+    expect(pill.textContent).toMatch(/3\.\ds/)
+  })
+
+  it("running without liveStartedAt: byte-identical to today (verb only, no duration)", () => {
+    render(<StatusPill status="running" />)
+    const txt = screen.getByTestId("status-pill").textContent ?? ""
+    expect(txt).toMatch(/running/i)
+    expect(txt).not.toMatch(/·/)
+  })
 })

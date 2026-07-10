@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 038 — Governance Health Surface</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 52px; }
+
+  /* ── App frame ─────────────────────────────────────────── */
+  .app { display: grid; grid-template-columns: 56px 1fr; min-height: calc(100vh - 52px); }
+  .nav-rail {
+    background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 0;
+  }
+  .nav-ico {
+    width: 40px; height: 40px; border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-text-dim); cursor: pointer; position: relative;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .nav-ico:hover { background: var(--color-accent); color: var(--color-text-muted); }
+  .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .nav-ico.new::after {
+    content: ''; position: absolute; top: 7px; right: 7px; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--color-warning);
+  }
+  .nav-ico svg { width: 19px; height: 19px; }
+  .nav-tip {
+    position: absolute; left: 48px; white-space: nowrap; background: var(--color-surface-hi);
+    border: 1px solid var(--color-border); padding: 3px 8px; border-radius: 6px;
+    font-size: var(--text-xs); color: var(--color-text-muted); opacity: 0; pointer-events: none;
+    transition: opacity var(--dur-fast); z-index: 50;
+  }
+  .nav-ico:hover .nav-tip { opacity: 1; }
+
+  .main { overflow-y: auto; max-height: calc(100vh - 52px); }
+  .page { max-width: 1040px; margin: 0 auto; padding: 28px 28px 80px; }
+
+  /* ── Page header ───────────────────────────────────────── */
+  .phead { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+  .phead h1 { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-xl); margin: 0; letter-spacing: -0.01em; }
+  .phead .sub { font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 3px; }
+  .ghost-btn {
+    display: inline-flex; align-items: center; gap: 6px; background: transparent;
+    border: 1px solid var(--color-border); color: var(--color-text-muted);
+    border-radius: var(--radius-sm); padding: 6px 11px; font-size: var(--text-xs);
+    font-family: var(--font-sans); cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .ghost-btn:hover { background: var(--color-accent); color: var(--color-text); }
+  .ghost-btn svg { width: 14px; height: 14px; }
+
+  /* ── Read-only banner ──────────────────────────────────── */
+  .ro-banner {
+    display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs);
+    color: var(--color-text-dim); background: var(--color-muted);
+    border: 1px solid var(--color-border-soft); border-radius: var(--radius-full);
+    padding: 3px 10px;
+  }
+  .ro-banner svg { width: 12px; height: 12px; }
+
+  /* ── Card (HealthPanel analog) ─────────────────────────── */
+  .card {
+    background: hsl(220 30% 7% / 0.5); border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; }
+  .card-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-headline); font-weight: 700; font-size: var(--text-base); }
+  .card-title svg { width: 16px; height: 16px; }
+  .card-count { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .ico-rel { color: var(--color-accent-violet); }
+  .ico-cls { color: var(--color-primary); }
+  .ico-meta { color: var(--color-warning); }
+
+  /* ── Rows ──────────────────────────────────────────────── */
+  .rows > .row + .row { border-top: 1px solid var(--color-border-soft); }
+  .row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+    transition: background var(--dur-fast); cursor: default;
+  }
+  .row:hover { background: hsl(220 30% 11% / 0.45); }
+  .row .fico { width: 15px; height: 15px; color: var(--color-text-dim); flex-shrink: 0; }
+  .row .fname { font-size: var(--text-sm); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .meta-reason { font-size: var(--text-xs); color: var(--color-text-dim); flex-shrink: 0; }
+
+  /* chips */
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px;
+    border-radius: var(--radius-full); flex-shrink: 0; }
+  .chip svg { width: 11px; height: 11px; }
+  .chip.danger { background: var(--color-danger-dim); color: hsl(0 80% 80%); }
+  .chip.warn { background: var(--color-warning-dim); color: var(--color-warning); }
+  .chip.neutral { background: var(--color-muted); color: var(--color-text-muted); }
+  .chip.med { background: var(--color-warning-dim); color: var(--color-warning); }
+
+  .row-fix {
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted);
+    border-radius: var(--radius-sm); padding: 4px 10px; font-size: var(--text-xs);
+    cursor: pointer; flex-shrink: 0; transition: all var(--dur-fast) var(--ease-out); font-family: var(--font-sans);
+  }
+  .row-fix:hover { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  .show-more { width: 100%; text-align: center; padding: 8px; font-size: var(--text-xs);
+    color: var(--color-text-dim); background: transparent; border: none; border-top: 1px solid var(--color-border-soft);
+    cursor: pointer; }
+  .show-more:hover { color: var(--color-text-muted); }
+
+  /* empty / all-clear */
+  .empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 30px 16px; }
+  .empty svg { width: 30px; height: 30px; color: var(--color-success); opacity: 0.85; margin-bottom: 10px; }
+  .empty .h { font-size: var(--text-sm); font-weight: 600; color: var(--color-success); }
+  .empty .b { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 3px; max-width: 260px; }
+
+  /* ── KPI summary strip ─────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .kpi {
+    background: hsl(220 30% 7% / 0.5); border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md); padding: 15px 16px; cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .kpi:hover { border-color: var(--color-border); background: hsl(220 30% 9% / 0.6); }
+  .kpi .lab { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .kpi .lab svg { width: 13px; height: 13px; }
+  .kpi .num { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-3xl); line-height: 1; margin-top: 8px; letter-spacing: -0.02em; }
+  .kpi .hint { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 4px; }
+  .kpi.attn .num { color: var(--color-warning); }
+  .kpi.clear .num { color: var(--color-success); }
+
+  /* ── Hero (variant C) ──────────────────────────────────── */
+  .hero {
+    display: flex; align-items: center; gap: 22px; background: hsl(220 30% 7% / 0.5);
+    border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); padding: 22px 24px; margin-bottom: 18px;
+  }
+  .ring { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .val .n { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-xl); line-height: 1; }
+  .ring .val .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-dim); margin-top: 2px; }
+  .hero-body h2 { margin: 0; font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); }
+  .hero-body p { margin: 4px 0 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .hero-pills { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .hpill { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 4px 10px;
+    border-radius: var(--radius-full); background: var(--color-muted); border: 1px solid var(--color-border-soft);
+    color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast); }
+  .hpill:hover { background: var(--color-accent); color: var(--color-text); }
+  .hpill b { color: var(--color-warning); font-variant-numeric: tabular-nums; }
+
+  /* ── Collapsible section (variant C) ───────────────────── */
+  .sec { background: hsl(220 30% 7% / 0.5); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); margin-bottom: 12px; overflow: hidden; }
+  .sec-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; user-select: none; }
+  .sec-head:hover { background: hsl(220 30% 11% / 0.4); }
+  .sec-head .chev { width: 15px; height: 15px; color: var(--color-text-dim); transition: transform var(--dur-base) var(--ease-out); }
+  .sec.open .chev { transform: rotate(90deg); }
+  .sec-head .st { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-base); flex: 1; }
+  .sec-head .stc { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .sec-head .ok { font-size: var(--text-xs); color: var(--color-success); display: inline-flex; align-items: center; gap: 4px; }
+  .sec-head .ok svg { width: 13px; height: 13px; }
+  .sec-body { display: none; border-top: 1px solid var(--color-border-soft); }
+  .sec.open .sec-body { display: block; }
+
+  /* ── Worklist (variant B) ──────────────────────────────── */
+  .filt { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .fchip { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-sm); padding: 6px 13px;
+    border-radius: var(--radius-full); background: transparent; border: 1px solid var(--color-border);
+    color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .fchip:hover { background: var(--color-accent); color: var(--color-text); }
+  .fchip.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .fchip .c { font-variant-numeric: tabular-nums; font-size: var(--text-xs); opacity: 0.8; }
+  .seg { display: inline-flex; background: var(--color-muted); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
+  .seg button { background: transparent; border: none; color: var(--color-text-muted); font-size: var(--text-sm);
+    padding: 5px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-sans); transition: all var(--dur-fast); }
+  .seg button.on { background: var(--color-surface-hi); color: var(--color-text); box-shadow: var(--shadow-sm); }
+
+  .tagrow { display: flex; align-items: center; gap: 12px; padding: 11px 16px; transition: background var(--dur-fast); }
+  .tagrow:hover { background: hsl(220 30% 11% / 0.45); }
+  .tagrow + .tagrow { border-top: 1px solid var(--color-border-soft); }
+  .sig-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sig-dot.rel { background: var(--color-accent-violet); }
+  .sig-dot.cls { background: var(--color-primary); }
+  .sig-dot.meta { background: var(--color-warning); }
+
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 10px; display: flex; gap: 7px; align-items: flex-start; }
+  .note svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 1px; }
+  .hide { display: none !important; }
+
+  .state-toggle { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--color-text-dim); }
+  .state-toggle button { background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted);
+    border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-family: var(--font-mono); }
+  .state-toggle button.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  @media (max-width: 760px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .card-stack-3 { grid-template-columns: 1fr !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ───────────────── Variant nav ───────────────── -->
+<div class="variant-nav">
+  <span class="label">Sketch 038 · Governance Health Surface</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Card-grid (own nav home) <span class="star">★ Selected</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Prioritized worklist (tab of Library Health)</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Summary-led drill-in (Documents group)</button>
+  <span style="flex:1"></span>
+  <div class="state-toggle">
+    <span>data:</span>
+    <button id="st-attn" class="on" onclick="setState('attn')">needs attention</button>
+    <button id="st-clear" onclick="setState('clear')">all healthy</button>
+  </div>
+</div>
+
+<!-- icon defs reused inline below -->
+<svg style="display:none">
+  <defs>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-rel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+    <symbol id="i-cls" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></symbol>
+    <symbol id="i-meta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></symbol>
+    <symbol id="i-flow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></symbol>
+    <symbol id="i-docs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 9-9"/><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT A — Card-grid, governance as its own top-level nav home
+     ════════════════════════════════════════════════════════════ -->
+<div id="variant-a" class="variant">
+  <div class="app">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg><span class="nav-tip">Chat</span></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg><span class="nav-tip">Workflows</span></div>
+      <div class="nav-ico"><svg><use href="#i-docs"/></svg><span class="nav-tip">Documents</span></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg><span class="nav-tip">Classification</span></div>
+      <div class="nav-ico active new"><svg><use href="#i-shield"/></svg><span class="nav-tip">Governance · NEW</span></div>
+      <div class="nav-ico"><svg><use href="#i-gauge"/></svg><span class="nav-tip">Library Health</span></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg><span class="nav-tip">Skills</span></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg><span class="nav-tip">Settings</span></div>
+    </nav>
+    <div class="main"><div class="page">
+      <div class="phead">
+        <div>
+          <h1>Governance Health</h1>
+          <div class="sub">Document structure &amp; trust — separate from retrieval (Library Health)</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span class="ro-banner"><svg><use href="#i-lock"/></svg> Read-only view</span>
+          <button class="ghost-btn"><svg><use href="#i-refresh"/></svg> Refresh</button>
+        </div>
+      </div>
+
+      <!-- KPI summary strip -->
+      <div class="kpi-grid" data-when="attn">
+        <div class="kpi attn"><div class="lab"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div><div class="num">3</div><div class="hint">links pointing at deleted / hidden docs</div></div>
+        <div class="kpi attn"><div class="lab"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified</div><div class="num">7</div><div class="hint">no rule matched on upload</div></div>
+        <div class="kpi attn"><div class="lab"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div><div class="num">12</div><div class="hint">a field the model wasn't sure about</div></div>
+      </div>
+      <div class="kpi-grid hide" data-when="clear">
+        <div class="kpi clear"><div class="lab"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div><div class="num">0</div><div class="hint">every link resolves</div></div>
+        <div class="kpi clear"><div class="lab"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified</div><div class="num">0</div><div class="hint">all uploads matched a rule</div></div>
+        <div class="kpi clear"><div class="lab"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div><div class="num">0</div><div class="hint">all fields confident</div></div>
+      </div>
+
+      <!-- three HealthPanel cards -->
+      <div class="card-stack-3" style="display:grid; grid-template-columns:1fr; gap:16px;">
+
+        <!-- Broken relationships -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><svg class="ico-rel"><use href="#i-rel"/></svg> Broken relationships</div>
+            <span class="card-count" data-when="attn">3 links</span><span class="card-count hide" data-when="clear">0 links</span>
+          </div>
+          <div data-when="attn">
+            <div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="chip danger">supersedes · missing</span><button class="row-fix">Open</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Vendor-MSA-Acme-2026.pdf</span><span class="chip danger">attached_to · no access</span><button class="row-fix">Open</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Risk-Register-Meridian.xlsx</span><span class="chip danger">references · deleted</span><button class="row-fix">Open</button></div>
+            </div>
+          </div>
+          <div class="hide" data-when="clear"><div class="empty"><svg><use href="#i-check"/></svg><div class="h">All links resolve</div><div class="b">No dangling or inaccessible relationships in your documents.</div></div></div>
+        </div>
+
+        <!-- Unclassified -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><svg class="ico-cls"><use href="#i-cls"/></svg> Unclassified documents</div>
+            <span class="card-count" data-when="attn">7 documents</span><span class="card-count hide" data-when="clear">0 documents</span>
+          </div>
+          <div data-when="attn">
+            <div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><button class="row-fix">Classify</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Untitled draft.docx</span><span class="chip neutral">no rule matched</span><button class="row-fix">Classify</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">notes-from-call.txt</span><span class="chip neutral">no rule matched</span><button class="row-fix">Classify</button></div>
+            </div>
+            <button class="show-more">Show 4 more</button>
+          </div>
+          <div class="hide" data-when="clear"><div class="empty"><svg><use href="#i-check"/></svg><div class="h">Everything is filed</div><div class="b">Every uploaded document matched a classification rule.</div></div></div>
+        </div>
+
+        <!-- Low-confidence metadata -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Low-confidence metadata</div>
+            <span class="card-count" data-when="attn">12 documents</span><span class="card-count hide" data-when="clear">0 documents</span>
+          </div>
+          <div data-when="attn">
+            <div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="meta-reason">author</span><span class="chip danger">Low · 0.31</span><button class="row-fix">Re-extract</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">contract_redline_v7.docx</span><span class="meta-reason">effective_date</span><span class="chip danger">Low · 0.28</span><button class="row-fix">Re-extract</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">meeting_minutes.pdf</span><span class="meta-reason">document_type</span><span class="chip med">Med · 0.54</span><button class="row-fix">Re-extract</button></div>
+            </div>
+            <button class="show-more">Show 9 more</button>
+          </div>
+          <div class="hide" data-when="clear"><div class="empty"><svg><use href="#i-check"/></svg><div class="h">Metadata is trustworthy</div><div class="b">No fields fell below the confidence threshold.</div></div></div>
+        </div>
+
+      </div>
+      <div class="note"><svg class="ico-meta"><use href="#i-meta"/></svg><span>Low-confidence here means the <b>per-field extraction</b> score (the document detail panel's chip) — <em>not</em> the retrieval-similarity "Low Confidence" tab on Library Health.</span></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT B — One prioritized worklist, a tab of Library Health
+     ════════════════════════════════════════════════════════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg><span class="nav-tip">Chat</span></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg><span class="nav-tip">Workflows</span></div>
+      <div class="nav-ico"><svg><use href="#i-docs"/></svg><span class="nav-tip">Documents</span></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg><span class="nav-tip">Classification</span></div>
+      <div class="nav-ico active"><svg><use href="#i-gauge"/></svg><span class="nav-tip">Library Health</span></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg><span class="nav-tip">Skills</span></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg><span class="nav-tip">Settings</span></div>
+    </nav>
+    <div class="main"><div class="page">
+      <div class="phead">
+        <div>
+          <h1>Library Health</h1>
+          <div class="sub">Retrieval &amp; structure health for your knowledge base</div>
+        </div>
+        <button class="ghost-btn"><svg><use href="#i-refresh"/></svg> Refresh</button>
+      </div>
+
+      <!-- segmented: Retrieval | Governance -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
+        <div class="seg">
+          <button onclick="bTab('ret', event)">Retrieval</button>
+          <button class="on" onclick="bTab('gov', event)">Governance <span style="opacity:.6">22</span></button>
+        </div>
+        <span class="ro-banner"><svg><use href="#i-lock"/></svg> Read-only view</span>
+      </div>
+
+      <!-- filter chips -->
+      <div class="filt" data-when="attn">
+        <button class="fchip on" data-f="all">All <span class="c">22</span></button>
+        <button class="fchip" data-f="rel"><span class="sig-dot rel"></span> Broken relationships <span class="c">3</span></button>
+        <button class="fchip" data-f="cls"><span class="sig-dot cls"></span> Unclassified <span class="c">7</span></button>
+        <button class="fchip" data-f="meta"><span class="sig-dot meta"></span> Low-confidence metadata <span class="c">12</span></button>
+      </div>
+
+      <!-- worklist (attention) -->
+      <div class="card" data-when="attn">
+        <div class="card-head">
+          <div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Needs attention</div>
+          <span class="card-count">22 items · highest-risk first</span>
+        </div>
+        <div class="rows" id="bworklist">
+          <div class="tagrow" data-t="rel"><span class="sig-dot rel"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="chip danger">link → missing</span><span class="meta-reason">supersedes</span><button class="row-fix">Open</button></div>
+          <div class="tagrow" data-t="rel"><span class="sig-dot rel"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">Vendor-MSA-Acme-2026.pdf</span><span class="chip danger">link → no access</span><span class="meta-reason">attached_to</span><button class="row-fix">Open</button></div>
+          <div class="tagrow" data-t="rel"><span class="sig-dot rel"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">Risk-Register-Meridian.xlsx</span><span class="chip danger">link → deleted</span><span class="meta-reason">references</span><button class="row-fix">Open</button></div>
+          <div class="tagrow" data-t="meta"><span class="sig-dot meta"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="chip danger">Low · 0.31</span><span class="meta-reason">author</span><button class="row-fix">Re-extract</button></div>
+          <div class="tagrow" data-t="meta"><span class="sig-dot meta"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">contract_redline_v7.docx</span><span class="chip danger">Low · 0.28</span><span class="meta-reason">effective_date</span><button class="row-fix">Re-extract</button></div>
+          <div class="tagrow" data-t="cls"><span class="sig-dot cls"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><span class="meta-reason">unclassified</span><button class="row-fix">Classify</button></div>
+          <div class="tagrow" data-t="cls"><span class="sig-dot cls"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">Untitled draft.docx</span><span class="chip neutral">no rule matched</span><span class="meta-reason">unclassified</span><button class="row-fix">Classify</button></div>
+          <div class="tagrow" data-t="meta"><span class="sig-dot meta"></span><svg class="fico"><use href="#i-file"/></svg><span class="fname">meeting_minutes.pdf</span><span class="chip med">Med · 0.54</span><span class="meta-reason">document_type</span><button class="row-fix">Re-extract</button></div>
+        </div>
+        <button class="show-more">Show 14 more</button>
+      </div>
+
+      <!-- all-clear -->
+      <div class="card hide" data-when="clear">
+        <div class="card-head"><div class="card-title"><svg class="ico-meta"><use href="#i-meta"/></svg> Needs attention</div><span class="card-count">0 items</span></div>
+        <div class="empty"><svg><use href="#i-check"/></svg><div class="h">Your documents are in good shape</div><div class="b">No broken links, unclassified files, or low-confidence metadata.</div></div>
+      </div>
+
+      <div class="note"><svg><use href="#i-meta"/></svg><span>One ranked queue across all three governance signals. "Low · 0.31" is the per-field extraction confidence (the 112 ConfidenceChip), kept distinct from the Retrieval tab's similarity scores.</span></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     VARIANT C — Summary hero + collapsible sections, in Documents
+     ════════════════════════════════════════════════════════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app">
+    <nav class="nav-rail">
+      <div class="nav-ico"><svg><use href="#i-chat"/></svg><span class="nav-tip">Chat</span></div>
+      <div class="nav-ico"><svg><use href="#i-flow"/></svg><span class="nav-tip">Workflows</span></div>
+      <div class="nav-ico active"><svg><use href="#i-docs"/></svg><span class="nav-tip">Documents</span></div>
+      <div class="nav-ico"><svg><use href="#i-wand"/></svg><span class="nav-tip">Classification</span></div>
+      <div class="nav-ico"><svg><use href="#i-gauge"/></svg><span class="nav-tip">Library Health</span></div>
+      <div class="nav-ico"><svg><use href="#i-zap"/></svg><span class="nav-tip">Skills</span></div>
+      <div style="flex:1"></div>
+      <div class="nav-ico"><svg><use href="#i-cog"/></svg><span class="nav-tip">Settings</span></div>
+    </nav>
+    <!-- mini documents sub-nav so the IA placement reads -->
+    <div style="display:grid; grid-template-columns: 184px 1fr; flex:1; min-width:0;">
+      <aside style="background:var(--color-bg-elev1); border-right:1px solid var(--color-border); padding:14px 8px;">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); padding:0 8px 8px;">Folders</div>
+        <div style="font-size:var(--text-sm); color:var(--color-text-muted); padding:6px 10px; border-radius:8px;">📁 All documents</div>
+        <div style="font-size:var(--text-sm); color:var(--color-text-muted); padding:6px 10px;">📁 Project Meridian</div>
+        <div style="font-size:var(--text-sm); color:var(--color-text-muted); padding:6px 10px;">📁 Contracts</div>
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); padding:14px 8px 8px;">Views</div>
+        <div style="font-size:var(--text-sm); color:var(--color-text-muted); padding:6px 10px;">⏳ Expiring soon</div>
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); padding:14px 8px 8px;">Automation</div>
+        <div style="font-size:var(--text-sm); color:var(--color-text-muted); padding:6px 10px;">⚡ Invoices → Finance</div>
+        <div style="border-top:1px solid var(--color-border-soft); margin:12px 6px;"></div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:var(--text-sm); color:var(--color-primary); background:var(--color-primary-dim); padding:7px 10px; border-radius:8px; border:1px solid var(--color-primary-glow);">
+          <svg style="width:15px;height:15px"><use href="#i-shield"/></svg> Governance
+          <span data-when="attn" style="margin-left:auto; font-size:10px; background:var(--color-warning-dim); color:var(--color-warning); padding:1px 7px; border-radius:99px;">22</span>
+        </div>
+      </aside>
+      <div class="main"><div class="page" style="max-width:860px;">
+        <div class="phead">
+          <div><h1>Governance Health</h1><div class="sub">Structure &amp; trust for the documents in your library</div></div>
+          <span class="ro-banner"><svg><use href="#i-lock"/></svg> Read-only</span>
+        </div>
+
+        <!-- hero (attention) -->
+        <div class="hero" data-when="attn">
+          <div class="ring">
+            <svg width="92" height="92"><circle cx="46" cy="46" r="40" stroke="var(--color-muted)" stroke-width="8" fill="none"/><circle cx="46" cy="46" r="40" stroke="var(--color-warning)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="63"/></svg>
+            <div class="val"><div class="n">75</div><div class="l">health</div></div>
+          </div>
+          <div class="hero-body">
+            <h2>3 areas need attention</h2>
+            <p>22 documents have a structural or trust signal worth a look. Nothing here changes a file on its own.</p>
+            <div class="hero-pills">
+              <span class="hpill" onclick="openSec('rel')"><span class="sig-dot rel"></span> Broken links <b>3</b></span>
+              <span class="hpill" onclick="openSec('cls')"><span class="sig-dot cls"></span> Unclassified <b>7</b></span>
+              <span class="hpill" onclick="openSec('meta')"><span class="sig-dot meta"></span> Low-confidence <b>12</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- hero (clear) -->
+        <div class="hero hide" data-when="clear">
+          <div class="ring">
+            <svg width="92" height="92"><circle cx="46" cy="46" r="40" stroke="var(--color-muted)" stroke-width="8" fill="none"/><circle cx="46" cy="46" r="40" stroke="var(--color-success)" stroke-width="8" fill="none" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="0"/></svg>
+            <div class="val"><div class="n" style="color:var(--color-success)">100</div><div class="l">health</div></div>
+          </div>
+          <div class="hero-body"><h2 style="color:var(--color-success)">Everything looks healthy</h2><p>No broken links, unclassified documents, or low-confidence metadata right now.</p></div>
+        </div>
+
+        <!-- sections (attention) -->
+        <div data-when="attn">
+          <div class="sec open" id="sec-rel">
+            <div class="sec-head" onclick="toggleSec('rel')"><svg class="chev"><use href="#i-chev"/></svg><span class="st" style="display:inline-flex;align-items:center;gap:8px"><svg class="ico-rel" style="width:16px;height:16px"><use href="#i-rel"/></svg> Broken relationships</span><span class="stc">3 links</span></div>
+            <div class="sec-body"><div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Q3-Board-Deck-FINAL.pptx</span><span class="chip danger">supersedes · missing</span><button class="row-fix">Open</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Vendor-MSA-Acme-2026.pdf</span><span class="chip danger">attached_to · no access</span><button class="row-fix">Open</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Risk-Register-Meridian.xlsx</span><span class="chip danger">references · deleted</span><button class="row-fix">Open</button></div>
+            </div></div>
+          </div>
+          <div class="sec" id="sec-cls">
+            <div class="sec-head" onclick="toggleSec('cls')"><svg class="chev"><use href="#i-chev"/></svg><span class="st" style="display:inline-flex;align-items:center;gap:8px"><svg class="ico-cls" style="width:16px;height:16px"><use href="#i-cls"/></svg> Unclassified documents</span><span class="stc">7 documents</span></div>
+            <div class="sec-body"><div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">scan_2026-06-19_invoice.pdf</span><span class="chip neutral">no rule matched</span><button class="row-fix">Classify</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">Untitled draft.docx</span><span class="chip neutral">no rule matched</span><button class="row-fix">Classify</button></div>
+            </div></div>
+          </div>
+          <div class="sec" id="sec-meta">
+            <div class="sec-head" onclick="toggleSec('meta')"><svg class="chev"><use href="#i-chev"/></svg><span class="st" style="display:inline-flex;align-items:center;gap:8px"><svg class="ico-meta" style="width:16px;height:16px"><use href="#i-meta"/></svg> Low-confidence metadata</span><span class="stc">12 documents</span></div>
+            <div class="sec-body"><div class="rows">
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">2024_annual_report_scan.pdf</span><span class="meta-reason">author</span><span class="chip danger">Low · 0.31</span><button class="row-fix">Re-extract</button></div>
+              <div class="row"><svg class="fico"><use href="#i-file"/></svg><span class="fname">contract_redline_v7.docx</span><span class="meta-reason">effective_date</span><span class="chip danger">Low · 0.28</span><button class="row-fix">Re-extract</button></div>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- sections (clear) -->
+        <div class="hide" data-when="clear">
+          <div class="sec"><div class="sec-head"><svg class="chev"><use href="#i-chev"/></svg><span class="st">Broken relationships</span><span class="ok"><svg><use href="#i-check"/></svg> clear</span></div></div>
+          <div class="sec"><div class="sec-head"><svg class="chev"><use href="#i-chev"/></svg><span class="st">Unclassified documents</span><span class="ok"><svg><use href="#i-check"/></svg> clear</span></div></div>
+          <div class="sec"><div class="sec-head"><svg class="chev"><use href="#i-chev"/></svg><span class="st">Low-confidence metadata</span><span class="ok"><svg><use href="#i-check"/></svg> clear</span></div></div>
+        </div>
+
+        <div class="note"><svg class="ico-meta"><use href="#i-meta"/></svg><span>Healthy sections collapse to a one-line "clear" so the page stays a 3-second read at rest. Co-located with Documents so doc-governance lives next to the documents themselves.</span></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── Sketch toolbar ───────────────── -->
+<div class="sketch-toolbar">
+  <span>038</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="vp(390)">📱</button><button onclick="vp(768)">▢</button><button onclick="vp(0)">🖥</button>
+</div>
+
+<script>
+function showVariant(id, e) {
+  document.querySelectorAll('.variant').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).style.display = 'block';
+  if (e) e.target.classList.add('active');
+}
+function setState(s) {
+  document.getElementById('st-attn').classList.toggle('on', s === 'attn');
+  document.getElementById('st-clear').classList.toggle('on', s === 'clear');
+  document.querySelectorAll('[data-when]').forEach(el => {
+    el.classList.toggle('hide', el.getAttribute('data-when') !== s);
+  });
+}
+// Variant B segmented + filter
+function bTab(t, e) {
+  document.querySelectorAll('#variant-b .seg button').forEach(b => b.classList.remove('on'));
+  e.target.classList.add('on');
+}
+document.querySelectorAll('#variant-b .fchip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#variant-b .fchip').forEach(c => c.classList.remove('on'));
+    chip.classList.add('on');
+    const f = chip.getAttribute('data-f');
+    document.querySelectorAll('#bworklist .tagrow').forEach(r => {
+      r.style.display = (f === 'all' || r.getAttribute('data-t') === f) ? 'flex' : 'none';
+    });
+  });
+});
+// Variant C sections
+function toggleSec(id) { document.getElementById('sec-' + id).classList.toggle('open'); }
+function openSec(id) {
+  const s = document.getElementById('sec-' + id);
+  s.classList.add('open');
+  s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+// fix buttons → honest micro-receipt + row resolves (re-fetch feel)
+document.querySelectorAll('.row-fix').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const label = btn.textContent.trim();
+    const row = btn.closest('.row, .tagrow');
+    const receipt = label === 'Re-extract' ? '⟳ Re-extraction queued'
+                  : label === 'Classify' ? 'Opening classify…'
+                  : 'Opening…';
+    btn.textContent = receipt; btn.disabled = true; btn.style.opacity = '0.7';
+    if (label === 'Re-extract') {
+      setTimeout(() => { row.style.transition = 'opacity .4s, transform .4s'; row.style.opacity = '0'; row.style.transform = 'translateX(8px)'; }, 700);
+    } else {
+      setTimeout(() => { btn.textContent = label; btn.disabled = false; btn.style.opacity = '1'; }, 1100);
+    }
+  });
+});
+// show-more demo
+document.querySelectorAll('.show-more').forEach(b => b.addEventListener('click', () => { b.textContent = 'Showing top 10 — your library may contain more.'; b.disabled = true; }));
+// viewport
+function vp(w) { document.querySelectorAll('.app').forEach(a => { a.style.maxWidth = w ? w + 'px' : 'none'; a.style.margin = w ? '0 auto' : '0'; a.style.border = w ? '1px solid var(--color-border)' : 'none'; }); }
+</script>
+</body>
+</html>

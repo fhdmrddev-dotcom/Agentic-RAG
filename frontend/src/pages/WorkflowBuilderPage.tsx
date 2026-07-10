@@ -60,7 +60,14 @@ export interface WorkflowBuilderPageProps {
   /** Optional Plan-05 publish-gauntlet seam — the page composes it when present
    *  (the gauntlet owns the publish-disabled-on-empty-golden_input rule). Left as
    *  a typed prop so Plan 05 can land independently without an import-before-exists
-   *  break. */
+   *  break.
+   *
+   *  Phase 124-03 Task 2 (WUX-01, D-06): `def` is the WORKING definition forwarded
+   *  to the gauntlet so its prepended pub-scale soul block reads the same authored
+   *  purpose / tier / spine / needs / output. `BuilderDefinition` already carries
+   *  the soul-readable fields (business_requirement / project_folder_id / phases),
+   *  so this seam is additive — the describe/draft/publish flow is unchanged; the
+   *  call site (WorkflowsPage) just passes the supplied `def` through as `definition`. */
   renderPublish?: (def: BuilderDefinition, draftId: string | null) => React.ReactNode
   /** Phase 103-ux OPEN/TWEAK: when present, the Builder starts DIRECTLY in the
    *  "drafted" editing view on this existing definition — it SKIPS the
@@ -71,10 +78,19 @@ export interface WorkflowBuilderPageProps {
    *     frozen published row is never touched).
    *  Absent → the existing describe-first FRESH build, byte-identical. */
   initial?: BuilderInitial
+  /** Phase 124 CR-01 fix: seed the describe textarea from an upstream "Describe &
+   *  run" door so the loose-path text survives the hand-off into the Builder (it was
+   *  otherwise silently dropped). Only meaningful for a FRESH build (no `initial`) —
+   *  the drafted editing view ignores it. */
+  initialDescribe?: string
+  /** Phase 124 CR-01 fix: when true (the loose door's "Draft the workflow" CTA), run
+   *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
+   *  so the fast path actually drafts instead of dead-ending on an empty screen. */
+  autoDraft?: boolean
 }
 
-export function WorkflowBuilderPage({ renderPublish, initial }: WorkflowBuilderPageProps) {
-  const [describe, setDescribe] = useState("")
+export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, autoDraft }: WorkflowBuilderPageProps) {
+  const [describe, setDescribe] = useState(initialDescribe ?? "")
   // OPEN/TWEAK: when `initial` is provided, boot straight into the drafted editing
   // view on the loaded definition (the describe/composing screen is skipped). A
   // fresh build (no `initial`) starts "empty" exactly as before.
@@ -196,6 +212,23 @@ export function WorkflowBuilderPage({ renderPublish, initial }: WorkflowBuilderP
       })
     }
   }, [describe, projectFolderId])
+
+  // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
+  // "Draft the workflow" CTA (autoDraft), run the EXISTING generate→draft flow ONCE
+  // with the seeded text — so the fast path actually drafts instead of dead-ending on
+  // an empty describe screen. Guarded to fire exactly once, fresh-build ("empty") only.
+  const autoDraftFiredRef = useRef(false)
+  useEffect(() => {
+    if (
+      autoDraft &&
+      !autoDraftFiredRef.current &&
+      (initialDescribe ?? "").trim().length > 0 &&
+      state.phase === "empty"
+    ) {
+      autoDraftFiredRef.current = true
+      void onDraft()
+    }
+  }, [autoDraft, initialDescribe, state.phase, onDraft])
 
   // Merge a phase-form patch into the selected phase's config (immutable).
   const onPhaseChange = useCallback(

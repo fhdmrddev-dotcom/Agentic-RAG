@@ -12,6 +12,7 @@ import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { preparingDescription } from "@/lib/providerLogo"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 import { dedupToolCalls } from "@/lib/stepCount"
 
@@ -330,6 +331,15 @@ type NodeState = "done" | "active" | "queued"
 // non-execute_code finished tool; execute_code reuses it for its done resting
 // line so a done code card shows ONE result-bearing line, not args + a
 // separate result row.
+// SEED-098 Change 1: the essence line is now the resting shape for ACTIVE
+// (running/preparing) tools too, not just finished ones — so an active tool
+// rests as the SAME calm one-line shape (no auto-expanded heavy body, no
+// show→collapse flicker), with its live body one click behind the chevron.
+//   • running   → `Running {tool}` (primary) + optional ` "{summary}"`; right
+//     pill = the Variant B merged live chip (verb · live duration in ONE chip).
+//   • preparing → `Preparing {tool}…` + preparingDescription suffix; right pill
+//     = `preparing` (or `preparing · X.X KB` when argsBytesStreamed > 0).
+//   • done/interrupted → UNCHANGED: `{tool} → {result}` + done pill w/ duration.
 function ToolEssenceLine({
   tc,
   onExpand,
@@ -337,12 +347,18 @@ function ToolEssenceLine({
   tc: ToolCall
   onExpand: () => void
 }) {
+  const isRunning = tc.status === "running"
+  const isPreparing = tc.status === "preparing"
+  const isActive = isRunning || isPreparing
   const result = summarizeToolCall(tc) || "View results"
+  const summary = toolSummary(tc)
   return (
     <button
       type="button"
       onClick={onExpand}
-      data-testid="tool-result-summary"
+      // Finished essence keeps the historical testid; the active essence is
+      // reachable via its inner StatusPill (data-testid="status-pill").
+      data-testid={isActive ? undefined : "tool-result-summary"}
       aria-label="Expand this step"
       className="w-full flex items-center gap-2.5 text-left group"
     >
@@ -350,21 +366,58 @@ function ToolEssenceLine({
         className={cn(
           "flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300",
           toolIconColor(tc.name, tc.status),
+          isPreparing && "opacity-50",
         )}
       >
         {toolIcon(tc.name)}
       </span>
       <span className="flex-1 min-w-0 text-xs truncate">
-        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-        <span className="mx-1 text-muted-foreground/50">→</span>
-        <span className="text-muted-foreground">{result}</span>
+        {isPreparing ? (
+          <span className="font-semibold text-foreground/50 italic">
+            Preparing {toolLabel(tc.name)}…
+            {(() => {
+              const prepDesc = preparingDescription(tc)
+              return prepDesc ? (
+                <span className="ml-1 font-normal text-foreground/60 not-italic">
+                  {" "}— {prepDesc}
+                </span>
+              ) : null
+            })()}
+          </span>
+        ) : isRunning ? (
+          <>
+            <span className="font-semibold text-primary">Running {toolLabel(tc.name)}</span>
+            {summary && <span className="ml-1.5 opacity-50">"{summary}"</span>}
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+            <span className="mx-1 text-muted-foreground/50">→</span>
+            <span className="text-muted-foreground">{result}</span>
+          </>
+        )}
       </span>
-      <StatusPill
-        status={pillStatus(tc.status)}
-        duration={
-          tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
-        }
-      />
+      {isPreparing ? (
+        <StatusPill
+          status="preparing"
+          runningLabel={
+            tc.argsBytesStreamed != null && tc.argsBytesStreamed > 0
+              ? `preparing · ${(tc.argsBytesStreamed / 1024).toFixed(1)} KB`
+              : undefined
+          }
+        />
+      ) : isRunning ? (
+        // The Variant B merged live chip — verb + live ticking duration in ONE
+        // chip; no separate ElapsedTimer span on the active essence row.
+        <StatusPill status="running" liveStartedAt={tc.startedAt ?? undefined} />
+      ) : (
+        <StatusPill
+          status={pillStatus(tc.status)}
+          duration={
+            tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
+          }
+        />
+      )}
       <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
     </button>
   )
@@ -511,36 +564,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   const togglePanel = (id: string, defaultExpanded: boolean) =>
     setPanelExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }))
 
-  // 075.6 Plan 03 / SPEC Req #7: step-list collapse predicate.
-  // Threshold N=3 locked per Boundary Keeper Round 1. Collapse window is the
-  // run of consecutive completed (status === "done") tool items STRICTLY
-  // preceding the active (running/preparing) tool item. When the window
-  // length is ≥3, the displayItems map renders ONE summary row at i=0 and
-  // null-returns for 1 ≤ i < activeIndex; expanding the chevron restores
-  // per-row rendering. Iteration divider at L729 walks backward through
-  // displayItems[j] for j=i-1 → 0 to find prevToolIteration — when collapsed,
-  // the immediate predecessor of the active step is the LAST collapsed item,
-  // so the divider above the active step fires correctly for the
-  // iter-N → iter-(N+1) boundary (Pitfall 6 / Landmine L5 mitigation).
+  // `activeIndex` = index of the running/preparing tool item (or -1 when the
+  // run has settled). Used only to give an EXPANDED earlier step its per-row
+  // re-collapse control (isExpandedEarlierStep below) — it no longer gates any
+  // collapse-to-text behavior. Every finished step renders as the SAME one-line
+  // ToolEssenceLine card whether the run is live or settled, so the streaming
+  // and settled views are identical (no card-to-text flip).
   const activeIndex = displayItems.findIndex(
     (it) => it.kind === "tool" && (it.tc.status === "running" || it.tc.status === "preparing"),
   )
-  const completedBeforeActive =
-    activeIndex === -1
-      ? []
-      : displayItems.slice(0, activeIndex).filter(
-          (it): it is Extract<DisplayItem, { kind: "tool" }> =>
-            it.kind === "tool" && it.tc.status === "done",
-        )
-  // Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate): replace the
-  // single shared collapse boolean — where one click on ANY collapsed summary
-  // row toggled the whole flag and expanded EVERY finished card (the #1 felt
-  // bug, violates D-01 click-to-expand) — with a per-step expanded Set keyed
-  // on the SAME `stepKeyOf` identity the rail snum + dedup use. Membership in
-  // the Set means "this finished step is expanded to its full body"; absence
-  // means "folded to its one-line essence". The prior >=3 collapse gate is
-  // GONE — EVERY finished step folds from step 1 (Focus Mode from the very
-  // first finished tool). The identity scheme survives the
+  // Per-step expanded Set keyed on the SAME `stepKeyOf` identity the rail snum
+  // + dedup use. Membership means "this step is expanded to its full body";
+  // absence means "folded to its one-line essence card" (ToolEssenceLine).
+  // Clicking one essence card expands ONLY that card (D-01 click-to-expand);
+  // the others stay folded. The identity scheme survives the
   // preparing->running->done id mutation (075.9) and a reload (state is
   // reconstructed from `toolCalls` each render). State stays component-local
   // and provider-agnostic — no StreamsProvider/api.ts/backend change.
@@ -552,98 +589,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
       n.delete(key)
       return n
     })
-  // Skill collapsed rows have no stepKey identity in toolStepNumber; give them
-  // a stable composite key so a skill row is individually expandable too and a
-  // tool-row click NEVER expands a skill row (or any other tool row).
-  const skillStepKey = (activation: SkillActivation) => `skill-${activation.occurredAt}`
-
-  // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
-  // collapsed items) as data-iteration-min so future readers can see the
-  // boundary the summary row spans without re-deriving it.
-  const collapsedIterationMin = (() => {
-    const iters = completedBeforeActive
-      .map((it) => it.tc.iteration)
-      .filter((x): x is number => x !== undefined)
-    return iters.length > 0 ? Math.min(...iters) : undefined
-  })()
-
-  // Phase 095 Plan 06: under interleaved partial-expand the contiguous
-  // collapsed block can break, so the data-iteration-min hint can no longer be
-  // hard-coded at i === 0. Compute the FIRST still-collapsed earlier step
-  // (i < activeIndex, kind === 'tool', not in expandedSteps) and put the hint
-  // on that row only.
-  const firstCollapsedToolIndex = (() => {
-    if (activeIndex === -1) return -1
-    for (let i = 0; i < activeIndex; i++) {
-      const it = displayItems[i]
-      if (it.kind === "tool" && !expandedSteps.has(stepKeyOf(it.tc, i))) return i
-    }
-    return -1
-  })()
-
   // Phase 075.7 UAT fix (Bug D): RunCard.tsx wraps this component and owns
   // the outer rounded frame, sticky header (run summary + timer + counter +
   // brand-pulse avatar), expand/collapse state, and shimmer. ToolCallPanel
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* Phase 095 Plan 06 (GAP-095-01 + GAP-095-03 un-gate):
-              EVERY finished step before the active one folds to a one-line
-              `→ {result}` essence row (Focus Mode from step 1 — no >=3 gate).
-              Clicking ONE essence row adds ONLY that row's key to
-              `expandedSteps`, so it alone expands to its full body; the other
-              finished essence rows stay folded (closes the fold-all bug). The
-              prior aggregate "Hide earlier steps" toggle (re-folded ALL) is
-              gone — each expanded earlier step gets its own per-row re-collapse
-              control instead (rendered in the full-body branch below). The
-              iteration divider above the active step still derives
-              prevToolIteration from the LAST collapsed-but-rendered item
-              (Pitfall 6 / Landmine L5 mitigation preserved). */}
+          {/* Every step renders as the SAME frame in all run states — no
+              card-to-text flip. Finished steps before the active one fall
+              through to the one-line ToolEssenceLine card (badge + timing +
+              chevron), identical to how they render once the run settles;
+              clicking one expands ONLY that card (expandedSteps). The prior
+              "Focus Mode" degraded-text summary rows are gone. */}
           {displayItems.map((item, i) => {
-            if (
-              i < activeIndex &&
-              (item.kind !== "tool" || !expandedSteps.has(stepKeyOf(item.tc, i)))
-            ) {
-              if (item.kind === 'tool') {
-                const collapsedTc = item.tc
-                const collapsedKey = stepKeyOf(collapsedTc, i)
-                const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
-                return (
-                  <button
-                    key={`step-summary-${i}-${collapsedKey}`}
-                    type="button"
-                    onClick={() => expandStep(collapsedKey)}
-                    data-testid="step-summary-row"
-                    data-iteration-min={i === firstCollapsedToolIndex ? collapsedIterationMin : undefined}
-                    aria-label="Expand this step"
-                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
-                  >
-                    <span className="opacity-50 flex-shrink-0">→</span>
-                    <span className="truncate flex-1 min-w-0">{summaryText}</span>
-                  </button>
-                )
-              }
-              // Skill rows in collapsed Focus Mode: keep them visible as a
-              // single compact line so the user still sees the activation
-              // happened mid-run. A skill row expands ONLY its own composite
-              // key — a tool-row click never reaches it.
-              return (
-                <button
-                  key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
-                  type="button"
-                  onClick={() => expandStep(skillStepKey(item.activation))}
-                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
-                >
-                  <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
-                  <span className="truncate flex-1 min-w-0 italic">
-                    skill: {item.activation.skillName}
-                  </span>
-                </button>
-              )
-            }
-            // Phase 095 Plan 06: a skill row whose key IS in expandedSteps (or
-            // any skill row at/after the active index) falls through to the
-            // full SkillRow render below.
+            // Skill activation rows always render as the full SkillRow card.
             if (item.kind === 'skill') {
               return (
                 <div key={`skill-${i}-${item.activation.occurredAt}`}>
@@ -709,8 +668,16 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
             // branch above. Active/preparing tools never collapse (the live
             // head + streaming body always render). Mutually exclusive with
             // isExpandedEarlierStep (that requires the key IN expandedSteps).
+            // SEED-098 Change 1: the DEFAULT visibility for ACTIVE
+            // (running/preparing) tools now flips to the essence line too — the
+            // active tool rests collapsed to its one-line essence (no
+            // auto-expanded heavy body / flicker) and reveals the live streaming
+            // body one click behind the chevron (its stepKey joins expandedSteps,
+            // falling through UNCHANGED to the execute_code / generic body below).
+            // Finished-tool behavior is identical to before.
             const isFinished = tc.status === "done" || tc.status === "interrupted"
-            const isFinishedCollapsed = isFinished && !expandedSteps.has(stepKey)
+            const isActive = tc.status === "running" || tc.status === "preparing"
+            const isCollapsedToEssence = (isFinished || isActive) && !expandedSteps.has(stepKey)
 
             return (
               <div
@@ -769,7 +736,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     <span>Hide</span>
                   </button>
                 )}
-                {isFinishedCollapsed ? (
+                {isCollapsedToEssence ? (
                   /* Phase 095 Plan 06 (GAP-095-03 essence): the single
                      essence line for a finished, not-expanded tool. Clicking
                      it expands this card's full body (adds its key to
@@ -819,6 +786,22 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                         {tc.status === "preparing" ? (
                           <span className="font-semibold text-foreground/50 italic">
                             Preparing {toolLabel(tc.name)}…
+                            {/* Phase 128 Plan 04 (TDP-02 / D-04): surface the
+                                tool's description DURING the preparing window —
+                                preparingDescription parses the partial-JSON
+                                tc.argsCodeText (tc.args is still {} until
+                                tool_start). Additive: when it returns null the
+                                quiet "Preparing {tool}…" copy stays — never
+                                fabricate (D-06 honest fallback). Rendered as a
+                                React text child (auto-escaped), never innerHTML. */}
+                            {(() => {
+                              const prepDesc = preparingDescription(tc)
+                              return prepDesc ? (
+                                <span className="ml-1 font-normal text-foreground/60 not-italic">
+                                  {" "}— {prepDesc}
+                                </span>
+                              ) : null
+                            })()}
                             {/* T-260523-09: bytes-streamed badge during the
                                 long LLM tool-args generation. Replaces the
                                 prior silent "preparing" state with a live
@@ -936,11 +919,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                       // always use toolLabel(tc.name). D-08: surface
                       // tc.args.description when available.
                       const isExecuteCode = tc.name === "execute_code"
+                      // Phase 128 Plan 04 (TDP-02 / D-04): route the title
+                      // through the shared preparingDescription helper instead
+                      // of reading tc.args?.description directly — tc.args is
+                      // EMPTY {} during early preparing (the reducer keeps it
+                      // empty until tool_start), so the direct read showed
+                      // nothing; preparingDescription parses the partial-JSON
+                      // tc.argsCodeText. Null → the honest "Generating {tool}…"
+                      // fallback (D-06, never fabricate).
+                      const prepDesc = preparingDescription(tc)
                       return (
                         <ToolArgsLivePanel
                           title={
-                            tc.args?.description
-                              ? `Generating ${toolLabel(tc.name)}: ${tc.args.description}`
+                            prepDesc
+                              ? `Generating ${toolLabel(tc.name)}: ${prepDesc}`
                               : `Generating ${toolLabel(tc.name)}…`
                           }
                           contentText={tc.argsCodeText!}

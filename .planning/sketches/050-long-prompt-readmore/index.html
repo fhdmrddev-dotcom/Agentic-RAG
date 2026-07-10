@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 050 — Long User Prompt → Read more (CTC-04)</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     Sketch 050 — long-prompt-readmore (CTC-04)
+     Refines ONLY the right-aligned user bubble in MessageItem.tsx:205-217.
+     Reuses house chrome (.sketch-toolbar / .variant-nav / .variant-tab)
+     from ../themes/default.css — those classes are NOT redefined here.
+     ───────────────────────────────────────────────────────────── */
+
+  /* The theme has no "white" token (foreground on a gradient is the venial
+     Tailwind text-white exception). Hoist the ONE place white is authored into
+     sketch-local custom properties so every white literal below is explicit and
+     edited in one spot. */
+  :root {
+    --bubble-fg: #fff;                       /* text-white on the gradient bubble */
+    --bubble-scrim: 255 255 255;             /* rgb channels for the inline-chip scrim */
+  }
+
+  .stage {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5) 120px;
+    transition: max-width var(--dur-base) var(--ease-out);
+  }
+
+  .scope-note {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-4) 0 var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+  .scope-note b { color: var(--color-text); font-weight: 600; }
+  .scope-note .ic { color: var(--color-primary); }
+
+  /* ── controls: cycle prompt length so the operator feels the threshold ── */
+  .ctl-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+  .ctl-row .ctl-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-dim);
+    margin-right: var(--space-1);
+  }
+  .seg-btn {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 5px 11px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .seg-btn:hover { background: var(--color-accent); color: var(--color-text); }
+  .seg-btn.active {
+    background: var(--color-primary-dim);
+    color: var(--color-primary);
+    border-color: var(--color-primary-glow);
+  }
+  .ctl-hint {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    margin-left: auto;
+  }
+  .ctl-hint b { color: var(--color-primary); font-weight: 600; }
+
+  /* ── the chat column (seamless, no boxed scroll) ── */
+  .chat-col { display: flex; flex-direction: column; gap: var(--space-1); }
+
+  /* ── REAL "before" anatomy (MessageItem.tsx:205-217) ──
+     flex justify-end · items-end gap-2.5 · max-w-[70%]
+     gradient-primary bubble rounded-2xl rounded-br-md · pre-wrap break-words
+     + w-7 h-7 round User avatar to the bubble's right                       */
+  .msg-user {
+    display: flex;
+    justify-content: flex-end;   /* right-aligned — preserved in all variants */
+    padding: var(--space-2) 0;
+    animation: fadeSlideUp var(--dur-slow) var(--ease-out);
+  }
+  .msg-inner {
+    display: flex;
+    align-items: flex-end;       /* items-end */
+    gap: 10px;                    /* gap-2.5 */
+    max-width: 70%;              /* max-w-[70%] */
+    min-width: 0;
+  }
+  .bubble {
+    /* gradient-primary = linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%)) */
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    color: var(--bubble-fg);     /* text-white */
+    border-radius: var(--radius-xl);      /* rounded-2xl */
+    border-bottom-right-radius: var(--radius-md);  /* rounded-br-md — the tail */
+    padding: 10px 16px;          /* px-4 py-2.5 */
+    font-size: var(--text-sm);   /* text-sm */
+    line-height: 1.6;            /* leading-relaxed */
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .bubble p {
+    margin: 0;
+    white-space: pre-wrap;       /* whitespace-pre-wrap */
+    overflow-wrap: anywhere;     /* break-words */
+    word-break: break-word;
+  }
+  .avatar-user {
+    flex-shrink: 0;
+    width: 28px;                 /* w-7 */
+    height: 28px;                /* h-7 */
+    border-radius: var(--radius-full);
+    background: var(--color-muted);
+    border: 1px solid var(--color-border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+    color: var(--color-text-muted);
+  }
+  .avatar-user svg { width: 14px; height: 14px; }
+
+  /* an assistant reply stub so the bubble has conversational context */
+  .msg-assistant {
+    display: flex;
+    gap: 10px;
+    padding: var(--space-2) 0 var(--space-4);
+    max-width: 78%;
+  }
+  .avatar-assistant {
+    flex-shrink: 0; width: 28px; height: 28px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bubble-fg); box-shadow: var(--shadow-sm);
+  }
+  .assistant-text {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    padding-top: 2px;
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     VARIANT A — CSS line-clamp + gradient fade + inline Read more
+     ════════════════════════════════════════════════════════════ */
+  .clampA .clamp-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 7;           /* ~7 lines */
+    line-clamp: 7;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .clampA.open .clamp-text {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+  }
+  /* fade matched to the BUBBLE bg (violet end of the 135deg gradient), NOT the page bg.
+     We sample the lower-right of the bubble (the dark-violet corner) so the text
+     dissolves into the bubble, never into a page-color band. */
+  .clampA .clamp-text::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 3.2em;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(252 88% 66% / 0),
+      hsl(252 88% 66% / 0.92) 92%
+    );
+    border-bottom-right-radius: var(--radius-md);
+    border-bottom-left-radius: var(--radius-xl);
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+  .clampA .clamp-text { position: relative; }
+  .clampA.open .clamp-text::after { opacity: 0; }
+  .clampA.short .clamp-text::after { display: none; }   /* short prompt = no fade */
+
+  .readmore {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--bubble-fg);
+    background: rgb(var(--bubble-scrim) / 0.14);
+    border: 1px solid rgb(var(--bubble-scrim) / 0.22);
+    border-radius: var(--radius-full);
+    padding: 3px 11px;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+    font-family: var(--font-sans);
+  }
+  .readmore:hover { background: rgb(var(--bubble-scrim) / 0.24); }
+  .readmore .chev {
+    display: inline-block;
+    transition: transform var(--dur-base) var(--ease-out);
+    font-size: 11px;
+  }
+  .open .readmore .chev { transform: rotate(180deg); }
+  .count-hint {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: rgb(var(--bubble-scrim) / 0.62);
+    margin-left: 8px;
+    white-space: nowrap;
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     VARIANT B — fixed max-height + centered Read-more pill (overlaps fade)
+     ════════════════════════════════════════════════════════════ */
+  .clampB .clamp-text {
+    max-height: 11.2em;       /* ~7 lines of leading-relaxed */
+    overflow: hidden;
+    position: relative;
+    transition: max-height var(--dur-slow) var(--ease-out);
+  }
+  .clampB.open .clamp-text {
+    max-height: 240em;        /* large ceiling so transition reads as expand */
+  }
+  .clampB .clamp-text::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 4.2em;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(252 88% 66% / 0),
+      hsl(252 88% 66% / 0.95) 96%
+    );
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+  .clampB.open .clamp-text::after { opacity: 0; }
+  .clampB.short .clamp-text { max-height: none; }
+  .clampB.short .clamp-text::after { display: none; }
+
+  .pill-wrap {
+    display: flex;
+    justify-content: center;
+    margin-top: -16px;        /* pulls the pill up to overlap the fade */
+    position: relative;
+    z-index: 2;
+  }
+  .clampB.short .pill-wrap { display: none; }
+  .readmore-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--bubble-fg);
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    border: 1px solid rgb(var(--bubble-scrim) / 0.28);
+    border-radius: var(--radius-full);
+    padding: 4px 14px;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+    font-family: var(--font-sans);
+  }
+  .readmore-pill:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+  .readmore-pill .chev {
+    display: inline-block;
+    transition: transform var(--dur-base) var(--ease-out);
+    font-size: 11px;
+  }
+  /* the pill lives OUTSIDE the .clampB bubble, so its open-state is driven by a
+     class on the pill itself (toggled in toggleClamp alongside the bubble) —
+     NOT by .clampB.open, which would never match an external sibling. */
+  .readmore-pill.open .chev { transform: rotate(180deg); }
+
+  /* ════════════════════════════════════════════════════════════
+     VARIANT C — clamp + count hint beside Read more (reuses A treatment)
+     ════════════════════════════════════════════════════════════ */
+  .clampC .clamp-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 7;
+    line-clamp: 7;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    position: relative;
+  }
+  .clampC.open .clamp-text {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+  }
+  .clampC .clamp-text::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 3.2em;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(252 88% 66% / 0),
+      hsl(252 88% 66% / 0.92) 92%
+    );
+    border-bottom-right-radius: var(--radius-md);
+    border-bottom-left-radius: var(--radius-xl);
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+  .clampC.open .clamp-text::after { opacity: 0; }
+  .clampC.short .clamp-text::after { display: none; }
+  .readmore-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 7px;
+  }
+
+  /* hide the readmore affordance entirely on short prompts (all variants) */
+  .short .readmore,
+  .short .readmore-row { display: none; }
+
+  /* small caption above each bubble naming the scenario */
+  .scenario-cap {
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-dim);
+    margin: var(--space-4) 0 0;
+  }
+  .scenario-cap:first-child { margin-top: 0; }
+
+  .section-divider {
+    height: 1px;
+    background: var(--color-border-soft);
+    margin: var(--space-5) 0;
+    border: 0;
+  }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ VARIANT NAV (house class — reused, not restyled) ═══════════════ -->
+<nav class="variant-nav">
+  <span class="label">CTC-04 · clamp treatment</span>
+  <button class="variant-tab active" id="tab-A" onclick="showVariant('A')">A · Fade + inline Read more<span class="star">★</span></button>
+  <button class="variant-tab" id="tab-B" onclick="showVariant('B')">B · Centered Read-more pill</button>
+  <button class="variant-tab" id="tab-C" onclick="showVariant('C')">C · Clamp + count hint</button>
+</nav>
+
+<div class="stage" id="stage">
+
+  <!-- honesty: scope statement on the surface -->
+  <div class="scope-note">
+    <span class="ic">●</span>
+    <span><b>Scope: USER prompts only.</b> Assistant answers are out of scope — they already
+    have their own preview/expand path. Pure client-side clamp — <b>no net-new wire</b>, so no
+    net-new flags. Refines only the right-aligned bubble in <span class="mono">MessageItem.tsx:205</span>.</span>
+  </div>
+
+  <!-- cycle-prompt-length control — feel the threshold -->
+  <div class="ctl-row">
+    <span class="ctl-label">Prompt length</span>
+    <button class="seg-btn active" id="len-short"  onclick="setLength('short')">Short (1 line)</button>
+    <button class="seg-btn"        id="len-long"   onclick="setLength('long')">Long (~150 words)</button>
+    <button class="seg-btn"        id="len-xlong"  onclick="setLength('xlong')">Pasted spec (~600 words)</button>
+    <span class="ctl-hint" id="ctl-hint">Clamp fires above <b>7 lines</b> — short renders unchanged</span>
+  </div>
+
+  <!-- ════════ VARIANT A ════════ -->
+  <div class="variant active" id="variant-A">
+    <div class="chat-col" id="col-A"></div>
+  </div>
+
+  <!-- ════════ VARIANT B ════════ -->
+  <div class="variant" id="variant-B">
+    <div class="chat-col" id="col-B"></div>
+  </div>
+
+  <!-- ════════ VARIANT C ════════ -->
+  <div class="variant" id="variant-C">
+    <div class="chat-col" id="col-C"></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ SHARED TOOLBAR (house class — reused, not restyled) ═══════════════ -->
+<div class="sketch-toolbar">
+  <span>theme</span>
+  <select id="theme-select" onchange="setTheme(this.value)">
+    <option value="default">Default</option>
+  </select>
+  <span>·</span>
+  <button onclick="setViewport(400)">Phone 400</button>
+  <button onclick="setViewport(720)">Tablet 720</button>
+  <button onclick="setViewport(860)">Desktop 860</button>
+</div>
+
+<script>
+  /* ─────────────────────────────────────────────────────────────
+     Real-ish content (grounding §2): a board-deck analysis request.
+     ───────────────────────────────────────────────────────────── */
+
+  const SHORT = "Summarize the Q3 retention number from the board deck.";
+
+  const LONG =
+"Here is our Q3 board deck outline. For each section, pull the supporting figures from the knowledge base and flag anything that looks off.\n\n" +
+"1. Revenue — pull FY25 ARR, net new ARR, and the QoQ growth rate. Cross-check the number against the finance export, not the slide.\n" +
+"2. Retention — find the gross and net revenue retention figures and tell me which cohort is dragging us down.\n" +
+"3. Pipeline — total qualified pipeline and the win rate for the enterprise segment.\n\n" +
+"Once you have the figures, write a two-paragraph narrative I can paste under the title slide.";
+
+  const XLONG =
+"Here is our Q3 board deck outline. For each section, pull the supporting figures from the knowledge base, cross-check them against the raw finance export, and flag anything that looks off before I present this to the board on Thursday.\n\n" +
+"1. Revenue. Pull FY25 ARR, net new ARR for the quarter, and the QoQ growth rate. Do not trust the number on the slide — read board_minutes_q3.md and the finance export and reconcile the two. If they disagree by more than 2%, stop and tell me which source you believe and why.\n\n" +
+"2. Retention. Find the gross revenue retention and net revenue retention figures. Then tell me which customer cohort is dragging NRR down — segment it by ACV band if the data supports it. I specifically want to know whether the SMB churn we saw in Q2 has continued or stabilized.\n\n" +
+"3. Pipeline. Total qualified pipeline entering Q4, the enterprise win rate over the trailing two quarters, and the average sales cycle length. If you can chart the pipeline-coverage ratio against the Q4 target, do that and save it as a PNG.\n\n" +
+"4. Burn and runway. Net burn for the quarter and current runway in months at the trailing-3-month burn rate. Note any one-time items that distort the trend.\n\n" +
+"5. Headcount. Open reqs versus plan, and the fully-loaded cost per head for the new sales hires.\n\n" +
+"For each figure, cite the source file and the page or line you pulled it from so I can defend the number in the room. Where a figure is missing from the knowledge base, say so explicitly rather than guessing — I would rather present a gap than a fabricated number.\n\n" +
+"Once you have all the figures reconciled, write a tight one-page narrative I can paste under the title slide: lead with the headline ARR and NRR, then the single biggest risk, then the single biggest opportunity. Keep it to roughly 250 words, executive tone, no hedging. Then build the supporting slides as a .pptx with one chart per section, and give me the deck plus a short list of every assumption you had to make.";
+
+  const TEXT = { short: SHORT, long: LONG, xlong: XLONG };
+
+  // approximate word + line metrics for the count-hint / threshold copy
+  const METRICS = {
+    short: { words: 9,  lines: 1  },
+    long:  { words: 152, lines: 13 },
+    xlong: { words: 612, lines: 41 },
+  };
+
+  let curLen = 'short';
+
+  const userSvg =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>' +
+    '<circle cx="12" cy="7" r="4"/></svg>';
+  const botSvg =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/>' +
+    '<circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/>' +
+    '<line x1="16" y1="16" x2="16" y2="16"/></svg>';
+
+  /* escape user text (React auto-escapes; we mirror that honesty) */
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* Build one user bubble for a given variant + length.
+     `isShort` => no clamp, no fade, no Read-more (renders unchanged). */
+  function userBubble(variant, len) {
+    const m = METRICS[len];
+    const isShort = (len === 'short');
+    const txt = esc(TEXT[len]);
+    const wrapId = `bubble-${variant}-${len}`;
+
+    let inner = '';
+    if (variant === 'A') {
+      inner =
+        `<div class="clamp-text"><p>${txt}</p></div>` +
+        (isShort ? '' :
+          `<span class="readmore" onclick="toggleClamp('${wrapId}')">` +
+          `<span class="rm-label">Read more</span><span class="chev">⌄</span></span>`);
+    } else if (variant === 'B') {
+      inner =
+        `<div class="clamp-text"><p>${txt}</p></div>`;
+      // pill sits OUTSIDE the bubble, overlapping its fade — appended after the bubble
+    } else if (variant === 'C') {
+      inner =
+        `<div class="clamp-text"><p>${txt}</p></div>` +
+        (isShort ? '' :
+          `<div class="readmore-row">` +
+          `<span class="readmore" onclick="toggleClamp('${wrapId}')">` +
+          `<span class="rm-label">Read more</span><span class="chev">⌄</span></span>` +
+          `<span class="count-hint">· ${m.words} words</span>` +
+          `</div>`);
+    }
+
+    const clampClass = `clamp${variant}` + (isShort ? ' short' : '');
+
+    let html =
+      `<div class="msg-user">` +
+        `<div class="msg-inner">` +
+          `<div class="bubble ${clampClass}" id="${wrapId}">` +
+            inner +
+          `</div>` +
+          `<div class="avatar-user">${userSvg}</div>` +
+        `</div>` +
+      `</div>`;
+
+    // Variant B's pill rides just below the bubble, right-aligned with it
+    if (variant === 'B' && !isShort) {
+      html =
+        `<div class="msg-user">` +
+          `<div class="msg-inner" style="flex-direction:column;align-items:flex-end;">` +
+            `<div style="display:flex;align-items:flex-end;gap:10px;max-width:100%;min-width:0;">` +
+              `<div class="bubble ${clampClass}" id="${wrapId}">${inner}</div>` +
+              `<div class="avatar-user">${userSvg}</div>` +
+            `</div>` +
+            `<div class="pill-wrap" style="margin-right:38px;">` +
+              `<span class="readmore-pill" id="pill-${wrapId}" onclick="toggleClamp('${wrapId}')">` +
+                `<span class="rm-label">Read more</span><span class="chev">⌄</span></span>` +
+            `</div>` +
+          `</div>` +
+        `</div>`;
+    }
+    return html;
+  }
+
+  function assistantStub(text) {
+    return (
+      `<div class="msg-assistant">` +
+        `<div class="avatar-assistant">${botSvg}</div>` +
+        `<div class="assistant-text">${text}</div>` +
+      `</div>`
+    );
+  }
+
+  function scenarioCap(label) {
+    return `<div class="scenario-cap">${label}</div>`;
+  }
+
+  /* Render a variant column: a SHORT bubble (always unchanged) + the
+     currently-selected length so the operator can compare in place,
+     and the conversation has real context. */
+  function renderColumn(variant) {
+    const col = document.getElementById('col-' + variant);
+    let html = '';
+
+    // 1) a short prompt — always renders unchanged (the control case)
+    html += scenarioCap('short prompt · renders unchanged');
+    html += userBubble(variant, 'short');
+    html += assistantStub('The Q3 net revenue retention came in at <b>108%</b>, down from 114% in Q2.');
+
+    html += '<hr class="section-divider" />';
+
+    // 2) the selected length (long or xlong) — clamps
+    if (curLen !== 'short') {
+      const capTxt = curLen === 'long'
+        ? 'long prompt · ~150 words · clamps'
+        : 'pasted spec · ~600 words · clamps';
+      html += scenarioCap(capTxt);
+      html += userBubble(variant, curLen);
+      html += assistantStub('On it — pulling the figures now and reconciling against the finance export.');
+    } else {
+      // when "short" is selected, show BOTH a long and an x-long so the threshold is felt
+      html += scenarioCap('long prompt · ~150 words · clamps');
+      html += userBubble(variant, 'long');
+      html += assistantStub('Reading the board minutes to extract the retention number.');
+      html += '<hr class="section-divider" />';
+      html += scenarioCap('pasted spec · ~600 words · clamps');
+      html += userBubble(variant, 'xlong');
+      html += assistantStub('Searching the knowledge base for Q3 revenue figures.');
+    }
+
+    col.innerHTML = html;
+  }
+
+  /* toggle a single bubble open/closed; flip Read-more ↔ Show less + rotate chevron
+     on EVERY affordance bound to this bubble — the inline chip (A/C, a descendant of
+     the bubble) AND Variant B's external pill (a sibling, id="pill-<wrapId>"), which
+     .clampB.open can never reach. We drive the pill's own .open class here. */
+  function toggleClamp(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('open');
+    const open = el.classList.contains('open');
+
+    // collect both the bubble (inline chip) and its external pill, if present
+    const targets = [el];
+    const pill = document.getElementById('pill-' + id);
+    if (pill) {
+      pill.classList.toggle('open', open);   // drives .readmore-pill.open .chev rotation
+      targets.push(pill);
+    }
+
+    // flip the label on every affordance bound to this bubble
+    targets.forEach(t => t.querySelectorAll('.rm-label').forEach(l => {
+      l.textContent = open ? 'Show less' : 'Read more';
+    }));
+  }
+
+  function renderAll() {
+    renderColumn('A');
+    renderColumn('B');
+    renderColumn('C');
+  }
+
+  function setLength(len) {
+    curLen = len;
+    document.getElementById('len-short').classList.toggle('active', len === 'short');
+    document.getElementById('len-long').classList.toggle('active', len === 'long');
+    document.getElementById('len-xlong').classList.toggle('active', len === 'xlong');
+    const hint = document.getElementById('ctl-hint');
+    const m = METRICS[len];
+    if (len === 'short') {
+      hint.innerHTML = 'Clamp fires above <b>7 lines</b> — short renders unchanged';
+    } else {
+      hint.innerHTML = `${m.words} words · ~${m.lines} lines → clamped to <b>7 lines</b> (${m.lines - 7} hidden)`;
+    }
+    renderAll();
+  }
+
+  function showVariant(v) {
+    ['A', 'B', 'C'].forEach(x => {
+      document.getElementById('variant-' + x).classList.toggle('active', x === v);
+      document.getElementById('tab-' + x).classList.toggle('active', x === v);
+    });
+  }
+
+  /* toolbar */
+  function setViewport(px) {
+    document.getElementById('stage').style.maxWidth = px + 'px';
+  }
+  function setTheme(_v) { /* only Default theme ships for this sketch */ }
+
+  /* init */
+  renderAll();
+</script>
+</body>
+</html>

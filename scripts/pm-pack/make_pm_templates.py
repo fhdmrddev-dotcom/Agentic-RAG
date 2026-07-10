@@ -1,7 +1,7 @@
-"""Phase 104 Plan 01 — reproducible builder for the 2 PM docxtpl templates.
+"""Phase 104 Plan 01 (+ Phase 143 Plan 03) — reproducible builder for the PM docxtpl templates.
 
-CONTENT/DATA ONLY (PM-01). Builds, via python-docx (no manual Word authoring), the two
-``.docx`` templates the headline template-fill workflows render:
+CONTENT/DATA ONLY (PM-01 / WF-01). Builds, via python-docx (no manual Word authoring), the
+``.docx`` templates the template-fill workflows render:
 
   - ``templates/weekly-status-report.docx`` — scalar tags the model emits as cited
     ``FlatScalar``s (``{{ key.value }}`` -> context key ``key``).
@@ -9,6 +9,11 @@ CONTENT/DATA ONLY (PM-01). Builds, via python-docx (no manual Word authoring), t
     the model emits 8 cited columns (``{{ r.<col>.value }}``) and the **Score** cell is
     an INLINE Jinja P×I expression over the WORDED probability/impact (NOT a model field,
     NOT backend code).
+  - ``templates/compliance-gap-report.docx`` — Phase 143 (WF-01) starter: a 6-column
+    ``{%tr for r in rows %}`` table (``{{ r.<col>.value }}`` — requirement / source_clause /
+    current_state / gap / severity / owner) + a scalar header block. Authored fresh for the
+    Compliance Gap Report starter (D-143-3); re-homed to the seed-user Storage prefix by
+    ``scripts/seed-starters.py`` (D-143-4b).
 
 Mirrors the proven spike-097 conventions (``scripts/spike-097/make_template.py``):
 every Jinja tag lives in its OWN single-run paragraph / cell (Pitfall-4-safe — a tag
@@ -41,6 +46,7 @@ from docx import Document
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATUS_PATH = TEMPLATES_DIR / "weekly-status-report.docx"
 RISK_PATH = TEMPLATES_DIR / "risk-register.docx"
+COMPLIANCE_PATH = TEMPLATES_DIR / "compliance-gap-report.docx"
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +158,80 @@ def build_risk_register() -> Path:
     return RISK_PATH
 
 
+# ---------------------------------------------------------------------------
+# Compliance Gap Report (Phase 143 / WF-01 starter) — 6-col {%tr%} table + scalar header.
+# Fresh composition (RESEARCH 331-347): one row per compliance obligation, every cited
+# column a {{ r.<col>.value }} single-run cell (no inline expression — unlike the Risk
+# Register's P×I Score, this starter has no derived cell). The TAG NAMES are the contract:
+# each {{ r.<col>.value }} -> EmitFieldMap row column `<col>`; the scalar header keys map to
+# FlatScalar context keys. Pitfall-4-safe (one Jinja tag per single-run cell/paragraph;
+# the {%tr%} loop tags in dedicated open/close rows).
+# ---------------------------------------------------------------------------
+COMPLIANCE_HEADERS = [
+    "Requirement", "Source Clause", "Current State", "Gap", "Severity", "Owner",
+]
+
+# Body row tags in the SAME column order as COMPLIANCE_HEADERS — 6 cited columns.
+COMPLIANCE_BODY_TAGS = [
+    "{{ r.requirement.value }}",
+    "{{ r.source_clause.value }}",
+    "{{ r.current_state.value }}",
+    "{{ r.gap.value }}",
+    "{{ r.severity.value }}",
+    "{{ r.owner.value }}",
+]
+
+assert len(COMPLIANCE_HEADERS) == len(COMPLIANCE_BODY_TAGS), "header/body column count mismatch"
+
+# Scalar header block — (heading label, scalar context key) pairs. Each {{ key.value }}
+# tag lives in its own single-run paragraph (Pitfall-4-safe).
+COMPLIANCE_HEADER_SECTIONS = [
+    ("Report Title", "report_title"),
+    ("Report Date", "report_date"),
+    ("Scope", "scope"),
+]
+
+
+def build_compliance_gap_report() -> Path:
+    """Write templates/compliance-gap-report.docx (6-col {%tr%} table + scalar header block)."""
+    doc = Document()
+    doc.add_heading("Compliance Gap Report", level=0)
+
+    # Scalar context tags — each label+tag in its own single-run paragraph.
+    for label, key in COMPLIANCE_HEADER_SECTIONS:
+        doc.add_paragraph("%s: {{ %s.value }}" % (label, key))
+    doc.add_paragraph("")  # spacer
+
+    # 4 rows: header + dedicated {%tr for%} row + content row + dedicated {%tr endfor%} row
+    # (mirror build_risk_register — docxtpl replaces each {%tr %}-bearing row with the bare
+    # {% ... %} statement, so the loop tags MUST sit in their own rows).
+    table = doc.add_table(rows=4, cols=len(COMPLIANCE_HEADERS))
+    table.style = "Table Grid"
+
+    header_cells = table.rows[0].cells
+    for i, label in enumerate(COMPLIANCE_HEADERS):
+        header_cells[i].text = label
+
+    # Dedicated loop-open row — tag in the first cell, rest left blank.
+    table.rows[1].cells[0].text = "{%tr for r in rows %}"
+
+    # Content row — the row docxtpl repeats once per `r` in `rows`.
+    content_cells = table.rows[2].cells
+    for i, tag in enumerate(COMPLIANCE_BODY_TAGS):
+        content_cells[i].text = tag
+
+    # Dedicated loop-close row.
+    table.rows[3].cells[0].text = "{%tr endfor %}"
+
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+    doc.save(str(COMPLIANCE_PATH))
+    # Re-open to confirm integrity.
+    Document(str(COMPLIANCE_PATH))
+    return COMPLIANCE_PATH
+
+
 def build() -> list[Path]:
-    return [build_status_report(), build_risk_register()]
+    return [build_status_report(), build_risk_register(), build_compliance_gap_report()]
 
 
 if __name__ == "__main__":

@@ -275,19 +275,55 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     const spine = screen.getByTestId("gauntlet-spine")
-    // Match the exact server-fixed stage LABELS (8 ordered stages, sketch 020-B D2).
+    // Match the short human-readable stage labels (sketch 051-A UX labels — full
+    // technical descriptions live in the node title= tooltip, not the visible text).
     for (const label of [
-      "Owner check",
-      "Definition valid",
-      "business_requirement",
-      "Structural lint",
-      "Interactive-phase check",
-      "Golden run on your KB",
-      "Structural gate",
-      "Independent judge",
+      "Owner",
+      "Valid",
+      "Goal",
+      "Structure",
+      "Pause",
+      "Golden run",
+      "Citations",
+      "Judge",
     ]) {
       expect(within(spine).getByText(label)).toBeInTheDocument()
     }
+  })
+
+  // --- Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the prepended soul block ---
+
+  it("prepends the pub-scale soul block (purpose + tier chip) ABOVE the gauntlet ladder (D-06)", async () => {
+    const definition = {
+      name: "Weekly Status",
+      business_requirement: "Summarize the week's progress for stakeholders.",
+      phases: [
+        { slug: "gather", phase_index: 0, name: "Gather", config: { phase_type: "llm_agent" } },
+        { slug: "emit", phase_index: 1, name: "Emit", config: { phase_type: "llm_emit", citation_policy: "strict" } },
+      ],
+    }
+    render(<PublishGauntlet definitionId="def-1" definition={definition} />)
+    await openModal()
+
+    // The soul block renders at pub scale with the authored purpose + the tier chip.
+    const soul = screen.getByTestId("workflow-soul")
+    expect(soul).toHaveAttribute("data-scale", "pub")
+    expect(screen.getByText(/Summarize the week's progress/i)).toBeInTheDocument()
+    expect(screen.getByTestId("soul-tier")).toHaveAttribute("data-tier", "STRICT")
+
+    // DOM order: the soul block precedes the 8-stage gauntlet spine.
+    const spine = screen.getByTestId("gauntlet-spine")
+    expect(soul.compareDocumentPosition(spine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("renders the soul's honest draft empty-state when no definition is passed — and does not crash (additive, optional prop)", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    // The soul block still mounts; the purpose atom shows the honest empty-state (D-03).
+    expect(screen.getByTestId("workflow-soul")).toBeInTheDocument()
+    expect(screen.getByText(/draft · purpose not declared yet/i)).toBeInTheDocument()
+    // The 8-stage ladder is unaffected (byte-behavior-identical — D-06).
+    expect(screen.getByTestId("gauntlet-spine")).toBeInTheDocument()
   })
 
   // --- Source-grep guards (the locked render rules survive refactors) ---
@@ -384,5 +420,89 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
     await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
     await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toHaveTextContent(/elapsed/i))
+  })
+})
+
+// --- Phase 127-02 Task 2 (WUX-03, sketch 051-A) — worded verdict leads, raw grid on-demand ---
+//
+// The resolved gauntlet must LEAD with a plain-worded verdict; the verbatim 5-field
+// PublishVerdict grid + the `▦ rendered verbatim` provenance cap are DEMOTED behind a
+// <details data-testid="raw-verdict"> disclosure (honesty preserved, just not leading).
+// The judge per-criterion rows stay FIRST-CLASS (outside the disclosure). Every existing
+// honesty assertion above is unchanged — these are ADDITIVE.
+describe("PublishGauntlet — worded verdict leads + raw 5-field grid on-demand (Phase 127-02)", () => {
+  /** A 200 judge BLOCK with a per-criterion row + a server summary. */
+  const judgeBlock: PublishOutcome = {
+    kind: "verdict",
+    verdict: {
+      published: false,
+      version: null,
+      golden_run_id: "a7f3c1d2-run",
+      blocked_stage: "judge",
+      named_failures: [
+        { criterion: "grounded_in_evidence", score: 0.42, evidence: "3 of 12 figures are uncited." },
+        { summary: "a quarter of its quantitative claims are not grounded in a cited source" },
+      ],
+    },
+  }
+
+  it("(a) leads a resolved block with a plain-worded headline that PRECEDES the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+    // The worded headline conveys "blocked by the grader / hard wall" — not the bare grid.
+    const headline = screen.getByTestId("verdict-headline")
+    expect(headline).toHaveTextContent(/blocked by the grader/i)
+    // DOM order: the worded headline precedes the raw-verdict disclosure.
+    const raw = screen.getByTestId("raw-verdict")
+    expect(headline.compareDocumentPosition(raw) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("(a') leads a success with a worded 'Published … is live' headline (server-truth version)", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: { published: true, version: 3, golden_run_id: "r3", blocked_stage: null, named_failures: [] },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-success")).toBeInTheDocument())
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent(/published.*v3.*is live/i)
+  })
+
+  it("(b) demotes the raw 5-field grid INSIDE <details data-testid=raw-verdict> — all 5 verdict-* rows are descendants", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    expect(raw.tagName).toBe("DETAILS")
+    // All 5 verbatim verdict rows live inside the disclosure.
+    for (const field of ["published", "version", "golden_run_id", "blocked_stage", "named_failures"]) {
+      expect(within(raw).getByTestId(`verdict-${field}`)).toBeInTheDocument()
+    }
+  })
+
+  it("(c) keeps the ▦ 'rendered verbatim' provenance cap INSIDE the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    expect(within(raw).getByText(/rendered verbatim from the server — not re-derived/i)).toBeInTheDocument()
+  })
+
+  it("(d) keeps the judge per-criterion rows FIRST-CLASS — OUTSIDE the raw-verdict disclosure", async () => {
+    mockedPublish.mockResolvedValue(judgeBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    const raw = await screen.findByTestId("raw-verdict")
+    // The per-criterion row is the worded "why" — it must NOT be demoted into the grid.
+    expect(within(raw).queryByText(/grounded_in_evidence/)).not.toBeInTheDocument()
+    // It is still present, first-class, in the block.
+    expect(screen.getByText(/grounded_in_evidence/)).toBeInTheDocument()
   })
 })

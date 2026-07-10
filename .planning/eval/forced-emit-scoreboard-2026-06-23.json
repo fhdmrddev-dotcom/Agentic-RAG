@@ -1,0 +1,258 @@
+[
+  {
+    "schema_difficulty": "easy",
+    "provider": "openai",
+    "model_effective": "gpt-5.4-mini",
+    "declared_emit_tier": "force_strict",
+    "winning_rung": "strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "openai",
+    "model_effective": "gpt-5.4-mini",
+    "declared_emit_tier": "force_strict",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "FAIL",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "anthropic",
+    "model_effective": "claude-haiku-4-5-20251001",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "anthropic",
+    "model_effective": "claude-haiku-4-5-20251001",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "google",
+    "model_effective": "gemini-3.5-flash",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "google",
+    "model_effective": "gemini-3.5-flash",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "openrouter",
+    "model_effective": "z-ai/glm-5.1",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": false
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "openrouter",
+    "model_effective": "z-ai/glm-5.1",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": false
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "deepseek",
+    "model_effective": "deepseek-v4-flash",
+    "declared_emit_tier": "force",
+    "winning_rung": "coerce",
+    "axes": {
+      "trigger": "PASS",
+      "force": "FAIL",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "deepseek",
+    "model_effective": "deepseek-v4-flash",
+    "declared_emit_tier": "force",
+    "winning_rung": "coerce",
+    "axes": {
+      "trigger": "PASS",
+      "force": "FAIL",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "moonshot",
+    "model_effective": "kimi-k2.6",
+    "declared_emit_tier": "coerce",
+    "winning_rung": "coerce",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "moonshot",
+    "model_effective": "kimi-k2.6",
+    "declared_emit_tier": "coerce",
+    "winning_rung": "coerce",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "zhipu",
+    "model_effective": "glm-5.1",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "zhipu",
+    "model_effective": "glm-5.1",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "easy",
+    "provider": "minimax",
+    "model_effective": "MiniMax-M2.7-highspeed",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "schema_difficulty": "hard",
+    "provider": "minimax",
+    "model_effective": "MiniMax-M2.7-highspeed",
+    "declared_emit_tier": "force",
+    "winning_rung": "non_strict_force",
+    "axes": {
+      "trigger": "PASS",
+      "force": "PASS",
+      "recovery": "PASS",
+      "honest_fail": "PASS"
+    },
+    "documented": [],
+    "outcome": "completed",
+    "gated": true
+  }
+]

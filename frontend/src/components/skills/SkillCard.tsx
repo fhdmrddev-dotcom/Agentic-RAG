@@ -3,6 +3,7 @@ import { Zap, Pencil, Globe, Trash2, MessageSquare, Download, Loader2 } from "lu
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { PublishGateDialog } from "./PublishGateDialog"
 import type { Skill } from "@/types"
 
 interface Props {
@@ -12,9 +13,15 @@ interface Props {
   onSelect: (skill: Skill) => void
   onDelete: (id: string) => Promise<void>
   onToggleEnabled: (id: string) => Promise<void>
-  onToggleGlobal: (id: string) => Promise<void>
+  // Phase 136 (GATE-01): the share direction rides an optional `override` through
+  // the publish gate; the unshare direction passes nothing (never gated — D-07).
+  onToggleGlobal: (id: string, override?: boolean) => Promise<void>
   onTryInChat: (skillName: string) => void
   onExport: (id: string, name: string) => Promise<void>
+  // Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06): passed through to the publish
+  // gate dialog's UNMET-branch "Review evals →" link (Studio · Evals). Optional so
+  // callers without a navigator simply render no link.
+  onReviewEvals?: (skillId: string) => void
 }
 
 export function SkillCard({
@@ -27,11 +34,14 @@ export function SkillCard({
   onToggleGlobal,
   onTryInChat,
   onExport,
+  onReviewEvals,
 }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
   const [localEnabled, setLocalEnabled] = useState(skill.is_enabled)
   const [exporting, setExporting] = useState(false)
+  // Phase 136 (GATE-01 / D-05): the private→global share opens the gate dialog.
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
 
   const isOwner = skill.user_id === currentUserId
 
@@ -88,7 +98,16 @@ export function SkillCard({
       <div className="flex items-start gap-2">
         <Zap className="h-4 w-4 mt-0.5 text-primary shrink-0" />
         <span className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">{skill.name}</span>
-        {skill.is_global && (
+        {/* Phase 137.2 / CREATE-01 (D-01) — ONE pill via a ternary: "Built-in"
+            (trust-badge tint) for a system-owned platform built-in, else the
+            existing muted "Global" pill. A built-in is inherently global, so
+            two pills would be redundant. Reflects the backend value; never set
+            here (badge-spoofing mitigation, T-137.2-02). */}
+        {skill.is_system ? (
+          <span className="text-[10px] text-primary bg-primary/10 px-2 py-1 rounded-full shrink-0">
+            Built-in
+          </span>
+        ) : skill.is_global && (
           <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full shrink-0">
             Global
           </span>
@@ -217,7 +236,15 @@ export function SkillCard({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={handleToggleGlobal}
+                      onClick={() => {
+                        // D-07: unshare (global→private) is a direct, never-gated
+                        // toggle; share (private→global) opens the publish gate.
+                        if (skill.is_global) {
+                          handleToggleGlobal()
+                        } else {
+                          setShowPublishDialog(true)
+                        }
+                      }}
                     >
                       <Globe className="h-3.5 w-3.5" />
                     </Button>
@@ -250,6 +277,18 @@ export function SkillCard({
       {toggleError && (
         <p className="text-xs text-destructive mt-1">{toggleError}</p>
       )}
+
+      {/* Phase 136 (GATE-01 / D-05): publish gate on the share direction. The
+          server is the gate (D-07) — onConfirm just echoes the override choice. */}
+      <PublishGateDialog
+        skillId={skill.id}
+        open={showPublishDialog}
+        onOpenChange={setShowPublishDialog}
+        onConfirm={async (override) => {
+          await onToggleGlobal(skill.id, override)
+        }}
+        onReviewEvals={onReviewEvals}
+      />
     </div>
   )
 }

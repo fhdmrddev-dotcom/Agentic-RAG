@@ -9,11 +9,11 @@ affected_areas: [frontend/streaming, frontend/run-honesty, harness/workflow-ui]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Reviewed at /gsd:discuss-phase 124 (2026-06-26) — left OPEN, NOT folded: live-run timer/reconcile mechanics, not the soul/door chrome Phase 124 re-skins. Re-check after the 124 run-header soul re-skin lands — if the soul header touches the run strip, this timer-reseed + duplicate-avatar bug may then be in-scope to fix. | Reviewed at /gsd:discuss-phase 128 (2026-06-27) — CONDITIONAL fold (CONTEXT D-04): CTC-03 makes the header RunStatusStrip the SOLE timer, so the timer-reseed fix (seed elapsed from run started_at, not mount) is folded into 128 ONLY IF the planner confirms the reseed is in that same canonical Deep RunStatusStrip (vs the 095.1-fixed Deep run-card, vs the harness/workflow strip = Phase 127's surface); else leave open. The duplicate-avatar symptom (StreamsProvider/MessageList double-mount race) is NOT folded — deferred to the run-honesty cluster slot. Stays OPEN."
 reproduces_on:
-  branch: v2.5-dev
-  commit: d152dc83
-  date: 2026-06-10
+  branch: develop
+  commit: 66dca2d8
+  date: 2026-06-22
 ---
 
 # BUG-260610-01: Workflow-run nav glitch — timer resets + duplicated empty assistant avatar
@@ -41,6 +41,15 @@ Re-observed during Phase 102 freshness `ask_user` live UAT (DeepSeek `deepseek-v
 - **At KICKOFF (flow start), not just on nav:** an orphan empty assistant avatar (no content) appears, and is sometimes **duplicated at start — one orphan avatar + one showing "starting workflow"**. This pins a second trigger beyond nav-back: the run-kickoff optimistic placeholder + the first SSE event double-mount (the S3 MessageList key-mismatch / S4 optimistic+reconcile-race seams).
 - **CONFIRMED render-only (not a data dup):** the backend has exactly **1 assistant message row** per run (`messages` where role='assistant' = 1 for both the Proceed run ccec4354 and the Abort run 146a3bc2). The duplicate/orphan is purely a frontend render artifact — no duplicated message, no data loss. The freshness pause itself worked correctly (Proceed → completed + `validator_ask_user_approved` receipt; Abort → honest fail).
 - **NOT a Phase 102 regression:** Phase 102 changed zero frontend files (all fixes were backend: publish_service / forced_emit / validator_kinds). This is the same pre-existing chat-surface bug; DeepSeek's first-token latency amplifies the empty-avatar window.
+
+## Update — reproduced at KICKOFF on a FAST provider during Phase 121 demo (2026-06-22, HEAD 66dca2d8 / develop)
+
+Re-observed live while demoing the Phase 121 2-pill composer: launched the published `Doc Q&A` workflow from the Workflows page into a fresh thread (OpenAI `gpt-5.4-mini`, the operator's default — **a fast provider**, not the slow OpenRouter/Moonshot/DeepSeek/Google runs all prior evidence came from).
+
+- **At KICKOFF, the duplicated empty assistant avatar flashed for ~1–2 s, then reconciled away** once the first content arrived. Operator-observed in real time; the orchestrator's discrete a11y snapshots/screenshots only froze a single empty avatar (the transient double-mount is too brief to reliably catch in a point-in-time capture — noting this so future repro attempts use video/rapid frames, not single snapshots).
+- **New signal — provider speed is NOT a precondition:** all prior evidence (Google/OpenRouter/Moonshot/DeepSeek) framed the empty-avatar window as *amplified by slow first-token latency*. This repro on fast OpenAI `gpt-5.4-mini` shows the double-mount still fires even when first-token latency is low — consistent with the root cause being the **kickoff optimistic-placeholder + first-SSE-event double-mount race** (S3/S4 seams), with provider latency only widening the *visible* window, not causing it.
+- **NOT a Phase 121 regression:** Phase 121 (IA-01, 2-pill composer removal) touched **zero** render-path files — `git diff 131584b6^..66dca2d8` over `MessageItem.tsx` / `MessageList.tsx` / `useMessages.ts` / `StreamsProvider.tsx` is empty (composer-only edits to `MessageInput.tsx` + `ChatArea.tsx`). The avatar double-mount path is untouched; this is the same pre-existing artifact. Phase 121 decision **D-07** had already routed this report to Phase 124 (kept open, in the SC#10 must-not-regress set, not folded into 121).
+- **Sibling cluster confirmed same session:** the run timeline still rendered the placeholder phase slug **`phase-0`** ("Phase 1 of 3, phase-0, started") — i.e. `BUG-260609-04` reproduced alongside, reinforcing the "close the workflow-run-display cluster together" routing below.
 
 ## Why it matters
 

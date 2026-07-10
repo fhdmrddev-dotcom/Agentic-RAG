@@ -239,6 +239,16 @@ class WorkflowDefinition(_StrictBase):
     # the publish ENDPOINT (Plan 05), NOT this schema, enforces "required at publish".
     business_requirement: str | None = None
 
+    # ── 143 WF-01 — Starters-shelf curation marker (D-143-2). Additive-optional,
+    # zero-migration: old JSONB rows model_validate() to None (mirrors the 098 lock
+    # above). Load-bearing (Shared Pattern 1): a seeded starter carries
+    # category='starter' INSIDE this definition JSONB, and the fresh-copy fork
+    # round-trips it through create_draft (POST /workflows parses the body as this
+    # model) — so without this field extra='forbid' would 422 on the key. The
+    # Starters shelf query reads definition->>'category'='starter'. This does NOT
+    # relax extra='forbid': every OTHER unknown key still raises ValidationError.
+    category: str | None = None
+
     @model_validator(mode="after")
     def _folder_scope_requires_project(self) -> "WorkflowDefinition":
         # D-07 STRUCTURAL half only: a per-phase folder_scope needs a project_folder_id

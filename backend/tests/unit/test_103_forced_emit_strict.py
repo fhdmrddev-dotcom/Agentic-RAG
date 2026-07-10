@@ -82,9 +82,10 @@ def _patch_gateway(monkeypatch):
 
 
 def _patch_strict_capable(monkeypatch):
-    """Mock a STRICT-capable FORCE-tier model cap (the OpenAI/DeepSeek shape): the
-    cap-derived strict is True, so strict=None must propagate True and strict=False
-    must override it to False."""
+    """Mock a STRICT-capable force_strict-tier model cap (the OpenAI shape): the first
+    rung is ``strict_force`` (strict_schema True), so strict=None must propagate True
+    (the strict_force rung) and strict=False must demote it to non_strict_force
+    (strict_schema False). Phase 122: the ladder resolves on ``emit_tier``."""
     import app.services.forced_emit as fe
 
     monkeypatch.setattr(
@@ -93,6 +94,7 @@ def _patch_strict_capable(monkeypatch):
         lambda model: {
             "forced_emission": True,
             "strict_json_schema": True,
+            "emit_tier": "force_strict",
             "provider": "openai",
         },
     )
@@ -145,13 +147,15 @@ async def test_strict_true_overrides(_patch_gateway, monkeypatch):
     the override is symmetric and not merely a one-way disable)."""
     import app.services.forced_emit as fe
 
-    # A FORCE-tier model whose cap-derived strict is FALSE.
+    # A FORCE-tier model whose cap-derived strict is FALSE — the first rung
+    # (non_strict_force) carries strict_schema False, but strict=True overrides it ON.
     monkeypatch.setattr(
         fe,
         "get_model_capability",
         lambda model: {
             "forced_emission": True,
             "strict_json_schema": False,
+            "emit_tier": "force",
             "provider": "openai",
         },
     )

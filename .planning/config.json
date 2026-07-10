@@ -15,13 +15,14 @@
     "ui_review": true,
     "auto_advance": false,
     "skip_discuss": false,
-    "use_worktrees": true,
+    "use_worktrees": false,
     "research_before_questions": false
   },
   "model_profile": "quality",
   "commit_docs": true,
   "git": {
-    "branching_strategy": "none"
+    "branching_strategy": "none",
+    "base_branch": "master"
   },
   "hooks": {
     "context_warnings": true

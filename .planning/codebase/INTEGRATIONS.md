@@ -134,7 +134,7 @@ Provider routing decision table lives in `MODEL_CAPABILITIES` (`backend/app/conf
 
 **CI Pipeline:**
 - GitHub Actions — `.github/workflows/backend-tests.yml`
-  - Triggers: pushes to `master`, `main`, `v2.5-dev`; PRs on backend / migrations changes
+  - Triggers: pushes to `master`, `main`, `develop`, `release/**`; PRs on backend / migrations changes
   - Steps: Python 3.12, install backend deps, boot Redis via `docker compose -f docker-compose.dev.yml up -d redis`, host-port readiness probe, `pytest tests -q`
   - No frontend test job, no Playwright e2e job, no lint job in CI yet
 

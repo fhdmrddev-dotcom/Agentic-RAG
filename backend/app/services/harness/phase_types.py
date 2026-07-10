@@ -632,6 +632,8 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
                         "user_id": current_user.get("id"),
                         "role": "system",
                         "content": prompt,
+                        # CTX-01 (T-120-04): llm_human_input ask_user prompt — workflow row.
+                        "origin": "harness",
                         "tool_calls": [
                             {
                                 "kind": "ask_user_prompt",
@@ -1041,9 +1043,16 @@ class _ProducerStreamCtx:
     def __init__(self, inner, run_id) -> None:
         self._inner = inner
         self.run_id = run_id
+        # Phase 141 (COLL-02 / Landmine 2): expose the workflow-run lineage from the RAW
+        # bag's run_id (= workflow_runs.id on this emit path) so own_claim_for_ctx derives
+        # str(W), NEVER the 'deep' sentinel. This proxy OVERRIDES run_id to the producer id
+        # and the harness bag has no workflow_run_id attr, so without this a workflow emit
+        # render would mis-claim as Deep and re-open the cross-context leak. A locally-set
+        # attribute short-circuits __getattr__.
+        self.workflow_run_id = getattr(inner, "run_id", None)
 
     def __getattr__(self, name: str):
-        # Only called when normal lookup misses (run_id/_inner resolve locally).
+        # Only called when normal lookup misses (run_id/workflow_run_id/_inner resolve locally).
         return getattr(self._inner, name)
 
 
@@ -1100,12 +1109,21 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     try:
         # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
         asset_ref = _emit_bound_asset_ref(definition)
+        # Phase 141 (COLL-02 / Landmine 1&2): run-scope the ephemeral (Branch 2) fallback
+        # when no library asset is bound. The RAW harness bag has NO workflow_run_id attr,
+        # so own_claim_for_ctx(ctx) would wrongly derive 'deep' here — instead the bag's
+        # run_id IS workflow_runs.id (verified _build_phase_tool_context:354), always a
+        # workflow lineage on this path. Guard the None edge (minimal/unit ctx) → own_claim
+        # None (the Branch-1 bound-asset path ignores it anyway). This matches the own_claim
+        # the emit re-dispatch derives via _ProducerStreamCtx.workflow_run_id (Landmine 1).
+        own_claim = str(run_id) if run_id is not None else None
         src = await resolve_template_source(
             pool=pool,
             supabase=getattr(ctx, "supabase", None),
             thread_id=getattr(ctx, "thread_id", None),
             user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
             asset_ref=asset_ref,  # the bound template (NOT None) — the model never selects it
+            own_claim=own_claim,
         )
         if not src.get("bytes"):
             # State (e): no template bound AND no ephemeral upload resolved — honest fail.

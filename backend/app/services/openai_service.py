@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import logging
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -593,7 +592,14 @@ EXECUTE_CODE_TOOL = {
             "Use skill_files to inject skill attachment files (templates, assets) into the sandbox "
             "at /sandbox/{filename} before your code runs — reference them with that path in code. "
             "Use this for data analysis, calculations, generating charts, creating documents, "
-            "or any task that benefits from running actual Python code."
+            "or any task that benefits from running actual Python code. "
+            "This sandbox runs Python only. Pre-installed: python-pptx, matplotlib, numpy, pandas, "
+            "openpyxl, python-docx, pypdf, reportlab, docxtpl, seaborn, scipy, scikit-learn, plotly "
+            "(install other PyPI packages via `libraries`). NOT available and cannot be installed "
+            "here: Node/npm/npx, LibreOffice (soffice), pandoc, Poppler (pdftoppm), markitdown, and "
+            "any bundled scripts/office/* helpers. If a skill's instructions tell you to shell out "
+            "to those, do NOT -- they will fail; do the equivalent work in-memory with the Python "
+            "libraries above, or tell the user it is not available."
         ),
         "parameters": {
             "type": "object",
@@ -1486,6 +1492,21 @@ def create_adaptive_streaming_chat(
     
     provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
 
+    # Phase 123 (WR-06): strip internal ``_``-prefixed markers from each message
+    # before they reach ``client.chat.completions.create``. ``_reconstruct_history``
+    # stamps ``_pinned_skill`` on load_skill tool-result messages (agent_loop.py) and
+    # ``trim_messages_to_fit`` preserves it (it is the de-dupe key in context_window).
+    # The Anthropic/Google adapters rebuild messages so the marker is dropped there,
+    # but the OpenAI-compat path (OpenAI + OpenRouter + Ollama + DeepSeek) funnels the
+    # list straight to the SDK, and OpenAI / several compat providers 400 on unknown
+    # top-level message properties. This shallow per-message comprehension is safely
+    # DOWNSTREAM of the upstream trim (the pin ORDERING is already baked into the list;
+    # only the now-redundant marker is removed). ``content`` is referenced by-reference,
+    # NOT deep-copied — it can be large.
+    messages = [
+        {k: v for k, v in m.items() if not k.startswith("_")} for m in messages
+    ]
+
     kwargs: dict = {
         "model": effective_model,
         "messages": messages,
@@ -1533,34 +1554,26 @@ def create_adaptive_streaming_chat(
     # set. NEVER reached on the auto path (the byte-identical RED LINE).
     if force_tool_name is not None:
         _forced_tools = tools_override if tools_override is not None else get_tools(user_settings)
-        if strict_response_format:
-            # 101.1 review WR-05 (1): strictness for FORCED TOOL ARGUMENTS belongs
-            # on the FUNCTION DEFINITION ("strict": true) — on OpenAI-compat APIs,
-            # ``response_format`` constrains the assistant CONTENT channel, not the
-            # forced tool-call arguments (the thing the executor validates). The
-            # schema is already strict-shaped (additionalProperties:false +
-            # all-required-with-null from EmitFieldMap — D-09). Deep-copy FIRST: the
-            # fallback list is the SHARED get_tools() catalog — never mutate it.
-            _forced_tools = copy.deepcopy(_forced_tools)
-            for _t in _forced_tools or []:
-                _fn = _t.get("function") if isinstance(_t, dict) else None
-                if _fn and _fn.get("name") == force_tool_name:
-                    _fn["strict"] = True
-                    break
+        # Phase 122 (MP-02 / D-122-04): the function-level ``strict`` flag block
+        # (101.1 WR-05 (1)) is REMOVED. It was INERT for DeepSeek (a documented
+        # /beta-only feature we never reach) and contributed NOTHING for OpenAI —
+        # OpenAI's token-level guarantee comes from the ``response_format`` json_schema
+        # built below, not from a function-def flag. Removing it does NOT regress
+        # OpenAI force_strict (A4 — proven by test_openai_force_strict_preserved).
         kwargs["tools"] = _forced_tools
         kwargs["tool_choice"] = {
             "type": "function",
             "function": {"name": force_tool_name},
         }
-        if strict_response_format and provider == "openai":
-            # 101.1 review WR-05 (2): ``json_schema`` response_format is verified on
-            # OpenAI ONLY — DeepSeek's documented response_format support is
-            # ``json_object``, so an unverified ``json_schema`` would 400 EVERY
-            # DeepSeek TIER-FORCE emit (the exact "docs said forceable!" trap
-            # 101.1-07 hit; the layer-6 backstop catches it honestly but the feature
-            # dies). Gate per-provider; the plan-10 live re-verify must assert a
-            # forced=true + emit_rendered receipt on DeepSeek with the function-level
-            # strict flag above — widen this gate only on live evidence.
+        if strict_response_format:
+            # Phase 122 (MP-02 / D-122-04): the hardcoded ``and provider == "openai"``
+            # name check is REMOVED — the gate is now TIER-DRIVEN. The caller sets
+            # ``strict_response_format`` ONLY for emit_tier=="force_strict" shots, which
+            # (post-migration) are OpenAI-only by MEASUREMENT, not by name. So the
+            # json_schema response_format is requested whenever strict is asked for, with
+            # no provider-name special-case. DeepSeek is now emit_tier=force (never
+            # force_strict), so its caller never sets strict_response_format → it never
+            # reaches this branch (the old "docs said forceable!" 400 trap can't recur).
             # Build the strict json_schema response_format from the forced tool's
             # parameters. Defensive: only inject when the named tool's schema is
             # present in the tool list.
@@ -1617,6 +1630,12 @@ def create_adaptive_streaming_chat(
                     # Enable Response Healing plugin
                     kwargs.setdefault("extra_body", {})
                     kwargs["extra_body"]["plugins"] = [{"id": "response-healing"}]
+                    # Phase 129 (D-02 / MP-04 — wires the config.py D-15 directive):
+                    # require_parameters so OpenRouter excludes upstreams that would
+                    # silently drop the tool schema. Strictly inside the quality +
+                    # openrouter double-gate — native/xml strategies and every
+                    # non-OpenRouter provider stay byte-identical (D-14 RED LINE).
+                    kwargs["extra_body"]["provider"] = {"require_parameters": True}
         else:
             # Structured mode: DO NOT pass tools param
             # Tool schemas are injected into system prompt by caller (threads.py)
