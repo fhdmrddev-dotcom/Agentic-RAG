@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-10T22:25:04.157Z"
+status: verifying
+last_updated: "2026-07-10T22:43:36.816Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 26
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 5
-  percent: 0
+  completed_plans: 6
+  percent: 4
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 146 (operator-foundation) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-10
 
 ### Quick Tasks Completed
@@ -340,6 +340,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 146 P02 | 11min | 3 tasks | 8 files |
 | Phase 146 P146-04 | 2min | 2 tasks | 3 files |
 | Phase 146 P05 | 3min | 3 tasks | 5 files |
+| Phase 146 P06 | 10min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -415,6 +416,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 146-04: operator probe is render-only (getOperatorProbe 404→null); backend require_operator 404 gate stays the sole authority (Pitfall 13)
 - [Phase 146]: 146-05: shipped the five Control Room presentational leaves (OperatorBand/HealthSignals/LockedTab/TechnicalNamesToggle/RecentActionsCard) — sketch winners 061-B + 062-A, pure prop-driven leaves typed against the Plan-04 api.ts contract, composed by the Plan-06 shell
 - [Phase 146]: 146-05: LockedTab keeps NO phase-number token in shipped copy OR source comments (T-146-10 grep treats any 'phase 1xx' substring as a leak); amber operator zone uses Tailwind amber-* tokens (StatusPill precedent), not a bespoke warning utility
+- [Phase 146]: Control Room reachable via the probe-gated shield rendered OUTSIDE NAV_ITEMS (D-07 byte-identity, regression-locked); the 061-B shell's manual ↻ Refresh honesty beat (no auto-poll) visibly prepends the operator's own 'Viewed system health' ledger row (D-04/D-08)
 
 ## Operator Next Steps
 

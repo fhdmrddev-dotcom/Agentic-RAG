@@ -107,7 +107,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 146-06-PLAN.md — ControlRoomPage + AuditTab assembly, ↻ Refresh ledger beat, reachability triad (ActiveView + ChatLayout branch + probe-gated shield outside NAV_ITEMS) + NAV_ITEMS regression test
+- [x] 146-06-PLAN.md — ControlRoomPage + AuditTab assembly, ↻ Refresh ledger beat, reachability triad (ActiveView + ChatLayout branch + probe-gated shield outside NAV_ITEMS) + NAV_ITEMS regression test
 
 **UI hint**: yes
 
