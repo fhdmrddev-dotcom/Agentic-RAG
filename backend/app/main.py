@@ -242,6 +242,22 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
+    # Phase 146 D-01: idempotent operator bootstrap from OPERATOR_EMAILS (after the
+    # asyncpg pool is ensured). The DB table (operator_users) is the runtime source of
+    # truth; the env var is bootstrap-only. Best-effort — mirrors the settings-migration
+    # block above (logs on failure, NEVER blocks startup). Concurrent-safe under
+    # WORKER_COUNT=2 by construction: seed_operators_from_env upserts INSERT ... ON
+    # CONFLICT (user_id) DO NOTHING, so both workers race, the first wins, the second
+    # no-ops — NO lock/leader-election needed. An OPERATOR_EMAILS entry with no matching
+    # auth.users row is warned-and-deferred inside the seed (re-seeds on a later restart
+    # once the user signs up).
+    from app.services.operator_service import seed_operators_from_env
+    try:
+        await get_pg_pool()  # ensure pool exists before the seed write
+        await seed_operators_from_env()
+    except Exception as e:
+        logger.error("Operator seed failed (app continues, no operators bootstrapped): %s", e)
+
     # Phase 110 DMF-01 / D-110-4 — audit-enum drift guard. MUST hard-fail (unlike the
     # best-effort blocks above): a frozenset⊄live-CHECK drift = a silent prod audit hole.
     # Mirrors the 075.4 UnknownProviderError-at-startup pattern. Runs per worker (read-only,
