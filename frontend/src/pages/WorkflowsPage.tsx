@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   listPublishedWorkflows,
+  listStarterWorkflows,
   listDraftWorkflows,
   createWorkflowDraft,
   type PublishedWorkflow,
@@ -49,6 +50,16 @@ import type { Folder } from "@/types"
 
 /** Sentinel for the "Unbound (no project)" filter (IR-04 — module-scope, not per-render). */
 const UNBOUND = "__unbound__"
+
+/** Phase 143 (WF-01 / D-143-1) — a 6-char base36 fork-slug suffix for the fresh-copy
+ *  fork (`<starter-slug>-<hash>`). Robustly 6 chars of [a-z0-9] even if a single
+ *  Math.random().toString(36) run falls short (rare), so it always matches the
+ *  `<slug>-[a-z0-9]{6}` shape the fork/collision contract expects (Pitfall 5). */
+function freshHash(): string {
+  let h = ""
+  while (h.length < 6) h += Math.random().toString(36).slice(2)
+  return h.slice(0, 6)
+}
 
 /** A small violet net-new honesty flag (D14). */
 function NetNewFlag({ label = "net-new" }: { label?: string }) {
@@ -79,6 +90,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [published, setPublished] = useState<PublishedWorkflow[]>([])
+  // Phase 143 (WF-01): the curated Starters shelf (is_global + category='starter').
+  const [starters, setStarters] = useState<PublishedWorkflow[]>([])
   const [drafts, setDrafts] = useState<WorkflowDraftRow[]>([])
   const [runFor, setRunFor] = useState<PublishedWorkflow | null>(null)
   const [kickoff, setKickoff] = useState("")
@@ -103,6 +116,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // rendered list lagged the selection). Each fetch takes a monotonic ticket; only
   // the most-recently-issued ticket is allowed to commit its result to state.
   const publishedSeqRef = useRef(0)
+  const startersSeqRef = useRef(0)
   const draftsSeqRef = useRef(0)
 
   const refetchPublished = useCallback(async () => {
@@ -111,7 +125,11 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     // a real folder id → live ?project_folder_id= re-query (the narrows-only filter).
     const projectArg = selectedProjectId && selectedProjectId !== UNBOUND ? selectedProjectId : null
     const seq = ++publishedSeqRef.current
-    const rows = await listPublishedWorkflows(projectArg)
+    // Phase 143 (D-143-2a): the Workflows-page Published shelf is MINE-only — pass
+    // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_global)
+    // stop double-rendering here; they live in the Starters shelf. Only THIS call site
+    // opts in — the composer picker + WorkspacePanel keep the default global feed.
+    const rows = await listPublishedWorkflows(projectArg, undefined, { scope: "mine" })
     // Latest-wins: a stale (superseded) response NEVER paints over a newer selection.
     if (seq !== publishedSeqRef.current) return
     if (selectedProjectId === UNBOUND) {
@@ -120,6 +138,16 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       setPublished(rows)
     }
   }, [selectedProjectId])
+
+  // Phase 143 (WF-01): the curated Starters feed — a single unscoped global fetch on
+  // mount. Same latest-wins guard as the others (cheap insurance though a single
+  // unscoped fetch rarely races).
+  const refetchStarters = useCallback(async () => {
+    const seq = ++startersSeqRef.current
+    const rows = await listStarterWorkflows()
+    if (seq !== startersSeqRef.current) return
+    setStarters(rows)
+  }, [])
 
   const refetchDrafts = useCallback(async () => {
     const seq = ++draftsSeqRef.current
@@ -132,6 +160,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   useEffect(() => {
     refetchPublished().catch(console.error)
   }, [refetchPublished])
+
+  useEffect(() => {
+    refetchStarters().catch(console.error)
+  }, [refetchStarters])
 
   useEffect(() => {
     refetchDrafts().catch(console.error)
@@ -171,6 +203,47 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         setPageView("builder")
       } catch (e) {
         console.error("[WorkflowsPage] Tweak fork failed", e)
+      }
+    },
+    [refetchDrafts],
+  )
+
+  // ── Use this starter (WF-01, D-143-1): a FRESH-COPY fork. A sibling of onTweak
+  //    with exactly two deltas — a NEW auto-suffixed slug + version:1 (NOT the
+  //    same-slug Tweak's v(N+1)) — required because UNIQUE(slug, version) is GLOBAL
+  //    across all users, so two forkers of ONE shared starter can't both mint
+  //    <slug> v(N+1). The server (createWorkflowDraft → POST /workflows) forces
+  //    is_global=false / status=draft / created_by=caller; the published starter row
+  //    stays frozen. On a 409 slug/version collision (astronomically unlikely hash
+  //    clash) retry once with a fresh hash (Pitfall 5). Lands in the Builder (D-143-1a). ──
+  const onUseStarter = useCallback(
+    async (starter: PublishedWorkflow) => {
+      const def = (starter.definition ?? {}) as Record<string, unknown>
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // NOTE: `def` may carry `category:"starter"` — that is SAFE (Plan 01 added the
+        // additive field to WorkflowDefinition); do NOT strip it from the fork body.
+        const forked = {
+          ...def,
+          slug: `${starter.slug}-${freshHash()}`,
+          version: 1,
+          status: "draft",
+        } as WorkflowDefinitionJSON
+        try {
+          const created = await createWorkflowDraft(forked)
+          await refetchDrafts()
+          setBuilderInitial({
+            definition: forked,
+            draftId: created.id,
+            label: `From starter · ${starter.name}`,
+          })
+          setPageView("builder")
+          return
+        } catch (e) {
+          // Retry ONCE on a slug/version collision; any other error surfaces + stops.
+          if (attempt === 0 && String(e).includes("409")) continue
+          console.error("[WorkflowsPage] starter fork failed", e)
+          return
+        }
       }
     },
     [refetchDrafts],
@@ -347,9 +420,66 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           />
         </nav>
 
-        {/* ── Shelves: Drafts ABOVE Published ── */}
+        {/* ── Shelves: Starters → Published → Drafts (BUG-260628-01 fold, D-143-5):
+              runnable/curated on top, drafts below (they were burying published). ── */}
         <div className="flex flex-col gap-6">
-          {/* Drafts & seeds shelf (D8 — above Published; the Build-card lives here) */}
+          {/* Starters shelf (WF-01, D-143-5/8 — curated, fork-able global starters, on TOP) */}
+          <section data-testid="starters-shelf">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Starters · {starters.length}
+              </h2>
+              <span
+                title="Curated, official starter workflows — fork one into your own editable copy"
+                className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-primary"
+              >
+                curated
+              </span>
+            </div>
+            {starters.length === 0 ? (
+              <p className="text-[13px] italic text-muted-foreground">No starters available yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {starters.map((wf) => (
+                  <StarterCard key={wf.id} wf={wf} onUse={() => onUseStarter(wf)} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Published shelf (live-backed, MINE-only — D-143-2a; scaffolds+starters de-duped) */}
+          <section data-testid="published-shelf">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Published · {published.length}
+              </h2>
+              <span
+                title="The live, owner-scoped endpoint (mine-only via ?scope=mine)"
+                className="rounded-full border border-success/40 bg-success/10 px-1.5 py-0.5 font-mono text-[8px] font-semibold text-success"
+              >
+                GET /workflows/published
+              </span>
+            </div>
+            {published.length === 0 ? (
+              <p className="text-[13px] italic text-muted-foreground">
+                No published workflows{selectedProjectId ? " for this project" : ""} yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {published.map((wf) => (
+                  <PublishedCard
+                    key={wf.id}
+                    wf={wf}
+                    folderName={folderName((wf.definition as DefShape | undefined)?.project_folder_id)}
+                    onRun={() => { setRunFor(wf); setKickoff("") }}
+                    onTweak={() => onTweak(wf)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Drafts & seeds shelf (below the runnable shelves; the Build-card lives here) */}
           <section data-testid="drafts-shelf">
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -378,38 +508,6 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 <DraftCard key={d.id} draft={d} onOpen={() => onOpenDraft(d)} />
               ))}
             </div>
-          </section>
-
-          {/* Published shelf (live-backed) */}
-          <section data-testid="published-shelf">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Published · {published.length}
-              </h2>
-              <span
-                title="The live, owner-scoped endpoint"
-                className="rounded-full border border-success/40 bg-success/10 px-1.5 py-0.5 font-mono text-[8px] font-semibold text-success"
-              >
-                GET /workflows/published
-              </span>
-            </div>
-            {published.length === 0 ? (
-              <p className="text-[13px] italic text-muted-foreground">
-                No published workflows{selectedProjectId ? " for this project" : ""} yet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {published.map((wf) => (
-                  <PublishedCard
-                    key={wf.id}
-                    wf={wf}
-                    folderName={folderName((wf.definition as DefShape | undefined)?.project_folder_id)}
-                    onRun={() => { setRunFor(wf); setKickoff("") }}
-                    onTweak={() => onTweak(wf)}
-                  />
-                ))}
-              </div>
-            )}
           </section>
         </div>
       </div>
@@ -566,6 +664,52 @@ function PublishedCard({
           className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
         >
           ▶ Run
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Phase 143 (WF-01, D-143-8) — the curated Starter card. Reuses the EXACT PublishedCard
+// chrome + the shared <WorkflowSoul scale="card"> (no new card design; G-2 waived), with
+// two swaps: a "Starter" chip (the Glean verified-badge analog, cloned from the published
+// pill) and a "Use this" fork affordance (data-testid="use-starter") wired to onUseStarter
+// instead of the ⑂ Tweak / ▶ Run pair. The published starter row is never mutated by the
+// card — "Use this" mints a fresh OWNED copy (createWorkflowDraft INSERT).
+function StarterCard({ wf, onUse }: { wf: PublishedWorkflow; onUse: () => void }) {
+  const def = wf.definition as DefShape | undefined
+  return (
+    <div data-testid="starter-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+      {/* Card chrome: name header + the curated "Starter" chip (filled primary — distinct
+          from the outlined "published" pill so curated ≠ user-made reads at a glance). */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span aria-hidden="true">✨</span>
+            <span className="truncate text-[14px] font-medium text-foreground">{wf.name}</span>
+          </div>
+        </div>
+        <span
+          title="A curated, official starter — fork it into your own editable copy"
+          className="shrink-0 rounded-full border border-primary/50 bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary"
+        >
+          Starter
+        </span>
+      </div>
+      {/* The SAME shared card-scale soul the published + draft cards render. */}
+      <WorkflowSoul def={def} scale="card" />
+      {/* D-143-1/1a: "Use this" forks a FRESH owned copy (new slug + v1) into the Builder —
+          NOT the same-slug Tweak. (Label omits the word "starter" so the "Starter" chip is
+          the single curated marker on the card.) */}
+      <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
+        <button
+          type="button"
+          data-testid="use-starter"
+          onClick={onUse}
+          title="Fork a fresh personal copy of this starter into the Builder"
+          className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
+        >
+          Use this →
         </button>
       </div>
     </div>

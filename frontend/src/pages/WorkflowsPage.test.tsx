@@ -176,7 +176,12 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
     await waitFor(() => expect(mockListPublished).toHaveBeenCalled())
     mockListPublished.mockClear()
     fireEvent.click(screen.getByText("DBA Chapters"))
-    await waitFor(() => expect(mockListPublished).toHaveBeenCalledWith("folder-aaa"))
+    // Phase 143 (D-143-2a): the Workflows-page Published shelf now opts into scope:"mine"
+    // (mine-only de-dupe). The project folder id stays the FIRST arg; scope rides in the
+    // 3rd options arg so the composer picker / WorkspacePanel (no scope) stay unchanged.
+    await waitFor(() =>
+      expect(mockListPublished).toHaveBeenCalledWith("folder-aaa", undefined, { scope: "mine" }),
+    )
   })
 
   it("latest-wins: a STALE earlier response never paints over the current selection", async () => {
@@ -203,13 +208,17 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
   })
 })
 
-describe("WorkflowsPage — drafts-above-published shelves + build-card", () => {
-  it("the Drafts shelf renders ABOVE the Published shelf (DOM order)", async () => {
+describe("WorkflowsPage — published-above-drafts shelves + build-card", () => {
+  it("the Published shelf renders ABOVE the Drafts shelf (DOM order — BUG-260628-01 fold, D-143-5)", async () => {
+    // Phase 143 (D-143-5): the sections are reordered Starters → Published → Drafts so
+    // runnable published/starters are no longer buried under drafts (this replaces the
+    // old drafts-above-published contract; the full 3-shelf order is asserted in the
+    // Starters-shelf block below).
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const drafts = await screen.findByTestId("drafts-shelf")
-    const published = screen.getByTestId("published-shelf")
-    // compareDocumentPosition: FOLLOWING (4) means `published` comes after `drafts`.
-    expect(drafts.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const published = await screen.findByTestId("published-shelf")
+    const drafts = screen.getByTestId("drafts-shelf")
+    // compareDocumentPosition: FOLLOWING (4) means `drafts` comes after `published`.
+    expect(published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it("the dashed build-card is present in the drafts shelf and opens the two-door chooser (WUX-02)", async () => {
