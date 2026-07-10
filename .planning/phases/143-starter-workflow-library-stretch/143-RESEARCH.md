@@ -375,18 +375,21 @@ Author the `.docx` with a `make_pm_templates.py`-style python-docx builder (each
 | A3 | Running a seeded starter over a populated KB (e.g., the PM demo corpus) satisfies the strict `citations_required` gate. | Pitfall 2 | The pm-pack corpus was ingested for the operator's demo folder; a forker without content will fail the strict gate by design. [ASSUMED — verify at UAT] |
 | A4 | `scripts/pm-pack/templates/risk-register.docx` + `weekly-status-report.docx` are the byte-source for the re-homed templates. | Runtime State | If the committed files diverged from what's in the operator's `_library/`, the seeded starter renders a different template than the source row. Low risk (both reproducible via `make_pm_templates.py`). [VERIFIED files exist; content parity ASSUMED] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Document starters vs chat-answer starters (reconcile D-143-3a).**
+   - **RESOLVED — keep documents (D-143-3a revised, D-143-4b transform+storage-seed).**
    - What we know: `render_template` is the only file emitter; a "→document" starter must bind a template (re-homed) and needs the Storage seed.
    - What's unclear: whether the user accepts the added storage-seed step for genuine documents, or would prefer template-free chat-answer starters.
    - Recommendation: keep the document path (faithful to WF-01's "→document" + the ROADMAP wording); it is well-precedented and modest work. Surface the storage-seed step explicitly at plan time so it isn't a surprise.
 
 2. **Citation policy for starters: `strict` (fail on gaps) vs `flag` (deliver with visible gaps).**
+   - **RESOLVED — strict (D-143-7).**
    - What we know: the source rows are `strict`; strict fails on an empty/mismatched KB.
    - Recommendation: keep `strict` for fidelity to the source and to the "grounded deliverable" value prop, but call it out — the user may prefer `flag` for starters so a first run always produces *something*. A one-line change per emit phase if they choose `flag`.
 
 3. **Where the Build-card lands after the section reorder.**
+   - **RESOLVED — Starters → Published → Drafts, Build-card stays in Drafts (D-143-8).**
    - What we know: BUG-260628-01 wants runnable above drafts; the Build-card currently lives in the Drafts shelf.
    - Recommendation: Starters → Published → Drafts; keep the Build-card in Drafts, and (optional) add a header "Build a workflow" button so create-discovery doesn't regress. Minor UX; G-2 sketch waived.
 

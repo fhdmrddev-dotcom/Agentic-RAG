@@ -419,7 +419,21 @@ Plans:
   2. A user can fork a starter into a personal draft and edit it without affecting the published starter (WF-01).
   3. The starters are authored on the existing generic primitives — no new runtime (red line) (WF-01).
 
-**Plans**: TBD
+**Plans**: 5 plans (planned 2026-07-10)
+
+**Wave 0:**
+- [ ] `143-01-PLAN.md` — `category` schema contract on `WorkflowDefinition` + Wave-0 RED test backstops
+
+**Wave 1** *(blocked on Wave 0 completion)*:
+- [ ] `143-02-PLAN.md` — `list_starter_workflows` + additive `owned_only` de-dupe + `GET /workflows/starters` + `?scope=mine`
+- [ ] `143-03-PLAN.md` — Compliance Gap Report template + migration 094 (transformed, distinct slugs) + `seed-starters.py` storage seed
+
+**Wave 2** *(blocked on Wave 1 completion)*:
+- [ ] `143-04-PLAN.md` — `listStarterWorkflows` + Starters shelf (top) + `onUseStarter` fresh-copy fork + section reorder (BUG-260628-01) + Starter chip
+
+**Wave 3** *(blocked on Wave 2 completion)*:
+- [ ] `143-05-PLAN.md` — [BLOCKING] operator apply (SQL editor) + templates upload + full-schema regen; live SC-d / A1 / empty-KB UAT
+
 **UI hint**: yes
 
 #### Phase 144: Agent-Driven Skill File Attachment (STRETCH)
@@ -474,7 +488,7 @@ Plans:
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
-| 143. Starter Workflow Library (STRETCH) | 0/TBD | Gated (behind CORE) | - |
+| 143. Starter Workflow Library (STRETCH) | 0/5 | Planned | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 6/6 | Complete (SC#10 UAT 6/6) | 2026-07-10 |
 
