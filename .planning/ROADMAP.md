@@ -432,7 +432,7 @@ Plans:
 - [x] `143-04-PLAN.md` — `listStarterWorkflows` + Starters shelf (top) + `onUseStarter` fresh-copy fork + section reorder (BUG-260628-01) + Starter chip (executed 2026-07-10, 2/2 tasks; 3 frontend RED backstops GREEN)
 
 **Wave 3** *(blocked on Wave 2 completion)*:
-- [~] `143-05-PLAN.md` — apply COMPLETE (templates uploaded + mig 094 applied via SQL editor, incl. risk-register id-collision fix `…00c1`→`…0094c1`; full-schema regen no-op — schema-only); live UI + fork verified (Chrome MCP: shelf/chip/CTA/suffixed-slug draft/builder spine). Run-UAT DEFERRED to operator: publish→run→cited `.docx`, non-operator A1, empty-KB honesty (executed 2026-07-10)
+- [~] `143-05-PLAN.md` — apply COMPLETE (templates uploaded + mig 094 applied via SQL editor, incl. risk-register id-collision fix `…00c1`→`…0094c1`; full-schema regen no-op — schema-only). **Core run-UAT PROVEN LIVE (Chrome MCP, operator acct):** fork → publish gauntlet (golden run + judge approved) → run produced `/risk-register.docx` (37.4 KB, high confidence, 17 real citations), STRICT gate rejected 2 uncited emits first (D-143-7 honesty). Deferred (small): non-operator A1 + dedicated empty-folder test (executed 2026-07-10)
 
 **UI hint**: yes
 
@@ -488,7 +488,7 @@ Plans:
 | 140. Smart-Dispatch Relevance Pre-Filter (STRETCH) | 5/5 | Complete | 2026-07-07 |
 | 141. template_input Resolver Run-Scope (STRETCH) | 3/3 | Complete | 2026-07-07 |
 | 142. Non-Python Skill-Script Honesty (STRETCH) | 5/5 | Complete | 2026-07-08 |
-| 143. Starter Workflow Library (STRETCH) | 5/5 | Executed · apply done, run-UAT deferred | - |
+| 143. Starter Workflow Library (STRETCH) | 5/5 | Executed · core UAT proven live (cited .docx + judge), A1+empty-KB deferred | - |
 | 144. Agent-Driven Skill File Attachment (STRETCH) | 0/TBD | Gated (behind CORE) | - |
 | 145. Run-Lifecycle Honesty + threads.py Extraction (STRETCH · FOUNDATION) | 6/6 | Complete (SC#10 UAT 6/6) | 2026-07-10 |
 

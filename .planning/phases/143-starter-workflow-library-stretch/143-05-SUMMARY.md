@@ -34,26 +34,41 @@ operator re-pasted, and the live DB now has **3 `category='starter'` rows** (ind
   entry `contains: "starter"` for `full-schema.sql` was written on a wrong assumption about this
   artifact — it cannot be satisfied by a schema-only dump and is not a real gap.
 
-### Task 2 — Fork + run each starter to a cited `.docx` (incl. non-operator A1) — ⏸ DEFERRED (partial)
+### Task 2 — Fork + run each starter to a cited `.docx` (incl. non-operator A1) — ✅ CORE PROVEN LIVE (operator account); A1 still deferred
 
-Verified live via Chrome MCP (operator-directed):
+Verified live via Chrome MCP (operator-directed, operator account):
 - ✅ All 3 starters render on the **top CURATED Starters shelf** with the **STARTER** chip, **STRICT**
   lock, provider/model icons, "produces: … · file", and the **"Use this →"** CTA.
-- ✅ **Fork works (SC-d):** "Use this →" on Risk Register created **`risk-register-d438rw`** — a new
-  owned **draft** with a suffixed slug at version 1 (NOT a v2 of the starter), opened in the Builder
-  with the correct 2-step spine (`retrieve` llm_agent → `emit` llm_emit), `search_documents` tool on
-  retrieve, STRICT emit.
+- ✅ **Fork works (SC-d):** "Use this →" on Risk Register created a new owned **draft** with a suffixed
+  slug (`risk-register-98k7sq`, also `-d438rw` earlier) at version 1 (NOT a v2 of the starter), opened
+  in the Builder with the correct 2-step spine (`retrieve` llm_agent → `emit` llm_emit), `search_documents`
+  tool on retrieve, STRICT emit. Published starter row unchanged (fork = fresh INSERT).
+- ✅ **Publish gauntlet PASSED:** the forked Risk Register ran the full 8-stage gauntlet — a **real golden
+  run** of the workflow against the KB + an **independent judge** — and published ("Published Risk Register
+  v1"). Judge-approval = the workflow produces a valid, grounded, cited deliverable.
+- ✅ **Run → cited `.docx` PRODUCED:** ran it (kickoff = "Build a project risk register for Project
+  Meridian…") on the workspace default model `deepseek-v4-flash`. The STRICT emit gate **rejected the
+  emit TWICE** ("emitted field-map has uncited or invented values or is missing required template keys —
+  the deliverable was NOT produced") before producing **`/risk-register.docx` (37.4 KB), HIGH confidence,
+  17 real citations** traced to the actual Project Meridian corpus (Charter-Excerpt, risk-log.md,
+  Status-Report-Week09, weekly-meeting-notes-week9). This is BOTH the success path AND the D-143-7 honesty
+  gate demonstrated in one run.
 
-**Not executed (deferred to operator):** publish the fork → run over a matched KB → confirm a cited
-`.docx`; the non-operator fork+run (A1 / T-143-06 cross-user service-role Storage read); "published
-starter row unchanged after fork." Operator redirected the session to capturing future UX enhancements
-before running these — precedent: Phases 140 (UAT partial) / 142 (Live UAT pending).
+**Still deferred (small):** the non-operator fork+run (A1 / T-143-06 cross-user service-role Storage read)
+— low-risk now that the operator run resolved the re-homed seed template cleanly.
 
-### Task 3 — Empty-KB honesty + chip/CTA read — ⏸ DEFERRED (visual partial)
+**UX signal (operator north star = smooth/error-free):** on the fast `deepseek-v4-flash` the strict gate
+needed 2 retries before grounding every cell — correct honesty, but a weaker model can loop. Tunable-gate
+lever already captured as SEED-082 (emit-gate-policy-flexibility); a stronger default model runs smoother.
+
+### Task 3 — Empty-KB honesty + chip/CTA read — ◑ MOSTLY PROVEN LIVE; explicit empty-folder test deferred
 
 - ✅ Chip / CTA / Starters-on-top layout read as intended (verified live).
-- **Not executed:** empty-KB fork run must fail honestly with a citation gap (strict gate, D-143-7) —
-  deferred to operator.
+- ✅ **Honesty gate demonstrated live** (D-143-7): during the Task-2 run the STRICT emit validator
+  rejected 2 incompletely-cited emits ("deliverable was NOT produced") before shipping — the honest
+  no-fabrication behavior, observed over a REAL corpus (even stronger than the empty-KB case).
+- **Deferred (small):** the explicit empty/mismatched-KB fork run (a run that fails and produces NO
+  file at all) — the mechanism is proven; only the dedicated empty-folder scenario is unrun.
 
 ## Operator UX findings (captured, not built — 143 red line held)
 
@@ -68,6 +83,9 @@ Operator clarified two desires that are OUT of 143 scope:
 - `supabase/migrations/094_starter_workflows.sql` — risk-register id re-homed `…00c1`→`…0094c1` (fix).
 - `supabase/full-schema.sql` — regenerated (no-reset), unchanged (schema-only; not committed).
 
-## Self-Check: PASSED (apply) / DEFERRED (run-UAT)
-Apply landed + verified; live UI/fork verified; run-to-cited-`.docx` + A1 + empty-KB UAT are the
-outstanding operator-driven proofs before phase verification can PASS.
+## Self-Check: PASSED (apply + core run-UAT); 2 small items deferred
+Apply landed + verified; live end-to-end PROVEN on operator account: fork → publish gauntlet (golden
+run + judge approved) → run produced `/risk-register.docx` (37.4 KB, high confidence, 17 real citations),
+with the STRICT gate rejecting 2 uncited emits first (honesty). Remaining deferred (low-risk): the
+non-operator A1 run + the dedicated empty-folder honesty scenario. WF-01 substantively PROVEN;
+`/gsd:verify-work 143` can close it once A1 + empty-folder are ticked (or accept as-is).
