@@ -93,7 +93,7 @@
 Plans:
 **Wave 1**
 
-- [ ] 146-01-PLAN.md — Migrations 095 (operator_users + operator_audit_log, RLS deny-all) + 096 (org_id stub sweep) + [BLOCKING] live apply + full-schema regen
+- [x] 146-01-PLAN.md — Migrations 095 (operator_users + operator_audit_log, RLS deny-all) + 096 (org_id stub sweep) + [BLOCKING] live apply + full-schema regen
 - [ ] 146-02-PLAN.md — require_operator router-level gate (byte-identical 404) + audit floor + delete BACKPRESSURE_ADMIN_USER_IDS + /admin/me probe + /admin/audit feed + gate regression suite
 
 **Wave 2** *(blocked on Wave 1 completion)*

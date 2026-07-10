@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-10T21:14:44.589Z"
-last_activity: 2026-07-10 -- Phase 146 planning complete
+last_updated: "2026-07-10T21:33:02.416Z"
+last_activity: 2026-07-10
 progress:
   total_phases: 26
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v3.3 Operator UX — roadmap created 2026-07-10 (13 phases: CORE 146-155 + STRETCH 156-158; 19 requirements, 100% mapped). Next → `/gsd:plan-phase 146` (Operator Foundation — G-2 sketch-gated admin shell).
+**Current focus:** Phase 146 — operator-foundation
 
 ## Current Position
 
-Phase: 146 (Operator Foundation) — context gathered, ready to plan
-Plan: —
+Phase: 146 (operator-foundation) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-07-10 -- Phase 146 planning complete
+Last activity: 2026-07-10
 
 ### Quick Tasks Completed
 
@@ -336,6 +336,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 143 P02 | 9min | 2 tasks | 2 files |
 | Phase 143 P03 | 6min | 3 tasks | 4 files |
 | Phase 143 P04 | 6min | 2 tasks | 3 files |
+| Phase 146 P01 | 9min | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -403,6 +404,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 143-02: owned_only additive default-off param on list_published_workflows (Published shelf narrows to mine; picker/WorkspacePanel/threads.py keep globals default — D-143-2b); Starters shelf = own list_starter_workflows curated-globals query + GET /workflows/starters
 - [Phase ?]: Phase 143 Plan 03: 3 curated starters authored as seed migration 094 with DISTINCT slugs (pm-* would UNIQUE-collide); promote = TRANSFORM (strip folder binding+scope, re-home template to seed _library, category='starter', keep strict citation gates); storage bytes via scripts/seed-starters.py --upload
 - [Phase ?]: Phase 143 scope-narrowing threaded as a 3rd positional options param on listPublishedWorkflows (not a 2nd-arg options object) so WorkspacePanel's signal-as-2nd-arg call stays byte-identical (D-143-2b)
+- [Phase 146-01]: operator_users carries NO org_id (D-06 org-agnostic principal) — protects the v3.4 one-way door
+- [Phase 146-01]: operator_audit_log.action is free-text with NO CHECK (A4); actor is PLAIN uuid NO FK (tamper-resistant, mig-059 idiom)
+- [Phase 146-01]: org_id stubs on documents/folders/threads/skills with NO index — harness_audit shape per D-05, not the DM-era indexed shape
 
 ## Operator Next Steps
 
