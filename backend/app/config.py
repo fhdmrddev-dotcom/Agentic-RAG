@@ -893,15 +893,19 @@ class Settings(BaseSettings):
     postgres_pool_min: int = 2
     postgres_pool_max: int = 10
 
-    # Backpressure admin endpoint (Phase 078 — D-078-07 WORKER-LIFT-04)
-    # Comma-separated Supabase Auth user IDs allowed to call GET /admin/backpressure.
-    # Fail-closed in production (ENVIRONMENT=production): 403 when unset/empty.
-    # Fail-open in dev (default): no restriction so testing works without config.
-    backpressure_admin_user_ids: str = ""
+    # Operator role bootstrap (Phase 146 — ADMIN-01, D-01)
+    # Comma-separated operator emails, idempotently seeded into operator_users on
+    # startup (resolved against auth.users by lowercased email). Bootstrap-only —
+    # the DB table is the runtime source of truth; removing an email does NOT
+    # un-operator anyone (Phase 148 territory). Legitimately env/infra, not an
+    # app_settings value (CLAUDE.md settings-vs-env rule). Replaces the deleted
+    # BACKPRESSURE_ADMIN_USER_IDS allow-list + dev fail-open (D-02): /admin now
+    # sits behind require_operator, non-operators get 404 even in dev.
+    operator_emails: str = ""
 
-    # Deployment environment — used by backpressure auth gating and test guards.
-    # Values: "production" | "prod" → fail-closed for admin endpoints.
-    # Default: "" (dev/local) → fail-open.
+    # Deployment environment marker (e.g. "production"). Consumed at the deploy/env
+    # layer and by test guards; no longer gates /admin — Phase 146 replaced the
+    # backpressure allow-list + dev fail-open with the require_operator gate (D-02).
     environment: str = ""
 
     # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout

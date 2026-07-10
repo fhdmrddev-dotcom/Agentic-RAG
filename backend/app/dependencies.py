@@ -1,12 +1,16 @@
 import json
+import logging
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import create_client, Client
 
 from app.config import settings
+from app.services.operator_service import is_operator, write_operator_audit
+
+logger = logging.getLogger(__name__)
 
 bearer_scheme = HTTPBearer()
 
@@ -112,3 +116,85 @@ async def get_current_user(
         return {"id": response.user.id, "email": response.user.email}
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+
+# ── Phase 146 (ADMIN-01) — operator gate + append-only audit floor ────────────
+# Byte-identical to Starlette's unknown-route 404 (non-discoverable). Do NOT
+# customize the body — the whole point is that a non-operator cannot tell an
+# /admin route exists-but-forbidden vs. simply not existing (404-not-403).
+_NOT_FOUND = HTTPException(status_code=404, detail="Not Found")
+
+# Plain-sentence label + machine action code, keyed by /admin path. Endpoints may
+# also set request.state.audit_label / audit_action explicitly; these are the
+# route-derived fallbacks the floor uses when they did not.
+_AUDIT_LABELS: dict[str, tuple[str, str]] = {
+    "/admin/backpressure": ("Viewed system health", "health.view"),
+    "/admin/audit": ("Viewed recent actions", "audit.view"),
+}
+
+
+def _derive_plain_label(request: Request) -> str:
+    return _AUDIT_LABELS.get(request.url.path, ("Performed an operator action", ""))[0]
+
+
+def _derive_action(request: Request) -> str:
+    known = _AUDIT_LABELS.get(request.url.path)
+    if known:
+        return known[1]
+    # "<area>.<verb>" fallback: last non-'admin' path segment + ".view".
+    parts = [p for p in request.url.path.split("/") if p and p != "admin"]
+    area = parts[-1] if parts else "admin"
+    return f"{area}.view"
+
+
+async def require_operator(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Router-level default-deny gate for every /admin route (Pattern 1).
+
+    ``get_current_user`` already raised 401 on a bad/absent JWT. On non-membership
+    raise a byte-identical 404 (non-discoverable — 404-not-403). On membership, stash
+    the operator on ``request.state`` for the audit floor + the ``/admin/me`` probe,
+    and return the identity. The backend runs on the service-role key with NO RLS
+    backstop, so this gate is the SOLE authority (Pitfall 1). Attach at the ROUTER
+    level (never per-endpoint) so a future /admin endpoint cannot forget it.
+    """
+    if not await is_operator(current_user["id"]):
+        raise _NOT_FOUND
+    request.state.operator = current_user
+    return current_user
+
+
+async def operator_audit_floor(
+    request: Request,
+    supabase: Client = Depends(get_supabase),
+):
+    """Append-only audit floor as a yield-dependency (Pattern 2).
+
+    Attach PER-ACTION-ENDPOINT (never at the router level) so the ``GET /admin/me``
+    mount probe stays floor-EXEMPT (Pitfall 4 — probes must not spam the ledger). The
+    teardown runs AFTER the response (off the latency path): it reads an enrich
+    label/action/is_write from ``request.state`` (falling back to a route-derived plain
+    label/action), and writes exactly ONE ``operator_audit_log`` row — no UPDATE,
+    preserving immutability. Wrapped in try/except that logs and swallows — the floor
+    never raises into the request.
+    """
+    yield
+    try:
+        op = getattr(request.state, "operator", None)
+        if op is None:
+            return  # the gate already 404'd a non-operator — nothing to record
+        label = getattr(request.state, "audit_label", None) or _derive_plain_label(request)
+        action = getattr(request.state, "audit_action", None) or _derive_action(request)
+        is_write = getattr(request.state, "audit_is_write", False)
+        await write_operator_audit(
+            operator_user_id=op["id"],
+            action=action,
+            label=label,
+            is_write=is_write,
+            metadata={},
+            supabase=supabase,
+        )
+    except Exception as exc:
+        logger.error("operator audit floor failed: %s", exc)  # swallow (D-05 precedent)
