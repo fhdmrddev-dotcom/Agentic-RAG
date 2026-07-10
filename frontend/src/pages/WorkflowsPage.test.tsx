@@ -27,6 +27,7 @@ const {
   mockPublish,
   mockListFolders,
   mockListSkills,
+  mockListStarters,
 } = vi.hoisted(() => ({
   mockListPublished: vi.fn(),
   mockListDrafts: vi.fn(),
@@ -36,11 +37,13 @@ const {
   mockPublish: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
+  mockListStarters: vi.fn(),
 }))
 
 // Mock the api seam. The page consumes listPublishedWorkflows + listDraftWorkflows
 // + createWorkflowDraft; the hosted Builder consumes generate/create/update +
 // listFolders/listSkills (103-ux folder/skill name maps); the Gauntlet consumes publish.
+// Phase 143 (WF-01): the Starters shelf consumes listStarterWorkflows (RED until Plan 04).
 vi.mock("@/lib/api", () => ({
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
@@ -50,6 +53,7 @@ vi.mock("@/lib/api", () => ({
   publishWorkflow: mockPublish,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  listStarterWorkflows: mockListStarters,
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
@@ -121,10 +125,37 @@ const draftRow = {
   },
 }
 
+/**
+ * Phase 143 (WF-01) — a curated starter (is_global published, category='starter').
+ * A two-phase KB→document def: retrieve (llm_agent) → emit (llm_emit strict). The
+ * fresh-copy fork (D-143-1) mints a NEW suffixed slug + v1 off this seeded slug.
+ */
+const starterRow = {
+  id: "starter-1",
+  slug: "risk-register",
+  name: "Risk Register",
+  definition: {
+    slug: "risk-register",
+    version: 1,
+    name: "Risk Register",
+    status: "published",
+    category: "starter",
+    phases: [
+      { slug: "retrieve", phase_index: 0, config: { phase_type: "llm_agent" } },
+      {
+        slug: "emit",
+        phase_index: 1,
+        config: { phase_type: "llm_emit", citation_policy: "strict" },
+      },
+    ],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockListPublished.mockResolvedValue([strictPublished, loosePublished])
   mockListDrafts.mockResolvedValue([draftRow])
+  mockListStarters.mockResolvedValue([starterRow])
   mockCreateDraft.mockResolvedValue({ id: "new-draft", version: 3 })
   // The hosted Builder fetches folders + skills on mount (103-ux name maps).
   mockListFolders.mockResolvedValue(folders)
@@ -368,6 +399,48 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     await screen.findByTestId("spine-node-pull")
     // The header carries the Tweak caption with the new version.
     expect(screen.getByText(/Tweak · vendor-risk v3/)).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowsPage — Starters shelf (WF-01, D-143-1/2/5/8) [RED until Plan 04]", () => {
+  it("renders the Starters shelf with the curated card, its Starter/Official chip, and a Use-this-starter control", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const shelf = await screen.findByTestId("starters-shelf")
+    // The seeded curated starter renders as a card inside the shelf.
+    const card = within(shelf).getByTestId("starter-card")
+    expect(within(card).getByText("Risk Register")).toBeInTheDocument()
+    // The curated-vs-mine visual distinction (D-143-8, Glean verified-badge analog).
+    expect(within(card).getByText(/starter|official/i)).toBeInTheDocument()
+    // The fork affordance ("Use this starter", Zapier clone-CTA analog).
+    expect(within(card).getByTestId("use-starter")).toBeInTheDocument()
+  })
+
+  it("onUseStarter forks a FRESH copy: new suffixed slug + v1 + draft (INSERT, never UPDATE the frozen starter)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const shelf = await screen.findByTestId("starters-shelf")
+    fireEvent.click(within(shelf).getByTestId("use-starter"))
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    const forked = mockCreateDraft.mock.calls[0][0]
+    // D-143-1: a brand-new owned identity — a NEW auto-suffixed slug off "risk-register".
+    expect(forked.slug).toMatch(/^risk-register-[a-z0-9]{6}$/)
+    expect(forked.version).toBe(1) // v1, NOT the same-slug Tweak's N+1
+    expect(forked.status).toBe("draft")
+    // It is an INSERT (createWorkflowDraft) — the frozen published starter is NEVER UPDATEd.
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  it("folds BUG-260628-01 (SC-e): section order is Starters → Published → Drafts (runnable no longer buried under drafts)", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const starters = await screen.findByTestId("starters-shelf")
+    const published = screen.getByTestId("published-shelf")
+    const drafts = screen.getByTestId("drafts-shelf")
+    // compareDocumentPosition FOLLOWING (4): starters precedes published precedes drafts.
+    expect(
+      starters.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 })
 
