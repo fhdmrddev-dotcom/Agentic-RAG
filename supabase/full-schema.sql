@@ -465,6 +465,7 @@ CREATE TABLE public.app_settings (
     self_improve_enabled boolean DEFAULT true,
     workflows_enabled boolean DEFAULT true,
     maintenance_mode boolean DEFAULT false,
+    feature_visibility jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
