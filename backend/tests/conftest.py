@@ -12,6 +12,17 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 os.environ.setdefault("LLM_API_KEY", "test-llm-api-key")
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 os.environ.setdefault("LANGSMITH_PROJECT", "test-project")
+# Phase 146 (ADMIN-01 / WR-04): neutralize the operator bootstrap seed for the
+# unit suite. The `client` fixture runs TestClient(app) as a context manager,
+# which executes the full lifespan — including seed_operators_from_env(). Settings
+# reads backend/.env and postgres_dsn defaults to the LIVE local Postgres
+# (127.0.0.1:54322), so without this guard, on a dev machine with the local stack
+# up and OPERATOR_EMAILS populated in .env, every TestClient startup would INSERT
+# real role-granting operator_users rows as a side effect of running unit tests.
+# A real env var takes precedence over .env in pydantic-settings, so the seed
+# short-circuits at the empty-list check with zero pool activity (exactly what
+# test_seed_noop_when_no_emails pins).
+os.environ.setdefault("OPERATOR_EMAILS", "")
 
 from unittest.mock import MagicMock  # noqa: E402
 
