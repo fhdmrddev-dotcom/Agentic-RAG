@@ -158,7 +158,16 @@ Plans:
   3. Advanced features (eval studio, model management, trigger tuner) are hidden from end users and visible only to operators — enforced at the API layer (a non-operator API call is refused, not merely UI-hidden), per a per-feature visibility map.
   4. Cross-user read paths in the admin browser are explicitly filtered (no full-tenant leak on the service-role client).
 
-**Plans**: TBD
+**Plans**: 9 plans in 6 waves
+- [ ] 148-01-PLAN.md — Wave 0 test scaffold (16 test_148_* files + conftest fixtures)
+- [ ] 148-02-PLAN.md — Backend substrate: migration 098 + audience resolver/writer + require_visible + app-layer ban check
+- [ ] 148-03-PLAN.md — Apply migration 098 to the live DB + regenerate full-schema (operator step)
+- [ ] 148-04-PLAN.md — Governance + operator service layer (audit query/CSV, roster, grant/revoke)
+- [ ] 148-05-PLAN.md — VIS-01 enforcement wiring: GET /features + require_visible across governed routers (Run carve-outs)
+- [ ] 148-06-PLAN.md — Operator admin endpoints (platform browse/export, users disable/enable, grant/revoke, visibility set)
+- [ ] 148-07-PLAN.md — Frontend VIS-01 enforcement: effective-features hook + nav vanish + graceful 403 bounce
+- [ ] 148-08-PLAN.md — 067-A audit browser: source switch + chip filters + pager + recorded CSV
+- [ ] 148-09-PLAN.md — 068-A users roster (victim-naming guards) + 069-A feature-visibility audience rows
 **Note**: "Sign in as user" impersonation ships only if scoped cheaply (dual-identity audit); otherwise it is deferred to STRETCH with a named re-open trigger.
 **UI hint**: yes
 
