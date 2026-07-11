@@ -462,6 +462,9 @@ CREATE TABLE public.app_settings (
     skill_builder_model text DEFAULT ''::text NOT NULL,
     harness_judge_model text DEFAULT ''::text NOT NULL,
     skill_catalog_max_tokens integer DEFAULT 1500 NOT NULL,
+    self_improve_enabled boolean DEFAULT true,
+    workflows_enabled boolean DEFAULT true,
+    maintenance_mode boolean DEFAULT false,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 

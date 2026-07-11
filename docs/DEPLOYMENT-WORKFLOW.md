@@ -3,7 +3,7 @@
 **Audience:** operator (plain language on purpose).
 **Purpose:** the day-to-day "how a change goes from my laptop to live, safely" guide.
 **Companion doc:** [`DEPLOYMENT-PIPELINE.md`](./DEPLOYMENT-PIPELINE.md) — the *architecture* (what runs where, accounts, costs). This doc is the *process*.
-**Last updated:** 2026-06-29
+**Last updated:** 2026-07-11
 
 ---
 
@@ -107,7 +107,7 @@ environment. When a change touches the left column, do the right column **in clo
 | If your change involves… | …then in CLOUD you must |
 |---|---|
 | **A new/changed env var** (`backend/.env.example` updated) | Add/update it in **Coolify** (backend) and/or **Vercel** (frontend, `VITE_*`), then redeploy. |
-| **A DB schema change** | Apply the numbered `supabase/migrations/NNN_*.sql` by **pasting into the cloud Supabase SQL editor** (never `db push`/`db reset`). Then regen `full-schema.sql`. Do the same locally. **To list exactly which migrations cloud still needs:** `bash scripts/pending-cloud-migrations.sh` (diffs your deploy ref against `origin/production`). Apply them in numeric order, once each (migrations are not idempotent). |
+| **A DB schema change** | Apply the numbered `supabase/migrations/NNN_*.sql` by **pasting into the cloud Supabase SQL editor** (never `db push`/`db reset`). Then regen `full-schema.sql`. Do the same locally. **To list exactly which migrations cloud still needs:** `bash scripts/pending-cloud-migrations.sh` (diffs your deploy ref against `origin/production`). Apply them in numeric order, once each (migrations are not idempotent). **Migration 097 (`097_operator_flags.sql`)** adds three additive `app_settings` boolean columns (`self_improve_enabled`, `workflows_enabled`, `maintenance_mode`) — paste it into the cloud SQL editor at promotion (idempotent `ADD COLUMN IF NOT EXISTS`, safe to re-run). |
 | **A new app setting / seed row** | Settings live in `app_settings`/`user_settings`. A fresh cloud DB may be **missing seed rows** (`pg_dump --schema-only` skips data). Insert/verify the row in cloud (e.g. `app_settings 'global'`). **Migrations 087 + 088 + 089 (`skill_creator_reborn` + `skill_creator_eval_step_sequencing` + `skill_creator_file_attach_honesty`) are data-carrying** — the built-in `skill-creator` seed is NOT in `full-schema.sql`. After deploy, verify `SELECT count(*) FROM public.skills WHERE id='00000000-0000-0000-0000-000000000010' AND is_system=true` returns 1 in cloud; if 0 (env bootstrapped from `full-schema.sql`), apply migration 087 THEN 088 THEN 089 via the SQL editor, in that order (all idempotent — safe to re-run; 088/089 both UPDATE the row 087 creates). |
 | **A model / provider** | The cloud provider **key** (env) must serve the chosen model. Local and cloud keys can differ — a model that works locally can 404 on cloud (this caused the metadata-extraction bug: extraction defaulted to `gpt-4o`, which the cloud key couldn't serve). Pin known-good models. |
 | **The code sandbox** | Cloud needs the Docker socket mounted into the backend container **and** the sandbox image built **on the VPS host** (`agentic-rag-sandbox:<tag>`). Local just uses your laptop's Docker. |
@@ -150,6 +150,9 @@ Before `master → production`:
 ---
 
 ## Changelog
+- **2026-07-11** — Parity checklist: noted migration 097 (`097_operator_flags.sql`, three
+  additive `app_settings` operator-flag booleans) must be pasted into the cloud SQL editor at
+  promotion (Phase 147 FLAG-01 substrate).
 - **2026-06-29** — Doc created. Captured the `develop → master → production` model, the
   local↔cloud parity rule + checklist, the normal promotion flow, and the
   fast-forward/worktree-cherry-pick hotfix recipes used during the cloud deploy bug-fix
