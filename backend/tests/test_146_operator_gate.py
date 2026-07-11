@@ -53,6 +53,32 @@ def test_admin_404_matches_unknown_route_404(client, auth_headers, mock_asyncpg_
     assert "application/json" in gated.headers.get("content-type", "")
 
 
+def test_audit_floor_fallback_derives_write_verb_from_method():
+    """WR-03: the route-derived audit fallback reflects the HTTP method.
+
+    A future POST/DELETE /admin endpoint that forgets the explicit
+    request.state.audit_* enrichment must NOT be recorded as a harmless
+    '<area>.view' read. The fallback derives 'view' for GET and 'write' for any
+    mutating method, and the is_write floor is method-derived — so the floor never
+    under-reports the destructive actions it exists to catch.
+    """
+    from types import SimpleNamespace
+
+    from app.dependencies import _WRITE_METHODS, _derive_action
+
+    get_req = SimpleNamespace(url=SimpleNamespace(path="/admin/users"), method="GET")
+    assert _derive_action(get_req) == "users.view"
+
+    for method in ("POST", "PUT", "PATCH", "DELETE"):
+        write_req = SimpleNamespace(url=SimpleNamespace(path="/admin/users"), method=method)
+        assert _derive_action(write_req) == "users.write", method
+        assert method in _WRITE_METHODS
+
+    # A known path still wins from the label map regardless of method.
+    known = SimpleNamespace(url=SimpleNamespace(path="/admin/backpressure"), method="POST")
+    assert _derive_action(known) == "health.view"
+
+
 def test_unauthenticated_admin_matches_unknown_route_404(client):
     """WR-02: an /admin request with NO Authorization header is byte-identical to an
     unknown-route 404 — NOT a 403 — so the non-discoverability contract holds pre-auth.

@@ -142,6 +142,15 @@ _AUDIT_LABELS: dict[str, tuple[str, str]] = {
 }
 
 
+# WR-03: the audit floor exists so a future /admin endpoint is audited "by
+# construction" even when its author forgets the explicit request.state.audit_*
+# enrichment. The route-derived fallback must therefore reflect the HTTP method:
+# a mutating method (POST/PUT/PATCH/DELETE) that forgot to set state must NOT be
+# recorded as a harmless ".view" read with no write mark — that under-reports
+# exactly the destructive actions the floor exists to catch.
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
 def _derive_plain_label(request: Request) -> str:
     return _AUDIT_LABELS.get(request.url.path, ("Performed an operator action", ""))[0]
 
@@ -150,10 +159,13 @@ def _derive_action(request: Request) -> str:
     known = _AUDIT_LABELS.get(request.url.path)
     if known:
         return known[1]
-    # "<area>.<verb>" fallback: last non-'admin' path segment + ".view".
+    # "<area>.<verb>" fallback: last non-'admin' path segment + method-derived verb
+    # (GET -> "view"; any mutating method -> "write") so the floor never labels a
+    # forgotten write endpoint as a read (WR-03).
     parts = [p for p in request.url.path.split("/") if p and p != "admin"]
     area = parts[-1] if parts else "admin"
-    return f"{area}.view"
+    verb = "view" if request.method == "GET" else "write"
+    return f"{area}.{verb}"
 
 
 async def authenticate_operator_request(
@@ -227,7 +239,11 @@ async def operator_audit_floor(
             return  # the gate already 404'd a non-operator — nothing to record
         label = getattr(request.state, "audit_label", None) or _derive_plain_label(request)
         action = getattr(request.state, "audit_action", None) or _derive_action(request)
-        is_write = getattr(request.state, "audit_is_write", False)
+        # WR-03: floor is_write from the HTTP method when the endpoint didn't set it,
+        # so a forgotten write endpoint isn't recorded as a read (is_write=False).
+        is_write = getattr(request.state, "audit_is_write", None)
+        if is_write is None:
+            is_write = request.method in _WRITE_METHODS
         await write_operator_audit(
             operator_user_id=op["id"],
             action=action,
