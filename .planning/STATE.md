@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T18:30:00.000Z"
+last_updated: "2026-07-11T18:35:00.000Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 20
   percent: 8
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 5 of 9 (148-05 complete — VIS-01 API enforcement wall)
-Status: 148-05 complete — GET /features effective-map + require_visible gates across 6 governed routers; effective_features 2/2 + carveouts 3/3 GREEN; 146/147 regression 78/78; Run carve-outs (providers/published/starters) + threads.py launch intact; awaiting 148-06 (operator admin endpoints)
+Plan: 5 of 9 complete (148-01/02/03/04/05 done; 148-06/07/08/09 open)
+Status: 148-03 complete — operator applied migration 098 (`app_settings.feature_visibility` jsonb + D-05 day-one seed: skill_studio/model_management=operators, workflow_authoring/governance_health=everyone) to the live LOCAL DB via the SQL editor; `full-schema.sql` regenerated (no reset, live-DB dump) with the column at line 468 (commit `edfcc1a0`). **CLOUD PARITY PENDING:** paste migration 098 into the CLOUD Supabase SQL editor at the next production promotion — local + cloud each carry their own `app_settings.global` row, so the seed must run in both (docs/DEPLOYMENT-WORKFLOW.md §5). 148-05 (GET /features + require_visible across 6 governed routers) already complete. VIS-01 stays Pending until the full feature ships (148-06 endpoints + 148-07/08/09 frontend). Awaiting 148-06 (operator admin endpoints).
 Last activity: 2026-07-11
 
 ### Quick Tasks Completed
@@ -346,6 +346,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 146 P05 | 3min | 3 tasks | 5 files |
 | Phase 146 P06 | 10min | 3 tasks | 6 files |
 | Phase 148 P01 | 40 | 3 tasks | 15 files |
+| Phase 148 P03 | ~6min | 1 auto task (Task 1 = operator human-action) | 1 file |
 
 ## Decisions
 
@@ -428,6 +429,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 148]: 148-04: skipped requirements.mark-complete for ADMIN-03 — service layer built + unit-tested (10/10 service tests GREEN) but not yet wired to any router (148-06 endpoints / 148-07 UI); marking now would be false-green. Completes at phase verify-work (mirrors 148-02 substrate posture). Controller-level tests (disable/enable/view_platform_recorded) stay expected-RED, owned by 148-06.
 - [Phase 148]: 148-05 (VIS-01): require_visible attached at ROUTER level for the no-carve-out governed routers (evals.py both routers, skill_tuner.py, skill_test_cases.py, document_governance.py) so EVERY endpoint is gated safe-by-construction (require_operator precedent — a future endpoint cannot forget it); PER-ENDPOINT (decorator dependencies=[]) only on the carve-out routers settings.py (4 model_management gates) + workflows.py (6 workflow_authoring gates), because router-gating them would 403 the Run carve-outs (RESEARCH anti-pattern is scoped to exactly those two files). GET /settings/providers, GET /workflows/published|starters, and the threads.py workflow launch left ungated (Run stays for everyone — D-05); threads.py untouched.
 - [Phase 148]: 148-05: skipped requirements.mark-complete for VIS-01 — the API enforcement WALL is done (GET /features + require_visible gates GREEN) but VIS-01's frontend hide/bounce half (148-07) is unshipped; marking now would be false-green. Completes at phase verify-work (mirrors the 148-02/148-04 substrate posture).
+- [Phase 148]: 148-03 (VIS-01): operator applied migration 098 to the live LOCAL DB via the SQL editor (NEVER db push/reset — preserves dev data); full-schema.sql regenerated (no --reset, live-DB dump) — feature_visibility jsonb column captured at line 468, a 1-insertion dump delta not a hand-edit (commit edfcc1a0). CLOUD PARITY: mig 098 (column + D-05 seed UPDATE) MUST be pasted into the CLOUD Supabase SQL editor at the next promotion — local + cloud each carry their own app_settings.global row (docs/DEPLOYMENT-WORKFLOW.md §5 parity checklist + the standing v3.3 cloud-migrations rule; mirrors mig 097). Skipped requirements.mark-complete for VIS-01 (multi-plan feature; marked at phase verify-work — same posture as 148-02/04/05).
 
 ## Operator Next Steps
 
