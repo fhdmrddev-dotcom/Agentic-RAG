@@ -4,12 +4,12 @@ title: GPT-5.6 (Sol/Terra/Luna) 400s on every tool-enabled chat — reasoning_ef
 reported: 2026-07-11
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [backend/provider-openai, backend/agent-loop, model-registry]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-114, SEED-088]
-re_open_trigger: null
+re_open_trigger: next OpenAI-adapter phase (SEED-114 Responses-API adapter) or the v3.4 milestone sweep — whichever comes first. Phase 149 D-149-16 ships only the operator-serviceable stopgap (registry native_tools flip, proven by a 149 UAT row); the model line remains reasoning-off-or-prompt-injected until the adapter lands.
 reproduces_on:
   branch: develop
   commit: 4f29413b

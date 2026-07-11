@@ -4,9 +4,9 @@ title: openai/gpt-4o Deep runs intermittently 400 — max_tokens 32768 exceeds t
 reported: 2026-06-20
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/provider-routing, MODEL_CAPABILITIES, openai-service]
-folded_into: null
+folded_into: 149
 verified_closed_by: null
 related_seeds: [SEED-009]
 re_open_trigger: null
