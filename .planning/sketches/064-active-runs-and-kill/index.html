@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 064 — Active Runs &amp; the Kill Action (Phase 147)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .variant-meta { padding: 10px 20px 0; font-size: var(--text-sm); color: var(--color-text-muted); max-width: 1040px; }
+  .variant-meta b { color: var(--color-text); font-weight: 600; }
+  .variant-meta .rec { color: var(--color-warning); font-weight: 600; }
+
+  .app-frame {
+    height: calc(100vh - 118px); min-height: 640px; margin: 12px 20px 20px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--color-bg); box-shadow: var(--shadow-lg);
+    position: relative; display: flex; flex-direction: column;
+  }
+
+  /* ── locked 061-B band ── */
+  .op-band { background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1); border-bottom: 1px solid hsl(38 92% 60% / 0.25); padding: 14px 22px 0; flex: 0 0 auto; }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title { display: flex; align-items: center; gap: 9px; font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); color: var(--color-text); }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .op-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-sm); padding: 2px 7px; }
+  .rec-marker { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); white-space: nowrap; border-radius: var(--radius-full); padding: 3px 10px; transition: all var(--dur-base) var(--ease-out); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.6); flex: 0 0 6px; }
+  .rec-marker.flash { background: var(--color-warning-dim); color: var(--color-warning); }
+  .rec-marker.flash .rec-dot { background: var(--color-warning); animation: brandPulse 0.5s var(--ease-out) 2; }
+  .back-link { font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px; }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); user-select: none; }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab.locked { color: var(--color-text-dim); cursor: not-allowed; }
+  .band-tab .lock { font-size: 10px; opacity: 0.6; }
+
+  .body-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
+  .section-head h2 { margin: 0; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .live-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--color-success); background: var(--color-success-dim); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .head-spacer { flex: 1; }
+  .sub-line { font-size: var(--text-sm); color: var(--color-text-dim); margin: 0 0 16px; }
+  .sub-line b { color: var(--color-text-muted); font-family: var(--font-mono); font-weight: 600; }
+
+  .scenario { display: inline-flex; align-items: center; gap: 2px; font-family: var(--font-mono); font-size: 10px; border: 1px dashed var(--color-border); border-radius: var(--radius-full); padding: 2px; }
+  .scenario .lbl { color: var(--color-text-dim); padding: 0 6px; }
+  .scenario button { background: transparent; border: none; color: var(--color-text-dim); cursor: pointer; font-family: inherit; font-size: inherit; padding: 3px 8px; border-radius: var(--radius-full); }
+  .scenario button.on { background: var(--color-muted); color: var(--color-text); }
+
+  .prov-logo { width: 20px; height: 20px; flex: 0 0 20px; border-radius: 5px; }
+  .prov-name { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+
+  .empty { text-align: center; color: var(--color-text-dim); padding: 60px 20px; font-size: var(--text-base); }
+  .empty .big { font-size: var(--text-lg); color: var(--color-text-muted); margin-bottom: 6px; }
+
+  /* long-running + stuck cues */
+  .tag { font-family: var(--font-mono); font-size: 10px; border-radius: var(--radius-sm); padding: 1px 7px; }
+  .tag.long { color: var(--color-warning); background: var(--color-warning-dim); }
+  .tag.stuck { color: var(--color-danger); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.35); }
+
+  /* ══════════ A + C: table ══════════ */
+  .runs-table { width: 100%; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .rt-head, .rt-row { display: grid; grid-template-columns: 210px 1fr 120px 132px; gap: 14px; align-items: center; padding: 11px 16px; }
+  .rt-head { background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); font-family: var(--font-mono); }
+  .rt-row { border-bottom: 1px solid var(--color-border-soft); transition: background var(--dur-fast) var(--ease-out); }
+  .rt-row:last-child { border-bottom: none; }
+  .rt-row:hover { background: var(--color-bg-elev1); }
+  .rt-row.stuck-row { background: hsl(0 72% 51% / 0.04); }
+  .rt-model { display: flex; align-items: center; gap: 9px; }
+  .rt-model .m { font-weight: 600; color: var(--color-text); font-size: var(--text-sm); }
+  .rt-ctx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rt-ctx .who { color: var(--color-text); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt-ctx .doing { font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 6px; }
+  .rt-ctx .doing .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary); animation: brandPulse 1.4s var(--ease-out) infinite; flex: 0 0 5px; }
+  .rt-elapsed { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); display: flex; align-items: center; gap: 8px; }
+  .rt-elapsed .thread { font-size: 10px; color: var(--color-text-dim); }
+  .rt-action { display: flex; justify-content: flex-end; }
+
+  .kill-btn { font-size: var(--text-xs); color: var(--color-text-dim); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap; }
+  .kill-btn:hover { color: var(--color-danger); border-color: hsl(0 72% 51% / 0.5); background: var(--color-danger-dim); }
+
+  /* A: arm-to-confirm inline */
+  .arm-wrap { display: inline-flex; align-items: center; gap: 6px; animation: toolSlideIn var(--dur-fast) var(--ease-out); }
+  .arm-q { font-size: var(--text-xs); color: var(--color-danger); white-space: nowrap; }
+  .arm-yes { font-size: var(--text-xs); color: #fff; background: var(--color-danger); border: 1px solid var(--color-danger); border-radius: var(--radius-sm); padding: 5px 11px; cursor: pointer; font-weight: 600; }
+  .arm-yes:hover { filter: brightness(1.1); }
+  .arm-no { font-size: var(--text-xs); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; }
+  .arm-no:hover { color: var(--color-text); }
+
+  /* C: press-and-hold */
+  .hold-btn { position: relative; overflow: hidden; font-size: var(--text-xs); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; user-select: none; white-space: nowrap; }
+  .hold-btn:hover { border-color: hsl(0 72% 51% / 0.5); color: var(--color-danger); }
+  .hold-btn .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--color-danger-dim); border-right: 2px solid var(--color-danger); z-index: 0; transition: width 60ms linear; }
+  .hold-btn .lbl { position: relative; z-index: 1; }
+  .hold-btn.holding { color: var(--color-danger); }
+
+  /* cancelling / cancelled states (shared) */
+  .state-cancelling { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-warning); }
+  .spin-ring { width: 12px; height: 12px; border: 2px solid hsl(38 92% 60% / 0.25); border-top-color: var(--color-warning); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .rt-row.done { opacity: 0.55; background: transparent; }
+  .rt-row.done .rt-model .m { text-decoration: line-through; color: var(--color-text-dim); }
+  .state-done { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-danger); }
+  .state-done .rec-tick { color: var(--color-warning); }
+
+  /* ══════════ B: cards + confirm sheet ══════════ */
+  .runs-cards { display: flex; flex-direction: column; gap: 10px; }
+  .run-card { display: flex; align-items: center; gap: 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 16px; position: relative; transition: all var(--dur-base) var(--ease-out); }
+  .run-card.stuck-row { border-color: hsl(0 72% 51% / 0.4); background: hsl(0 72% 51% / 0.05); }
+  .run-card .rc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .run-card .rc-top { display: flex; align-items: center; gap: 9px; }
+  .run-card .rc-model { font-weight: 600; color: var(--color-text); }
+  .run-card .rc-meta { font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .run-card .rc-doing { display: inline-flex; align-items: center; gap: 6px; }
+  .run-card .rc-doing .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary); animation: brandPulse 1.4s var(--ease-out) infinite; }
+  .run-card .rc-elapsed { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); flex: 0 0 auto; }
+  .run-card.done { opacity: 0.55; }
+  .run-card.done .rc-model { text-decoration: line-through; color: var(--color-text-dim); }
+
+  .confirm-sheet { position: absolute; right: 14px; top: calc(100% - 6px); z-index: 40; width: 320px; background: var(--color-surface-hi); border: 1px solid hsl(0 72% 51% / 0.4); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 15px 16px; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .confirm-sheet h4 { margin: 0 0 6px; font-family: var(--font-headline); font-size: var(--text-base); color: var(--color-text); }
+  .confirm-sheet p { margin: 0 0 14px; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.5; }
+  .confirm-sheet p b { color: var(--color-text); }
+  .confirm-sheet .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .cs-cancel { font-size: var(--text-sm); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 13px; cursor: pointer; }
+  .cs-cancel:hover { color: var(--color-text); }
+  .cs-kill { font-size: var(--text-sm); color: #fff; background: var(--color-danger); border: 1px solid var(--color-danger); border-radius: var(--radius-sm); padding: 6px 13px; cursor: pointer; font-weight: 600; }
+  .cs-kill:hover { filter: brightness(1.1); }
+  .sheet-scrim { position: absolute; inset: 0; z-index: 30; }
+
+  .foot-note { margin-top: 14px; font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .wire-flag { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12); border-radius: var(--radius-sm); padding: 2px 6px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 064 · Active Runs &amp; the Kill Action</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Table + arm-to-confirm</button>
+  <button class="variant-tab active" onclick="showVariant('b', event)">B: Cards + confirm sheet <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Table + press-and-hold</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="sketch-toolbar">
+  <span>064</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setStage('768px')" title="tablet">💻</button>
+  <button onclick="setStage('none')" title="desktop">🖥</button>
+</div>
+
+<script>
+const ME = 'fhdmrd@gmail.com';
+const now = Date.now();
+const PROV_NAME = { anthropic:'Anthropic', openai:'OpenAI', google:'Google', deepseek:'DeepSeek', minimax:'MiniMax', moonshot:'Moonshot' };
+const LONG_MS = 480000; // 8 min
+
+const BASE = [
+  { id:'run_a91f', prov:'anthropic', model:'Claude Sonnet 4.5', who:'fhdmrd@gmail.com',            thread:'th_2f9c', doing:'execute_code · step 3', started: now-134000, stuck:false },
+  { id:'run_7c02', prov:'openai',    model:'GPT-5',             who:'maria@acme.co',               thread:'th_88a1', doing:'search_documents',     started: now-31000,  stuck:false },
+  { id:'run_3de8', prov:'google',    model:'Gemini 2.5 Pro',    who:'sam@acme.co',                 thread:'th_04b7', doing:'starting…',            started: now-8000,   stuck:false },
+  { id:'run_5f1a', prov:'deepseek',  model:'DeepSeek V3',       who:'priya@acme.co',               thread:'th_9d33', doing:'writing response',     started: now-302000, stuck:false },
+  { id:'run_c40e', prov:'minimax',   model:'MiniMax M2',        who:'Workflow · Weekly Risk Register', thread:'wf_638f', doing:'render_template', started: now-521000, stuck:false },
+  { id:'run_b7d2', prov:'moonshot',  model:'Kimi K2',           who:'leo@acme.co',                 thread:'th_1c56', doing:'no activity for 4 min', started: now-860000, stuck:true },
+];
+
+const V = {};
+['a','b','c'].forEach(v => V[v] = {
+  scenario: 'full',
+  runs: BASE.map(r => ({...r, status:'running'})),  // status: running | cancelling | done
+});
+function scoped(v){
+  const all = V[v].runs;
+  if (V[v].scenario === 'full') return all;
+  if (V[v].scenario === 'one')  return all.filter(r => r.id==='run_b7d2');
+  return [];
+}
+
+function fmtElapsed(ms){ const s=Math.floor(ms/1000); const m=Math.floor(s/60); return m>0 ? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; }
+function shield(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>'; }
+function longTag(r){ return (now - r.started) >= LONG_MS && !r.stuck ? `<span class="tag long">long-running</span>` : ''; }
+function stuckTag(r){ return r.stuck ? `<span class="tag stuck">not responding</span>` : ''; }
+
+function band(v){
+  return `<div class="op-band">
+    <div class="band-top">
+      <div class="band-title">${shield()} Control Room</div>
+      <span class="op-chip">OPERATOR</span>
+      <span class="band-identity">${ME}</span>
+      <span class="spacer"></span>
+      <span class="rec-marker" id="rec-${v}"><span class="rec-dot"></span> every action recorded</span>
+      <span class="back-link">‹ Back to app</span>
+    </div>
+    <div class="band-tabs">
+      <span class="band-tab">Overview</span>
+      <span class="band-tab active">Control Plane</span>
+      <span class="band-tab locked">Users &amp; Access <span class="lock">🔒 148</span></span>
+      <span class="band-tab locked">Model Registry <span class="lock">🔒 149</span></span>
+      <span class="band-tab">Audit log</span>
+    </div>
+  </div>`;
+}
+
+function scenarioCycler(v){
+  const opts = [['full','6 runs'],['one','1 run'],['none','none']];
+  return `<span class="scenario"><span class="lbl">preview scale</span>` +
+    opts.map(([k,l]) => `<button class="${V[v].scenario===k?'on':''}" onclick="setScenario('${v}','${k}')">${l}</button>`).join('') + `</span>`;
+}
+
+/* ══════════ A: table + arm-to-confirm ══════════ */
+function rowA(v, r){
+  if (r.status === 'cancelling') return rowCancelling(r);
+  if (r.status === 'done') return rowDone(r);
+  return `<div class="rt-row ${r.stuck?'stuck-row':''}" id="row-${v}-${r.id}">
+    <div class="rt-model"><img class="prov-logo" src="logos/${r.prov}-color.svg" alt=""><span class="m">${r.model}</span></div>
+    <div class="rt-ctx"><span class="who">${r.who} ${longTag(r)} ${stuckTag(r)}</span><span class="doing">${r.stuck?'':'<span class="dot"></span>'}${r.doing}</span></div>
+    <div class="rt-elapsed"><span class="elapsed" data-started="${r.started}">${fmtElapsed(now-r.started)}</span><span class="thread">${r.thread}</span></div>
+    <div class="rt-action"><button class="kill-btn" onclick="armA('${v}','${r.id}',this)">Kill</button></div>
+  </div>`;
+}
+function armA(v, id, btn){
+  const cell = btn.parentElement;
+  const r = V[v].runs.find(x=>x.id===id);
+  cell.innerHTML = `<span class="arm-wrap">
+    <span class="arm-q">Kill this run?</span>
+    <button class="arm-yes" onclick="doKill('${v}','${id}')">Kill</button>
+    <button class="arm-no" onclick="disarmA('${v}','${id}')">Keep</button>
+  </span>`;
+}
+function disarmA(v, id){
+  const row = document.getElementById('row-'+v+'-'+id);
+  if (row) row.querySelector('.rt-action').innerHTML = `<button class="kill-btn" onclick="armA('${v}','${id}',this)">Kill</button>`;
+}
+
+/* ══════════ C: table + press-and-hold ══════════ */
+function rowC(v, r){
+  if (r.status === 'cancelling') return rowCancelling(r);
+  if (r.status === 'done') return rowDone(r);
+  return `<div class="rt-row ${r.stuck?'stuck-row':''}" id="row-${v}-${r.id}">
+    <div class="rt-model"><img class="prov-logo" src="logos/${r.prov}-color.svg" alt=""><span class="m">${r.model}</span></div>
+    <div class="rt-ctx"><span class="who">${r.who} ${longTag(r)} ${stuckTag(r)}</span><span class="doing">${r.stuck?'':'<span class="dot"></span>'}${r.doing}</span></div>
+    <div class="rt-elapsed"><span class="elapsed" data-started="${r.started}">${fmtElapsed(now-r.started)}</span><span class="thread">${r.thread}</span></div>
+    <div class="rt-action"><button class="hold-btn" id="hold-${v}-${r.id}"
+       onmousedown="holdStart('${v}','${r.id}')" onmouseup="holdEnd('${v}','${r.id}')" onmouseleave="holdEnd('${v}','${r.id}')">
+       <span class="fill"></span><span class="lbl">Hold to kill</span></button></div>
+  </div>`;
+}
+const holdTimers = {};
+function holdStart(v, id){
+  const btn = document.getElementById('hold-'+v+'-'+id);
+  const fill = btn.querySelector('.fill'); const lbl = btn.querySelector('.lbl');
+  btn.classList.add('holding'); lbl.textContent = 'Keep holding…';
+  let pct = 0;
+  holdTimers[v+id] = setInterval(() => {
+    pct += 7; fill.style.width = pct + '%';
+    if (pct >= 100) { clearInterval(holdTimers[v+id]); delete holdTimers[v+id]; doKill(v, id); }
+  }, 60);
+}
+function holdEnd(v, id){
+  if (holdTimers[v+id]) {
+    clearInterval(holdTimers[v+id]); delete holdTimers[v+id];
+    const btn = document.getElementById('hold-'+v+'-'+id);
+    if (btn) { btn.classList.remove('holding'); btn.querySelector('.fill').style.width='0%'; btn.querySelector('.lbl').textContent='Hold to kill'; }
+  }
+}
+
+/* ══════════ B: cards + confirm sheet ══════════ */
+function cardB(v, r){
+  if (r.status === 'cancelling') return `<div class="run-card">${cancellingInner(r)}</div>`;
+  if (r.status === 'done') return `<div class="run-card done">${doneInner(r)}</div>`;
+  return `<div class="run-card ${r.stuck?'stuck-row':''}" id="row-${v}-${r.id}">
+    <img class="prov-logo" style="width:26px;height:26px;flex:0 0 26px" src="logos/${r.prov}-color.svg" alt="">
+    <div class="rc-main">
+      <div class="rc-top"><span class="rc-model">${r.model}</span><span class="prov-name">${PROV_NAME[r.prov]}</span>${longTag(r)}${stuckTag(r)}</div>
+      <div class="rc-meta">
+        <span>${r.who}</span>
+        <span class="rc-doing">${r.stuck?'':'<span class="dot"></span>'}${r.doing}</span>
+        <span style="font-family:var(--font-mono)">${r.thread}</span>
+      </div>
+    </div>
+    <span class="rc-elapsed elapsed" data-started="${r.started}">${fmtElapsed(now-r.started)}</span>
+    <button class="kill-btn" onclick="openSheet('${v}','${r.id}',this)">Kill</button>
+  </div>`;
+}
+function openSheet(v, id, btn){
+  closeSheets();
+  const r = V[v].runs.find(x=>x.id===id);
+  const card = document.getElementById('row-'+v+'-'+id);
+  const who = r.who.startsWith('Workflow') ? 'the ' + r.who.replace('Workflow · ','') + ' workflow' : r.who + "'s run";
+  const dur = fmtElapsed(now - r.started);
+  const scrim = document.createElement('div'); scrim.className = 'sheet-scrim'; scrim.onclick = closeSheets;
+  const sheet = document.createElement('div'); sheet.className = 'confirm-sheet';
+  sheet.innerHTML = `<h4>Kill this run?</h4>
+    <p>End <b>${who}</b> on <b>${r.model}</b>, <b>${dur}</b> in.${r.stuck?' This run has not responded for 4 minutes.':''}
+       It cancels immediately — the user sees it stop. This is recorded with your name.</p>
+    <div class="row"><button class="cs-cancel" onclick="closeSheets()">Keep it running</button>
+    <button class="cs-kill" onclick="doKill('${v}','${id}')">Kill run</button></div>`;
+  card.appendChild(scrim); card.appendChild(sheet);
+}
+function closeSheets(){ document.querySelectorAll('.confirm-sheet,.sheet-scrim').forEach(e=>e.remove()); }
+
+/* ══════════ shared cancelling → done ══════════ */
+function cancellingInner(r){
+  const heal = r.stuck ? ' · recovering a stuck run' : '';
+  return `<img class="prov-logo" style="${r._card?'width:26px;height:26px;flex:0 0 26px':''}" src="logos/${r.prov}-color.svg" alt="">
+    <div class="rt-model rc-main" style="flex:1"><span class="m rc-model" style="text-decoration:none">${r.model}</span></div>
+    <span class="state-cancelling"><span class="spin-ring"></span>Cancelling…${heal}</span>`;
+}
+function doneInner(r){
+  const label = r.stuck ? 'Cancelled · recovered a stuck run' : 'Cancelled · recorded';
+  return `<img class="prov-logo" style="${r._card?'width:26px;height:26px;flex:0 0 26px':''}" src="logos/${r.prov}-color.svg" alt="">
+    <div class="rt-model rc-main" style="flex:1"><span class="m rc-model">${r.model}</span></div>
+    <span class="state-done">✎ ${label}</span>`;
+}
+function rowCancelling(r){ return `<div class="rt-row">${cancellingRowGrid(r, cancellingInner(r))}</div>`; }
+function rowDone(r){ return `<div class="rt-row done">${cancellingRowGrid(r, doneInner(r))}</div>`; }
+function cancellingRowGrid(r, inner){
+  // reuse grid columns; span the state across
+  return `<div class="rt-model"><img class="prov-logo" src="logos/${r.prov}-color.svg" alt=""><span class="m">${r.model}</span></div>
+    <div class="rt-ctx"><span class="who">${r.who}</span></div>
+    <div class="rt-elapsed"><span class="thread">${r.thread}</span></div>
+    <div class="rt-action">${r.status==='cancelling'
+       ? '<span class="state-cancelling"><span class="spin-ring"></span>Cancelling…'+(r.stuck?' · healing':'')+'</span>'
+       : '<span class="state-done">✎ '+(r.stuck?'Recovered':'Cancelled')+'</span>'}</div>`;
+}
+
+/* ══════════ the kill (honest: cancelling → cancel_run zombie-heal → cancelled) ══════════ */
+function doKill(v, id){
+  closeSheets();
+  const r = V[v].runs.find(x=>x.id===id);
+  if (!r) return;
+  r.status = 'cancelling';
+  renderRuns(v);
+  recFlash(v);
+  setTimeout(() => { r.status = 'done'; renderRuns(v); }, r.stuck ? 1600 : 1100);
+}
+
+function recFlash(v){
+  const rec = document.getElementById('rec-'+v);
+  if (!rec) return;
+  rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+  const t = rec.querySelector('.txt');
+  setTimeout(()=>rec.classList.remove('flash'), 1600);
+}
+
+/* ══════════ view assembly ══════════ */
+const RENDER = { a: rowA, b: cardB, c: rowC };
+function renderRuns(v){
+  const list = scoped(v);
+  const host = document.getElementById('runs-'+v);
+  const nRunning = list.filter(r=>r.status==='running'||r.status==='cancelling').length;
+  const countEl = document.getElementById('count-'+v);
+  if (countEl) countEl.textContent = nRunning;
+  if (list.length === 0) {
+    host.innerHTML = `<div class="empty"><div class="big">No runs in flight</div>Nothing is executing right now. Active runs appear here the moment a user or workflow starts one.</div>`;
+    return;
+  }
+  if (v === 'b') {
+    list.forEach(r => r._card = true);
+    host.innerHTML = `<div class="runs-cards">` + list.map(r => cardB(v, r)).join('') + `</div>`;
+  } else {
+    host.innerHTML = `<div class="runs-table">
+      <div class="rt-head"><span>Model</span><span>User / activity</span><span>Elapsed</span><span style="text-align:right">Action</span></div>` +
+      list.map(r => RENDER[v](v, r)).join('') + `</div>`;
+  }
+}
+
+function body(v){
+  return `<div class="app-frame">${band(v)}
+    <div class="body-scroll scrollbar-thin">
+      <div class="section-head"><h2>Active runs</h2><span class="live-badge">live · <span id="count-${v}">6</span> running</span><span class="head-spacer"></span>${scenarioCycler(v)}</div>
+      <p class="sub-line">Every in-flight agent run across all users and workflows. Kill ends one immediately — it cancels the run (via the same safe path that heals stuck runs) and is recorded with your name.</p>
+      <div id="runs-${v}"></div>
+      <div class="foot-note"><span>Kill delegates to <b>cancel_run</b> — the zombie-heal path (D-062-11): a run whose worker has already died is <i>recovered</i>, not left hanging.</span><span class="wire-flag">net-new · 147 · SC#10</span></div>
+    </div>
+  </div>`;
+}
+
+const META = {
+  a: '<b>A — Table + arm-to-confirm inline.</b> A dense instrument table. Click <span class="rec">Kill</span> and the button flips in place to "Kill this run? · Kill / Keep" — one deliberate second click, no modal, fast for a real runaway. The row then shows an honest <b>Cancelling… → Cancelled · recorded</b> two-state.',
+  b: '<b>B — Cards + confirm sheet.</b> ★ <b>Winner.</b> Each run is a calm card showing what it\'s doing. Kill opens a small sheet that <i>names the victim</i> — "End maria\'s run on GPT-5, 2m 14s in" — the heaviest, most explicit guard, right for an action with a victim. Killed card collapses to a "cancelled · recorded" receipt.',
+  c: '<b>C — Table + press-and-hold.</b> Same table, but Kill is a press-and-hold — the physical friction is the safety. Hold ~1s and a fill sweeps the button; release early to abort. No modal, tactile, but less conventional for an admin table.',
+};
+
+const stage = document.getElementById('stage');
+['a','b','c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v==='b'?' active':'');
+  wrap.id = 'variant-'+v;
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + body(v);
+  stage.appendChild(wrap);
+  renderRuns(v);
+});
+
+setInterval(() => {
+  document.querySelectorAll('.elapsed[data-started]').forEach(el => {
+    el.textContent = fmtElapsed(Date.now() - Number(el.dataset.started));
+  });
+}, 1000);
+
+function setScenario(v, s){
+  // reset any killed runs when changing scale so the demo is repeatable
+  V[v].runs.forEach(r => r.status = 'running');
+  V[v].scenario = s;
+  renderRuns(v);
+  document.getElementById('variant-'+v).querySelector('.scenario').outerHTML = scenarioCycler(v);
+}
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  if (ev) ev.target.classList.add('active');
+}
+function setStage(w){ document.getElementById('stage').style.maxWidth = (w==='none')?'none':w; }
+</script>
+</body>
+</html>
