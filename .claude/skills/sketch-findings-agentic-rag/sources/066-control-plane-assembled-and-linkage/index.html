@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 066 — Control Plane Assembled &amp; Linkage Contract (Phase 147)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; max-width: 1180px; }
+
+  .ref-bar { padding: 14px 20px 4px; max-width: 1180px; margin: 0 auto; }
+  .ref-bar h1 { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 800; margin: 0 0 4px; }
+  .ref-bar p { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 12px; max-width: 900px; }
+  .ref-bar p b { color: var(--color-text); }
+  .linkmap-toggle {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 6px 14px;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .linkmap-toggle:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+  .linkmap-toggle.on { color: var(--color-accent-violet); border-color: hsl(258 90% 66% / 0.5); background: hsl(258 90% 66% / 0.1); }
+
+  .app-frame {
+    height: 720px; margin: 12px 20px 20px; max-width: 1140px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden;
+    background: var(--color-bg); box-shadow: var(--shadow-lg); position: relative;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── locked 061-B band ── */
+  .op-band { background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1); border-bottom: 1px solid hsl(38 92% 60% / 0.25); padding: 14px 22px 0; flex: 0 0 auto; }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title { display: flex; align-items: center; gap: 9px; font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); color: var(--color-text); }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .op-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-sm); padding: 2px 7px; }
+  .tech-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px 10px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); user-select: none; white-space: nowrap; }
+  .tech-toggle:hover { color: var(--color-text-muted); border-color: var(--color-text-dim); }
+  .tech-toggle.on { color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+  .rec-marker { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); white-space: nowrap; border-radius: var(--radius-full); padding: 3px 10px; cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+  .rec-marker:hover { color: var(--color-text-muted); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.6); flex: 0 0 6px; }
+  .rec-marker.flash { background: var(--color-success-dim); color: var(--color-text-muted); }
+  .rec-marker.flash .rec-dot { animation: brandPulse 0.5s var(--ease-out) 2; }
+  .back-link { font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px; }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); user-select: none; position: relative; }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab.locked { color: var(--color-text-dim); }
+  .band-tab .lock { font-size: 10px; opacity: 0.6; }
+  .band-tab .count-pill { font-family: var(--font-mono); font-size: 10px; background: var(--color-muted); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 1px 7px; }
+
+  /* ── pinned vitals (063-B) ── */
+  .vitals { flex: 0 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 11px 24px; background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border); }
+  .vital { display: inline-flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+  .vital .d { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.7); }
+  .vital.degraded .d { background: var(--color-warning); animation: brandPulse 1.4s var(--ease-out) infinite; }
+  .vital.down .d { background: var(--color-danger); }
+  .vital .vn { color: var(--color-text); font-weight: 500; }
+  .vital .vv { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .vital.sep { border-left: 1px solid var(--color-border); padding-left: 20px; }
+  .vitals .refresh-btn { margin-left: auto; }
+  .refresh-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--color-accent); color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 12px; font-size: var(--text-xs); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .refresh-btn:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+  .refresh-btn.spin svg { animation: spin 0.6s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .body-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .view { display: none; } .view.open { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
+  .section-head:not(:first-child) { margin-top: 24px; }
+  .section-head h2 { margin: 0; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .live-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--color-success); background: var(--color-success-dim); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .head-spacer { flex: 1; }
+  .sub-line { font-size: var(--text-sm); color: var(--color-text-dim); margin: 0 0 14px; max-width: 780px; }
+  .sub-line b { color: var(--color-text-muted); }
+  .wire-flag { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12); border-radius: var(--radius-sm); padding: 2px 6px; }
+
+  /* dep cards + capacity (063) */
+  .dep-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dep-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 15px; position: relative; overflow: hidden; }
+  .dep-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--color-success); }
+  .dep-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .dep-name { font-weight: 600; color: var(--color-text); }
+  .dep-plain { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .dep-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 600; color: var(--color-success); }
+  .dep-status .d { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.7); }
+  .dep-detail { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .cap-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+  .cap-item { flex: 1 1 150px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 11px 14px; }
+  .cap-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 3px; }
+  .cap-val { font-family: var(--font-mono); font-size: var(--text-xl); font-weight: 600; color: var(--color-text); line-height: 1.1; }
+  .cap-sub { font-size: 10px; color: var(--color-text-dim); margin-top: 2px; }
+
+  /* 064-B run cards */
+  .prov-logo { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px; }
+  .runs-cards { display: flex; flex-direction: column; gap: 10px; }
+  .run-card { display: flex; align-items: center; gap: 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 16px; position: relative; transition: all var(--dur-base) var(--ease-out); }
+  .run-card.stuck-row { border-color: hsl(0 72% 51% / 0.4); background: hsl(0 72% 51% / 0.05); }
+  .run-card .rc-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .run-card .rc-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .run-card .rc-model { font-weight: 600; color: var(--color-text); }
+  .prov-name { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .run-card .rc-meta { font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .run-card .rc-doing { display: inline-flex; align-items: center; gap: 6px; }
+  .run-card .rc-doing .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary); animation: brandPulse 1.4s var(--ease-out) infinite; }
+  .run-card .rc-elapsed { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); flex: 0 0 auto; }
+  .run-card.done { opacity: 0.55; }
+  .run-card.done .rc-model { text-decoration: line-through; color: var(--color-text-dim); }
+  .tag { font-family: var(--font-mono); font-size: 10px; border-radius: var(--radius-sm); padding: 1px 7px; }
+  .tag.long { color: var(--color-warning); background: var(--color-warning-dim); }
+  .tag.stuck { color: var(--color-danger); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.35); }
+  .kill-btn { font-size: var(--text-xs); color: var(--color-text-dim); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap; }
+  .kill-btn:hover { color: var(--color-danger); border-color: hsl(0 72% 51% / 0.5); background: var(--color-danger-dim); }
+  .state-cancelling { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-warning); }
+  .spin-ring { width: 12px; height: 12px; border: 2px solid hsl(38 92% 60% / 0.25); border-top-color: var(--color-warning); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .state-done { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-danger); }
+  .confirm-sheet { position: absolute; right: 14px; top: calc(100% - 6px); z-index: 40; width: 330px; background: var(--color-surface-hi); border: 1px solid hsl(0 72% 51% / 0.4); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 15px 16px; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .confirm-sheet h4 { margin: 0 0 6px; font-family: var(--font-headline); font-size: var(--text-base); color: var(--color-text); }
+  .confirm-sheet p { margin: 0 0 14px; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.5; }
+  .confirm-sheet p b { color: var(--color-text); }
+  .confirm-sheet .row { display: flex; gap: 8px; justify-content: flex-end; }
+  .cs-cancel { font-size: var(--text-sm); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 13px; cursor: pointer; }
+  .cs-cancel:hover { color: var(--color-text); }
+  .cs-kill { font-size: var(--text-sm); color: #fff; background: var(--color-danger); border: 1px solid var(--color-danger); border-radius: var(--radius-sm); padding: 6px 13px; cursor: pointer; font-weight: 600; }
+  .cs-kill:hover { filter: brightness(1.1); }
+  .sheet-scrim { position: absolute; inset: 0; z-index: 30; }
+
+  /* 065-A controls */
+  .cap-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cap-card2 { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; transition: border-color var(--dur-base) var(--ease-out); }
+  .cap-card2.off { border-color: hsl(0 72% 51% / 0.35); background: hsl(0 72% 51% / 0.035); }
+  .cap-card2 .cc-top { display: flex; align-items: flex-start; gap: 12px; }
+  .cap-card2 .cc-body { flex: 1; }
+  .cap-card2 .cc-label { font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+  .cap-card2 .cc-sub { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 2px; }
+  .off-tag { font-family: var(--font-mono); font-size: 10px; color: var(--color-danger); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.3); border-radius: var(--radius-sm); padding: 1px 7px; }
+  .impact { font-size: var(--text-xs); color: var(--color-warning); display: none; align-items: center; gap: 6px; margin-top: 8px; }
+  .impact.show { display: flex; }
+  .impact::before { content: '⚠'; }
+  .switch { width: 38px; height: 21px; border-radius: var(--radius-full); background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / 0.5); position: relative; cursor: pointer; transition: all var(--dur-base) var(--ease-out); flex: 0 0 38px; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 19px; width: 15px; height: 15px; border-radius: 50%; background: var(--color-success); transition: all var(--dur-base) var(--ease-out); }
+  .switch.off { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / 0.5); }
+  .switch.off::after { left: 2px; background: var(--color-danger); }
+  .platform-panel { margin-top: 16px; border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-md); overflow: hidden; }
+  .platform-panel .pp-head { background: linear-gradient(180deg, hsl(38 92% 60% / 0.08), transparent); padding: 11px 16px; border-bottom: 1px solid hsl(38 92% 60% / 0.2); display: flex; align-items: center; gap: 8px; }
+  .platform-panel .pp-head svg { width: 15px; height: 15px; color: var(--color-warning); flex: 0 0 15px; }
+  .platform-panel .pp-head .t { font-family: var(--font-headline); font-weight: 700; color: var(--color-text); }
+  .platform-panel .pp-head .pill { font-family: var(--font-mono); font-size: 10px; color: var(--color-warning); background: var(--color-warning-dim); border-radius: var(--radius-sm); padding: 1px 7px; margin-left: auto; }
+  .platform-panel .pp-body { padding: 14px 16px; }
+  .maint-ctl { display: flex; align-items: center; gap: 10px; }
+  .arm-wrap { display: inline-flex; align-items: center; gap: 6px; }
+  .arm-q { font-size: var(--text-xs); color: var(--color-warning); }
+  .arm-yes { font-size: var(--text-xs); color: hsl(216 45% 6%); background: var(--color-warning); border: 1px solid var(--color-warning); border-radius: var(--radius-sm); padding: 5px 11px; cursor: pointer; font-weight: 700; }
+  .arm-no { font-size: var(--text-xs); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; }
+  .maint-banner { display: none; align-items: center; gap: 8px; margin-top: 12px; background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.35); border-radius: var(--radius-md); padding: 9px 14px; font-size: var(--text-sm); color: var(--color-warning); }
+  .maint-banner.on { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* ledger */
+  .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .card-head h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; }
+  .card-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--color-border-soft); font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card-link { color: var(--color-primary); cursor: pointer; font-size: var(--text-xs); }
+  .card-link:hover { text-decoration: underline; }
+  .audit-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-plain { color: var(--color-text); }
+  .audit-actor { color: var(--color-text-dim); font-size: var(--text-xs); }
+  .audit-when { margin-left: auto; color: var(--color-text-dim); font-size: var(--text-xs); }
+  .audit-row.is-write .audit-plain::before { content: '✎ '; color: var(--color-warning); }
+
+  /* locked-tab refusal + generic empty */
+  .refusal { text-align: center; padding: 60px 20px; color: var(--color-text-dim); }
+  .refusal .big { font-size: var(--text-lg); color: var(--color-text-muted); margin-bottom: 6px; }
+  .refusal .lock-ico { font-size: 26px; opacity: 0.5; margin-bottom: 10px; }
+
+  /* ── link-map overlay ── */
+  .lk { display: none; }
+  .app-frame.linkmap .lk {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px; margin-left: 6px;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700; line-height: 1;
+    color: #fff; background: var(--color-accent-violet); border-radius: var(--radius-full);
+    box-shadow: 0 0 0 2px var(--color-bg); vertical-align: middle;
+  }
+  .app-frame.linkmap [data-link] { outline: 1px dashed hsl(258 90% 66% / 0.5); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+  /* ── the contract tables (always visible below the frame) ── */
+  .contract { max-width: 1140px; margin: 8px 20px 60px; }
+  .contract h2 { font-family: var(--font-headline); font-size: var(--text-xl); font-weight: 800; margin: 26px 0 4px; }
+  .contract h2 .n { color: var(--color-accent-violet); }
+  .contract .lead { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 14px; max-width: 900px; }
+  .tbl { width: 100%; border-collapse: collapse; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; font-size: var(--text-sm); }
+  .tbl th, .tbl td { text-align: left; padding: 9px 13px; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; }
+  .tbl thead th { background: var(--color-bg-elev1); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); font-family: var(--font-mono); }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl td .chip { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #fff; background: var(--color-accent-violet); border-radius: var(--radius-full); }
+  .tbl td b { color: var(--color-text); }
+  .tbl td code, .tbl td .mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-primary); }
+  .tbl .live { color: var(--color-success); font-family: var(--font-mono); font-size: 10px; }
+  .tbl .locked-c { color: var(--color-text-dim); font-family: var(--font-mono); font-size: 10px; }
+  .rules { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .rules li { background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); border-radius: var(--radius-sm); padding: 11px 15px; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .rules li b { color: var(--color-text); }
+  .decision { background: hsl(38 92% 60% / 0.06); border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-md); padding: 15px 18px; margin-top: 12px; }
+  .decision h3 { margin: 0 0 6px; font-family: var(--font-headline); font-size: var(--text-base); color: var(--color-warning); }
+  .decision p { margin: 0 0 8px; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .decision p b { color: var(--color-text); }
+</style>
+</head>
+<body>
+
+<div class="ref-bar">
+  <h1>Control Plane — assembled &amp; wired</h1>
+  <p>The three winners composed into the single Phase 147 surface: the <b>063-B</b> pinned-health frame, with the
+     <b>064-B</b> confirm-sheet run cards and the <b>065-A</b> card-grid controls as sections in the scroll. Below the
+     frame is the <b>navigation &amp; linkage contract</b> — every button and link's destination — so we build one spec, not three.</p>
+  <span class="linkmap-toggle" id="lmt" onclick="toggleLinkmap()">🔗 Show link map</span>
+</div>
+
+<div id="stage">
+  <div class="app-frame" id="frame">
+    <!-- band -->
+    <div class="op-band">
+      <div class="band-top">
+        <div class="band-title" data-link="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg> Control Room<sup class="lk">1</sup></div>
+        <span class="op-chip">OPERATOR</span>
+        <span class="band-identity">fhdmrd@gmail.com</span>
+        <span class="spacer"></span>
+        <span class="tech-toggle" data-link="10" id="tech" onclick="toggleTech()">⌥ Technical names<sup class="lk">10</sup></span>
+        <span class="rec-marker" data-link="2" id="rec" onclick="go('audit')"><span class="rec-dot"></span> every action recorded<sup class="lk">2</sup></span>
+        <span class="back-link" data-link="3" onclick="flash('‹ would exit the Control Room, back to the main app')">‹ Back to app<sup class="lk">3</sup></span>
+      </div>
+      <div class="band-tabs">
+        <span class="band-tab active" data-link="4" onclick="go('cp')">Control Plane<sup class="lk">4</sup></span>
+        <span class="band-tab locked" data-link="5" onclick="go('lock148')">Users &amp; Access <span class="lock">🔒 148</span><sup class="lk">5</sup></span>
+        <span class="band-tab locked" data-link="6" onclick="go('lock149')">Model Registry <span class="lock">🔒 149</span><sup class="lk">6</sup></span>
+        <span class="band-tab locked" data-link="7" onclick="go('lock150')">Secrets <span class="lock">🔒 150</span><sup class="lk">7</sup></span>
+        <span class="band-tab" data-link="8" onclick="go('audit')">Audit log <span class="count-pill" id="tabcount">2</span><sup class="lk">8</sup></span>
+      </div>
+    </div>
+
+    <!-- pinned vitals (063-B) -->
+    <div class="vitals" id="vitals">
+      <span class="vital"><span class="d"></span><span class="vn">Redis</span><span class="vv">Healthy</span></span>
+      <span class="vital"><span class="d"></span><span class="vn">Database</span><span class="vv">Healthy</span></span>
+      <span class="vital"><span class="d"></span><span class="vn">Code sandbox</span><span class="vv">Healthy</span></span>
+      <span class="vital sep"><span class="vn">Agents working</span> <span class="vv" id="vit-runs">4</span></span>
+      <span class="vital"><span class="vn" id="cap-vn">Server capacity</span> <span class="vv">3 / 40</span></span>
+      <button class="refresh-btn" data-link="9" onclick="refresh(this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh<sup class="lk">9</sup></button>
+    </div>
+
+    <div class="body-scroll scrollbar-thin">
+      <!-- ══ Control Plane view ══ -->
+      <div class="view open" id="view-cp">
+        <div class="section-head"><h2>Details</h2><span class="sub-line" style="margin:0">the vital signs above stay pinned as you scroll</span></div>
+        <div class="dep-grid">
+          <div class="dep-card"><div class="dep-top"><div><div class="dep-name">Redis</div><div class="dep-plain">Cache &amp; run coordination</div></div><span class="dep-status"><span class="d"></span>Healthy</span></div><div class="dep-detail">2 ms · 4 active runs</div></div>
+          <div class="dep-card"><div class="dep-top"><div><div class="dep-name">Database</div><div class="dep-plain">Supabase Postgres</div></div><span class="dep-status"><span class="d"></span>Healthy</span></div><div class="dep-detail">8 ms · 1 / 10 connections</div></div>
+          <div class="dep-card"><div class="dep-top"><div><div class="dep-name">Code sandbox</div><div class="dep-plain">Docker execution</div></div><span class="dep-status"><span class="d"></span>Healthy</span></div><div class="dep-detail">2 sessions warm</div></div>
+        </div>
+        <div class="cap-row">
+          <div class="cap-item"><div class="cap-label"><span data-plain="Server capacity" data-tech="anyio_threadpool_depth">Server capacity</span></div><div class="cap-val">3 / 40</div><div class="cap-sub">workers busy</div></div>
+          <div class="cap-item"><div class="cap-label"><span data-plain="Agents working now" data-tech="per_worker_run_count">Agents working now</span></div><div class="cap-val">4</div><div class="cap-sub">across 2 workers</div></div>
+          <div class="cap-item"><div class="cap-label"><span data-plain="Database connections" data-tech="postgres_pool_in_use">Database connections</span></div><div class="cap-val">1 / 10</div><div class="cap-sub">in use</div></div>
+        </div>
+
+        <div class="section-head"><h2>Active runs</h2><span class="live-badge">live · <span id="runcount">4</span> running</span></div>
+        <p class="sub-line">Every in-flight run across all users &amp; workflows. Kill ends one immediately (the safe path that also heals stuck runs) and is recorded with your name.</p>
+        <div id="runs" class="runs-cards"></div>
+
+        <div class="section-head"><h2>Controls</h2><span class="head-spacer"></span><span class="wire-flag">net-new · 147</span></div>
+        <p class="sub-line">Turn a capability off and it stops for <b>every user</b> immediately (fail-closed). Maintenance mode is different — it makes the <b>whole platform</b> read-only.</p>
+        <div class="cap-cards" id="caps"></div>
+        <div class="platform-panel">
+          <div class="pp-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg><span class="t">Platform state</span><span class="pill">affects the whole platform</span></div>
+          <div class="pp-body">
+            <div style="display:flex; align-items:flex-start; gap:14px;">
+              <div style="flex:1"><div style="font-weight:600; color:var(--color-text)">Maintenance mode</div><div style="font-size:var(--text-xs); color:var(--color-text-dim); margin-top:2px">The whole platform goes read-only. Users can read everything, but nothing new runs — no chats, workflows, or uploads.</div></div>
+              <div id="maint-ctl" data-link="14"></div>
+            </div>
+            <div class="maint-banner" id="banner">⚠ Maintenance mode is ON — the whole platform is read-only right now.</div>
+          </div>
+        </div>
+
+        <div class="section-head"><h2>Activity</h2><span class="live-badge">live</span></div>
+        <div class="card">
+          <div id="feed"></div>
+          <div class="card-foot"><span>Everything an operator does here is recorded automatically.</span><span class="wire-flag">net-new · 146</span><span style="flex:1"></span><span class="card-link" data-link="15" onclick="go('audit')">View all ›<sup class="lk">15</sup></span></div>
+        </div>
+      </div>
+
+      <!-- ══ Audit log view ══ -->
+      <div class="view" id="view-audit">
+        <div class="section-head"><h2>Audit log</h2><span class="live-badge">live</span></div>
+        <div class="card" style="max-width:820px">
+          <div id="feed-full"></div>
+          <div class="card-foot"><span>Who did what, and when — every operator action, no exceptions.</span><span style="flex:1"></span><span class="locked-c" style="border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:1px 6px;">search, date filters &amp; export → Phase 148</span></div>
+        </div>
+      </div>
+
+      <!-- ══ locked-tab refusals ══ -->
+      <div class="view" id="view-lock148"><div class="refusal"><div class="lock-ico">🔒</div><div class="big">Nothing here yet — arrives with Phase 148</div>Users &amp; Access lets you browse the audit trail in depth, manage user access, and control which advanced features end users can see.</div></div>
+      <div class="view" id="view-lock149"><div class="refusal"><div class="lock-ico">🔒</div><div class="big">Nothing here yet — arrives with Phase 149</div>Model Registry lets you edit model capabilities and run live provider discovery — no restart, no silent capability guesses.</div></div>
+      <div class="view" id="view-lock150"><div class="refusal"><div class="lock-ico">🔒</div><div class="big">Nothing here yet — arrives with Phase 150</div>Secrets stores provider API keys encrypted at rest, with env-var fallback preserved.</div></div>
+    </div>
+
+    <div id="frame-toast" style="position:absolute; left:50%; bottom:16px; transform:translateX(-50%); z-index:60; display:none; background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:9px 16px; font-size:var(--text-sm); color:var(--color-text);"></div>
+  </div>
+</div>
+
+<!-- ═══════════ navigation & linkage contract ═══════════ -->
+<div class="contract">
+  <h2>Navigation &amp; linkage contract</h2>
+  <p class="lead">Turn on <b>🔗 Show link map</b> above to see each numbered control highlighted on the surface. This is the single spec for where everything goes — build against this, not against the three sketches individually.</p>
+
+  <h3 style="font-family:var(--font-headline); font-size:var(--text-md); margin:18px 0 8px;">Band tabs — the Control Room top nav</h3>
+  <table class="tbl">
+    <thead><tr><th>#</th><th>Tab</th><th>State at 147</th><th>Destination / behavior</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip">4</span></td><td><b>Control Plane</b></td><td><span class="live">live · 147</span></td><td>The operator's live landing surface (this view). Pinned vitals + Health + Active runs + Controls + Activity. <b>Recommended: the 146 "Overview" tab becomes this</b> — see the open decision below.</td></tr>
+      <tr><td><span class="chip">5</span></td><td>Users &amp; Access</td><td><span class="locked-c">locked → 148</span></td><td>Honest calm refusal naming Phase 148. Audit browser (filter/paginate/CSV) + user disable/enable + feature-visibility greenlists live here.</td></tr>
+      <tr><td><span class="chip">6</span></td><td>Model Registry</td><td><span class="locked-c">locked → 149</span></td><td>Honest refusal naming Phase 149. Model-capability write UI + live discovery.</td></tr>
+      <tr><td><span class="chip">7</span></td><td>Secrets</td><td><span class="locked-c">locked → 150</span></td><td>Honest refusal naming Phase 150. Encrypted key management.</td></tr>
+      <tr><td><span class="chip">8</span></td><td><b>Audit log</b></td><td><span class="live">live · 146</span></td><td>The full history home. 146 shipped read; 148 adds filter/date/CSV. The Activity section's "View all ›" lands here.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-family:var(--font-headline); font-size:var(--text-md); margin:22px 0 8px;">Buttons &amp; links → destination</h3>
+  <table class="tbl">
+    <thead><tr><th>#</th><th>Control</th><th>Action</th><th>Destination / effect</th><th>Recorded?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip">1</span></td><td>Shield · "Control Room" title</td><td>click</td><td>No-op (you are home). Identity marker only.</td><td>—</td></tr>
+      <tr><td><span class="chip">2</span></td><td>"every action recorded" marker</td><td>click</td><td>→ <b>Audit log</b> tab (the recording's home). Flashes on every write.</td><td>read (audit.view)</td></tr>
+      <tr><td><span class="chip">3</span></td><td>‹ Back to app</td><td>click</td><td>Exits the Control Room → the main app (prior route). Shield stays in the app rail.</td><td>—</td></tr>
+      <tr><td><span class="chip">9</span></td><td>↻ Refresh (vitals)</td><td>click</td><td>Re-fetches <code>/admin/backpressure</code> + dependency health; updates in place.</td><td>read (health.view)</td></tr>
+      <tr><td><span class="chip">10</span></td><td>⌥ Technical names</td><td>toggle</td><td>Display-only relabel (plain ⟷ technical) across the whole Control Room. LANG-01 / Phase 154 preview. No contract/enum change.</td><td>—</td></tr>
+      <tr><td><span class="chip">11</span></td><td>Run card (each)</td><td>—</td><td><b>Read-only.</b> Does NOT drill into another user's thread contents (scope/privacy). Kill is the only action; thread id shown for support reference.</td><td>—</td></tr>
+      <tr><td><span class="chip">12</span></td><td>Kill (run)</td><td>click → sheet</td><td><b>Confirm sheet names the victim</b> (who / model / elapsed) → <code>cancel_run</code> (zombie-heal) → Cancelling… → Cancelled. Card = receipt.</td><td><b>write (run.kill)</b></td></tr>
+      <tr><td><span class="chip">13</span></td><td>Capability switch (×4)</td><td>toggle</td><td>Flips an <code>app_settings</code> flag (fail-closed) — off for all users on next request (TTL cache). Direct flip, no confirm (fast for an emergency).</td><td><b>write (flag.*)</b></td></tr>
+      <tr><td><span class="chip">14</span></td><td>Maintenance mode</td><td>arm → confirm</td><td><b>Arm-to-confirm</b> (platform-wide guard) → <code>app_settings</code> maintenance flag → persistent read-only banner.</td><td><b>write (maintenance.set)</b></td></tr>
+      <tr><td><span class="chip">15</span></td><td>Activity · "View all ›"</td><td>click</td><td>→ <b>Audit log</b> tab.</td><td>read (audit.view)</td></tr>
+    </tbody>
+  </table>
+  <p class="lead" style="margin-top:10px;">Plus, external to this frame: the <b>shield entry in the main app rail</b> (shipped Phase 146, probe-gated) → opens the Control Plane. Non-operators never see it, and any <code>/admin</code> route returns <b>404</b>.</p>
+
+  <h3 style="font-family:var(--font-headline); font-size:var(--text-md); margin:22px 0 8px;">Consistency rules (the whole-surface guards)</h3>
+  <ul class="rules">
+    <li><b>One receipt vocabulary (062-A).</b> Every write → a ✎ row in Activity + Audit and a "every action recorded" band flash. No per-surface bespoke confirmation styling.</li>
+    <li><b>Graded action guards — by shape, consistently.</b> Target-specific destructive actions use a <b>confirm sheet that names the target</b> (Kill run #12). Global state switches use <b>inline arm-to-confirm</b> (Maintenance #14). Reversible per-user capability switches (#13) flip <b>directly</b>. Same rule everywhere a future action of that shape appears.</li>
+    <li><b>Consequence ≠ receipt.</b> Maintenance ON raises a <b>persistent present-tense banner</b> ("read-only right now") that is distinct from the past-tense ledger receipt ("Turned ON maintenance mode"). Two truths, two elements.</li>
+    <li><b>Plain-language default, ⌥ technical reveal (#10).</b> Every technical term (parameter names, action codes) is plain by default; the reveal is Control-Room-wide and display-only. Extends the Phase-124 two-door pattern; ratified app-wide in Phase 154.</li>
+    <li><b>Honest locks.</b> Future tabs stay visible, dimmed, with a calm refusal naming the arriving phase — never hidden, never a broken 404 inside the shell.</li>
+    <li><b>Non-discoverable (146 red line).</b> The whole surface is probe-gated: a non-operator can't see the shield and gets a 404 on every <code>/admin</code> route. Enforced in application code (no RLS backstop on the service-role client).</li>
+    <li><b>Read-only monitoring, not surveillance.</b> The operator sees others' run metadata (user / model / elapsed / current tool) but cannot open another user's thread contents from here. "Sign in as user" / thread inspection is a Phase-148 named-trigger decision, not implied by Kill.</li>
+  </ul>
+
+  <h2 style="margin-top:26px;">Open IA decision <span class="n">→ discuss-phase 147</span></h2>
+  <div class="decision">
+    <h3>Does "Overview" survive, or become "Control Plane"?</h3>
+    <p>Phase 146 shipped an <b>Overview</b> tab (health posture + a controls <i>preview</i> + ledger) alongside a <i>locked</i> <b>Control Plane</b> slot. At 147 the live surface holds all of that plus active runs + real controls. Keeping both would <b>split health across two tabs</b>.</p>
+    <p><b>Recommendation:</b> promote — the 146 "Overview" tab <b>becomes</b> the live "Control Plane" (one landing, no duplication); the 061-B locked slot is fulfilled by promotion, not by a parallel tab. Designed that way here.</p>
+    <p><b>Alternative (if kept):</b> "Overview" stays a thin home (welcome + top-line posture + shortcuts) and "Control Plane" is the cockpit — accept some health duplication. Ratify at discuss-phase as <b>D-147-IA</b>.</p>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>066</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="document.getElementById('lmt').click()" title="link map">🔗</button>
+</div>
+
+<script>
+const ME = 'fhdmrd@gmail.com';
+const now = Date.now();
+const PROV_NAME = { anthropic:'Anthropic', openai:'OpenAI', google:'Google', deepseek:'DeepSeek', minimax:'MiniMax', moonshot:'Moonshot' };
+const LONG_MS = 480000;
+let techNames = false;
+
+let runs = [
+  { id:'run_a91f', prov:'anthropic', model:'Claude Sonnet 4.5', who:'fhdmrd@gmail.com',                 thread:'th_2f9c', doing:'execute_code · step 3', started: now-134000, stuck:false, status:'running' },
+  { id:'run_7c02', prov:'openai',    model:'GPT-5',             who:'maria@acme.co',                    thread:'th_88a1', doing:'search_documents',     started: now-31000,  stuck:false, status:'running' },
+  { id:'run_c40e', prov:'minimax',   model:'MiniMax M2',        who:'Workflow · Weekly Risk Register',  thread:'wf_638f', doing:'render_template',      started: now-521000, stuck:false, status:'running' },
+  { id:'run_b7d2', prov:'moonshot',  model:'Kimi K2',           who:'leo@acme.co',                      thread:'th_1c56', doing:'no activity for 4 min', started: now-860000, stuck:true,  status:'running' },
+];
+const CAPS = [
+  { key:'web_search',   label:'Web search',      sub:'Agents can search the internet.',         offImpact:'Search calls now refuse for everyone.', on:true },
+  { key:'sandbox',      label:'Code sandbox',     sub:'Agents can run code in a sandbox.',        offImpact:'2 runs using code will error on their next call.', on:true },
+  { key:'self_improve', label:'Self-improvement', sub:'Skills can propose edits to themselves.',  offImpact:'The proposer is paused for everyone.', on:true },
+  { key:'workflows',    label:'Workflows',        sub:'Multi-step automations can run.',          offImpact:'1 workflow in progress finishes; no new ones start.', on:true },
+];
+let maintenance = false, maintArmed = false;
+let feed = [
+  { plain:'Signed in to the Control Room', actor:ME, when:'just now', write:false },
+  { plain:'Operator access granted (initial setup)', actor:'system', when:'Jul 10 · 09:00', write:false },
+];
+
+function fmtElapsed(ms){ const s=Math.floor(ms/1000); const m=Math.floor(s/60); return m>0 ? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; }
+function longTag(r){ return (now-r.started)>=LONG_MS && !r.stuck ? '<span class="tag long">long-running</span>' : ''; }
+function stuckTag(r){ return r.stuck ? '<span class="tag stuck">not responding</span>' : ''; }
+
+function renderRuns(){
+  const host = document.getElementById('runs');
+  const active = runs.filter(r=>r.status==='running'||r.status==='cancelling').length;
+  document.getElementById('runcount').textContent = active;
+  document.getElementById('vit-runs').textContent = active;
+  host.innerHTML = runs.map(r => {
+    if (r.status==='cancelling') return `<div class="run-card"><img class="prov-logo" src="logos/${r.prov}-color.svg" alt=""><div class="rc-main"><span class="rc-model" style="text-decoration:none">${r.model}</span></div><span class="state-cancelling"><span class="spin-ring"></span>Cancelling…${r.stuck?' · recovering a stuck run':''}</span></div>`;
+    if (r.status==='done') return `<div class="run-card done"><img class="prov-logo" src="logos/${r.prov}-color.svg" alt=""><div class="rc-main"><span class="rc-model">${r.model}</span></div><span class="state-done">✎ ${r.stuck?'Cancelled · recovered a stuck run':'Cancelled · recorded'}</span></div>`;
+    return `<div class="run-card ${r.stuck?'stuck-row':''}" id="row-${r.id}">
+      <img class="prov-logo" src="logos/${r.prov}-color.svg" alt="">
+      <div class="rc-main">
+        <div class="rc-top"><span class="rc-model">${r.model}</span><span class="prov-name">${PROV_NAME[r.prov]}</span>${longTag(r)}${stuckTag(r)}</div>
+        <div class="rc-meta"><span>${r.who}</span><span class="rc-doing">${r.stuck?'':'<span class="dot"></span>'}${r.doing}</span><span style="font-family:var(--font-mono)">${r.thread}</span></div>
+      </div>
+      <span class="rc-elapsed elapsed" data-started="${r.started}">${fmtElapsed(now-r.started)}</span>
+      <button class="kill-btn" data-link="12" onclick="openSheet('${r.id}',this)">Kill<sup class="lk">12</sup></button>
+    </div>`;
+  }).join('');
+}
+
+function openSheet(id, btn){
+  closeSheets();
+  const r = runs.find(x=>x.id===id); const card = document.getElementById('row-'+id);
+  const who = r.who.startsWith('Workflow') ? 'the ' + r.who.replace('Workflow · ','') + ' workflow' : r.who + "'s run";
+  const scrim = document.createElement('div'); scrim.className='sheet-scrim'; scrim.onclick=closeSheets;
+  const sheet = document.createElement('div'); sheet.className='confirm-sheet';
+  sheet.innerHTML = `<h4>Kill this run?</h4><p>End <b>${who}</b> on <b>${r.model}</b>, <b>${fmtElapsed(now-r.started)}</b> in.${r.stuck?' This run has not responded for 4 minutes.':''} It cancels immediately — the user sees it stop. Recorded with your name.</p><div class="row"><button class="cs-cancel" onclick="closeSheets()">Keep it running</button><button class="cs-kill" onclick="doKill('${id}')">Kill run</button></div>`;
+  card.appendChild(scrim); card.appendChild(sheet);
+}
+function closeSheets(){ document.querySelectorAll('.confirm-sheet,.sheet-scrim').forEach(e=>e.remove()); }
+function doKill(id){
+  closeSheets();
+  const r = runs.find(x=>x.id===id); if(!r) return;
+  r.status='cancelling'; renderRuns(); recFlash();
+  logAction(`Killed a run — ${r.model} (${r.who})`, true);
+  setTimeout(()=>{ r.status='done'; renderRuns(); }, r.stuck?1600:1100);
+}
+
+function renderCaps(){
+  document.getElementById('caps').innerHTML = CAPS.map(c => `
+    <div class="cap-card2 ${c.on?'':'off'}" id="cap-${c.key}">
+      <div class="cc-top">
+        <div class="cc-body">
+          <div class="cc-label"><span class="name">${c.label}</span>${c.on?'':'<span class="off-tag">off for everyone</span>'}</div>
+          <div class="cc-sub">${c.sub}</div>
+        </div>
+        <div class="switch ${c.on?'':'off'}" data-link="13" onclick="toggleCap('${c.key}')"></div>
+      </div>
+      <div class="impact ${c.on?'':'show'}">${c.offImpact}</div>
+    </div>`).join('');
+}
+function toggleCap(key){
+  const c = CAPS.find(x=>x.key===key); c.on=!c.on; renderCaps();
+  logAction(`Turned ${c.on?'ON':'OFF'} ${c.label} for all users`, true);
+}
+
+function renderMaint(){
+  const host = document.getElementById('maint-ctl');
+  if (maintArmed) {
+    host.innerHTML = `<span class="arm-wrap"><span class="arm-q">Put the whole platform in read-only mode?</span><button class="arm-yes" onclick="confirmMaint()">${maintenance?'Turn off':'Confirm'}</button><button class="arm-no" onclick="maintArmed=false;renderMaint()">Cancel</button></span><sup class="lk">14</sup>`;
+  } else {
+    host.innerHTML = `<div class="switch ${maintenance?'':'off'}" onclick="maintArmed=true;renderMaint()"></div><sup class="lk">14</sup>`;
+  }
+}
+function confirmMaint(){
+  maintenance=!maintenance; maintArmed=false; renderMaint();
+  document.getElementById('banner').classList.toggle('on', maintenance);
+  logAction(maintenance?'Turned ON maintenance mode — platform is read-only for users':'Turned OFF maintenance mode — platform back to normal', true);
+}
+
+function feedRows(list){ return list.map(r=>`<div class="audit-row${r.write?' is-write':''}"><span class="audit-plain">${r.plain}</span><span class="audit-actor">${r.actor}</span><span class="audit-when">${r.when}</span></div>`).join(''); }
+function renderFeed(){
+  document.getElementById('feed').innerHTML = feedRows(feed.slice(0,5));
+  document.getElementById('feed-full').innerHTML = feedRows(feed);
+  document.getElementById('tabcount').textContent = feed.length;
+}
+function logAction(plain, write){ feed.unshift({plain, actor:ME, when:'just now', write}); renderFeed(); recFlash(); }
+function recFlash(){ const rec=document.getElementById('rec'); rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash'); setTimeout(()=>rec.classList.remove('flash'),1400); }
+
+function refresh(btn){ btn.classList.add('spin'); setTimeout(()=>btn.classList.remove('spin'),650); logAction('Viewed system health', false); }
+function toggleTech(){
+  techNames=!techNames;
+  document.getElementById('tech').classList.toggle('on', techNames);
+  document.querySelectorAll('[data-plain]').forEach(el=>{ el.textContent = techNames ? el.dataset.tech : el.dataset.plain; });
+  document.getElementById('cap-vn').textContent = techNames ? 'anyio_pool' : 'Server capacity';
+}
+
+/* nav */
+function go(view){
+  const map = { cp:'view-cp', audit:'view-audit', lock148:'view-lock148', lock149:'view-lock149', lock150:'view-lock150' };
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('open'));
+  document.getElementById(map[view]).classList.add('open');
+  document.querySelectorAll('.band-tab').forEach(t=>t.classList.remove('active'));
+  if (view==='cp') document.querySelector('[data-link="4"]').classList.add('active');
+  if (view==='audit') document.querySelector('[data-link="8"]').classList.add('active');
+  if (view==='lock148') document.querySelector('[data-link="5"]').classList.add('active');
+  if (view==='lock149') document.querySelector('[data-link="6"]').classList.add('active');
+  if (view==='lock150') document.querySelector('[data-link="7"]').classList.add('active');
+}
+function flash(msg){ const t=document.getElementById('frame-toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 2200); }
+function toggleLinkmap(){
+  const on = document.getElementById('frame').classList.toggle('linkmap');
+  document.getElementById('lmt').classList.toggle('on', on);
+  document.getElementById('lmt').textContent = on ? '🔗 Hide link map' : '🔗 Show link map';
+}
+
+renderRuns(); renderCaps(); renderMaint(); renderFeed();
+setInterval(()=>{ document.querySelectorAll('.elapsed[data-started]').forEach(el=>{ el.textContent = fmtElapsed(Date.now()-Number(el.dataset.started)); }); }, 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 065 — System Controls &amp; Maintenance (Phase 147)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .variant-meta { padding: 10px 20px 0; font-size: var(--text-sm); color: var(--color-text-muted); max-width: 1040px; }
+  .variant-meta b { color: var(--color-text); font-weight: 600; }
+
+  .app-frame { height: calc(100vh - 118px); min-height: 640px; margin: 12px 20px 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; background: var(--color-bg); box-shadow: var(--shadow-lg); position: relative; display: flex; flex-direction: column; }
+
+  /* ── locked 061-B band ── */
+  .op-band { background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1); border-bottom: 1px solid hsl(38 92% 60% / 0.25); padding: 14px 22px 0; flex: 0 0 auto; }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title { display: flex; align-items: center; gap: 9px; font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); color: var(--color-text); }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .op-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-sm); padding: 2px 7px; }
+  .rec-marker { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); white-space: nowrap; border-radius: var(--radius-full); padding: 3px 10px; transition: all var(--dur-base) var(--ease-out); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.6); flex: 0 0 6px; }
+  .rec-marker.flash { background: var(--color-success-dim); color: var(--color-text-muted); }
+  .rec-marker.flash .rec-dot { animation: brandPulse 0.5s var(--ease-out) 2; }
+  .back-link { font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px; }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); user-select: none; }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab.locked { color: var(--color-text-dim); cursor: not-allowed; }
+  .band-tab .lock { font-size: 10px; opacity: 0.6; }
+
+  .body-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
+  .section-head h2 { margin: 0; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .sub-line { font-size: var(--text-sm); color: var(--color-text-dim); margin: 0 0 18px; max-width: 760px; }
+  .head-spacer { flex: 1; }
+  .wire-flag { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12); border-radius: var(--radius-sm); padding: 2px 6px; }
+
+  /* ── shared switch (locked 062-A) — default state = ON (green) ── */
+  .switch { width: 38px; height: 21px; border-radius: var(--radius-full); background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / 0.5); position: relative; cursor: pointer; transition: all var(--dur-base) var(--ease-out); flex: 0 0 38px; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 19px; width: 15px; height: 15px; border-radius: 50%; background: var(--color-success); transition: all var(--dur-base) var(--ease-out); }
+  .switch.off { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / 0.5); }
+  .switch.off::after { left: 2px; background: var(--color-danger); }
+
+  /* off-state consequence text */
+  .off-tag { font-family: var(--font-mono); font-size: 10px; color: var(--color-danger); background: var(--color-danger-dim); border: 1px solid hsl(0 72% 51% / 0.3); border-radius: var(--radius-sm); padding: 1px 7px; }
+  .impact { font-size: var(--text-xs); color: var(--color-warning); display: none; align-items: center; gap: 6px; margin-top: 6px; }
+  .impact.show { display: flex; animation: fadeSlideUp var(--dur-fast) var(--ease-out); }
+  .impact::before { content: '⚠'; }
+
+  /* ══════════ A: capability card grid + separated maintenance ══════════ */
+  .cap-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cap-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; transition: border-color var(--dur-base) var(--ease-out); }
+  .cap-card.off { border-color: hsl(0 72% 51% / 0.35); background: hsl(0 72% 51% / 0.035); }
+  .cap-card .cc-top { display: flex; align-items: flex-start; gap: 12px; }
+  .cap-card .cc-body { flex: 1; }
+  .cap-card .cc-label { font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+  .cap-card .cc-sub { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 2px; }
+
+  .platform-panel { margin-top: 18px; border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-md); overflow: hidden; }
+  .platform-panel .pp-head { background: linear-gradient(180deg, hsl(38 92% 60% / 0.08), transparent); padding: 11px 16px; border-bottom: 1px solid hsl(38 92% 60% / 0.2); display: flex; align-items: center; gap: 8px; }
+  .platform-panel .pp-head svg { width: 15px; height: 15px; color: var(--color-warning); flex: 0 0 15px; }
+  .platform-panel .pp-head .t { font-family: var(--font-headline); font-weight: 700; color: var(--color-text); }
+  .platform-panel .pp-head .pill { font-family: var(--font-mono); font-size: 10px; color: var(--color-warning); background: var(--color-warning-dim); border-radius: var(--radius-sm); padding: 1px 7px; }
+  .platform-panel .pp-body { padding: 14px 16px; }
+
+  /* ══════════ B: weighted list ══════════ */
+  .ctrl-list { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .ctrl-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--color-border-soft); transition: background var(--dur-base) var(--ease-out); }
+  .ctrl-item:last-child { border-bottom: none; }
+  .ctrl-item .ci-body { flex: 1; }
+  .ctrl-item .ci-label { font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 9px; }
+  .ctrl-item .ci-sub { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 2px; }
+  .ctrl-item.off { background: hsl(0 72% 51% / 0.04); }
+  .ctrl-item.off .ci-label .name { color: var(--color-text-muted); }
+  .ctrl-item.maint-row { background: var(--color-bg-elev1); border-top: 1px solid hsl(38 92% 60% / 0.3); padding: 18px 16px; }
+  .ctrl-item.maint-row .ci-label { font-family: var(--font-headline); font-size: var(--text-md); }
+  .ctrl-item.maint-row.on { background: var(--color-warning-dim); }
+
+  /* ══════════ C: two-tier ══════════ */
+  .tier { margin-bottom: 20px; }
+  .tier-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .tier-head .th-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); color: var(--color-text); }
+  .tier-head .th-sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .tier.platform .tier-head .th-title { color: var(--color-warning); }
+  .tier-box { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .tier.platform .tier-box { border-color: hsl(38 92% 60% / 0.35); background: linear-gradient(180deg, hsl(38 92% 60% / 0.05), transparent), var(--color-surface); }
+  .tier-row { display: flex; align-items: flex-start; gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--color-border-soft); }
+  .tier-row:last-child { border-bottom: none; }
+  .tier-row .tr-body { flex: 1; }
+  .tier-row .tr-label { font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 9px; }
+  .tier-row .tr-sub { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 2px; }
+  .tier-row.off { background: hsl(0 72% 51% / 0.04); }
+  .tier.platform .tier-row { padding: 16px; }
+
+  /* maintenance arm-to-confirm (consistency with 064 heavy-action guard) */
+  .maint-ctl { display: flex; align-items: center; gap: 10px; }
+  .arm-wrap { display: inline-flex; align-items: center; gap: 6px; animation: toolSlideIn var(--dur-fast) var(--ease-out); }
+  .arm-q { font-size: var(--text-xs); color: var(--color-warning); white-space: nowrap; }
+  .arm-yes { font-size: var(--text-xs); color: hsl(216 45% 6%); background: var(--color-warning); border: 1px solid var(--color-warning); border-radius: var(--radius-sm); padding: 5px 11px; cursor: pointer; font-weight: 700; }
+  .arm-yes:hover { filter: brightness(1.08); }
+  .arm-no { font-size: var(--text-xs); color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; }
+  .arm-no:hover { color: var(--color-text); }
+
+  .maint-banner { display: none; align-items: center; gap: 8px; margin-top: 14px; background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.35); border-radius: var(--radius-md); padding: 10px 15px; font-size: var(--text-sm); color: var(--color-warning); }
+  .maint-banner.on { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* ── ledger (062-A receipt home) ── */
+  .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px; margin-top: 22px; }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .card-head h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; }
+  .live-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--color-success); background: var(--color-success-dim); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .audit-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-plain { color: var(--color-text); flex: 0 0 auto; }
+  .audit-actor { color: var(--color-text-dim); font-size: var(--text-xs); }
+  .audit-when { margin-left: auto; color: var(--color-text-dim); font-size: var(--text-xs); }
+  .audit-row.is-write .audit-plain::before { content: '✎ '; color: var(--color-warning); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 065 · System Controls &amp; Maintenance</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Card grid + separated maintenance <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Weighted list</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Two-tier split</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="sketch-toolbar">
+  <span>065</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setStage('768px')" title="tablet">💻</button>
+  <button onclick="setStage('none')" title="desktop">🖥</button>
+</div>
+
+<script>
+const ME = 'fhdmrd@gmail.com';
+const CAPS = [
+  { key:'web_search',   label:'Web search',       sub:'Agents can search the internet.',              offImpact:'Search calls now refuse for everyone.' },
+  { key:'sandbox',      label:'Code sandbox',      sub:'Agents can run code in a sandbox.',            offImpact:'2 runs using code will error on their next call.' },
+  { key:'self_improve', label:'Self-improvement',  sub:'Skills can propose edits to themselves.',      offImpact:'The proposer is paused for everyone.' },
+  { key:'workflows',    label:'Workflows',         sub:'Multi-step automations can run.',              offImpact:'1 workflow in progress finishes; no new ones start.' },
+];
+const CAP_LABEL = Object.fromEntries(CAPS.map(c=>[c.key,c.label]));
+
+const V = {};
+['a','b','c'].forEach(v => V[v] = {
+  flags: { web_search:true, sandbox:true, self_improve:true, workflows:true },
+  maintenance: false,
+  maintArmed: false,
+  feed: [
+    { plain:'Signed in to the Control Room', actor:ME, when:'just now', write:false },
+    { plain:'Operator access granted (initial setup)', actor:'system', when:'Jul 10 · 09:00', write:false },
+  ],
+});
+
+function shield(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>'; }
+
+function band(v){
+  return `<div class="op-band">
+    <div class="band-top">
+      <div class="band-title">${shield()} Control Room</div>
+      <span class="op-chip">OPERATOR</span>
+      <span class="band-identity">${ME}</span>
+      <span class="spacer"></span>
+      <span class="rec-marker" id="rec-${v}"><span class="rec-dot"></span> every action recorded</span>
+      <span class="back-link">‹ Back to app</span>
+    </div>
+    <div class="band-tabs">
+      <span class="band-tab">Overview</span>
+      <span class="band-tab active">Control Plane</span>
+      <span class="band-tab locked">Users &amp; Access <span class="lock">🔒 148</span></span>
+      <span class="band-tab locked">Model Registry <span class="lock">🔒 149</span></span>
+      <span class="band-tab">Audit log</span>
+    </div>
+  </div>`;
+}
+
+/* ══════════ A ══════════ */
+function variantA(v){
+  const f = V[v].flags;
+  const cards = CAPS.map(c => `
+    <div class="cap-card ${f[c.key]?'':'off'}" id="capcard-${v}-${c.key}">
+      <div class="cc-top">
+        <div class="cc-body">
+          <div class="cc-label"><span class="name">${c.label}</span>${f[c.key]?'':'<span class="off-tag">off for everyone</span>'}</div>
+          <div class="cc-sub">${c.sub}</div>
+        </div>
+        <div class="switch ${f[c.key]?'':'off'}" onclick="toggleFlag('${v}','${c.key}')"></div>
+      </div>
+      <div class="impact ${f[c.key]?'':'show'}" id="impact-${v}-${c.key}">${c.offImpact}</div>
+    </div>`).join('');
+  return `<div class="app-frame">${band(v)}
+    <div class="body-scroll scrollbar-thin">
+      <div class="section-head"><h2>Platform controls</h2><span class="head-spacer"></span><span class="wire-flag">net-new · 147</span></div>
+      <p class="sub-line">Turn a capability off and it stops for <b>every user</b> immediately (fail-closed). Maintenance mode is different — it makes the <b>whole platform</b> read-only. Every change is recorded with your name.</p>
+      <div class="cap-cards">${cards}</div>
+      <div class="platform-panel">
+        <div class="pp-head">${shield()}<span class="t">Platform state</span><span class="pill">affects the whole platform</span></div>
+        <div class="pp-body">${maintControl(v)}<div class="maint-banner ${V[v].maintenance?'on':''}" id="banner-${v}">⚠ Maintenance mode is ON — users currently see the platform read-only. Nothing new runs.</div></div>
+      </div>
+      ${ledger(v)}
+    </div>
+  </div>`;
+}
+
+/* ══════════ B ══════════ */
+function variantB(v){
+  const f = V[v].flags;
+  const items = CAPS.map(c => `
+    <div class="ctrl-item ${f[c.key]?'':'off'}" id="capcard-${v}-${c.key}">
+      <div class="ci-body">
+        <div class="ci-label"><span class="name">${c.label}</span>${f[c.key]?'':'<span class="off-tag">off for all users</span>'}</div>
+        <div class="ci-sub">${c.sub}</div>
+        <div class="impact ${f[c.key]?'':'show'}" id="impact-${v}-${c.key}">${c.offImpact}</div>
+      </div>
+      <div class="switch ${f[c.key]?'':'off'}" onclick="toggleFlag('${v}','${c.key}')"></div>
+    </div>`).join('');
+  return `<div class="app-frame">${band(v)}
+    <div class="body-scroll scrollbar-thin">
+      <div class="section-head"><h2>Platform controls</h2><span class="head-spacer"></span><span class="wire-flag">net-new · 147</span></div>
+      <p class="sub-line">Each switch affects <b>every user</b> the instant you flip it (fail-closed). The heaviest control — maintenance mode — sits last, set apart.</p>
+      <div class="ctrl-list">
+        ${items}
+        <div class="ctrl-item maint-row ${V[v].maintenance?'on':''}" id="maint-row-${v}">
+          <div class="ci-body">
+            <div class="ci-label"><span class="name">Maintenance mode</span><span class="off-tag" style="color:var(--color-warning);background:var(--color-warning-dim);border-color:hsl(38 92% 60% / 0.3)">whole platform</span></div>
+            <div class="ci-sub">Puts the entire platform in read-only mode — users can read everything, but nothing new runs (no chats, workflows, or uploads).</div>
+            <div class="maint-banner ${V[v].maintenance?'on':''}" id="banner-${v}" style="margin-top:12px">⚠ Maintenance mode is ON — the whole platform is read-only right now.</div>
+          </div>
+          ${maintControl(v)}
+        </div>
+      </div>
+      ${ledger(v)}
+    </div>
+  </div>`;
+}
+
+/* ══════════ C ══════════ */
+function variantC(v){
+  const f = V[v].flags;
+  const rows = CAPS.map(c => `
+    <div class="tier-row ${f[c.key]?'':'off'}" id="capcard-${v}-${c.key}">
+      <div class="tr-body">
+        <div class="tr-label"><span class="name">${c.label}</span>${f[c.key]?'':'<span class="off-tag">off for everyone</span>'}</div>
+        <div class="tr-sub">${c.sub}</div>
+        <div class="impact ${f[c.key]?'':'show'}" id="impact-${v}-${c.key}">${c.offImpact}</div>
+      </div>
+      <div class="switch ${f[c.key]?'':'off'}" onclick="toggleFlag('${v}','${c.key}')"></div>
+    </div>`).join('');
+  return `<div class="app-frame">${band(v)}
+    <div class="body-scroll scrollbar-thin">
+      <div class="section-head"><h2>Platform controls</h2><span class="head-spacer"></span><span class="wire-flag">net-new · 147</span></div>
+      <p class="sub-line">Two different kinds of power, kept visibly apart: reversible <b>capabilities</b>, and the platform-wide <b>state</b> switch.</p>
+      <div class="tier capabilities">
+        <div class="tier-head"><span class="th-title">Capabilities</span><span class="th-sub">turn a feature off for all users · fail-closed · reversible anytime</span></div>
+        <div class="tier-box">${rows}</div>
+      </div>
+      <div class="tier platform">
+        <div class="tier-head"><span class="th-title">Platform state</span><span class="th-sub">affects the entire platform at once</span></div>
+        <div class="tier-box">
+          <div class="tier-row">
+            <div class="tr-body">
+              <div class="tr-label"><span class="name">Maintenance mode</span></div>
+              <div class="tr-sub">The whole platform goes read-only. Users can read everything, but nothing new runs — no chats, no workflows, no uploads.</div>
+              <div class="maint-banner ${V[v].maintenance?'on':''}" id="banner-${v}" style="margin-top:12px">⚠ Maintenance mode is ON — the whole platform is read-only right now.</div>
+            </div>
+            ${maintControl(v)}
+          </div>
+        </div>
+      </div>
+      ${ledger(v)}
+    </div>
+  </div>`;
+}
+
+/* maintenance control: arm-to-confirm (heavy-action guard, consistent w/ 064 Kill) */
+function maintControl(v){
+  if (V[v].maintArmed) {
+    return `<span class="arm-wrap">
+      <span class="arm-q">Put the whole platform in read-only mode?</span>
+      <button class="arm-yes" onclick="confirmMaint('${v}')">${V[v].maintenance?'Turn off':'Confirm'}</button>
+      <button class="arm-no" onclick="disarmMaint('${v}')">Cancel</button>
+    </span>`;
+  }
+  return `<div class="maint-ctl"><div class="switch ${V[v].maintenance?'':'off'}" onclick="armMaint('${v}')" title="${V[v].maintenance?'on':'off'}"></div></div>`;
+}
+
+function ledger(v){
+  return `<div class="card">
+    <div class="card-head"><h3>Recent operator actions</h3><span class="live-badge">live</span></div>
+    <div id="feed-${v}">${feedRows(v)}</div>
+  </div>`;
+}
+function feedRows(v){
+  return V[v].feed.slice(0,5).map(r => `
+    <div class="audit-row${r.write?' is-write':''}">
+      <span class="audit-plain">${r.plain}</span>
+      <span class="audit-actor">${r.actor}</span>
+      <span class="audit-when">${r.when}</span>
+    </div>`).join('');
+}
+
+const BUILDERS = { a:variantA, b:variantB, c:variantC };
+const META = {
+  a: '<b>A — Card grid + separated maintenance.</b> ★ <b>Winner.</b> The four capability kill-switches sit as a 2×2 card grid; turning one off tints its card red, adds an "off for everyone" tag, and reveals the concrete impact. Maintenance mode is spatially set apart in its own amber-framed "Platform state" panel — the distinction is <i>where it lives</i>.',
+  b: '<b>B — Weighted list.</b> One clean list; the weight comes from what OFF <i>does to the row</i> — red tint, "off for all users" tag, and the impact line appearing. Maintenance mode is the last, tallest, amber-topped row — heaviest by position and size, not a separate zone.',
+  c: '<b>C — Two-tier split.</b> An explicit conceptual split with headers: "Capabilities" (reversible feature switches, calm) vs "Platform state" (maintenance, amber-framed). Reads as two <i>different kinds of power</i> — the strongest distinction.',
+};
+
+const stage = document.getElementById('stage');
+['a','b','c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v==='a'?' active':'');
+  wrap.id = 'variant-'+v;
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + BUILDERS[v](v);
+  stage.appendChild(wrap);
+});
+
+function rerender(v){
+  const wrap = document.getElementById('variant-'+v);
+  const active = wrap.classList.contains('active');
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + BUILDERS[v](v);
+  if (!active) wrap.classList.remove('active');
+}
+function recFlash(v){
+  const rec = document.getElementById('rec-'+v);
+  if (!rec) return;
+  rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+  setTimeout(()=>rec.classList.remove('flash'), 1400);
+}
+function logAction(v, plain, write){
+  V[v].feed.unshift({ plain, actor:ME, when:'just now', write });
+  const feed = document.getElementById('feed-'+v);
+  if (feed) feed.innerHTML = feedRows(v);
+  recFlash(v);
+}
+
+function toggleFlag(v, key){
+  V[v].flags[key] = !V[v].flags[key];
+  rerender(v);
+  logAction(v, `Turned ${V[v].flags[key]?'ON':'OFF'} ${CAP_LABEL[key]} for all users`, true);
+}
+function armMaint(v){ V[v].maintArmed = true; rerender(v); }
+function disarmMaint(v){ V[v].maintArmed = false; rerender(v); }
+function confirmMaint(v){
+  V[v].maintenance = !V[v].maintenance;
+  V[v].maintArmed = false;
+  rerender(v);
+  logAction(v, V[v].maintenance ? 'Turned ON maintenance mode — platform is read-only for users' : 'Turned OFF maintenance mode — platform back to normal', true);
+}
+
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  if (ev) ev.target.classList.add('active');
+}
+function setStage(w){ document.getElementById('stage').style.maxWidth = (w==='none')?'none':w; }
+</script>
+</body>
+</html>
