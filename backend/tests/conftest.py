@@ -1031,3 +1031,49 @@ def oversized_ooxml_bytes() -> bytes:
     base = _make_ooxml("word")
     pad = _TEMPLATE_MAX_FILE_SIZE + 1 - len(base)
     return base + b"\x00" * pad
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 148 Wave-0 fixtures (Plan 148-01 Task 3) — governance / ban / visibility
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Two shared fixtures every downstream 148 backend plan depends on:
+#   banned_user       -> the asyncpg-pool + future banned_until wiring for the
+#                        app-layer ban check (_is_banned / get_current_user, 148-02).
+#   feature_visibility -> the D-05 day-one app_settings.feature_visibility enum-record
+#                        map (NEVER booleans — SEED-115 forward-compat), for the
+#                        feature_audience resolver + GET /features (148-02/148-05).
+# Reuse the existing mock_asyncpg_pool + _supabase GoTrue-admin mock; append only.
+
+@pytest.fixture
+def banned_user(mock_asyncpg_pool, monkeypatch):
+    """A target whose ``auth.users.banned_until`` is in the future (a disabled user).
+
+    Wires ``app.dependencies._pg_pool`` -> ``mock_asyncpg_pool`` and seeds a future
+    ``banned_until`` so the 148-02 ``_is_banned(...)`` app-layer check resolves True even
+    against a still-valid JWT (closing the stateless-token window, Pitfall 1). Yields
+    ``{"id", "banned_until"}`` for the target.
+    """
+    import datetime as _dt
+
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    banned_until = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=3650)  # ~10y future
+    mock_asyncpg_pool.set_fetchrow_result({"banned_until": banned_until})
+    return {"id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "banned_until": banned_until}
+
+
+@pytest.fixture
+def feature_visibility():
+    """The D-05 day-one ``app_settings.feature_visibility`` enum-record map.
+
+    Enum-shaped records ``{"audience": "operators"|"everyone"}`` — NEVER booleans (the
+    SEED-115 forward-compat contract that keeps the v3.4 roles path open). Skill Studio +
+    model management default to Operators-only; workflow authoring + governance health
+    default to Everyone (D-05/D-06 polarity).
+    """
+    return {
+        "skill_studio": {"audience": "operators"},
+        "model_management": {"audience": "operators"},
+        "workflow_authoring": {"audience": "everyone"},
+        "governance_health": {"audience": "everyone"},
+    }
