@@ -243,3 +243,51 @@ def test_flag_maintenance_records_maintenance_set(client, auth_headers, mock_asy
     inserts = _audit_inserts(mock_builder)
     assert len(inserts) == 1
     assert inserts[0].args[0]["action"] == "maintenance.set"
+
+
+def test_flag_write_failure_500_and_no_false_success_audit(client, auth_headers, mock_asyncpg_pool, mock_builder, monkeypatch):
+    """CR-02: a failed DB write must 500 (never a false 204) and write NO success row.
+
+    Root-cause path — NO ``save_app_settings`` function stub. The REAL
+    ``save_app_settings`` runs; the asyncpg pool's ``execute`` RAISES (pool exhausted /
+    transient Postgres blip), so ``save_app_settings`` swallows-then-returns False and
+    ``set_flag`` turns that into a 500 BEFORE any success ``audit_label`` is set. This is
+    the exact inverse of the phase bug: a silent no-op that reports success and records a
+    "Turned ON maintenance mode" ledger LIE. We mock the DATA-ACCESS layer the writer
+    actually uses (the asyncpg pool ``get_pg_pool()`` returns — ``app.dependencies._pg_pool``,
+    set by ``_op``), NOT the supabase query-builder (MEMORY mock-completeness lesson).
+
+    The operator gate still resolves via the pool's ``fetchrow`` (``_op``); only the write
+    ``execute`` is poisoned. The audit floor is ACTIVE on this path (real gate → real
+    ``request.state.operator``), so this also proves the floor records NO success row when
+    the handler raises a 500 (FastAPI re-throws the HTTPException into the floor's bare
+    ``yield`` → its teardown is skipped → nothing written)."""
+    _op(mock_asyncpg_pool, monkeypatch)
+
+    async def _boom_execute(*_a, **_k):
+        raise RuntimeError("asyncpg pool exhausted — transient DB write failure")
+
+    # Poison ONLY the write path — the operator gate's fetchrow (set by _op) is untouched.
+    monkeypatch.setattr(mock_asyncpg_pool, "execute", _boom_execute)
+
+    res = client.put(
+        "/admin/flags",
+        json={"key": "maintenance_mode", "value": True},
+        headers=auth_headers,
+    )
+    assert res.status_code == 500, (
+        f"a failed flag write must surface a real 500, never a false 204; got "
+        f"{res.status_code} {res.text}"
+    )
+
+    # NO success flag row may be recorded for a write that did not persist — neither the
+    # dedicated ``maintenance.set`` nor any ``flag.<key>.<on|off>``. A phantom success row
+    # is the integrity gap CR-02 closes; an honest ``flag.write_failed`` row (if the floor
+    # is ever wired to record on exceptions) is fine — only a SUCCESS claim is forbidden.
+    actions = {i.args[0]["action"] for i in _audit_inserts(mock_builder)}
+    assert "maintenance.set" not in actions, (
+        f"a failed write must not record a success maintenance.set row; got {actions}"
+    )
+    assert not any(
+        a.startswith("flag.") and (a.endswith(".on") or a.endswith(".off")) for a in actions
+    ), f"a failed write must not record a success flag.<key>.<on|off> row; got {actions}"

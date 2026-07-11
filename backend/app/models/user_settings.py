@@ -256,11 +256,22 @@ def invalidate_settings_cache() -> None:
     _settings_cache_time = 0.0
 
 
-async def save_app_settings(updates: dict[str, Any]) -> None:
+async def save_app_settings(updates: dict[str, Any]) -> bool:
     """Write settings to app_settings DB row via asyncpg.
 
     Ports the _is_valid_api_key sentinel guard (D-14).
     Calls invalidate_settings_cache() on success (D-07).
+
+    Returns:
+        True  — the UPDATE persisted, OR there was nothing to write (the
+                filtered/sentinel no-op case), so existing callers that treated
+                a completed call as success keep their prior semantics.
+        False — the DB write raised (pool exhausted / transient Postgres blip /
+                connection reset). The exception is logged, NOT re-raised, so
+                callers that ignore the return value are unaffected — but a
+                caller that CARES (CR-02: set_flag) can now surface a failed
+                write as a real error instead of a false success + false audit
+                row.
     """
     # Filter out sentinel / invalid API key values (D-14, T-081.1-07)
     clean: dict[str, Any] = {}
@@ -278,7 +289,7 @@ async def save_app_settings(updates: dict[str, Any]) -> None:
         clean[k] = v
 
     if not clean:
-        return
+        return True  # nothing to persist is a successful no-op (caller semantics preserved)
 
     # Build parameterized UPDATE -- column names from code constants, values via $N
     cols = list(clean.keys())
@@ -295,11 +306,13 @@ async def save_app_settings(updates: dict[str, Any]) -> None:
             *vals,
         )
         invalidate_settings_cache()
+        return True
     except Exception:
         logger.warning(
             "save_app_settings: DB write failed; settings not persisted",
             exc_info=True,
         )
+        return False
 
 
 # ── Model capabilities overrides cache (Phase 081.1 D-09/D-10) ──────────

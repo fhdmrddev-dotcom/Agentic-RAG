@@ -446,7 +446,26 @@ async def set_flag(
             detail=f"Unknown flag key: {body.key}",
         )
 
-    await save_app_settings({body.key: body.value})
+    # CR-02: save_app_settings SWALLOWS every DB-write exception and returns a bool.
+    # A False result means the flip did NOT persist (pool exhausted / transient blip /
+    # connection reset). Surface that as a real 500 — NEVER a false 204 — and do it
+    # BEFORE any success audit_label is set, so the honest ledger never records a
+    # kill-switch flip that did not happen (the whole point of this phase). We also
+    # stamp an explicit failure action/label onto request.state: the operator_audit_floor
+    # teardown runs after the yield and, on FastAPI >=0.106, a raised HTTPException is
+    # re-thrown INTO the floor at its (un-try/except'd) `yield` — so the floor SKIPS its
+    # write entirely on this path and records nothing. Stamping the error state is
+    # belt-and-braces: if the floor is ever changed to record on exceptions, it records a
+    # truthful "failed to persist" row, never a false success.
+    if not await save_app_settings({body.key: body.value}):
+        request.state.audit_action = "flag.write_failed"
+        request.state.audit_label = (
+            f"Flag change for {_FLAG_HUMAN_NAMES[body.key]} failed to persist"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not persist the flag — it was not changed.",
+        )
 
     on = "ON" if body.value else "OFF"
     if body.key == "maintenance_mode":
