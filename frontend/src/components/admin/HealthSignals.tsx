@@ -11,6 +11,18 @@
 //   postgres_pool_in_use    → "Database connections"
 //   per_worker_run_count    → "Work spread"
 //
+// Phase 147 Plan 07 (ADMIN-02 / 064-B) — the additive dependency-health row.
+// Below the four backpressure signals we now render three dependency probes from
+// the additive `signals.dependencies` payload (D-078-08): Redis / Database /
+// Code sandbox, each a status dot honestly mapping the probe state:
+//
+//   up (fast)                   → success (green)
+//   up but latency > threshold  → slow (amber)      — a working-but-degraded dep
+//   down                        → destructive (red)
+//   sandbox state === "off"     → NEUTRAL grey + "off by config"  (Pitfall 6 —
+//                                 a deliberately-disabled sandbox is NEVER red)
+//   dependencies absent / null  → neutral "—" placeholder (older backend / loading)
+//
 // PURE PRESENTATIONAL LEAF: props in, DOM out. The shell (Plan 06) owns the fetch
 // and the `showTechnical` toggle state and passes both down. A null `signals`
 // (loading / not-yet-fetched) renders a calm dimmed placeholder — never a crash.
@@ -60,6 +72,66 @@ function valueFor(field: string, s: BackpressureSignals): string {
   }
 }
 
+// ── Phase 147 Plan 07 (ADMIN-02) — dependency-health probes ──────────────────
+// Any dependency answering slower than this (while still "up") reads as SLOW
+// (amber) rather than green — a working-but-degraded dependency the operator
+// should notice before it goes fully down. Tuned generously; the honest thing is
+// "responds but sluggish", not a hard SLA.
+const SLOW_LATENCY_MS = 500
+
+/** One probe entry as it arrives on `signals.dependencies` (all three share the
+ *  shape; `sandbox` additionally carries the "off" state). */
+interface DepProbe {
+  state: "off" | "up" | "down"
+  latency_ms: number | null
+}
+
+/** The derived, display-facing dependency status. `slow` + `unknown` are CLIENT
+ *  derivations (latency threshold / absent payload) — never wire states. */
+type DepStatus = "up" | "slow" | "down" | "off" | "unknown"
+
+// Plain labels + the raw `dependencies.<key>` field revealed under ⌥ Technical.
+const DEP_ORDER: ReadonlyArray<{
+  key: "redis" | "supabase" | "sandbox"
+  label: string
+  sub: string
+}> = [
+  { key: "redis", label: "Redis", sub: "in-memory run buffer" },
+  { key: "supabase", label: "Database", sub: "Postgres, storage & auth" },
+  { key: "sandbox", label: "Code sandbox", sub: "Docker code execution" },
+]
+
+/** Map a probe (or its absence) to a display status. `off` is honored FIRST so a
+ *  deliberately-disabled sandbox can never fall through to a red "down" (Pitfall 6). */
+function depStatus(probe: DepProbe | undefined | null): DepStatus {
+  if (!probe) return "unknown"
+  if (probe.state === "off") return "off"
+  if (probe.state === "down") return "down"
+  // state === "up": a high latency reads as slow, not healthy.
+  if (probe.latency_ms != null && probe.latency_ms > SLOW_LATENCY_MS) return "slow"
+  return "up"
+}
+
+// Status → dot color. `off` and `unknown` are NEUTRAL (muted) — the off branch
+// MUST NOT use the destructive/red class (Pitfall 6 acceptance).
+const DEP_DOT: Record<DepStatus, string> = {
+  up: "bg-success",
+  slow: "bg-amber-400",
+  down: "bg-destructive",
+  off: "bg-muted-foreground/40",
+  unknown: "bg-muted-foreground/25",
+}
+
+// Status → plain word. "off by config" is the calm, non-alarming label a disabled
+// sandbox wears; a null/absent payload reads as a neutral em-dash placeholder.
+const DEP_STATUS_LABEL: Record<DepStatus, string> = {
+  up: "Healthy",
+  slow: "Slow",
+  down: "Down",
+  off: "off by config",
+  unknown: "—",
+}
+
 /** The four plain-labeled health signals with a raw-name reveal (D-07). */
 export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
   const loading = signals === null
@@ -68,31 +140,77 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
     value: loading ? "—" : valueFor(s.field, signals),
   }))
 
+  // The dependency probes ride the same `signals` payload additively; when the
+  // backend has not shipped Plan 147-04 yet (or while loading) `dependencies` is
+  // absent → every probe reads "unknown" (neutral placeholder), never a crash.
+  const deps = signals?.dependencies
+
   return (
-    <div
-      className={cn(
-        "grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4",
-        loading && "opacity-40",
-      )}
-      aria-busy={loading}
-    >
-      {views.map((v) => (
-        <div key={v.field} className="rounded-[10px] border border-border bg-card px-3.5 py-3">
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full bg-success" />
-            {v.label}
-          </div>
-          <div className="font-mono text-xl font-semibold leading-tight tabular-nums text-foreground">
-            {v.value}
-          </div>
-          <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{v.sub}</div>
-          {showTechnical && (
-            <div className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60" title={v.field}>
-              {v.field}
+    <div className="space-y-3">
+      {/* The four backpressure signals — unchanged from Plan 146-05. */}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4",
+          loading && "opacity-40",
+        )}
+        aria-busy={loading}
+      >
+        {views.map((v) => (
+          <div key={v.field} className="rounded-[10px] border border-border bg-card px-3.5 py-3">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full bg-success" />
+              {v.label}
             </div>
-          )}
-        </div>
-      ))}
+            <div className="font-mono text-xl font-semibold leading-tight tabular-nums text-foreground">
+              {v.value}
+            </div>
+            <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{v.sub}</div>
+            {showTechnical && (
+              <div className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60" title={v.field}>
+                {v.field}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Phase 147 (ADMIN-02 / 064-B) — dependency-health dots (up/slow/down/off). */}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-2.5 sm:grid-cols-3",
+          loading && "opacity-40",
+        )}
+        aria-busy={loading}
+      >
+        {DEP_ORDER.map((d) => {
+          const probe = deps?.[d.key] ?? null
+          const status = loading ? "unknown" : depStatus(probe)
+          return (
+            <div key={d.key} className="rounded-[10px] border border-border bg-card px-3.5 py-3">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden="true"
+                  className={cn("h-1.5 w-1.5 flex-none rounded-full", DEP_DOT[status])}
+                />
+                {d.label}
+              </div>
+              <div className="text-sm font-semibold leading-tight text-foreground">
+                {DEP_STATUS_LABEL[status]}
+              </div>
+              <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{d.sub}</div>
+              {showTechnical && (
+                <div
+                  className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60"
+                  title={`dependencies.${d.key}`}
+                >
+                  dependencies.{d.key}
+                  {probe?.latency_ms != null ? ` · ${probe.latency_ms}ms` : ""}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
