@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Lock } from "lucide-react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
@@ -7,7 +7,7 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
-import { getMaintenanceStatus } from "@/lib/api"
+import { getMaintenanceStatus, FEATURE_FORBIDDEN_EVENT } from "@/lib/api"
 
 // Phase 147 (D-06 / T-147-15) — the persistent, app-wide, end-user maintenance
 // banner. It lives at the App/ChatLayout seam OUTSIDE the operator /admin surface
@@ -112,8 +112,38 @@ function App() {
   // use simply does NOT render (the sketch 069-A vanish). Fails CLOSED to {} on error
   // / pre-resolve — a blip never flashes an operators-only feature to an end user
   // (T-148-FAILCLOSED). An operator's map is all-true → every nav item shows.
-  const { features: effectiveFeatures } = useEffectiveFeatures(user?.id ?? null)
+  const { features: effectiveFeatures, refetch: refetchFeatures } = useEffectiveFeatures(user?.id ?? null)
   const navItems = visibleNavItems(effectiveFeatures)
+
+  // Phase 148 (VIS-01 / D-04): the graceful mid-session-flip bounce. If a governed
+  // feature's audience is tightened while a non-operator is on its page, that page's
+  // NEXT data fetch is refused server-side (a 403 from require_visible). api.ts surfaces
+  // any such ApiError(403) as the FEATURE_FORBIDDEN_EVENT window event — we catch it
+  // here, show a PLAIN refusal (matching the server body, never a crash/blank),
+  // setActiveView("chat") to route home, and refetch the effective map so the nav
+  // re-syncs within the ~30s TTL window. Render-only — the server 403 is the wall; the
+  // client map alone is NOT the trigger (a flip can land before the map refetch).
+  const [featureRefusal, setFeatureRefusal] = useState<string | null>(null)
+  useEffect(() => {
+    const onForbidden = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail
+      // Only a require_visible 403 bounces (the event only fires on 403 — keep the
+      // guard explicit + grep-able).
+      if (detail?.status !== 403) return
+      setFeatureRefusal("This feature is available to administrators only.")
+      setActiveView("chat")
+      refetchFeatures()
+    }
+    window.addEventListener(FEATURE_FORBIDDEN_EVENT, onForbidden)
+    return () => window.removeEventListener(FEATURE_FORBIDDEN_EVENT, onForbidden)
+  }, [refetchFeatures])
+  // Auto-dismiss the plain refusal after a few seconds — it is a transient product
+  // message (the user is already routed home), not a blocking modal.
+  useEffect(() => {
+    if (!featureRefusal) return
+    const id = window.setTimeout(() => setFeatureRefusal(null), 6000)
+    return () => window.clearTimeout(id)
+  }, [featureRefusal])
 
   if (loading) {
     return (
@@ -133,6 +163,19 @@ function App() {
         {/* Phase 147 (D-06): app-wide end-user maintenance banner — sits above
             ChatLayout, outside the /admin surface, reading the public /health flag. */}
         <MaintenanceBanner />
+        {/* Phase 148 (VIS-01 / D-04): the graceful-bounce plain refusal. Shown for a
+            few seconds after a mid-session feature-flip 403 routed the user home — a
+            calm, honest product message (NOT an alarm), matching the server 403 body.
+            RENDER-ONLY; the server 403 is the security wall. */}
+        {featureRefusal && (
+          <div
+            role="status"
+            className="fixed inset-x-0 top-0 z-[61] flex items-center justify-center gap-2 border-b border-border/50 bg-card/95 px-4 py-2 text-center text-sm font-medium text-foreground shadow-sm backdrop-blur-sm"
+          >
+            <Lock className="h-4 w-4 flex-none text-muted-foreground" aria-hidden="true" />
+            <span>{featureRefusal}</span>
+          </div>
+        )}
         <ChatLayout
           onSignOut={signOut}
           activeView={activeView}
