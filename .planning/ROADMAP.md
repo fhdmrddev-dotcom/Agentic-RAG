@@ -123,7 +123,19 @@ Plans:
   3. An operator can toggle per-feature kill-switches (web search, sandbox, self-improve, workflows) and the disabled capability stops working for all users (fail-closed).
   4. An operator can enable maintenance/read-only mode and end users see the platform become read-only, on the existing `app_settings` TTL-cached substrate (no new flag infrastructure).
 
-**Plans**: TBD
+**Plans**: 9 plans (3 waves)
+
+Plans:
+- [ ] 147-01-PLAN.md — Flag substrate: migration 097 (3 app_settings booleans) + fail-closed read helpers (D-Q4 polarity) [FLAG-01]
+- [ ] 147-02-PLAN.md — Health probes (Redis/Supabase/sandbox additive on /backpressure) + cross-user active-runs read (D-Q1 kind derivation) + D-07 poll/visit floor discipline [ADMIN-02]
+- [ ] 147-03-PLAN.md — Operator Kill: factor cancel_run zombie-heal into a shared helper + POST /admin/runs/{id}/kill (victim-only audit) + PUT /admin/flags [ADMIN-02, FLAG-01]
+- [ ] 147-04-PLAN.md — Two-layer fail-closed capability kill-switches (hide + refuse + proposer guard) + D-05 workflow-launch block [FLAG-01]
+- [ ] 147-05-PLAN.md — Maintenance write-block middleware + off-switch allowlist + public /health flag [FLAG-01]
+- [ ] 147-06-PLAN.md — Frontend API contract (types + client fns) + BUG-260710-01/-02 cancelled-run honesty (render-only, G-5 safe) [ADMIN-02]
+- [ ] 147-07-PLAN.md — HealthSignals dependency dots + ActiveRunsSection (064-B cards, victim-naming Kill, honest Cancelling->Cancelled) [ADMIN-02]
+- [ ] 147-08-PLAN.md — CapabilityGrid (065-A armed-OFF 2x2) + MaintenancePanel (amber arm-to-confirm) [FLAG-01]
+- [ ] 147-09-PLAN.md — ControlRoomPage recompose (D-08 promote + 063-B scroll + D-07 auto-poll/visit) + end-user maintenance banner [ADMIN-02, FLAG-01]
+
 **UI hint**: yes
 
 ### Phase 148: Governance — Audit, Users & Feature Visibility
