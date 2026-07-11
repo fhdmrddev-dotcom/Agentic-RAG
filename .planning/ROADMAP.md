@@ -63,8 +63,8 @@
 ### Phase Checklist
 
 - [x] **Phase 146: Operator Foundation** — `operator_users` + default-deny `require_operator` (404) + `operator_audit_log` + `/admin` route tree + RBAC on `/admin/backpressure` + `org_id` stubs (ADMIN-01) — completed 2026-07-11
-- [ ] **Phase 147: Operator Control Plane** — health/backpressure + active-runs-with-Kill + per-feature kill-switches + maintenance/read-only mode (ADMIN-02, FLAG-01)
-- [ ] **Phase 148: Governance — Audit, Users & Feature Visibility** — audit browser (filter/paginate/CSV) + user list disable/enable + API-enforced feature greenlists (ADMIN-03, VIS-01)
+- [x] **Phase 147: Operator Control Plane** — health/backpressure + active-runs-with-Kill + per-feature kill-switches + maintenance/read-only mode (ADMIN-02, FLAG-01) — completed 2026-07-11
+- [x] **Phase 148: Governance — Audit, Users & Feature Visibility** — audit browser (filter/paginate/CSV) + user list disable/enable + API-enforced feature greenlists (ADMIN-03, VIS-01) — completed 2026-07-12
 - [ ] **Phase 149: Model Registry & Discovery** — write UI over `model_capabilities_overrides` + `model_discovery_service` propose-only (MODEL-01, MODEL-02)
 - [ ] **Phase 150: Secrets at Rest** — app-layer `cryptography` envelope encryption of `app_settings` key columns + env-fallback + round-trip-verified saves (SEC-01)
 - [ ] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01)

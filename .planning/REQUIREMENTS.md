@@ -81,11 +81,11 @@ Which phases cover which requirements. Filled by roadmap creation (2026-07-10). 
 
 | Requirement | Phase | Track | Status |
 |-------------|-------|-------|--------|
-| ADMIN-01 | Phase 146 (CORE) | Admin Shell | Pending |
-| ADMIN-02 | Phase 147 (CORE) | Admin Shell | Pending |
-| FLAG-01 | Phase 147 (CORE) | Admin Shell | Pending |
-| ADMIN-03 | Phase 148 (CORE) | Admin Shell | Pending |
-| VIS-01 | Phase 148 (CORE) | Admin Shell | Pending |
+| ADMIN-01 | Phase 146 (CORE) | Admin Shell | Complete |
+| ADMIN-02 | Phase 147 (CORE) | Admin Shell | Complete |
+| FLAG-01 | Phase 147 (CORE) | Admin Shell | Complete |
+| ADMIN-03 | Phase 148 (CORE) | Admin Shell | Complete |
+| VIS-01 | Phase 148 (CORE) | Admin Shell | Complete |
 | MODEL-01 | Phase 149 (CORE) | Model & Settings | Pending |
 | MODEL-02 | Phase 149 (CORE) | Model & Settings | Pending |
 | SEC-01 | Phase 150 (CORE) | Model & Settings | Pending |
