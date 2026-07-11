@@ -23,7 +23,7 @@
 // `action_type` codes revealed behind the shared ⌥ Technical names toggle.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from "react"
-import { X } from "lucide-react"
+import { Download, Eye, X } from "lucide-react"
 
 import type { OperatorAuditRow, PlatformAuditFilters, PlatformAuditPage } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -194,9 +194,42 @@ interface AuditTabProps {
   /** Ask the shell to (re)fetch the platform browse with these filters + page. The
    *  shell owns the guarded fetch; this leaf calls it when its filter/page changes. */
   onQueryPlatform: (filters: PlatformAuditFilters, page: number) => void
+  /** Export EXACTLY the filtered platform set as CSV (067-A). The shell calls the
+   *  recorded `audit.export` endpoint; this promise REJECTS on the over-cap 413 so the
+   *  leaf shows the "narrow the filter" refusal instead of a partial download. */
+  onExportPlatform: (filters: PlatformAuditFilters) => Promise<void>
   /** The shared ⌥ two-audience reveal (LANG-01) — raw `action_type` codes behind it. */
   showTechnical: boolean
   onToggleTechnical: () => void
+}
+
+/** CSV-escape one field (quote-wrap + double any inner quotes). */
+function csvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+/** Build a CSV of the operator ledger's filtered rows (the operator source export is
+ *  client-side — these are the operator's OWN actions, already in the ledger; there is
+ *  no cross-user read to record). The platform export is the recorded server endpoint. */
+function operatorCsv(rows: OperatorAuditRow[]): string {
+  const lines = [["timestamp", "action", "label", "is_write"].join(",")]
+  for (const r of rows) {
+    lines.push([csvField(r.created_at), csvField(r.action), csvField(r.label), r.is_write ? "true" : "false"].join(","))
+  }
+  return lines.join("\n")
+}
+
+/** Trigger a browser download of an in-memory CSV blob (mirrors the api.ts idiom). */
+function downloadCsv(filename: string, content: string): void {
+  const blob = new Blob([content], { type: "text/csv" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 /** The 067-A audit browser — source switch + chip filters + paged table over both ledgers. */
@@ -207,12 +240,15 @@ export function AuditTab({
   platformResult,
   platformLoading,
   onQueryPlatform,
+  onExportPlatform,
   showTechnical,
   onToggleTechnical,
 }: AuditTabProps) {
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [openChip, setOpenChip] = useState<"action" | "date" | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   // Flipping the source resets the filter (the two ledgers have different vocab) +
   // paging + any open popover, in one batched update (no stale intermediate fetch).
@@ -220,6 +256,7 @@ export function AuditTab({
     setFilters(EMPTY_FILTERS)
     setPage(1)
     setOpenChip(null)
+    setExportError(null)
     onSourceChange(next)
   }
 
@@ -228,6 +265,7 @@ export function AuditTab({
     setFilters(next)
     setPage(1)
     setOpenChip(null)
+    setExportError(null)
   }
 
   const platformFilters = useMemo<PlatformAuditFilters>(
@@ -325,6 +363,42 @@ export function AuditTab({
     ? new Date(new Date(filters.until).getTime() - 86_400_000).toISOString().slice(0, 10)
     : ""
 
+  // Export button copy names the LIVE match count (067-A CSV honesty). When the
+  // platform total is not fully known (has_more), the button honestly says "all
+  // matching" and the server receipt names the exact count in the ledger.
+  const exportLabel = exporting
+    ? "Exporting…"
+    : source === "platform" && platformHasMore
+      ? "Export all matching entries"
+      : `Export ${matchCount} ${matchCount === 1 ? "entry" : "entries"}`
+
+  async function handleExport() {
+    setExportError(null)
+    if (source === "operator") {
+      // The operator's own actions — a client-side CSV of exactly the filtered set.
+      downloadCsv("operator-audit.csv", operatorCsv(operatorFiltered))
+      return
+    }
+    setExporting(true)
+    try {
+      await onExportPlatform(platformFilters)
+    } catch (err) {
+      // The shell rejects with an ApiError-shaped `status`; 413 is the over-cap refusal
+      // (the server recorded NOTHING and sent no file — never a partial download).
+      const status =
+        typeof err === "object" && err !== null && "status" in err
+          ? Number((err as { status: unknown }).status)
+          : 0
+      setExportError(
+        status === 413
+          ? "Too many rows — narrow the filter, then export again."
+          : "Export failed — please try again.",
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
       <div className="rounded-[10px] border border-border bg-card px-4 py-3.5">
@@ -367,7 +441,31 @@ export function AuditTab({
 
           <span className="flex-1" />
           <TechnicalNamesToggle enabled={showTechnical} onToggle={onToggleTechnical} />
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting || matchCount === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-accent px-3 py-1 text-xs text-muted-foreground transition-colors enabled:hover:border-muted-foreground/40 enabled:hover:text-foreground disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            {exportLabel}
+          </button>
         </div>
+
+        {/* Cross-user reading is visible, never silent (SC#4 — the threat made legible). */}
+        {source === "platform" && (
+          <p className="mb-2.5 flex items-center gap-1.5 rounded-md bg-amber-400/10 px-2.5 py-1.5 text-[11px] text-amber-600/90 dark:text-amber-400/80">
+            <Eye className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+            Looking at user activity is itself recorded.
+          </p>
+        )}
+
+        {/* Over-cap / failed export refusal — surfaced, never a partial download. */}
+        {exportError && (
+          <p className="mb-2.5 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive" role="alert">
+            {exportError}
+          </p>
+        )}
 
         {/* 029-A chip strip: Show [action type] [when] [+ user?] · N entries match. */}
         <div className="relative mb-1.5 flex flex-wrap items-center gap-2 text-sm">

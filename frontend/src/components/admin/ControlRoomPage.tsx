@@ -39,6 +39,7 @@ import { ChevronRight, Lock, RefreshCw } from "lucide-react"
 import {
   getAdminActiveRuns,
   getBackpressure,
+  exportPlatformAudit,
   getOperatorAudit,
   getPlatformAudit,
   getSettings,
@@ -232,6 +233,19 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       if (alive.current) setPlatformLoading(false)
     }
   }, [])
+
+  // ── The recorded CSV export (067-A). Exports EXACTLY the filtered platform set; the
+  //    server records ONE `audit.export` row naming the exact count (over-cap → 413,
+  //    NOTHING recorded — 148-06). After a success we re-read the operator ledger so
+  //    the ✎ `audit.export` receipt lands visibly (062-A). A failure RE-THROWS so
+  //    AuditTab surfaces the over-cap "narrow the filter" refusal (no partial download). ──
+  const handleExportPlatform = useCallback(
+    async (filters: PlatformAuditFilters) => {
+      await exportPlatformAudit(filters)
+      if (alive.current) void fetchAudit()
+    },
+    [fetchAudit],
+  )
 
   // ── D-07 entry + auto-poll. Fetch everything once on mount, record ONE visit
   //    row, then silently poll the read-only data (~10s) while visible. The poll
@@ -503,6 +517,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             platformResult={platformResult}
             platformLoading={platformLoading}
             onQueryPlatform={queryPlatform}
+            onExportPlatform={handleExportPlatform}
             showTechnical={showTechnical}
             onToggleTechnical={() => setShowTechnical((v) => !v)}
           />
