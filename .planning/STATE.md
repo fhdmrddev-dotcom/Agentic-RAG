@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T19:01:22.289Z"
+last_updated: "2026-07-11T19:32:23.265Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 22
+  completed_plans: 23
   percent: 8
 ---
 
@@ -27,11 +27,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 7 of 9 complete (148-01/02/03/04/05/06/07 done; 148-08/09 open)
-Status: 148-07 (VIS-01 frontend render layer) complete — 148-08 next
+Plan: 8 of 9 complete (148-01/02/03/04/05/06/07/08 done; 148-09 open)
+Status: 148-08 (067-A audit browser UI) complete — 148-09 (Users & Access roster + Feature Visibility) next
 Last activity: 2026-07-11
 
+**148-08 decisions/notes (2026-07-11):**
+
+- 067-A audit browser shipped: the placeholder AuditTab is now the one-browser-two-sources surface — a locked Operator-actions | Platform-activity source switch over BOTH ledgers, one 029-A chip-filter (action-type + date-preset + click-a-user) / pager / count-naming recorded-CSV grammar. `api.ts` gains `getPlatformAudit` (recorded browse) + `exportPlatformAudit` (capped CSV; over-cap 413 → ApiError, never a partial download). ControlRoomPage owns the guarded platform fetch + the export handler (re-reads the operator ledger so the ✎ `audit.export` receipt lands).
+- **ADMIN-03 NOT marked complete** — this plan ships the AUDIT half; the Users & Access roster/disable UI is 148-09. Marking now = false green (mirrors 148-06). ADMIN-03 + VIS-01 close at 148 verify-work when audit + users + visibility all land.
+- **Honest counts (SC#4):** operator source counts client-side (exact over ≤200 loaded); platform source is COUNT-free server pagination (`page i` + has_more Next — no fabricated `of N`, no full-tenant total leak). Export names the exact count, or "all matching" when has_more (server receipt names it). Cross-user read made legible: every platform browse records `audit.view_platform`; the UI shows "Looking at user activity is itself recorded."
+- **Build gate (memory lesson):** `tsc -b` = 30 before AND after (the known 148-07 baseline — 21 SEED-056 `__tests__` rot + 9 React-19 types drift); the 3 touched files add ZERO tsc errors. `vite build` GREEN (exit 0) at every commit. Phase-147 `ControlRoomPage.test.tsx` 6/6 stay green. LESSON: `noUnusedLocals` forces the ControlRoomPage state + AuditTab props seam to change in the same commit — coupled files must be co-committed for a green per-task build.
+
 **148-07 decisions/notes (2026-07-11):**
+
 - VIS-01 frontend shipped: `useEffectiveFeatures` (fail-closed to `{}`) hides governed nav items (the sketch 069-A vanish) + `ApiError(403)` graceful bounce; render-only, 148-05's `require_visible` API is the sole wall. VIS-01 completes at phase verify-work (frontend + API halves both landed).
 - **Frontend build gate is RED on pre-existing rot, NOT 148-07.** `cd frontend && npm run build` (`tsc -b`) has **30 pre-existing errors** at baseline (21 = SEED-056 `__tests__/` vitest rot; 9 = a React-19 `@types/react`/zustand `node_modules` drift across 7 source files). 148-07 adds ZERO new errors (baseline-fingerprint diff) and `vite build` alone is GREEN. Logged with re-open trigger in `.planning/phases/148-.../deferred-items.md`. A hard-green `npm run build` gate needs these 30 cleared first — surface at 148 verify-work.
 - Rule 2 wiring: the 3 governance signal reads now throw `ApiError(403)` so the bounce fires end-to-end for the realistic `governance_health` tighten. Remaining governed api reads/mutations still throw plain `Error` (documented, non-blocking — Operators-only surfaces already vanish from nav).
