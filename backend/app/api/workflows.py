@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
+from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
 from app.db.workflows import (
     create_workflow_definition,
     delete_workflow_definition,
@@ -102,6 +102,10 @@ class DraftRow(BaseModel):
     definition: dict | None = None
 
 
+# Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
+# picker feeds (the Deep/Harness composer + Workflows launch); end users need them so Run stays
+# for everyone (D-05). The workflow LAUNCH in threads.py is also ungated (untouched by this
+# plan). Only the AUTHORING/publish endpoints below carry require_visible('workflow_authoring').
 @router.get("/published", response_model=list[PublishedWorkflow])
 async def get_published_workflows(
     project_folder_id: UUID | None = None,
@@ -204,7 +208,11 @@ class PublishVerdict(BaseModel):
     named_failures: list = Field(default_factory=list)
 
 
-@router.post("/{definition_id}/publish", response_model=PublishVerdict)
+@router.post(
+    "/{definition_id}/publish",
+    response_model=PublishVerdict,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def publish_workflow(
     definition_id: UUID,
     body: PublishRequest,
@@ -263,7 +271,12 @@ def _coerce_user_id(current_user: dict) -> UUID:
     return UUID(user_id) if isinstance(user_id, str) else user_id
 
 
-@router.post("", response_model=DraftCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DraftCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def create_draft(
     body: WorkflowDefinition,
     current_user: dict = Depends(get_current_user),
@@ -292,7 +305,11 @@ async def create_draft(
     return DraftCreateResponse(**row)
 
 
-@router.get("/drafts", response_model=list[DraftRow])
+@router.get(
+    "/drafts",
+    response_model=list[DraftRow],
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def list_drafts(
     current_user: dict = Depends(get_current_user),
 ) -> list[DraftRow]:
@@ -317,7 +334,11 @@ async def list_drafts(
     ]
 
 
-@router.patch("/{definition_id}", response_model=DraftCreateResponse)
+@router.patch(
+    "/{definition_id}",
+    response_model=DraftCreateResponse,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def update_draft(
     definition_id: UUID,
     body: WorkflowDefinition,
@@ -348,7 +369,11 @@ async def update_draft(
     return DraftCreateResponse(**row)
 
 
-@router.delete("/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{definition_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def delete_draft(
     definition_id: UUID,
     current_user: dict = Depends(get_current_user),
@@ -392,7 +417,10 @@ class GenerateRequest(BaseModel):
     template_placeholders: list[str] | None = None
 
 
-@router.post("/generate")
+@router.post(
+    "/generate",
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def generate_workflow(
     body: GenerateRequest,
     current_user: dict = Depends(get_current_user),
