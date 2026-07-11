@@ -53,6 +53,28 @@ def test_admin_404_matches_unknown_route_404(client, auth_headers, mock_asyncpg_
     assert "application/json" in gated.headers.get("content-type", "")
 
 
+def test_unauthenticated_admin_matches_unknown_route_404(client):
+    """WR-02: an /admin request with NO Authorization header is byte-identical to an
+    unknown-route 404 — NOT a 403 — so the non-discoverability contract holds pre-auth.
+
+    Pops the conftest ``authenticate_operator_request`` override so the REAL
+    auto_error=False resolver runs: an absent header yields ``None`` credentials ->
+    ``_NOT_FOUND``. Falsifiable against the old shared bearer_scheme(auto_error=True),
+    which returned 403 "Not authenticated" here and let an anonymous scanner tell a
+    gated /admin route apart from a nonexistent one.
+    """
+    from app.dependencies import authenticate_operator_request
+
+    app.dependency_overrides.pop(authenticate_operator_request, None)
+    gated = client.get("/admin/backpressure")  # exists, gated — NO auth header
+    unknown = client.get("/admin/__definitely_not_a_route__")  # unknown — NO auth header
+
+    assert gated.status_code == unknown.status_code == 404
+    assert gated.json() == unknown.json() == {"detail": "Not Found"}
+    assert "application/json" in gated.headers.get("content-type", "")
+    # (reset_mocks re-installs the override before the next test.)
+
+
 def test_backpressure_reachable_for_operator(client, auth_headers, mock_asyncpg_pool, monkeypatch):
     """Operator JWT -> /admin/backpressure reachable (200) with the four signals present."""
     monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)

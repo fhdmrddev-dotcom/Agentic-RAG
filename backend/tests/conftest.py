@@ -86,10 +86,21 @@ mock_user_data = {"id": "00000000-0000-0000-0000-000000000001", "email": "test@e
 # ── Import app AFTER env vars are set ─────────────────────────────────────────
 
 from app.main import app  # noqa: E402
-from app.dependencies import get_current_user, get_supabase  # noqa: E402
+from app.dependencies import (  # noqa: E402
+    authenticate_operator_request,
+    get_current_user,
+    get_supabase,
+)
 
 app.dependency_overrides[get_current_user] = lambda: mock_user_data
 app.dependency_overrides[get_supabase] = lambda: _supabase
+# Phase 146 (ADMIN-01 / WR-02): the /admin gate resolves the caller via its own
+# auto_error=False dependency (folds absent/invalid JWTs into a 404). Override it
+# to inject a clean fake operator identity so gated-route tests reach the real
+# require_operator membership check with a JSON-serializable id (the real resolver
+# would return MagicMock ids from the supabase mock). The WR-02 regression pops
+# this override to exercise the genuine pre-auth 404 path.
+app.dependency_overrides[authenticate_operator_request] = lambda: mock_user_data
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -106,6 +117,9 @@ def reset_mocks():
     # Restore canonical dependency overrides (tests may swap get_supabase locally)
     app.dependency_overrides[get_current_user] = lambda: mock_user_data
     app.dependency_overrides[get_supabase] = lambda: _supabase
+    # Phase 146 (ADMIN-01 / WR-02): restore the /admin auth override so a test that
+    # pops it (the pre-auth 404 regression) never contaminates the next test.
+    app.dependency_overrides[authenticate_operator_request] = lambda: mock_user_data
 
     # Phase 146 (ADMIN-01): clear any leaked require_operator override so the
     # operator-present branch of one test never contaminates the next. Guarded —

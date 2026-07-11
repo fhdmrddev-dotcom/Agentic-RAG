@@ -124,6 +124,15 @@ async def get_current_user(
 # /admin route exists-but-forbidden vs. simply not existing (404-not-403).
 _NOT_FOUND = HTTPException(status_code=404, detail="Not Found")
 
+# WR-02: /admin gets its OWN bearer scheme with auto_error=False, used ONLY by the
+# operator gate. The shared ``bearer_scheme`` (auto_error=True) raises 403 on an
+# ABSENT Authorization header — so a request with no JWT to a real /admin route
+# returned 403 while /admin/<unknown> returned 404, letting an anonymous scanner
+# enumerate gated routes (defeating the non-discoverability claim). auto_error=False
+# hands us ``None`` for absent credentials so we fold every auth failure into the
+# SAME byte-identical 404. The shared get_current_user path is unchanged.
+_admin_bearer_scheme = HTTPBearer(auto_error=False)
+
 # Plain-sentence label + machine action code, keyed by /admin path. Endpoints may
 # also set request.state.audit_label / audit_action explicitly; these are the
 # route-derived fallbacks the floor uses when they did not.
@@ -147,18 +156,49 @@ def _derive_action(request: Request) -> str:
     return f"{area}.view"
 
 
+async def authenticate_operator_request(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_admin_bearer_scheme),
+    supabase: Client = Depends(get_supabase),
+) -> dict:
+    """Resolve the caller for the /admin surface, folding EVERY auth failure into 404.
+
+    WR-02: the non-discoverability contract (404-not-403) must hold BEFORE auth, not
+    only after. This uses the dedicated ``_admin_bearer_scheme`` (auto_error=False) so
+    an ABSENT Authorization header yields ``None`` here (instead of the shared scheme's
+    403), and an invalid/expired token — or any resolution error — is folded into the
+    SAME byte-identical ``_NOT_FOUND``. An anonymous scanner therefore cannot tell a
+    gated /admin route (404) apart from a nonexistent one (404).
+
+    A dedicated dependency (rather than reusing ``get_current_user``) keeps the shared
+    auth path untouched AND gives tests a clean override seam (conftest overrides this
+    to inject a fake operator identity; the WR-02 regression pops the override to
+    exercise the real pre-auth 404 path).
+    """
+    if credentials is None:
+        raise _NOT_FOUND
+    try:
+        response = supabase.auth.get_user(credentials.credentials)
+        user = getattr(response, "user", None)
+    except Exception:
+        raise _NOT_FOUND
+    if user is None:
+        raise _NOT_FOUND
+    return {"id": user.id, "email": user.email}
+
+
 async def require_operator(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(authenticate_operator_request),
 ) -> dict:
     """Router-level default-deny gate for every /admin route (Pattern 1).
 
-    ``get_current_user`` already raised 401 on a bad/absent JWT. On non-membership
-    raise a byte-identical 404 (non-discoverable — 404-not-403). On membership, stash
-    the operator on ``request.state`` for the audit floor + the ``/admin/me`` probe,
-    and return the identity. The backend runs on the service-role key with NO RLS
-    backstop, so this gate is the SOLE authority (Pitfall 1). Attach at the ROUTER
-    level (never per-endpoint) so a future /admin endpoint cannot forget it.
+    ``authenticate_operator_request`` already folded an absent/invalid JWT into a
+    byte-identical 404 (WR-02). On non-membership raise the same byte-identical 404
+    (non-discoverable — 404-not-403). On membership, stash the operator on
+    ``request.state`` for the audit floor + the ``/admin/me`` probe, and return the
+    identity. The backend runs on the service-role key with NO RLS backstop, so this
+    gate is the SOLE authority (Pitfall 1). Attach at the ROUTER level (never
+    per-endpoint) so a future /admin endpoint cannot forget it.
     """
     if not await is_operator(current_user["id"]):
         raise _NOT_FOUND
