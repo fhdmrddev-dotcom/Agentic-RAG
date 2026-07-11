@@ -127,6 +127,12 @@ None. The only security-relevant surface (the cross-user platform browse + the C
 - 148-09 (the last plan) delivers the Users & Access roster + Feature Visibility rows (the other half of ADMIN-03 + VIS-01 write UI), unlocking the `users-access` tab. ADMIN-03 + VIS-01 close at 148 verify-work when audit + users + visibility have all landed.
 - Lived-experience G-4 UAT (148-VALIDATION.md): "export row count matches the shown count + a ✎ Exported N receipt appears" is now buildable end-to-end against the live backend.
 
+## Self-Check: PASSED
+
+- Files: FOUND `frontend/src/lib/api.ts`, `frontend/src/components/admin/ControlRoomPage.tsx`, `frontend/src/components/admin/AuditTab.tsx` (api.ts carries `getPlatformAudit` + `exportPlatformAudit` + `PlatformAuditFilters` — 7 symbol matches).
+- Commits: FOUND `c4422b33` (Task 1), `0829e891` (Task 2), `5879a346` (Task 3) in `git log`.
+- Build: `tsc -b` = 30 (baseline, zero new; touched files clean), `vite build` exit 0; `ControlRoomPage.test.tsx` 6/6 green.
+
 ---
 *Phase: 148-governance-audit-users-feature-visibility*
 *Completed: 2026-07-11*
