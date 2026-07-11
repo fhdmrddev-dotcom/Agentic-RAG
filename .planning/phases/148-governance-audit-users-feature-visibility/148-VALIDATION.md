@@ -49,16 +49,18 @@ Key fixtures (extend `conftest.py`): `operator_override` (overrides `require_ope
 | Effective-features map | 1 | VIS-01 | — | `GET /features` returns per-user map (operator all-true; end user only Everyone) | unit | `pytest tests/test_148_effective_features.py -x` | ❌ W0 | ⬜ pending |
 | Platform browse filters → SQL | 1 | ADMIN-03 | T-leak | action_type IN + date range return only matching rows | unit | `pytest tests/test_148_platform_audit_filters.py -x` | ❌ W0 | ⬜ pending |
 | No full-tenant leak | 1 | ADMIN-03 | T-leak | Paginated (page_size cap) + user-scoped param honored | unit | `pytest tests/test_148_platform_audit_scope.py -x` | ❌ W0 | ⬜ pending |
-| CSV = exactly the filtered set | 1 | ADMIN-03 | T-leak | Over-cap → refuse; `audit.export` recorded with count | unit | `pytest tests/test_148_csv_export.py -x` | ❌ W0 | ⬜ pending |
-| view_platform recorded | 1 | ADMIN-03 | T-audit | Switching to Platform source records `audit.view_platform` | unit | `pytest tests/test_148_view_platform_recorded.py -x` | ❌ W0 | ⬜ pending |
+| CSV = exactly the filtered set (service) | 1 | ADMIN-03 | T-leak | Streams EXACTLY the filtered set; over-cap → refuse (413/422); returns exact count. *(owned by 148-04; the `audit.export`-recorded assertion lives in test_148_view_platform_recorded.py — 148-06)* | unit | `pytest tests/test_148_csv_export.py -x` | ❌ W0 | ⬜ pending |
+| view_platform + export recorded (controller) | 1 | ADMIN-03 | T-audit | Platform-source browse records `audit.view_platform`; a successful CSV export records `audit.export` with the exact count; a refused over-cap export records NOTHING *(owned by 148-06)* | unit | `pytest tests/test_148_view_platform_recorded.py -x` | ❌ W0 | ⬜ pending |
 | Roster last-active honesty | 1 | ADMIN-03 | — | `never signed in` when `last_sign_in_at` NULL (never fabricated) | unit | `pytest tests/test_148_roster.py::test_last_active_honesty -x` | ❌ W0 | ⬜ pending |
-| Disable → ban + run cancel | 1 | ADMIN-03 | T-ban | GoTrue `ban_duration` set + in-flight run cancelled via `_cancel_run_internals` | unit | `pytest tests/test_148_disable.py -x` | ❌ W0 | ⬜ pending |
+| Disable → ban + run cancel + self-guard | 1 | ADMIN-03 | T-ban | GoTrue `ban_duration` set + in-flight run cancelled via `_cancel_run_internals`; self-disable refused server-side (409) *(owned by 148-06)* | unit | `pytest tests/test_148_disable.py -x` | ❌ W0 | ⬜ pending |
 | App-layer ban enforcement | 1 | ADMIN-03 | T-ban | Disabled user with a live token → 403 on any authed route | unit | `pytest tests/test_148_ban_enforcement.py -x` | ❌ W0 | ⬜ pending |
 | Ban check fails OPEN | 1 | ADMIN-03 | T-lockout | DB read error → does not lock out everyone | unit | `pytest tests/test_148_ban_fail_open.py -x` | ❌ W0 | ⬜ pending |
 | Enable → clear ban | 1 | ADMIN-03 | T-ban | Enable sets `ban_duration="none"` | unit | `pytest tests/test_148_enable.py -x` | ❌ W0 | ⬜ pending |
-| Grant/revoke + self-guards | 1 | ADMIN-03 / D-01 | T-lockout | Grant populates `granted_by`; self-revoke + self-disable refused server-side | unit | `pytest tests/test_148_operator_grant.py -x` | ❌ W0 | ⬜ pending |
+| Grant + self-revoke guard (service) | 1 | ADMIN-03 / D-01 | T-lockout | Grant populates `granted_by`; self-revoke refused server-side. *(owned by 148-04; self-disable-409 moved to test_148_disable.py — 148-06)* | unit | `pytest tests/test_148_operator_grant.py -x` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · ❌ W0 = file created in Wave 0*
+
+> **Wave-ownership split (revision):** Wave-0 authors all 14 files, but assertions are scoped to the plan that IMPLEMENTS them so each plan's `<verify>` can pass in its own wave: `test_148_csv_export.py` + `test_148_operator_grant.py` hold ONLY service-level assertions (148-04, wave 3); the controller-level `audit.export`-recorded + refused-writes-nothing assertions live in `test_148_view_platform_recorded.py`, and the self-disable-409 assertion lives in `test_148_disable.py` (both 148-06, wave 4).
 
 ---
 

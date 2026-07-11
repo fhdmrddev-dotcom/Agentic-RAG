@@ -454,20 +454,23 @@ _ACTIONS = {
 | A4 | `governance_health` maps to `document_governance.py` (Phase 119 "Governance" nav), not `knowledge_health.py` ("Library Health") | Pattern 1 table | Low-Med — CONTEXT says "confirm exact router at planning". If the operator intends Library Health too, add `require_visible` there as well (still Everyone default, so no behavior change day-one). |
 | A5 | Gating the whole Settings page (minus `/providers`) as `model_management` is acceptable — end users lose the Settings page day-one | Pattern 1 table | Med — matches the "admin panel governs every dynamic setting" direction, but end users also lose retrieval/web-search tuning. **Confirm at planning** (see Open Q1). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `model_management` = the entire Settings page, or only the AI-model/embedding/engine-health sections?**
    - What we know: `GET/PUT /settings` return ONE payload covering all sections; endpoint-level gating can't split within it. `GET /settings/providers` (chat picker) must stay Everyone.
    - What's unclear: whether end users should retain access to non-model settings (retrieval, web search) — today they'd lose the whole page.
    - Recommendation: gate `GET/PUT /settings` + `/reembed*` as `model_management`, carve out `/settings/providers`. This matches D-05 + the admin-panel direction. If end-user retrieval tuning must survive, that's a section-split refactor — flag as out-of-scope for 148.
+   - **RESOLVED (planning):** `model_management` = the whole Settings page (`GET/PUT /settings` + `/reembed*`) MINUS the `GET /settings/providers` chat-picker carve-out — wired in **148-05 Task 2**. End-user retrieval/web-search tuning moving under the operator matches the admin-panel direction; a per-section split is explicitly out of scope for 148.
 
 2. **Should the effective-features fetch be a standalone `GET /features` or folded into an existing bootstrap call?**
    - What we know: there is no single app-config bootstrap endpoint; `useOperatorProbe` already does a one-shot session GET to `/admin/me`.
    - Recommendation: a standalone `GET /features` (authenticated, per-user) fetched via a `useEffectiveFeatures(userId)` hook that mirrors `useOperatorProbe`. Cleanest seam, no coupling to `/admin`.
+   - **RESOLVED (planning):** standalone authenticated `GET /features` (**148-05 Task 1**) consumed by a `useEffectiveFeatures(userId)` hook mirroring `useOperatorProbe` (**148-07 Task 1**).
 
 3. **CSV cap value + refuse-vs-truncate.**
    - What we know: "exports exactly the filtered set" + "size cap" are both locked; they conflict above the cap.
    - Recommendation: cap at ~50 000 rows, COUNT first, refuse (413) above cap with "narrow the filter". Preserves "exactly" and prevents a full dump. Confirm the cap number at planning.
+   - **RESOLVED (planning):** cap = **50,000 rows, refuse-if-exceeded** (413/422 "narrow the filter"), never truncate; a refused export writes no `audit.export` row — service-level cap in **148-04 Task 1**, controller receipt in **148-06 Task 1**.
 
 ## Environment Availability
 
@@ -605,10 +608,10 @@ _ACTIONS = {
 | Architecture | HIGH | Patterns compose verified 146/147/031 precedents |
 | Pitfalls | HIGH | Each maps to a live seam or cited GoTrue behavior |
 
-### Open Questions (for planning)
-1. `model_management` = whole Settings page (minus `/providers`) vs. only model sections (endpoint can't split one payload) — recommend whole-page gate, confirm.
-2. `governance_health` router = `document_governance.py` (recommended) — confirm whether Library Health is also intended.
-3. CSV cap value + refuse-vs-truncate — recommend ~50k refuse-if-exceeded.
+### Open Questions (RESOLVED for planning)
+1. `model_management` = whole Settings page (minus `/providers`) vs. only model sections (endpoint can't split one payload) — recommend whole-page gate, confirm. — **RESOLVED:** whole Settings page minus `/providers` (148-05 Task 2).
+2. `governance_health` router = `document_governance.py` (recommended) — confirm whether Library Health is also intended. — **RESOLVED:** `governance_health` = `document_governance.py` (148-05 Task 3); `knowledge_health.py` (Library Health) stays ungated/Everyone.
+3. CSV cap value + refuse-vs-truncate — recommend ~50k refuse-if-exceeded. — **RESOLVED:** 50,000 rows, refuse-if-exceeded (148-04 Task 1).
 
 ### Ready for Planning
 Research complete. Planner can create PLAN.md files: 1 migration wave (098 + full-schema regen + cloud-parity note), a backend wave (require_visible + ban check + governance_service + 7 admin endpoints + GET /features), a frontend wave (useEffectiveFeatures + AuditTab source-switch/filters/CSV + UsersAndAccess roster + FeatureVisibility cards per the locked 067/068/069 sketches), and a Wave-0 test scaffold.
