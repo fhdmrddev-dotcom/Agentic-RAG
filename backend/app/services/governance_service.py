@@ -173,3 +173,51 @@ async def export_platform_audit_csv(
         headers={"Content-Disposition": "attachment; filename=platform-audit.csv"},
     )
     return stream, count
+
+
+# ── Users roster ──────────────────────────────────────────────────────────────
+
+# One join: identity + honest last-active + doc/chat counts + operator role (RESEARCH §Code
+# Examples "Roster read"). ``is_operator`` derives from the ``operator_users`` join (NOT a JWT
+# claim — the SAME swappable boundary as ``is_operator()``). ``documents``/``threads`` both carry
+# ``user_id`` (Assumption A1 verified against full-schema.sql). ``ORDER BY last_sign_in_at DESC
+# NULLS LAST`` keeps never-signed-in users at the bottom without fabricating a timestamp.
+_ROSTER_SQL = (
+    "SELECT u.id, u.email, u.created_at, u.last_sign_in_at, u.banned_until, "
+    "(o.user_id IS NOT NULL) AS is_operator, "
+    "coalesce(d.cnt, 0) AS doc_count, "
+    "coalesce(t.cnt, 0) AS chat_count "
+    "FROM auth.users u "
+    "LEFT JOIN operator_users o ON o.user_id = u.id "
+    "LEFT JOIN (SELECT user_id, count(*) cnt FROM documents GROUP BY user_id) d ON d.user_id = u.id "
+    "LEFT JOIN (SELECT user_id, count(*) cnt FROM threads   GROUP BY user_id) t ON t.user_id = u.id "
+    "ORDER BY u.last_sign_in_at DESC NULLS LAST "
+    "LIMIT $1 OFFSET $2"
+)
+
+
+async def list_users_roster(page_size: int = 50, offset: int = 0) -> list[dict]:
+    """Users roster — ONE join returning honest last-active + doc/chat counts + operator role.
+
+    ``last_sign_in_at`` NULL is PRESERVED as ``None`` (the UI renders "never signed in") — never
+    backfilled or fabricated. ``banned_until`` in the future is returned so the UI can render the
+    Disabled chip. Paginated (``page_size`` clamped ``<= 100``), ordered newest-active-first with
+    never-signed-in users last.
+
+    Swallow-and-log posture (best-effort cross-user feed) — a DB blip returns ``[]``.
+    """
+    from app.dependencies import get_pg_pool
+
+    limit = _clamp_page_size(page_size)
+    try:
+        offset = max(0, int(offset))
+    except (TypeError, ValueError):
+        offset = 0
+
+    try:
+        pool = await get_pg_pool()
+        rows = await pool.fetch(_ROSTER_SQL, limit, offset)
+        return [dict(r) for r in rows]
+    except Exception as exc:
+        logger.error("users roster read failed: %s", exc)
+        return []
