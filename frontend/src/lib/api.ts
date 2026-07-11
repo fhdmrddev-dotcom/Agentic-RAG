@@ -2118,6 +2118,14 @@ export interface FullAppSettings {
   web_search_has_api_key: boolean
   web_search_max_results: number
   sandbox_enabled: boolean
+  // Phase 147 (FLAG-01 / migration 097) — the three net-new per-feature kill-switch
+  // + maintenance flags added to the `FullSettingsResponse` contract (Plan 147-01).
+  // `getSettings()` is the Control Room grid's flag-read source (no new flags GET);
+  // `setFlag()` is the write path. Defaults keep existing behavior byte-identical:
+  // self_improve/workflows default true, maintenance_mode false.
+  self_improve_enabled: boolean
+  workflows_enabled: boolean
+  maintenance_mode: boolean
   context_window_max_tokens: number
   sub_agent_max_output_tokens: number
   sub_agent_model: string
@@ -3522,6 +3530,16 @@ export interface BackpressureSignals {
   redis_active_runs: number
   postgres_pool_in_use: number
   per_worker_run_count: number
+  // Phase 147 (ADMIN-02 / D-078-08 additive-only) — the dependency-health probes
+  // appended to the SAME `GET /admin/backpressure` payload. OPTIONAL for
+  // back-compat: a backend that has not yet shipped Plan 147-04 omits the key and
+  // the four fields above stay byte-identical. `sandbox` has a third `"off"` state
+  // — a deliberately-disabled sandbox (SANDBOX_ENABLED=false) is grey, never red.
+  dependencies?: {
+    redis: { state: "up" | "down"; latency_ms: number | null }
+    supabase: { state: "up" | "down"; latency_ms: number | null }
+    sandbox: { state: "off" | "up" | "down"; latency_ms: number | null }
+  }
 }
 
 /** One append-only `operator_audit_log` row from `GET /admin/audit` (Plan 02) —
@@ -3574,4 +3592,118 @@ export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow
   if (!res.ok) throw new ApiError("Failed to load the operator audit feed.", res.status)
   const body = (await res.json()) as { entries?: OperatorAuditRow[] }
   return body.entries ?? []
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 147 (ADMIN-02 + FLAG-01) — Control Plane client contract.
+//
+// The Wave-1 seam: types + client fns every Wave-2/3 admin component consumes
+// (ActiveRunsSection, CapabilityGrid, MaintenancePanel). SAME security posture as
+// the 146 operator calls above: these decide RENDERING ONLY. Every /admin call is
+// independently 404-gated server-side (Pitfall 13 / T-147-12) — the client is
+// presentation, never a trust boundary. A forged operator flag reaches no data.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One live entry from `GET /admin/runs` (Plan 147-02) — every `runs:active`
+ *  member, enriched from its `runs` row for the 064-B card. `started_at` is a unix
+ *  epoch so the client computes elapsed with local math (no poll to tick — D-07).
+ *  `killable` is false for eval/tuner jobs (bounded internal work — D-01); those
+ *  render an honest "ends on its own" copy with no Kill affordance. `not_responding`
+ *  is the SERVER-derived stalled-stream signal (run:{id} stream age — the 064-B
+ *  not-responding tag source), never inferred client-side. */
+export interface ActiveRun {
+  run_id: string
+  kind: "chat" | "workflow" | "eval" | "tuner"
+  thread_id: string | null
+  user_id: string | null
+  user_email: string | null
+  model: string | null
+  provider: string | null
+  started_at: number
+  killable: boolean
+  not_responding: boolean
+}
+
+/** The five per-feature kill-switch / maintenance flags on the `app_settings` TTL
+ *  substrate (FLAG-01). `web_search_enabled` + `sandbox_enabled` are live since 053;
+ *  the other three ship with migration 097 (Plan 147-01). Fail-closed polarity is a
+ *  BACKEND concern (capability flags default-on last-known-good; `maintenance_mode`
+ *  cold-cache → false / platform OPEN). This union is the write key for `setFlag`. */
+export type FlagKey =
+  | "web_search_enabled"
+  | "sandbox_enabled"
+  | "self_improve_enabled"
+  | "workflows_enabled"
+  | "maintenance_mode"
+
+/** Read the live active-runs list (`GET /admin/runs`, Plan 147-02). Plain authed
+ *  GET — the router gate returns 404 to non-operators. The backend returns an
+ *  ENVELOPE `{"runs": [...]}` (same shape as `getOperatorAudit`'s `{entries}`);
+ *  unwrap `.runs` here — casting the raw object to `ActiveRun[]` would ship a
+ *  `{runs}` object into list state and crash the next `.map` (CR-01 precedent). */
+export async function getAdminActiveRuns(): Promise<ActiveRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/runs`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load active runs.", res.status)
+  const body = (await res.json()) as { runs?: ActiveRun[] }
+  return body.runs ?? []
+}
+
+/** Operator Kill: cancel ANY user's run (`POST /admin/runs/{run_id}/kill`,
+ *  Plan 147-02 — the ownership-unscoped sibling of the owner `DELETE /runs/{id}`).
+ *  Idempotent-terminal → 204; the killed user sees exactly a self-cancel (D-03) —
+ *  who/why lives only in `operator_audit_log`, never in the victim's chat. */
+export async function killRun(runId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/runs/${encodeURIComponent(runId)}/kill`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to end the run.", res.status)
+}
+
+/** Flip a per-feature kill-switch / maintenance flag (`PUT /admin/flags`, Plan
+ *  147-03). Body `{key, value}`; the backend writes `app_settings` + invalidates
+ *  the TTL cache. Effect propagates within the ~30s per-worker window ("takes
+ *  effect on their next call" — the 065-A impact copy accounts for this latency). */
+export async function setFlag(key: FlagKey, value: boolean): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/flags`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ key, value }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update the setting.", res.status)
+}
+
+/** Record ONE deliberate Control Plane ledger row (`POST /admin/control-plane/record`,
+ *  Plan 147-02). D-07 honesty seam: automated polls are floor-EXEMPT (silent);
+ *  instead a `"visit"` row ("Opened the Control Plane") is written once on tab-open
+ *  and the manual ↻ writes a `"refresh"` row. Every ledger row stays a human action. */
+export async function recordControlPlaneEvent(event: "visit" | "refresh"): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/control-plane/record`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ event }),
+  })
+  if (!res.ok) throw new ApiError("Failed to record the Control Plane event.", res.status)
+}
+
+/** Read the maintenance flag from the PUBLIC `GET /health` endpoint (Plan 147-01
+ *  appends an additive `maintenance` boolean). This is the NON-ADMIN flag source
+ *  for the end-user maintenance banner: end users get a 404 on every `/admin/*`
+ *  route, so the app-shell banner cannot read `/settings`-gated operator data —
+ *  it reads the public health probe instead. Unauthed, best-effort: any failure
+ *  or a backend that has not yet shipped the field resolves to `false` (banner
+ *  hidden — never falsely announce maintenance). */
+export async function getMaintenanceStatus(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`)
+    if (!res.ok) return false
+    const body = (await res.json()) as { maintenance?: boolean }
+    return body.maintenance ?? false
+  } catch {
+    return false
+  }
 }
