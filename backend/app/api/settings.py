@@ -64,6 +64,14 @@ class FullSettingsResponse(BaseModel):
     web_search_max_results: int
     # Sandbox
     sandbox_enabled: bool
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches, exposed
+    # on the EXISTING settings read contract (no new endpoint) so the Control Plane
+    # capability grid has a flag-read source, consistent with the two capability booleans
+    # (web_search_enabled / sandbox_enabled) already served here. GET /settings serves
+    # them to any authed user; the operator WRITE path lands on /admin/flags in a later plan.
+    self_improve_enabled: bool
+    workflows_enabled: bool
+    maintenance_mode: bool
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -208,6 +216,10 @@ async def _build_response(s=None) -> FullSettingsResponse:
         web_search_has_api_key=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
+        # Phase 147 (FLAG-01) — the three operator kill-switches from the effective settings.
+        self_improve_enabled=s.self_improve_enabled,
+        workflows_enabled=s.workflows_enabled,
+        maintenance_mode=s.maintenance_mode,
         context_window_max_tokens=s.context_window_max_tokens,
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,

@@ -133,6 +133,15 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches.
+    # app_settings-only (env_attr=None readback below; these are runtime SWITCHES,
+    # not secrets/infra — CLAUDE.md). D-Q4 polarity: capability switches default True
+    # (byte-identical runtime until an operator flips one); maintenance_mode defaults
+    # False (platform OPEN — a cold/fresh read must never wedge the platform).
+    self_improve_enabled: bool = True
+    workflows_enabled: bool = True
+    maintenance_mode: bool = False
+
     # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
     document_management_enabled: bool = True
 
@@ -509,6 +518,14 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         sandbox_enabled=_val_bool(row, "sandbox_enabled", "sandbox_enabled", True),
 
+        # Phase 147 (FLAG-01, migration 097) — env_attr=None: app_settings-only, no env
+        # fallback (runtime SWITCHES, not secrets/infra). D-Q4 polarity mirrors the
+        # migration defaults so a missing/None column reads the SAFE value for each flag:
+        # capability switches => True (never silently disable); maintenance => False (OPEN).
+        self_improve_enabled=_val_bool(row, "self_improve_enabled", None, True),
+        workflows_enabled=_val_bool(row, "workflows_enabled", None, True),
+        maintenance_mode=_val_bool(row, "maintenance_mode", None, False),
+
         # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
         document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
@@ -648,6 +665,59 @@ def document_management_enabled() -> bool:
         return load_app_settings().document_management_enabled
     except Exception:  # noqa: BLE001 — defensive: default-on on cold cache / DB read failure
         return True
+
+
+# ── Phase 147 (FLAG-01) — operator control-plane flag reads ────────────────────
+# All three read through the per-worker 30s TTL settings cache (load_app_settings),
+# so a flip propagates within the TTL window with NO server restart, and a transient
+# DB blip returns LAST-KNOWN-GOOD (the cache is not reset on a read failure — see
+# _load_settings_from_db:233-241), never "unknown". A truly-cold cache / a
+# load_app_settings() exception falls back to the D-Q4 polarity below.
+#
+# Pitfall 5 (deliberately NOT done): no Redis pub/sub cross-worker cache-bust. A
+# ≤30s per-worker skew is expected and honest — it matches the "takes effect on
+# their next call" operator copy.
+
+
+def self_improve_enabled() -> bool:
+    """FLAG-01 capability switch: is the self-improvement (skill-saving) capability on?
+
+    Polarity mirrors document_management_enabled() (default-ON): a cold-cache / DB-read
+    failure returns True so a transient blip NEVER silently disables the capability
+    (D-Q4). Only a deliberate operator OFF flip flips it.
+    """
+    try:
+        return load_app_settings().self_improve_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-ON on cold cache / read failure
+        return True
+
+
+def workflows_enabled() -> bool:
+    """FLAG-01 capability switch: are workflow launches allowed?
+
+    Default-ON polarity (D-Q4): a cold-cache / DB-read failure returns True — a blip
+    must not silently block workflow launches. In-flight workflow runs are unaffected
+    by this flag (D-05); it gates only NEW launches at the kickoff seam.
+    """
+    try:
+        return load_app_settings().workflows_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-ON on cold cache / read failure
+        return True
+
+
+def maintenance_mode() -> bool:
+    """FLAG-01 platform switch: is the platform in maintenance / read-only mode?
+
+    INVERTED polarity (D-Q4, operator-resolved 2026-07-11): a cold-cache / DB-read
+    failure returns False (platform OPEN). Failing "closed" here would be a
+    self-inflicted outage — a transient settings-read failure must NEVER wedge the
+    whole platform into read-only. Only a deliberate operator ON flip (or a live DB
+    value of True) enables maintenance.
+    """
+    try:
+        return load_app_settings().maintenance_mode
+    except Exception:  # noqa: BLE001 — defensive: default-OPEN (False) on cold cache / read failure
+        return False
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:

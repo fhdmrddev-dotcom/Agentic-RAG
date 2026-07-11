@@ -103,6 +103,10 @@ _DIRECT_COLUMNS: set[str] = {
     "web_search_enabled", "sandbox_enabled", "context_window_max_tokens",
     "sub_agent_max_output_tokens", "sub_agent_model", "llm_max_output_tokens",
     "openrouter_tool_strategy", "ollama_base_url",
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches.
+    # Column names are code CONSTANTS (never user input) -> keeps save_app_settings
+    # SQLi-safe (T-147-01). Values are parameterized ($N) in save_app_settings.
+    "self_improve_enabled", "workflows_enabled", "maintenance_mode",
 }
 
 _PROVIDER_MODEL_KEYS: set[str] = {

@@ -49,6 +49,10 @@ def _fake_settings(**overrides):
         tavily_api_key="",
         web_search_max_results=5,
         sandbox_enabled=True,
+        # Phase 147 (FLAG-01) — operator kill-switches now read by _build_response.
+        self_improve_enabled=True,
+        workflows_enabled=True,
+        maintenance_mode=False,
         context_window_max_tokens=120000,
         sub_agent_max_output_tokens=8192,
         sub_agent_model="claude-haiku-4-5-20251001",
