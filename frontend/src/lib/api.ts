@@ -21,6 +21,15 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL as string
  *  RENDER-ONLY — the server 403 is the security wall; this only avoids a dead-end. */
 export const FEATURE_FORBIDDEN_EVENT = "agentic:feature-forbidden"
 
+/** Phase 148 (VIS-01 / D-04 — CR-02 fix) — the EXACT server refusal detail that
+ *  `require_visible` returns (dependencies.py) for a non-operator hitting an
+ *  Operators-only governed feature. This literal is the SOLE trigger for the
+ *  graceful-bounce event: a bare 403 is NOT enough (the FLAG-01 workflows kill-switch
+ *  and the app-layer ban check BOTH also return 403 through `ApiError`). The backend
+ *  gate, the `ApiError` dispatch guard below, and the App-level `onForbidden` listener
+ *  all agree on THIS one literal — keep them in lockstep. */
+export const VISIBILITY_REFUSAL = "This feature is available to administrators only."
+
 /** Phase 092 (092-06 / F3): a status-carrying error so the send path can
  *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
  *  from a generic failure. Mirrors the existing DownloadError idiom (status +
@@ -32,12 +41,17 @@ export class ApiError extends Error {
     super(message)
     this.status = status
     this.name = "ApiError"
-    // Phase 148 (VIS-01 / D-04): a 403 is UNIQUELY a `require_visible` feature
-    // refusal in this app — the operator `/admin` surface returns 404 (never 403),
-    // and no other endpoint surfaces a 403 ApiError. So an `ApiError(403)` anywhere
-    // means "a governed feature was refused mid-session" → notify the App-level
-    // graceful-bounce listener. Render-only; the server 403 remains the authority.
-    if (status === 403 && typeof window !== "undefined") {
+    // Phase 148 (VIS-01 / D-04 — CR-01/CR-02 fix): a bare 403 is NOT uniquely a
+    // `require_visible` feature refusal. The FLAG-01 workflows kill-switch
+    // (threads.py — reachable via postMessage) and the app-layer ban check
+    // (dependencies.py — on the shared auth path) BOTH return 403 through `ApiError`.
+    // So gate the graceful-bounce event on the EXACT server refusal detail literal,
+    // NOT the bare status — only a genuine `require_visible` refusal carries
+    // VISIBILITY_REFUSAL, so only it bounces (the kill-switch/ban 403s keep their real
+    // message + their own error handling). getEffectiveFeatures throws a PLAIN Error
+    // (never ApiError), so the /features read can never feed this loop either (CR-01).
+    // Render-only; the server 403 remains the authority.
+    if (status === 403 && message === VISIBILITY_REFUSAL && typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent(FEATURE_FORBIDDEN_EVENT, { detail: { message, status } }),
       )
@@ -3616,7 +3630,13 @@ export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
 export async function getEffectiveFeatures(): Promise<EffectiveFeatures> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/features`, { headers })
-  if (!res.ok) throw new ApiError("Failed to load feature visibility.", res.status)
+  // CR-01 fix: NEVER throw ApiError here. A banned user's `GET /features` returns 403
+  // (get_current_user → _is_banned), and an ApiError(403) would dispatch the
+  // FEATURE_FORBIDDEN_EVENT → App.onForbidden → refetchFeatures() → this call again →
+  // an unbounded /features refetch storm. A PLAIN Error keeps the effective-features
+  // read entirely out of the graceful-bounce loop; useEffectiveFeatures catches it and
+  // fails CLOSED to `{}` (every governed feature hidden). The server 403 stays the wall.
+  if (!res.ok) throw new Error("Failed to load feature visibility.")
   const body = (await res.json()) as { features?: EffectiveFeatures }
   return body.features ?? {}
 }

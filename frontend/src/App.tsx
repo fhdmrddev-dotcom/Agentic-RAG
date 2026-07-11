@@ -7,7 +7,7 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
-import { getMaintenanceStatus, FEATURE_FORBIDDEN_EVENT } from "@/lib/api"
+import { getMaintenanceStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL } from "@/lib/api"
 
 // Phase 147 (D-06 / T-147-15) — the persistent, app-wide, end-user maintenance
 // banner. It lives at the App/ChatLayout seam OUTSIDE the operator /admin surface
@@ -127,10 +127,13 @@ function App() {
   useEffect(() => {
     const onForbidden = (e: Event) => {
       const detail = (e as CustomEvent<{ message?: string; status?: number }>).detail
-      // Only a require_visible 403 bounces (the event only fires on 403 — keep the
-      // guard explicit + grep-able).
-      if (detail?.status !== 403) return
-      setFeatureRefusal("This feature is available to administrators only.")
+      // CR-02 fix: only a genuine require_visible refusal bounces. api.ts now gates the
+      // dispatch on status===403 AND message===VISIBILITY_REFUSAL, so the FLAG-01
+      // workflows kill-switch 403 and the app-layer ban 403 never reach here. Re-assert
+      // the SAME literal here (explicit + grep-able) so the backend gate, the ApiError
+      // dispatch guard, and this listener all agree on that one string.
+      if (detail?.status !== 403 || detail?.message !== VISIBILITY_REFUSAL) return
+      setFeatureRefusal(VISIBILITY_REFUSAL)
       setActiveView("chat")
       refetchFeatures()
     }
