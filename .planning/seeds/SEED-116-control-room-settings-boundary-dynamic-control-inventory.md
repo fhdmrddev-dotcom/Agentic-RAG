@@ -2,11 +2,26 @@
 id: SEED-116
 title: Control Room ↔ Settings boundary + full dynamic-control inventory
 planted: 2026-07-12
-status: unplanted
+status: resolved
+resolved: 2026-07-12
+resolved_by: ".planning/notes/settings-control-room-boundary.md (/gsd:explore session, operator-affirmed)"
 related_seeds: [SEED-115, SEED-112, SEED-113]
 related_memory: [project_admin_panel_plan, project_dynamic_settings_direction, project_settings_design_guidance, project_target_scale]
 re_open_trigger: "Before or at the start of Phase 149 (Model Registry & Discovery) — the first phase whose scope concretely straddles the Settings↔Control-Room line (a user picking a model vs an operator governing the registry). Resolve the boundary rule before 149 wires a model-management surface, so we don't build the split twice."
 ---
+
+> **RESOLVED 2026-07-12** via `/gsd:explore` (operator-affirmed). Decision + full inventory live in
+> **`.planning/notes/settings-control-room-boundary.md`**, to be promoted to a locked **D-149-NN** at
+> `/gsd:discuss-phase 149`. TL;DR of the ruling:
+> - **Three surfaces, not two:** Control Room = platform governance (operator) · Settings = user
+>   preferences *within what the operator allows*, privilege-gated · Profile menu (top-right) = identity.
+> - **One pattern for every knob:** operator governs the allowed-set + policy → user picks a preference
+>   within it → operator can **lock** any choice → Settings-knob visibility is privilege-gated (VIS-01).
+> - **Models (the 149 blocker) resolved:** registry/capabilities/discovery = operator; user picks from
+>   the enabled set; lock = policy flag; no per-group greenlist until v3.4 (SEED-115).
+> - **v3.3 scope:** 149 (models) + 150 (secrets, operator-only) + profile-menu split (SEED-113).
+>   Everything else (greenlists, retrofit existing knobs, cost caps, scheduled triggers, doc-ACL) →
+>   v3.4 governance/org-RBAC backlog — where automation + integration live.
 
 # SEED-116: Control Room ↔ Settings boundary + full dynamic-control inventory
 

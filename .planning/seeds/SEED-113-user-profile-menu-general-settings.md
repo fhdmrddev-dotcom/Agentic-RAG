@@ -17,6 +17,27 @@ priority: medium
 
 # SEED-113 — user profile menu + general-settings entry point (identity anchor in the app shell)
 
+## Direction confirmed + routing set (2026-07-12, /gsd:explore SEED-116)
+
+The operator re-affirmed and sharpened this during the SEED-116 boundary explore:
+
+> "Separate the profile settings — moved to the **top-right corner** (or the correct nice-looking
+> position) — let the user control the main personal settings like any application (profile / name /
+> etc.), and consider future **SSO / org-directory** integration."
+
+This seed is now the **user-side half** of the resolved Settings↔Control-Room boundary
+(`.planning/notes/settings-control-room-boundary.md`): Control Room = operator governance ·
+**Settings = privilege-gated user preferences** · **Profile menu = identity anchor (this seed)**.
+
+**Routing decision (nothing urgent — strategic sequencing):**
+- **NOT** inserted into Phases 149–158. It is **G-2 sketch-gated** (app-shell / nav-rail UI) and pairs
+  with **BUG-260711-01** (nav crowding) — do them in ONE sketch pass.
+- **Minimal slice** (identity anchor: name/email/profile/sign-out + move the *personal* half of
+  Settings here; no new settings surfaces) = a **small dedicated phase candidate for late-v3.3 or the
+  v3.4 kickoff**.
+- **Full shape** (role/tier badge, org switcher, per-type settings, SSO/SCIM) = **v3.4**, after tenancy
+  (isolated-vs-co-tenant + auth/billing) is decided (SEED-115 / project_org_level_deferred).
+
 ## The ask (operator, 2026-07-11)
 
 A standard identity-anchored menu in the app shell (likely top corner, per convention): shows the
