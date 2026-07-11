@@ -33,7 +33,6 @@ import asyncio
 import json
 import logging
 import time as time_mod
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -55,7 +54,6 @@ from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError
 from app.api.threads import (
     RUN_TASKS,
     TERMINAL_TYPES,
-    _emit_terminal,
     _RUN_STATUS_TO_TERMINAL_TYPE,
 )
 from app.config import settings
@@ -1118,148 +1116,25 @@ async def cancel_run(
             detail="Run not found",
         )
 
-    # ── Step 2: already-terminal → 204 silent (D-062-09 idempotent) ──
-    # NO UPDATE, NO Redis touch — the run is already finalized; re-call has
-    # no observable effect.
-    if row["status"] in ("completed", "failed", "cancelled", "timed_out"):
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    # ── Steps 2/3a/3b: the shared cancel / zombie-heal discipline (D-02) ──
+    # The idempotent-terminal 204, the PUBLISH-first ask_user sentinel + task.cancel()
+    # happy path, and the finalize_run_terminal + SETNX + EXPIRE zombie heal all live in
+    # ONE shared helper (run_lifecycle._cancel_run_internals) so the operator-side Kill
+    # reuses the EXACT same discipline WITHOUT drifting — the only thing the operator
+    # path drops is Step 1's ownership SELECT above. The owner path here is byte-
+    # equivalent: still idempotent-204, still PUBLISH-first, still zombie-heals. Local
+    # import keeps the helper off the /runs module-load path (runs.py style) and avoids
+    # the runs<->run_lifecycle import cycle.
+    from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
 
-    # ── Step 3a: happy path — producer alive in RUN_TASKS (D-062-10) ──
-    # task.cancel() schedules the CancelledError; the producer's existing
-    # handler at threads.py:2110-2116 sets _terminal_status='cancelled' and
-    # _shielded_finalize at threads.py:~2123-2138 runs the 5-step finalize
-    # ordering (sentinel → UPDATE → EXPIRE → ZREM → RUN_TASKS.pop)
-    # ASYNCHRONOUSLY. DELETE does NOT await the task — return 204 immediately.
-    task = RUN_TASKS.get(run_id)
-    if task is not None and not task.done():
-        # Phase 085 D-085-04 — PUBLISH cancel sentinel BEFORE task.cancel() so
-        # any paused _handle_ask_user wakes and returns a normal ToolResult
-        # ("ask_user cancelled by user stop") BEFORE CancelledError propagates
-        # (RESEARCH §A.5 PUBLISH-first ordering). Without this ordering, the
-        # CancelledError lands inside pubsub.get_message's wait loop, the
-        # handler returns normally to its finally, the agent loop is still
-        # mid-iteration but the run terminates without a kind='ask_user_
-        # response' companion row — GET /threads/{tid}/ask_user/pending would
-        # then return that prompt forever.
-        #
-        # Best-effort — never block the cancel verb on Redis failure (the
-        # same discipline as the zombie-heal Redis ops below).
-        try:
-            from app.services.ask_user_service import publish_cancel_sentinel  # noqa: PLC0415
-            await publish_cancel_sentinel(redis, run_id)
-        except Exception:
-            logger.exception(
-                "ask_user cancel sentinel broadcast failed for run %s", run_id
-            )
-        task.cancel()
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    await _cancel_run_internals(
+        run_id=run_id,
+        status=row["status"],
+        thread_id=row["thread_id"],
+        redis=redis,
+        supabase=supabase,
+    )
 
-    # ── Step 3b: zombie heal (D-062-11) ──
-    # RUN_TASKS missing but runs.status='streaming' — process restarted,
-    # producer died without finalizing, etc. User intent ("Stop my run") is
-    # honored even when the producer is dead. Each Redis op gets its own
-    # try/except per D-062-13 (T-062-03) — DELETE returns 204 even if every
-    # Redis op fails.
-    thread_id = row["thread_id"]
-    stream_key = f"run:{run_id}"
-
-    # 1. Atomic terminal co-write (Phase 145-03 / D-145-14 writer parity). The
-    # runs.status='cancelled' UPDATE + both mirror ZREMs are now ONE call via the
-    # run_lifecycle owner (was: a supabase UPDATE here + a separate ZREM ×2 at old
-    # step 3), so a healed zombie can't leave runs.status terminal while runs:active
-    # still lists it — the drift this phase closes. NO new cancel logic: only the
-    # WRITER is swapped, the semantics are unchanged. Best-effort per D-062-13 — a
-    # failure still returns 204 (logged); status lands FIRST (before the synthetic
-    # sentinel below), preserving the 075.4-03 ordering. The owner reuses the shared
-    # db.runs.finalize_run writer (parity with the happy-path _shielded_finalize) + a
-    # real datetime completed_at (the WR-01-correct form the supabase path used). Local
-    # imports keep the owner/pool off the /runs module-load path (runs.py style).
-    try:
-        from app.dependencies import get_pg_pool  # noqa: PLC0415
-        from app.services.run_lifecycle import finalize_run_terminal  # noqa: PLC0415
-        pool = await get_pg_pool()
-        await finalize_run_terminal(
-            pool=pool,
-            redis=redis,
-            run_id=run_id,
-            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-            status="cancelled",
-            error="cancelled_by_user",
-            completed_at=datetime.now(timezone.utc),
-        )
-    except Exception:
-        logger.exception(
-            "Zombie heal finalize (cancel) failed for run %s", run_id
-        )
-
-    # Phase 092 (092-03 / SC#2, MODE-02) — clear the per-thread workflow lock
-    # anchor on cancel so a cancelled Harness/cap_paused run never strands the
-    # thread Harness-locked. Keyed by the thread (a cancel knows its thread_id,
-    # not necessarily the workflow_runs id the anchor points at). Best-effort,
-    # symmetric with the zombie-heal Redis ops (D-062-13). The happy-path live
-    # cancel reaches the same clear via the engine's finish_run (the single
-    # authoritative workflow_runs-side site); this is the zombie-heal sibling.
-    try:
-        await aexec(
-            supabase.table("threads")
-            .update({"active_workflow_run_id": None})
-            .eq("id", thread_id)
-        )
-    except Exception:
-        logger.exception(
-            "Zombie heal anchor-clear failed for thread %s (run %s)",
-            thread_id, run_id,
-        )
-
-    # 2. Synthetic terminal sentinel — gives any attached consumer the event
-    # it needs to break out of the XREAD loop. Only emitted if the buffer
-    # still exists (TTL-expired runs have nothing to attach to).
-    # WR-04 fix: gate the XADD on a SETNX cancel-lock so concurrent DELETEs
-    # on the same run_id only write ONE sentinel. Two concurrent zombie-heal
-    # paths could both pass the ownership SELECT + status check, both reach
-    # this point, and both XADD a 'cancelled'+'zombie_healed' sentinel —
-    # not user-visible (consumer breaks on first), but a duplicate sentinel
-    # is still a code smell and could cause flaky tests with tight
-    # assertion counts. Lock TTL=60s matches the EXPIRE bucket below.
-    # SET NX EX is a single atomic Redis op; its own try/except per D-062-13.
-    sentinel_lock_acquired = False
-    try:
-        sentinel_lock_acquired = bool(
-            await redis.set(f"run:{run_id}:cancel_lock", "1", nx=True, ex=60)
-        )
-    except (RedisError, OSError):
-        logger.exception(
-            "Zombie heal cancel_lock SETNX failed for run %s", run_id
-        )
-        # On lock failure, fall through and emit the sentinel anyway — the
-        # original best-effort behavior is preferred over silent degradation
-        # if Redis is misbehaving.
-        sentinel_lock_acquired = True
-    if sentinel_lock_acquired:
-        try:
-            if await redis.exists(stream_key):
-                await _emit_terminal(
-                    redis, run_id, "cancelled", reason="zombie_healed"
-                )
-        except (RedisError, OSError):
-            logger.exception(
-                "Zombie heal sentinel XADD failed for run %s", run_id
-            )
-
-    # 3. ZREM both sorted sets — MOVED into the finalize_run_terminal owner at step 1
-    # (Phase 145-03 / D-145-14): the mirror removal now co-writes atomically with the
-    # runs.status='cancelled' UPDATE, so a healed zombie can't leave runs.status
-    # terminal while runs:active still lists it. No standalone removal remains here.
-
-    # 4. EXPIRE 60s (failed/cancelled bucket per D-061-04). Lets attached
-    # consumers drain the buffer before it disappears.
-    try:
-        await redis.expire(stream_key, 60)
-    except (RedisError, OSError):
-        logger.exception(
-            "Zombie heal EXPIRE failed for run %s", run_id
-        )
-
-    # 5. Always 204 — Postgres UPDATE is the source-of-truth cancel record;
-    # Redis ops are best-effort (D-062-13).
+    # Always 204 — every sub-path (terminal-noop / task-cancelled / zombie-healed)
+    # returns success; Postgres runs.status is the durable cancel record (D-062-13).
     return Response(status_code=status.HTTP_204_NO_CONTENT)
