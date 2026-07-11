@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T17:28:42.018Z"
+last_updated: "2026-07-11T18:30:00.000Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 18
+  completed_plans: 19
   percent: 8
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 4 of 9 (148-04 complete — governance/operator service layer)
-Status: 148-04 complete — 10/10 service tests GREEN; 146/147 regression 78/78; awaiting next wave plan
+Plan: 5 of 9 (148-05 complete — VIS-01 API enforcement wall)
+Status: 148-05 complete — GET /features effective-map + require_visible gates across 6 governed routers; effective_features 2/2 + carveouts 3/3 GREEN; 146/147 regression 78/78; Run carve-outs (providers/published/starters) + threads.py launch intact; awaiting 148-06 (operator admin endpoints)
 Last activity: 2026-07-11
 
 ### Quick Tasks Completed
@@ -426,6 +426,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 148]: 148-04: governance_service.py cross-user reads (query_platform_audit, list_users_roster) swallow-and-log to [] (best-effort feed); only the CSV over-cap refusal (AuditExportTooLarge, >_CSV_MAX_ROWS=50000) propagates as a deliberate 4xx — never truncates. Every filter a NULL-guarded $N bind (user scope / action_type text[] ANY / half-open [since,until) window); page_size clamped <=100 at the service boundary (SC#4 no-full-tenant-leak).
 - [Phase 148]: 148-04: export CSV returns the COUNT-probe value as the exact filtered count (not len(rows)) — the authoritative set size that gates the cap and 148-06 stamps onto audit.export; belt-and-suspenders LIMIT (==cap) never truncates a validated under-cap set. grant_operator idempotent ON CONFLICT DO UPDATE re-stamps granted_by; revoke_operator refuses self-revoke (409) BEFORE any pool access (Pitfall 7 lockout-proof).
 - [Phase 148]: 148-04: skipped requirements.mark-complete for ADMIN-03 — service layer built + unit-tested (10/10 service tests GREEN) but not yet wired to any router (148-06 endpoints / 148-07 UI); marking now would be false-green. Completes at phase verify-work (mirrors 148-02 substrate posture). Controller-level tests (disable/enable/view_platform_recorded) stay expected-RED, owned by 148-06.
+- [Phase 148]: 148-05 (VIS-01): require_visible attached at ROUTER level for the no-carve-out governed routers (evals.py both routers, skill_tuner.py, skill_test_cases.py, document_governance.py) so EVERY endpoint is gated safe-by-construction (require_operator precedent — a future endpoint cannot forget it); PER-ENDPOINT (decorator dependencies=[]) only on the carve-out routers settings.py (4 model_management gates) + workflows.py (6 workflow_authoring gates), because router-gating them would 403 the Run carve-outs (RESEARCH anti-pattern is scoped to exactly those two files). GET /settings/providers, GET /workflows/published|starters, and the threads.py workflow launch left ungated (Run stays for everyone — D-05); threads.py untouched.
+- [Phase 148]: 148-05: skipped requirements.mark-complete for VIS-01 — the API enforcement WALL is done (GET /features + require_visible gates GREEN) but VIS-01's frontend hide/bounce half (148-07) is unshipped; marking now would be false-green. Completes at phase verify-work (mirrors the 148-02/148-04 substrate posture).
 
 ## Operator Next Steps
 
