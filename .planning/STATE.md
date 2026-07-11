@@ -11,6 +11,7 @@ progress:
   total_plans: 6
   completed_plans: 6
   percent: 4
+stopped_at: Phase 147 context gathered — ready to plan (resume: .planning/phases/147-operator-control-plane/147-CONTEXT.md)
 ---
 
 # Project State
