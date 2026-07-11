@@ -3766,6 +3766,142 @@ export async function exportPlatformAudit(filters: PlatformAuditFilters): Promis
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 148 (ADMIN-03 users roster + VIS-01 feature visibility) — the Users &
+// Access write layer (068-A roster · graded action guards · 069-A audience rows).
+//
+// SAME security posture as every /admin call above: these decide RENDERING + fire
+// the SERVER-enforced writes. The router `require_operator` gate (146) is the sole
+// authority — a non-operator gets a byte-identical 404. The self-guards the roster
+// UI shows (disable/remove-operator on your own row) are COURTESY only; the server
+// refuses a self-target with 409 (148-06) — that is the real lockout-proof wall.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One roster row from `GET /admin/users` (148-06 → `list_users_roster`, one join).
+ *  Honest last-active: `last_sign_in_at` NULL means the user has NEVER signed in (the
+ *  UI renders "never signed in" italic — never fabricated). `banned_until` in the
+ *  FUTURE means the account is disabled (GoTrue ban) → the Disabled status chip.
+ *  `is_operator` drives the ⛨ role chip; `doc_count`/`chat_count` are the identity sub. */
+export interface UserRosterRow {
+  id: string
+  email: string | null
+  created_at: string
+  last_sign_in_at: string | null
+  banned_until: string | null
+  is_operator: boolean
+  doc_count: number
+  chat_count: number
+}
+
+/** One server page of the users roster. The backend returns newest-active-first
+ *  (`ORDER BY last_sign_in_at DESC NULLS LAST`); the client only filters/searches
+ *  the loaded page — never an unbounded client-side fetch. */
+export interface UserRosterPage {
+  users: UserRosterRow[]
+  page: number
+  page_size: number
+}
+
+// NOTE: the governed-feature key union `GovernedFeature` is already defined once near
+// the top of this file (the `GET /features` effective-map keys). It IS the backend
+// `_VISIBILITY_FEATURES` allowlist — reused here as the `setFeatureVisibility` key type
+// (a value outside it is rejected 400 server-side before any write). Do NOT redeclare it.
+
+/** The audience an advanced feature is visible to. An ENUM, **NEVER a boolean** —
+ *  the SEED-115 extensible-audience forward-compat contract: the two-position control
+ *  is the degenerate two-audience case of a value designed to grow into an audience
+ *  picker (IdP groups / departments at v3.4). `everyone` = all end users see it;
+ *  `operators` = operators only (end users are refused server-side, not just hidden). */
+export type FeatureAudience = "everyone" | "operators"
+
+/** Read the users roster (`GET /admin/users`, 148-06). Plain authed GET — the router
+ *  gate returns 404 to non-operators; this cross-user read is floor-EXEMPT (the `/runs`
+ *  poll precedent, D-07). 1-based pagination; the server clamps `pageSize` ≤ 100. The
+ *  backend returns an envelope `{users, page, page_size}` — unwrap defensively (CR-01). */
+export async function getUsersRoster(page = 1, pageSize = 50): Promise<UserRosterPage> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    page_size: String(pageSize),
+  })
+  const res = await fetch(`${API_BASE}/admin/users?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the users roster.", res.status)
+  const body = (await res.json()) as Partial<UserRosterPage>
+  return {
+    users: body.users ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+  }
+}
+
+/** Disable a user (`POST /admin/users/{id}/disable`, 148-06). Server-enforced: GoTrue
+ *  ban + in-flight run cancel + a recorded `user.disable` row. A self-target is refused
+ *  409 BEFORE any mutation (lockout-proof — the UI self-guard is only courtesy). The
+ *  user's documents/chats/settings are KEPT; re-enable restores access. */
+export async function disableUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/disable`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to disable the user.", res.status)
+}
+
+/** Re-enable a user (`POST /admin/users/{id}/enable`, 148-06). Restorative + direct:
+ *  lifts the GoTrue ban and records a `user.enable` row. */
+export async function enableUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/enable`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to re-enable the user.", res.status)
+}
+
+/** Grant operator access (`POST /admin/users/{id}/operator`, 148-06 / D-01). The server
+ *  INSERTs the membership populating `granted_by` (mig 095 provenance), idempotently, and
+ *  records `operator.grant`. Blast radius: the grantee can see every user's activity + kill
+ *  anyone's runs — the amber roster sheet names it before firing. */
+export async function grantOperator(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/operator`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to grant operator access.", res.status)
+}
+
+/** Revoke operator access (`DELETE /admin/users/{id}/operator`, 148-06). The person keeps
+ *  their normal account (only the membership row is removed); past operator actions stay in
+ *  the trail forever. A self-revoke is refused 409 server-side BEFORE any delete. */
+export async function revokeOperator(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/operator`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to revoke operator access.", res.status)
+}
+
+/** Set a governed feature's audience (`PUT /admin/visibility`, 148-06 / VIS-01). The body
+ *  is `{feature, audience}` where `audience` is an ENUM VALUE (`"everyone"`|`"operators"`),
+ *  **never a boolean** — the extensible-audience forward-compat contract (SEED-115). The
+ *  server allowlist-validates both (400 on a bad value BEFORE any write), atomically JSONB-
+ *  merges the single record (no lost-update clobber), and records `visibility.set`. The
+ *  audience flip propagates within the ~30s per-worker TTL ("on their next call"). */
+export async function setFeatureVisibility(
+  feature: GovernedFeature,
+  audience: FeatureAudience,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ feature, audience }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Phase 147 (ADMIN-02 + FLAG-01) — Control Plane client contract.
 //
 // The Wave-1 seam: types + client fns every Wave-2/3 admin component consumes
