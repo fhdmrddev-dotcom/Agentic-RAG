@@ -145,6 +145,13 @@ class UserEffectiveSettings(BaseModel):
     # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
     document_management_enabled: bool = True
 
+    # Phase 148 (VIS-01, migration 098) — per-feature audience map. Enum-shaped
+    # records {"audience": "operators"|"everyone"} keyed by feature — NEVER booleans
+    # (SEED-115 forward-compat to roles). app_settings-only JSONB (env_attr=None
+    # readback below). Resolved via feature_audience() with a per-feature cold-read
+    # default (_GOVERNED_FEATURES, D-06); NEVER read directly as a security control.
+    feature_visibility: dict = {}
+
     # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
@@ -498,6 +505,18 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
     providers = _build_providers(row)
     api_key, base_url, model, available, active_provider = _resolve_llm(row, providers)
 
+    # Phase 148 VIS-01 — feature_visibility JSONB. Same double-serialization guard
+    # provider_model_lists uses (the migration runner may json.dumps() before the
+    # JSONB codec, storing a JSON string literal in JSONB). Handle dict AND str.
+    _raw_fv = row.get("feature_visibility") or {}
+    if isinstance(_raw_fv, str):
+        import json as _json
+        try:
+            _raw_fv = _json.loads(_raw_fv)
+        except (ValueError, TypeError):
+            _raw_fv = {}
+    feature_visibility = _raw_fv if isinstance(_raw_fv, dict) else {}
+
     return UserEffectiveSettings(
         llm_api_key=api_key,
         llm_base_url=base_url,
@@ -542,6 +561,9 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
         document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
+
+        # Phase 148 VIS-01 — env_attr=None: app_settings-only JSONB, no env fallback.
+        feature_visibility=feature_visibility,
 
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
@@ -731,6 +753,64 @@ def maintenance_mode() -> bool:
         return load_app_settings().maintenance_mode
     except Exception:  # noqa: BLE001 — defensive: default-OPEN (False) on cold cache / read failure
         return False
+
+
+# ── Phase 148 (VIS-01) — feature-visibility audience resolver + writer ─────────
+# Audience is an ENUM (never a boolean). _GOVERNED_FEATURES is the ONE place the
+# D-06 cold-read polarity lives: deny (operators) for skill_studio + model_management,
+# allow (everyone) for workflow_authoring + governance_health. The DB seed (mig 098)
+# is belt-and-suspenders — a genuine cold-read still resolves to the same polarity.
+
+_GOVERNED_FEATURES: dict[str, str] = {
+    "skill_studio": "operators",
+    "model_management": "operators",
+    "workflow_authoring": "everyone",
+    "governance_health": "everyone",
+}
+
+
+def feature_audience(feature: str) -> str:
+    """Resolve a feature's audience -> 'everyone' | 'operators' (VIS-01).
+
+    Reads the stored enum record from the per-worker 30s TTL settings cache
+    (load_app_settings().feature_visibility). Returns the stored ``audience`` ONLY
+    when it is a recognized enum value; a cold cache / DB blip / missing key /
+    malformed record / unknown feature falls back to the per-feature hardcoded
+    default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
+    returns a boolean, and NEVER raises (mirrors maintenance_mode's no-raise posture).
+    """
+    try:
+        fv = load_app_settings().feature_visibility or {}
+        rec = fv.get(feature) or {}
+        aud = rec.get("audience") if isinstance(rec, dict) else None
+        if aud in ("everyone", "operators"):
+            return aud
+    except Exception:  # noqa: BLE001 — defensive: fall back to the hardcoded default
+        pass
+    return _GOVERNED_FEATURES.get(feature, "operators")
+
+
+async def set_feature_visibility(feature: str, audience: str) -> bool:
+    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01).
+
+    Merges only ``{feature: {"audience": audience}}`` into app_settings.feature_visibility
+    so a concurrent toggle of a DIFFERENT feature can't be clobbered (Pitfall 4 — the
+    lost-update a whole-column ``SET`` would cause). Deliberately does NOT route through
+    save_app_settings (which does a whole-column ``SET``). The caller validates
+    feature/audience against code allowlists before calling — this function still only
+    ever serializes the single validated record (SQLi-safe: asyncpg ``$1`` + JSONB codec).
+    Invalidates the settings cache so the next read reflects the change within the TTL.
+    """
+    from app.dependencies import get_pg_pool
+    pool = await get_pg_pool()
+    await pool.execute(
+        "UPDATE app_settings SET feature_visibility = "
+        "coalesce(feature_visibility, '{}'::jsonb) || $1::jsonb, updated_at = now() "
+        "WHERE id = 'global'",
+        {feature: {"audience": audience}},  # JSONB codec serializes the dict
+    )
+    invalidate_settings_cache()
+    return True
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:
