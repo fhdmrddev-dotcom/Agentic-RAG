@@ -33,7 +33,18 @@ findings:
   warning: 3
   info: 4
   total: 9
-status: issues_found
+resolved:
+  - CR-01  # fixed b0e09841
+  - CR-02  # fixed b0e09841
+  - WR-01  # fixed e5b2bab7
+  - WR-03  # fixed 335970ee
+deferred:
+  - WR-02  # needs a GET visibility read endpoint — documented follow-up
+  - IN-01
+  - IN-02
+  - IN-03
+  - IN-04
+status: partially_resolved
 ---
 
 # Phase 148: Code Review Report
@@ -41,7 +52,9 @@ status: issues_found
 **Reviewed:** 2026-07-12
 **Depth:** standard
 **Files Reviewed:** 24
-**Status:** issues_found
+**Status:** partially_resolved (4 fixed 2026-07-12; WR-02 + IN-01..04 deferred)
+
+> **Resolution (2026-07-12):** CR-01, CR-02, WR-01, WR-03 fixed + verified (test_148 31/31, 146+147+148 109/109, tsc -b at baseline, vite build green) — commits `b0e09841` (CR-01/CR-02: features read throws plain Error + dispatch gated on the exact refusal literal), `e5b2bab7` (WR-01: ban check folded into the `/admin` byte-identical 404, fail-open), `335970ee` (WR-03: migration 098 seed now data-idempotent, existing keys win). WR-02 (needs a GET visibility read endpoint) + the 4 Info items are documented follow-ups — candidates for verify-work gaps or a future polish pass.
 
 ## Summary
 
