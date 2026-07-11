@@ -32,9 +32,10 @@ def test_every_row_has_emit_tier():
 
 def test_force_strict_is_openai_only():
     """Every emit_tier==force_strict row is provider==openai, and there are EXACTLY
-    14 such rows (D-122-04, SC#2). force_strict means 'OpenAI by measurement, not by
-    name' — a token-level strict json_schema guarantee that only OpenAI actually
-    honors (DeepSeek's strict is inert without a /beta base_url we never set)."""
+    17 such rows (D-122-04, SC#2; 14 at Phase 122 + gpt-5.6 Sol/Terra/Luna added
+    2026-07-11). force_strict means 'OpenAI by measurement, not by name' — a
+    token-level strict json_schema guarantee that only OpenAI actually honors
+    (DeepSeek's strict is inert without a /beta base_url we never set)."""
     force_strict_ids = [
         model_id
         for model_id, cap in MODEL_CAPABILITIES.items()
@@ -44,8 +45,8 @@ def test_force_strict_is_openai_only():
         assert MODEL_CAPABILITIES[model_id].get("provider") == "openai", (
             f"{model_id} is force_strict but provider != openai"
         )
-    assert len(force_strict_ids) == 14, (
-        f"expected exactly 14 force_strict rows, found {len(force_strict_ids)}: {force_strict_ids}"
+    assert len(force_strict_ids) == 17, (
+        f"expected exactly 17 force_strict rows, found {len(force_strict_ids)}: {force_strict_ids}"
     )
 
 
@@ -95,20 +96,24 @@ def test_glm_zhipu_is_force():
 
 
 def test_emit_tier_counts_match_locked_migration():
-    """The 55-row migration mapping is exactly 14 force_strict / 41 force / 5 coerce
-    (122-PATTERNS.md table: 14 OpenAI force_strict; 2 deepseek + 34 other = 36...
-    no — 14 + 2 + 34 = 50 forced; the 2 deepseek-force + 34 other-force = 36 force,
-    plus 5 coerce). Lock the totals so a future row-add can't silently skew the split."""
+    """The registry split is exactly 17 force_strict / 39 force / 5 coerce = 61 rows.
+    Base (Phase 122, 122-PATTERNS.md table): 14 OpenAI force_strict; 36 force; 5
+    coerce = 55. The ``force`` count then grew 36 -> 39 as post-122 non-OpenAI
+    flagships landed (claude-sonnet-5/opus-4-8, gemini-3.x, glm-5 family, MiniMax-M3),
+    which this tripwire was not updated to reflect. Delta 2026-07-11: gpt-5.6
+    Sol/Terra/Luna add 3 OpenAI force_strict rows (14 -> 17). Totals reconciled to
+    current reality so the tripwire can catch the NEXT skew."""
     counts = {tier: 0 for tier in _VALID_TIERS}
     for cap in MODEL_CAPABILITIES.values():
         tier = cap.get("emit_tier")
         if tier in counts:
             counts[tier] += 1
-    # 14 OpenAI force_strict; 2 deepseek (demoted) + 34 other forced = 36 force; 5 coerce.
-    assert counts["force_strict"] == 14, counts
-    assert counts["force"] == 36, counts
+    # 17 OpenAI force_strict (14 base + gpt-5.6 Sol/Terra/Luna); 2 deepseek (demoted)
+    # + 37 other forced = 39 force; 5 coerce.
+    assert counts["force_strict"] == 17, counts
+    assert counts["force"] == 39, counts
     assert counts["coerce"] == 5, counts
-    assert sum(counts.values()) == 55, counts
+    assert sum(counts.values()) == 61, counts
 
 
 def test_emit_tier_registry_miss_defaults_coerce():

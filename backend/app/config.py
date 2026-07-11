@@ -79,6 +79,9 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gpt-5.4-nano":                         200_000,  # actual 400K — 200K practical cap
     "gpt-5.5":                              400_000,  # actual 1M — 400K practical cap
     "gpt-5.5-pro":                          400_000,  # actual 1M — 400K practical cap (mirrors gpt-5.5; live /models 2026-06-07, 096 D-05 curation)
+    "gpt-5.6-sol":                          400_000,  # flagship — 400K practical cap (mirrors gpt-5.5; docs 2026-07-11, conservative pending GA spec)
+    "gpt-5.6-terra":                        400_000,  # balanced everyday — 400K practical cap (mirrors gpt-5.5; docs 2026-07-11)
+    "gpt-5.6-luna":                         200_000,  # lightweight/fast — 200K conservative cap pending published spec (docs 2026-07-11)
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-8":                      200_000,  # actual 1M — 200K practical cap (mirrors opus-4-7; live /models 2026-06-07, 096 D-05 curation)
     "claude-opus-4-7":                      200_000,  # actual 1M — 200K practical cap
@@ -248,6 +251,14 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # representative-class
     "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # 300s -> 600s flagship tier (Open Q4 resolved, operator-approved 2026-06-07)
     "gpt-5.5-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
+    # GPT-5.6 family (Sol/Terra/Luna) — durable capability tiers, previewed 2026-07-09
+    # (openai.com/index/previewing-gpt-5-6-sol). Sol=flagship (only tier unlocking max
+    # reasoning effort + ultra mode); Terra=balanced everyday; Luna=lightweight/fastest.
+    # Same OpenAI TIER-FORCE + verified strict json_schema as the rest of the gpt-5 line.
+    # Re-verify ids + caps against live /models (scripts/curate_models.py) once GA.
+    "gpt-5.6-sol":   {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
+    "gpt-5.6-terra": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
+    "gpt-5.6-luna":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
     "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},
     # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use
