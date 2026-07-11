@@ -134,11 +134,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 147-03-PLAN.md — Operator Kill: factor cancel_run zombie-heal into a shared helper + POST /admin/runs/{id}/kill (victim-only audit) + PUT /admin/flags [ADMIN-02, FLAG-01]
-- [ ] 147-04-PLAN.md — Two-layer fail-closed capability kill-switches (hide + refuse + proposer guard) + D-05 workflow-launch block [FLAG-01]
-- [ ] 147-05-PLAN.md — Maintenance write-block middleware + off-switch allowlist + public /health flag [FLAG-01]
-- [ ] 147-07-PLAN.md — HealthSignals dependency dots + ActiveRunsSection (064-B cards, victim-naming Kill, honest Cancelling->Cancelled) [ADMIN-02]
-- [ ] 147-08-PLAN.md — CapabilityGrid (065-A armed-OFF 2x2) + MaintenancePanel (amber arm-to-confirm) [FLAG-01]
+- [x] 147-03-PLAN.md — Operator Kill: factor cancel_run zombie-heal into a shared helper + POST /admin/runs/{id}/kill (victim-only audit) + PUT /admin/flags [ADMIN-02, FLAG-01]
+- [x] 147-04-PLAN.md — Two-layer fail-closed capability kill-switches (hide + refuse + proposer guard) + D-05 workflow-launch block [FLAG-01]
+- [x] 147-05-PLAN.md — Maintenance write-block middleware + off-switch allowlist + public /health flag [FLAG-01]
+- [x] 147-07-PLAN.md — HealthSignals dependency dots + ActiveRunsSection (064-B cards, victim-naming Kill, honest Cancelling->Cancelled) [ADMIN-02]
+- [x] 147-08-PLAN.md — CapabilityGrid (065-A armed-OFF 2x2) + MaintenancePanel (amber arm-to-confirm) [FLAG-01]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
