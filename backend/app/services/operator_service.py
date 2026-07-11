@@ -20,6 +20,8 @@ this module never triggers a partial-import of ``app.dependencies``.
 """
 import logging
 
+from fastapi import HTTPException
+
 from app.config import settings
 from app.utils.db import aexec
 
@@ -163,3 +165,47 @@ async def seed_operators_from_env() -> None:
             "VALUES ($1, NULL, 'env-bootstrap') ON CONFLICT (user_id) DO NOTHING",
             r["id"],
         )
+
+
+# ── Runtime grant / revoke (Phase 148 — ADMIN-03 / D-01) ──────────────────────
+
+async def grant_operator(target_id: str, acting_operator_id: str) -> None:
+    """Grant operator access to ``target_id``, recording ``granted_by`` = the acting operator.
+
+    Mirrors ``seed_operators_from_env``'s INSERT shape but swaps the env-bootstrap provenance
+    (``NULL, 'env-bootstrap'``) for the runtime provenance (``$2`` acting operator,
+    ``'granted via roster'``) and adds ``ON CONFLICT (user_id) DO UPDATE SET granted_by =
+    EXCLUDED.granted_by`` so it is idempotent AND re-stamps ``granted_by`` on a re-grant (D-01,
+    mig 095 provenance). Parameterized (``$1``/``$2``) — never f-string SQL.
+    """
+    from app.dependencies import get_pg_pool
+
+    pool = await get_pg_pool()
+    await pool.execute(
+        "INSERT INTO operator_users (user_id, granted_by, note) "
+        "VALUES ($1, $2, 'granted via roster') "
+        "ON CONFLICT (user_id) DO UPDATE SET granted_by = EXCLUDED.granted_by",
+        target_id,
+        acting_operator_id,
+    )
+
+
+async def revoke_operator(target_id: str, acting_operator_id: str) -> None:
+    """Revoke operator access from ``target_id`` — REFUSING a self-revoke BEFORE any DELETE.
+
+    Pitfall 7 (self-lockout): the server is the real wall, not the UI tooltip. If ``target_id``
+    is the acting operator's own id, raise ``HTTPException(409)`` FIRST — before touching the
+    pool — so no mutation can occur. Past ``operator_audit_log`` rows are UNTOUCHED (its
+    ``operator_user_id`` is a plain uuid with no FK — mig 095); revocation only removes the
+    live membership row.
+    """
+    if target_id == acting_operator_id:
+        raise HTTPException(
+            status_code=409,
+            detail="You cannot remove your own operator access.",
+        )
+
+    from app.dependencies import get_pg_pool
+
+    pool = await get_pg_pool()
+    await pool.execute("DELETE FROM operator_users WHERE user_id = $1", target_id)
