@@ -42,23 +42,22 @@ router = APIRouter(
 
 
 @router.get("/backpressure")
-async def get_backpressure(
-    request: Request,
-    _floor: None = Depends(operator_audit_floor),
-):
-    """Return worker backpressure metrics for the ops dashboard.
+async def get_backpressure():
+    """Return worker backpressure metrics + dependency-health for the ops dashboard.
 
     D-078-06: four signals — anyio_threadpool_depth, redis_active_runs,
     postgres_pool_in_use, per_worker_run_count.
-    D-078-08: JSON shape is additive-only — consumers can add fields
-    (uptime_seconds, sandbox_active_sessions, memory_rss_mb) without breaking.
+    D-078-08: JSON shape is additive-only — Phase 147 (ADMIN-02) APPENDS a top-level
+    ``dependencies`` block (redis / supabase / sandbox reachability + latency + the
+    3-state sandbox) WITHOUT touching the four original keys.
 
-    Phase 146: gated by the router-level require_operator; the audit floor records
-    this view under the plain label "Viewed system health" (action "health.view").
+    Phase 147 D-07: this endpoint is now floor-EXEMPT (the ``operator_audit_floor``
+    dependency + the audit_label/action lines are REMOVED). The Control Plane
+    auto-polls it every ~10s while open; recording every poll would spam the ledger
+    with non-actions. The ONE deliberate "Viewed system health" ledger row is written
+    by ``POST /admin/control-plane/record`` on a manual refresh instead. The
+    ``GET /admin/me`` no-floor probe is the exempt precedent.
     """
-    request.state.audit_label = "Viewed system health"
-    request.state.audit_action = "health.view"
-
     # 1. AnyIO thread-pool depth
     limiter = anyio.to_thread.current_default_thread_limiter()
     anyio_borrowed = limiter.borrowed_tokens
@@ -92,6 +91,11 @@ async def get_backpressure(
     except ImportError:
         per_worker_run_count = 0
 
+    # 5. Dependency-health probes (Phase 147 ADMIN-02) — ADDITIVE, concurrent,
+    # best-effort (each degrades to down/off; never raises out of the endpoint).
+    from app.services.health_probe import probe_dependencies
+    dependencies = await probe_dependencies()
+
     return {
         "anyio_threadpool_depth": {
             "borrowed": anyio_borrowed,
@@ -100,6 +104,7 @@ async def get_backpressure(
         "redis_active_runs": redis_active_runs,
         "postgres_pool_in_use": pg_in_use,
         "per_worker_run_count": per_worker_run_count,
+        "dependencies": dependencies,
     }
 
 
