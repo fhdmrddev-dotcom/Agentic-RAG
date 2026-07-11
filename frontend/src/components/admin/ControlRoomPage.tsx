@@ -40,6 +40,7 @@ import {
   getAdminActiveRuns,
   getBackpressure,
   getOperatorAudit,
+  getPlatformAudit,
   getSettings,
   killRun,
   recordControlPlaneEvent,
@@ -49,6 +50,8 @@ import {
   type FullAppSettings,
   type OperatorAuditRow,
   type OperatorIdentity,
+  type PlatformAuditFilters,
+  type PlatformAuditPage,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { OperatorBand } from "./OperatorBand"
@@ -56,7 +59,7 @@ import { HealthSignals } from "./HealthSignals"
 import { TechnicalNamesToggle } from "./TechnicalNamesToggle"
 import { RecentActionsCard } from "./RecentActionsCard"
 import { LockedTab } from "./LockedTab"
-import { AuditTab } from "./AuditTab"
+import { AuditTab, type AuditSource } from "./AuditTab"
 import { ActiveRunsSection } from "./ActiveRunsSection"
 import { CapabilityGrid, type CapabilityKey } from "./CapabilityGrid"
 import { MaintenancePanel } from "./MaintenancePanel"
@@ -113,6 +116,9 @@ const TABS: readonly TabDef[] = [
 // The Audit tab holds the full history; the Control Plane shows a small preview.
 const AUDIT_LIMIT = 200
 const ACTIVITY_PREVIEW = 6
+// Platform-activity browse page size (067-A). The server clamps to ≤100; 50 keeps the
+// recorded cross-user read (audit.view_platform) modest — this is a monitor, not a firehose.
+const PLATFORM_PAGE_SIZE = 50
 // Silent auto-poll cadence for the read-only live data (D-07). Generous floor —
 // the surface is a monitor, not a firehose; polls are floor-exempt (plan 02).
 const POLL_INTERVAL_MS = 10_000
@@ -153,8 +159,15 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [runs, setRuns] = useState<ActiveRun[] | null>(null)
   const [settings, setSettings] = useState<FullAppSettings | null>(null)
   const [auditRows, setAuditRows] = useState<OperatorAuditRow[]>([])
+  // 067-A: the Audit tab is one browser over TWO ledgers. The operator source is the
+  // `auditRows` feed above (this operator's own actions). The platform source is the
+  // cross-user `audit_log` browse — server-paginated, fetched here (the shell owns the
+  // fetch + the alive.current guard; AuditTab owns the filter state — 148-PATTERNS).
+  const [auditSource, setAuditSource] = useState<AuditSource>("operator")
+  const [platformResult, setPlatformResult] = useState<PlatformAuditPage | null>(null)
+  const [platformLoading, setPlatformLoading] = useState(false)
   // This shell owns the two-audience toggle state (LANG-01); it threads
-  // showTechnical down to HealthSignals + CapabilityGrid.
+  // showTechnical down to HealthSignals + CapabilityGrid + the Audit tab.
   const [showTechnical, setShowTechnical] = useState(false)
   // Prop-controlled recording FLASH for the band (062-A marker beat); pulsed after
   // a manual refresh records the operator's own "refresh" row.
@@ -200,6 +213,23 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       if (alive.current) setAuditRows(rows)
     } catch {
       /* keep the last-known ledger */
+    }
+  }, [])
+
+  // ── Platform-activity browse (067-A source #2). AuditTab owns the filter state and
+  //    calls this with the resolved filters + page whenever they change; the shell owns
+  //    the guarded fetch (alive.current) + honest-degrade .catch (keeps the last-known
+  //    page on a blip). Every call RECORDS `audit.view_platform` server-side — a
+  //    cross-user read is never silent (SC#4). ──
+  const queryPlatform = useCallback(async (filters: PlatformAuditFilters, page: number) => {
+    if (alive.current) setPlatformLoading(true)
+    try {
+      const res = await getPlatformAudit(filters, page, PLATFORM_PAGE_SIZE)
+      if (alive.current) setPlatformResult(res)
+    } catch {
+      /* keep the last-known platform page (honest degrade, never a crash) */
+    } finally {
+      if (alive.current) setPlatformLoading(false)
     }
   }, [])
 
@@ -466,7 +496,16 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             </div>
           </>
         ) : activeTab === "audit" ? (
-          <AuditTab rows={auditRows} />
+          <AuditTab
+            source={auditSource}
+            onSourceChange={setAuditSource}
+            operatorRows={auditRows}
+            platformResult={platformResult}
+            platformLoading={platformLoading}
+            onQueryPlatform={queryPlatform}
+            showTechnical={showTechnical}
+            onToggleTechnical={() => setShowTechnical((v) => !v)}
+          />
         ) : (
           <LockedTab title={active.label} description={active.lockedDescription} />
         )}

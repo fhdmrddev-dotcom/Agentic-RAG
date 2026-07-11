@@ -3648,6 +3648,124 @@ export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 148 (ADMIN-03 / 067-A) — the platform-audit browser (BOTH-ledger client).
+//
+// The operator ledger above is your OWN governance actions (operator_audit_log).
+// This section adds the SECOND source of the 067-A one-browser-two-sources surface:
+// the cross-user PLATFORM `audit_log` (every user's real activity — the 19-action
+// vocabulary of migs 030/071). These are the SC#4 no-RLS-backstop cross-user READS:
+// every `GET /admin/platform-audit` call records `audit.view_platform` server-side
+// (viewing user activity is ITSELF in the ledger — never silent), and a successful
+// export records `audit.export` naming the exact count. Query/scope/cap safety is
+// entirely server-side (148-04/06 — parameterized binds, page_size ≤ 100,
+// COUNT-first refuse-over-50000). The client only renders + passes filters; it never
+// does an unbounded client-side fetch. RENDER-ONLY (Pitfall 13): every /admin call
+// is independently 404-gated server-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The shared filter shape for the platform-audit browse + CSV export (067-A). A
+ *  NULL/absent `userId` is the deliberate ALL-users read; a value scopes to one user.
+ *  `actionTypes` maps to the repeatable `action_type` query param (text[] ANY);
+ *  `since`/`until` are ISO timestamps forming a half-open `[since, until)` window. */
+export interface PlatformAuditFilters {
+  userId?: string | null
+  actionTypes?: string[]
+  since?: string | null
+  until?: string | null
+}
+
+/** One cross-user `audit_log` row from `GET /admin/platform-audit` (148-06). Unlike
+ *  the operator ledger this is the RAW platform vocabulary — `action_type` is a code
+ *  (e.g. `document.upload`) the UI maps to a plain-first label + group. `user_id` is
+ *  the acting user (clickable → filter-to-them); no email is joined (metadata only). */
+export interface PlatformAuditRow {
+  id: string
+  user_id: string | null
+  action_type: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+/** One server page of the platform-audit browse. `has_more` drives the pager Next —
+ *  the browse endpoint is COUNT-free by design (no full-tenant total leak, SC#4). */
+export interface PlatformAuditPage {
+  entries: PlatformAuditRow[]
+  page: number
+  page_size: number
+  has_more: boolean
+}
+
+/** Shared query-string builder for the two platform-audit calls (browse + export) so
+ *  the export set is EXACTLY the browsed/filtered set (067-A CSV honesty). */
+function platformAuditParams(filters: PlatformAuditFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.userId) params.set("user_id", filters.userId)
+  for (const at of filters.actionTypes ?? []) params.append("action_type", at)
+  if (filters.since) params.set("since", filters.since)
+  if (filters.until) params.set("until", filters.until)
+  return params
+}
+
+/** Browse the cross-user platform `audit_log` (`GET /admin/platform-audit`, 148-06).
+ *  A RECORDED read — every call stamps `audit.view_platform` server-side (SC#4: viewing
+ *  user activity is itself in the ledger). Plain authed GET; the router gate returns a
+ *  byte-identical 404 to non-operators. Pagination is 1-based; the server clamps
+ *  `pageSize` ≤ 100 (no full-tenant leak). The backend returns an envelope
+ *  `{entries, page, page_size, has_more}` — unwrap defensively (CR-01 precedent). */
+export async function getPlatformAudit(
+  filters: PlatformAuditFilters,
+  page = 1,
+  pageSize = 50,
+): Promise<PlatformAuditPage> {
+  const headers = await getAuthHeaders()
+  const params = platformAuditParams(filters)
+  params.set("page", String(Math.max(1, page)))
+  params.set("page_size", String(pageSize))
+  const res = await fetch(`${API_BASE}/admin/platform-audit?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load platform activity.", res.status)
+  const body = (await res.json()) as Partial<PlatformAuditPage>
+  return {
+    entries: body.entries ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    has_more: body.has_more ?? false,
+  }
+}
+
+/** Export EXACTLY the filtered platform `audit_log` set as CSV (`GET
+ *  /admin/platform-audit/export`, 148-06) and trigger a browser download. On SUCCESS the
+ *  server records ONE `audit.export` row naming the exact count (the ✎ receipt lands in
+ *  the OPERATOR ledger on the next read). On an over-cap set the server REFUSES with 413
+ *  (never a partial download) — surfaced here as an `ApiError(413)` so the caller shows
+ *  "narrow the filter" instead of downloading a truncated file. Mirrors `exportAuditLogs`'s
+ *  blob-download idiom. NOTE: /admin never returns 403, so this ApiError cannot trip the
+ *  VIS-01 feature-forbidden bounce (that is uniquely a `require_visible` 403). */
+export async function exportPlatformAudit(filters: PlatformAuditFilters): Promise<void> {
+  const token = await getAuthToken()
+  const params = platformAuditParams(filters)
+  const res = await fetch(`${API_BASE}/admin/platform-audit/export?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 413
+        ? "Too many rows — narrow the filter, then export again."
+        : "Failed to export platform activity.",
+      res.status,
+    )
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "platform-audit.csv"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Phase 147 (ADMIN-02 + FLAG-01) — Control Plane client contract.
 //
 // The Wave-1 seam: types + client fns every Wave-2/3 admin component consumes
