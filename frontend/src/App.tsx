@@ -41,10 +41,13 @@ function App() {
   // callers land in Studio · Triggering — no standalone Tuner surface remains.
   const handleTuneSkill = (skillId: string) => handleOpenStudio(skillId, "triggering")
 
-  // Phase 146 (ADMIN-01 / D-07): one probe per app mount. isOperator gates the
-  // shield (render-only); identity feeds the Control Room band. A non-operator's
-  // probe yields null → isOperator false → the nav stays byte-identical to today.
-  const { isOperator, identity: operatorIdentity } = useOperatorProbe()
+  // Phase 146 (ADMIN-01 / D-07): one probe per authenticated session, keyed to
+  // the signed-in user id (WR-01 — NOT App mount). isOperator gates the shield
+  // (render-only); identity feeds the Control Room band. Keying to user?.id
+  // re-probes after a fresh SPA sign-in and clears operator state on sign-out /
+  // user switch. A non-operator's probe yields null → isOperator false → the nav
+  // stays byte-identical to today.
+  const { isOperator, identity: operatorIdentity } = useOperatorProbe(user?.id ?? null)
 
   if (loading) {
     return (
