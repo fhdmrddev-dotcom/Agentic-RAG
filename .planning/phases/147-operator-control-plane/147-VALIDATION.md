@@ -45,7 +45,7 @@ created: 2026-07-11
 | 147-01-01 | 01 | 1 | FLAG-01 | T-147-01 / T-147-02 / T-147-COLD | last-known-good on blip; D-Q4 cold polarity; SQLi-safe column allowlist | unit | `cd backend && venv/Scripts/python -m pytest tests/test_147_flag_failure_semantics.py -x` | ❌ W0 | ⬜ pending |
 | 147-01-02 | 01 | 1 | FLAG-01 | — | migration applied to live DB; schema regen | manual | operator SQL-editor apply + `bash scripts/regenerate-full-schema.sh` | N/A | ⬜ pending |
 | 147-02-01 | 02 | 1 | ADMIN-02 | — | additive-only /backpressure; sandbox off≠down; poll floor-exempt | unit | `cd backend && venv/Scripts/python -m pytest tests/test_147_health_probe.py -x` | ❌ W0 | ⬜ pending |
-| 147-02-02 | 02 | 1 | ADMIN-02 | T-147-03 / T-147-04 / T-147-05 / T-147-13 | cross-user list gated; 404 non-discoverable; no free-text audit action; tuner no-Kill | integration | `cd backend && venv/Scripts/python -m pytest tests/test_147_active_runs.py -x` | ❌ W0 | ⬜ pending |
+| 147-02-02 | 02 | 1 | ADMIN-02 | T-147-03 / T-147-04 / T-147-05 / T-147-13 | cross-user list gated; 404 non-discoverable; no free-text audit action; tuner no-Kill; server-derived not_responding (stream-age oracle) | integration | `cd backend && venv/Scripts/python -m pytest tests/test_147_active_runs.py -x` | ❌ W0 | ⬜ pending |
 | 147-06-01 | 06 | 1 | ADMIN-02 | — | client contract types | typecheck | `cd frontend && npx tsc --noEmit -p tsconfig.json` | ✅ (extend api.ts) | ⬜ pending |
 | 147-06-02 | 06 | 1 | ADMIN-02 | T-147-07 | victim sees exactly a self-cancel (D-03) across reload | unit (Vitest) | `cd frontend && npm run test -- MessageItem` | ⚠️ extend | ⬜ pending |
 | 147-03-01 | 03 | 2 | ADMIN-02 | T-147-08 | shared cancel discipline; owner path still 404s cross-user | integration | `cd backend && venv/Scripts/python -m pytest tests/test_062_cancel_run.py -x` | ⚠️ extend | ⬜ pending |
@@ -72,7 +72,7 @@ New test files each code task creates before/with its implementation (TDD mode i
 
 - [ ] `backend/tests/test_147_flag_failure_semantics.py` — last-known-good / D-Q4 cold-cache polarity (147-01-01)
 - [ ] `backend/tests/test_147_health_probe.py` — Redis/Supabase/sandbox probes (up/down/off + latency); backpressure additive + floor-exempt (147-02-01)
-- [ ] `backend/tests/test_147_active_runs.py` — cross-user list + D-Q1 kind derivation + tuner-no-Kill + /record events (147-02-02)
+- [ ] `backend/tests/test_147_active_runs.py` — cross-user list + D-Q1 kind derivation + tuner-no-Kill + /record events + not_responding stream-age derivation (147-02-02)
 - [ ] `backend/tests/test_147_operator_kill.py` — operator Kill (shared internals, no ownership, victim-only audit, zombie-heal verb) + PUT /admin/flags allowlist (147-03-02)
 - [ ] `backend/tests/test_147_flag_hide.py` / `backend/tests/test_147_flag_refuse.py` — two-layer fail-closed gate + Deep byte-identical no-op (147-04-01)
 - [ ] `backend/tests/test_147_workflows_flag.py` — D-05 block-new-launches; in-flight + Deep untouched (147-04-02)
@@ -93,7 +93,7 @@ Existing infrastructure (pytest + vitest + tsc) covers all phase requirements �
 |----------|-------------|------------|-------------------|
 | Migration 097 applied to the live local DB | FLAG-01 | Migrations are pasted into the Supabase SQL editor by the operator (CLAUDE.md — never db push/reset) | Plan 01 Task 2 [BLOCKING]: paste 097, confirm 3 columns, run regenerate-full-schema.sh, commit both |
 | Live cross-worker flag propagation ≤ TTL | FLAG-01 | Multi-worker (WORKER_COUNT=2) per-worker cache; a ≤30s skew is expected + honest (Pitfall 5) | Flip a switch, confirm the capability stops for a live chat within the TTL window on both workers |
-| Long-message elapsed + "not responding" tag on the real card | ADMIN-02 | Requires a real ≥50-message / ≥5KB streaming run and a genuinely-stalled stream | SC#10 Axis 4 below (Chrome MCP / operator-driven) |
+| Long-message elapsed + "not responding" tag on the real card | ADMIN-02 | The `not_responding` boolean is unit-tested with mocked stream ages (147-02-02); a REAL ≥50-message / ≥5KB streaming run with a genuinely-stalled stream is live-only | SC#10 Axis 4 below (Chrome MCP / operator-driven) |
 
 ---
 
