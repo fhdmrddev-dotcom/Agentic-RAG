@@ -39,20 +39,29 @@ import { ChevronRight, Lock, RefreshCw } from "lucide-react"
 import {
   getAdminActiveRuns,
   getBackpressure,
+  disableUser,
+  enableUser,
   exportPlatformAudit,
   getOperatorAudit,
   getPlatformAudit,
   getSettings,
+  getUsersRoster,
+  grantOperator,
   killRun,
   recordControlPlaneEvent,
+  revokeOperator,
+  setFeatureVisibility,
   setFlag,
   type AdminActiveRun as ActiveRun,
   type BackpressureSignals,
+  type FeatureAudience,
   type FullAppSettings,
+  type GovernedFeature,
   type OperatorAuditRow,
   type OperatorIdentity,
   type PlatformAuditFilters,
   type PlatformAuditPage,
+  type UserRosterRow,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { OperatorBand } from "./OperatorBand"
@@ -64,6 +73,8 @@ import { AuditTab, type AuditSource } from "./AuditTab"
 import { ActiveRunsSection } from "./ActiveRunsSection"
 import { CapabilityGrid, type CapabilityKey } from "./CapabilityGrid"
 import { MaintenancePanel } from "./MaintenancePanel"
+import { UsersAndAccess } from "./UsersAndAccess"
+import { FeatureVisibility } from "./FeatureVisibility"
 
 interface ControlRoomPageProps {
   /** The signed-in operator identity (from the App-level probe); null while loading. */
@@ -93,12 +104,11 @@ interface TabDef {
 // System Controls moved into the Control Plane body; the other two were renamed.
 const TABS: readonly TabDef[] = [
   { id: "control-plane", label: "Control Plane", locked: false },
-  {
-    id: "users-access",
-    label: "Users & Access",
-    locked: true,
-    lockedDescription: "User management, access control, and impersonation are coming soon.",
-  },
+  // 148-09 (ADMIN-03 / VIS-01): the Users & Access tab UNLOCKS into the 068-A roster
+  // + the 069-A feature-visibility rows. Impersonation ("Sign in as user") is
+  // deliberately NOT built (D-02) — the roster + audit browser + active-runs are the
+  // support surface — so the old "impersonation coming soon" copy is retired.
+  { id: "users-access", label: "Users & Access", locked: false },
   {
     id: "model-registry",
     label: "Model Registry",
@@ -120,6 +130,9 @@ const ACTIVITY_PREVIEW = 6
 // Platform-activity browse page size (067-A). The server clamps to ≤100; 50 keeps the
 // recorded cross-user read (audit.view_platform) modest — this is a monitor, not a firehose.
 const PLATFORM_PAGE_SIZE = 50
+// Users-roster page size (068-A). The server clamps ≤ 100; the roster is a monitor +
+// governance surface, so one modest page keeps the cross-user read light.
+const ROSTER_PAGE_SIZE = 50
 // Silent auto-poll cadence for the read-only live data (D-07). Generous floor —
 // the surface is a monitor, not a firehose; polls are floor-exempt (plan 02).
 const POLL_INTERVAL_MS = 10_000
@@ -154,6 +167,19 @@ const OVERALL_LABEL: Record<OverallHealth, string> = {
   unknown: "Checking…",
 }
 
+// 069-A feature-visibility seed. There is no read endpoint for the persisted audience
+// map in this frontend-only slice (the PUT is the only /admin/visibility route — 148-06),
+// so the rows seed from the DOCUMENTED day-one polarity, which is byte-identical to the
+// backend `_GOVERNED_FEATURES` cold-default AND the mig-098 DB seed. Each successful flip
+// updates this map + is recorded server-side (visibility.set). NEVER a boolean — the enum
+// value is the SEED-115 extensible-audience forward-compat contract.
+const DEFAULT_VISIBILITY: Record<GovernedFeature, FeatureAudience> = {
+  skill_studio: "operators",
+  model_management: "operators",
+  workflow_authoring: "everyone",
+  governance_health: "everyone",
+}
+
 export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [activeTab, setActiveTab] = useState<ControlRoomTab>("control-plane")
   const [signals, setSignals] = useState<BackpressureSignals | null>(null)
@@ -167,6 +193,15 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [auditSource, setAuditSource] = useState<AuditSource>("operator")
   const [platformResult, setPlatformResult] = useState<PlatformAuditPage | null>(null)
   const [platformLoading, setPlatformLoading] = useState(false)
+  // 068-A: the Users & Access roster (cross-user read, floor-exempt). `null` until the
+  // tab is first opened (lazy — no cross-user read on every Control Plane visit); the
+  // shell owns the fetch + the graded-guard writes, UsersAndAccess is a pure leaf.
+  const [rosterRows, setRosterRows] = useState<UserRosterRow[] | null>(null)
+  // 069-A: the current per-feature audience map (enum values, never booleans). Seeded
+  // from the day-one polarity (see DEFAULT_VISIBILITY); each flip updates it + records.
+  const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience>>(
+    DEFAULT_VISIBILITY,
+  )
   // This shell owns the two-audience toggle state (LANG-01); it threads
   // showTechnical down to HealthSignals + CapabilityGrid + the Audit tab.
   const [showTechnical, setShowTechnical] = useState(false)
@@ -214,6 +249,17 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       if (alive.current) setAuditRows(rows)
     } catch {
       /* keep the last-known ledger */
+    }
+  }, [])
+  // 068-A roster fetch — mirrors fetchAudit (alive.current guard + honest-degrade
+  // .catch). Fetched lazily on tab-open and re-fetched after every roster write so the
+  // status/role chips reflect the new persisted truth (no optimistic chip flip).
+  const fetchRoster = useCallback(async () => {
+    try {
+      const page = await getUsersRoster(1, ROSTER_PAGE_SIZE)
+      if (alive.current) setRosterRows(page.users)
+    } catch {
+      /* keep the last-known roster (honest degrade, never a crash) */
     }
   }, [])
 
@@ -309,6 +355,15 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     }
   }, [fetchSignals, fetchRuns, fetchSettings, fetchAudit])
 
+  // ── Lazy roster load (068-A): fetch the users roster the first time the operator
+  //    opens the Users & Access tab, and refresh it on every re-open. This keeps the
+  //    cross-user read OFF the Control Plane landing path (it only fires when the tab
+  //    is actually viewed). The 069-A visibility rows read from seeded shell state
+  //    (no read endpoint in this slice), so they need no fetch here. ──
+  useEffect(() => {
+    if (activeTab === "users-access") void fetchRoster()
+  }, [activeTab, fetchRoster])
+
   // ── The manual ↻ Refresh (D-07): re-fetch AND record the deliberate "refresh"
   //    row, then re-read the ledger so it visibly lands, then pulse the marker.
   //    Distinct from the silent polls above — this is the human "I looked". ──
@@ -353,6 +408,66 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       if (alive.current) void fetchSettings()
     },
     [fetchSettings],
+  )
+
+  // ── The band recording marker (062-A): pulse it after any recorded write so the
+  //    operator sees "this was recorded" reflected in the band, matching the ledger. ──
+  const pulseRecording = useCallback(() => {
+    if (!alive.current) return
+    setRecordingPulse(true)
+    window.setTimeout(() => {
+      if (alive.current) setRecordingPulse(false)
+    }, 1500)
+  }, [])
+
+  // ── 068-A roster writes. Each is SERVER-enforced (148-06); after a success we
+  //    re-fetch the roster so the status/role chips reflect the new truth (no optimistic
+  //    flip — the server is the source of truth) and pulse the band recording marker.
+  //    Errors RE-THROW so the row surfaces its retry affordance. ──
+  const handleDisableUser = useCallback(
+    async (userId: string) => {
+      await disableUser(userId)
+      pulseRecording()
+      if (alive.current) void fetchRoster()
+    },
+    [fetchRoster, pulseRecording],
+  )
+  const handleEnableUser = useCallback(
+    async (userId: string) => {
+      await enableUser(userId)
+      pulseRecording()
+      if (alive.current) void fetchRoster()
+    },
+    [fetchRoster, pulseRecording],
+  )
+  const handleGrantOperator = useCallback(
+    async (userId: string) => {
+      await grantOperator(userId)
+      pulseRecording()
+      if (alive.current) void fetchRoster()
+    },
+    [fetchRoster, pulseRecording],
+  )
+  const handleRevokeOperator = useCallback(
+    async (userId: string) => {
+      await revokeOperator(userId)
+      pulseRecording()
+      if (alive.current) void fetchRoster()
+    },
+    [fetchRoster, pulseRecording],
+  )
+
+  // ── 069-A visibility write. The audience is an ENUM (never a boolean). On success we
+  //    optimistically reflect the new audience in the shell map (the write is recorded
+  //    server-side + propagates within the ~30s TTL) and pulse the band marker. On
+  //    failure we RE-THROW so the card surfaces its retry (and the map stays put). ──
+  const handleSetVisibility = useCallback(
+    async (feature: GovernedFeature, audience: FeatureAudience) => {
+      await setFeatureVisibility(feature, audience)
+      if (alive.current) setVisibility((prev) => ({ ...prev, [feature]: audience }))
+      pulseRecording()
+    },
+    [pulseRecording],
   )
 
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
@@ -521,6 +636,31 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             showTechnical={showTechnical}
             onToggleTechnical={() => setShowTechnical((v) => !v)}
           />
+        ) : activeTab === "users-access" ? (
+          // 068-A roster, then the 069-A feature-visibility rows BELOW it (visibility
+          // governs WHO — it lives with the roster, never next to the kill-switches).
+          <div className="mx-auto max-w-5xl space-y-8 px-6 py-6">
+            <div className="flex items-center">
+              <span className="flex-1" />
+              <TechnicalNamesToggle
+                enabled={showTechnical}
+                onToggle={() => setShowTechnical((v) => !v)}
+              />
+            </div>
+            <UsersAndAccess
+              rows={rosterRows}
+              currentOperatorId={identity?.id ?? null}
+              onDisable={handleDisableUser}
+              onEnable={handleEnableUser}
+              onGrantOperator={handleGrantOperator}
+              onRevokeOperator={handleRevokeOperator}
+            />
+            <FeatureVisibility
+              visibility={visibility}
+              onSetVisibility={handleSetVisibility}
+              showTechnical={showTechnical}
+            />
+          </div>
         ) : (
           <LockedTab title={active.label} description={active.lockedDescription} />
         )}
