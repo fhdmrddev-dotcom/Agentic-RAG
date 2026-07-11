@@ -183,7 +183,25 @@ Plans:
   3. Discovery never auto-enables a capability the provider's `/models` endpoint did not return (propose-only — reproducing the silent no-tools bug is barred).
   4. A non-operator cannot reach the model-write path.
 
-**Plans**: TBD
+**Plans**: 7 plans (3 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 149-01-PLAN.md — Migration 099 (deprecated + llm_model_locked) + [BLOCKING] live apply + full-schema regen + config read-path overlay
+- [ ] 149-02-PLAN.md — model_discovery_service: httpx fan-out over the 8-provider allowlist + propose-only diff (SC#3)
+- [ ] 149-03-PLAN.md — Effective-model + DB-aware max_output_tokens clamp (D-149-15 / BUG-260620-01)
+- [ ] 149-04-PLAN.md — Frontend api.ts registry seams + picker visual polish (logos, grouping, deprecated badge)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 149-05-PLAN.md — GET/PATCH /admin/models (union read + SQLi-safe write) + _build_providers enabled-filter + deprecated_models payload
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 149-06-PLAN.md — Default/locked-disable 409 guard + lock/unlock + POST /admin/models/discover + threads.py enabled-enforce fallback notice
+- [ ] 149-07-PLAN.md — ModelRegistryTab (070-A) + ModelDiscoveryPanel (071-A) + Control Room tab unlock + SC#10 VALIDATION rows
+
 **UI hint**: yes
 
 ### Phase 150: Secrets at Rest
