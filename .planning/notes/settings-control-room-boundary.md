@@ -55,7 +55,26 @@ picks their *own default from the enabled set* in Settings. The registry `enable
 coupling (enabled-in-registry = shows-in-the-user-picker). "Lock" = a policy flag that pins the org
 model and turns off user override. **No per-group greenlist in v3.3** (that's SEED-115 / v3.4).
 
+## ⚠ UPDATE 2026-07-12 — evidence-based sweep + the reframe (F1)
+
+The inventory below was pressure-tested with a two-scout evidence sweep over the REAL Settings page +
+backend config (operator directive: "map everything once, leave nothing behind"). The exhaustive
+item-by-item map now lives in **`.planning/notes/dynamic-control-inventory.md`** (the living master
+table) — read THAT for the full per-knob decision. Key reframe it surfaced:
+
+**F1 — Today's entire Settings page is already global + already operator-gated** (every knob saves to
+the global `app_settings` row, whole page behind `require_visible("model_management")` = operators-only).
+The only truly per-user surfaces are Memory (`user_memory`) + theme. So Settings is NOT split — **it is a
+misplaced operator console**; the Control Room absorbs the global config, Settings shrinks to a genuine
+(mostly NEW) personal sliver, Profile holds identity. Other findings: F2 web_search/sandbox toggles are
+the SAME column as the CR kill-switches (consolidate); F3 the per-user layer needs `user_settings.preferences`
+revived (dead since mig 011); F4 secrets have env schema-drift 150 must reconcile; F5 prompts/chunking/
+cost/scheduler/rate-limiting are dynamic nowhere. **Discovery ≠ full capabilities** (operator-confirmed):
+provider `/models` gives IDs reliably but only Google + OpenRouter return capabilities — hence SC3
+propose-only. Target IA + milestone rollup are in the master doc.
+
 ## THE INVENTORY — every dynamic-control candidate, mapped to the pattern + a milestone
+> Superseded by the exhaustive evidence-based table in `dynamic-control-inventory.md`; kept below as the original first-pass.
 
 ### v3.3 (scoped now)
 - **Models** → Phase 149. Registry + capabilities + discovery = operator; user picks from enabled set;

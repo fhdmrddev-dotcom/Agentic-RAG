@@ -10,9 +10,12 @@ related_memory: [project_admin_panel_plan, project_dynamic_settings_direction, p
 re_open_trigger: "Before or at the start of Phase 149 (Model Registry & Discovery) — the first phase whose scope concretely straddles the Settings↔Control-Room line (a user picking a model vs an operator governing the registry). Resolve the boundary rule before 149 wires a model-management surface, so we don't build the split twice."
 ---
 
-> **RESOLVED 2026-07-12** via `/gsd:explore` (operator-affirmed). Decision + full inventory live in
-> **`.planning/notes/settings-control-room-boundary.md`**, to be promoted to a locked **D-149-NN** at
-> `/gsd:discuss-phase 149`. TL;DR of the ruling:
+> **RESOLVED 2026-07-12** via `/gsd:explore` (operator-affirmed). The boundary RULE lives in
+> **`.planning/notes/settings-control-room-boundary.md`**; the **exhaustive evidence-based item-by-item
+> decision table** (every Settings knob + backend config + gaps + future, from a two-scout code sweep)
+> lives in **`.planning/notes/dynamic-control-inventory.md`**. Both promote to a locked **D-149-NN** at
+> `/gsd:discuss-phase 149`. Key reframe (F1): today's Settings is ALREADY global + operator-gated ⇒ a
+> misplaced Control Room, not a split. TL;DR of the ruling:
 > - **Three surfaces, not two:** Control Room = platform governance (operator) · Settings = user
 >   preferences *within what the operator allows*, privilege-gated · Profile menu (top-right) = identity.
 > - **One pattern for every knob:** operator governs the allowed-set + policy → user picks a preference
