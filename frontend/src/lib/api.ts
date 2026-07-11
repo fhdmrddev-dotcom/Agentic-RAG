@@ -2640,24 +2640,30 @@ export interface GovLowConfidenceItem {
   min_confidence: number
 }
 
+// Phase 148 (VIS-01 / D-04): the three `document-governance` signal reads are
+// governed by `require_visible('governance_health')` (148-05). They throw `ApiError`
+// (carrying `res.status`) — NOT a plain Error — so a mid-session governance_health
+// tighten surfaces the 403 through the D-04 graceful bounce (GovernancePage auto-fetches
+// all three on mount, so a non-operator landing after a tighten bounces home instead of
+// dead-ending). ApiError extends Error, so existing message-only catch sites are unaffected.
 export async function getGovBroken(offset = 0, limit = 20): Promise<PaginatedResponse<GovBrokenItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/broken-relationships?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load broken relationships")
+  if (!res.ok) throw new ApiError("Failed to load broken relationships", res.status)
   return res.json() as Promise<PaginatedResponse<GovBrokenItem>>
 }
 
 export async function getGovUnclassified(offset = 0, limit = 20): Promise<PaginatedResponse<GovUnclassifiedItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/unclassified?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load unclassified documents")
+  if (!res.ok) throw new ApiError("Failed to load unclassified documents", res.status)
   return res.json() as Promise<PaginatedResponse<GovUnclassifiedItem>>
 }
 
 export async function getGovLowConfidence(offset = 0, limit = 20): Promise<PaginatedResponse<GovLowConfidenceItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/low-confidence?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load low-confidence metadata")
+  if (!res.ok) throw new ApiError("Failed to load low-confidence metadata", res.status)
   return res.json() as Promise<PaginatedResponse<GovLowConfidenceItem>>
 }
 
