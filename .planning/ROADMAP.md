@@ -167,7 +167,7 @@ Plans:
 - [x] 148-06-PLAN.md — Operator admin endpoints (platform browse/export, users disable/enable, grant/revoke, visibility set)
 - [x] 148-07-PLAN.md — Frontend VIS-01 enforcement: effective-features hook + nav vanish + graceful 403 bounce
 - [x] 148-08-PLAN.md — 067-A audit browser: source switch + chip filters + pager + recorded CSV
-- [ ] 148-09-PLAN.md — 068-A users roster (victim-naming guards) + 069-A feature-visibility audience rows
+- [x] 148-09-PLAN.md — 068-A users roster (victim-naming guards) + 069-A feature-visibility audience rows
 **Note**: "Sign in as user" impersonation ships only if scoped cheaply (dual-identity audit); otherwise it is deferred to STRETCH with a named re-open trigger.
 **UI hint**: yes
 
@@ -323,7 +323,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 146. Operator Foundation | 6/6 | Complete | 2026-07-11 |
 | 147. Operator Control Plane | 0/? | Not started | - |
-| 148. Governance — Audit, Users & Feature Visibility | 5/9 | In Progress | - |
+| 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 0/? | Not started | - |
 | 150. Secrets at Rest | 0/? | Not started | - |
 | 151. Agent File Tools | 0/? | Not started | - |

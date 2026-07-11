@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T19:32:23.265Z"
+last_updated: "2026-07-11T19:58:42.587Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 24
-  completed_plans: 23
-  percent: 8
+  completed_plans: 24
+  percent: 12
 ---
 
 # Project State
@@ -26,10 +26,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 8 of 9 complete (148-01/02/03/04/05/06/07/08 done; 148-09 open)
-Status: 148-08 (067-A audit browser UI) complete — 148-09 (Users & Access roster + Feature Visibility) next
+Phase: 148 (governance-audit-users-feature-visibility) — ALL PLANS COMPLETE (awaiting verify-work)
+Plan: 9 of 9 complete (148-01/02/03/04/05/06/07/08/09 all done)
+Status: 148-09 (Users & Access roster + Feature Visibility) complete — phase 148's audit + users + visibility UI have all landed. **ADMIN-03 + VIS-01 close at `/gsd:verify-work 148`** (the G-4 lived-experience UAT: disabled user is really out; the map is honest + API is the wall). NEXT: `/gsd:verify-work 148`.
 Last activity: 2026-07-11
+
+**148-09 decisions/notes (2026-07-11):**
+
+- The locked Users & Access tab UNLOCKS into the 068-A instrument roster + the 069-A feature-visibility rows below it (the last 148 plan). `UsersAndAccess.tsx` (new): honest last-active (`never signed in` italic for NULL `last_sign_in_at` — never fabricated), status/amber-operator-role chips, email search, newest-active-first. Graded guards (066): Disable = the 064-B victim-naming sheet (names the user, effect + KEPT + reversible + recorded); Enable = direct/restorative; grant/revoke = amber blast-radius sheets; self-row Disable/Remove-operator = courtesy tooltip (the 148-06 409 is the real wall). `FeatureVisibility.tsx` (new): four cards with a two-position `Everyone | ⛨ Operators only` control that reads/writes an ENUM audience — NEVER a boolean (SEED-115 forward-compat) — amber-never-red, "refused server-side, not just hidden" consequence line + expandable enforcement `<details>`, ✎ `visibility.set` receipt.
+- **D-02 impersonation NOT built** (deliberate) — the roster + audit browser + active-runs are the support surface; the only "impersonation" token in the code is the D-02 comment.
+- **Visibility read seeds from the day-one default** (documented limitation, NOT a stub): no GET for the persisted audience map in this frontend-only slice (PUT is the only `/admin/visibility` route; GET `/settings` filters `feature_visibility` out via `response_model`). `DEFAULT_VISIBILITY` == backend `_GOVERNED_FEATURES` == the mig-098 seed, so it's correct on a fresh deploy; each flip is a REAL recorded write. A persisted NON-default audience shows stale on reload — a future GET (or adding it to the settings response) is the clean fix.
+- **Build gate (memory lesson — real numbers):** `tsc -b` = 30 before AND after (the 148-07 baseline — 21 SEED-056 `__tests__` rot + 9 React-19 types drift); the 4 touched files add ZERO tsc errors. `vite build` GREEN (exit 0). Phase-147 `ControlRoomPage.test.tsx` 6/6 stay green (it never opens the users-access tab → the lazy roster fetch never fires). LESSON: the roster fetch is LAZY on tab-open (keeps the cross-user read off the Control Plane landing path + leaves the 147 test untouched); Task 1 split into an api-seam commit + a shell-wiring commit so each of the 4 commits builds green in dependency order.
+- **ADMIN-03 + VIS-01 NOT marked complete** — mirrors 148-06/07/08 (false-green avoidance); the phase G-4 UAT closes them at verify-work.
 
 **148-08 decisions/notes (2026-07-11):**
 
