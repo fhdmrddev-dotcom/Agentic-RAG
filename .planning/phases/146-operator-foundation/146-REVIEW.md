@@ -36,7 +36,21 @@ findings:
   warning: 4
   info: 9
   total: 15
-status: issues_found
+fixed: 6
+remaining: 9
+status: fixes_applied
+fix_pass:
+  date: 2026-07-11
+  scope: critical_warning
+  fixed: [CR-01, CR-02, WR-01, WR-02, WR-03, WR-04]
+  remaining: info-only (IN-01..IN-09, out of --fix scope)
+  commits:
+    CR-01: 683216f2
+    CR-02: 21990f41
+    WR-01: 36ce6149
+    WR-02: 8e3239ed
+    WR-03: 50d71349
+    WR-04: 145e9b7c
 ---
 
 # Phase 146: Code Review Report
@@ -44,7 +58,21 @@ status: issues_found
 **Reviewed:** 2026-07-11
 **Depth:** standard
 **Files Reviewed:** 28
-**Status:** issues_found
+**Status:** fixes_applied (all 2 Critical + 4 Warning fixed 2026-07-11; 9 Info remain, out of `--fix` scope)
+
+## Fix Pass — 2026-07-11
+
+All Critical and Warning findings were fixed with root-cause changes, each in its own
+atomic commit; the 9 Info findings are out of the `--fix` scope and remain open.
+
+| Finding | Status | Commit | Note |
+|---|---|---|---|
+| CR-01 | ✅ Fixed | `683216f2` | client unwraps `{entries}` envelope + regression test |
+| CR-02 | ✅ Fixed | `21990f41` | read `deps._pg_pool` live; falsifiable non-zero test |
+| WR-01 | ✅ Fixed | `36ce6149` | probe keyed to `userId`; re-probe/clear on session change |
+| WR-02 | ✅ Fixed | `8e3239ed` | `/admin` auto_error=False bearer folds absent/invalid → 404 |
+| WR-03 | ✅ Fixed | `50d71349` | verb + `is_write` floor derived from HTTP method (logic — human-verify on first write endpoint) |
+| WR-04 | ✅ Fixed | `145e9b7c` | conftest `OPERATOR_EMAILS=""` guard — no real-DB seed in unit tests |
 
 ## Summary
 
@@ -63,6 +91,8 @@ Four warnings follow: the probe is keyed to App mount instead of the auth sessio
 ## Critical Issues
 
 ### CR-01: `getOperatorAudit` response-shape mismatch crashes the Control Room for real operators — BLOCKER
+
+**Status:** ✅ Fixed 2026-07-11 — commit `683216f2`. `getOperatorAudit` now unwraps `body.entries ?? []` (mirroring `getAuditLogs`); added `frontend/src/lib/api.operatorAudit.test.ts` pinning the unwrap.
 
 **File:** `frontend/src/lib/api.ts:3564-3570`, `backend/app/api/admin.py:131`, `frontend/src/components/admin/ControlRoomPage.tsx:233,237`
 **Issue:** The backend audit feed returns an envelope:
@@ -97,6 +127,8 @@ The codebase already models this envelope correctly elsewhere (`entries: AuditEn
 
 ### CR-02: `postgres_pool_in_use` is structurally always 0 — stale from-import snapshot of the pool singleton — BLOCKER
 
+**Status:** ✅ Fixed 2026-07-11 — commit `21990f41`. `admin.py` now reads the live `deps._pg_pool` at call time (via `import app.dependencies as deps`) instead of a from-import snapshot; added a falsifiable test that installs a fake pool via the production rebind seam and asserts `postgres_pool_in_use == 7`.
+
 **File:** `backend/app/api/admin.py:24,76-80` (origin: Phase 078; re-authored in this phase's import block)
 **Issue:** `admin.py` does `from app.dependencies import _pg_pool` at module import time, when the singleton is `None`. `get_pg_pool()` later rebinds `app.dependencies._pg_pool` to the real pool, but Python from-imports copy the binding — `app.api.admin._pg_pool` stays `None` forever. So:
 
@@ -122,6 +154,8 @@ if deps._pg_pool is not None:
 
 ### WR-01: Operator probe keyed to App mount, not the auth session — no shield after fresh sign-in; stale operator state across a user switch
 
+**Status:** ✅ Fixed 2026-07-11 — commit `36ce6149`. `useOperatorProbe(userId)` is now keyed to the authenticated user id (App passes `user?.id ?? null`): re-probes on user change, clears operator state on sign-out, one probe per session, fail-closed. Tests cover signed-out no-probe, re-probe on fresh sign-in, and stale-state clear on a same-tab user switch.
+
 **File:** `frontend/src/hooks/useOperatorProbe.ts:35-52`, `frontend/src/App.tsx:47`
 **Issue:** The probe runs exactly once, in a `useEffect(..., [])` at App mount. Two real flows break:
 
@@ -145,11 +179,15 @@ In `App.tsx`: `useOperatorProbe(user?.id ?? null)`. This preserves the one-probe
 
 ### WR-02: Non-discoverability contract does not hold for unauthenticated probes — /admin routes are enumerable without a token
 
+**Status:** ✅ Fixed 2026-07-11 — commit `8e3239ed`. Added a dedicated `_admin_bearer_scheme = HTTPBearer(auto_error=False)` used only by the gate via a new `authenticate_operator_request` dependency that folds absent AND invalid/expired credentials into the same byte-identical 404. The shared `get_current_user` path is untouched. Regression test asserts an unauthenticated `/admin/backpressure` is byte-identical to the unknown-route 404.
+
 **File:** `backend/app/dependencies.py:15` (`bearer_scheme = HTTPBearer()`), `backend/app/dependencies.py:150-166`
 **Issue:** The 404-not-403 contract is enforced only *after* authentication. `HTTPBearer()` defaults to `auto_error=True`, so a request with **no** Authorization header to any real /admin route returns **403 "Not authenticated"**, and a bad token returns **401** — while `/admin/anything-else` returns 404 (routing fails before dependencies run). An anonymous scanner can therefore distinguish existing gated routes (`/admin/me`, `/admin/backpressure`, `/admin/audit` → 403/401) from nonexistent ones (→ 404), defeating the "the surface is non-discoverable" claim made in admin.py's module docstring and the gate test's docstring. The tests only pin the authenticated-non-operator case. This grants no access — but the entire premise of choosing 404 over 403 was that a non-operator "cannot tell an /admin route exists-but-forbidden vs. simply not existing," and today anyone without a JWT can tell.
 **Fix:** if the contract is meant to be absolute, give /admin its own credential handling that folds auth failures into the same 404 — e.g. a `HTTPBearer(auto_error=False)` used only by `require_operator`, raising `_NOT_FOUND` when credentials are absent/invalid — and add a test asserting an unauthenticated `/admin/backpressure` matches the unknown-route response. If the contract is deliberately JWT-scoped, correct the docstrings so the shipped claim matches the shipped behavior.
 
 ### WR-03: Audit-floor fallback mislabels future write endpoints as reads
+
+**Status:** ✅ Fixed 2026-07-11 — commit `50d71349` (logic fix — human-verify recommended when the first write endpoint lands). `_derive_action` derives the verb from the method (GET → `view`, POST/PUT/PATCH/DELETE → `write`) and the floor derives `is_write` from the method when the endpoint didn't set `request.state.audit_is_write`. Unit test pins `_derive_action` across methods and the known-path override.
 
 **File:** `backend/app/dependencies.py:140-147,190`
 **Issue:** The floor's route-derived fallback always produces `"<area>.view"` (`_derive_action`) and `is_write` defaults to `False` — regardless of HTTP method. The floor exists so a future /admin endpoint gets audited "by construction" even when its author forgets the explicit `request.state.audit_*` enrichment. But if a Phase-147+ author adds `POST /admin/users/{id}/disable` and forgets the state-set, the ledger records a harmless-looking `users.view` read with no ✎ mark — the floor under-reports exactly the destructive actions it exists to catch, and the free-text `action` column (deliberately no CHECK, mig 095) means nothing downstream will flag it.
@@ -168,6 +206,8 @@ is_write = getattr(request.state, "audit_is_write", request.method in _WRITE_MET
 ```
 
 ### WR-04: Lifespan operator seed performs privilege-granting writes against the real local DB from the unit-test suite
+
+**Status:** ✅ Fixed 2026-07-11 — commit `145e9b7c`. Added `os.environ.setdefault("OPERATOR_EMAILS", "")` to `backend/tests/conftest.py`'s env block (before the app import), so the lifespan seed short-circuits at the empty-list check with zero pool activity — no real-DB role grants as a side effect of running unit tests.
 
 **File:** `backend/app/main.py:254-259`, `backend/tests/conftest.py:146-149`, `backend/app/config.py:726,892`
 **Issue:** The `client` fixture runs `TestClient(app)` as a context manager, which executes the full lifespan — now including `seed_operators_from_env()`. `Settings` reads `backend/.env` (`env_file=".env"`, config.py:726) and `postgres_dsn` defaults to the live local Supabase Postgres (`127.0.0.1:54322`, config.py:892). conftest neutralizes SUPABASE_URL/keys via `os.environ.setdefault` but sets **no** `OPERATOR_EMAILS` guard. On a dev machine with the local stack up and `OPERATOR_EMAILS` populated in `.env` (the documented setup), every TestClient startup connects to the real DB and INSERTs real `operator_users` rows — a role-granting write fired as a side effect of running unit tests. The pre-existing `_migrate_settings_override` block set the precedent for real-DB lifespan access in tests, but this phase extends it from a read-mostly migration to a security-relevant grant.
