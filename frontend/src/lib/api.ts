@@ -12,6 +12,15 @@ export interface SkillImportResult {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
+/** Phase 148 (VIS-01 / D-04) — the mid-session feature-flip bounce signal. When a
+ *  governed page's audience is tightened while a non-operator is on it, that page's
+ *  NEXT data fetch is refused server-side (a 403 from `require_visible`). Any api.ts
+ *  call that surfaces the refusal as an `ApiError(403)` dispatches this window event
+ *  (one chokepoint — the `ApiError` constructor below), so the App-level listener can
+ *  bounce home with a plain refusal instead of a dead/blank governed page.
+ *  RENDER-ONLY — the server 403 is the security wall; this only avoids a dead-end. */
+export const FEATURE_FORBIDDEN_EVENT = "agentic:feature-forbidden"
+
 /** Phase 092 (092-06 / F3): a status-carrying error so the send path can
  *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
  *  from a generic failure. Mirrors the existing DownloadError idiom (status +
@@ -23,8 +32,31 @@ export class ApiError extends Error {
     super(message)
     this.status = status
     this.name = "ApiError"
+    // Phase 148 (VIS-01 / D-04): a 403 is UNIQUELY a `require_visible` feature
+    // refusal in this app — the operator `/admin` surface returns 404 (never 403),
+    // and no other endpoint surfaces a 403 ApiError. So an `ApiError(403)` anywhere
+    // means "a governed feature was refused mid-session" → notify the App-level
+    // graceful-bounce listener. Render-only; the server 403 remains the authority.
+    if (status === 403 && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(FEATURE_FORBIDDEN_EVENT, { detail: { message, status } }),
+      )
+    }
   }
 }
+
+/** Phase 148 (VIS-01 / D-04) — the four governed feature keys (the effective-map
+ *  keys of `GET /features`). skill_studio + model_management are Operators-only on
+ *  the day-one map; workflow_authoring + governance_health are Everyone (148-05). */
+export type GovernedFeature =
+  | "skill_studio"
+  | "model_management"
+  | "workflow_authoring"
+  | "governance_health"
+
+/** The caller's effective feature→visible map. Partial so the fail-CLOSED `{}`
+ *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
+export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
@@ -3566,6 +3598,21 @@ export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
   if (res.status === 404) return null
   if (!res.ok) throw new ApiError("Failed to load the operator identity.", res.status)
   return (await res.json()) as OperatorIdentity
+}
+
+/** Phase 148 (VIS-01 / D-04): the caller's effective feature→visible map from the
+ *  authenticated `GET /features` (148-05). EVERY authenticated user has a map — a
+ *  non-operator reaches it (200) to learn which governed nav items to hide; this is
+ *  deliberately NOT the operator-probe's 404→null idiom (there is no "you have no
+ *  map" state). RENDER-ONLY: the per-endpoint `require_visible` gates (148-05) are the
+ *  sole security authority — a governed page fetch still returns 403 server-side
+ *  regardless of this map (that 403 is the graceful-bounce trigger, not this call). */
+export async function getEffectiveFeatures(): Promise<EffectiveFeatures> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/features`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load feature visibility.", res.status)
+  const body = (await res.json()) as { features?: EffectiveFeatures }
+  return body.features ?? {}
 }
 
 /** Read the four live backpressure/health signals (`GET /admin/backpressure`).
