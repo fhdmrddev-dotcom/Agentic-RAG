@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T18:35:00.000Z"
+last_updated: "2026-07-11T19:10:00.000Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 21
   percent: 8
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 5 of 9 complete (148-01/02/03/04/05 done; 148-06/07/08/09 open)
-Status: 148-03 complete — operator applied migration 098 (`app_settings.feature_visibility` jsonb + D-05 day-one seed: skill_studio/model_management=operators, workflow_authoring/governance_health=everyone) to the live LOCAL DB via the SQL editor; `full-schema.sql` regenerated (no reset, live-DB dump) with the column at line 468 (commit `edfcc1a0`). **CLOUD PARITY PENDING:** paste migration 098 into the CLOUD Supabase SQL editor at the next production promotion — local + cloud each carry their own `app_settings.global` row, so the seed must run in both (docs/DEPLOYMENT-WORKFLOW.md §5). 148-05 (GET /features + require_visible across 6 governed routers) already complete. VIS-01 stays Pending until the full feature ships (148-06 endpoints + 148-07/08/09 frontend). Awaiting 148-06 (operator admin endpoints).
+Plan: 6 of 9 complete (148-01/02/03/04/05/06 done; 148-07/08/09 open)
+Status: 148-06 complete — 8 operator endpoints added to the EXISTING `admin.py` router (all inherit the byte-identical 404 gate, no RLS backstop): `GET /admin/platform-audit` + `/export` (recorded cross-user reads — `audit.view_platform` floor row is_write=False; a successful export records `audit.export` naming the EXACT count, a refused over-cap export records NOTHING), `GET /admin/users` (floor-exempt roster), `POST /admin/users/{id}/disable` (self-guard 409 BEFORE any mutation; GoTrue ban `876600h` via run_in_threadpool; victim in-flight runs cancelled via the SHARED `_cancel_run_internals`; records `user.disable`), `POST .../enable` (`ban_duration=none`; records `user.enable`), `POST/DELETE .../operator` (grant/revoke delegating to operator_service, self-revoke 409 preserved), `PUT /admin/visibility` (feature+audience allowlist-validated → 400 before any write → `set_feature_visibility` atomic JSONB merge; records `visibility.set`). Commits `3055196d`/`fcd8a65d`/`b5adbc36`. Full `test_148_*.py` sweep ALL GREEN (37/37 with the 146 gate) — no remaining backend RED stubs. **CLOUD PARITY still PENDING:** migration 098 into the CLOUD Supabase SQL editor at the next production promotion. VIS-01 + ADMIN-03 stay Pending until the frontend ships (148-07/08/09) — requirements.mark-complete deliberately skipped (mirrors 148-02/04). Awaiting 148-07 (frontend: AuditTab source-switch/filters/CSV + UsersAndAccess roster + FeatureVisibility).
 Last activity: 2026-07-11
 
 ### Quick Tasks Completed

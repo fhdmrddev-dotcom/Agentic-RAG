@@ -164,7 +164,7 @@ Plans:
 - [x] 148-03-PLAN.md — Apply migration 098 to the live DB + regenerate full-schema (operator step)
 - [x] 148-04-PLAN.md — Governance + operator service layer (audit query/CSV, roster, grant/revoke)
 - [x] 148-05-PLAN.md — VIS-01 enforcement wiring: GET /features + require_visible across governed routers (Run carve-outs)
-- [ ] 148-06-PLAN.md — Operator admin endpoints (platform browse/export, users disable/enable, grant/revoke, visibility set)
+- [x] 148-06-PLAN.md — Operator admin endpoints (platform browse/export, users disable/enable, grant/revoke, visibility set)
 - [ ] 148-07-PLAN.md — Frontend VIS-01 enforcement: effective-features hook + nav vanish + graceful 403 bounce
 - [ ] 148-08-PLAN.md — 067-A audit browser: source switch + chip filters + pager + recorded CSV
 - [ ] 148-09-PLAN.md — 068-A users roster (victim-naming guards) + 069-A feature-visibility audience rows
