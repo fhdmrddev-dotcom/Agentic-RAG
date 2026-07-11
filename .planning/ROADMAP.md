@@ -323,7 +323,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 146. Operator Foundation | 6/6 | Complete | 2026-07-11 |
 | 147. Operator Control Plane | 0/? | Not started | - |
-| 148. Governance — Audit, Users & Feature Visibility | 3/9 | In Progress | - |
+| 148. Governance — Audit, Users & Feature Visibility | 4/9 | In Progress | - |
 | 149. Model Registry & Discovery | 0/? | Not started | - |
 | 150. Secrets at Rest | 0/? | Not started | - |
 | 151. Agent File Tools | 0/? | Not started | - |
