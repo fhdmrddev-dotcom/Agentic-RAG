@@ -21,7 +21,11 @@ import {
 import type { ActiveView } from "@/App"
 import type { Folder, Thread } from "@/types"
 // Phase 103 (REQ-7) — the single shared nav source (kills the triplication).
-import { NAV_ITEMS } from "@/lib/nav-items"
+// Phase 148 (VIS-01 / D-04): the rail now renders the effective-features-FILTERED
+// `navItems` prop threaded from App (governed items already vanished per sketch
+// 069-A) — NOT the raw NAV_ITEMS const — so a non-operator's rail hides the same
+// governed features the mobile drawer does. Render-only; the API is the wall.
+import type { NavItem } from "@/lib/nav-items"
 // SEED-064: cross-thread run visibility + Stop.
 import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
 import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
@@ -29,6 +33,10 @@ import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
 interface Props {
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  // Phase 148 (VIS-01 / D-04): the effective-features-FILTERED nav list from App —
+  // governed items the caller can't use are already dropped (the vanish, never a
+  // locked/badged item). The operator shield stays OUTSIDE this list (isOperator).
+  navItems: readonly NavItem[]
   // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. When true,
   // the amber operator shield renders at the rail bottom; when false/loading it
   // renders NOTHING (no placeholder, no reserved space) — the rail is byte-identical
@@ -51,6 +59,7 @@ interface Props {
 export function NavPanel({
   activeView,
   onNavigate,
+  navItems,
   isOperator,
   onSignOut,
   threads,
@@ -291,7 +300,7 @@ export function NavPanel({
         {/* Primary Nav Items */}
         {/* padding px-3 (12px), button px-2.5 (10px). Icon is centered at 32px perfectly fitting the 64px collapsed parent. */}
         <div className="px-3 pb-2 space-y-1">
-          {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
+          {navItems.map(({ view, icon: Icon, label }) => {
             const isActive = activeView === view
             const buttonContent = (
               <button

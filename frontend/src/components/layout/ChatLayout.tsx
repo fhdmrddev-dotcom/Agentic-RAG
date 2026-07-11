@@ -23,10 +23,12 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Plus, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
-// shared NAV_ITEMS const (incl. the Workflows home + its distinct icon) — the
-// local NAV_ITEMS_MOBILE triplicate is gone (NavPanel already consumes it; this
-// is the third + final consumer that kills the triplication).
-import { NAV_ITEMS } from "@/lib/nav-items"
+// shared nav list (incl. the Workflows home + its distinct icon) — the local
+// NAV_ITEMS_MOBILE triplicate is gone (NavPanel consumes the same list). Phase 148
+// (VIS-01): the list is now the effective-features-FILTERED `navItems` threaded from
+// App (governed items already vanished) — NOT the raw NAV_ITEMS const, so the mobile
+// drawer and the desktop rail hide the same governed features per one filter pass.
+import type { NavItem } from "@/lib/nav-items"
 // Phase 103-06: the Run-from-page launch reuses the EXISTING kickoff path —
 // createThread + sendMessage(workflow_definition_id) — NEVER a bespoke
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
@@ -36,6 +38,11 @@ interface Props {
   onSignOut: () => void
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  // Phase 148 (VIS-01 / D-04): the effective-features-FILTERED nav list from App
+  // (governed items the caller can't use already dropped — the sketch 069-A vanish).
+  // Threaded to both the desktop NavPanel and the mobile drawer so both hide the
+  // same features from a single filter pass. Render-only; the API is the wall.
+  navItems: readonly NavItem[]
   // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. isOperator
   // gates the shield (nav + mobile drawer); operatorIdentity feeds the Control Room
   // band. Non-operators get isOperator=false → nav stays byte-identical to today.
@@ -59,7 +66,7 @@ interface Props {
   onTuneSkill: (skillId: string) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
   const {
     threads,
     selectedThread,
@@ -157,6 +164,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, isOperator, oper
       <NavPanel
         activeView={activeView}
         onNavigate={onNavigate}
+        navItems={navItems}
         isOperator={isOperator}
         onSignOut={onSignOut}
         threads={threads}
@@ -241,7 +249,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, isOperator, oper
           </div>
           {/* Nav icon row (bottom, fixed) */}
           <div className="border-t border-border/20 px-2 py-3 flex items-center justify-around">
-            {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
+            {navItems.map(({ view, icon: Icon, label }) => {
               const isActive = activeView === view
               return (
                 <button

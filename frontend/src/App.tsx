@@ -63,6 +63,12 @@ function MaintenanceBanner() {
 // to the nav (the probe-gated shield) and identity threads to the Control Room.
 // The backend 404 gate stays the sole authority; a forged flag reveals nothing.
 import { useOperatorProbe } from "@/hooks/useOperatorProbe"
+// Phase 148 (VIS-01 / D-04): the per-session effective-features probe (sibling of
+// useOperatorProbe). Its map filters the nav (governed items vanish per the sketch
+// 069-A) and its refetch re-syncs after the graceful 403 bounce. Render-only —
+// 148-05's require_visible API is the security wall.
+import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
+import { visibleNavItems } from "@/lib/nav-items"
 
 export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room"
 
@@ -101,6 +107,14 @@ function App() {
   // stays byte-identical to today.
   const { isOperator, identity: operatorIdentity } = useOperatorProbe(user?.id ?? null)
 
+  // Phase 148 (VIS-01 / D-04): the per-session effective-features map, keyed to the
+  // same user id (WR-01). It filters the nav so a governed feature the caller cannot
+  // use simply does NOT render (the sketch 069-A vanish). Fails CLOSED to {} on error
+  // / pre-resolve — a blip never flashes an operators-only feature to an end user
+  // (T-148-FAILCLOSED). An operator's map is all-true → every nav item shows.
+  const { features: effectiveFeatures } = useEffectiveFeatures(user?.id ?? null)
+  const navItems = visibleNavItems(effectiveFeatures)
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -123,6 +137,7 @@ function App() {
           onSignOut={signOut}
           activeView={activeView}
           onNavigate={setActiveView}
+          navItems={navItems}
           isOperator={isOperator}
           operatorIdentity={operatorIdentity}
           prefillMessage={prefillMessage}
