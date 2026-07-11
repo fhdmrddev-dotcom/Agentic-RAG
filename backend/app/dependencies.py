@@ -218,6 +218,16 @@ async def authenticate_operator_request(
     auth path untouched AND gives tests a clean override seam (conftest overrides this
     to inject a fake operator identity; the WR-02 regression pops the override to
     exercise the real pre-auth 404 path).
+
+    WR-01 (Phase 148 review): the app-layer ban check must cover the /admin seam too.
+    ``get_current_user`` enforces ``_is_banned``, but /admin authenticates HERE and never
+    called it — so a disabled operator's still-valid JWT kept full /admin access until
+    token expiry (and could ``POST /admin/users/{self}/enable`` to lift their own ban, or
+    disable the operator who disabled them). A banned operator is folded into the SAME
+    byte-identical ``_NOT_FOUND`` — NEVER a discoverable 403 — so /admin stays
+    non-discoverable, and the check FAILS OPEN exactly like ``_is_banned`` (a transient DB
+    blip returns False, never locking operators out). The shared ``get_current_user`` flow
+    is not touched.
     """
     if credentials is None:
         raise _NOT_FOUND
@@ -227,6 +237,9 @@ async def authenticate_operator_request(
     except Exception:
         raise _NOT_FOUND
     if user is None:
+        raise _NOT_FOUND
+    # WR-01: fold a banned operator into the byte-identical 404 (fail-OPEN via _is_banned).
+    if await _is_banned(user.id):
         raise _NOT_FOUND
     return {"id": user.id, "email": user.email}
 
