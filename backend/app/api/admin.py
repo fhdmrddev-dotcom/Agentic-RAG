@@ -22,12 +22,14 @@ Endpoints:
   visit + per manual refresh (D-07); floor-ATTACHED, server-owned (label, action).
 """
 import logging
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
 import anyio
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 import app.dependencies as deps
@@ -38,10 +40,13 @@ from app.dependencies import (
     operator_audit_floor,
     require_operator,
 )
-from app.models.user_settings import save_app_settings
+from app.models.user_settings import save_app_settings, set_feature_visibility
+from app.services import governance_service
 from app.services.operator_service import (
     get_operator_record,
     get_recent_operator_audit,
+    grant_operator,
+    revoke_operator,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +68,29 @@ _FLAG_HUMAN_NAMES = {
     "maintenance_mode": "maintenance mode",
 }
 _FLAG_KEYS = set(_FLAG_HUMAN_NAMES)
+
+# ── Phase 148 (ADMIN-03 / VIS-01) constants ───────────────────────────────────
+# The GoTrue "indefinite" ban literal. Go's time.ParseDuration largest unit is
+# HOURS (day/year units are REJECTED — Pitfall 2), so ~100y == "876600h". "none"
+# lifts the ban (GoTrue nulls auth.users.banned_until).
+_INDEFINITE_BAN = "876600h"
+
+# Terminal run statuses — mirrors run_lifecycle._cancel_run_internals Step 2. A
+# victim's runs in any OTHER state are in-flight and are cancelled on disable via
+# the SHARED cancel helper (reuse, never re-implement — D-062 discipline).
+_TERMINAL_RUN_STATUSES = ("completed", "failed", "cancelled", "timed_out")
+
+# PUT /admin/visibility code allowlists (T-148-03). feature + audience are validated
+# against these code constants BEFORE any write — never free text (SQLi-safe, mirrors
+# set_flag's _FLAG_KEYS guard). Audience is an enum VALUE, never a boolean (the
+# SEED-115 forward-compat contract that keeps the v3.4 roles path open).
+_VISIBILITY_FEATURES = {
+    "skill_studio",
+    "model_management",
+    "workflow_authoring",
+    "governance_health",
+}
+_VISIBILITY_AUDIENCES = {"everyone", "operators"}
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -547,3 +575,115 @@ async def get_operator_audit_feed(
     request.state.audit_action = "audit.view"
     entries = await get_recent_operator_audit(limit=limit)
     return {"entries": entries}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 148 (ADMIN-03) — platform audit browse + capped CSV export
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# These are the SC#4 no-RLS-backstop cross-user READS. The query/scope/cap safety
+# lives in governance_service (148-04, parameterized $N binds, page_size ≤ 100,
+# COUNT-first refuse-over-50000); here the controller is thin: delegate + RECORD.
+# Both are floor-ATTACHED with audit_is_write=False and SERVER-OWNED labels — a
+# cross-user read is NEVER silent (T-148-01).
+
+
+def _describe_audit_filter(
+    user_id: str | None,
+    action_types: list[str] | None,
+    since: datetime | None,
+    until: datetime | None,
+) -> str:
+    """A short, plain-language summary of the active filter for the audit.export label."""
+    parts = ["one user" if user_id else "all users"]
+    if action_types:
+        n = len(action_types)
+        parts.append(f"{n} action type{'s' if n != 1 else ''}")
+    if since or until:
+        parts.append("date range")
+    return ", ".join(parts)
+
+
+@router.get("/platform-audit")
+async def browse_platform_audit(
+    request: Request,
+    user_id: str | None = None,
+    action_type: list[str] | None = Query(default=None),
+    since: datetime | None = None,
+    until: datetime | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Cross-user platform ``audit_log`` browse — a RECORDED read (SC#4, no RLS backstop).
+
+    ``user_id`` NULL = the deliberate all-users read; a value = single-user scope.
+    ``action_type`` is a repeatable query param (text[] ANY); ``since``/``until`` a
+    half-open window. Pagination is 1-based (``page``); the service clamps ``page_size``
+    ≤ 100 so the response is never larger than one page (no full-tenant leak). The
+    query/scope/cap safety is entirely in ``governance_service.query_platform_audit`` —
+    this controller only delegates + records the ``audit.view_platform`` floor row
+    (``audit_is_write=False``, a read receipt with a server-owned label, never client
+    text).
+    """
+    request.state.audit_label = "Viewed platform activity"
+    request.state.audit_action = "audit.view_platform"
+    request.state.audit_is_write = False
+
+    page = max(1, page)
+    offset = (page - 1) * max(1, page_size)
+    rows = await governance_service.query_platform_audit(
+        user_id=user_id,
+        action_types=action_type,
+        since=since,
+        until=until,
+        page_size=page_size,
+        offset=offset,
+    )
+    return {
+        "entries": rows,
+        "page": page,
+        "page_size": page_size,
+        "has_more": len(rows) == page_size,
+    }
+
+
+@router.get("/platform-audit/export")
+async def export_platform_audit(
+    request: Request,
+    user_id: str | None = None,
+    action_type: list[str] | None = Query(default=None),
+    since: datetime | None = None,
+    until: datetime | None = None,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Export EXACTLY the filtered platform ``audit_log`` set as CSV — capped, recorded.
+
+    Delegates to ``governance_service.export_platform_audit_csv`` (COUNT-first; refuses
+    over 50 000 rows rather than silently truncating). On SUCCESS it records ONE
+    ``audit.export`` floor row naming the EXACT row count. On the over-cap REFUSE it maps
+    the domain ``AuditExportTooLarge`` to a 413 and records NOTHING — the audit state is
+    stamped ONLY after the count is known, and the raised exception is re-thrown into the
+    floor's ``yield`` so its post-yield write is skipped entirely (same discipline as
+    ``set_flag``'s failure path). A refused export therefore leaves no receipt (T-148-01).
+    """
+    try:
+        stream, count = await governance_service.export_platform_audit_csv(
+            user_id=user_id,
+            action_types=action_type,
+            since=since,
+            until=until,
+        )
+    except governance_service.AuditExportTooLarge as exc:
+        # Over-cap: refuse (never truncate) — 413, and NO audit.export receipt. The
+        # audit_* state below is never reached, and the floor skips its write.
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Too many rows ({exc.count}) — narrow the filter.",
+        )
+
+    summary = _describe_audit_filter(user_id, action_type, since, until)
+    request.state.audit_label = f"Exported {count} audit entries ({summary})"
+    request.state.audit_action = "audit.export"
+    request.state.audit_is_write = False
+    return stream
