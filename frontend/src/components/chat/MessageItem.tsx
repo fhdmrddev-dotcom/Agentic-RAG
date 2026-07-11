@@ -553,6 +553,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
             </span>
           </span>
+        ) : message.runStatus === "cancelled" ? (
+          // BUG-260710-02 (Phase 147 / D-03): cancelling BEFORE the first visible
+          // token persists a genuinely empty assistant row (content_len=0 — e.g. a
+          // DeepSeek early cancel whose only output was stripped DSML markup). The
+          // renderer previously drew an avatar-only empty bubble that reads as
+          // "something broke". Render an honest "cancelled — no output yet"
+          // affordance instead (mirrors the stopped-indicator styling: Square icon
+          // + muted italic). Reached only in the falsy-content branch, so a
+          // cancelled run WITH content renders its content normally + the
+          // persistent "Response stopped" indicator below. Pure render-derive from
+          // the persisted runStatus — no shared-path fork (D-03/G-5 safe).
+          <div
+            className="flex items-center gap-1.5 text-sm text-muted-foreground"
+            data-testid="cancelled-no-output"
+          >
+            <Square className="w-3 h-3" />
+            <span className="italic">cancelled — no output yet</span>
+          </div>
         ) : null}
         {/* SEED-098 Change 2: the `hasAnyTools` bottom italic echo
             (`Preparing code…/Synthesizing answer…` + dots) is GONE — the RunCard
@@ -567,7 +585,21 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             this dual update, a timed_out run with content would show
             contradictory copy (in-content banner suppressed because content
             present; bottom indicator says "Response stopped"). */}
-        {(message.stopped || message.runStatus === "timed_out") && !isStreaming && (
+        {/* BUG-260710-01 (Phase 147 / D-03): `message.stopped` is LIVE-only state and
+            is NOT re-derived on reload, so a persisted cancelled run lost its
+            "Response stopped" indicator after navigating away and back (the
+            partial answer then read as a normal completed answer). Add the
+            `runStatus === 'cancelled'` clause so the indicator persists across
+            reload — the copy switch above already renders "Response stopped" for
+            the non-timed-out case (types/index.ts:163 already SAYS cancelled
+            renders "Response stopped"; the render condition was the bug). Gated on
+            `!!message.content` so an EMPTY early-cancel row is handled instead by
+            the "cancelled — no output yet" affordance in the content region (no
+            double indicator). Render-derive only — no shared-path fork (D-03/G-5). */}
+        {(message.stopped ||
+          message.runStatus === "timed_out" ||
+          (message.runStatus === "cancelled" && !!message.content)) &&
+          !isStreaming && (
           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
             <Square className="w-3 h-3" />
             <span className="italic">
