@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T19:10:00.000Z"
+last_updated: "2026-07-11T19:01:22.289Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 21
+  completed_plans: 22
   percent: 8
 ---
 
@@ -27,9 +27,14 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 6 of 9 complete (148-01/02/03/04/05/06 done; 148-07/08/09 open)
-Status: 148-06 complete — 8 operator endpoints added to the EXISTING `admin.py` router (all inherit the byte-identical 404 gate, no RLS backstop): `GET /admin/platform-audit` + `/export` (recorded cross-user reads — `audit.view_platform` floor row is_write=False; a successful export records `audit.export` naming the EXACT count, a refused over-cap export records NOTHING), `GET /admin/users` (floor-exempt roster), `POST /admin/users/{id}/disable` (self-guard 409 BEFORE any mutation; GoTrue ban `876600h` via run_in_threadpool; victim in-flight runs cancelled via the SHARED `_cancel_run_internals`; records `user.disable`), `POST .../enable` (`ban_duration=none`; records `user.enable`), `POST/DELETE .../operator` (grant/revoke delegating to operator_service, self-revoke 409 preserved), `PUT /admin/visibility` (feature+audience allowlist-validated → 400 before any write → `set_feature_visibility` atomic JSONB merge; records `visibility.set`). Commits `3055196d`/`fcd8a65d`/`b5adbc36`. Full `test_148_*.py` sweep ALL GREEN (37/37 with the 146 gate) — no remaining backend RED stubs. **CLOUD PARITY still PENDING:** migration 098 into the CLOUD Supabase SQL editor at the next production promotion. VIS-01 + ADMIN-03 stay Pending until the frontend ships (148-07/08/09) — requirements.mark-complete deliberately skipped (mirrors 148-02/04). Awaiting 148-07 (frontend: AuditTab source-switch/filters/CSV + UsersAndAccess roster + FeatureVisibility).
+Plan: 7 of 9 complete (148-01/02/03/04/05/06/07 done; 148-08/09 open)
+Status: 148-07 (VIS-01 frontend render layer) complete — 148-08 next
 Last activity: 2026-07-11
+
+**148-07 decisions/notes (2026-07-11):**
+- VIS-01 frontend shipped: `useEffectiveFeatures` (fail-closed to `{}`) hides governed nav items (the sketch 069-A vanish) + `ApiError(403)` graceful bounce; render-only, 148-05's `require_visible` API is the sole wall. VIS-01 completes at phase verify-work (frontend + API halves both landed).
+- **Frontend build gate is RED on pre-existing rot, NOT 148-07.** `cd frontend && npm run build` (`tsc -b`) has **30 pre-existing errors** at baseline (21 = SEED-056 `__tests__/` vitest rot; 9 = a React-19 `@types/react`/zustand `node_modules` drift across 7 source files). 148-07 adds ZERO new errors (baseline-fingerprint diff) and `vite build` alone is GREEN. Logged with re-open trigger in `.planning/phases/148-.../deferred-items.md`. A hard-green `npm run build` gate needs these 30 cleared first — surface at 148 verify-work.
+- Rule 2 wiring: the 3 governance signal reads now throw `ApiError(403)` so the bounce fires end-to-end for the realistic `governance_health` tighten. Remaining governed api reads/mutations still throw plain `Error` (documented, non-blocking — Operators-only surfaces already vanish from nav).
 
 ### Quick Tasks Completed
 
