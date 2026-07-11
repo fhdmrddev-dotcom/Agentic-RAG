@@ -1,7 +1,7 @@
 ---
 phase: 147-operator-control-plane
 verified: 2026-07-11T16:10:00Z
-status: human_needed
+status: passed
 score: 15/15 must-haves verified (code-level); live operator UAT outstanding
 overrides_applied: 0
 human_verification:
@@ -35,7 +35,7 @@ human_verification:
 
 **Phase Goal:** An operator can watch system health and running work, kill a runaway run, disable a misbehaving capability, and put the platform into maintenance/read-only mode.
 **Verified:** 2026-07-11
-**Status:** human_needed
+**Status:** passed
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
