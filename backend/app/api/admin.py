@@ -20,8 +20,8 @@ import logging
 import anyio
 from fastapi import APIRouter, Depends, Request
 
+import app.dependencies as deps
 from app.dependencies import (
-    _pg_pool,
     get_redis,
     operator_audit_floor,
     require_operator,
@@ -71,11 +71,17 @@ async def get_backpressure(
     except Exception as exc:
         logger.warning("backpressure: Redis unreachable, reporting 0: %s", type(exc).__name__)
 
-    # 3. asyncpg pool -- in-use connections
+    # 3. asyncpg pool -- in-use connections.
+    # CR-02: read the pool via the LIVE module attribute (deps._pg_pool), NOT a
+    # from-import snapshot. `from app.dependencies import _pg_pool` copies the
+    # binding at import time (when the singleton is still None); get_pg_pool()
+    # later rebinds app.dependencies._pg_pool, but the copied name stays None
+    # forever, so this signal was structurally always 0 in production.
+    pool = deps._pg_pool
     pg_in_use = 0
-    if _pg_pool is not None:
+    if pool is not None:
         try:
-            pg_in_use = _pg_pool.get_size() - _pg_pool.get_idle_size()
+            pg_in_use = pool.get_size() - pool.get_idle_size()
         except Exception:
             pass
 
