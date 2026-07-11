@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
-last_updated: "2026-07-11T07:08:32.598Z"
-last_activity: 2026-07-11
+status: executing
+last_updated: "2026-07-11T08:13:28.362Z"
+last_activity: 2026-07-11 -- Phase 147 planning complete
 progress:
   total_phases: 26
   completed_phases: 1
-  total_plans: 6
+  total_plans: 15
   completed_plans: 6
   percent: 4
-stopped_at: Phase 147 context gathered — ready to plan (resume: .planning/phases/147-operator-control-plane/147-CONTEXT.md)
 ---
 
 # Project State
@@ -29,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 147
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-11
+Status: Ready to execute
+Last activity: 2026-07-11 -- Phase 147 planning complete
 
 ### Quick Tasks Completed
 
@@ -42,6 +41,10 @@ Last activity: 2026-07-11
 | 260705-nfu | Fix silent data-loss bug in skill ZIP import — one colliding flattened filename (e.g. duplicate `__init__.py` from different folders) used to throw an unhandled exception that killed the rest of the upload loop, silently dropping every later file (confirmed live: the real imported docx skill was missing 6 files, incl. its whole templates/ folder). `_upload_skill_files` is now per-file resilient (try/except, logs, returns errors) + `import_skill` de-dups colliding flattened names (`_dedup_flattened_name`) before upload; sync-path failures surface via the existing `errors` response channel, background-path failures are logged. Folder-tree fidelity itself stays unchanged/deferred. | 2026-07-05 | `0402fa6b` | Verified — 18/18 new+existing tests green + 37/37 across the full skills suite (independently re-run after Docker/backend came back up); plan-checked 0 blockers (2 passes, 1 trivial self-corrected); scope-contained to `skills.py` + its test file | [260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-](./quick/260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-/) |
 
 ### Recent Completed Phases
+
+**Guardrail overrides:**
+
+- **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.
 
 **Phase 123 — Skill Triggering Quality (TRIG-01 / TRIG-03 / CTX-03) — COMPLETE (2026-06-26).** All 3 gates clear: secure-phase 29/29 threats CLOSED (threats_open 0, `fc17016b`) · validate-phase NYQUIST-COMPLIANT 12/12 Per-Task COVERED (148 backend + 40 frontend = 188 tests green, `06ae19dc`) · verify 12/12 must-haves + **SC#10 4-axis live UAT 4/4 PASS** (2026-06-26): Axis 1 cross-provider D-01 fidelity · Axis 2 multi-tool pin durability (surfaced+fixed render bugs BUG-260626-01/-04 — shared `dedupMessagesByRunId` helper, `2a48fea4`/`6ec8be77`, verified live) · Axis 3 parallel-thread isolation (3-run Redis snapshot, no pin leak) · Axis 4 long-message pin + honest `_TRIM_MARKER` eviction (forced real 8000-tok overflow). `123-VERIFICATION.md` flipped `human_needed` → `passed`; `123-HUMAN-UAT.md` status passed (4/4). **Deferred (NOT 123 blockers):** BUG-260626-02 (Phase-120 baseline leak into live final-emit) + BUG-260626-03 (run-end todo finalizer) → **SEED-094** (backend run-end honesty). Follow-up candidate: LangSmith not emitting since 2026-06-20 (raw-SDK `wrap_openai` path). **Next: Phase 124 (Workflow Studio UX) — G-2 sketch-gated; run `/gsd:sketch 124`.**
 
