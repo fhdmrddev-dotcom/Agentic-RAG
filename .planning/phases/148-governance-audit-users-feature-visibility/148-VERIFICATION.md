@@ -1,8 +1,8 @@
 ---
 phase: 148-governance-audit-users-feature-visibility
 verified: 2026-07-12T00:00:00Z
-status: human_needed
-score: 13/13 must-haves verified (code-level); 3 G-4 lived-experience items require live human testing
+status: passed
+score: 13/13 must-haves verified (code-level) + 3/3 G-4 lived-experience items live-confirmed by operator UAT 2026-07-12 (148-HUMAN-UAT.md)
 overrides_applied: 0
 requirements_status:
   ADMIN-03: satisfied (recommend flipping REQUIREMENTS.md Pending -> Complete)
