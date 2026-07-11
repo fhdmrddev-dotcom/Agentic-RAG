@@ -56,7 +56,7 @@ from app.services.harness.scope import resolve_project_subtree, assert_folder_sc
 # validate_skill_refs / materialize_skill_snapshots_if_needed through the module
 # object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
 from app.services.harness import skill_snapshot as _skill_snapshot
-from app.models.user_settings import load_user_settings, override_provider
+from app.models.user_settings import load_user_settings, override_provider, workflows_enabled
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
@@ -935,6 +935,22 @@ async def send_message(
         # owns the clear). A fresh kickoff below will re-point the anchor atomically.
 
     if body.workflow_definition_id is not None:
+        # ── Phase 147 (FLAG-01 / D-05) — workflows kill-switch: block NEW launches ──
+        # Fires ONLY here (inside the NEW-launch branch) and BEFORE any definition
+        # resolve / user-message insert / create_workflow_run, so a refused launch
+        # leaves NO partial run row and NO blank message (the same fail-closed-before-
+        # insert discipline the kickoff already follows). Scope is deliberately narrow:
+        #   * in-flight workflow runs are UNTOUCHED (Kill is the tool for those — D-05);
+        #     a locked-thread kickoff already 409s above, so we never reach here for one.
+        #   * a plain Deep send (workflow_definition_id is None) never enters this branch
+        #     → Deep chat is byte-identical regardless of the flag.
+        # workflows_enabled() reads the plan-01 last-known-good TTL cache (default-ON on a
+        # blip — D-Q4), so a transient settings-read failure never blocks a legit launch.
+        if not workflows_enabled():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Workflows are currently disabled by the administrator",
+            )
         # Resolve+parse the published definition UNDER THE USER'S RLS (T-092-05 IDOR
         # mitigation): only a published, owned-or-global definition may be kicked
         # off. A non-owned / private / unpublished id is refused 404 (never leaks

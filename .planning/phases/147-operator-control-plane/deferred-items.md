@@ -21,6 +21,20 @@ changes. Logged, not fixed (executor scope boundary).
   membership instead of a brittle total. FLAG-01's own self_improve conditional is fully
   covered by the new `test_147_flag_hide.py` set-equality assertions.
 
+## From Plan 147-04 (Task 2)
+
+- **Pre-existing integration-test rot (stale patch target):**
+  `backend/tests/integration/test_threads.py` — `TestSendMessage::test_sse_stream_contains_delta_events`,
+  `::test_sse_stream_delta_events_are_valid_json`, and both
+  `TestSendMessageDispatchAttribution::*` tests fail at BASELINE with
+  `AttributeError: module 'app.api.threads' does not have the attribute 'create_streaming_chat'`.
+  That symbol was removed from `threads.py` in a prior refactor (Phase 089 agent_loop
+  extraction) — verified 0 references in both committed HEAD and this plan's working copy,
+  and Plan 147-04's threads.py diff is import + one D-05 guard only (never touches
+  `create_streaming_chat` or the streaming path). Unrelated to 147-04. Fix = re-point the
+  patch to the current streaming entry point (agent_loop) or delete the stale tests. The
+  D-05 kickoff guard is covered by the new `test_147_workflows_flag.py` (3/3 green).
+
 ## From Plan 147-06 (Task 2)
 
 - **Pre-existing test rot (SEED-056):** `frontend/src/__tests__/components/MessageItem.test.tsx`
