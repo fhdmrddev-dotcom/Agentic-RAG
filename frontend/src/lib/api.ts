@@ -3611,7 +3611,7 @@ export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow
  *  render an honest "ends on its own" copy with no Kill affordance. `not_responding`
  *  is the SERVER-derived stalled-stream signal (run:{id} stream age — the 064-B
  *  not-responding tag source), never inferred client-side. */
-export interface ActiveRun {
+export interface AdminActiveRun {
   run_id: string
   kind: "chat" | "workflow" | "eval" | "tuner"
   thread_id: string | null
@@ -3639,13 +3639,13 @@ export type FlagKey =
 /** Read the live active-runs list (`GET /admin/runs`, Plan 147-02). Plain authed
  *  GET — the router gate returns 404 to non-operators. The backend returns an
  *  ENVELOPE `{"runs": [...]}` (same shape as `getOperatorAudit`'s `{entries}`);
- *  unwrap `.runs` here — casting the raw object to `ActiveRun[]` would ship a
+ *  unwrap `.runs` here — casting the raw object to `AdminActiveRun[]` would ship a
  *  `{runs}` object into list state and crash the next `.map` (CR-01 precedent). */
-export async function getAdminActiveRuns(): Promise<ActiveRun[]> {
+export async function getAdminActiveRuns(): Promise<AdminActiveRun[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/admin/runs`, { headers })
   if (!res.ok) throw new ApiError("Failed to load active runs.", res.status)
-  const body = (await res.json()) as { runs?: ActiveRun[] }
+  const body = (await res.json()) as { runs?: AdminActiveRun[] }
   return body.runs ?? []
 }
 

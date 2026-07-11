@@ -12,7 +12,7 @@
  * calls at runtime are needed (every other api export is a type, erased at build).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup, within, act } from "@testing-library/react"
+import { render, screen, cleanup, within, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ControlRoomPage } from "../ControlRoomPage"

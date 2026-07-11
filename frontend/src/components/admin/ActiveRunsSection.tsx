@@ -31,7 +31,7 @@
 import { useEffect, useState } from "react"
 import { AlertTriangle, Bot, Check, Clock, Loader2, Timer } from "lucide-react"
 
-import type { ActiveRun } from "@/lib/api"
+import type { AdminActiveRun as ActiveRun } from "@/lib/api"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 import {

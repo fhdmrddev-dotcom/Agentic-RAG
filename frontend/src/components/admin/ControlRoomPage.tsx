@@ -44,7 +44,7 @@ import {
   killRun,
   recordControlPlaneEvent,
   setFlag,
-  type ActiveRun,
+  type AdminActiveRun as ActiveRun,
   type BackpressureSignals,
   type FullAppSettings,
   type OperatorAuditRow,

@@ -14,7 +14,7 @@ import { render, screen, waitFor, cleanup, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event"
 
 import { ActiveRunsSection } from "../ActiveRunsSection"
-import type { ActiveRun } from "@/lib/api"
+import type { AdminActiveRun as ActiveRun } from "@/lib/api"
 
 // started_at is a unix epoch (seconds); pin "now" 134s later → elapsed "2m 14s".
 const STARTED_AT = 1_000_000
