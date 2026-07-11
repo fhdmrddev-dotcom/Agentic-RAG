@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { AlertTriangle } from "lucide-react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
@@ -6,6 +7,57 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+import { getMaintenanceStatus } from "@/lib/api"
+
+// Phase 147 (D-06 / T-147-15) — the persistent, app-wide, end-user maintenance
+// banner. It lives at the App/ChatLayout seam OUTSIDE the operator /admin surface
+// (end users are 404 on every /admin route), so it reads the PUBLIC /health
+// `maintenance` boolean via getMaintenanceStatus — never an /admin route. When
+// maintenance is ON, all users see an honest read-only banner and can still
+// browse/read; when OFF (or on any read failure), it renders NOTHING — the app
+// DOM stays byte-identical to today. Presentational + resilient: a failed read
+// assumes not-in-maintenance so a health blip never falsely announces maintenance
+// or blocks the app. It is a fixed top strip so it disturbs no existing layout.
+function MaintenanceBanner() {
+  const [maintenanceOn, setMaintenanceOn] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    const read = () => {
+      // getMaintenanceStatus already resolves false on any failure (unauthed,
+      // best-effort). Guard the setState against unmount either way.
+      getMaintenanceStatus()
+        .then((on) => {
+          if (alive) setMaintenanceOn(on)
+        })
+        .catch(() => {
+          if (alive) setMaintenanceOn(false)
+        })
+    }
+    read()
+    // Poll on a modest cadence matching the flag TTL window — do NOT hammer it.
+    const id = window.setInterval(read, 30_000)
+    return () => {
+      alive = false
+      window.clearInterval(id)
+    }
+  }, [])
+
+  if (!maintenanceOn) return null
+
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-0 top-0 z-[60] flex items-center justify-center gap-2 border-b border-amber-500/40 bg-amber-500/95 px-4 py-2 text-center text-sm font-medium text-amber-950 shadow-sm"
+    >
+      <AlertTriangle className="h-4 w-4 flex-none" aria-hidden="true" />
+      <span>
+        Maintenance mode — the platform is read-only. You can read everything; nothing new runs
+        right now.
+      </span>
+    </div>
+  )
+}
 // Phase 146 (ADMIN-01 / D-07): the operator probe is hosted ONCE at App level
 // (single mount probe — Pitfall 4). It drives RENDERING ONLY: isOperator threads
 // to the nav (the probe-gated shield) and identity threads to the Control Room.
@@ -64,6 +116,9 @@ function App() {
   return (
     <StreamsProvider>
       <TooltipProvider>
+        {/* Phase 147 (D-06): app-wide end-user maintenance banner — sits above
+            ChatLayout, outside the /admin surface, reading the public /health flag. */}
+        <MaintenanceBanner />
         <ChatLayout
           onSignOut={signOut}
           activeView={activeView}
