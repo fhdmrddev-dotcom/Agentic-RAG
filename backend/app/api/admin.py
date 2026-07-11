@@ -687,3 +687,149 @@ async def export_platform_audit(
     request.state.audit_action = "audit.export"
     request.state.audit_is_write = False
     return stream
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 148 (ADMIN-03) — users roster + disable (ban + in-flight cancel) + enable
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+async def _lookup_user_email(user_id) -> str:
+    """Best-effort victim naming (metadata only — linkage rule #11; never content).
+
+    Returns the target's ``auth.users.email`` for a plain-sentence audit label; falls
+    back to ``"a user"`` on a missing pool / miss / any read error (naming must never
+    sink the action). Reads via the LIVE ``deps._pg_pool`` attribute (never an import
+    snapshot — CR-02).
+    """
+    pool = deps._pg_pool
+    if pool is None:
+        return "a user"
+    try:
+        row = await pool.fetchrow("SELECT email FROM auth.users WHERE id = $1", user_id)
+        if row and row["email"]:
+            return row["email"]
+    except Exception:
+        logger.exception("user email lookup failed for %s", user_id)
+    return "a user"
+
+
+async def _cancel_inflight_runs(user_id, supabase) -> int:
+    """Cancel the victim's in-flight runs on disable — REUSING the shared cancel helper.
+
+    Looks up the victim's non-terminal ``runs`` rows (any status not in
+    ``_TERMINAL_RUN_STATUSES``) and delegates each to the SHARED
+    ``run_lifecycle._cancel_run_internals`` — the same D-062 zombie-heal discipline the
+    operator Kill path uses, never re-implemented. Best-effort per run: one bad row never
+    sinks the disable. Returns the number of runs handed to the cancel helper.
+    """
+    pool = deps._pg_pool
+    if pool is None:
+        return 0
+    try:
+        rows = await pool.fetch(
+            "SELECT run_id, status, thread_id FROM runs "
+            "WHERE user_id = $1 AND status <> ALL($2::text[])",
+            user_id,
+            list(_TERMINAL_RUN_STATUSES),
+        )
+    except Exception:
+        logger.exception("disable: active-runs lookup failed for %s", user_id)
+        return 0
+    if not rows:
+        return 0
+
+    from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
+
+    cancelled = 0
+    for row in rows:
+        rid = row["run_id"]
+        try:
+            await _cancel_run_internals(
+                run_id=rid,
+                status=row["status"],
+                thread_id=str(row["thread_id"]) if row["thread_id"] else None,
+                redis=get_redis(),
+                supabase=supabase,
+            )
+            cancelled += 1
+        except Exception:
+            logger.exception("disable: cancel of run %s failed (continuing)", rid)
+    return cancelled
+
+
+@router.get("/users")
+async def list_users(page: int = 1, page_size: int = 50):
+    """Users roster — honest last-active + doc/chat counts + operator role. Floor-EXEMPT.
+
+    Poll-style read (the ``/runs`` precedent, D-07): the UsersAndAccess table re-fetches,
+    so recording every poll would spam the ledger. 1-based pagination; the service clamps
+    ``page_size`` ≤ 100. Delegates to ``governance_service.list_users_roster`` (one join,
+    never fabricated last-active). Cross-user read behind the router gate (no RLS backstop).
+    """
+    page = max(1, page)
+    offset = (page - 1) * max(1, page_size)
+    rows = await governance_service.list_users_roster(page_size=page_size, offset=offset)
+    return {"users": rows, "page": page, "page_size": page_size}
+
+
+@router.post("/users/{user_id}/disable", status_code=status.HTTP_204_NO_CONTENT)
+async def disable_user(
+    user_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Disable a user — GoTrue ban + in-flight run cancel + a recorded ``user.disable``.
+
+    Self-guard FIRST (Pitfall 7 — self-lockout): if ``user_id`` is the acting operator's
+    own id, refuse ``409`` BEFORE any mutation. Then ban via the GoTrue admin API with the
+    EXACT indefinite literal ``"876600h"`` (day/year units are rejected — Pitfall 2),
+    wrapped in ``run_in_threadpool`` (supabase-py is blocking httpx — D-v2.5-01). Then cancel
+    the victim's in-flight runs via the SHARED ``_cancel_run_internals`` (reuse, never
+    re-implement). The floor row carries the 064-B victim-naming label + ``user.disable``.
+    The app-layer ban check in ``get_current_user`` (148-02) closes the live-JWT window.
+    """
+    acting_id = request.state.operator["id"]  # set by require_operator (router gate)
+    if str(user_id) == str(acting_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You cannot disable yourself.",
+        )
+
+    sb = get_supabase()
+    await run_in_threadpool(
+        lambda: sb.auth.admin.update_user_by_id(
+            str(user_id), {"ban_duration": _INDEFINITE_BAN}
+        )
+    )
+
+    victim = await _lookup_user_email(user_id)
+    await _cancel_inflight_runs(user_id, sb)
+
+    request.state.audit_label = f"Disabled {victim}'s account"
+    request.state.audit_action = "user.disable"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/users/{user_id}/enable", status_code=status.HTTP_204_NO_CONTENT)
+async def enable_user(
+    user_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Re-enable a user — lift the GoTrue ban and record a ``user.enable`` row.
+
+    ``ban_duration="none"`` nulls ``auth.users.banned_until`` (GoTrue). Restorative +
+    direct: NO in-flight cancel, NO self-guard (re-enabling yourself is harmless). The
+    blocking admin call rides ``run_in_threadpool`` (D-v2.5-01). Floor row: the 064-B
+    plain-sentence label + ``user.enable``.
+    """
+    sb = get_supabase()
+    await run_in_threadpool(
+        lambda: sb.auth.admin.update_user_by_id(str(user_id), {"ban_duration": "none"})
+    )
+
+    victim = await _lookup_user_email(user_id)
+    request.state.audit_label = f"Re-enabled {victim}'s account"
+    request.state.audit_action = "user.enable"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
