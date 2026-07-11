@@ -70,3 +70,21 @@ changes. Logged, not fixed (executor scope boundary).
   (the `fk_aware_runs_factory` conftest fixture exists for exactly this but this file
   predates it). Unrelated to this plan's cancel refactor (the failure is at POST-time run
   INSERT, before any DELETE). Fix = adopt `fk_aware_runs_factory`.
+
+## From Plan 147-07 (Task 2)
+
+- **Duplicate `export interface ActiveRun` in `frontend/src/lib/api.ts`:** the file
+  now declares `ActiveRun` twice — the legacy Phase-062 mirror (`api.ts:231`,
+  `{ run_id, started_at: string, status: "streaming" }`) AND the Plan-147-06 admin
+  shape (`api.ts:3614`, `{ run_id, kind, …, started_at: number, killable,
+  not_responding }`). TypeScript declaration-merges same-name interfaces in one
+  module; the project `tsc --noEmit` is GREEN at baseline and after this plan
+  (verified via a throwaway `import type { ActiveRun }` probe that resolves the
+  ADMIN fields incl. `started_at` usable as `number`), so the effective type serves
+  the admin consumers correctly today. It is nonetheless a latent maintainability
+  landmine: the two `started_at` types (`string` vs `number`) are structurally
+  incompatible and a future edit touching either declaration can flip the merge into
+  a hard `TS2717`. NOT this plan's file to change (plan 07 only consumes the type;
+  Wave-1 context says don't re-declare it) and not caused by this task, so logged not
+  fixed (scope boundary). Fix = rename one of them (e.g. the legacy 062 mirror →
+  `StreamingActiveRun`) and re-point `getActiveRuns`/`ThreadSnapshot.active_runs`.
