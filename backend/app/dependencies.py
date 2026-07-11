@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 import asyncpg
 import redis.asyncio as aioredis
@@ -104,6 +105,28 @@ async def get_pg_pool() -> asyncpg.Pool:
     return _pg_pool
 
 
+async def _is_banned(user_id: str) -> bool:
+    """Phase 148 (T-148-02 / T-148-04) — is this user disabled (banned_until in the future)?
+
+    Reads ``auth.users.banned_until`` via the singleton asyncpg pool (~1ms). Returns True
+    ONLY for a real FUTURE ``banned_until``; False for NULL / past. FAILS OPEN — any read
+    exception returns False so a transient DB blip can NEVER lock out every user (the
+    "no self-inflicted outage" polarity — matches the maintenance_mode default-OPEN
+    posture). The stateless-JWT window is already bounded and the ban is re-enforced on
+    the next successful read. Do NOT trust ``supabase.auth.get_user`` to reject a live
+    token's ban — it does not (Pitfall 1); this app-layer check is the enforcement seam.
+    """
+    try:
+        pool = await get_pg_pool()
+        row = await pool.fetchrow(
+            "SELECT banned_until FROM auth.users WHERE id = $1", user_id
+        )
+        bu = row and row["banned_until"]
+        return bu is not None and bu > datetime.now(timezone.utc)
+    except Exception:
+        return False  # fail-OPEN — re-enforced on the next successful read
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     supabase: Client = Depends(get_supabase),
@@ -113,9 +136,19 @@ async def get_current_user(
         response = supabase.auth.get_user(token)
         if response.user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        return {"id": response.user.id, "email": response.user.email}
+        identity = {"id": response.user.id, "email": response.user.email}
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    # Phase 148 (ADMIN-03 / T-148-02) — app-layer ban check. AFTER the token validates
+    # and OUTSIDE the auth try/except above (so this 403 is NOT folded into the 401).
+    # Closes the ~1h stateless-JWT window: a banned user's live token stays valid until
+    # exp, so only a per-request DB check locks them out. _is_banned fails OPEN.
+    if await _is_banned(identity["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is disabled — contact your administrator.",
+        )
+    return identity
 
 
 # ── Phase 146 (ADMIN-01) — operator gate + append-only audit floor ────────────
@@ -254,3 +287,33 @@ async def operator_audit_floor(
         )
     except Exception as exc:
         logger.error("operator audit floor failed: %s", exc)  # swallow (D-05 precedent)
+
+
+# ── Phase 148 (VIS-01) — per-endpoint feature-visibility gate ──────────────────
+def require_visible(feature: str):
+    """VIS-01 API-layer visibility gate (D-03). A dependency FACTORY.
+
+    Returns an async dependency that is a literal NO-OP for operators AND for
+    Everyone-audience features (Deep Mode / the Run + chat-model-picker carve-outs stay
+    byte-identical), and raises **403 — NOT 404** for a non-operator hitting an
+    Operators-only feature. The /admin surface keeps its byte-identical 404; a governed
+    product feature is a deliberate 403 an end user can understand (these are features
+    they may legitimately have seen before a flip). ``is_operator`` is the ONE swappable
+    boundary — SEED-115 later flips it to "is in group X" with zero change here.
+
+    Attach PER-ENDPOINT on the governed authoring/management endpoints ONLY — never at a
+    router level that would gate a Run/chat carve-out (``GET /settings/providers``,
+    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` is
+    lazy-imported inside the closure to avoid an import cycle (user_settings -> deps).
+    """
+    async def _dep(current_user: dict = Depends(get_current_user)):
+        if await is_operator(current_user["id"]):
+            return  # operator -> no-op
+        from app.models.user_settings import feature_audience
+        if feature_audience(feature) == "everyone":
+            return  # Everyone-audience feature -> no-op (carve-out byte-identical)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This feature is available to administrators only.",
+        )
+    return _dep
