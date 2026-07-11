@@ -142,7 +142,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 147-09-PLAN.md — ControlRoomPage recompose (D-08 promote + 063-B scroll + D-07 auto-poll/visit) + end-user maintenance banner [ADMIN-02, FLAG-01]
+- [x] 147-09-PLAN.md — ControlRoomPage recompose (D-08 promote + 063-B scroll + D-07 auto-poll/visit) + end-user maintenance banner [ADMIN-02, FLAG-01]
 
 **UI hint**: yes
 
