@@ -128,9 +128,9 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 147-01-PLAN.md — Flag substrate: migration 097 (3 app_settings booleans) + fail-closed read helpers (D-Q4 polarity) [FLAG-01]
-- [ ] 147-02-PLAN.md — Health probes (Redis/Supabase/sandbox additive on /backpressure) + cross-user active-runs read (D-Q1 kind derivation) + D-07 poll/visit floor discipline [ADMIN-02]
-- [ ] 147-06-PLAN.md — Frontend API contract (types + client fns) + BUG-260710-01/-02 cancelled-run honesty (render-only, G-5 safe) [ADMIN-02]
+- [x] 147-01-PLAN.md — Flag substrate: migration 097 (3 app_settings booleans) + fail-closed read helpers (D-Q4 polarity) [FLAG-01]
+- [x] 147-02-PLAN.md — Health probes (Redis/Supabase/sandbox additive on /backpressure) + cross-user active-runs read (D-Q1 kind derivation) + D-07 poll/visit floor discipline [ADMIN-02]
+- [x] 147-06-PLAN.md — Frontend API contract (types + client fns) + BUG-260710-01/-02 cancelled-run honesty (render-only, G-5 safe) [ADMIN-02]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
