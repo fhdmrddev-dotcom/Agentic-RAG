@@ -110,8 +110,10 @@ def test_get_passes_under_maintenance(on_client):
 
 
 def test_head_and_options_pass_under_maintenance(on_client):
-    assert on_client.head("/read").status_code == 200
-    # OPTIONS is a passthrough method — the middleware must never 503 it (preflight).
+    # HEAD/OPTIONS are passthrough methods — the middleware must never 503 them. (The
+    # router itself may 405 when no HEAD/OPTIONS handler is declared; that only proves
+    # the request reached routing, i.e. the middleware let it through.)
+    assert on_client.head("/read").status_code != 503
     assert on_client.options("/read").status_code != 503
 
 

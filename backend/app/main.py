@@ -58,6 +58,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.middleware.maintenance import MaintenanceMiddleware
 
 
 def _patch_postgrest_maybe_single():
@@ -459,6 +460,18 @@ async def lifespan(app_instance):
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
+# Phase 147 (FLAG-01 / D-06) — maintenance/read-only write-block seam. Registered
+# BEFORE CORS so CORS ends up OUTERMOST (Starlette applies add_middleware in reverse
+# registration order — the LAST-registered wraps the rest). CORS-outermost means:
+#   (a) CORS still answers OPTIONS preflight in maintenance, and
+#   (b) a 503 write-block still carries CORS headers so the browser can READ it
+#       (a maintenance-outermost 503 would surface as an opaque CORS error).
+# Pure-ASGI middleware (NOT BaseHTTPMiddleware) so it never buffers the SSE stream; it
+# reads the flag from the in-memory TTL settings cache (no per-request DB, D-v2.5-01)
+# and fails OPEN on a cold/blip read (D-Q4). The allowlist keeps the off-switch
+# (PUT /admin/flags), login, and DELETE /runs/{id} reachable even under maintenance.
+app.add_middleware(MaintenanceMiddleware)
+
 # FRONTEND_URL may hold one origin or a comma-separated list (e.g.
 # "https://superrag.cloud,https://agentic-rag-rho.vercel.app"). Split + strip
 # so multiple production origins can be allowed without a code change; a single
@@ -478,12 +491,17 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     from app.dependencies import get_redis
+    from app.models.user_settings import maintenance_mode
     try:
         await asyncio.wait_for(get_redis().ping(), timeout=1.0)
         redis_status = "ok"
     except Exception:
         redis_status = "unreachable"
-    return {"status": "ok", "redis": redis_status}
+    # Phase 147 (FLAG-01 / D-06) — additive maintenance boolean so the end-user
+    # (non-operator) banner has a PUBLIC flag source without hitting /admin (which is
+    # 404 to non-operators). Boolean ONLY — no other settings may leak here (T-147-15).
+    # Read via the same in-memory TTL cache (maintenance_mode(): fail-OPEN, no DB call).
+    return {"status": "ok", "redis": redis_status, "maintenance": maintenance_mode()}
 
 
 @app.get("/models")
