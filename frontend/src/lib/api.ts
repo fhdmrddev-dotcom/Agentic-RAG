@@ -3560,11 +3560,18 @@ export async function getBackpressure(): Promise<BackpressureSignals> {
 }
 
 /** Read the recent operator-actions ledger feed (`GET /admin/audit`). Plain
- *  authed GET; `limit` optionally caps how many rows come back. */
+ *  authed GET; `limit` optionally caps how many rows come back.
+ *
+ *  CR-01: the backend returns an ENVELOPE `{"entries": [...]}` (admin.py) — the
+ *  same shape as `getAuditLogs` above. Unwrap `.entries` here; casting the raw
+ *  object to `OperatorAuditRow[]` shipped a `{entries}` object into `auditRows`
+ *  state, and the next `auditRows.slice(...)` crashed the whole Control Room tree
+ *  (no error boundary above it → white screen). The unwrap is the contract. */
 export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow[]> {
   const headers = await getAuthHeaders()
   const qs = limit != null ? `?limit=${encodeURIComponent(limit)}` : ""
   const res = await fetch(`${API_BASE}/admin/audit${qs}`, { headers })
   if (!res.ok) throw new ApiError("Failed to load the operator audit feed.", res.status)
-  return (await res.json()) as OperatorAuditRow[]
+  const body = (await res.json()) as { entries?: OperatorAuditRow[] }
+  return body.entries ?? []
 }
