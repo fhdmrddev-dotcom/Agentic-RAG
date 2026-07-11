@@ -833,3 +833,92 @@ async def enable_user(
     request.state.audit_label = f"Re-enabled {victim}'s account"
     request.state.audit_action = "user.enable"
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 148 (ADMIN-03 / D-01, VIS-01) — operator grant/revoke + visibility set
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/users/{user_id}/operator", status_code=status.HTTP_204_NO_CONTENT)
+async def grant_operator_access(
+    user_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Grant operator access (D-01) — delegates to ``operator_service.grant_operator``.
+
+    The service INSERTs ``operator_users`` populating ``granted_by`` = the acting operator
+    (mig 095 provenance), idempotent via ``ON CONFLICT DO UPDATE``. Floor row: a
+    plain-sentence ``operator.grant`` naming the grantee.
+    """
+    acting_id = request.state.operator["id"]
+    await grant_operator(str(user_id), acting_id)
+
+    email = await _lookup_user_email(user_id)
+    request.state.audit_label = f"Granted operator access to {email}"
+    request.state.audit_action = "operator.grant"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/users/{user_id}/operator", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_operator_access(
+    user_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Revoke operator access — delegates to ``operator_service.revoke_operator``.
+
+    The service refuses a self-revoke with ``409`` BEFORE any DELETE (lockout-proof —
+    Pitfall 7; the server is the wall, not the UI tooltip). The person keeps their normal
+    account (only the membership row is removed); past ``operator_audit_log`` history is
+    untouched. Floor row: ``operator.revoke`` naming the target.
+    """
+    acting_id = request.state.operator["id"]
+    email = await _lookup_user_email(user_id)  # name the target before the delete
+    await revoke_operator(str(user_id), acting_id)  # raises 409 on self BEFORE any mutation
+
+    request.state.audit_label = f"Revoked {email}'s operator access"
+    request.state.audit_action = "operator.revoke"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class VisibilityUpdate(BaseModel):
+    """Body for PUT /admin/visibility. ``feature`` + ``audience`` are validated against
+    code allowlists in the handler (T-148-03) — never free text. ``audience`` is an enum
+    VALUE, never a boolean (SEED-115 forward-compat)."""
+
+    feature: str
+    audience: str
+
+
+@router.put("/visibility", status_code=status.HTTP_204_NO_CONTENT)
+async def set_visibility(
+    request: Request,
+    body: VisibilityUpdate,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Set a governed feature's audience (VIS-01) — allowlist-validated, then atomic merge.
+
+    Validates ``feature`` against the four-key code allowlist AND ``audience`` against
+    ``{everyone, operators}`` and rejects a bad value with ``400`` BEFORE any write (never
+    free text → SQLi-safe, mirrors ``set_flag``'s ``_FLAG_KEYS`` guard). Then delegates to
+    ``set_feature_visibility`` (atomic per-key JSONB ``||`` merge — no lost-update clobber).
+    Floor row: ``visibility.set`` with a plain-sentence label.
+    """
+    if body.feature not in _VISIBILITY_FEATURES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown feature: {body.feature}",
+        )
+    if body.audience not in _VISIBILITY_AUDIENCES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown audience: {body.audience}",
+        )
+
+    await set_feature_visibility(body.feature, body.audience)
+
+    request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
+    request.state.audit_action = "visibility.set"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
