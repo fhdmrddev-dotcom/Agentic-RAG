@@ -513,7 +513,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -539,6 +539,7 @@ app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Ski
 app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
 app.include_router(evals.router)  # Phase 133 EVAL-02 — owner-scoped eval runner control surface (POST kickoff + GET results/list; companion runs row reuses runs.py stream/cancel)
 app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eval surface (POST engine-sweep + GET engine-health + GET /evals/runs/{id} skill-less readout; matrix launch stays on evals.router)
+app.include_router(features.router)  # Phase 148 VIS-01 — authenticated per-user GET /features effective-map (NOT operator-gated; top-level, not under /admin — non-operators must reach it to learn their own map)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
