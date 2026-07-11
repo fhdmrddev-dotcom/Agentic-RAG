@@ -160,9 +160,9 @@ Plans:
 
 **Plans**: 9 plans in 6 waves
 - [x] 148-01-PLAN.md — Wave 0 test scaffold (16 test_148_* files + conftest fixtures)
-- [ ] 148-02-PLAN.md — Backend substrate: migration 098 + audience resolver/writer + require_visible + app-layer ban check
+- [x] 148-02-PLAN.md — Backend substrate: migration 098 + audience resolver/writer + require_visible + app-layer ban check
 - [ ] 148-03-PLAN.md — Apply migration 098 to the live DB + regenerate full-schema (operator step)
-- [ ] 148-04-PLAN.md — Governance + operator service layer (audit query/CSV, roster, grant/revoke)
+- [x] 148-04-PLAN.md — Governance + operator service layer (audit query/CSV, roster, grant/revoke)
 - [ ] 148-05-PLAN.md — VIS-01 enforcement wiring: GET /features + require_visible across governed routers (Run carve-outs)
 - [ ] 148-06-PLAN.md — Operator admin endpoints (platform browse/export, users disable/enable, grant/revoke, visibility set)
 - [ ] 148-07-PLAN.md — Frontend VIS-01 enforcement: effective-features hook + nav vanish + graceful 403 bounce
@@ -323,7 +323,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 146. Operator Foundation | 6/6 | Complete | 2026-07-11 |
 | 147. Operator Control Plane | 0/? | Not started | - |
-| 148. Governance — Audit, Users & Feature Visibility | 2/9 | In Progress | - |
+| 148. Governance — Audit, Users & Feature Visibility | 3/9 | In Progress | - |
 | 149. Model Registry & Discovery | 0/? | Not started | - |
 | 150. Secrets at Rest | 0/? | Not started | - |
 | 151. Agent File Tools | 0/? | Not started | - |

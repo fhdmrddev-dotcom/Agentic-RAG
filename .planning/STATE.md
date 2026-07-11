@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-11T17:16:57.216Z"
+last_updated: "2026-07-11T17:28:42.018Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 26
   completed_phases: 2
   total_plans: 24
-  completed_plans: 16
+  completed_plans: 18
   percent: 8
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 148 (governance-audit-users-feature-visibility) — EXECUTING
-Plan: 3 of 9
-Status: Ready to execute
+Plan: 4 of 9 (148-04 complete — governance/operator service layer)
+Status: 148-04 complete — 10/10 service tests GREEN; 146/147 regression 78/78; awaiting next wave plan
 Last activity: 2026-07-11
 
 ### Quick Tasks Completed
@@ -423,6 +423,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 146]: 146-05: LockedTab keeps NO phase-number token in shipped copy OR source comments (T-146-10 grep treats any 'phase 1xx' substring as a leak); amber operator zone uses Tailwind amber-* tokens (StatusPill precedent), not a bespoke warning utility
 - [Phase 146]: Control Room reachable via the probe-gated shield rendered OUTSIDE NAV_ITEMS (D-07 byte-identity, regression-locked); the 061-B shell's manual ↻ Refresh honesty beat (no auto-poll) visibly prepends the operator's own 'Viewed system health' ledger row (D-04/D-08)
 - [Phase ?]: 148-01: Nyquist Wave-0 scaffold — 14 RED test_148 files + banned_user/feature_visibility fixtures; wave-ownership split
+- [Phase 148]: 148-04: governance_service.py cross-user reads (query_platform_audit, list_users_roster) swallow-and-log to [] (best-effort feed); only the CSV over-cap refusal (AuditExportTooLarge, >_CSV_MAX_ROWS=50000) propagates as a deliberate 4xx — never truncates. Every filter a NULL-guarded $N bind (user scope / action_type text[] ANY / half-open [since,until) window); page_size clamped <=100 at the service boundary (SC#4 no-full-tenant-leak).
+- [Phase 148]: 148-04: export CSV returns the COUNT-probe value as the exact filtered count (not len(rows)) — the authoritative set size that gates the cap and 148-06 stamps onto audit.export; belt-and-suspenders LIMIT (==cap) never truncates a validated under-cap set. grant_operator idempotent ON CONFLICT DO UPDATE re-stamps granted_by; revoke_operator refuses self-revoke (409) BEFORE any pool access (Pitfall 7 lockout-proof).
+- [Phase 148]: 148-04: skipped requirements.mark-complete for ADMIN-03 — service layer built + unit-tested (10/10 service tests GREEN) but not yet wired to any router (148-06 endpoints / 148-07 UI); marking now would be false-green. Completes at phase verify-work (mirrors 148-02 substrate posture). Controller-level tests (disable/enable/view_platform_recorded) stay expected-RED, owned by 148-06.
 
 ## Operator Next Steps
 
