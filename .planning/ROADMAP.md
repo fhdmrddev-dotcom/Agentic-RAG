@@ -159,7 +159,7 @@ Plans:
   4. Cross-user read paths in the admin browser are explicitly filtered (no full-tenant leak on the service-role client).
 
 **Plans**: 9 plans in 6 waves
-- [ ] 148-01-PLAN.md — Wave 0 test scaffold (16 test_148_* files + conftest fixtures)
+- [x] 148-01-PLAN.md — Wave 0 test scaffold (16 test_148_* files + conftest fixtures)
 - [ ] 148-02-PLAN.md — Backend substrate: migration 098 + audience resolver/writer + require_visible + app-layer ban check
 - [ ] 148-03-PLAN.md — Apply migration 098 to the live DB + regenerate full-schema (operator step)
 - [ ] 148-04-PLAN.md — Governance + operator service layer (audit query/CSV, roster, grant/revoke)
