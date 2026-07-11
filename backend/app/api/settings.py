@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from supabase import Client
 
 from app.config import MODEL_CAPABILITIES, _infer_provider_for
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
     load_app_settings,
@@ -279,12 +279,24 @@ def _validate_confidence_buckets(high: float | None, medium: float | None) -> No
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("", response_model=FullSettingsResponse)
+# Phase 148 (VIS-01) — the model-registry / Settings surface is an Operators-only governed
+# feature (model_management). Gate PER-ENDPOINT (NEVER at the router level) so the Run carve-out
+# GET /settings/providers below stays ungated (Pitfall 3 — router-gating would 403 the chat model
+# picker). require_visible is a no-op for operators + Everyone-audience features; 403 (D-03) else.
+@router.get(
+    "",
+    response_model=FullSettingsResponse,
+    dependencies=[Depends(require_visible("model_management"))],
+)
 async def get_settings(current_user: dict = Depends(get_current_user)):
     return await _build_response()
 
 
-@router.put("", response_model=FullSettingsResponse)
+@router.put(
+    "",
+    response_model=FullSettingsResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def update_settings(
     body: SettingsUpdate,
     background_tasks: BackgroundTasks,
@@ -469,7 +481,11 @@ class ReembedProgressResponse(BaseModel):
     updated_at: float | None = None
 
 
-@router.get("/reembed-progress", response_model=ReembedProgressResponse)
+@router.get(
+    "/reembed-progress",
+    response_model=ReembedProgressResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def get_reembed_progress(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
@@ -485,7 +501,11 @@ async def get_reembed_progress(
     return await reembed_progress(supabase, current_user["id"], s)
 
 
-@router.post("/reembed", response_model=ReembedProgressResponse)
+@router.post(
+    "/reembed",
+    response_model=ReembedProgressResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def rekick_reembed(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
@@ -503,6 +523,9 @@ async def rekick_reembed(
     return await reembed_progress(supabase, current_user["id"], s)
 
 
+# Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT add require_visible here. This feeds the chat
+# model picker (ChatArea.tsx getProviders()); end users need it. Gating it would be a
+# self-inflicted end-user outage (Pitfall 3 / T-148-08). test_148_carveouts guards this.
 @router.get("/providers")
 async def get_providers(current_user: dict = Depends(get_current_user)):
     """Lightweight endpoint for the chat UI provider selector."""

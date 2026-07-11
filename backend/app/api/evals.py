@@ -56,7 +56,7 @@ from supabase import Client
 
 from app.config import MODEL_CAPABILITIES, get_model_capability
 from app.db.runs import insert_run
-from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
+from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
 from app.models.eval_run import (
     ForcePromoteBody,
     PromotionGate,
@@ -70,13 +70,25 @@ from app.services import eval_aggregation, eval_runner_service, skill_proposer_s
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/skills", tags=["skill-evals"])
+# Phase 148 (VIS-01) — Skill Studio is an Operators-only governed feature. Gate the WHOLE
+# router (every endpoint, no carve-out) so a non-operator is refused server-side (403 — D-03,
+# not 404) and a future eval endpoint cannot forget the gate. require_visible is a no-op for
+# operators + Everyone-audience features; is_operator is the ONE swappable audience boundary.
+router = APIRouter(
+    prefix="/skills",
+    tags=["skill-evals"],
+    dependencies=[Depends(require_visible("skill_studio"))],
+)
 
 # Phase 137.1 (EVAL-05) — the skill-LESS eval surface (engine smoke sweep + engine-health
 # board + the skill-less run readout). These routes are NOT under the ``/skills`` prefix (a
 # sweep run has no skill_id — D-02), so they live on their own ``/evals`` router. Registered
 # alongside ``router`` in main.py.
-router_evals = APIRouter(prefix="/evals", tags=["evals"])
+router_evals = APIRouter(
+    prefix="/evals",
+    tags=["evals"],
+    dependencies=[Depends(require_visible("skill_studio"))],  # Phase 148 (VIS-01) — same Skill Studio gate
+)
 
 # TTL on the Redis in-flight claim — generously above the longest bounded run so a
 # crashed/killed worker that never reaches the job ``finally`` can't wedge a skill forever
