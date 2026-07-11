@@ -23,18 +23,22 @@ Endpoints:
 """
 import logging
 from typing import Literal
+from uuid import UUID
 
 import anyio
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
+from supabase import Client
 
 import app.dependencies as deps
 from app.config import settings
 from app.dependencies import (
     get_redis,
+    get_supabase,
     operator_audit_floor,
     require_operator,
 )
+from app.models.user_settings import save_app_settings
 from app.services.operator_service import (
     get_operator_record,
     get_recent_operator_audit,
@@ -45,6 +49,20 @@ logger = logging.getLogger(__name__)
 # Kill is wired day-one for chat + workflow only (D-01); eval/tuner are bounded internal
 # jobs that end on their own (no operator-side cancel this phase).
 _KILLABLE_KINDS = {"chat", "workflow"}
+
+# FLAG-01 (T-147-01): the code-constant kill-switch allowlist — the ONLY keys PUT
+# /admin/flags may write. A client-supplied column name must NEVER reach
+# save_app_settings' SET clause (which interpolates the column name into SQL). These
+# are the five booleans added to main._DIRECT_COLUMNS (mig 097 added the last three).
+# Keyed by human name so the audit label is plain-language (LANG-01, born plain).
+_FLAG_HUMAN_NAMES = {
+    "web_search_enabled": "web search",
+    "sandbox_enabled": "code sandbox",
+    "self_improve_enabled": "self-improvement",
+    "workflows_enabled": "workflows",
+    "maintenance_mode": "maintenance mode",
+}
+_FLAG_KEYS = set(_FLAG_HUMAN_NAMES)
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -300,6 +318,144 @@ async def get_active_runs():
         })
 
     return {"runs": runs_out}
+
+
+@router.post("/runs/{run_id}/kill", status_code=status.HTTP_204_NO_CONTENT)
+async def kill_run(
+    run_id: UUID,
+    request: Request,
+    supabase: Client = Depends(get_supabase),
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Operator Kill — cancel ANY user's chat/workflow run (ADMIN-02 / D-02 / D-03).
+
+    The ONLY difference from the owner-scoped ``cancel_run`` is the missing ownership
+    filter (D-02): the SELECT here carries NO ``user_id`` predicate, so it reaches any
+    user's run — but a MISSING run still 404s (non-discoverable, T-147-04). The
+    ownership skip is legitimate ONLY behind this ``require_operator`` router gate
+    (T-147-06 — the shared helper makes no privileged decision). Internal jobs
+    (eval/tuner, D-01) are refused with a plain 409 — they end on their own, no Kill.
+
+    The cancel itself DELEGATES to the SHARED ``_cancel_run_internals`` so the D-062
+    zombie-heal discipline never drifts. The audit label names the victim + model
+    (064-B) — but a zombie-heal OUTCOME reads "Recovered a stuck run", never "killed"
+    (064-B honesty; the verb is derived from which sub-path fired). The victim sees
+    exactly a self-cancel; who/why lives ONLY in ``operator_audit_log`` (D-03 — no
+    operator attribution reaches anything the victim reads). Floor-attached.
+    """
+    pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
+    if pool is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    # Operator-scoped SELECT — NO ``.eq(user_id)`` (the ENTIRE D-02 difference). Fetch
+    # ANY user's row (for victim naming); still 404-non-discoverable on a missing id.
+    try:
+        run_rows = await pool.fetch(
+            "SELECT run_id, status, thread_id, user_id, model, provider "
+            "FROM runs WHERE run_id = $1",
+            run_id,
+        )
+    except Exception:
+        logger.exception("kill_run: runs SELECT failed for %s", run_id)
+        run_rows = []
+    row = run_rows[0] if run_rows else None
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    # D-01: refuse internal jobs. An eval companion run shares its UUID with
+    # ``eval_runs.id`` (the D-Q1 derivation plan 02's /admin/runs uses); a tuner job has
+    # no ``runs`` row at all so it never reaches here (it 404'd above).
+    try:
+        eval_rows = await pool.fetch("SELECT id FROM eval_runs WHERE id = $1", run_id)
+    except Exception:
+        logger.exception("kill_run: eval detection failed for %s (continuing)", run_id)
+        eval_rows = []
+    if eval_rows:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This is an internal evaluation job — it finishes on its own and "
+                "can't be stopped by hand."
+            ),
+        )
+
+    # Victim naming (metadata ONLY — linkage rule #11; never thread contents).
+    model = row["model"]
+    victim = "a user"
+    if row["user_id"] is not None:
+        try:
+            user_rows = await pool.fetch(
+                "SELECT email FROM auth.users WHERE id = $1", row["user_id"]
+            )
+            if user_rows and user_rows[0]["email"]:
+                victim = user_rows[0]["email"]
+        except Exception:
+            logger.exception("kill_run: victim email enrichment failed (continuing)")
+
+    # Delegate to the SHARED cancel/zombie-heal discipline — WITHOUT the ownership
+    # filter (which we deliberately skipped above). Nothing operator-identifying is
+    # passed: the victim's run finalizes to the ordinary cancelled/cancelled_by_user
+    # terminal state, identical to a self-cancel (D-03).
+    from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
+
+    outcome = await _cancel_run_internals(
+        run_id=run_id,
+        status=row["status"],
+        thread_id=str(row["thread_id"]) if row["thread_id"] else None,
+        redis=get_redis(),
+        supabase=supabase,
+    )
+
+    # 064-B honesty: a zombie-heal reads "Recovered a stuck run", a live cancel "Ended
+    # {victim}'s run". Both record action ``run.kill``. Who/why lives ONLY here.
+    if outcome == "zombie_healed":
+        request.state.audit_label = f"Recovered a stuck run on {model}"
+    else:
+        request.state.audit_label = f"Ended {victim}'s run on {model}"
+    request.state.audit_action = "run.kill"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class FlagUpdate(BaseModel):
+    """Body for PUT /admin/flags. ``key`` is validated against the code-constant
+    allowlist in the handler (T-147-01); ``value`` is a strict bool."""
+
+    key: str
+    value: bool
+
+
+@router.put("/flags", status_code=status.HTTP_204_NO_CONTENT)
+async def set_flag(
+    request: Request,
+    body: FlagUpdate,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Write ONE validated kill-switch through ``save_app_settings`` (FLAG-01).
+
+    T-147-01: ``key`` MUST be one of the code-constant flag names (``_FLAG_KEYS``) — a
+    client-supplied column name must NEVER reach ``save_app_settings``' SET clause, which
+    interpolates the column name into SQL. An unknown key → 422 (never a write). The
+    value is a bool (Pydantic). ``save_app_settings`` issues the parameterized UPDATE and
+    invalidates the per-worker TTL cache (the flag takes effect within the ~30s window —
+    the "on their next call" copy). Floor-attached: ``flag.<key>.<on|off>`` (except
+    ``maintenance_mode`` → ``maintenance.set``, 066 linkage), plain-language label.
+    """
+    if body.key not in _FLAG_KEYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown flag key: {body.key}",
+        )
+
+    await save_app_settings({body.key: body.value})
+
+    on = "ON" if body.value else "OFF"
+    if body.key == "maintenance_mode":
+        request.state.audit_action = "maintenance.set"
+        request.state.audit_label = f"Turned {on} maintenance mode"
+    else:
+        request.state.audit_action = f"flag.{body.key}.{'on' if body.value else 'off'}"
+        request.state.audit_label = f"Turned {on} {_FLAG_HUMAN_NAMES[body.key]} for everyone"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 class ControlPlaneRecord(BaseModel):
