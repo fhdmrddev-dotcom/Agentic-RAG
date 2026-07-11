@@ -33,6 +33,10 @@ from app.services.sub_agent_service import run_sub_agent
 from app.services.audit_service import write_audit_entry
 from app.services.sandbox_service import sandbox_manager, harvest_output_files, snapshot_output_baseline
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+# Phase 147 (FLAG-01 / D-04 layer 2 REFUSE) — the refuse gate reads the SAME
+# last-known-good TTL settings cache the get_tools hide layer reads. Module-level
+# (patch-where-used friendly) and cycle-safe: user_settings imports only app.config.
+from app.models.user_settings import load_app_settings
 from app.services.sql_service import query_documents
 from app.services.skill_lint import lint_description
 # Phase 115 (VIEW-07) — the query_documents_by_view handler reuses the 113/114 leak-safe
@@ -3254,6 +3258,52 @@ def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[st
         logger.exception("tool_refused audit spawn failed for tool=%s", tool_name)
 
 
+# ---------------------------------------------------------------------------
+# Phase 147 (FLAG-01 / D-04 layer 2 — fail-closed capability REFUSE)
+# ---------------------------------------------------------------------------
+# The fail-closed sibling of the 091 whitelist no-op below. When an operator flips a
+# capability kill-switch OFF, an in-flight call to that capability tool gets a plain
+# ToolResult refusal the agent can relay and work around. It is:
+#   * provider-agnostic — a plain ``ToolResult.result`` string; the agent loop attaches
+#     the matching tool_call_id itself, so NO ``provider ==`` branch is ever touched
+#     (T-147-14 / the red line: the shared path never forks under a flag), and the
+#     refusal is IDENTICAL for OpenAI / Anthropic / Google / OpenRouter.
+#   * a literal no-op when every gated flag is ON/absent — skipped exactly like the
+#     ``phase_whitelist is None`` Deep-Mode branch, so Deep dispatch is byte-identical.
+#   * defense-in-depth with the get_tools HIDE layer: a disabled tool is BOTH omitted
+#     from the schema AND refused here if a model calls it anyway (D-04).
+_CAPABILITY_FLAG_TOOLS: dict[str, tuple[str, str]] = {
+    # tool_name -> (app_settings flag attribute, human label for the plain refusal copy)
+    "web_search": ("web_search_enabled", "Web search"),
+    "execute_code": ("sandbox_enabled", "Code execution"),
+    "save_skill": ("self_improve_enabled", "Self-improvement (skill saving)"),
+}
+
+
+def _capability_disabled_message(tool_name: str) -> "str | None":
+    """Return a plain admin refusal message if ``tool_name`` is a capability tool whose
+    operator kill-switch is currently OFF, else ``None``.
+
+    ``None`` for any non-gated tool (the common case, a fast dict-miss) AND for a gated
+    tool whose flag is ON/absent → the caller's branch is skipped and dispatch proceeds
+    byte-identically. Fail-closed toward last-known-good: a ``load_app_settings()``
+    exception (cold cache / DB blip) returns ``None`` (treat as ON) so a transient blip
+    NEVER silently disables a capability (D-Q4 default-ON polarity / T-147-02). The
+    settings read itself already returns the STALE cache on a DB failure — this except is
+    the belt-and-braces second line."""
+    gate = _CAPABILITY_FLAG_TOOLS.get(tool_name)
+    if gate is None:
+        return None  # not a gated capability tool → fast no-op (the overwhelming common case)
+    flag_attr, label = gate
+    try:
+        flag_on = getattr(load_app_settings(), flag_attr)
+    except Exception:  # noqa: BLE001 — defensive: cold cache / read blip → treat as ON (D-Q4)
+        return None
+    if flag_on:
+        return None  # capability ON/absent → literal no-op (Deep byte-identical)
+    return f"{label} is currently disabled by the administrator"
+
+
 async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
     """Route a tool call to its handler. Unknown tools return an error string."""
     # Phase 091 HARNESS-05 (D-05 layer 2 — hard backstop for hallucinated names).
@@ -3272,6 +3322,16 @@ async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolRes
                 f"Available tools here: {allowed}"
             ),
             "allowed": allowed,
+        }))
+    # Phase 147 FLAG-01 (D-04 layer 2 REFUSE) — a disabled capability tool called
+    # in-flight gets a plain refusal ToolResult the agent can relay. Literal no-op when
+    # the flag is ON/absent (Deep byte-identical); provider-agnostic (no provider branch).
+    _disabled_msg = _capability_disabled_message(tool_name)
+    if _disabled_msg is not None:
+        return ToolResult(result=json.dumps({
+            "error": "capability_disabled",
+            "tool": tool_name,
+            "message": _disabled_msg,
         }))
     handler = _TOOL_REGISTRY.get(tool_name)
     if handler is None:

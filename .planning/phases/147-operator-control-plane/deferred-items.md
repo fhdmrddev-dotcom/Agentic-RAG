@@ -3,6 +3,24 @@
 Items found during execution that are OUT OF SCOPE for the current task's
 changes. Logged, not fixed (executor scope boundary).
 
+## From Plan 147-04 (Task 1)
+
+- **Pre-existing stale hardcoded tool counts:**
+  `backend/tests/unit/test_085_tool_registration.py::test_get_tools_returns_22_tools_with_no_conditional_enabled`
+  asserts the no-web/no-sandbox base toolbox is exactly 22 and both-conditionals-on is
+  exactly 24. Reality at committed HEAD (before 147-04): the base list is already **24**
+  tools — `query_documents_by_view` (Phase 115) + `get_related_documents` (Phase 116) were
+  added to the always-on base after this Phase-085 test's counts were written, but the
+  hardcoded `22`/`24` were never bumped, so it fails `24 != 22` on the baseline. Verified via
+  `git show HEAD:...openai_service.py` (base-list count = 24). Plan 147-04's `get_tools`
+  change is exactly count-neutral (it removes `SAVE_SKILL_TOOL` from the base list and
+  re-appends it via a default-ON conditional `getattr(effective, "self_improve_enabled",
+  True)`), so the count is 24 both before and after — the failure is Phase 115/116
+  documentation debt in an unrelated test, NOT a 147-04 regression. Not fixed (scope
+  boundary). Fix = bump expected counts to 24 (base) / 26 (both on), or assert conditional
+  membership instead of a brittle total. FLAG-01's own self_improve conditional is fully
+  covered by the new `test_147_flag_hide.py` set-equality assertions.
+
 ## From Plan 147-06 (Task 2)
 
 - **Pre-existing test rot (SEED-056):** `frontend/src/__tests__/components/MessageItem.test.tsx`

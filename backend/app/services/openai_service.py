@@ -1028,7 +1028,7 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, QUERY_DOCUMENTS_BY_VIEW_TOOL,
              GET_RELATED_DOCUMENTS_TOOL,
              LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
-             LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
+             LOAD_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
@@ -1044,6 +1044,24 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     # path (Google max_tools:16); Deep stays byte-identical with this tool present.
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
+    # Phase 147 (FLAG-01 / D-04 layer 1 HIDE): the self-improvement operator kill-switch
+    # gates SAVE_SKILL_TOOL exactly as web/sandbox gate their tools — resolved
+    # effective-settings-first. Appended BEFORE web/sandbox so its relative order is
+    # unchanged, and default-True (migration 097) → the returned list is set-identical to
+    # the pre-147 toolbox until an operator flips self-improve OFF (the Phase 091 whitelist
+    # no-op precedent; Deep Mode byte-identical when nothing is off). The effective-None
+    # fallback reads the plan-01 TTL-cached helper — NOT ``settings.<flag>`` — because
+    # self_improve is an app_settings-only switch with NO env attribute (unlike web/sandbox).
+    # getattr default-True mirrors the D-Q4 default-ON polarity: a settings object built
+    # before this field existed (or a partial duck-typed effective) reads capability-ON,
+    # never silently hiding save_skill. Real UserEffectiveSettings always carries the field.
+    if effective is not None:
+        self_improve_on = getattr(effective, "self_improve_enabled", True)
+    else:
+        from app.models.user_settings import self_improve_enabled as _self_improve_enabled
+        self_improve_on = _self_improve_enabled()
+    if self_improve_on:
+        tools.append(SAVE_SKILL_TOOL)
     if web_enabled:
         tools.append(WEB_SEARCH_TOOL)
     if sandbox_enabled:
@@ -1232,6 +1250,9 @@ _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     "gpt-5.4-mini":                          32768,  # supports 128k; 32K conservative
     "gpt-5.4-nano":                          16384,  # budget — keep conservative
     "gpt-5.5":                               65536,  # supports 128k; 64K practical ceiling
+    "gpt-5.6-sol":                           65536,  # flagship; supports 128k; 64K practical ceiling
+    "gpt-5.6-terra":                         65536,  # balanced; supports 128k; 64K practical ceiling
+    "gpt-5.6-luna":                          32768,  # lightweight/fast; 32K conservative
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-7":                       32768,  # supports 128k; 32k practical for agentic RAG
     "claude-haiku-4-5-20251001":             32768,  # supports 64k; 32k practical for sub-agent analysis
