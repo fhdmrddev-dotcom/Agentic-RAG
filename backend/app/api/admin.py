@@ -111,6 +111,19 @@ _MODEL_CAP_COLUMNS = {
     "deprecated_reason",
 }
 
+# Phase 149 (WR-01): the per-column value-type contract for the PATCH write. A wrong-typed
+# value is rejected 422 BEFORE any DB touch (never a 500 from an asyncpg type error). bool is
+# a subclass of int in Python, so the int columns reject a bool EXPLICITLY — which also makes
+# the ``enabled is False`` disable guard safe (a non-bool ``enabled`` can never slip past as a
+# falsy value). ``deprecated_reason`` is the lone str-or-null column; every column also
+# accepts an explicit ``null`` (a Reset that clears the override to DEF).
+_MODEL_CAP_INT_COLUMNS = {
+    "llm_call_timeout_seconds",
+    "context_window_tokens",
+    "max_output_tokens",
+}
+_MODEL_CAP_BOOL_COLUMNS = {"native_tools", "enabled", "deprecated"}
+
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
     prefix="/admin",
@@ -1070,6 +1083,33 @@ async def set_model_capability(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown capability field(s): {', '.join(sorted(unknown))}",
         )
+
+    # WR-01: per-column value-type validation BEFORE any DB touch — a wrong-typed value is a
+    # 422 (client error), never a 500 (an asyncpg type error caught by the broad except). An
+    # explicit null is a valid Reset for every column. bool is a subclass of int in Python, so
+    # the int columns reject a bool explicitly (which also makes the ``enabled is False``
+    # disable guard below safe — a non-bool ``enabled`` can never slip past as a falsy value).
+    for col, val in body.items():
+        if val is None:
+            continue  # explicit null → Reset (clears to DEF); valid for any column.
+        if col in _MODEL_CAP_INT_COLUMNS:
+            if isinstance(val, bool) or not isinstance(val, int):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{col}' must be an integer or null.",
+                )
+        elif col in _MODEL_CAP_BOOL_COLUMNS:
+            if not isinstance(val, bool):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{col}' must be a boolean or null.",
+                )
+        elif col == "deprecated_reason":
+            if not isinstance(val, str):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="'deprecated_reason' must be a string or null.",
+                )
 
     # Phase 149 (D-149-09 disable-path half): NO dead default. Disabling the current org
     # default — OR the locked model — is REFUSED with a plain 409 BEFORE any write, so the

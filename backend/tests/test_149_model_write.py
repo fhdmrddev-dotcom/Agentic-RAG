@@ -76,6 +76,39 @@ async def test_unknown_field_rejected_before_any_sql(monkeypatch):
     assert flag["called"] is False, "no cache invalidation on the reject path"
 
 
+async def test_wrong_typed_enabled_string_rejected_422(monkeypatch):
+    """WR-01: ``enabled`` sent as the STRING "true" → 422 BEFORE any SQL (never a 500)."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+
+    with pytest.raises(HTTPException) as ei:
+        await set_model_capability("gpt-4o", {"enabled": "true"}, _fake_request(), _floor=None)
+    assert ei.value.status_code == 422
+    assert not pool.calls, "a wrong-typed value must be rejected before any SQL"
+
+
+async def test_wrong_typed_int_column_string_rejected_422(monkeypatch):
+    """WR-01: ``max_output_tokens`` sent as a non-numeric string → 422 (not a 500)."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+
+    with pytest.raises(HTTPException) as ei:
+        await set_model_capability("gpt-4o", {"max_output_tokens": "big"}, _fake_request(), _floor=None)
+    assert ei.value.status_code == 422
+    assert not pool.calls
+
+
+async def test_bool_for_int_column_rejected_422(monkeypatch):
+    """WR-01: a bool for an int column → 422 (bool is an int subclass, rejected explicitly)."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+
+    with pytest.raises(HTTPException) as ei:
+        await set_model_capability("gpt-4o", {"max_output_tokens": True}, _fake_request(), _floor=None)
+    assert ei.value.status_code == 422
+    assert not pool.calls
+
+
 async def test_valid_patch_upserts_invalidates_and_stamps(monkeypatch):
     """A valid patch → a parameterized upsert + invalidate + model.capability.set stamp."""
     pool = _RecordingPool()
