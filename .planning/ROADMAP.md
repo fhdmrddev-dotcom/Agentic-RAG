@@ -199,8 +199,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 149-06-PLAN.md — Default/locked-disable 409 guard + lock/unlock + POST /admin/models/discover + threads.py enabled-enforce fallback notice
-- [ ] 149-07-PLAN.md — ModelRegistryTab (070-A) + ModelDiscoveryPanel (071-A) + Control Room tab unlock + SC#10 VALIDATION rows
+- [x] 149-06-PLAN.md — Default/locked-disable 409 guard + lock/unlock + POST /admin/models/discover + threads.py enabled-enforce fallback notice
+- [x] 149-07-PLAN.md — ModelRegistryTab (070-A) + ModelDiscoveryPanel (071-A) + Control Room tab unlock + SC#10 VALIDATION rows
 
 **UI hint**: yes
 
