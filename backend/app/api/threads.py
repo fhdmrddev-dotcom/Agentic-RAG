@@ -250,14 +250,27 @@ async def _reresolve_fallback_provider(effective_model: str, current_provider: s
     PRE-fallback value on a fallback (the ``body.provider`` branch and the non-registry
     ``else`` branch both keep the original ``active_provider``) — a MiniMax-served fallback
     would otherwise record ``provider='anthropic'`` (the UAT Test-7 wart). This returns the
-    effective model's provider when it is a real (non-``"unknown"``) value, else the current
-    provider UNCHANGED — a garbage / absent capability never yanks the recorded provider.
-    Reads through the same cached ``get_model_capability_async`` the handler already calls
-    (no new per-request DB read on a warm cache); routing itself is unchanged.
+    effective model's provider ONLY when the capability is a VERIFIED entry
+    (``capability_source`` in ``registry`` / ``db_override``), else the current provider
+    UNCHANGED. WR-01 (review round 2): post-075.3, ``get_model_capability_async`` never
+    returns ``provider="unknown"`` for a non-empty id — a registry/DB miss returns a
+    pattern-INFERRED provider (slashed ids → ``openrouter``, garbage → the ``ollama``
+    bucket) with ``capability_source="inferred"``, so a source check (the same D-075.3-08
+    semantics the pre-existing provider-resolution block enforces 20 lines below the call
+    site) is what actually delivers the "a garbage / absent capability never yanks the
+    recorded provider" promise. Without it, an org default absent from the registry/DB
+    (legacy env-CSV model, mis-cased id) would yank ``runs.provider`` AND live SDK routing
+    to an inference bucket — e.g. a slashed local-model default routed to OpenRouter (the
+    BUG-260616-01 data-egress class: a name cannot identify the endpoint).
+    ``db_override`` is accepted alongside ``registry`` because a discovery-confirmed
+    DB-only model is operator-verified. Reads through the same cached
+    ``get_model_capability_async`` the handler already calls (no new per-request DB read
+    on a warm cache); routing itself is unchanged.
     """
     capability = await get_model_capability_async(effective_model) or {}
-    provider = capability.get("provider", "unknown")
-    if provider and provider != "unknown":
+    provider = capability.get("provider")
+    source = capability.get("capability_source", "")
+    if provider and provider != "unknown" and source in ("registry", "db_override"):
         return provider
     return current_provider
 

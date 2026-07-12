@@ -189,6 +189,33 @@ async def test_reresolve_provider_handles_none_capability(monkeypatch):
     assert await threads_mod._reresolve_fallback_provider("mystery", "openai") == "openai"
 
 
+async def test_reresolve_provider_rejects_inferred_capability(monkeypatch):
+    """WR-01 (review round 2): post-075.3 a registry/DB miss never returns
+    provider='unknown' — it returns a pattern-INFERRED provider with
+    capability_source='inferred' (slashed ids → openrouter, garbage → ollama). The
+    re-resolve must KEEP the current provider for that shape: an org default absent from
+    the registry/DB must never yank runs.provider + live SDK routing to an inference
+    bucket (a slashed local-model default routed to OpenRouter is the BUG-260616-01
+    data-egress class — D-075.3-08 semantics, same as the provider-resolution block)."""
+    async def _inferred_capability(model_id):
+        # The real-world garbage shape: an LM-Studio-style slashed id inferred → openrouter.
+        return {"provider": "openrouter", "capability_source": "inferred"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _inferred_capability)
+    assert await threads_mod._reresolve_fallback_provider("google/gemma-3-4b", "ollama") == "ollama"
+
+
+async def test_reresolve_provider_accepts_db_override_capability(monkeypatch):
+    """WR-01 companion: a discovery-confirmed DB-only model (capability_source=
+    'db_override') IS operator-verified — the re-resolve accepts it (alongside
+    'registry'), so DB-catalog fallback targets still record honestly."""
+    async def _db_capability(model_id):
+        return {"provider": "minimax", "capability_source": "db_override"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _db_capability)
+    assert await threads_mod._reresolve_fallback_provider("MiniMax-M2.5", "anthropic") == "minimax"
+
+
 # ---------------------------------------------------------------------------
 # Review round-2 CR-01 — the fallback must change the model ACTUALLY SENT, not just
 # the bookkeeping. The LLM request model is always body.model (agent_loop.py native
