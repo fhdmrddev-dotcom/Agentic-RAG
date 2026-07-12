@@ -1593,12 +1593,24 @@ async def run_agent_loop(
 
     try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
       try:
-        # Pre-inject tool instructions only for OpenRouter XML strategy — the one
-        # deterministic structured-mode path. All other providers use native tool
-        # calling; unknown models get post-creation injection (next iteration).
-        _needs_pre_injection = (
-            getattr(user_settings, "active_provider", "") == "openrouter"
-            and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+        # Phase 149 Plan 11 (SC#1 second half / WR-05): pre-inject tool instructions for the
+        # OpenRouter XML strategy AND for any compat-path model an operator flipped to STRUCTURED
+        # (native_tools=False). The STRUCTURED branch of the stream omits the native `tools` param,
+        # so without this the DB-flipped model has NO tool mechanism on iteration 0 and hallucinates
+        # a non-answer (the post-stream fallback never fires — no parsed tool call → no next
+        # iteration). anthropic/google native-SDK dispatch is excluded inside the gate (WR-05).
+        #
+        # Compute the effective model exactly as the compat branch streams it (mirrors line ~2044;
+        # the trailing settings.llm_model guards against None), then WARM the override cache before
+        # the SYNC gate read so resolve_calling_mode reflects the operator's DB toggle even on the
+        # body.provider-set branch where threads.py's warm-read is skipped. get_model_capability_async
+        # is already imported + TTL-cached + called per-iteration, so this is D-14-neutral for the
+        # no-override path (a native model still resolves NATIVE → no injection). We are inside the
+        # outer async try: here, so the await is legal.
+        _effective_model = body.model or user_settings.llm_model or settings.llm_model
+        await get_model_capability_async(_effective_model)
+        _needs_pre_injection = _should_pre_inject_structured(
+            getattr(user_settings, "active_provider", "") or "", _effective_model, user_settings
         )
         _structured_tools_injected = False
 
