@@ -132,3 +132,58 @@ async def test_fallback_notice_emit_names_both_on_the_wire(monkeypatch):
     assert payload["disabled_model"] == "gpt-4o"
     assert payload["fallback_model"] == "claude-opus-4-8"
     assert "gpt-4o" in payload["message"] and "claude-opus-4-8" in payload["message"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 149 Plan 09 Task 1 (D-149-10 bookkeeping honesty) — after a disabled-model
+# fallback the RECORDED provider must be re-resolved to the EFFECTIVE (fallback)
+# model's provider, so runs.provider matches the model that actually served the run
+# (the UAT Test-7 secondary wart: a MiniMax-served fallback recorded provider='anthropic').
+# The re-resolve is a pure, additive helper (`_reresolve_fallback_provider`) driven off
+# the same cached `get_model_capability_async` the send_message handler already calls —
+# no restructure of the existing if/else provider block, routing unchanged.
+# ---------------------------------------------------------------------------
+async def test_fallback_run_records_effective_provider(monkeypatch):
+    """A disabled-model fallback → the provider that reaches register_run_start is
+    re-resolved from the EFFECTIVE (fallback) model. Selected an anthropic model that the
+    operator just disabled; the org default is a minimax model → the run must record
+    provider='minimax', NOT the pre-fallback 'anthropic'."""
+    monkeypatch.setattr(
+        threads_mod, "load_all_model_overrides",
+        AsyncMock(return_value={"claude-opus-4-8": {"enabled": False}}),
+    )
+
+    async def _fake_capability(model_id):
+        # The org-default fallback model is served by minimax.
+        return {"provider": "minimax", "capability_source": "db_override"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _fake_capability)
+
+    effective, notice = await _resolve_enabled_model("claude-opus-4-8", "MiniMax-M2.7-highspeed")
+    assert effective == "MiniMax-M2.7-highspeed"
+    assert notice is not None, "a fallback must fire"
+
+    # Pre-fallback the recorded provider was 'anthropic'; the re-resolve corrects it to the
+    # fallback model's provider (minimax) — the runs row no longer lies about who served it.
+    recorded = await threads_mod._reresolve_fallback_provider(effective, "anthropic")
+    assert recorded == "minimax"
+
+
+async def test_reresolve_provider_guards_garbage_capability(monkeypatch):
+    """A garbage / 'unknown' capability never yanks the recorded provider — the guard keeps
+    the pre-fallback provider (byte-identical, no dishonest re-record)."""
+    async def _unknown_capability(model_id):
+        return {"provider": "unknown"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _unknown_capability)
+    assert await threads_mod._reresolve_fallback_provider("garbage-model", "anthropic") == "anthropic"
+
+
+async def test_reresolve_provider_handles_none_capability(monkeypatch):
+    """A None capability (no registry/DB row at all) keeps the provider unchanged too —
+    the no-usable-capability path never blanks or garbles runs.provider."""
+    async def _none_capability(model_id):
+        return None
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _none_capability)
+    assert await threads_mod._reresolve_fallback_provider("mystery", "openai") == "openai"
