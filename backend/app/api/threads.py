@@ -56,7 +56,12 @@ from app.services.harness.scope import resolve_project_subtree, assert_folder_sc
 # validate_skill_refs / materialize_skill_snapshots_if_needed through the module
 # object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
 from app.services.harness import skill_snapshot as _skill_snapshot
-from app.models.user_settings import load_user_settings, override_provider, workflows_enabled
+from app.models.user_settings import (
+    load_all_model_overrides,
+    load_user_settings,
+    override_provider,
+    workflows_enabled,
+)
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
@@ -186,6 +191,41 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
         f"run:{run_id}",
         {"data": json.dumps({"type": type, **fields})},
     )
+
+
+async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple[str, dict | None]:
+    """Phase 149 (D-149-10) enabled-enforcement at the ONE shared model-resolution seam.
+
+    If ``resolved_model`` was operator-DISABLED, fall back to the org default and return
+    ``(org_default, notice)`` where ``notice`` names BOTH models for an honest inline SSE
+    event; otherwise return ``(resolved_model, None)`` — byte-identical to before (the
+    shared Deep/workflow path is untouched for the common enabled case; no per-provider
+    fork, D-14 red line).
+
+    The disabled check reads the CACHED all-rows override set (``load_all_model_overrides``
+    — 30s TTL, no per-request DB read on a warm cache; the enabled-only hot cache is NOT
+    touched). A model is disabled ONLY when its override row carries ``enabled=false``; an
+    absent override defaults enabled. The org default is guaranteed ENABLED by the Plan-06
+    Task-1 guards (the disable guard refuses disabling it; the lock guard refuses locking a
+    disabled model), so the fallback target can never itself be disabled — no dead default.
+    A settings-read blip is swallowed (returns the model unchanged) so this never breaks
+    send_message.
+    """
+    try:
+        overrides = await load_all_model_overrides()
+    except Exception:  # noqa: BLE001 — an override-read blip must never sink send_message
+        return resolved_model, None
+    is_disabled = (overrides.get(resolved_model) or {}).get("enabled") is False
+    if is_disabled and org_default and org_default != resolved_model:
+        return org_default, {
+            "disabled_model": resolved_model,
+            "fallback_model": org_default,
+            "message": (
+                f"{resolved_model} was disabled by your administrator — "
+                f"this reply used {org_default}."
+            ),
+        }
+    return resolved_model, None
 
 
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
@@ -1088,6 +1128,14 @@ async def send_message(
 
     run_id = _uuid_mod.uuid4()
     _resolved_model = body.model if getattr(body, "model", None) else _user_settings.llm_model
+    # Phase 149 (D-149-10) — enabled-enforcement at the ONE shared resolution seam: a user
+    # whose selected model was just operator-DISABLED runs on the org default instead, with
+    # an honest inline SSE notice naming BOTH models (emitted below, once the run stream
+    # exists). Single-seam additive guard; for an enabled / no-override model this is a
+    # no-op and the shared path stays byte-identical (no per-provider fork — D-14).
+    _resolved_model, _model_fallback_notice = await _resolve_enabled_model(
+        _resolved_model, _user_settings.llm_model
+    )
     # D-067.3-N01-01: Resolution order — explicit body.provider (already
     # applied to _user_settings.active_provider above via override_provider) >
     # MODEL_CAPABILITIES[model]["provider"] > active_provider fallback.
@@ -1160,6 +1208,18 @@ async def send_message(
         except Exception:
             logger.exception("Failed to finalize spawn-failed run %s", run_id)
         raise
+
+    # Phase 149 (D-149-10): the run stream now exists — emit the honest disabled-model
+    # fallback notice (naming BOTH models) when the user's selected model was operator-
+    # disabled. REUSES the canonical _emit informational-event shape (no new emitter, no
+    # per-provider fork). Best-effort: an informational emit must never sink the run.
+    if _model_fallback_notice:
+        try:
+            await _emit(redis, run_id, "model_disabled_fallback", **_model_fallback_notice)
+        except Exception:  # noqa: BLE001 — informational only; never break the run
+            logger.warning(
+                "D-149-10 fallback notice emit failed for run %s", run_id, exc_info=True
+            )
 
     # ── Phase 092 MODE-01 — kickoff: create the workflow run + set the anchor ──
     # AFTER the producer-shell `runs` row exists (two-rows model, RESEARCH A2 /
