@@ -1220,3 +1220,105 @@ async def set_model_lock(
         request.state.audit_action = "model.unlock"
         request.state.audit_label = f"Unlocked {model_id}"
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 149 (MODEL-02 / D-149-11) — operator-gated live model discovery
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# POST /admin/models/discover fans out to the keyed providers server-side (the Plan-02
+# model_discovery_service) and returns the EPHEMERAL propose-only diff. No proposals table
+# (D-149-12). Provider selection is validated against the code-constant PROVIDER_ENDPOINTS
+# set (SSRF-safe — no client URL). The new non-GET route inherits the router require_operator
+# 404 gate and carries its OWN non-operator 404 test.
+
+
+class DiscoverRequest(BaseModel):
+    """Optional body for POST /admin/models/discover. ``providers`` (if given) is validated
+    against ``set(PROVIDER_ENDPOINTS)`` — a code-constant allowlist, NEVER a URL/base — so no
+    client-supplied value can ever become a request target (SSRF-safe, T-149-14)."""
+
+    providers: list[str] | None = None
+
+
+@router.post("/models/discover")
+async def run_model_discovery(
+    request: Request,
+    body: DiscoverRequest | None = None,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Operator-gated live model discovery (D-149-11) — fan out, diff, ✎ receipt.
+
+    Resolves keyed providers from settings and fans out to each provider's ``/models``
+    (``model_discovery_service`` — SSRF-safe: URLs come ONLY from the hardcoded
+    PROVIDER_ENDPOINTS allowlist), builds the current registry union (built-in
+    MODEL_CAPABILITIES ∪ ``load_all_model_overrides``), and returns the EPHEMERAL
+    propose-only diff (``new``/``changed``/``vanished``) plus honest per-provider outcomes.
+    NO proposals table is written — the diff lives only in this response (D-149-12); the
+    operator confirms each change through the PATCH capability seam (SC#3 — discovery never
+    auto-enables). If the (optional) body carries a provider selection, EVERY value must be
+    in ``set(PROVIDER_ENDPOINTS)`` or the whole run is refused 422 BEFORE any fan-out (no
+    client value reaches the HTTP client). Stamps a ✎ ``model.discover`` receipt.
+    Non-operators are 404'd by the router gate.
+    """
+    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    from app.services.model_discovery_service import (  # function-local (Pitfall 4)
+        PROVIDER_ENDPOINTS,
+        compute_diff,
+        discover_all,
+        keyed_from_settings,
+    )
+
+    selection = body.providers if body is not None else None
+    if selection is not None:
+        # SSRF gate (T-149-14): validate against the code-constant allowlist BEFORE any
+        # fan-out. A client value never becomes a request URL — the reject path calls no
+        # service. Mirror the _MODEL_CAP_COLUMNS allowlist-before-touch discipline.
+        allowed = set(PROVIDER_ENDPOINTS)
+        unknown = [p for p in selection if p not in allowed]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown provider(s): {', '.join(sorted(unknown))}",
+            )
+
+    keyed = keyed_from_settings()
+    if selection is not None:
+        # Honor the selection: only the chosen providers keep their key (others → None,
+        # so discover_all skips them as no_key). Iteration stays over the code constant.
+        chosen = set(selection)
+        keyed = {p: (keyed.get(p) if p in chosen else None) for p in keyed}
+
+    discovered = await discover_all(keyed)
+
+    # Current registry union: built-in DEF ∪ ALL DB override rows (enabled AND disabled).
+    # Each entry MUST carry a ``provider`` (compute_diff's vanished detection keys on it).
+    current: dict[str, dict] = {}
+    for mid, cap in MODEL_CAPABILITIES.items():
+        current[mid] = dict(cap)
+    overrides = await load_all_model_overrides()
+    for mid, ovr in overrides.items():
+        merged = dict(current.get(mid, {}))
+        for k, v in ovr.items():
+            if v is not None:  # null-clears-to-DEF overlay (same rule as the registry read)
+                merged[k] = v
+        if not merged.get("provider"):
+            merged["provider"] = ovr.get("provider") or _infer_provider_for(mid)
+        current[mid] = merged
+
+    diff = compute_diff(current, discovered)
+
+    request.state.audit_action = "model.discover"
+    request.state.audit_label = "Ran model discovery"
+
+    # Honest per-provider outcomes — names + status ONLY (never the response body or key,
+    # T-149-04). ``ok`` is derived so the tab can show which providers ran vs skipped/errored.
+    providers_summary = [
+        {
+            "provider": d.get("provider"),
+            "status": d.get("status"),
+            "ok": d.get("status") == "ok",
+        }
+        for d in discovered
+    ]
+    return {**diff, "providers": providers_summary}
