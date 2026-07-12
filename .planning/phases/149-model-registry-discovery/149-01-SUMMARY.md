@@ -103,6 +103,14 @@ None for this plan beyond the completed operator checkpoint. **Cloud parity DEFE
 - The two columns + the overlaid `deprecated` field now exist end-to-end (schema + live DB + read path), so downstream 149 plans (registry read/write UI, capability guards, picker badge) can build on them.
 - No blockers.
 
+## Self-Check: PASSED
+
+- Created files verified present: `099_model_registry_deprecated.sql`, `test_149_config_overlay.py`, `149-01-SUMMARY.md`.
+- Commits verified in git log: `904fa6a1` (migration), `667df4da` (overlay + test), `eb085a82` (full-schema regen), `8f1f80e4` (summary).
+- Live-DB columns confirmed in regenerated `full-schema.sql`: `model_capabilities_overrides.deprecated`/`deprecated_reason`, `app_settings.llm_model_locked`.
+- Overlay test `test_149_config_overlay.py`: 3 passed.
+- STATE.md / ROADMAP.md not modified by this executor (orchestrator owns those writes).
+
 ---
 *Phase: 149-model-registry-discovery*
 *Completed: 2026-07-12*
