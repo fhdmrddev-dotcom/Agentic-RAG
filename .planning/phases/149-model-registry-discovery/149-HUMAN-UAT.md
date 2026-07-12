@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: partial
 phase: 149-model-registry-discovery
 source: [149-VERIFICATION.md, 149-VALIDATION.md]
 started: 2026-07-12
@@ -8,7 +8,7 @@ updated: 2026-07-12
 
 ## Current Test
 
-[testing complete — 11/11 executed live via Chrome-MCP + DB/Redis evidence, 2026-07-12. All 3 issues root-caused during the session (diagnosis embedded). Registry state fully restored post-UAT: org default MiniMax-M2.5-highspeed unlocked; all Test toggles reset; only two benign context OVRs remain (gemini-3.5-flash=100k, gpt-5.4=150k) + gpt-4.1's preserved deprecated_reason.]
+[ROUND-2 RE-TEST PENDING — gap plans 08/09/10 + round-2 review fixes (46c09382..4c8dc454) landed 2026-07-12; verifier re-ran static+unit gates green (81 backend / 33 frontend / build clean) and routed to human_needed for the live re-run. Round-1 results below are the pre-fix historical record. Re-run PRIMARY rows 1, 4, 7 (the fixed majors — for 7 specifically confirm the fallback model is actually SERVED, not 400/404, per review CR-01) + row 5 (enable/disable coupling regression), and a light regression pass on 2/3/6/8/9/10/11. Round-1 session had restored registry state: org default MiniMax-M2.5-highspeed unlocked; benign context OVRs remain (gemini-3.5-flash=100k, gpt-5.4=150k) + gpt-4.1's preserved deprecated_reason.]
 
 > Full step-by-step instructions for every row live in **`149-VALIDATION.md` → Manual-Only Verifications**.
 > This file is the tracking surface (surfaces in `/gsd:progress` + `/gsd:audit-uat`); run it via `/gsd:verify-work 149`.
@@ -80,16 +80,17 @@ evidence: "Chrome-MCP driven live: (a) courtesy gate observed in Test 5 — disa
 ## Summary
 
 total: 11
-passed: 8
-issues: 3
-pending: 0
+passed: 8 (round-1, pre-fix — light regression re-run requested)
+issues: 0 (3 round-1 majors: fixes landed, live re-test pending)
+pending: 4 (primary re-test rows 1, 4, 5, 7)
 skipped: 0
 blocked: 0
 
 ## Gaps
 
 - truth: "SC#1 — toggling native_tools in the registry changes the next request's tool-calling path (native ↔ prompt-injected) with no restart"
-  status: failed
+  status: fix-landed
+  fix: "plan 08 (56945cca DB-aware resolve_calling_mode) — re-test live"
   reason: "User reported: toggled Tools OFF on gpt-5.4-mini; tools still fired natively — no routing change. Confirmed via DB (override persisted native_tools=false) + source trace."
   severity: major
   test: 1
@@ -106,7 +107,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "OpenRouter (namespaced vendor/model IDs) rows are editable/lockable like every other provider's rows"
-  status: failed
+  status: fix-landed
+  fix: "plan 08 (3afc53e3 {model_id:path} converter) + review fix e41195ce (empty-id 422) — re-test live"
   reason: "User-visible: in-row red 'Not Found' on any OpenRouter capability edit; value never changes. Confirmed via TestClient probe — %2F-encoded id 404s on both PATCH and PUT lock routes."
   severity: major
   test: 4
@@ -121,7 +123,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "D-149-10 — Thread B on a just-disabled model shows the honest inline model_disabled_fallback notice naming BOTH models (no silent swap)"
-  status: failed
+  status: fix-landed
+  fix: "plan 09 (6dc1a8dd provider re-resolve + 464ac9c1 inline notice) + review fixes 46c09382 (CR-01 effective model on the wire) / 7b3e82de / beb32917 — re-test live"
   reason: "User-visible: no notice rendered; swap was silent. Backend emit verified present in Redis run stream (run 1c4c7b4a) with both model names + admin message."
   severity: major
   test: 7
@@ -139,7 +142,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "Discovery per-model cards label capability provenance consistently with the provider run card"
-  status: failed
+  status: fix-landed
+  fix: "plan 10 (85ebf452 per-field provenance suffix) — re-test live"
   reason: "Google new-model cards read 'returned IDs only' while their token limits ARE provider-returned and auto-filled green; the google provider card correctly says 'capabilities ✓'. Label-only contradiction."
   severity: cosmetic
   test: 9
@@ -152,7 +156,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "The deprecated-reason input commits like the numeric cells do"
-  status: failed
+  status: fix-landed
+  fix: "plan 10 (33a90f26 Enter-commit/Escape-cancel) + review fix 3214bbbf (dirty check + busy-window) — re-test live"
   reason: "Enter in the reason input does NOT commit (typed reason silently lost); only blur commits. Numeric cells commit on Enter."
   severity: minor
   test: 10

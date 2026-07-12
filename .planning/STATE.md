@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 149 (model-registry-discovery) — EXECUTING
-Plan: 10 of 10 (gap-closure wave 08/09/10 landed; phase held for verify-work + secure-phase)
-Status: Executing Phase 149
-Last activity: 2026-07-12 -- 149-10 gap-closure executed (Tests 9+10 UI-honesty)
+Phase: 149 (model-registry-discovery) — GAPS CLOSED, held for live UAT re-run + secure-phase
+Plan: 10 of 10 (gap-closure 08/09/10 landed + round-2 review CR-01+WR-01..05 fixed)
+Status: Verifier human_needed (14/14 code-level must-haves; live re-run of rows 1/4/5/7 pending)
+Last activity: 2026-07-12 -- round-2 code review fixed (46c09382..4c8dc454), re-verification human_needed
+
+**149 gaps-only execution + round-2 review (2026-07-12, orchestrator):**
+
+- Gap plans 08/09/10 executed sequentially on main tree (3/3 ok, no deviations). Post-merge gate: 69→78 backend green, vite build exit 0, tsc at 30-error baseline (0 new).
+- **Round-2 code review (149-REVIEW.md, status resolved): 1 Critical + 5 Warnings + 4 Info.** CR-01 was real: plan-09's provider flip aimed requests at the fallback provider while `body.model` still carried the DISABLED model (cross-provider fallback → 400/404; same-provider → false notice). Fixed at the seam — `_apply_fallback_to_request` rewrites `body.model` to the effective model (`46c09382`); WR-01 capability_source registry/db_override gate (`7b3e82de`); WR-02 provider recorded only when switch applied (`beb32917`); WR-04 empty model_id 422 on both :path routes (`e41195ce`); WR-03 deprecated-reason dirty check + busy-window survival (`3214bbbf`); WR-05 honest-lock native_tools toggle on anthropic/google rows, native-branch routing consult deferred (`4c8dc454`). IN-01..04 documented-not-fixed (info; IN-03 = notice is stream-transient, candidate for polish).
+- **LESSON (repeat of round-1 CR-01):** green unit tests masked a wire-level blocker twice in this phase — helper-scoped tests never asserted what actually went on the wire. Live/e2e assertion of the SERVED artifact is the only honest gate for request-path fixes.
+- **Fixer session-limit recovery:** gsd-code-fixer hit the session cap after committing to worktree branch `gsd-reviewfix/149-retry-1283`; orchestrator ff-merged (clean, forked at develop tip), deleted branch, finished REVIEW.md statuses. Side-effect: worktree removal nuked `frontend/node_modules` through a junction — restored via `npm ci` (Vite dev server PID had rolldown DLL locked; killed, user must restart `npm run dev`).
+- **Gates:** regression 109/109 (146+147+148 suites); schema-drift = known false positive (mig 099 columns verified live in DB via psycopg2; project never uses `db push`) → bypassed with evidence; codebase-drift warn = never-mapped baseline noise, non-blocking.
+- **Verifier (re-run): human_needed** — 14/14 code-level must-haves verified in source (CR-01 wiring traced to RunContext), suites re-run independently (81 backend / 33 frontend / build clean). Pending: live re-run of UAT rows 1, 4, 7 (fixed majors — row 7 must confirm the fallback model is SERVED) + 5, light regression on the rest → 149-HUMAN-UAT.md (status partial, gaps fix-landed).
+- NEXT: `/gsd:verify-work 149` (live re-run) → `/gsd:secure-phase 149` → phase.complete → Phase 150.
 
 **149-10 execution notes (2026-07-12) — gap-closure, UI-only, additive:**
 
