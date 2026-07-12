@@ -188,10 +188,10 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 149-01-PLAN.md — Migration 099 (deprecated + llm_model_locked) + [BLOCKING] live apply + full-schema regen + config read-path overlay
-- [ ] 149-02-PLAN.md — model_discovery_service: httpx fan-out over the 8-provider allowlist + propose-only diff (SC#3)
-- [ ] 149-03-PLAN.md — Effective-model + DB-aware max_output_tokens clamp (D-149-15 / BUG-260620-01)
-- [ ] 149-04-PLAN.md — Frontend api.ts registry seams + picker visual polish (logos, grouping, deprecated badge)
+- [x] 149-01-PLAN.md — Migration 099 (deprecated + llm_model_locked) + [BLOCKING] live apply + full-schema regen + config read-path overlay
+- [x] 149-02-PLAN.md — model_discovery_service: httpx fan-out over the 8-provider allowlist + propose-only diff (SC#3)
+- [x] 149-03-PLAN.md — Effective-model + DB-aware max_output_tokens clamp (D-149-15 / BUG-260620-01)
+- [x] 149-04-PLAN.md — Frontend api.ts registry seams + picker visual polish (logos, grouping, deprecated badge)
 
 **Wave 2** *(blocked on Wave 1)*
 
