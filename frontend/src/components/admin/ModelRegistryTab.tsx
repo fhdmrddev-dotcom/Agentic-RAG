@@ -519,8 +519,18 @@ function DeprecatedControl({
 
   function commitReason() {
     if (settled.current) return
+    // WR-03 (review round 2) dirty check — the missing half of the InlineNumberCell
+    // parity (NumericCell's parent drops no-change commits): a plain focus+blur /
+    // tab-through with zero edits must never PATCH, never stamp a ✎ audit receipt for
+    // a change that did not happen, and never trigger the shell's registry re-fetch.
+    const next = reason.trim() || null
+    if (next === (row.deprecated_reason ?? null)) return
+    // WR-03 busy-window: if another write on this row is in flight, do NOT settle —
+    // settling here (before write()'s busy guard dropped the call) swallowed the
+    // typed reason permanently. Left un-settled, the next blur/Enter commits it.
+    if (busy) return
     settled.current = true
-    void onWrite({ deprecated: true, deprecated_reason: reason.trim() || null })
+    void onWrite({ deprecated: true, deprecated_reason: next })
   }
 
   return (

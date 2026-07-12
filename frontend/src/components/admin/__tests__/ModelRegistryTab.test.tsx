@@ -13,7 +13,7 @@
  *   • a 409 rejection surfaces the server `detail` in-row (never a silent failure).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, cleanup, within, fireEvent } from "@testing-library/react"
+import { render, screen, cleanup, within, fireEvent, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ModelRegistryTab } from "../ModelRegistryTab"
@@ -251,6 +251,78 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     fireEvent.blur(input)
 
     expect(onSet).toHaveBeenCalledTimes(1)
+  })
+
+  // ── WR-03 (review round 2) — dirty check + busy-window commit survival ──────────
+
+  it("test_reason_noop_blur_never_writes — focus + blur with zero edits issues NO write (no PATCH, no ✎ receipt, no refetch)", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: "original reason" })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const input = screen.getByRole("textbox", { name: /deprecation reason for gpt-5\.6-sol/i })
+    // A plain tab-through: focus, no edits, blur. The dirty check must drop it —
+    // every such blur used to issue a real PATCH + stamp a false audit receipt.
+    await user.click(input)
+    fireEvent.blur(input)
+
+    expect(onSet).not.toHaveBeenCalled()
+  })
+
+  it("test_reason_busy_commit_not_swallowed — a commit landing during another write's busy window survives (re-commits once busy clears)", async () => {
+    const user = userEvent.setup()
+    let resolveFirst: (() => void) | undefined
+    const onSet = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveFirst = resolve }),
+      )
+      .mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const input = screen.getByRole("textbox", { name: /deprecation reason for gpt-5\.6-sol/i })
+    await user.click(input)
+    await user.type(input, "queued reason")
+
+    // Another control on the row starts a write → the row goes busy (in flight).
+    fireEvent.click(screen.getByRole("switch", { name: /native tools for gpt-5\.6-sol/i }))
+    expect(onSet).toHaveBeenCalledTimes(1)
+
+    // The reason blur lands DURING the busy window. Before the fix this settled the
+    // one-shot guard and then write() dropped the call — the typed reason was
+    // swallowed permanently (no retry until a fresh keystroke).
+    fireEvent.blur(input)
+    expect(onSet).toHaveBeenCalledTimes(1) // still only the in-flight write
+
+    // The in-flight write completes → busy clears…
+    await waitFor(() => resolveFirst!())
+    await waitFor(() =>
+      expect(
+        screen.getByRole("switch", { name: /native tools for gpt-5\.6-sol/i }),
+      ).not.toBeDisabled(),
+    )
+
+    // …and the next blur commits the still-pending reason (never lost).
+    fireEvent.blur(input)
+    expect(onSet).toHaveBeenCalledTimes(2)
+    expect(onSet).toHaveBeenLastCalledWith("gpt-5.6-sol", {
+      deprecated: true,
+      deprecated_reason: "queued reason",
+    })
   })
 
   it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {
