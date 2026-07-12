@@ -466,6 +466,7 @@ CREATE TABLE public.app_settings (
     workflows_enabled boolean DEFAULT true,
     maintenance_mode boolean DEFAULT false,
     feature_visibility jsonb DEFAULT '{}'::jsonb NOT NULL,
+    llm_model_locked boolean DEFAULT false NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -949,7 +950,9 @@ CREATE TABLE public.model_capabilities_overrides (
     native_tools boolean,
     enabled boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deprecated boolean DEFAULT false NOT NULL,
+    deprecated_reason text
 );
 
 
