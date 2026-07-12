@@ -33,14 +33,18 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 import app.dependencies as deps
-from app.config import settings
+from app.config import MODEL_CAPABILITIES, _infer_provider_for, settings
 from app.dependencies import (
     get_redis,
     get_supabase,
     operator_audit_floor,
     require_operator,
 )
-from app.models.user_settings import save_app_settings, set_feature_visibility
+from app.models.user_settings import (
+    invalidate_model_overrides_cache,
+    save_app_settings,
+    set_feature_visibility,
+)
 from app.services import governance_service
 from app.services.operator_service import (
     get_operator_record,
@@ -91,6 +95,21 @@ _VISIBILITY_FEATURES = {
     "governance_health",
 }
 _VISIBILITY_AUDIENCES = {"everyone", "operators"}
+
+# Phase 149 (MODEL-01 / T-149-11): the ONLY columns a capability PATCH may write — the
+# seven editable columns of model_capabilities_overrides. A client-supplied field name
+# must NEVER reach the upsert's column list (which interpolates names into SQL). An
+# unknown key → 422 BEFORE any DB touch (mirrors set_flag's _FLAG_KEYS guard); the upsert
+# values are parameterized $N binds — no client field name reaches a SET clause (Pattern 2).
+_MODEL_CAP_COLUMNS = {
+    "llm_call_timeout_seconds",
+    "context_window_tokens",
+    "max_output_tokens",
+    "native_tools",
+    "enabled",
+    "deprecated",
+    "deprecated_reason",
+}
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -922,3 +941,97 @@ async def set_visibility(
     request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
     request.state.audit_action = "visibility.set"
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 149 (MODEL-01) — the model registry: full-union read + SQLi-safe write
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# D-149-03: the registry is the FULL union — built-in config.MODEL_CAPABILITIES DEF rows
+# ∪ model_capabilities_overrides OVR rows ∪ discovery-confirmed DB-only rows. config.py
+# is the shipped baseline; the DB is the living registry. Both routes are 404-gated for
+# non-operators by the router-level require_operator (no RLS backstop — SC#4 / D-149-09).
+
+
+def _registry_row(model_id, cap, ovr, default_model, model_locked):
+    """Build one union registry row: OVR (DB-stored) values win over DEF (built-in) values,
+    with BOTH discernible via ``overridden_fields`` so the editor can render Reset (D-149-03).
+
+    ``cap`` is the built-in MODEL_CAPABILITIES entry (or None for a DB-only model); ``ovr``
+    is the model_capabilities_overrides row (or None for a pure DEF row). An OVR column is
+    applied only when NON-None (null-clears-to-DEF — the same overlay rule as
+    get_model_capability_async), so an operator's cleared field falls back to the built-in.
+    """
+    cap = cap or {}
+    ovr = ovr or {}
+
+    def _eff(col, default=None):
+        v = ovr.get(col)
+        if v is not None:
+            return v
+        return cap.get(col, default)
+
+    provider = ovr.get("provider") or cap.get("provider") or _infer_provider_for(model_id)
+    # DB-only OR any model carrying a stored override row → db_override; else the built-in.
+    source = "db_override" if ovr else "registry"
+    # Which editable columns are actually STORED (non-None) in the DB — the editor renders
+    # Reset only for fields that are overridden vs inherited from the built-in DEF.
+    overridden_fields = sorted(c for c in _MODEL_CAP_COLUMNS if ovr.get(c) is not None)
+
+    _enabled = ovr.get("enabled")
+    _deprecated = ovr.get("deprecated")
+    return {
+        "model_id": model_id,  # verbatim casing (Pitfall 6)
+        "provider": provider,
+        "capability_source": source,
+        "enabled": bool(_enabled) if _enabled is not None else True,
+        "deprecated": bool(_deprecated) if _deprecated is not None else False,
+        "context_window_tokens": _eff("context_window_tokens", 0) or 0,
+        "max_output_tokens": _eff("max_output_tokens", 0) or 0,
+        "native_tools": bool(_eff("native_tools", False)),
+        "llm_call_timeout_seconds": _eff("llm_call_timeout_seconds", 0) or 0,
+        "is_default": model_id == default_model,
+        "is_locked": bool(model_locked) and model_id == default_model,
+        # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.
+        "overridden_fields": overridden_fields,
+    }
+
+
+@router.get("/models")
+async def get_model_registry(request: Request):
+    """Full-union model registry read (D-149-03) — floor-EXEMPT poll-style read.
+
+    Returns ``{"models": [...]}``: every built-in MODEL_CAPABILITIES model as a DEF row
+    (capability_source="registry"), every override as an OVR row (capability_source=
+    "db_override"), and every DB-only model (in overrides, not in the built-in registry)
+    as a DB-only row. Reads the ALL-ROWS override cache (``load_all_model_overrides`` —
+    disabled rows INCLUDED, Pitfall 1) so the editor can re-enable what was disabled, and
+    stamps ``is_default``/``is_locked`` from the app_settings row (``llm_model`` +
+    ``llm_model_locked``). Floor-EXEMPT (the tab re-fetches — the /admin/runs + /admin/users
+    poll precedent, D-07); ``audit_is_write=False`` marks it a read. The router gate is the
+    sole authority — a non-operator gets a byte-identical 404 (SC#4 / D-149-09).
+    """
+    request.state.audit_is_write = False
+
+    # Function-local imports (Pitfall 4 — keep the settings module off admin's load path).
+    from app.models.user_settings import _load_settings_from_db, load_all_model_overrides
+
+    settings_row = await _load_settings_from_db()
+    default_model = settings_row.get("llm_model") or ""
+    model_locked = bool(settings_row.get("llm_model_locked"))
+
+    overrides = await load_all_model_overrides()
+
+    rows = []
+    seen = set()
+    # DEF rows (built-in registry) overlaid with any OVR.
+    for model_id, cap in MODEL_CAPABILITIES.items():
+        rows.append(_registry_row(model_id, cap, overrides.get(model_id), default_model, model_locked))
+        seen.add(model_id)
+    # DB-only rows (in overrides, not in the built-in registry) — discovery-confirmed models.
+    for model_id, ovr in overrides.items():
+        if model_id in seen:
+            continue
+        rows.append(_registry_row(model_id, None, ovr, default_model, model_locked))
+
+    return {"models": rows}
