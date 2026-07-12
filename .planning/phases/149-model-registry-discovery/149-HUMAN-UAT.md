@@ -1,14 +1,14 @@
 ---
-status: complete
+status: partial
 phase: 149-model-registry-discovery
 source: [149-VERIFICATION.md, 149-VALIDATION.md]
 started: 2026-07-12
-updated: 2026-07-12
+updated: 2026-07-13
 ---
 
 ## Current Test
 
-[round-2 re-test complete 2026-07-13 — rows 4/5/7/12 pass live; row 1 = 1 major issue (structured-path injection gap, diagnosed); +1 incidental minor (suggestion think-leak). Registry state fully restored: claude-haiku re-enabled, gpt-4.1 deprecated=false + reason preserved, discovery proposals discarded, org default MiniMax-M2.5-highspeed untouched.]
+[round-3 fixes landed 2026-07-13 (plans 149-11 + 149-12, verifier 9/9 code-level, review round 3: 0 critical) — LIVE RE-TEST PENDING for: (a) row 1 — native_tools OFF on an OpenAI/compat model → "list the top-level folders" must FIRE A TOOL via the structured path (pre-injection gate a91cb334/b6d1d6cf/22161913); (b) row-7 residual — a MiniMax-served reply's follow-up suggestion chips must be clean questions, no <think> (strip a85eb20a/01b92536). Prior round-2 state: rows 4/5/7/12 pass live; registry state fully restored: claude-haiku re-enabled, gpt-4.1 deprecated=false + reason preserved, discovery proposals discarded, org default MiniMax-M2.5-highspeed untouched.]
 
 > Full step-by-step instructions for every row live in **`149-VALIDATION.md` → Manual-Only Verifications**.
 > This file is the tracking surface (surfaces in `/gsd:progress` + `/gsd:audit-uat`); run it via `/gsd:verify-work 149`.
@@ -187,7 +187,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "SC#1 second half — with native_tools OFF the chat STILL WORKS via the prompt-injected (structured) path"
-  status: failed
+  status: fix-landed
+  fix: "plan 11 (a91cb334 RED tests + b6d1d6cf _should_pre_inject_structured gate + 22161913 run_agent_loop wiring w/ cache warm) — re-test live"
   reason: "User reported: 'list the top-level folders' → hallucinated 'No folder listing is available from the current context'; DB shows zero tool_calls on both turns (runs af51b538 20:00Z + 6eaeac19 20:04Z, gpt-5.4-mini, completed, no error). Routing itself verified STRUCTURED (override row native_tools=false source=db_override; live resolve_calling_mode seam returns STRUCTURED vs NATIVE control)."
   severity: major
   test: 1
@@ -203,7 +204,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "Follow-up suggestion chips contain only clean questions regardless of which model served the reply"
-  status: failed
+  status: fix-landed
+  fix: "plan 12 (a85eb20a RED tests + 01b92536 _strip_think_blocks before line-parse) — re-test live"
   reason: "Observed live during row 7: the MiniMax-served fallback reply follow-up chips rendered raw reasoning markup — chips read <think>, then two chain-of-thought sentences."
   severity: minor
   test: 7
