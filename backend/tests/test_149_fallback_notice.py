@@ -187,3 +187,195 @@ async def test_reresolve_provider_handles_none_capability(monkeypatch):
 
     monkeypatch.setattr(threads_mod, "get_model_capability_async", _none_capability)
     assert await threads_mod._reresolve_fallback_provider("mystery", "openai") == "openai"
+
+
+# ---------------------------------------------------------------------------
+# Review round-2 CR-01 — the fallback must change the model ACTUALLY SENT, not just
+# the bookkeeping. The LLM request model is always body.model (agent_loop.py native
+# + compat paths → the gateway's model=request.model; ctx.resolved_model is a dead
+# local there), so `_apply_fallback_to_request` must rewrite body.model to the
+# EFFECTIVE fallback model. Before the fix, a cross-provider fallback aimed the
+# still-DISABLED model at the fallback model's provider (400/404 hard-fail — the
+# UAT Test-7 shape) and a same-provider fallback silently served the disabled model
+# under a notice claiming otherwise. These tests drive the REAL seam helper with a
+# REAL MessageCreate + REAL override_provider (no fixture-masking of the served
+# model), plus a wire-level test asserting the model handed to the gateway.
+# ---------------------------------------------------------------------------
+def _settings_with_providers():
+    """A real UserEffectiveSettings (model_construct — only the fields the seam touches)
+    with anthropic (current) + minimax (fallback target) BOTH key-configured."""
+    from app.models.user_settings import LLMProvider, UserEffectiveSettings
+
+    return UserEffectiveSettings.model_construct(
+        llm_api_key="sk-anthropic",
+        llm_base_url="https://api.anthropic.com",
+        llm_model="MiniMax-M2.5-highspeed",
+        available_models=[],
+        active_provider="anthropic",
+        providers=[
+            LLMProvider(
+                id="anthropic", name="Anthropic",
+                base_url="https://api.anthropic.com", api_key="sk-anthropic",
+            ),
+            LLMProvider(
+                id="minimax", name="MiniMax",
+                base_url="https://api.minimax.io/v1", api_key="sk-minimax",
+            ),
+        ],
+    )
+
+
+async def test_fallback_rewrites_outbound_body_model(monkeypatch):
+    """CR-01: a cross-provider fallback rewrites body.model to the EFFECTIVE fallback
+    model AND re-resolves provider/credentials — the outbound request is coherent
+    (fallback model at the fallback model's provider), never the disabled model aimed
+    at a provider that cannot serve it."""
+    from app.models.message import MessageCreate
+
+    async def _fake_capability(model_id):
+        return {"provider": "minimax", "capability_source": "registry"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _fake_capability)
+
+    body = MessageCreate(content="hi", model="claude-haiku-4-5-20251001")
+    new_body, provider, new_settings = await threads_mod._apply_fallback_to_request(
+        body, "MiniMax-M2.5-highspeed", "anthropic", _settings_with_providers()
+    )
+
+    # THE CR-01 assertion: the outbound request model IS the fallback model.
+    assert new_body.model == "MiniMax-M2.5-highspeed", (
+        "body.model is what the agent loop / gateway send — it must carry the "
+        "EFFECTIVE fallback model, never the disabled one"
+    )
+    assert new_body.content == "hi"  # the rest of the request is untouched
+    # The plan-09 provider re-resolve still lands: routing + runs.provider go minimax.
+    assert provider == "minimax"
+    assert new_settings.active_provider == "minimax"
+    assert new_settings.llm_api_key == "sk-minimax"
+
+
+async def test_same_provider_fallback_still_rewrites_model(monkeypatch):
+    """CR-01 (the false-notice half): a SAME-provider fallback (disabled gpt-4o-mini →
+    org default gpt-4o) has a no-op provider flip, but body.model must STILL be
+    rewritten — otherwise the disabled model is silently served while the inline
+    notice tells the user the fallback model replied."""
+    from app.models.message import MessageCreate
+
+    async def _fake_capability(model_id):
+        return {"provider": "anthropic", "capability_source": "registry"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _fake_capability)
+
+    settings = _settings_with_providers()
+    body = MessageCreate(content="hi", model="claude-haiku-4-5-20251001")
+    new_body, provider, new_settings = await threads_mod._apply_fallback_to_request(
+        body, "claude-opus-4-8", "anthropic", settings
+    )
+
+    assert new_body.model == "claude-opus-4-8", (
+        "a same-provider fallback must still swap the served model (the notice names it)"
+    )
+    assert provider == "anthropic"  # provider unchanged — the flip is a no-op
+    assert new_settings is settings  # no credential switch needed
+
+
+async def test_gateway_receives_effective_model_from_body():
+    """CR-01 wire-level regression: drive the REAL run_agent_loop with the post-seam
+    request state (body.model = the fallback model) and assert the model handed to the
+    gateway's create_adaptive_streaming_chat IS body.model. This pins the seam invariant
+    the plan-09 unit tests masked: the request model on the wire comes from body.model,
+    so the threads.py rewrite is what makes the fallback real end-to-end."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    from app.services.agent_loop import RunContext, run_agent_loop
+    from app.services.openai_service import CallingMode
+    from tests.integration._run_helpers import _build_mock_supabase, _make_result
+
+    thread_id = str(uuid4())
+
+    def _chunk(content, finish_reason=None):
+        c = MagicMock()
+        c.usage = None
+        c.choices = [MagicMock()]
+        c.choices[0].finish_reason = finish_reason
+        delta = MagicMock()
+        delta.content = content
+        delta.tool_calls = None
+        delta.reasoning_content = None
+        c.choices[0].delta = delta
+        return c
+
+    def _chunks():
+        yield _chunk("ok")
+        yield _chunk(None, finish_reason="stop")
+
+    mock_supabase = _build_mock_supabase()
+    mock_supabase.table("threads").execute.side_effect = (
+        lambda *a, **k: _make_result({"id": thread_id, "folder_id": None})
+    )
+
+    redis_mock = MagicMock()
+    redis_mock.xadd = AsyncMock(return_value=b"1-0")
+    redis_mock.expire = AsyncMock(return_value=True)
+
+    user_settings = MagicMock()
+    user_settings.active_provider = "minimax"  # compat path (not anthropic/google native)
+    user_settings.llm_model = "MiniMax-M2.5-highspeed"
+    user_settings.llm_api_key = "sk-minimax"
+    user_settings.llm_base_url = "https://api.minimax.io/v1"
+    user_settings.openrouter_tool_strategy = "quality"
+    user_settings.web_search_enabled = False
+    user_settings.sandbox_enabled = False
+    user_settings.task_per_run_concurrency = 3
+
+    body = MagicMock()
+    body.model = "MiniMax-M2.5-highspeed"  # the post-seam EFFECTIVE (fallback) model
+    body.provider = None
+    body.agent_mode = "general"
+    body.content = "fallback wire test"
+
+    ctx = RunContext(
+        run_id=uuid4(),
+        thread_id=thread_id,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"},
+        user_settings=user_settings,
+        body=body,
+        redis=redis_mock,
+        supabase=mock_supabase,
+        resolved_model="MiniMax-M2.5-highspeed",
+        resolved_provider="minimax",
+    )
+
+    captured: dict = {}
+
+    def _capture_stream(*args, **kwargs):
+        captured["model"] = kwargs.get("model")
+        return (iter(_chunks()), CallingMode.NATIVE)
+
+    with patch(
+        "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
+        side_effect=_capture_stream,
+    ), patch(
+        "app.services.agent_loop.get_pg_pool",
+        new=AsyncMock(return_value=MagicMock()),
+    ), patch(
+        "app.services.agent_loop.insert_assistant_message",
+        new=AsyncMock(return_value=uuid4()),
+    ), patch(
+        "app.services.suggestion_service.generate_suggestions",
+        return_value=([], None),
+    ):
+        await run_agent_loop(
+            ctx,
+            emit=AsyncMock(return_value=None),
+            emit_terminal=AsyncMock(return_value=None),
+            spawn=lambda coro: asyncio.ensure_future(coro),
+            result_sink={},
+        )
+
+    assert captured.get("model") == "MiniMax-M2.5-highspeed", (
+        "the model handed to the gateway must equal body.model (the effective fallback "
+        f"model) — got {captured.get('model')!r}"
+    )
+    assert captured["model"] == ctx.body.model

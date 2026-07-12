@@ -262,6 +262,44 @@ async def _reresolve_fallback_provider(effective_model: str, current_provider: s
     return current_provider
 
 
+async def _apply_fallback_to_request(
+    body, resolved_model: str, resolved_provider: str, user_settings
+):
+    """Phase 149 review round-2 CR-01 — apply a fired disabled-model fallback to the
+    OUTBOUND request. Called ONLY when ``_model_fallback_notice`` is truthy (the enabled /
+    no-fallback path never enters — byte-identical, D-14).
+
+    Returns ``(body, resolved_provider, user_settings)``:
+
+    - ``body`` is rebuilt with ``body.model`` = the EFFECTIVE (fallback) model. This is
+      THE CR-01 fix: the model actually sent to the LLM is always ``body.model``
+      (``agent_loop.py:1937`` native path, ``:2005``/``:2032`` compat path → the gateway's
+      ``model=request.model``); ``ctx.resolved_model`` is a dead local there. Without the
+      rewrite every fallback-fired run still sent the DISABLED model on the wire — the
+      plan-09 provider flip then aimed that disabled model at the fallback model's
+      provider (cross-provider fallback → provider 400/404 hard-fail, the exact UAT
+      Test-7 shape), and a same-provider fallback silently served the disabled model
+      while the inline notice claimed the fallback model replied. Post-seam
+      ``body.model`` readers audited: the title-gen read (threads.py ~:1325), the
+      RunContext/agent_loop request sites, and the suggestion-gen reads all correctly
+      want the EFFECTIVE model.
+    - ``resolved_provider`` / ``user_settings`` carry the plan-09 provider re-resolve
+      (bookkeeping honesty — ``runs.provider`` names who actually serves the run) via
+      the same canonical ``override_provider`` mutation path the registry branch uses.
+    """
+    fallback_provider = await _reresolve_fallback_provider(resolved_model, resolved_provider)
+    if fallback_provider != resolved_provider:
+        resolved_provider = fallback_provider
+        # Align user_settings so any downstream reader (agent_runner SDK selection)
+        # stays consistent with the recorded provider — same canonical mutation path
+        # the registry branch uses.
+        user_settings = override_provider(user_settings, resolved_provider)
+    # CR-01: the producer's closure-captured body must carry the EFFECTIVE model —
+    # this is the value the agent loop / provider gateway put on the wire.
+    body = body.model_copy(update={"model": resolved_model})
+    return body, resolved_provider, user_settings
+
+
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
 # SYSTEM_PROMPT, TOOL_USAGE_INSTRUCTIONS, _format_tool_list, CONFIDENCE_DISCLAIMER,
 # _compute_confidence, _deduplicate_citations MOVED verbatim to
@@ -1204,25 +1242,22 @@ async def send_message(
         else:
             _resolved_provider = _user_settings.active_provider
 
-    # Phase 149 Plan 09 (D-149-10 bookkeeping honesty) — when a disabled-model fallback
-    # fired, _resolved_model is now the org-default fallback but _resolved_provider may still
-    # hold the PRE-fallback provider (both the body.provider branch and the non-registry else
-    # above leave it as the original active_provider). Re-resolve the provider from the
-    # EFFECTIVE fallback model so register_run_start records who actually served the run (a
-    # MiniMax-served fallback records "minimax", not the stale "anthropic"). Minimal additive
-    # guard at the existing seam (threads.py is a G-5 hot file — no refactor, no per-provider
-    # fork, routing unchanged); for the no-fallback case _model_fallback_notice is falsy → a
-    # no-op and the shared path stays byte-identical (D-14).
+    # Phase 149 Plan 09 (D-149-10 bookkeeping honesty) + review round-2 CR-01 — when a
+    # disabled-model fallback fired, _resolved_model is now the org-default fallback but
+    # BOTH the outbound request model (body.model — what the agent loop / gateway actually
+    # send) and _resolved_provider still hold PRE-fallback values. _apply_fallback_to_request
+    # re-resolves the recorded provider from the EFFECTIVE fallback model (a MiniMax-served
+    # fallback records "minimax", not the stale "anthropic") AND rewrites body.model to the
+    # effective model so the fallback model is what actually goes on the wire (CR-01: without
+    # the rewrite, a cross-provider fallback hard-failed and a same-provider fallback silently
+    # served the disabled model under a false notice). Minimal additive guard at the existing
+    # seam (threads.py is a G-5 hot file — no refactor, no per-provider fork); for the
+    # no-fallback case _model_fallback_notice is falsy → a no-op and the shared path stays
+    # byte-identical (D-14).
     if _model_fallback_notice:
-        _fallback_provider = await _reresolve_fallback_provider(
-            _resolved_model, _resolved_provider
+        body, _resolved_provider, _user_settings = await _apply_fallback_to_request(
+            body, _resolved_model, _resolved_provider, _user_settings
         )
-        if _fallback_provider != _resolved_provider:
-            _resolved_provider = _fallback_provider
-            # Align _user_settings so any downstream reader (agent_runner SDK selection)
-            # stays consistent with the recorded provider — same canonical mutation path
-            # the registry branch uses.
-            _user_settings = override_provider(_user_settings, _resolved_provider)
 
     try:
         # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
