@@ -210,7 +210,7 @@ Plans:
 
 **Gap closure (round 2)** *(from 149-HUMAN-UAT.md round-2 re-test — 1 major + 1 minor; both root-caused live; independent, parallel)*
 
-- [ ] 149-11-PLAN.md — Structured-path pre-injection: fire TOOL_USAGE_INSTRUCTIONS when a DB native_tools=False compat model resolves STRUCTURED (Test 1 SC#1 second half; WR-05 native-SDK boundary kept)
+- [x] 149-11-PLAN.md — Structured-path pre-injection: fire TOOL_USAGE_INSTRUCTIONS when a DB native_tools=False compat model resolves STRUCTURED (Test 1 SC#1 second half; WR-05 native-SDK boundary kept)
 - [ ] 149-12-PLAN.md — Suggestion think-leak: strip `<think>` reasoning blocks before the line-parse so compat-model chips are clean questions (Test 7 minor)
 
 **UI hint**: yes
