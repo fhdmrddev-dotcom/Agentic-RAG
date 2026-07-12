@@ -101,3 +101,11 @@ None - no external service configuration required. (The discovery endpoint and i
 ---
 *Phase: 149-model-registry-discovery*
 *Completed: 2026-07-12*
+
+## Self-Check: PASSED
+
+- FOUND: `backend/app/services/model_discovery_service.py`
+- FOUND: `backend/tests/test_149_discovery.py`
+- FOUND: `.planning/phases/149-model-registry-discovery/149-02-SUMMARY.md`
+- Commits verified: `b3825693` (test), `2780fbe9` (feat), `86f4af36` (test), `050331ff` (feat), `94b6a3df` (docs)
+- Tests: `pytest tests/test_149_discovery.py` → 3 passed
