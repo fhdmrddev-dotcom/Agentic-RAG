@@ -1453,6 +1453,47 @@ def _resolve_db_max_output_cap(model_id: str | None) -> int | None:
     return None
 
 
+def _resolve_db_native_tools(model_id: str | None) -> bool | None:
+    """Best-effort SYNC read of an operator's DB-edited ``native_tools`` override for
+    ``model_id`` (Phase 149 SC#1 / D-149-16 — the DB overlay for the tool-calling mode).
+
+    Mirrors :func:`_resolve_db_max_output_cap` byte-for-byte in structure. ``resolve_calling_mode``
+    stays SYNC (the D-14 byte-identical boundary), so we cannot ``await`` the async DB overlay
+    (``get_model_capability_async``) here. Instead we read the SAME 30s-TTL
+    ``_model_overrides_cache`` the async request path warms: ``agent_loop.py`` calls
+    ``get_model_capability_async(effective_model)`` immediately before opening the stream (and
+    ``_load_model_overrides`` loads EVERY enabled override row — the rows carry ``native_tools``
+    among their columns), so this sync read reflects an operator's toggle within the D-149-16
+    TTL window WITHOUT an await in the hot path — i.e. the mode is resolved on the async path and
+    passed in via the cache.
+
+    Returns ``True``/``False`` when a row exists AND its ``native_tools`` value is not None (the
+    operator explicitly turned native tools ON or OFF); otherwise ``None`` so
+    ``resolve_calling_mode`` falls back to the static ``MODEL_CAPABILITIES`` value (a cold cache,
+    an absent row, or a null ``native_tools`` column is the byte-identical no-override default,
+    never a crash — mirrors _resolve_db_max_output_cap / D-074-02).
+    """
+    if not model_id:
+        return None
+    try:
+        # Lazy import mirrors _resolve_db_max_output_cap's own lazy import
+        # (avoids the openai_service <-> user_settings import cycle).
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model_id)
+        if row is not None:
+            db_native = row.get("native_tools")
+            if db_native is not None:
+                return bool(db_native)
+    except Exception:
+        logger.warning(
+            "_resolve_db_native_tools: sync cache read failed for model=%s; "
+            "falling back to static registry native_tools",
+            model_id,
+            exc_info=True,
+        )
+    return None
+
+
 def _uses_max_completion_tokens(model: str) -> bool:
     """Return True for models that require max_completion_tokens instead of max_tokens.
 
@@ -1518,7 +1559,19 @@ class CallingMode(str, Enum):
 def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | None" = None) -> CallingMode:
     """Determine whether to use native API tools or structured JSON prompting."""
     cap = get_model_capability(model_id)
-    
+
+    # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT
+    # request's routing. Read the DB override SYNC from the same warm _model_overrides_cache the
+    # max_output clamp uses (_resolve_db_native_tools — no await on the hot path; None on a
+    # cold/absent/null row → byte-identical to today, D-14). An explicit native_tools=False must
+    # win for EVERY provider (disabling native tools is the whole point of the toggle), so it
+    # short-circuits to STRUCTURED here — this correctly bypasses the OpenRouter strategy branch
+    # below too. An explicit True flows through the existing branch (it does not override an xml
+    # strategy) and only settles the final static decision.
+    db_native = _resolve_db_native_tools(model_id)
+    if db_native is False:
+        return CallingMode.STRUCTURED
+
     # OpenRouter strategy override — applies when the active provider is openrouter
     # OR when the model is explicitly in the registry as an openrouter model
     is_openrouter = (
@@ -1531,8 +1584,11 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
             return CallingMode.STRUCTURED
         # quality and native both attempt native, but quality adds :exacto
         return CallingMode.NATIVE
-    
-    if cap["native_tools"]:
+
+    # Effective native_tools: an operator's explicit True (db_native) wins over the static cap;
+    # when db_native is None this collapses to cap["native_tools"] — byte-identical (D-14).
+    effective_native = db_native if db_native is not None else cap["native_tools"]
+    if effective_native:
         return CallingMode.NATIVE
     return CallingMode.STRUCTURED
 
