@@ -1035,3 +1035,89 @@ async def get_model_registry(request: Request):
         rows.append(_registry_row(model_id, None, ovr, default_model, model_locked))
 
     return {"models": rows}
+
+
+@router.patch("/models/{model_id}")
+async def set_model_capability(
+    model_id: str,
+    body: dict,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """SQLi-safe capability write with null-clears-to-DEF Reset (MODEL-01 / D-149-02).
+
+    T-149-11: reject any body key not in ``_MODEL_CAP_COLUMNS`` with 422 BEFORE any SQL —
+    a client field name never reaches the upsert's column list. The upsert is a
+    parameterized asyncpg INSERT ... ON CONFLICT (model_id) DO UPDATE (values via $N binds).
+
+    Reset semantics (D-149-02 / 149-07): a field sent as an EXPLICIT ``null`` CLEARS that
+    override (the column is written SQL NULL, so get_model_capability_async's non-None
+    overlay skips it and the value falls back to the built-in DEF). An OMITTED key is left
+    UNTOUCHED. The raw ``dict`` body preserves the present-null-vs-omitted distinction that a
+    Pydantic model would erase.
+
+    On success: invalidate the TTL cache (so the edit is visible on the next request — ≤30s
+    cross-worker per Pitfall 3, the accepted SC#1 semantics) + stamp a ✎
+    ``model.capability.set`` receipt. On a persistence failure: stamp
+    ``model.capability.write_failed`` + raise a real 500 (never a false 2xx — mirrors
+    set_flag's honest-failure path). The default/locked-disable guard + lock semantics are
+    Plan 06 — this is the base write. Non-operators are 404'd by the router gate.
+    """
+    # T-149-11: allowlist BEFORE any DB touch. An unknown field never reaches a SET clause.
+    unknown = [k for k in body if k not in _MODEL_CAP_COLUMNS]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown capability field(s): {', '.join(sorted(unknown))}",
+        )
+
+    # Only keys PRESENT in the raw body are written; an explicit null → SQL NULL (clear to
+    # DEF), an omitted key → never touched (do NOT coalesce omitted to NULL — that would
+    # wipe unrelated overrides). Column names come ONLY from the code allowlist (SQLi-safe).
+    present_cols = [c for c in _MODEL_CAP_COLUMNS if c in body]
+    if not present_cols:
+        # Nothing to change — a no-op success; never writes a bare all-DEF override row.
+        request.state.audit_action = "model.capability.set"
+        request.state.audit_label = f"No capability changes for {model_id}"
+        return {"ok": True, "model_id": model_id, "changed": []}
+
+    # provider is NOT NULL on the table; needed for a first-time INSERT of a DEF/DB-only
+    # model. get_model_capability returns the registry (or inferred) provider; an existing
+    # OVR row keeps its stored provider (ON CONFLICT does not touch it).
+    from app.config import get_model_capability  # function-local (Pitfall 4)
+    provider = get_model_capability(model_id).get("provider") or _infer_provider_for(model_id)
+
+    insert_cols = ["model_id", "provider", *present_cols]
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(insert_cols)))
+    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in present_cols)
+    sql = (
+        f"INSERT INTO model_capabilities_overrides ({', '.join(insert_cols)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT (model_id) DO UPDATE SET {set_clause}, updated_at = now()"
+    )
+    values = [model_id, provider, *[body[c] for c in present_cols]]
+
+    pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
+    write_ok = False
+    if pool is not None:
+        try:
+            await pool.execute(sql, *values)
+            write_ok = True
+        except Exception:
+            logger.exception("set_model_capability: upsert failed for %s", model_id)
+
+    if not write_ok:
+        # Honest failure: stamp a *.write_failed receipt and raise a real 500 — never a
+        # false 2xx. (Like set_flag, the raised HTTPException re-enters the floor's yield,
+        # so the floor skips its write; the stamp is belt-and-braces.)
+        request.state.audit_action = "model.capability.write_failed"
+        request.state.audit_label = f"Capability change for {model_id} failed to persist"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not persist the capability change — it was not changed.",
+        )
+
+    invalidate_model_overrides_cache()  # SC#1: edit visible on the next request
+    request.state.audit_action = "model.capability.set"
+    request.state.audit_label = f"Changed capabilities for {model_id}"
+    return {"ok": True, "model_id": model_id, "changed": present_cols}
