@@ -1084,6 +1084,18 @@ async def set_model_capability(
     set_flag's honest-failure path). The default/locked-disable guard + lock semantics are
     Plan 06 — this is the base write. Non-operators are 404'd by the router gate.
     """
+    # WR-04 (review round 2): the `:path` converter regex is `.*` — unlike the old
+    # single-segment `{model_id}` (`[^/]+`), it matches the EMPTY string, so
+    # `PATCH /admin/models/` would reach this handler with model_id="" and upsert a
+    # phantom model_id="" row that then surfaces in the registry union. Reject
+    # empty / whitespace-or-slash-only ids with a 422 BEFORE any other processing —
+    # restores the non-empty guarantee the old converter provided structurally.
+    if not model_id or not model_id.strip("/ \t\r\n"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_id must be non-empty.",
+        )
+
     # T-149-11: allowlist BEFORE any DB touch. An unknown field never reaches a SET clause.
     unknown = [k for k in body if k not in _MODEL_CAP_COLUMNS]
     if unknown:
@@ -1246,6 +1258,18 @@ async def set_model_lock(
     (never a false 204 — mirrors set_flag's honest-failure path). Non-operators are 404'd by
     the router gate; a failed persist re-enters the floor's yield so no false receipt is written.
     """
+    # WR-04 (review round 2): the `:path` converter matches the EMPTY string —
+    # `PUT /admin/models//lock` would reach this handler with model_id="" and (on
+    # locked=true) write app_settings.llm_model="" + llm_model_locked=true, blanking
+    # AND locking the org default. Reject empty / whitespace-or-slash-only ids with a
+    # 422 BEFORE any write — restores the old single-segment converter's structural
+    # non-empty guarantee.
+    if not model_id or not model_id.strip("/ \t\r\n"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_id must be non-empty.",
+        )
+
     from app.models.user_settings import (  # function-local (Pitfall 4)
         invalidate_model_overrides_cache,
         load_all_model_overrides,

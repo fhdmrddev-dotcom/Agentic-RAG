@@ -94,3 +94,46 @@ def test_lock_namespaced_id_routes(client, operator_override, monkeypatch):
     assert res.status_code != 404, "namespaced PUT .../lock must route (Test-4 / Test-5 leg)"
     assert res.status_code == 204
     fake_save.assert_awaited_once_with({"llm_model": _NAMESPACED, "llm_model_locked": True})
+
+
+# ── WR-04 (review round 2): the `:path` converter matches the EMPTY string ─────
+# The old single-segment `{model_id}` regex (`[^/]+`) made an empty id structurally
+# impossible; `:path` (`.*`) does not. Without the handler guard, PATCH /admin/models/
+# upserts a phantom model_id="" row and PUT /admin/models//lock BLANKS + LOCKS the org
+# default (app_settings.llm_model=""). Both must 422 before any write.
+
+def test_patch_empty_model_id_is_422(client, operator_override, monkeypatch):
+    """PATCH /admin/models/ (empty model_id via the `:path` converter) → 422, and the
+    upsert is never reached (no phantom model_id='' registry row)."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+    monkeypatch.setattr(admin_mod, "invalidate_model_overrides_cache", lambda: None)
+
+    res = client.patch("/admin/models/", json={"max_output_tokens": 8192})
+
+    assert res.status_code == 422, "an empty model_id must be refused, never upserted"
+    assert pool.calls == [], "the guard must fire BEFORE any DB touch"
+
+
+def test_patch_whitespace_model_id_is_422(client, operator_override, monkeypatch):
+    """PATCH /admin/models/%20 (whitespace-only id) → 422 — same guard, same reason."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+    monkeypatch.setattr(admin_mod, "invalidate_model_overrides_cache", lambda: None)
+
+    res = client.patch("/admin/models/%20", json={"max_output_tokens": 8192})
+
+    assert res.status_code == 422
+    assert pool.calls == []
+
+
+def test_lock_empty_model_id_is_422(client, operator_override, monkeypatch):
+    """PUT /admin/models//lock (empty model_id) → 422 BEFORE any write — the org default
+    must never be blanked + locked by a buggy client call."""
+    fake_save = AsyncMock(return_value=True)
+    monkeypatch.setattr(admin_mod, "save_app_settings", fake_save)
+
+    res = client.put("/admin/models//lock", json={"locked": True})
+
+    assert res.status_code == 422, "an empty model_id lock must be refused"
+    fake_save.assert_not_awaited()  # llm_model='' + llm_model_locked=true never written
