@@ -999,10 +999,15 @@ def _registry_row(model_id, cap, ovr, default_model, model_locked):
         "capability_source": source,
         "enabled": bool(_enabled) if _enabled is not None else True,
         "deprecated": bool(_deprecated) if _deprecated is not None else False,
-        "context_window_tokens": _eff("context_window_tokens", 0) or 0,
-        "max_output_tokens": _eff("max_output_tokens", 0) or 0,
+        # WR-04: distinguish "not tracked in the registry" from a real 0. No built-in
+        # MODEL_CAPABILITIES entry carries context_window_tokens, so coalescing absent→0 made
+        # the tab read "Context 0 · DEF" for essentially every registry row (false — the value
+        # is simply not tracked, not zero). Return the RAW effective value or None; the tab
+        # renders None as "—" (not a concrete 0). Same for the sibling numeric fields.
+        "context_window_tokens": _eff("context_window_tokens"),
+        "max_output_tokens": _eff("max_output_tokens"),
         "native_tools": bool(_eff("native_tools", False)),
-        "llm_call_timeout_seconds": _eff("llm_call_timeout_seconds", 0) or 0,
+        "llm_call_timeout_seconds": _eff("llm_call_timeout_seconds"),
         "is_default": model_id == default_model,
         "is_locked": bool(model_locked) and model_id == default_model,
         # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.

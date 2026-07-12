@@ -160,6 +160,28 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     expect(await screen.findByText(/pick a new default first/i)).toBeInTheDocument()
   })
 
+  it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {
+    render(
+      <ModelRegistryTab
+        rows={[
+          makeRow({
+            context_window_tokens: null,
+            max_output_tokens: null,
+            llm_call_timeout_seconds: null,
+          }),
+        ]}
+        onSetCapability={noop}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    // The Context cell shows the em-dash "not tracked" placeholder, never a false "0".
+    const ctxBtn = screen.getByRole("button", { name: /edit context for gpt-5\.6-sol/i })
+    expect(ctxBtn).toHaveTextContent("—")
+    expect(ctxBtn).not.toHaveTextContent("0")
+  })
+
   it("shows a Reset ONLY on an overridden field, and Reset sends an explicit null (clears to DEF)", async () => {
     const user = userEvent.setup()
     const onSet = vi.fn().mockResolvedValue(undefined)

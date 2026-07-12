@@ -396,7 +396,8 @@ function NumericCell({
 }: {
   modelId: string
   field: NumField
-  value: number
+  /** WR-04: `null` = the value is not tracked in the registry (renders "—", empty input). */
+  value: number | null
   overridden: boolean
   editing: boolean
   busy: boolean
@@ -417,14 +418,17 @@ function NumericCell({
       if (settled.current) return
       settled.current = true
       const n = parseInt(raw, 10)
-      onCommit(Number.isFinite(n) ? n : value)
+      // A valid number commits; an empty/invalid edit is a no-op (never a stray Reset), so a
+      // "not tracked" (null) cell the operator opens but leaves blank stays untracked.
+      if (Number.isFinite(n)) onCommit(n)
+      else onCancel()
     }
     return (
       <input
         type="number"
         aria-label={`${field.label} for ${modelId}`}
         autoFocus
-        defaultValue={String(value)}
+        defaultValue={value === null ? "" : String(value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             commitFrom((e.target as HTMLInputElement).value)
@@ -451,7 +455,9 @@ function NumericCell({
           !overridden && "italic text-muted-foreground",
         )}
       >
-        <span className="font-mono text-xs">{fmtNum(value, field.suffix)}</span>
+        <span className="font-mono text-xs">
+          {value === null ? "—" : fmtNum(value, field.suffix)}
+        </span>
         <SourceTag overridden={overridden} />
       </button>
       {overridden && (

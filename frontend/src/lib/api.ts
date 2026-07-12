@@ -4052,10 +4052,14 @@ export interface ModelRegistryRow {
   capability_source: "registry" | "db_override"
   enabled: boolean
   deprecated: boolean
-  context_window_tokens: number
-  max_output_tokens: number
+  /** WR-04 honesty: a numeric capability NOT tracked in the built-in registry reads `null`
+   *  (rendered as "—" in the tab), NOT a concrete `0`. No built-in MODEL_CAPABILITIES row
+   *  carries `context_window_tokens`, so it is `null` on every pure-DEF row until an operator
+   *  sets an override. `null` shows an empty edit input (the operator can type a number). */
+  context_window_tokens: number | null
+  max_output_tokens: number | null
   native_tools: boolean
-  llm_call_timeout_seconds: number
+  llm_call_timeout_seconds: number | null
   is_default: boolean
   is_locked: boolean
   /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
