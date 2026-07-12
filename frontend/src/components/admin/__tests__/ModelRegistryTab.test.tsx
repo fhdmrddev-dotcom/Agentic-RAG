@@ -13,7 +13,7 @@
  *   • a 409 rejection surfaces the server `detail` in-row (never a silent failure).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, cleanup, within } from "@testing-library/react"
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ModelRegistryTab } from "../ModelRegistryTab"
@@ -174,6 +174,83 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
       name: /deprecation reason for gpt-5\.6-sol/i,
     })
     expect(reasonInput).toHaveValue("superseded by gpt-5.6")
+  })
+
+  // ── D-149-04 / Test-10 — deprecated-reason commit parity with InlineNumberCell ──
+  // The reproduced UAT complaint: a typed reason was reported as commit-on-blur-only and
+  // could be lost on Enter (or double-written by Enter-then-blur). These lock full parity:
+  // Enter commits exactly once, Escape cancels (revert, no write), and the one-shot guard
+  // stops the trailing blur from double-writing.
+
+  it("test_reason_enter_commits_once — Enter commits the typed reason exactly once (never lost)", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const input = screen.getByRole("textbox", { name: /deprecation reason for gpt-5\.6-sol/i })
+    await user.click(input)
+    await user.type(input, "superseded by gpt-5.6")
+    await user.keyboard("{Enter}")
+
+    expect(onSet).toHaveBeenCalledTimes(1)
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", {
+      deprecated: true,
+      deprecated_reason: "superseded by gpt-5.6",
+    })
+  })
+
+  it("test_reason_escape_cancels — Escape reverts the draft to the stored reason and does NOT write", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: "original reason" })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const input = screen.getByRole("textbox", { name: /deprecation reason for gpt-5\.6-sol/i })
+    await user.click(input)
+    await user.clear(input)
+    await user.type(input, "a new draft")
+    expect(input).toHaveValue("a new draft")
+
+    await user.keyboard("{Escape}")
+
+    // Cancel semantics: no write fired, and the input reverted to the stored reason.
+    expect(onSet).not.toHaveBeenCalled()
+    expect(input).toHaveValue("original reason")
+  })
+
+  it("test_reason_enter_then_blur_no_double_write — Enter then the trailing blur writes at most once", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: null })]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const input = screen.getByRole("textbox", { name: /deprecation reason for gpt-5\.6-sol/i })
+    await user.click(input)
+    await user.type(input, "superseded")
+    await user.keyboard("{Enter}")
+    // The blur that eventually fires must NOT re-commit (the one-shot `settled` guard).
+    fireEvent.blur(input)
+
+    expect(onSet).toHaveBeenCalledTimes(1)
   })
 
   it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {

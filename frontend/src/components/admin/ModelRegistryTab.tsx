@@ -507,6 +507,22 @@ function DeprecatedControl({
   // preserves it (a blur/enter no longer overwrites the current reason with a blank).
   const [reason, setReason] = useState(row.deprecated_reason ?? "")
 
+  // Full commit parity with InlineNumberCell (D-149-04 / Test-10): a one-shot `settled`
+  // guard so an Enter-commit isn't re-fired by the trailing blur, and an Escape-cancel
+  // isn't turned into a commit by its own blur. Reset when the reason editor (re)mounts
+  // (the row becomes deprecated) AND on every fresh keystroke — so a genuine re-edit still
+  // commits, but a single logical edit writes at most once.
+  const settled = useRef(false)
+  useEffect(() => {
+    if (row.deprecated) settled.current = false
+  }, [row.deprecated])
+
+  function commitReason() {
+    if (settled.current) return
+    settled.current = true
+    void onWrite({ deprecated: true, deprecated_reason: reason.trim() || null })
+  }
+
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2">
       <RowToggle
@@ -538,13 +554,23 @@ function DeprecatedControl({
           placeholder="reason (optional)"
           value={reason}
           disabled={busy}
-          onChange={(e) => setReason(e.target.value)}
+          onChange={(e) => {
+            // A fresh keystroke invalidates a prior commit → a genuine re-edit commits again.
+            settled.current = false
+            setReason(e.target.value)
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void onWrite({ deprecated: true, deprecated_reason: reason.trim() || null })
+            if (e.key === "Enter") {
+              // Commit (with preventDefault so it never triggers a stray surrounding submit).
+              e.preventDefault()
+              commitReason()
+            } else if (e.key === "Escape") {
+              // Cancel: revert the draft to the stored reason and never write.
+              settled.current = true
+              setReason(row.deprecated_reason ?? "")
+            }
           }}
-          onBlur={() => {
-            if (reason.trim()) void onWrite({ deprecated: true, deprecated_reason: reason.trim() })
-          }}
+          onBlur={commitReason}
           className="w-40 rounded-[5px] border border-warning/40 bg-background px-1.5 py-0.5 text-[11px] text-foreground placeholder:text-muted-foreground/50"
         />
       )}
