@@ -28,3 +28,22 @@ provider-router/MDL fixture drift.
 
 **Re-open trigger:** the overdue `backend/app/api/threads.py` G-5 extraction refactor
 (ledger: "G-5 fires — extraction due") should sweep these mock targets when it lands.
+
+## Plan 149-08 (2026-07-12) — pre-existing integration-env failure (1 test)
+
+Discovered while running the `-k "149 or model_gate or admin"` regression sweep for the
+gap-closure fixes (the test name contains "admin" so it matched the filter — it is NOT an
+admin/model-registry test).
+
+- `tests/integration/test_extraction_dispatcher.py::TestExtractionDispatcher::test_per_call_hint_respects_admin_disable`
+
+**Root cause: out of scope + environmental.** The test drives `POST /documents/{id}/reextract`
+(the documents router) and receives `503 Service Unavailable` — it needs live extraction/DB
+services this test environment does not provide. It **fails identically in isolation (fresh
+process)**, so it is not an ordering artifact of the 149-08 tests and is entirely unrelated to
+this plan's changes (which touch only `openai_service.resolve_calling_mode` + the two `admin.py`
+model-route decorators — neither can affect the documents reextract path). Not fixed per the
+SCOPE BOUNDARY rule.
+
+**Re-open trigger:** revisit when the integration suite is run against live extraction services
+(or when the reextract 503 service-availability guard is next audited).

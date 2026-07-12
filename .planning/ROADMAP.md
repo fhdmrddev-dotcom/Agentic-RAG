@@ -204,7 +204,7 @@ Plans:
 
 **Gap closure** *(from 149-HUMAN-UAT.md — 3 MAJOR + 2 minor gaps; all root-caused live; independent, parallel)*
 
-- [ ] 149-08-PLAN.md — Backend request-path: native_tools DB-aware calling mode (SC#1/Test 1) + `{model_id:path}` OpenRouter slash-ID routes (Test 4/5)
+- [x] 149-08-PLAN.md — Backend request-path: native_tools DB-aware calling mode (SC#1/Test 1) + `{model_id:path}` OpenRouter slash-ID routes (Test 4/5)
 - [ ] 149-09-PLAN.md — Honest disabled-model fallback end-to-end: frontend `model_disabled_fallback` SSE notice (Test 7/D-149-10) + threads.py provider re-resolve
 - [ ] 149-10-PLAN.md — Discovery/registry UI honesty: truthful per-model provenance label (Test 9/SC#3) + deprecated-reason Enter/Esc commit parity (Test 10)
 
