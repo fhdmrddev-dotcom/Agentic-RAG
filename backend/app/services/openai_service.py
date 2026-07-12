@@ -1563,11 +1563,18 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
     # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT
     # request's routing. Read the DB override SYNC from the same warm _model_overrides_cache the
     # max_output clamp uses (_resolve_db_native_tools — no await on the hot path; None on a
-    # cold/absent/null row → byte-identical to today, D-14). An explicit native_tools=False must
-    # win for EVERY provider (disabling native tools is the whole point of the toggle), so it
+    # cold/absent/null row → byte-identical to today, D-14). An explicit native_tools=False
     # short-circuits to STRUCTURED here — this correctly bypasses the OpenRouter strategy branch
-    # below too. An explicit True flows through the existing branch (it does not override an xml
-    # strategy) and only settles the final static decision.
+    # below too. SCOPE (WR-05, review round 2): resolve_calling_mode is consulted ONLY by the
+    # OpenAI-compat gateway path (7 of the 9 providers). Models served by the Anthropic/Google
+    # NATIVE SDK branches (agent_loop.py:1921 dispatches on active_provider_name BEFORE any
+    # calling-mode read) are always-native and never see this override — the registry UI gates
+    # the native_tools toggle for those rows (honest lock, "always native on this provider")
+    # rather than record a silently-inert OVR. Honoring the override there would mean rerouting
+    # native-SDK traffic through the compat adapter (Google's native base URL is not
+    # OpenAI-compatible; STRUCTURED changes tool semantics) — deferred, see 149-REVIEW.md WR-05.
+    # An explicit True flows through the existing branch (it does not override an xml strategy)
+    # and only settles the final static decision.
     db_native = _resolve_db_native_tools(model_id)
     if db_native is False:
         return CallingMode.STRUCTURED

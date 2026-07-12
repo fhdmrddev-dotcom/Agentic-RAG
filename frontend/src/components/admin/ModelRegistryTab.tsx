@@ -311,13 +311,20 @@ function ModelRow({
           </td>
         ))}
 
-        {/* native_tools toggle. */}
+        {/* native_tools toggle. WR-05 (review round 2) honest lock: models whose provider is
+            anthropic/google are served by the NATIVE SDK branches (agent_loop dispatches on
+            the active provider BEFORE any calling-mode read), which never consult
+            native_tools — a write here would record an OVR + ✎ receipt while routing stays
+            byte-identical. Silent inertness on an operator control is banned (Control-Room
+            honest-locks doctrine), so the toggle is gated with the always-native tooltip. */}
         <td className="border-t border-border/40 px-3 py-2 align-middle">
           <RowToggle
             on={row.native_tools}
             busy={busy}
             label={`Native tools for ${id}`}
             tone="primary"
+            gated={row.provider === "anthropic" || row.provider === "google"}
+            gatedTitle="Always native on this provider — Anthropic/Google models run their native SDK paths, which don't consult this toggle."
             onToggle={() => void write({ native_tools: !row.native_tools })}
           />
         </td>
@@ -668,6 +675,8 @@ function RowToggle({
   label,
   tone,
   size = "md",
+  gated = false,
+  gatedTitle,
   onToggle,
 }: {
   on: boolean
@@ -675,6 +684,12 @@ function RowToggle({
   label: string
   tone: "primary" | "success" | "warning"
   size?: "sm" | "md"
+  /** WR-05 honest lock: when true the switch is inert BY DECLARATION — aria-disabled +
+   *  click guard + courtesy tooltip (the LockControl gated pattern, NOT `disabled`, so
+   *  the tooltip still shows). Used where a write would be silently inert (e.g.
+   *  native_tools on a native-SDK-served provider). */
+  gated?: boolean
+  gatedTitle?: string
   onToggle: () => void
 }) {
   const dims = size === "sm" ? "h-4 w-7" : "h-5 w-9"
@@ -689,11 +704,17 @@ function RowToggle({
       aria-checked={on}
       aria-label={label}
       disabled={busy}
-      onClick={onToggle}
+      aria-disabled={gated || busy}
+      title={gated ? gatedTitle : undefined}
+      onClick={() => {
+        if (gated) return
+        onToggle()
+      }}
       className={cn(
         "relative inline-flex flex-none items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         dims,
         on ? onBg : "bg-muted",
+        gated && "cursor-not-allowed opacity-40",
       )}
     >
       <span

@@ -325,6 +325,43 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     })
   })
 
+  // ── WR-05 (review round 2) — native_tools honest lock on native-SDK providers ──
+  // Anthropic/Google models run the native SDK branches (agent_loop dispatches on the
+  // active provider before any calling-mode read), which never consult native_tools —
+  // a write would record an OVR + ✎ receipt while routing stays byte-identical. The
+  // toggle is therefore GATED (aria-disabled + always-native tooltip + click no-op),
+  // never silently inert (Control-Room honest-locks doctrine).
+
+  it("test_native_tools_gated_on_native_sdk_rows — anthropic/google rows gate the toggle (no inert write); compat rows keep it live", async () => {
+    const user = userEvent.setup()
+    const onSet = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ModelRegistryTab
+        rows={[
+          makeRow({ model_id: "claude-opus-4-8", provider: "anthropic" }),
+          makeRow({ model_id: "gpt-5.6-sol", provider: "openai" }),
+        ]}
+        onSetCapability={onSet}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const gated = screen.getByRole("switch", { name: /native tools for claude-opus-4-8/i })
+    // Honest lock: declared inert + the courtesy tooltip names WHY.
+    expect(gated).toHaveAttribute("aria-disabled", "true")
+    expect(gated.getAttribute("title")).toMatch(/always native/i)
+    // Clicking it never issues the silently-inert write (no OVR, no false ✎ receipt).
+    fireEvent.click(gated)
+    expect(onSet).not.toHaveBeenCalled()
+
+    // A compat-served row keeps the live toggle — the gate is provider-scoped.
+    const live = screen.getByRole("switch", { name: /native tools for gpt-5\.6-sol/i })
+    expect(live).not.toHaveAttribute("aria-disabled", "true")
+    await user.click(live)
+    expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { native_tools: false })
+  })
+
   it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {
     render(
       <ModelRegistryTab
