@@ -206,6 +206,12 @@ class ModelCapability(TypedDict, total=False):
     # registry MISS (un-doc-verified / case-sensitivity) SAFELY degrades to coerce
     # (default-SAFE, D-122-05) — never wrongly assumes force/strict it hasn't verified.
     emit_tier: Literal["force_strict", "force", "coerce"]  # Phase 122 D-122-04 — single source of truth (default-SAFE "coerce")
+    # Phase 149 D-149-04/D-149-05 — INFORMATIONAL sunset state. True => the provider is
+    # deprecating the model / it vanished from live /models discovery (warn-and-steer).
+    # The end-user effect is a BADGE ONLY — `enabled` alone controls availability; a
+    # deprecated model can stay enabled. Overlaid from model_capabilities_overrides.deprecated
+    # by get_model_capability_async so a discovery-confirmed DB-only row carries it with no code edit.
+    deprecated: bool  # Phase 149 D-149-04 — informational deprecated badge (default absent = not deprecated)
 
 
 # Capability registry: which models support native API tool calling.
@@ -695,7 +701,7 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
                 base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
             # Overlay non-None DB fields
             for field in ("llm_call_timeout_seconds", "context_window_tokens",
-                          "max_output_tokens", "native_tools"):
+                          "max_output_tokens", "native_tools", "deprecated"):
                 db_val = db_row.get(field)
                 if db_val is not None:
                     base[field] = db_val
