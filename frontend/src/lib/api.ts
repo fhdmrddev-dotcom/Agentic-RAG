@@ -4058,6 +4058,12 @@ export interface ModelRegistryRow {
   llm_call_timeout_seconds: number
   is_default: boolean
   is_locked: boolean
+  /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
+   *  built-in registry (DEF). The tab renders per-field OVR/DEF and shows a Reset only on
+   *  overridden fields; a Reset sends an explicit `null` for that field (clears to DEF, Plan
+   *  05 Task 3). Additive — the Plan-05 backend `_registry_row` already emits it (the seven
+   *  `_MODEL_CAP_COLUMNS` names); Plan 07 extends the TS type per the 149-04/05 handoff. */
+  overridden_fields: string[]
 }
 
 /** The editable-columns patch body for `PATCH /admin/models/{id}` (Plan 06). Every
@@ -4073,23 +4079,59 @@ export interface ModelCapabilityPatch {
   llm_call_timeout_seconds?: number
 }
 
-/** The per-provider outcome of one live-discovery run (`POST /admin/models/discover`,
- *  Plan 06). Each provider either returned a model list or errored; `new_models` /
- *  `changed_models` / `vanished_models` are the ephemeral propose-only diff groups
- *  (SC#3 — discovery NEVER auto-enables; the operator confirms each change). */
-export interface DiscoveryProviderResult {
+// ── Plan-07 shape reconciliation (149-06 SUMMARY handoff) ─────────────────────
+// The Plan-04 `DiscoveryResult` stub (`{providers:[{new_models,…}]}`) was an
+// interface-first placeholder. The Plan-06 backend actually returns
+// `compute_diff`'s top-level `{new,changed,vanished}` groups PLUS an additive
+// per-provider `providers` outcome summary (names + status only — NEVER the
+// response body or key, T-149-04). These types now mirror that exact wire shape,
+// which the ModelDiscoveryPanel consumes.
+
+/** The propose-only sentinel the backend emits for a capability a provider did NOT
+ *  return (`model_discovery_service.UNKNOWN`). The panel renders any field equal to
+ *  this as the amber "unknown — you set it" input — NEVER a guessed value (SC#3). */
+export const DISCOVERY_UNKNOWN = "unknown"
+
+/** One discovered-but-unknown model (`compute_diff` "new"). Lands `enabled=false`; each
+ *  capability field is a concrete provider-returned value OR the `DISCOVERY_UNKNOWN`
+ *  sentinel string (SC#3 — never a guess; keys are the discovery-service field names
+ *  `context` / `max_output` / `native_tools`). */
+export interface DiscoveredNewModel {
   provider: string
+  model_id: string
+  enabled: boolean
+  capabilities: Record<string, number | boolean | string>
+}
+
+/** One model whose provider-RETURNED capability differs from the stored value. */
+export interface DiscoveredChangedModel {
+  provider: string
+  model_id: string
+  changes: Record<string, { from: number | boolean | string | null; to: number | boolean | string }>
+}
+
+/** One stored model an OK provider did NOT return — flagged, never auto-deleted (058/060). */
+export interface DiscoveredVanishedModel {
+  provider: string
+  model_id: string
+}
+
+/** One provider's honest run outcome — names + status only. `status` is `"ok"`,
+ *  `"no_key"`, `"http-{code}"`, or `"error-{ExceptionName}"`; `ok` is the derived
+ *  boolean so the panel can show ran-vs-skipped/errored. */
+export interface DiscoveryProviderOutcome {
+  provider: string
+  status: string
   ok: boolean
-  error: string | null
-  new_models: string[]
-  changed_models: string[]
-  vanished_models: string[]
 }
 
 /** The full ephemeral diff returned by `runModelDiscovery` — never persisted; the
  *  operator reviews it and confirms individual changes through `setModelCapability`. */
 export interface DiscoveryResult {
-  providers: DiscoveryProviderResult[]
+  new: DiscoveredNewModel[]
+  changed: DiscoveredChangedModel[]
+  vanished: DiscoveredVanishedModel[]
+  providers: DiscoveryProviderOutcome[]
 }
 
 /** Read the model registry (`GET /admin/models`, Plan 05). Plain authed GET — the
