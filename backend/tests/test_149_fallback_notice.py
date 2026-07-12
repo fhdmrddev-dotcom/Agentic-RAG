@@ -306,6 +306,55 @@ async def test_same_provider_fallback_still_rewrites_model(monkeypatch):
     assert new_settings is settings  # no credential switch needed
 
 
+async def test_unkeyed_fallback_provider_is_not_recorded(monkeypatch):
+    """WR-02 (review round 2): when the fallback model's provider has NO configured API
+    key, override_provider refuses (returns the settings unchanged) and the SDK keeps
+    serving with the pre-fallback provider — so the RECORDED provider must stay the
+    pre-fallback one too. Recording the un-keyed fallback provider would make
+    runs.provider name a provider that did not serve the run (the runs-row dishonesty
+    plan 09 set out to fix, in the opposite direction)."""
+    from app.models.message import MessageCreate
+    from app.models.user_settings import LLMProvider, UserEffectiveSettings
+
+    async def _fake_capability(model_id):
+        return {"provider": "minimax", "capability_source": "registry"}
+
+    monkeypatch.setattr(threads_mod, "get_model_capability_async", _fake_capability)
+
+    settings = UserEffectiveSettings.model_construct(
+        llm_api_key="sk-anthropic",
+        llm_base_url="https://api.anthropic.com",
+        llm_model="MiniMax-M2.5-highspeed",
+        available_models=[],
+        active_provider="anthropic",
+        providers=[
+            LLMProvider(
+                id="anthropic", name="Anthropic",
+                base_url="https://api.anthropic.com", api_key="sk-anthropic",
+            ),
+            # minimax exists but has NO key — override_provider must refuse the switch.
+            LLMProvider(
+                id="minimax", name="MiniMax",
+                base_url="https://api.minimax.io/v1", api_key="",
+            ),
+        ],
+    )
+    body = MessageCreate(content="hi", model="claude-haiku-4-5-20251001")
+    new_body, provider, new_settings = await threads_mod._apply_fallback_to_request(
+        body, "MiniMax-M2.5-highspeed", "anthropic", settings
+    )
+
+    # The SDK keeps the pre-fallback provider — the record must match it.
+    assert provider == "anthropic", (
+        "an un-keyed fallback provider must NOT be recorded — runs.provider would name "
+        "a provider that did not serve the run"
+    )
+    assert new_settings is settings  # the refused switch left the settings untouched
+    assert new_settings.active_provider == "anthropic"
+    # The CR-01 model rewrite still applies regardless of the provider refusal.
+    assert new_body.model == "MiniMax-M2.5-highspeed"
+
+
 async def test_gateway_receives_effective_model_from_body():
     """CR-01 wire-level regression: drive the REAL run_agent_loop with the post-seam
     request state (body.model = the fallback model) and assert the model handed to the

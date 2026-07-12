@@ -299,14 +299,23 @@ async def _apply_fallback_to_request(
     - ``resolved_provider`` / ``user_settings`` carry the plan-09 provider re-resolve
       (bookkeeping honesty — ``runs.provider`` names who actually serves the run) via
       the same canonical ``override_provider`` mutation path the registry branch uses.
+      WR-02 (review round 2): the re-resolved provider is committed ONLY when the
+      credentials switch actually applied — ``override_provider`` returns the settings
+      UNCHANGED (same object) when the target provider has no configured API key, and
+      recording the fallback provider in that case would make ``runs.provider`` name a
+      provider that did not serve the run (the exact runs-row dishonesty plan 09 set out
+      to fix, in the opposite direction).
     """
     fallback_provider = await _reresolve_fallback_provider(resolved_model, resolved_provider)
     if fallback_provider != resolved_provider:
-        resolved_provider = fallback_provider
         # Align user_settings so any downstream reader (agent_runner SDK selection)
         # stays consistent with the recorded provider — same canonical mutation path
-        # the registry branch uses.
-        user_settings = override_provider(user_settings, resolved_provider)
+        # the registry branch uses. Identity check: override_provider returns
+        # `effective` unchanged on refusal (no key configured for the target).
+        switched = override_provider(user_settings, fallback_provider)
+        if switched is not user_settings:
+            user_settings = switched
+            resolved_provider = fallback_provider
     # CR-01: the producer's closure-captured body must carry the EFFECTIVE model —
     # this is the value the agent loop / provider gateway put on the wire.
     body = body.model_copy(update={"model": resolved_model})
