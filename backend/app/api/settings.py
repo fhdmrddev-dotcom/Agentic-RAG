@@ -548,4 +548,17 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         for p in s.providers
         if p.api_key  # only providers that have a key set
     ]
-    return {"active": s.active_provider, "active_model": s.llm_model, "providers": configured}
+    # Phase 149 (IN-01 / D-149-05): the deprecated-model id set for the chat picker's
+    # informational badge. Same comprehension as the /settings response so the chat composer's
+    # MessageInput can render the `deprecated` badge (deprecated ≠ disabled — a deprecated
+    # model stays enabled/selectable). load_all_model_overrides never raises (returns the
+    # stale/empty cache on a blip), so this can never break the end-user picker feed.
+    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    _overrides = await load_all_model_overrides()
+    deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
+    return {
+        "active": s.active_provider,
+        "active_model": s.llm_model,
+        "providers": configured,
+        "deprecated_models": deprecated_models,
+    }

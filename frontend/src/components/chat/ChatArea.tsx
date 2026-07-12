@@ -56,6 +56,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
+  // Phase 149 (IN-01 / D-149-05): the registry's deprecated-model ids, threaded from
+  // getProviders() into MessageInput so the chat picker renders the informational
+  // `deprecated` badge (deprecated ≠ disabled — the model stays selectable).
+  const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
@@ -133,8 +137,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   useEffect(() => {
     getProviders()
-      .then(({ active, active_model, providers: list }) => {
+      .then(({ active, active_model, providers: list, deprecated_models }) => {
         setProviders(list)
+        // Defensive: absent → empty set → no badge (older backend / read blip).
+        setDeprecatedModels(new Set(deprecated_models ?? []))
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)
@@ -348,6 +354,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       models={models}
       selectedModel={selectedModel}
       onModelChange={setSelectedModel}
+      deprecatedModels={deprecatedModels}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
       prefillMessage={failedDraft ?? prefillMessage}
