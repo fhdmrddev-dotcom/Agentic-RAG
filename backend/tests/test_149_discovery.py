@@ -232,6 +232,27 @@ def test_discovery():
     json.dumps(diff)
 
 
+def test_case_insensitive_id_matching():
+    """WR-02: a discovered id returned in DIFFERENT casing than the registry stores (the
+    zhipu/minimax casing trap — registry ``GLM-4.5`` vs a live ``glm-4.5``) is matched
+    case-insensitively. It must NOT surface as BOTH a ``new`` AND a ``vanished`` phantom
+    pair; verbatim casing is preserved in all output."""
+    current = {"GLM-4.5": {"provider": "zhipu", "enabled": True}}
+    discovered = [
+        {"provider": "zhipu", "status": "ok", "ids": ["glm-4.5"],
+         "caps": {}, "capabilities_returned": False},
+    ]
+
+    diff = mds.compute_diff(current, discovered)
+
+    new_ids = {n["model_id"] for n in diff["new"]}
+    vanished_ids = {v["model_id"] for v in diff["vanished"]}
+    # A case-variant of a known model is NOT new…
+    assert new_ids == set(), "a case-variant of a known model must not be flagged new"
+    # …and the live model returned in different casing is NOT vanished.
+    assert vanished_ids == set(), "a live model returned in different casing must not vanish"
+
+
 def test_propose_only():
     """SC#3: new models land disabled; capabilities fill ONLY where the provider
     returned them — OpenRouter fills native_tools, Google does not, everyone else

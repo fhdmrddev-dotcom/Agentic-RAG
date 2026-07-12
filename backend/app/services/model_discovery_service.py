@@ -441,8 +441,19 @@ def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
             ok_info[entry["provider"]] = {
                 "ids": ids,               # newest-first order preserved
                 "id_set": set(ids),
+                # WR-02: case-folded membership set for the VANISHED test — a live model
+                # returned in different casing must NOT false-vanish.
+                "id_set_lc": {i.lower() for i in ids},
                 "caps": entry.get("caps") or {},
             }
+
+    # WR-02: case-folded index of the current registry (folded id -> verbatim stored id).
+    # zhipu/minimax return case-variant ids (registry ``minimax-m3`` vs a live ``MiniMax-M3``,
+    # ``GLM-4.5`` vs ``glm-4.5``); matching case-SENSITIVELY emits the SAME model as BOTH
+    # ``new`` AND ``vanished`` (phantom churn — the operator could disable/deprecate a live
+    # model). Match on the folded key; preserve VERBATIM casing in ALL output (new entries,
+    # changed, vanished all use the stored/returned id as-is).
+    current_by_lc = {k.lower(): k for k in current}
 
     new: list[dict] = []
     changed: list[dict] = []
@@ -452,7 +463,8 @@ def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
         provider_caps = info["caps"]
         for model_id in info["ids"]:
             model_caps = provider_caps.get(model_id, {})
-            if model_id not in current:
+            stored_key = current_by_lc.get(model_id.lower())
+            if stored_key is None:  # unknown even case-insensitively → genuinely new
                 new.append(_build_new_entry(provider, model_id, model_caps))
                 continue
             # changed: compare ONLY the fields the provider actually returned. CR-01: read
@@ -460,7 +472,7 @@ def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
             # — the injected ``current`` carries ``context_window_tokens`` /
             # ``max_output_tokens``, NOT the discovery field names — while KEEPING the
             # output keyed by the discovery-namespace ``field`` (the frontend contract).
-            stored = current[model_id]
+            stored = current[stored_key]
             field_changes: dict = {}
             for field, value in model_caps.items():
                 if field not in _CAP_FIELDS:
@@ -471,17 +483,17 @@ def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
             if field_changes:
                 changed.append({
                     "provider": provider,
-                    "model_id": model_id,
+                    "model_id": model_id,   # verbatim RETURNED casing
                     "changes": field_changes,
                 })
 
-    # VANISHED — current ids of an OK provider that were not returned. A
-    # failed / no_key provider is absent from ok_info → contributes none.
+    # VANISHED — current ids of an OK provider that were not returned (case-insensitively,
+    # WR-02). A failed / no_key provider is absent from ok_info → contributes none.
     vanished: list[dict] = []
     for model_id, cap in current.items():
         provider = cap.get("provider")
         info = ok_info.get(provider)
-        if info is not None and model_id not in info["id_set"]:
-            vanished.append({"provider": provider, "model_id": model_id})
+        if info is not None and model_id.lower() not in info["id_set_lc"]:
+            vanished.append({"provider": provider, "model_id": model_id})  # verbatim STORED casing
 
     return {"new": new, "changed": changed, "vanished": vanished}
