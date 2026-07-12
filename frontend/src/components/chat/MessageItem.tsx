@@ -424,6 +424,21 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             activated-skills array) already covers it. The legacy single-skill
             field is no longer READ in this render path; it stays intact in
             types + StreamsProvider for DB-loaded-message compat. */}
+        {/* Phase 149 Plan 09 (D-149-10) — honest disabled-model fallback notice. When the
+            user's selected model was operator-DISABLED, the backend runs the org default and
+            emits `model_disabled_fallback`; StreamsProvider stamps it here. Rendered as a
+            small inline informational notice showing the backend `message` string (which
+            already names BOTH the disabled model and the fallback) — never a silent swap.
+            A SIBLING of the content block (renders regardless of content) so it shows even
+            before any delta streams. Absent → nothing extra (enabled path byte-identical). */}
+        {message.role === "assistant" && message.modelFallbackNotice && (
+          <div
+            data-testid="model-fallback-notice"
+            className="mt-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-400/90"
+          >
+            {message.modelFallbackNotice.message}
+          </div>
+        )}
         {message.content ? (
           <div className="text-sm text-foreground">
             {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (

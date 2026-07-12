@@ -344,6 +344,13 @@ export interface StreamCallbacks {
   onSubAgentDelta?: (text: string) => void
   onSubAgentDone?: () => void
   onSkillActivated?: (skillName: string) => void
+  /** Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice. Backend
+   * emits `model_disabled_fallback` on the run stream (naming BOTH the disabled model and
+   * the org-default fallback) when the user's selected model was operator-DISABLED. Pre-fix
+   * the frontend had NO handler → the event was dropped and the user saw a SILENT swap (the
+   * UAT Test-7 root cause). The handler stamps `modelFallbackNotice` on the assistant message
+   * so MessageItem renders an inline notice. Informational only — carries no terminal state. */
+  onModelDisabledFallback?: (disabledModel: string, fallbackModel: string, message: string) => void
   /** Phase 067.1 Plan 04: skill description hint from skill_loaded follow-up SSE event.
    * Fires AFTER skill_activated when the skill row's description column is non-empty. */
   onSkillLoaded?: (skillName: string, description: string) => void
@@ -683,6 +690,16 @@ export async function subscribeToRun(
         }
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
+        // Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice.
+        // Informational branch (mirrors skill_activated) — carries NO `return`, so the
+        // cursor-advance below still fires. Pre-fix this event fell through the ladder and
+        // was silently dropped (the UAT Test-7 silent-swap root cause).
+        else if (t === "model_disabled_fallback" && callbacks.onModelDisabledFallback)
+          callbacks.onModelDisabledFallback(
+            parsed.disabled_model as string,
+            parsed.fallback_model as string,
+            parsed.message as string,
+          )
         else if (t === "skill_loaded" && callbacks.onSkillLoaded)
           callbacks.onSkillLoaded(parsed.skill_name as string, parsed.description as string)
         else if (t === "code_execution_start" && callbacks.onCodeExecutionStart)
