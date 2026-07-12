@@ -168,3 +168,87 @@ async def test_provider_outcomes():
 
     # Failure messages are names-only — never echo the response body.
     assert "rate limited" not in by_provider["deepseek"]["status"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 2 — diff partition + propose-only capability fill (SC#3).
+# ─────────────────────────────────────────────────────────────────────────────
+def test_discovery():
+    """new/changed/vanished partition; a FAILED provider manufactures no
+    false-vanished (the 058/060 lesson)."""
+    current = {
+        "gpt-4o":     {"provider": "openai", "context": 128_000, "enabled": True},
+        "gpt-old":    {"provider": "openai", "enabled": True},      # → vanished (openai ok)
+        "claude-x":   {"provider": "anthropic", "enabled": True},   # anthropic FAILED → NOT vanished
+        "gemini-pro": {"provider": "google", "context": 1_000_000, "max_output": 8192},
+    }
+    discovered = [
+        {"provider": "openai", "status": "ok", "ids": ["gpt-5.6", "gpt-4o"],
+         "caps": {}, "capabilities_returned": False},
+        # anthropic did not respond ok → contributes NO vanished entries.
+        {"provider": "anthropic", "status": "http-429", "ids": []},
+        {"provider": "google", "status": "ok", "ids": ["gemini-pro", "gemini-new"],
+         "caps": {"gemini-pro": {"context": 2_000_000, "max_output": 8192},
+                  "gemini-new": {"context": 1_000_000, "max_output": 8192}},
+         "capabilities_returned": True},
+    ]
+
+    diff = mds.compute_diff(current, discovered)
+
+    assert {n["model_id"] for n in diff["new"]} == {"gpt-5.6", "gemini-new"}
+    # gemini-pro's context changed 1M → 2M (only the returned field is compared).
+    assert {c["model_id"] for c in diff["changed"]} == {"gemini-pro"}
+    # gpt-old vanished (openai is ok); claude-x does NOT (anthropic failed).
+    vanished_ids = {v["model_id"] for v in diff["vanished"]}
+    assert vanished_ids == {"gpt-old"}
+    assert "claude-x" not in vanished_ids
+
+    # Ephemeral + JSON-serializable (D-149-12) — no proposals table.
+    import json
+    json.dumps(diff)
+
+
+def test_propose_only():
+    """SC#3: new models land disabled; capabilities fill ONLY where the provider
+    returned them — OpenRouter fills native_tools, Google does not, everyone else
+    fills nothing. An un-returned capability is the `unknown` sentinel, never a
+    guessed value and never an auto-enable."""
+    current: dict = {}  # everything discovered is new
+    discovered = [
+        {"provider": "openai", "status": "ok", "ids": ["gpt-new"],
+         "caps": {}, "capabilities_returned": False},
+        {"provider": "google", "status": "ok", "ids": ["gemini-new"],
+         "caps": {"gemini-new": {"context": 1_000_000, "max_output": 8192}},
+         "capabilities_returned": True},
+        {"provider": "openrouter", "status": "ok", "ids": ["vendor/model-new"],
+         "caps": {"vendor/model-new": {"context": 200_000, "max_output": 8192,
+                                       "native_tools": True}},
+         "capabilities_returned": True},
+    ]
+
+    diff = mds.compute_diff(current, discovered)
+    new_by_id = {n["model_id"]: n for n in diff["new"]}
+
+    # No new model is ever auto-enabled.
+    for entry in diff["new"]:
+        assert entry["enabled"] is False
+
+    # OpenAI (IDs only) → EVERY capability field is the unknown sentinel.
+    openai_caps = new_by_id["gpt-new"]["capabilities"]
+    assert openai_caps["context"] == mds.UNKNOWN
+    assert openai_caps["max_output"] == mds.UNKNOWN
+    assert openai_caps["native_tools"] == mds.UNKNOWN
+
+    # Google → context + max_output filled; native_tools is the sentinel, NOT a bool.
+    g = new_by_id["gemini-new"]["capabilities"]
+    assert g["context"] == 1_000_000
+    assert g["max_output"] == 8192
+    assert g["native_tools"] == mds.UNKNOWN
+    assert not isinstance(g["native_tools"], bool)
+
+    # OpenRouter → native_tools filled from supported_parameters (a real bool).
+    o = new_by_id["vendor/model-new"]["capabilities"]
+    assert o["context"] == 200_000
+    assert o["max_output"] == 8192
+    assert isinstance(o["native_tools"], bool)
+    assert o["native_tools"] is True
