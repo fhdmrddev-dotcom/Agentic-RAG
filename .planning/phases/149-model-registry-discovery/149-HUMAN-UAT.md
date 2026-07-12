@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 149-model-registry-discovery
 source: [149-VERIFICATION.md, 149-VALIDATION.md]
 started: 2026-07-12
@@ -8,7 +8,7 @@ updated: 2026-07-13
 
 ## Current Test
 
-[round-3 fixes landed 2026-07-13 (plans 149-11 + 149-12, verifier 9/9 code-level, review round 3: 0 critical) — LIVE RE-TEST PENDING for: (a) row 1 — native_tools OFF on an OpenAI/compat model → "list the top-level folders" must FIRE A TOOL via the structured path (pre-injection gate a91cb334/b6d1d6cf/22161913); (b) row-7 residual — a MiniMax-served reply's follow-up suggestion chips must be clean questions, no <think> (strip a85eb20a/01b92536). Prior round-2 state: rows 4/5/7/12 pass live; registry state fully restored: claude-haiku re-enabled, gpt-4.1 deprecated=false + reason preserved, discovery proposals discarded, org default MiniMax-M2.5-highspeed untouched.]
+[testing complete — 12/12 pass. Round-3 live re-test 2026-07-13 (Claude-driven via Chrome) closed the final two gaps: (a) row 1 — native_tools OFF on gpt-5.4-mini → "list the top-level folders" fired the "Browsing folder tree" tool (Run · 1 step · done · 9.5s) and returned a grounded folder list; wire proof run a0cb6241 (openai, 1 tool call, no error); (b) row 7 residual — MiniMax-M2.5-highspeed reply's 3 follow-up chips all clean questions, no <think>; wire proof run c1f3dbab (minimax, completed). Registry state restored: gpt-5.4-mini native_tools back ON (✎ recorded). All prior round-1/round-2 rows retained. NEXT: /gsd:secure-phase 149.]
 
 > Full step-by-step instructions for every row live in **`149-VALIDATION.md` → Manual-Only Verifications**.
 > This file is the tracking surface (surfaces in `/gsd:progress` + `/gsd:audit-uat`); run it via `/gsd:verify-work 149`.
@@ -18,7 +18,9 @@ updated: 2026-07-13
 
 ### 1. Cross-provider · OpenAI — gpt-5.6 `native_tools` flip (no-restart proof, SC#1)
 expected: toggling `native_tools` OFF in the tab makes the next tool-carrying chat route through the prompt-injected path (still works) within ~30s TTL, no backend restart; toggle back ON → native tools again.
-result: issue
+result: pass
+round3: pass (2026-07-13, Claude-driven via Chrome — plan 149-11 fix VERIFIED LIVE). Toggled native_tools OFF for gpt-5.4-mini in the registry (TOOLS toggle grey, ENABLED stays green, no restart). New chat on OpenAI/gpt-5.4-mini → "list the top-level folders" → **Run · 1 step · ✓ done · 9.5s**, tool "Browsing folder tree → View results · DONE · 10ms" fired, real grounded folder list rendered (DBA / Weekly reports / Hybrid Search / Test Wasim / Project Meridian — Risks / PM Demo Project / SOPs / A-shared). NO hallucinated "no folder listing" and NON-zero tool calls — the exact round-2 failure is closed. WIRE PROOF (psycopg2 runs+messages): run a0cb6241 model=gpt-5.4-mini provider=openai status=completed output_tokens=86 error=NULL; assistant message tool_calls length=1 (was NULL in round-2 runs 6eaeac19/af51b538). Structured pre-injection path now fires a tool on iteration 1 for a DB-flipped compat model.
+round2: issue
 reported: "Routing half PASSES (verified: override persisted, live seam returns STRUCTURED for gpt-5.4-mini vs NATIVE control, no restart). But 'still works' half FAILS: 'list the top-level folders' produced a hallucinated non-answer ('No folder listing is available from the current context') with ZERO tool calls fired (runs 6eaeac19/af51b538: tool_calls NULL, 54 output tokens, no error)."
 severity: major
 note: "Toggle-back-ON half PASSES — native tool call fired (folder list, 1 step, 66ms) after re-enable. Regression contained to the OFF direction on compat providers; default path intact."
@@ -62,7 +64,8 @@ evidence: "Chrome-MCP driven live: edited gpt-5.4 Context=150000 (150k OVR + ✎
 expected: Thread A completes uninterrupted; Thread B falls back to the org default with the honest inline `model_disabled_fallback` notice naming both models; no silent swap.
 result: pass
 evidence: "Round-2 live (Claude-driven via Chrome, 2026-07-12 20:23Z): Thread B (pill=claude-haiku-4-5, model disabled mid-flight, 65s TTL wait) got a real answer WITH the inline amber notice naming both models (claude-haiku-4-5-20251001 was disabled by your administrator — this reply used MiniMax-M2.5-highspeed). Wire proof: runs c750bd38 = model MiniMax-M2.5-highspeed / provider minimax / completed / no error (round-1 recorded anthropic). Thread A (deepseek-v4-flash, 4-step run w/ doc+web search) streamed and completed simultaneously, untouched (runs 88864ef0). Registry state restored after test."
-note: "NEW minor issue observed during this row: follow-up suggestion chips leaked raw <think> reasoning from MiniMax — recorded as its own gap below."
+round3_suggestion_strip: pass (2026-07-13, Claude-driven via Chrome — plan 149-12 fix VERIFIED LIVE). Direct chat on minimax/MiniMax-M2.5-highspeed ("Explain the difference between RAG and fine-tuning...") → reply completed; the three Follow-up suggestion chips are ALL clean well-formed questions ("Can you combine RAG and fine-tuning in the same system...", "What are the typical costs and technical requirements...", "When starting a new LLM project, which approach should I try first..."). NO <think> markup, NO chain-of-thought sentences — the round-2 leak (chips reading "<think>" + 2 raw reasoning lines) is closed. WIRE PROOF: latest run c1f3dbab model=MiniMax-M2.5-highspeed provider=minimax status=completed output_tokens=787 error=NULL — reply genuinely MiniMax-served, so the compat-path _strip_think_blocks ran before the suggestion line-parse.
+note: "Round-2 note (now RESOLVED): follow-up suggestion chips leaked raw <think> reasoning from MiniMax — was recorded as its own gap below; re-tested live 2026-07-13, chips clean."
 round1: issue (fixed: 6dc1a8dd + 464ac9c1 + CR-01 46c09382 effective model on the wire)
 reported: "Live scenario driven end-to-end: Thread A (haiku long essay) kept streaming and completed uninterrupted (3390 out tokens) after haiku was disabled mid-flight; Thread B (sent on the just-disabled haiku) fell back to the org default MiniMax-M2.5-highspeed and answered fine — but NO fallback notice appeared anywhere in the chat. The swap was silent."
 severity: major
@@ -97,11 +100,12 @@ evidence: "Round-2 live (Claude-driven): Discovery run = propose-only banner + 4
 ## Summary
 
 total: 12
-passed: 11 (rows 2/3/6/8/9/10/11 round-1 retained; rows 4/5/7/12 round-2 live)
-issues: 1 major (row 1: structured path never pre-injects tool instructions for DB-flipped models) + 1 incidental minor (suggestion think-leak, gap below)
+passed: 12 (rows 2/3/6/8/9/10/11 round-1 retained; rows 4/5/7/12 round-2 live; row 1 round-3 live 2026-07-13)
+issues: 0 — both round-3 gaps VERIFIED LIVE 2026-07-13: (a) row 1 structured pre-injection fires a tool on a DB-flipped compat model (run a0cb6241, 1 tool call, grounded folder list); (b) row 7 suggestion chips clean, no <think> on a MiniMax-served reply (run c1f3dbab)
 pending: 0
 skipped: 0
 blocked: 0
+all_gaps: verified-live (7/7 — 5 in round-2, 2 in round-3); registry state restored (gpt-5.4-mini native_tools back ON, ✎ recorded)
 
 ## Gaps
 
@@ -187,8 +191,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "SC#1 second half — with native_tools OFF the chat STILL WORKS via the prompt-injected (structured) path"
-  status: fix-landed
-  fix: "plan 11 (a91cb334 RED tests + b6d1d6cf _should_pre_inject_structured gate + 22161913 run_agent_loop wiring w/ cache warm) — re-test live"
+  status: verified-live
+  fix: "plan 11 (a91cb334 RED tests + b6d1d6cf _should_pre_inject_structured gate + 22161913 run_agent_loop wiring w/ cache warm) — RE-TESTED LIVE 2026-07-13 PASS (run a0cb6241 gpt-5.4-mini, 1 tool call fired, grounded folder list; see row 1 round3 evidence)"
   reason: "User reported: 'list the top-level folders' → hallucinated 'No folder listing is available from the current context'; DB shows zero tool_calls on both turns (runs af51b538 20:00Z + 6eaeac19 20:04Z, gpt-5.4-mini, completed, no error). Routing itself verified STRUCTURED (override row native_tools=false source=db_override; live resolve_calling_mode seam returns STRUCTURED vs NATIVE control)."
   severity: major
   test: 1
@@ -204,8 +208,8 @@ blocked: 0
   debug_session: ""
 
 - truth: "Follow-up suggestion chips contain only clean questions regardless of which model served the reply"
-  status: fix-landed
-  fix: "plan 12 (a85eb20a RED tests + 01b92536 _strip_think_blocks before line-parse) — re-test live"
+  status: verified-live
+  fix: "plan 12 (a85eb20a RED tests + 01b92536 _strip_think_blocks before line-parse) — RE-TESTED LIVE 2026-07-13 PASS (run c1f3dbab MiniMax-M2.5-highspeed; 3 follow-up chips all clean questions, no <think>; see row 7 round3_suggestion_strip evidence)"
   reason: "Observed live during row 7: the MiniMax-served fallback reply follow-up chips rendered raw reasoning markup — chips read <think>, then two chain-of-thought sentences."
   severity: minor
   test: 7
