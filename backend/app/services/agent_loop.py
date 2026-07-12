@@ -49,6 +49,7 @@ from app.services.openai_service import (
     get_explorer_tools,
     EXPLORER_SYSTEM_PROMPT,
     CallingMode,
+    resolve_calling_mode,
     get_tools,
     embed_texts,
 )
@@ -762,6 +763,44 @@ def _format_tool_list(tools: list[dict]) -> str:
                 arg_lines.append(f"  - `{arg_name}` ({arg_type}){req_flag}: {arg_desc}")
             lines.extend(arg_lines)
     return "\n".join(lines)
+
+
+def _should_pre_inject_structured(
+    active_provider: str, effective_model: str, user_settings
+) -> bool:
+    """Phase 149 Plan 11 (SC#1 second half / WR-05) — decide whether to pre-inject the
+    STRUCTURED-path ``TOOL_USAGE_INSTRUCTIONS`` into the system prompt BEFORE the first stream.
+
+    Returns True when EITHER:
+
+    (a) the OpenRouter XML strategy is active — the original deterministic structured path,
+        preserved byte-identically to the prior inline gate; OR
+    (b) the effective calling mode resolves ``STRUCTURED`` for a compat-path provider — i.e. an
+        operator flipped ``native_tools`` OFF (surfaced via the warm ``_model_overrides_cache``
+        that the sync ``resolve_calling_mode`` consults — round-1 fix 56945cca). The
+        anthropic/google native-SDK providers are EXCLUDED (WR-05 boundary): they dispatch to
+        always-native adapters that never read ``native_tools``, so injecting tool instructions
+        would pollute a real native tool-carrying request.
+
+    Pure: no ``await``, no I/O. Reads ``user_settings`` attrs via ``getattr`` defaults and calls
+    the sync ``resolve_calling_mode``. The caller must warm the override cache
+    (``await get_model_capability_async(effective_model)``) before this sync gate read so the DB
+    toggle is reflected.
+    """
+    # Branch (a): preserve the existing OpenRouter XML pre-injection exactly (mirrors the prior
+    # inline gate's getattr defaults so branch (a) is byte-identical).
+    if (
+        active_provider == "openrouter"
+        and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+    ):
+        return True
+    # Branch (b): a compat-path model whose effective mode resolves STRUCTURED (e.g. an operator
+    # native_tools=False override). WR-05: NEVER for the anthropic/google native-SDK branches —
+    # they route always-native and must not see structured tool-instruction injection.
+    if active_provider not in ("anthropic", "google"):
+        if resolve_calling_mode(effective_model, user_settings) == CallingMode.STRUCTURED:
+            return True
+    return False
 
 
 CONFIDENCE_DISCLAIMER = (
