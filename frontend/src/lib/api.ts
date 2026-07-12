@@ -2199,6 +2199,13 @@ export interface FullAppSettings {
   // Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
   // mapping; frontend reads this to substitute {provider} in the tooltip text.
   inferred_provider_for: Record<string, string>
+  // Phase 149 (MODEL-01 / D-149-05) — the global set of model_ids flagged
+  // `deprecated` in the model registry. Plan 05 populates this in the backend
+  // settings payload; the picker (ModelPillRow / MessageInput) reads it
+  // defensively (`new Set(deprecated_models ?? [])`) to render an informational
+  // `deprecated` badge on those pills. Optional so an older backend response
+  // without the field never crashes the frontend (absent → empty set → no badge).
+  deprecated_models?: string[]
 }
 
 export type AppSettings = FullAppSettings
@@ -4001,6 +4008,143 @@ export async function setFlag(key: FlagKey, value: boolean): Promise<void> {
     body: JSON.stringify({ key, value }),
   })
   if (!res.ok) throw new ApiError("Failed to update the setting.", res.status)
+}
+
+/** Extract a FastAPI `detail` STRING from a non-2xx response for an `ApiError`
+ *  message, falling back to a generic line when the body is a 422 detail-array or
+ *  non-JSON. Mirrors `proposalError` but returns the string (ApiError owns status).
+ *  Used by the model-registry write seams so a 409 refusal preserves the server's
+ *  plain-language `detail` (the default/locked-guard reason) instead of a generic. */
+async function errorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const j = (await res.json()) as { detail?: unknown }
+    if (typeof j?.detail === "string") return j.detail
+  } catch {
+    /* non-JSON body — keep the generic fallback */
+  }
+  return fallback
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 149 (MODEL-01 + MODEL-02 / D-149-07) — the model-registry client contract.
+//
+// The interface-first Wave-1 seams the operator Model Registry tab (Plan 07)
+// consumes: read the registry (`getModelRegistry`), edit one model's capabilities
+// (`setModelCapability`), lock/unlock + pin the org default (`setModelLock` — the
+// DEDICATED PUT endpoint, SEPARATE from PATCH), and run live `/models` discovery
+// (`runModelDiscovery`, ephemeral diff). SAME security posture as the 146/147
+// admin calls above: these decide RENDERING ONLY — every /admin call is
+// independently 404-gated server-side (Pitfall 13 / T-149-08). The client adds
+// NO authority; the backend `require_operator` 404 gate (Plan 05/06) is the sole
+// wall. A non-operator simply gets a 404 → ApiError. The read seam UNWRAPS the
+// `{models}` envelope IN THE CLIENT (never in the component — CR-01 precedent).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One row of the model registry from `GET /admin/models` (Plan 05). Mirrors the
+ *  backend registry columns: `capability_source` distinguishes a `"registry"`
+ *  hardcoded-default row from a `"db_override"` operator-edited row (the
+ *  `model_capabilities_overrides` table, live since mig 053). `is_default` marks
+ *  the pinned org default; `is_locked` reflects the D-149-07 lock. `deprecated`
+ *  drives the picker's informational badge (surfaced via `deprecated_models`). */
+export interface ModelRegistryRow {
+  model_id: string
+  provider: string
+  capability_source: "registry" | "db_override"
+  enabled: boolean
+  deprecated: boolean
+  context_window_tokens: number
+  max_output_tokens: number
+  native_tools: boolean
+  llm_call_timeout_seconds: number
+  is_default: boolean
+  is_locked: boolean
+}
+
+/** The editable-columns patch body for `PATCH /admin/models/{id}` (Plan 06). Every
+ *  field optional — the tab sends only what changed. `deprecated` + `deprecated_reason`
+ *  flip the D-149-05 badge (the reason is operator context, never shown to end users). */
+export interface ModelCapabilityPatch {
+  enabled?: boolean
+  deprecated?: boolean
+  deprecated_reason?: string | null
+  context_window_tokens?: number
+  max_output_tokens?: number
+  native_tools?: boolean
+  llm_call_timeout_seconds?: number
+}
+
+/** The per-provider outcome of one live-discovery run (`POST /admin/models/discover`,
+ *  Plan 06). Each provider either returned a model list or errored; `new_models` /
+ *  `changed_models` / `vanished_models` are the ephemeral propose-only diff groups
+ *  (SC#3 — discovery NEVER auto-enables; the operator confirms each change). */
+export interface DiscoveryProviderResult {
+  provider: string
+  ok: boolean
+  error: string | null
+  new_models: string[]
+  changed_models: string[]
+  vanished_models: string[]
+}
+
+/** The full ephemeral diff returned by `runModelDiscovery` — never persisted; the
+ *  operator reviews it and confirms individual changes through `setModelCapability`. */
+export interface DiscoveryResult {
+  providers: DiscoveryProviderResult[]
+}
+
+/** Read the model registry (`GET /admin/models`, Plan 05). Plain authed GET — the
+ *  router gate returns 404 to non-operators. The backend returns an ENVELOPE
+ *  `{"models": [...]}` (same shape as `getAdminActiveRuns`'s `{runs}`); unwrap
+ *  `.models` HERE — casting the raw object to `ModelRegistryRow[]` would ship a
+ *  `{models}` object into list state and crash the next `.map` (CR-01 precedent). */
+export async function getModelRegistry(): Promise<ModelRegistryRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the model registry.", res.status)
+  const body = (await res.json()) as { models?: ModelRegistryRow[] }
+  return body.models ?? []
+}
+
+/** Edit one model's capabilities (`PATCH /admin/models/{id}`, Plan 06). Sends only
+ *  the changed fields. A 409 (the default/locked guard — e.g. disabling the pinned
+ *  default) surfaces as `ApiError` carrying the server `detail` so the tab can show
+ *  the plain-language refusal rather than a generic failure. */
+export async function setModelCapability(
+  modelId: string,
+  patch: ModelCapabilityPatch,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to update the model."), res.status)
+}
+
+/** Lock/unlock + pin the org default (`PUT /admin/models/{id}/lock`, Plan 06) — the
+ *  DEDICATED D-149-07 lock endpoint, SEPARATE from the PATCH capability seam. Body
+ *  `{ locked }`: `true` locks + pins the org default, `false` unlocks. A 409 (e.g. the
+ *  no-dead-default guard refusing to lock a disabled model) surfaces as `ApiError`
+ *  with the server `detail`. This is the seam Plan 07's `onLock`/`handleLock` calls. */
+export async function setModelLock(modelId: string, locked: boolean): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}/lock`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ locked }),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to update the model lock."), res.status)
+}
+
+/** Run live `/models` discovery across the configured providers (`POST
+ *  /admin/models/discover`, Plan 06). Returns the ephemeral propose-only diff
+ *  (SC#3 — never auto-enables anything); the operator confirms each change. */
+export async function runModelDiscovery(): Promise<DiscoveryResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/discover`, { method: "POST", headers })
+  if (!res.ok) throw new ApiError("Failed to run model discovery.", res.status)
+  return (await res.json()) as DiscoveryResult
 }
 
 /** Record ONE deliberate Control Plane ledger row (`POST /admin/control-plane/record`,
