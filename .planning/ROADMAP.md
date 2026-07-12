@@ -195,7 +195,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 149-05-PLAN.md — GET/PATCH /admin/models (union read + SQLi-safe write) + _build_providers enabled-filter + deprecated_models payload
+- [x] 149-05-PLAN.md — GET/PATCH /admin/models (union read + SQLi-safe write) + _build_providers enabled-filter + deprecated_models payload
 
 **Wave 3** *(blocked on Wave 2)*
 
