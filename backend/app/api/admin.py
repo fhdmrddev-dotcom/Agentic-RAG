@@ -999,6 +999,9 @@ def _registry_row(model_id, cap, ovr, default_model, model_locked):
         "capability_source": source,
         "enabled": bool(_enabled) if _enabled is not None else True,
         "deprecated": bool(_deprecated) if _deprecated is not None else False,
+        # IN-02: surface the stored deprecation reason so re-editing a deprecated model seeds
+        # the input from the current note (not blank) — a blur/enter no longer clobbers it.
+        "deprecated_reason": ovr.get("deprecated_reason"),
         # WR-04: distinguish "not tracked in the registry" from a real 0. No built-in
         # MODEL_CAPABILITIES entry carries context_window_tokens, so coalescing absent→0 made
         # the tab read "Context 0 · DEF" for essentially every registry row (false — the value

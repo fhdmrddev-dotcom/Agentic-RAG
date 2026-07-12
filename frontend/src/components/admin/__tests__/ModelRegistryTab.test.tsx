@@ -160,6 +160,22 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     expect(await screen.findByText(/pick a new default first/i)).toBeInTheDocument()
   })
 
+  it("seeds the deprecation-reason input from the stored reason (IN-02) — re-edit preserves the note", () => {
+    render(
+      <ModelRegistryTab
+        rows={[makeRow({ deprecated: true, deprecated_reason: "superseded by gpt-5.6" })]}
+        onSetCapability={noop}
+        onLock={noop}
+        showTechnical={false}
+      />,
+    )
+
+    const reasonInput = screen.getByRole("textbox", {
+      name: /deprecation reason for gpt-5\.6-sol/i,
+    })
+    expect(reasonInput).toHaveValue("superseded by gpt-5.6")
+  })
+
   it("renders a null numeric capability as “—” (not a concrete 0) — WR-04 honesty", () => {
     render(
       <ModelRegistryTab

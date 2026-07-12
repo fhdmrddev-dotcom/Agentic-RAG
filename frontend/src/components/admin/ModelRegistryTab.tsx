@@ -503,7 +503,9 @@ function DeprecatedControl({
   busy: boolean
   onWrite: (patch: ModelCapabilityPatch) => Promise<void>
 }) {
-  const [reason, setReason] = useState("")
+  // IN-02: seed the reason draft from the stored note so re-editing a deprecated model
+  // preserves it (a blur/enter no longer overwrites the current reason with a blank).
+  const [reason, setReason] = useState(row.deprecated_reason ?? "")
 
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2">

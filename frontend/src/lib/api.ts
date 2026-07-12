@@ -4052,6 +4052,11 @@ export interface ModelRegistryRow {
   capability_source: "registry" | "db_override"
   enabled: boolean
   deprecated: boolean
+  /** IN-02: the stored deprecation reason (operator context, never shown to end users). The
+   *  tab seeds the DeprecatedControl input from this so re-editing a deprecated model
+   *  preserves the current note instead of clobbering it with a blank. Optional/nullable —
+   *  absent or unset → empty input. */
+  deprecated_reason?: string | null
   /** WR-04 honesty: a numeric capability NOT tracked in the built-in registry reads `null`
    *  (rendered as "—" in the tab), NOT a concrete `0`. No built-in MODEL_CAPABILITIES row
    *  carries `context_window_tokens`, so it is `null` on every pure-DEF row until an operator
