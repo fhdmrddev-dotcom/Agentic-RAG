@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-12T21:07:48.167Z"
-last_activity: 2026-07-12 -- Phase 149 execution started
+last_updated: "2026-07-12T21:18:09.440Z"
+last_activity: 2026-07-12
 progress:
   total_phases: 26
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 36
-  completed_plans: 34
-  percent: 12
+  completed_plans: 36
+  percent: 15
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 149 (model-registry-discovery) — EXECUTING
-Plan: 1 of 12
-Status: Executing Phase 149
-Last activity: 2026-07-12 -- Phase 149 execution started
+Plan: 2 of 12
+Status: Ready to execute
+Last activity: 2026-07-12
 
 **149 gaps-only execution + round-2 review (2026-07-12, orchestrator):**
 
@@ -397,6 +397,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 148 P03 | ~6min | 1 auto task (Task 1 = operator human-action) | 1 file |
 | Phase 149 P09 | 7min | 2 tasks | 7 files |
 | Phase 149 P11 | 18min | 2 tasks | 2 files |
+| Phase 149 P12 | 12min | 1 tasks | 2 files |
 
 ## Decisions
 
@@ -481,6 +482,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 148]: 148-05: skipped requirements.mark-complete for VIS-01 — the API enforcement WALL is done (GET /features + require_visible gates GREEN) but VIS-01's frontend hide/bounce half (148-07) is unshipped; marking now would be false-green. Completes at phase verify-work (mirrors the 148-02/148-04 substrate posture).
 - [Phase 148]: 148-03 (VIS-01): operator applied migration 098 to the live LOCAL DB via the SQL editor (NEVER db push/reset — preserves dev data); full-schema.sql regenerated (no --reset, live-DB dump) — feature_visibility jsonb column captured at line 468, a 1-insertion dump delta not a hand-edit (commit edfcc1a0). CLOUD PARITY: mig 098 (column + D-05 seed UPDATE) MUST be pasted into the CLOUD Supabase SQL editor at the next promotion — local + cloud each carry their own app_settings.global row (docs/DEPLOYMENT-WORKFLOW.md §5 parity checklist + the standing v3.3 cloud-migrations rule; mirrors mig 097). Skipped requirements.mark-complete for VIS-01 (multi-plan feature; marked at phase verify-work — same posture as 148-02/04/05).
 - [Phase 149]: 149-11: agent_loop pre-injection gate now fires for compat-path STRUCTURED (operator native_tools=False OVR) via _should_pre_inject_structured — warmed by get_model_capability_async before the sync resolve_calling_mode read; anthropic/google native-SDK excluded (WR-05); openrouter+xml and no-override paths byte-identical (D-14).
+- [Phase 149]: 149-12: suggestion chips strip <think> reasoning blocks before the line-parse (module-private _strip_think_blocks mirrored from the threads.py sibling, not imported — avoids api->service inversion + G-5 hot-file import); strip runs BEFORE clamp-to-3 so reasoning never fills chip slots; closes round-2 UAT Test-7 minor gap on the D-149-10 fallback path.
 
 ## Operator Next Steps
 
