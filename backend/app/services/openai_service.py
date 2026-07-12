@@ -1301,6 +1301,8 @@ def _parse_model_output_limits(raw: str) -> dict[str, int]:
 def _resolve_max_tokens(
     explicit: int | None,
     user_settings: "UserEffectiveSettings | None",
+    effective_model: str | None = None,
+    db_max_output_cap: int | None = None,
 ) -> int:
     """Pick the right max_tokens for this call.
 
@@ -1314,11 +1316,29 @@ def _resolve_max_tokens(
 
     Phase 074 D-074-01: After resolution, ALL priority branches flow through
     a single clamp gate at the bottom of this function. The clamp returns
-    ``min(resolved, MODEL_CAPABILITIES[model]["max_output_tokens"])`` when an
-    entry exists and ``resolved`` exceeds it; pass-through otherwise per
-    D-074-02. The function was refactored from a 6-early-return shape to
-    single-return to ensure the clamp covers every priority branch
-    (RESEARCH.md Pitfall 1).
+    ``min(resolved, max_output_tokens[model])`` when a cap exists and ``resolved``
+    exceeds it; pass-through otherwise per D-074-02. The function was refactored
+    from a 6-early-return shape to single-return to ensure the clamp covers every
+    priority branch (RESEARCH.md Pitfall 1).
+
+    Phase 149 D-149-15 (closes BUG-260620-01): the clamp now honors the EFFECTIVE
+    model actually being sent — not ``user_settings.llm_model`` — and an operator's
+    DB-edited ``max_output_tokens`` — not just the static ``MODEL_CAPABILITIES``
+    dict. Both new parameters are OPTIONAL so any not-yet-updated caller degrades
+    to the pre-149 static-dict-against-user_settings behavior (never crashes):
+
+    - ``effective_model``: the model id that will actually be sent (resolved by the
+      caller, e.g. ``model or user_settings.llm_model or settings.llm_model``). When
+      provided it takes precedence for the clamp lookup; when ``None`` the lookup
+      falls back to the ``user_settings.llm_model`` chain exactly as before. A
+      sub-agent / explicit-model call therefore clamps against ITS model, not the
+      user's default (the BUG-260620-01 wrong-model mechanism — Pitfall 4).
+    - ``db_max_output_cap``: a pre-resolved DB-overridable ceiling for the effective
+      model. The (already-async) request path fetches it via
+      ``get_model_capability_async(effective_model)`` and threads it in, so this
+      function stays SYNC — no await deep in the hot path (RESEARCH.md Open Q3).
+      When provided it is the clamp ceiling; when ``None`` the ceiling falls back to
+      the static ``MODEL_CAPABILITIES`` entry for the effective model.
     """
     if explicit is not None:
         resolved = explicit
@@ -1354,21 +1374,36 @@ def _resolve_max_tokens(
 
         resolved = resolved_from_priority
 
-    # Phase 074 D-074-01: Clamp gate. Single chokepoint covers all priority
-    # branches above (explicit value, env override, per-model default, etc.).
-    # Pass-through if registry entry missing OR max_output_tokens key absent
-    # per D-074-02. RESEARCH.md Open Question 2: strip ONLY the OpenRouter
-    # `:exacto` quality-routing suffix (openai_service.py:838-840) before lookup.
-    # Do NOT use a generic `split(":")[0]` — that would also strip legitimate
-    # suffixes like `:free` on `minimax/minimax-m2.5:free`, which is a real
-    # upstream model card with its own registry entry (cap=16384), and the
-    # stripped form `minimax/minimax-m2.5` is NOT in the registry, so the clamp
-    # would silently lose protection for the `:free` tier. Targeted
-    # `.removesuffix(":exacto")` keeps both paths working.
-    model_id = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
+    # Phase 074 D-074-01 / Phase 149 D-149-15: Clamp gate. Single chokepoint
+    # covers all priority branches above (explicit value, env override, per-model
+    # default, etc.). Pass-through if no cap resolves per D-074-02.
+    #
+    # Model lookup (D-149-15): the EFFECTIVE model actually being sent wins so a
+    # sub-agent / explicit-model call clamps against the RIGHT cap; fall back to
+    # the `user_settings.llm_model` chain only when the caller did not thread an
+    # effective model (BUG-260620-01 was the wrong-model mechanism — Pitfall 4).
+    #
+    # RESEARCH.md Open Question 2: strip ONLY the OpenRouter `:exacto` quality-
+    # routing suffix (openai_service.py:838-840) before the static lookup. Do NOT
+    # use a generic `split(":")[0]` — that would also strip legitimate suffixes
+    # like `:free` on `minimax/minimax-m2.7:free`, which is a real upstream model
+    # card, and the stripped base form has a DIFFERENT cap, so the clamp would
+    # silently lose protection for the `:free` tier. Targeted `.removesuffix(...)`
+    # keeps both paths working.
+    #
+    # Ceiling (D-149-15): honor an operator's DB-edited max_output_tokens. When the
+    # caller pre-resolved a DB-overridable cap (via get_model_capability_async on
+    # the async request path — Open Q3, keeps this function sync) it is authoritative;
+    # otherwise fall back to the static MODEL_CAPABILITIES entry for the effective
+    # model so legacy / sync-gateway callers keep their registry protection.
+    model_id = effective_model or (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
     if model_id:
         lookup_key = model_id.removesuffix(":exacto") if model_id.endswith(":exacto") else model_id
-        cap = MODEL_CAPABILITIES.get(lookup_key, {}).get("max_output_tokens")
+        cap = (
+            db_max_output_cap
+            if db_max_output_cap is not None
+            else MODEL_CAPABILITIES.get(lookup_key, {}).get("max_output_tokens")
+        )
         if cap and resolved > cap:
             logger.info(
                 "clamped max_tokens for model=%s: %d -> %d",
@@ -1376,6 +1411,46 @@ def _resolve_max_tokens(
             )
             return cap
     return resolved
+
+
+def _resolve_db_max_output_cap(model_id: str | None) -> int | None:
+    """Best-effort SYNC read of an operator's DB-edited ``max_output_tokens`` for
+    ``model_id`` (Phase 149 D-149-15 — the DB overlay for the clamp ceiling).
+
+    Open Q3 keeps ``_resolve_max_tokens`` sync and the openai-compat stream
+    construction sync (the D-14 byte-identical boundary), so we cannot ``await``
+    the async DB overlay (``get_model_capability_async``) here. Instead we read the
+    SAME 30s-TTL ``_model_overrides_cache`` that the async request path warms:
+    ``agent_loop.py`` calls ``get_model_capability_async(effective_model)``
+    immediately before opening the stream (and ``_load_model_overrides`` loads
+    EVERY enabled override row into the cache), so this sync read reflects an
+    operator's edit within the D-149-16 TTL window WITHOUT an await in the hot
+    path — i.e. the cap is resolved on the async path and passed in via the cache.
+
+    Returns the DB-overridden cap when a row with a non-null ``max_output_tokens``
+    exists; otherwise ``None`` so ``_resolve_max_tokens`` falls back to the static
+    ``MODEL_CAPABILITIES`` ceiling (a cold cache or un-overridden model is the safe
+    static-clamp default, never a crash — D-074-02).
+    """
+    if not model_id:
+        return None
+    try:
+        # Lazy import mirrors config.get_model_capability_async's own lazy import
+        # (avoids the openai_service <-> user_settings import cycle).
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model_id)
+        if row is not None:
+            db_cap = row.get("max_output_tokens")
+            if db_cap is not None:
+                return int(db_cap)
+    except Exception:
+        logger.warning(
+            "_resolve_db_max_output_cap: sync cache read failed for model=%s; "
+            "falling back to static registry cap",
+            model_id,
+            exc_info=True,
+        )
+    return None
 
 
 def _uses_max_completion_tokens(model: str) -> bool:
@@ -1504,7 +1579,17 @@ def create_adaptive_streaming_chat(
     request construction — NOT the shared chunk/SSE path (the D-14 RED LINE)."""
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
-    resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
+    # Phase 149 D-149-15 (BUG-260620-01): clamp against the EFFECTIVE model actually
+    # sent + an operator's DB-edited max_output_tokens. The DB cap is read sync from
+    # the warm override cache (warmed by the async get_model_capability_async call on
+    # the request path — see _resolve_db_max_output_cap); None → static registry cap.
+    db_max_output_cap = _resolve_db_max_output_cap(effective_model)
+    resolved_tokens = _resolve_max_tokens(
+        max_tokens,
+        user_settings,
+        effective_model=effective_model,
+        db_max_output_cap=db_max_output_cap,
+    )
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     
     calling_mode = resolve_calling_mode(effective_model, user_settings)
