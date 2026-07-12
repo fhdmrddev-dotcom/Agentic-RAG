@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-12T16:33:13.882Z"
+last_updated: "2026-07-12T16:44:50.226Z"
 last_activity: 2026-07-12 -- Phase 149 execution started
 progress:
   total_phases: 26
   completed_phases: 3
   total_plans: 34
-  completed_plans: 32
+  completed_plans: 33
   percent: 12
 ---
 
@@ -27,9 +27,17 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 149 (model-registry-discovery) — EXECUTING
-Plan: 1 of 10
+Plan: 10 of 10 (gap-closure wave 08/09/10 landed; phase held for verify-work + secure-phase)
 Status: Executing Phase 149
-Last activity: 2026-07-12 -- Phase 149 execution started
+Last activity: 2026-07-12 -- 149-10 gap-closure executed (Tests 9+10 UI-honesty)
+
+**149-10 execution notes (2026-07-12) — gap-closure, UI-only, additive:**
+
+- Closes the two remaining low-severity live-UAT UI-honesty gaps; 2/2 tasks, both TDD, sequential on the main tree (`use_worktrees=false`). No API/contract/schema/enable-disable change; no new packages.
+- **Task 1 (Test-9 / SC#3, `85ebf452`):** `ModelDiscoveryPanel.NewModelRow` provenance suffix now derives from real per-field returned-vs-unknown counts (`returnedCount`/`totalCount`) — three-way `full ✓` / `IDs only` / `returned some capabilities`, never the binary `!anyUnknown`. Fixes the cosmetic lie where a Google model with returned token limits but unknown native_tools read "returned IDs only" while its provider run card correctly read "capabilities ✓". 3 provenance-state tests lock partial/full/zero.
+- **Task 2 (Test-10 / D-149-04, `33a90f26`):** `ModelRegistryTab.DeprecatedControl` reason input brought to full `InlineNumberCell` parity — Enter commits (`preventDefault`), Escape cancels (revert to stored reason, no write), one-shot `settled` guard (reset on remount + on each keystroke) stops the Enter/Escape→blur double-write. Blur-commit is now unconditional (a blank blur = intentional `deprecated_reason: null` clear — desired per checker info #3). Write shape unchanged (`deprecated`/`deprecated_reason` only; deprecated ≠ disabled). 3 tests lock enter-commits-once / escape-cancels / enter-then-blur-no-double-write.
+- **Gates:** ModelDiscoveryPanel 8/8 + ModelRegistryTab 12/12 vitest green; `npx vite build` exit 0; `tsc -b` = 30 (the known baseline — 0 NEW errors in the 4 touched files).
+- **Requirements NOT marked complete:** MODEL-01/MODEL-02 stay open (false-green avoidance, mirrors 148/149 convention) — the phase G-4/SC#10 live UAT + secure-phase close them at verify-work. This plan only closes 2 UAT cosmetic gaps.
 
 **149 execution notes (2026-07-12):**
 

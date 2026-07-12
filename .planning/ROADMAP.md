@@ -205,8 +205,8 @@ Plans:
 **Gap closure** *(from 149-HUMAN-UAT.md — 3 MAJOR + 2 minor gaps; all root-caused live; independent, parallel)*
 
 - [x] 149-08-PLAN.md — Backend request-path: native_tools DB-aware calling mode (SC#1/Test 1) + `{model_id:path}` OpenRouter slash-ID routes (Test 4/5)
-- [ ] 149-09-PLAN.md — Honest disabled-model fallback end-to-end: frontend `model_disabled_fallback` SSE notice (Test 7/D-149-10) + threads.py provider re-resolve
-- [ ] 149-10-PLAN.md — Discovery/registry UI honesty: truthful per-model provenance label (Test 9/SC#3) + deprecated-reason Enter/Esc commit parity (Test 10)
+- [x] 149-09-PLAN.md — Honest disabled-model fallback end-to-end: frontend `model_disabled_fallback` SSE notice (Test 7/D-149-10) + threads.py provider re-resolve
+- [x] 149-10-PLAN.md — Discovery/registry UI honesty: truthful per-model provenance label (Test 9/SC#3) + deprecated-reason Enter/Esc commit parity (Test 10)
 
 **UI hint**: yes
 
@@ -348,7 +348,7 @@ Plans:
 | 146. Operator Foundation | 6/6 | Complete | 2026-07-11 |
 | 147. Operator Control Plane | 0/? | Not started | - |
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
-| 149. Model Registry & Discovery | 0/? | Not started | - |
+| 149. Model Registry & Discovery | 10/10 | Executing (held for verify-work + secure-phase) | - |
 | 150. Secrets at Rest | 0/? | Not started | - |
 | 151. Agent File Tools | 0/? | Not started | - |
 | 152. Workflow Run Inputs | 0/? | Not started | - |
