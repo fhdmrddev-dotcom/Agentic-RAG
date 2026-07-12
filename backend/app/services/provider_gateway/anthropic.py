@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Generator
 from app.services.anthropic_service import stream_anthropic
 
 # Inline at agent_loop.py:1398 today — SAME source, moves with the construction.
-from app.services.openai_service import _resolve_max_tokens, get_tools
+from app.services.openai_service import _resolve_max_tokens, _resolve_db_max_output_cap, get_tools
 
 from app.config import settings, get_model_capability
 
@@ -79,7 +79,18 @@ def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, No
       - tools  = ``active_tools if active_tools is not None else get_tools(user_settings)``
     """
     user_settings = request.user_settings
-    _ant_max_tokens = _resolve_max_tokens(None, user_settings)
+    # Phase 149 D-149-15: clamp against the EFFECTIVE model actually sent
+    # (``request.model`` — a sub-agent / explicit-model call must NOT clamp against
+    # ``user_settings.llm_model``) and an operator's DB-edited max_output_tokens.
+    # The DB cap is a cheap sync read of the warm override cache (warmed by the
+    # async ``get_model_capability_async`` call in agent_loop before ``open_stream``).
+    # Single-chokepoint preserved (D-074-01) — no second clamp, no per-provider fork.
+    _ant_max_tokens = _resolve_max_tokens(
+        None,
+        user_settings,
+        effective_model=request.model,
+        db_max_output_cap=_resolve_db_max_output_cap(request.model),
+    )
     _ant_api_key = (
         (getattr(user_settings, "llm_api_key", None) or "")
         or settings.llm_api_key

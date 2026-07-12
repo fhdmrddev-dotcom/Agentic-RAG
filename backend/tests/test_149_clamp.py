@@ -20,7 +20,8 @@ from unittest.mock import MagicMock
 import pytest
 
 import app.config
-from app.services.openai_service import _resolve_max_tokens
+import app.models.user_settings as us_mod
+from app.services.openai_service import _resolve_max_tokens, _resolve_db_max_output_cap
 
 
 def _settings(model: str, provider: str = "openai"):
@@ -168,3 +169,55 @@ def test_legacy_call_without_effective_model_falls_back(caplog):
         result = _resolve_max_tokens(32768, s)  # no effective_model / db cap
     assert result == 16384, "legacy 2-arg call must still clamp via user_settings.llm_model"
     assert len(_clamp_logs(caplog)) == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — every clamp caller threads the effective model. These exercise the
+# gateway-adapter wiring (anthropic.py / google.py): effective_model=request.model
+# + a cheap sync DB-cap read from the warm override cache. A sub-agent / explicit-
+# model call MUST clamp against its OWN effective model, never user_settings.
+# ---------------------------------------------------------------------------
+def test_sub_agent_effective_model_clamps_against_own_cap(monkeypatch):
+    """The user's default is a high-cap model (gpt-5 = 128000) but the sub-agent
+    runs gpt-4o (16384). A 32768 request must clamp to gpt-4o's 16384 — proving the
+    wrong-model mechanism (BUG-260620-01) is closed on the adapter path."""
+    # No DB override → warm-cache read returns None → static registry cap used.
+    monkeypatch.setattr(us_mod, "_model_overrides_cache", {}, raising=False)
+    s = _settings("gpt-5")           # user's default = high cap (128000)
+    effective = "gpt-4o"             # the sub-agent's effective model (cap 16384)
+    db_cap = _resolve_db_max_output_cap(effective)
+    assert db_cap is None
+    result = _resolve_max_tokens(
+        32768, s, effective_model=effective, db_max_output_cap=db_cap
+    )
+    assert result == 16384, (
+        f"sub-agent gpt-4o must clamp 32768 -> 16384 against its OWN cap, not the "
+        f"user's gpt-5 (128000 -> would pass through); got {result}"
+    )
+
+
+def test_sub_agent_db_override_honored_via_warm_cache(monkeypatch):
+    """The adapter's cheap sync DB-cap read honors an operator override for the
+    effective (sub-agent) model — the warm override cache is authoritative."""
+    monkeypatch.setattr(
+        us_mod,
+        "_model_overrides_cache",
+        {"gpt-4o": {"model_id": "gpt-4o", "max_output_tokens": 5000}},
+        raising=False,
+    )
+    s = _settings("gpt-5")
+    effective = "gpt-4o"
+    db_cap = _resolve_db_max_output_cap(effective)
+    assert db_cap == 5000
+    result = _resolve_max_tokens(
+        32768, s, effective_model=effective, db_max_output_cap=db_cap
+    )
+    assert result == 5000
+
+
+def test_resolve_db_cap_cold_cache_returns_none(monkeypatch):
+    """A cold / empty override cache yields None (safe static-clamp fallback,
+    never a crash) — D-074-02."""
+    monkeypatch.setattr(us_mod, "_model_overrides_cache", {}, raising=False)
+    assert _resolve_db_max_output_cap("gpt-4o") is None
+    assert _resolve_db_max_output_cap(None) is None

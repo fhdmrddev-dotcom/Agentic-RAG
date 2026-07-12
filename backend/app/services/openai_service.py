@@ -1385,11 +1385,11 @@ def _resolve_max_tokens(
     #
     # RESEARCH.md Open Question 2: strip ONLY the OpenRouter `:exacto` quality-
     # routing suffix (openai_service.py:838-840) before the static lookup. Do NOT
-    # use a generic `split(":")[0]` — that would also strip legitimate suffixes
-    # like `:free` on `minimax/minimax-m2.7:free`, which is a real upstream model
-    # card, and the stripped base form has a DIFFERENT cap, so the clamp would
-    # silently lose protection for the `:free` tier. Targeted `.removesuffix(...)`
-    # keeps both paths working.
+    # use a generic colon-split that keeps only the pre-colon head — that would
+    # also strip legitimate suffixes like `:free` on `minimax/minimax-m2.7:free`,
+    # which is a real upstream model card, and the stripped base form has a
+    # DIFFERENT cap, so the clamp would silently lose protection for the `:free`
+    # tier. Targeted `.removesuffix(...)` keeps both paths working.
     #
     # Ceiling (D-149-15): honor an operator's DB-edited max_output_tokens. When the
     # caller pre-resolved a DB-overridable cap (via get_model_capability_async on
