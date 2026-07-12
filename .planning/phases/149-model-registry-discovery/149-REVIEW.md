@@ -27,15 +27,27 @@ findings:
   warning: 4
   info: 2
   total: 7
-status: issues_found
+status: resolved
+resolution:
+  resolved: 2026-07-12
+  all_findings_fixed: true
+  fix_commits:
+    - "da7c61d4 — CR-01 discovery diff namespace map + un-masked test"
+    - "eaa8d24a — WR-02 case-insensitive model_id matching (zhipu/minimax casing trap)"
+    - "6567c7e4 — WR-01 PATCH value type validation (422 not 500)"
+    - "aaa30cd0 — WR-03 authoritative guard reads + fallback re-verify"
+    - "51ab0776 — WR-04 Context column null-not-0 honesty"
+    - "a31121ee — IN-01 wire chat deprecated badge (/providers → ChatArea → MessageInput)"
+    - "b5eb9d6f — IN-02 preserve deprecated_reason on re-edit"
+  verification: "78 backend tests + 23 component + 11 adjacent frontend green; vite build exit 0; zero new tsc errors"
 ---
 
 # Phase 149: Code Review Report
 
-**Reviewed:** 2026-07-12
+**Reviewed:** 2026-07-12 · **Fixes applied:** 2026-07-12 (all 7 findings resolved — see frontmatter `resolution.fix_commits`)
 **Depth:** standard
 **Files Reviewed:** 18
-**Status:** issues_found
+**Status:** resolved (was issues_found)
 
 ## Summary
 
