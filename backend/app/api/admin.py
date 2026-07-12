@@ -1058,7 +1058,7 @@ async def get_model_registry(request: Request):
     return {"models": rows}
 
 
-@router.patch("/models/{model_id}")
+@router.patch("/models/{model_id:path}")
 async def set_model_capability(
     model_id: str,
     body: dict,
@@ -1221,7 +1221,7 @@ class ModelLockUpdate(BaseModel):
     locked: bool
 
 
-@router.put("/models/{model_id}/lock", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/models/{model_id:path}/lock", status_code=status.HTTP_204_NO_CONTENT)
 async def set_model_lock(
     model_id: str,
     body: ModelLockUpdate,
