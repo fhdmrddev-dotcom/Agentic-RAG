@@ -42,6 +42,7 @@ import {
   disableUser,
   enableUser,
   exportPlatformAudit,
+  getModelRegistry,
   getOperatorAudit,
   getPlatformAudit,
   getSettings,
@@ -50,13 +51,18 @@ import {
   killRun,
   recordControlPlaneEvent,
   revokeOperator,
+  runModelDiscovery,
   setFeatureVisibility,
   setFlag,
+  setModelCapability,
+  setModelLock,
   type AdminActiveRun as ActiveRun,
   type BackpressureSignals,
   type FeatureAudience,
   type FullAppSettings,
   type GovernedFeature,
+  type ModelCapabilityPatch,
+  type ModelRegistryRow,
   type OperatorAuditRow,
   type OperatorIdentity,
   type PlatformAuditFilters,
@@ -75,6 +81,8 @@ import { CapabilityGrid, type CapabilityKey } from "./CapabilityGrid"
 import { MaintenancePanel } from "./MaintenancePanel"
 import { UsersAndAccess } from "./UsersAndAccess"
 import { FeatureVisibility } from "./FeatureVisibility"
+import { ModelRegistryTab } from "./ModelRegistryTab"
+import { ModelDiscoveryPanel } from "./ModelDiscoveryPanel"
 
 interface ControlRoomPageProps {
   /** The signed-in operator identity (from the App-level probe); null while loading. */
@@ -109,12 +117,11 @@ const TABS: readonly TabDef[] = [
   // deliberately NOT built (D-02) — the roster + audit browser + active-runs are the
   // support surface — so the old "impersonation coming soon" copy is retired.
   { id: "users-access", label: "Users & Access", locked: false },
-  {
-    id: "model-registry",
-    label: "Model Registry",
-    locked: true,
-    lockedDescription: "Live model discovery and DB-managed model capabilities are coming soon.",
-  },
+  // 149-07 (MODEL-01 / MODEL-02): the Model Registry tab UNLOCKS into the 070-A
+  // capability instrument table + the 071-A discovery propose→confirm panel. Editing
+  // a capability takes effect on the next request — no restart (SC#1); discovery is
+  // propose-only (never auto-enables an un-returned capability — SC#3).
+  { id: "model-registry", label: "Model Registry", locked: false },
   {
     id: "secrets",
     label: "Secrets",
@@ -197,6 +204,10 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   // tab is first opened (lazy — no cross-user read on every Control Plane visit); the
   // shell owns the fetch + the graded-guard writes, UsersAndAccess is a pure leaf.
   const [rosterRows, setRosterRows] = useState<UserRosterRow[] | null>(null)
+  // 149-07: the Model Registry union rows (getModelRegistry). `null` until the tab is
+  // first opened (lazy — no registry read on every Control Plane visit); the shell owns
+  // the fetch + the write-then-refetch, ModelRegistryTab/Panel are pure leaves.
+  const [registryRows, setRegistryRows] = useState<ModelRegistryRow[] | null>(null)
   // 069-A: the current per-feature audience map (enum values, never booleans). Seeded
   // from the day-one polarity (see DEFAULT_VISIBILITY); each flip updates it + records.
   const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience>>(
@@ -260,6 +271,18 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       if (alive.current) setRosterRows(page.users)
     } catch {
       /* keep the last-known roster (honest degrade, never a crash) */
+    }
+  }, [])
+  // 149-07 registry fetch — mirrors fetchRoster (alive.current guard + honest-degrade
+  // .catch). Fetched lazily on tab-open and re-fetched after every capability/lock write
+  // + every confirmed discovery change so OVR/DEF + enabled + lock reflect the new
+  // persisted truth (no optimistic flip — the server is the source of truth, SC#1).
+  const fetchRegistry = useCallback(async () => {
+    try {
+      const rows = await getModelRegistry()
+      if (alive.current) setRegistryRows(rows)
+    } catch {
+      /* keep the last-known registry (honest degrade, never a crash) */
     }
   }, [])
 
@@ -362,7 +385,8 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   //    (no read endpoint in this slice), so they need no fetch here. ──
   useEffect(() => {
     if (activeTab === "users-access") void fetchRoster()
-  }, [activeTab, fetchRoster])
+    if (activeTab === "model-registry") void fetchRegistry()
+  }, [activeTab, fetchRoster, fetchRegistry])
 
   // ── The manual ↻ Refresh (D-07): re-fetch AND record the deliberate "refresh"
   //    row, then re-read the ledger so it visibly lands, then pulse the marker.
@@ -468,6 +492,42 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       pulseRecording()
     },
     [pulseRecording],
+  )
+
+  // ── 149-07 registry writes. Each is SERVER-enforced (Plan 05/06 — the allowlist PATCH,
+  //    the two-part no-dead-default guard, the dedicated lock PUT). After a success we
+  //    re-fetch the registry so OVR/DEF + enabled + lock reflect the new persisted truth
+  //    (no optimistic flip) and pulse the band recording marker. Errors RE-THROW so the
+  //    leaf surfaces the plain-language refusal in-row (the 409 detail — D-149-09). ──
+  const handleSetCapability = useCallback(
+    async (modelId: string, patch: ModelCapabilityPatch) => {
+      await setModelCapability(modelId, patch)
+      pulseRecording()
+      if (alive.current) void fetchRegistry()
+    },
+    [fetchRegistry, pulseRecording],
+  )
+  const handleLock = useCallback(
+    async (modelId: string, locked: boolean) => {
+      await setModelLock(modelId, locked)
+      pulseRecording()
+      if (alive.current) void fetchRegistry()
+    },
+    [fetchRegistry, pulseRecording],
+  )
+  // Discovery is ephemeral (D-149-12) — the panel owns the diff; the shell only runs the
+  // fan-out. Confirming routes each chosen change through the PATCH capability seam, then
+  // re-fetches the registry so any newly-confirmed model appears (propose-only — SC#3).
+  const handleRunDiscovery = useCallback(() => runModelDiscovery(), [])
+  const handleConfirmDiscovery = useCallback(
+    async (changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>) => {
+      for (const { modelId, patch } of changes) {
+        await setModelCapability(modelId, patch)
+      }
+      pulseRecording()
+      if (alive.current) void fetchRegistry()
+    },
+    [fetchRegistry, pulseRecording],
   )
 
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
@@ -659,6 +719,37 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
               visibility={visibility}
               onSetVisibility={handleSetVisibility}
               showTechnical={showTechnical}
+            />
+          </div>
+        ) : activeTab === "model-registry" ? (
+          // 070-A capability instrument table + the 071-A discovery propose→confirm panel.
+          // The shell owns the lazy fetch + write-then-refetch (server = source of truth,
+          // no optimistic flip); every recorded write pulses the band marker (062-A).
+          <div className="mx-auto max-w-5xl space-y-8 px-6 py-6">
+            <div className="flex items-center">
+              <div>
+                <h2 className="font-headline text-lg font-bold text-foreground">Model Registry</h2>
+                <p className="mt-0.5 max-w-[74ch] text-xs text-muted-foreground/80">
+                  Every model the platform can route to, and what it can do. Editing a capability
+                  takes effect on the next request — no restart. Enabled models appear in users’
+                  model picker; disabled ones are hidden.
+                </p>
+              </div>
+              <span className="flex-1" />
+              <TechnicalNamesToggle
+                enabled={showTechnical}
+                onToggle={() => setShowTechnical((v) => !v)}
+              />
+            </div>
+            <ModelRegistryTab
+              rows={registryRows}
+              onSetCapability={handleSetCapability}
+              onLock={handleLock}
+              showTechnical={showTechnical}
+            />
+            <ModelDiscoveryPanel
+              onRunDiscovery={handleRunDiscovery}
+              onConfirm={handleConfirmDiscovery}
             />
           </div>
         ) : (

@@ -26,6 +26,14 @@ vi.mock("@/lib/api", () => ({
   recordControlPlaneEvent: vi.fn(),
   killRun: vi.fn(),
   setFlag: vi.fn(),
+  // 149-07: the Model Registry tab lazily fetches the registry on open + writes through
+  // these seams. Only getModelRegistry is called on render (tab-open); the writes fire on
+  // interaction. ApiError/DISCOVERY_UNKNOWN are values the leaves import but never touch
+  // on the idle/empty render path exercised here.
+  getModelRegistry: vi.fn(),
+  runModelDiscovery: vi.fn(),
+  setModelCapability: vi.fn(),
+  setModelLock: vi.fn(),
 }))
 
 import {
@@ -33,6 +41,7 @@ import {
   getAdminActiveRuns,
   getSettings,
   getOperatorAudit,
+  getModelRegistry,
   recordControlPlaneEvent,
 } from "@/lib/api"
 
@@ -71,6 +80,7 @@ beforeEach(() => {
   vi.mocked(getSettings).mockResolvedValue(SETTINGS)
   vi.mocked(getOperatorAudit).mockResolvedValue([])
   vi.mocked(recordControlPlaneEvent).mockResolvedValue(undefined)
+  vi.mocked(getModelRegistry).mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -183,11 +193,26 @@ describe("ControlRoomPage (066) — the assembled Control Plane", () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole("tab", { name: /model registry/i }))
+    // Secrets is still locked (149 only unlocked Model Registry).
+    await user.click(screen.getByRole("tab", { name: /secrets/i }))
 
     expect(screen.getByText(/not built yet — coming soon/i)).toBeInTheDocument()
     // The body copy names the arriving capability with NO roadmap number.
-    expect(screen.getByText(/live model discovery/i)).toBeInTheDocument()
-    expect(screen.queryByText(/\b149\b/)).not.toBeInTheDocument()
+    expect(screen.getByText(/encrypted provider-key/i)).toBeInTheDocument()
+    expect(screen.queryByText(/\b148\b/)).not.toBeInTheDocument()
+  })
+
+  it("the Model Registry tab is UNLOCKED (149-07) — it renders the editor + discovery, not a LockedTab", async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole("tab", { name: /model registry/i }))
+
+    // The 070-A editor heading + the 071-A discovery panel render — NOT the locked refusal.
+    expect(await screen.findByRole("heading", { name: /^model registry$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /run discovery/i })).toBeInTheDocument()
+    expect(screen.queryByText(/not built yet — coming soon/i)).not.toBeInTheDocument()
+    // The shell fetched the registry lazily on tab-open.
+    expect(getModelRegistry).toHaveBeenCalled()
   })
 })
