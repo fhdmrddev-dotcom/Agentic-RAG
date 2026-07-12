@@ -183,7 +183,7 @@ Plans:
   3. Discovery never auto-enables a capability the provider's `/models` endpoint did not return (propose-only — reproducing the silent no-tools bug is barred).
   4. A non-operator cannot reach the model-write path.
 
-**Plans**: 7 plans (3 waves) + 3 gap-closure plans (1 wave, from live UAT 2026-07-12)
+**Plans**: 7 plans (3 waves) + 5 gap-closure plans (round 1: 3; round 2: 2 — from live UAT 2026-07-12/13)
 
 Plans:
 **Wave 1**
@@ -207,6 +207,11 @@ Plans:
 - [x] 149-08-PLAN.md — Backend request-path: native_tools DB-aware calling mode (SC#1/Test 1) + `{model_id:path}` OpenRouter slash-ID routes (Test 4/5)
 - [x] 149-09-PLAN.md — Honest disabled-model fallback end-to-end: frontend `model_disabled_fallback` SSE notice (Test 7/D-149-10) + threads.py provider re-resolve
 - [x] 149-10-PLAN.md — Discovery/registry UI honesty: truthful per-model provenance label (Test 9/SC#3) + deprecated-reason Enter/Esc commit parity (Test 10)
+
+**Gap closure (round 2)** *(from 149-HUMAN-UAT.md round-2 re-test — 1 major + 1 minor; both root-caused live; independent, parallel)*
+
+- [ ] 149-11-PLAN.md — Structured-path pre-injection: fire TOOL_USAGE_INSTRUCTIONS when a DB native_tools=False compat model resolves STRUCTURED (Test 1 SC#1 second half; WR-05 native-SDK boundary kept)
+- [ ] 149-12-PLAN.md — Suggestion think-leak: strip `<think>` reasoning blocks before the line-parse so compat-model chips are clean questions (Test 7 minor)
 
 **UI hint**: yes
 
