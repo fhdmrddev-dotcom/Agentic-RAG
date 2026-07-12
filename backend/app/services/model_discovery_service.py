@@ -83,6 +83,21 @@ UNKNOWN = "unknown"
 # native tool support). Every other capability is operator-set.
 _CAP_FIELDS = ("context", "max_output", "native_tools")
 
+# CR-01: discovery-namespace field -> registry/DB column name. ``compute_diff`` compares a
+# provider-RETURNED capability (keyed by the discovery field names in ``_CAP_FIELDS``)
+# against the INJECTED ``current`` registry, whose caps are keyed by the REAL registry/DB
+# column names (``context_window_tokens`` / ``max_output_tokens``). ``native_tools`` is the
+# SAME key in both namespaces. Without this map ``stored.get("context")`` /
+# ``stored.get("max_output")`` were ALWAYS None, so every already-known Google/OpenRouter
+# model false-flagged as "changed" from null (defeating the SC#3 "propose what changed"
+# purpose). Output ``field_changes`` STAY keyed by the discovery-namespace field (the
+# frontend contract) — only the STORED-side lookup is normalized.
+_FIELD_TO_REGISTRY = {
+    "context": "context_window_tokens",
+    "max_output": "max_output_tokens",
+    "native_tools": "native_tools",
+}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Id extractors — lifted VERBATIM from curate_models.py (openai-compat / minimax
@@ -440,12 +455,19 @@ def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
             if model_id not in current:
                 new.append(_build_new_entry(provider, model_id, model_caps))
                 continue
-            # changed: compare ONLY the fields the provider actually returned.
+            # changed: compare ONLY the fields the provider actually returned. CR-01: read
+            # the STORED value through the registry-namespace key (``_FIELD_TO_REGISTRY``)
+            # — the injected ``current`` carries ``context_window_tokens`` /
+            # ``max_output_tokens``, NOT the discovery field names — while KEEPING the
+            # output keyed by the discovery-namespace ``field`` (the frontend contract).
             stored = current[model_id]
             field_changes: dict = {}
             for field, value in model_caps.items():
-                if field in _CAP_FIELDS and stored.get(field) != value:
-                    field_changes[field] = {"from": stored.get(field), "to": value}
+                if field not in _CAP_FIELDS:
+                    continue
+                stored_val = stored.get(_FIELD_TO_REGISTRY[field])
+                if stored_val != value:
+                    field_changes[field] = {"from": stored_val, "to": value}
             if field_changes:
                 changed.append({
                     "provider": provider,

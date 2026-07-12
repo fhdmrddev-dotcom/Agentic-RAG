@@ -175,20 +175,33 @@ async def test_provider_outcomes():
 # ─────────────────────────────────────────────────────────────────────────────
 def test_discovery():
     """new/changed/vanished partition; a FAILED provider manufactures no
-    false-vanished (the 058/060 lesson)."""
+    false-vanished (the 058/060 lesson).
+
+    CR-01: the ``current`` fixture uses the REAL registry namespace
+    (``context_window_tokens`` / ``max_output_tokens``) that the ONLY production caller
+    (``admin.run_model_discovery``, which builds ``current`` from MODEL_CAPABILITIES ∪
+    ``load_all_model_overrides``) actually produces — NOT the discovery-service field names
+    (``context`` / ``max_output``) the buggy fixture used to feed. This exercises the true
+    changed-detection contract.
+    """
     current = {
-        "gpt-4o":     {"provider": "openai", "context": 128_000, "enabled": True},
-        "gpt-old":    {"provider": "openai", "enabled": True},      # → vanished (openai ok)
-        "claude-x":   {"provider": "anthropic", "enabled": True},   # anthropic FAILED → NOT vanished
-        "gemini-pro": {"provider": "google", "context": 1_000_000, "max_output": 8192},
+        "gpt-4o":       {"provider": "openai", "context_window_tokens": 128_000, "enabled": True},
+        "gpt-old":      {"provider": "openai", "enabled": True},      # → vanished (openai ok)
+        "claude-x":     {"provider": "anthropic", "enabled": True},   # anthropic FAILED → NOT vanished
+        # gemini-match: registry caps EXACTLY equal what Google returns → must NOT be "changed".
+        "gemini-match": {"provider": "google", "context_window_tokens": 1_000_000, "max_output_tokens": 8192},
+        # gemini-pro: registry context genuinely differs (1M stored vs 2M discovered) → "changed".
+        "gemini-pro":   {"provider": "google", "context_window_tokens": 1_000_000, "max_output_tokens": 8192},
     }
     discovered = [
         {"provider": "openai", "status": "ok", "ids": ["gpt-5.6", "gpt-4o"],
          "caps": {}, "capabilities_returned": False},
         # anthropic did not respond ok → contributes NO vanished entries.
         {"provider": "anthropic", "status": "http-429", "ids": []},
-        {"provider": "google", "status": "ok", "ids": ["gemini-pro", "gemini-new"],
-         "caps": {"gemini-pro": {"context": 2_000_000, "max_output": 8192},
+        {"provider": "google", "status": "ok",
+         "ids": ["gemini-match", "gemini-pro", "gemini-new"],
+         "caps": {"gemini-match": {"context": 1_000_000, "max_output": 8192},
+                  "gemini-pro": {"context": 2_000_000, "max_output": 8192},
                   "gemini-new": {"context": 1_000_000, "max_output": 8192}},
          "capabilities_returned": True},
     ]
@@ -196,8 +209,19 @@ def test_discovery():
     diff = mds.compute_diff(current, discovered)
 
     assert {n["model_id"] for n in diff["new"]} == {"gpt-5.6", "gemini-new"}
-    # gemini-pro's context changed 1M → 2M (only the returned field is compared).
-    assert {c["model_id"] for c in diff["changed"]} == {"gemini-pro"}
+
+    changed_ids = {c["model_id"] for c in diff["changed"]}
+    # (a) a known model whose registry caps MATCH the discovered caps is NOT "changed" —
+    #     this is the regression the CR-01 bug produced (matching caps false-flagged as changed).
+    assert "gemini-match" not in changed_ids
+    # (b) a known model whose value genuinely differs IS "changed", comparing against the
+    #     REGISTRY value (context_window_tokens=1M) — the from-value is 1M, NOT a spurious null.
+    assert changed_ids == {"gemini-pro"}
+    gemini_pro = next(c for c in diff["changed"] if c["model_id"] == "gemini-pro")
+    assert gemini_pro["changes"]["context"] == {"from": 1_000_000, "to": 2_000_000}
+    # max_output matched (8192 == 8192) so it is NOT reported as a change.
+    assert "max_output" not in gemini_pro["changes"]
+
     # gpt-old vanished (openai is ok); claude-x does NOT (anthropic failed).
     vanished_ids = {v["model_id"] for v in diff["vanished"]}
     assert vanished_ids == {"gpt-old"}
