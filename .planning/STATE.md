@@ -26,10 +26,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 149 (model-registry-discovery) — EXECUTING
-Plan: 1 of 7
-Status: Executing Phase 149
-Last activity: 2026-07-12 -- Phase 149 execution started
+Phase: 149 (model-registry-discovery) — EXECUTED, verification human_needed (NOT complete)
+Plan: 7 of 7 executed (all SUMMARYs landed)
+Status: Awaiting (1) live SC#10 cross-provider UAT via /gsd:verify-work 149, and (2) /gsd:secure-phase 149. Do NOT mark complete until both clear.
+Last activity: 2026-07-12 -- Phase 149 executed (7/7 plans, 3 waves, sequential main-tree) + all 7 code-review findings fixed; verifier human_needed on the 11 pending SC#10 UAT rows
+
+**149 execution notes (2026-07-12):**
+
+- **7/7 plans, 3 waves, sequential on main tree** (`use_worktrees=false`). Wave 1: 149-02 discovery service (SC#3 propose-only) · 149-03 effective-model+DB clamp (closes BUG-260620-01) · 149-04 FE api.ts contract + picker polish · 149-01 schema+mig099 (operator applied via SQL editor; deprecated/deprecated_reason on model_capabilities_overrides + llm_model_locked on app_settings; full-schema regenerated; **cloud parity DEFERRED** to the standing production-push checklist). Wave 2: 149-05 registry backend core (GET/PATCH /admin/models, SQLi-safe `_MODEL_CAP_COLUMNS` allowlist, enabled hides disabled, deprecated_models). Wave 3: 149-06 governance (no-dead-default graded guard both paths, PUT /admin/models/{id}/lock, POST /admin/models/discover, G-5 minimal threads.py fallback guard — override honored) · 149-07 operator Model Registry tab (070-A instrument table + 071-A discovery panel) + 149-VALIDATION.md SC#10 rows.
+- **Registry = code baseline + DB delta (NOT a DB-native table).** `MODEL_CAPABILITIES` (config.py, DEF/shipped) ∪ `model_capabilities_overrides` (DB: operator OVR edits + discovery-confirmed DB-only rows) ∪ `app_settings.llm_model`/`llm_model_locked` (org default+lock). `GET /admin/models` unions all three at read-time. Operator-editable fields = `_MODEL_CAP_COLUMNS` (7); correctness/integration fields (emit_tier, strict_json_schema, forced_emission, capability_source) stay code-only by design. Phase 149 = write-UI + governance on top of the mig-053 read overlay; it did NOT migrate the catalog into the DB. Full-DB-catalog + correctness-field visibility = future-milestone candidate (offered as a seed).
+- **Code review: 1 blocker + 4 warnings + 2 info — ALL 7 FIXED** (user chose "Everything now"): CR-01 discovery-diff namespace map + un-masked test (`da7c61d4`); WR-02 case-insensitive model_id match / zhipu-minimax casing (`eaa8d24a`); WR-01 PATCH value type-validation 422 (`6567c7e4`); WR-03 authoritative fresh guard reads + fallback re-verify — settings layer is uniformly in-process-TTL, no cross-worker invalidation anywhere, so the fix is fresh-read-at-decision not one-off Redis (`aaa30cd0`); WR-04 Context-column null-not-0 (`51ab0776`); IN-01 wire chat deprecated badge via /providers→ChatArea→MessageInput (`a31121ee`); IN-02 preserve deprecated_reason on re-edit (`b5eb9d6f`). 78 backend + 23 component + 11 adjacent FE green; vite build exit 0; zero new tsc.
+- **Gates:** post-merge 53/53 backend + 28 FE green; regression 68/68 (146/147/148) green; schema-drift = known false positive (mig applied via SQL editor per project rule, never `db push`) → bypassed. Verifier human_needed = 11 SC#10 live-UAT rows pending by design (real cross-provider) → tracked in **149-HUMAN-UAT.md**.
+- **Observed live (operator screenshot):** Control Plane Active-runs showed 23 phantom `seed@system.local`/gpt-4o CHAT runs — looks like seed/orphaned `runs:active` entries (run-honesty class), NOT caused by 149; offered to inspect+clear (not yet done).
 
 **148-09 decisions/notes (2026-07-11):**
 
