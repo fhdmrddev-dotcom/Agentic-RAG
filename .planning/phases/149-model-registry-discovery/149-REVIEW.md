@@ -25,15 +25,29 @@ findings:
   warning: 5
   info: 4
   total: 10
-status: issues_found
+status: resolved
+resolution:
+  resolved: 2026-07-12
+  all_findings_fixed: false
+  fixed: [CR-01, WR-01, WR-02, WR-03, WR-04, WR-05]
+  open_info: [IN-01, IN-02, IN-03, IN-04]
+  fix_commits:
+    - "46c09382 — CR-01 effective fallback model on the wire (body.model_copy at the _apply_fallback_to_request seam) + gateway-model regression test"
+    - "7b3e82de — WR-01 capability_source registry/db_override gate in _reresolve_fallback_provider (pattern-INFERRED providers rejected)"
+    - "beb32917 — WR-02 fallback provider recorded only when override_provider actually applied (identity check)"
+    - "e41195ce — WR-04 non-empty model_id 422 guard on both :path model routes (PATCH + PUT /lock)"
+    - "3214bbbf — WR-03 deprecated-reason dirty check (no-change blur never writes) + busy-window commit survival (settled flag not set while busy)"
+    - "4c8dc454 — WR-05 honest-lock: native_tools toggle gated with always-native tooltip on anthropic/google rows; native-branch routing consult DEFERRED (see finding body + openai_service.py scope comment)"
+  verification: "78 backend tests green (test_149_* full set); scoped vitest 26/26 (MessageItem.fallbackNotice + ModelDiscoveryPanel + ModelRegistryTab); vite build exit 0; tsc -b at the 30-error pre-existing baseline (0 new)"
+  note: "IN-01..IN-04 are documented, not fixed (info-only, out of fix scope this round). IN-03 (modelFallbackNotice is stream-transient — vanishes on reload) is the most user-visible of the four; candidate for the live-UAT pass or a future polish plan."
 ---
 
 # Phase 149: Code Review Report (Round 2 — gap-closure plans 08–10)
 
-**Reviewed:** 2026-07-12T17:16:38Z
+**Reviewed:** 2026-07-12T17:16:38Z · **Fixes applied:** 2026-07-12 (CR-01 + WR-01..WR-05 resolved — see frontmatter `resolution.fix_commits`; IN-01..IN-04 documented, not fixed)
 **Depth:** standard
 **Files Reviewed:** 15
-**Status:** issues_found
+**Status:** resolved (was issues_found)
 
 ## Summary
 
