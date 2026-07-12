@@ -1071,6 +1071,29 @@ async def set_model_capability(
             detail=f"Unknown capability field(s): {', '.join(sorted(unknown))}",
         )
 
+    # Phase 149 (D-149-09 disable-path half): NO dead default. Disabling the current org
+    # default — OR the locked model — is REFUSED with a plain 409 BEFORE any write, so the
+    # threads.py request-path fallback target (app_settings.llm_model) always resolves to an
+    # ENABLED model. An ordinary disable of a non-default, non-locked model stays a direct,
+    # reversible flip. The lock-path half of this guard lives in set_model_lock (refusing to
+    # LOCK a disabled model) — the two together guarantee no dead default can ever exist.
+    if body.get("enabled") is False:
+        from app.models.user_settings import _load_settings_from_db  # function-local (Pitfall 4)
+
+        _s = await _load_settings_from_db()
+        _org_default = _s.get("llm_model") or ""
+        _is_locked = bool(_s.get("llm_model_locked"))
+        if model_id == _org_default:
+            if _is_locked:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This model is locked as the org default — unlock it first.",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This is the org default model — pick a new default first.",
+            )
+
     # Only keys PRESENT in the raw body are written; an explicit null → SQL NULL (clear to
     # DEF), an omitted key → never touched (do NOT coalesce omitted to NULL — that would
     # wipe unrelated overrides). Column names come ONLY from the code allowlist (SQLi-safe).
@@ -1121,3 +1144,79 @@ async def set_model_capability(
     request.state.audit_action = "model.capability.set"
     request.state.audit_label = f"Changed capabilities for {model_id}"
     return {"ok": True, "model_id": model_id, "changed": present_cols}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 149 (MODEL-02 / D-149-07) — the dedicated lock/unlock endpoint
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Lock/unlock is a DEDICATED PUT /admin/models/{id}/lock route (body {locked}), SEPARATE
+# from the capability PATCH and matching the Plan-04 setModelLock seam — the lock is NOT a
+# model_capabilities_overrides column, it pins the single app_settings org default. The new
+# non-GET route inherits the router-level require_operator 404 gate (no RLS backstop) and
+# carries its OWN non-operator 404 test.
+
+
+class ModelLockUpdate(BaseModel):
+    """Body for PUT /admin/models/{id}/lock (the D-149-07 dedicated lock seam, SEPARATE
+    from the capability PATCH). ``locked`` is a strict bool (Pydantic)."""
+
+    locked: bool
+
+
+@router.put("/models/{model_id}/lock", status_code=status.HTTP_204_NO_CONTENT)
+async def set_model_lock(
+    model_id: str,
+    body: ModelLockUpdate,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Lock/unlock + pin the single org default (D-149-07 / D-149-09 lock-path half).
+
+    ``locked=true``: FIRST resolve the target's effective ``enabled`` from the all-rows
+    override cache (a model is disabled ONLY when its ``load_all_model_overrides()`` row
+    carries ``enabled=false``; an ABSENT override defaults enabled). If the target is
+    DISABLED, refuse with a plain 409 "enable it first" BEFORE any write — a lock must never
+    pin a disabled model as the org default (this is the lock-path half of the no-dead-default
+    guard; it 409-refuses rather than silently auto-enabling, symmetric with the disable
+    guard's honest consequence). Otherwise write ``llm_model=model_id`` + ``llm_model_locked=
+    true`` via the code-constant allowlist (SQLi-safe) and stamp a ✎ ``model.lock`` receipt.
+    The single ``llm_model`` pin + single ``llm_model_locked`` flag guarantee "at most one
+    lock" structurally.
+
+    ``locked=false``: clear ``llm_model_locked`` (``llm_model`` unchanged) + stamp ✎
+    ``model.unlock``. On a persistence failure, stamp ``*.write_failed`` + raise a real 500
+    (never a false 204 — mirrors set_flag's honest-failure path). Non-operators are 404'd by
+    the router gate; a failed persist re-enters the floor's yield so no false receipt is written.
+    """
+    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+
+    if body.locked:
+        # D-149-09 (lock path): never pin a DISABLED model as the org default. Refuse 409
+        # BEFORE any write — no hidden auto-enable side effect (honest consequence).
+        overrides = await load_all_model_overrides()
+        if (overrides.get(model_id) or {}).get("enabled") is False:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This model is disabled — enable it first.",
+            )
+        if not await save_app_settings({"llm_model": model_id, "llm_model_locked": True}):
+            request.state.audit_action = "model.lock.write_failed"
+            request.state.audit_label = f"Locking {model_id} as the org default failed to persist"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not persist the lock — it was not changed.",
+            )
+        request.state.audit_action = "model.lock"
+        request.state.audit_label = f"Locked {model_id} as the org default"
+    else:
+        if not await save_app_settings({"llm_model_locked": False}):
+            request.state.audit_action = "model.unlock.write_failed"
+            request.state.audit_label = f"Unlocking {model_id} failed to persist"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not persist the unlock — it was not changed.",
+            )
+        request.state.audit_action = "model.unlock"
+        request.state.audit_label = f"Unlocked {model_id}"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

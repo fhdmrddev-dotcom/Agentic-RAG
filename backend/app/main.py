@@ -108,6 +108,10 @@ _DIRECT_COLUMNS: set[str] = {
     # Column names are code CONSTANTS (never user input) -> keeps save_app_settings
     # SQLi-safe (T-147-01). Values are parameterized ($N) in save_app_settings.
     "self_improve_enabled", "workflows_enabled", "maintenance_mode",
+    # Phase 149 (MODEL-02, migration 099) — the single org-default lock flag. Written by
+    # the dedicated PUT /admin/models/{id}/lock endpoint through save_app_settings; a code
+    # CONSTANT (never user input) so the write stays SQLi-safe (value parameterized $N).
+    "llm_model_locked",
 }
 
 _PROVIDER_MODEL_KEYS: set[str] = {
