@@ -376,5 +376,90 @@ def keyed_from_settings() -> dict[str, str | None]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Diff computation + propose-only capability fill (SC#3) — added in Task 2.
+# Diff computation + propose-only capability fill (SC#3)
 # ─────────────────────────────────────────────────────────────────────────────
+def _build_new_entry(provider: str, model_id: str, model_caps: dict) -> dict:
+    """A discovered-but-unknown model. Lands ``enabled=False`` with a per-field
+    capability map: a concrete provider-returned value where present, else the
+    ``UNKNOWN`` sentinel. The asymmetry (SC#3) falls out naturally because
+    ``model_caps`` only carries the fields the provider actually returned —
+    OpenRouter yields all three, Google only the token limits, everyone else
+    nothing. NEVER a guessed value, NEVER an auto-enable (T-149-05)."""
+    capabilities: dict = {}
+    for field in _CAP_FIELDS:
+        value = model_caps.get(field)
+        capabilities[field] = value if value is not None else UNKNOWN
+    return {
+        "provider": provider,
+        "model_id": model_id,
+        "enabled": False,
+        "capabilities": capabilities,
+    }
+
+
+def compute_diff(current: dict[str, dict], discovered: list[dict]) -> dict:
+    """Partition discovered models against an INJECTED ``current`` registry.
+
+    ``current`` maps ``model_id -> capability dict`` (each carrying a
+    ``provider`` field). The caller supplies the registry union (config ∪ all
+    DB rows) — the service reads NO DB itself, keeping it pure/testable and
+    Wave-1-independent (D-149-12). ``discovered`` is the ``discover_all`` result.
+
+    Returns a plain, JSON-serializable dict with three groups:
+
+      ``new``      — returned ids absent from ``current``. Each lands
+                     ``enabled=False`` with propose-only capability fill.
+      ``changed``  — ids in both where a provider-RETURNED capability differs
+                     from the stored value (only returned fields are compared).
+      ``vanished`` — ``current`` ids belonging to an ``ok`` provider that were
+                     NOT in that provider's returned set. A provider that
+                     failed / had no key contributes NONE (its models are
+                     unknown, not gone — the 058/060 lesson).
+
+    The result is ephemeral — it lives only in the HTTP response; no proposals
+    table is built and no staleness lifecycle exists."""
+    # Only providers that responded ok contribute a DEFINITIVE returned set.
+    ok_info: dict[str, dict] = {}
+    for entry in discovered:
+        if entry.get("status") == "ok":
+            ids = list(entry.get("ids") or [])
+            ok_info[entry["provider"]] = {
+                "ids": ids,               # newest-first order preserved
+                "id_set": set(ids),
+                "caps": entry.get("caps") or {},
+            }
+
+    new: list[dict] = []
+    changed: list[dict] = []
+
+    # NEW + CHANGED — walk each ok provider's returned ids (newest-first kept).
+    for provider, info in ok_info.items():
+        provider_caps = info["caps"]
+        for model_id in info["ids"]:
+            model_caps = provider_caps.get(model_id, {})
+            if model_id not in current:
+                new.append(_build_new_entry(provider, model_id, model_caps))
+                continue
+            # changed: compare ONLY the fields the provider actually returned.
+            stored = current[model_id]
+            field_changes: dict = {}
+            for field, value in model_caps.items():
+                if field in _CAP_FIELDS and stored.get(field) != value:
+                    field_changes[field] = {"from": stored.get(field), "to": value}
+            if field_changes:
+                changed.append({
+                    "provider": provider,
+                    "model_id": model_id,
+                    "changes": field_changes,
+                })
+
+    # VANISHED — current ids of an OK provider that were not returned. A
+    # failed / no_key provider is absent from ok_info → contributes none.
+    vanished: list[dict] = []
+    for model_id, cap in current.items():
+        provider = cap.get("provider")
+        info = ok_info.get(provider)
+        if info is not None and model_id not in info["id_set"]:
+            vanished.append({"provider": provider, "model_id": model_id})
+
+    return {"new": new, "changed": changed, "vanished": vanished}
