@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
-last_updated: "2026-07-11T23:00:54.868Z"
-last_activity: 2026-07-11
+status: executing
+last_updated: "2026-07-12T06:26:42.081Z"
+last_activity: 2026-07-12 -- Phase 149 planning complete
 progress:
   total_phases: 26
   completed_phases: 3
-  total_plans: 24
+  total_plans: 31
   completed_plans: 24
   percent: 12
 ---
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 149
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-11
+Status: Ready to execute
+Last activity: 2026-07-12 -- Phase 149 planning complete
 
 **148-09 decisions/notes (2026-07-11):**
 
@@ -65,6 +65,7 @@ Last activity: 2026-07-11
 
 **Guardrail overrides:**
 
+- **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.
 
 **Phase 123 — Skill Triggering Quality (TRIG-01 / TRIG-03 / CTX-03) — COMPLETE (2026-06-26).** All 3 gates clear: secure-phase 29/29 threats CLOSED (threats_open 0, `fc17016b`) · validate-phase NYQUIST-COMPLIANT 12/12 Per-Task COVERED (148 backend + 40 frontend = 188 tests green, `06ae19dc`) · verify 12/12 must-haves + **SC#10 4-axis live UAT 4/4 PASS** (2026-06-26): Axis 1 cross-provider D-01 fidelity · Axis 2 multi-tool pin durability (surfaced+fixed render bugs BUG-260626-01/-04 — shared `dedupMessagesByRunId` helper, `2a48fea4`/`6ec8be77`, verified live) · Axis 3 parallel-thread isolation (3-run Redis snapshot, no pin leak) · Axis 4 long-message pin + honest `_TRIM_MARKER` eviction (forced real 8000-tok overflow). `123-VERIFICATION.md` flipped `human_needed` → `passed`; `123-HUMAN-UAT.md` status passed (4/4). **Deferred (NOT 123 blockers):** BUG-260626-02 (Phase-120 baseline leak into live final-emit) + BUG-260626-03 (run-end todo finalizer) → **SEED-094** (backend run-end honesty). Follow-up candidate: LangSmith not emitting since 2026-06-20 (raw-SDK `wrap_openai` path). **Next: Phase 124 (Workflow Studio UX) — G-2 sketch-gated; run `/gsd:sketch 124`.**
