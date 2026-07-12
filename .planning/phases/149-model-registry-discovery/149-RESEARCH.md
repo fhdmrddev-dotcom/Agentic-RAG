@@ -392,22 +392,27 @@ async def set_model_capability(model_id: str, patch: dict, request: Request,
 
 **Note:** A2 is the only assumption that could change what discovery auto-fills. It is conservative in the safe direction (treating Anthropic as IDs-only can only *under*-fill, never violate SC#3). Verify with a live `curate_models.py` run during planning.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> RESOLVED in planning — all three recommendations were adopted (see the inline RESOLVED notes below).
 
 1. **Lock storage shape (Claude's discretion)**
    - What we know: Lock pins the org default (writes `app_settings.llm_model`) + marks policy "locked"; at most one lock; must survive the v3.4 per-user layer (D-149-07).
    - What's unclear: Where the "locked" policy flag lives — a new `app_settings` column (`llm_model_locked boolean`) vs a small JSONB policy blob.
    - Recommendation: A single `llm_model_locked boolean` column beside `llm_model` is the least-surprise, forward-compatible choice (the v3.4 per-user layer reads it to block user override). Decide in planning; it's a 1-column addition to mig 099.
+   - RESOLVED: adopted — single `llm_model_locked boolean` column on `app_settings`, mig 099 (Plan 149-01).
 
 2. **Enabled-enforcement seam on the request path (Claude's discretion)**
    - What we know: Must live at the ONE shared model-resolution spot (never per provider); fallback to org default + inline notice (D-149-10).
    - What's unclear: The exact function in `threads.py` that resolves the effective model, and whether an existing SSE event shape fits the notice.
    - Recommendation: Locate the single resolution point where `effective_model` is computed (near openai_service.py:1508 / the threads.py model-resolve seam), enforce enabled there, and reuse an existing informational SSE event (the same channel used for `scope_violation`-style notices) rather than inventing a new event. Planner should grep `effective_model` + the SSE emitter to pin it.
+   - RESOLVED: enforced at the threads.py resolution seam, reusing the existing informational SSE event (Plan 149-06 Task 3).
 
 3. **Does the clamp fix require making `_resolve_max_tokens` async?**
    - What we know: It's currently sync and reads the static dict; the DB overlay is async (`_load_model_overrides`).
    - What's unclear: Whether to thread a pre-resolved DB cap into the sync function or make the resolution async.
    - Recommendation: Pass a pre-resolved `max_output_tokens` cap (already fetched via the async capability read on the request path) INTO `_resolve_max_tokens`, keeping it sync — avoids an await deep in the hot path. Confirm during D-149-15 tracing.
+   - RESOLVED: pre-resolved `max_output_tokens` cap threaded into the sync `_resolve_max_tokens` — kept sync, no await in the hot path (Plan 149-03).
 
 ## Environment Availability
 
