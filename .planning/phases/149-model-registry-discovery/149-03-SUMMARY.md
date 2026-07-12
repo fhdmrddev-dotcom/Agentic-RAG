@@ -138,3 +138,7 @@ None - no external service configuration required (no schema, no env, no provide
 ---
 *Phase: 149-model-registry-discovery*
 *Completed: 2026-07-12*
+
+## Self-Check: PASSED
+
+All created/modified files present on disk; all four plan commits (`463d2a63`, `dd31ef51`, `2c59ae59`, `0fceb155`) reachable in git history.
