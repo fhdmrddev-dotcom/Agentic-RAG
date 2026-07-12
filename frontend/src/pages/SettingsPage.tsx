@@ -576,6 +576,10 @@ export function SettingsPage() {
   // Used by ModelPillRow + selected-label badge to flag unregistered models.
   const [verifiedModels, setVerifiedModels] = useState<Set<string>>(new Set())
   const [inferredProviderFor, setInferredProviderFor] = useState<Record<string, string>>({})
+  // Phase 149 (D-149-05): model_ids flagged `deprecated` in the registry. Plan 05
+  // supplies `deprecated_models` in the settings payload; the picker lights up the
+  // `deprecated` badge for these. Defensive default (absent → empty set → no badge).
+  const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
 
   const hydrate = (data: FullAppSettings) => {
     setS(data)
@@ -632,6 +636,8 @@ export function SettingsPage() {
     // the fields doesn't crash the frontend; the badge simply won't render.
     setVerifiedModels(new Set(data.verified_models ?? []))
     setInferredProviderFor(data.inferred_provider_for ?? {})
+    // Phase 149 (D-149-05): seed the deprecated set defensively (Plan 05 payload).
+    setDeprecatedModels(new Set(data.deprecated_models ?? []))
   }
 
   useEffect(() => {
@@ -907,6 +913,8 @@ export function SettingsPage() {
                       llmModel={llmModel}
                       verifiedModels={verifiedModels}
                       inferredProviderFor={inferredProviderFor}
+                      deprecatedModels={deprecatedModels}
+                      providerId={activeProvider}
                       onSelect={setLlmModel}
                     />
                   </div>

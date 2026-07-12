@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
+import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 
 interface Provider {
@@ -33,6 +34,10 @@ interface Props {
   models?: string[]
   selectedModel?: string
   onModelChange?: (model: string) => void
+  /** Phase 149 (D-149-05): model_ids flagged `deprecated` in the registry. Members
+   *  render an informational `deprecated` badge but stay selectable. Optional —
+   *  absent → empty set → no badge (defensive; lights up once wired to the payload). */
+  deprecatedModels?: Set<string>
   agentMode?: "default" | "explorer"
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
@@ -76,6 +81,7 @@ export function MessageInput({
   models = [],
   selectedModel,
   onModelChange,
+  deprecatedModels,
   agentMode = "default",
   onAgentModeChange,
   prefillMessage,
@@ -245,34 +251,42 @@ export function MessageInput({
                   <DropdownMenuContent align="start" side="top" className="min-w-[200px] mb-1">
                     {models.map((m) => {
                       const info = MODEL_INFO[m]
+                      const isDeprecated = deprecatedModels?.has(m) ?? false
+                      // Phase 149 (D-149-17): the provider logo per row (single-source
+                      // @lobehub mark, Cpu fallback) + the capability info DEMOTED to a
+                      // hover tooltip so the model name stays primary (the operator's
+                      // "context info makes it not very good" cleanup — visual-only).
+                      const ModelMark = providerLogo(selectedProvider)
+                      const capTooltip = info
+                        ? `${(info.contextWindow / 1000).toFixed(0)}k context · ${info.maxOutputTokens.toLocaleString()} output · ${info.bestFor} · Cost tier: ${info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}`
+                        : undefined
                       return (
                         <DropdownMenuItem
                           key={m}
                           onSelect={() => onModelChange!(m)}
+                          title={capTooltip}
                           className={cn(
-                            "text-xs cursor-pointer items-start gap-2 py-2",
+                            "text-xs cursor-pointer items-center gap-2 py-1.5",
                             m === selectedModel && "font-medium bg-accent",
                           )}
                         >
-                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
-                          <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>{m}</span>
-                              {m === selectedModel && (
-                                <span className="text-[10px] text-primary font-semibold">active</span>
-                              )}
-                            </div>
-                            {info && (
-                              <>
-                                <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
-                                  {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground/50 font-normal">
-                                  <span className="font-medium">Cost tier:</span> {info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}
-                                </span>
-                              </>
-                            )}
-                          </div>
+                          {ModelMark ? (
+                            <ModelMark size={13} />
+                          ) : (
+                            <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate">{m}</span>
+                          {isDeprecated && (
+                            <span
+                              className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border shrink-0"
+                              title="This model is deprecated. It still works, but consider moving to a newer model."
+                            >
+                              deprecated
+                            </span>
+                          )}
+                          {m === selectedModel && (
+                            <span className="text-[10px] text-primary font-semibold shrink-0">active</span>
+                          )}
                         </DropdownMenuItem>
                       )
                     })}
