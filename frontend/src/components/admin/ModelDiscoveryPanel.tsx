@@ -460,8 +460,22 @@ function NewModelRow({
   onDraft: (field: string, value: string) => void
 }) {
   const id = model.model_id
-  const anyUnknown = Object.values(model.capabilities).some(isUnknown)
-  const returnedFull = !anyUnknown
+  const capValues = Object.values(model.capabilities)
+  const anyUnknown = capValues.some(isUnknown)
+  // SC#3 / D-149-13: derive the provenance suffix from the ACTUAL per-field returned-vs-unknown
+  // counts, not the binary `!anyUnknown`. The old all-or-nothing basis lied whenever a provider
+  // returned SOME (not all) fields — e.g. a Google model returns its token limits but never
+  // native_tools, so the card read "returned IDs only" while the google provider run card
+  // correctly read "capabilities ✓". Three-way: full ✓ / IDs only / a truthful partial label
+  // (never claim "IDs only" when any field returned, nor "full ✓" when any field is unknown).
+  const returnedCount = capValues.filter((v) => !isUnknown(v)).length
+  const totalCount = capValues.length
+  const provenanceLabel =
+    returnedCount === totalCount
+      ? "returned full capabilities ✓"
+      : returnedCount === 0
+        ? "returned IDs only"
+        : "returned some capabilities"
 
   return (
     <div
@@ -475,7 +489,7 @@ function NewModelRow({
         <AcceptCheck checked={accepted} label={`Accept ${id}`} onToggle={onToggleAccept} />
         <span className="font-mono text-sm text-foreground">{id}</span>
         <span className="text-xs text-muted-foreground">
-          · {model.provider} · {returnedFull ? "returned full capabilities ✓" : "returned IDs only"}
+          · {model.provider} · {provenanceLabel}
         </span>
       </div>
 

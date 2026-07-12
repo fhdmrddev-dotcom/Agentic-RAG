@@ -126,3 +126,94 @@ describe("ModelDiscoveryPanel (071-A) — SC#3 propose-only hero", () => {
     )
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SC#3 / D-149-13 (Test-9 COSMETIC) — the per-model provenance suffix must be
+// derived from ACTUAL per-field provenance, never the binary `!anyUnknown`. The old
+// all-or-nothing basis lied whenever a provider returned SOME (not all) fields: a
+// Google model whose token limits ARE returned (green) but whose native_tools is
+// "unknown — you set it" read "returned IDs only" while the google provider run card
+// correctly read "capabilities ✓". These lock the three states so the card can never
+// again contradict the provider card + the green per-field fills.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Run discovery against a caller-supplied diff (the shared RESULT is fixed at 2 new
+ *  models; these state tests need one-model-at-a-time control of the provenance mix). */
+async function runWith(result: DiscoveryResult) {
+  const user = userEvent.setup()
+  const onRun = vi.fn().mockResolvedValue(result)
+  const onConfirm = vi.fn().mockResolvedValue(undefined)
+  const view = render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={onConfirm} />)
+  await user.click(screen.getByRole("button", { name: /run discovery/i }))
+  await screen.findByText(/propose-only/i)
+  return { user, ...view }
+}
+
+describe("ModelDiscoveryPanel (071-A) — SC#3 truthful per-model provenance suffix", () => {
+  it("test_partial_provenance_not_ids_only — a partial Google model never reads 'returned IDs only'", async () => {
+    const { container } = await runWith({
+      new: [
+        {
+          provider: "google",
+          model_id: "gemini-3-pro",
+          enabled: false,
+          // token limits RETURNED (green), native_tools NOT returned (amber) — the mixed case.
+          capabilities: { context: 2000000, max_output: 64000, native_tools: DISCOVERY_UNKNOWN },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "google", status: "ok", ok: true }],
+    })
+
+    const row = container.querySelector<HTMLElement>('[data-new-model="gemini-3-pro"]')!
+    // The lie is gone — the card no longer claims "IDs only" when a field WAS returned…
+    expect(within(row).queryByText(/returned IDs only/i)).toBeNull()
+    // …nor "full ✓" while native_tools is still unknown.
+    expect(within(row).queryByText(/returned full capabilities/i)).toBeNull()
+  })
+
+  it("test_full_provenance_reads_full — every field returned → 'returned full capabilities ✓'", async () => {
+    const { container } = await runWith({
+      new: [
+        {
+          provider: "openrouter",
+          model_id: "z-ai/glm-6",
+          enabled: false,
+          capabilities: { context: 200000, max_output: 32000, native_tools: true },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "openrouter", status: "ok", ok: true }],
+    })
+
+    const row = container.querySelector<HTMLElement>('[data-new-model="z-ai/glm-6"]')!
+    expect(within(row).getByText(/returned full capabilities/i)).toBeInTheDocument()
+    expect(within(row).queryByText(/returned IDs only/i)).toBeNull()
+  })
+
+  it("test_zero_provenance_reads_ids_only — no field returned → 'returned IDs only'", async () => {
+    const { container } = await runWith({
+      new: [
+        {
+          provider: "openai",
+          model_id: "gpt-5.6-nova",
+          enabled: false,
+          capabilities: {
+            context: DISCOVERY_UNKNOWN,
+            max_output: DISCOVERY_UNKNOWN,
+            native_tools: DISCOVERY_UNKNOWN,
+          },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "openai", status: "ok", ok: true }],
+    })
+
+    const row = container.querySelector<HTMLElement>('[data-new-model="gpt-5.6-nova"]')!
+    expect(within(row).getByText(/returned IDs only/i)).toBeInTheDocument()
+    expect(within(row).queryByText(/returned full capabilities/i)).toBeNull()
+  })
+})
