@@ -104,6 +104,11 @@ class FullSettingsResponse(BaseModel):
     # without mirroring the inference table client-side — RESEARCH.md §6
     # Approach b, zero-drift over Approach a's 5-pattern client mirror).
     inferred_provider_for: dict[str, str]
+    # Phase 149 (MODEL-01 / D-149-05): the enabled models an operator has flagged
+    # deprecated (model_capabilities_overrides.deprecated). The picker reads this to
+    # light the informational "deprecated" badge — deprecated ≠ disabled, the model
+    # stays selectable (only `enabled` controls availability). Sorted for stable diffs.
+    deprecated_models: list[str]
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -177,6 +182,12 @@ async def _build_response(s=None) -> FullSettingsResponse:
     # publish judge. Function-local import keeps the harness validators registry off the
     # settings module-load path; NEVER introduce a second resolver (T-137.1-J2).
     from app.services.harness.validator_kinds import resolve_judge_model
+    # Phase 149 (MODEL-01 / D-149-05) — the enabled deprecated models for the picker badge.
+    # Reads the enabled-only hot cache (deprecated ≠ disabled — a deprecated model stays
+    # enabled); _load_model_overrides never raises (returns the stale/empty cache on a blip).
+    from app.models.user_settings import _load_model_overrides
+    _overrides = await _load_model_overrides()
+    deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -250,6 +261,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
             for m in p.models
             if m and m not in MODEL_CAPABILITIES
         },
+        # Phase 149 (MODEL-01 / D-149-05) — enabled deprecated models for the badge.
+        deprecated_models=deprecated_models,
     )
 
 

@@ -327,6 +327,15 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
 _model_overrides_cache: dict[str, dict] = {}
 _model_overrides_cache_time: float = 0.0
 
+# ── All-rows model overrides cache (Phase 149 MODEL-01 / Pitfall 1) ─────────────
+# SEPARATE from the enabled-only hot cache above. The registry editor AND the
+# picker's disabled-filter must SEE disabled rows (an operator has to be able to
+# re-enable what they disabled — Pitfall 1), so this reads ALL rows with NO `enabled`
+# filter. Its own 30s TTL; the hot cache (_model_overrides_cache) is left untouched so
+# the request hot path still reads only enabled rows.
+_all_model_overrides_cache: dict[str, dict] = {}
+_all_model_overrides_cache_time: float = 0.0
+
 
 async def _load_model_overrides() -> dict[str, dict]:
     """Return enabled model_capabilities_overrides rows as {model_id: row_dict}.
@@ -357,9 +366,47 @@ async def _load_model_overrides() -> dict[str, dict]:
 
 
 def invalidate_model_overrides_cache() -> None:
-    """Zero out model overrides cache timestamp (D-07 pattern)."""
-    global _model_overrides_cache_time
+    """Zero out BOTH the enabled-only hot cache AND the all-rows registry cache
+    timestamps (D-07 pattern), so the next read of either re-hits the DB.
+
+    Called on EVERY model-capability write (Phase 149 MODEL-01) so an edit is visible
+    on the next request (SC#1) — both the request hot path (_load_model_overrides) and
+    the operator registry read (load_all_model_overrides) refresh together.
+    """
+    global _model_overrides_cache_time, _all_model_overrides_cache_time
     _model_overrides_cache_time = 0.0
+    _all_model_overrides_cache_time = 0.0
+
+
+async def load_all_model_overrides() -> dict[str, dict]:
+    """Return ALL model_capabilities_overrides rows (enabled AND disabled) as
+    ``{model_id: row_dict}`` — Phase 149 MODEL-01 (D-149-03 / D-149-08 / Pitfall 1).
+
+    Separate 30s-TTL cache from the enabled-only hot cache (_load_model_overrides): the
+    registry editor needs to see disabled rows to re-enable them, and _build_providers
+    needs the disabled-id set to hide disabled models from the picker. NO `enabled`
+    filter — this is the ONLY read that surfaces disabled rows. Never raises (mirrors
+    _load_model_overrides): a DB blip returns the stale/empty cache.
+    """
+    global _all_model_overrides_cache, _all_model_overrides_cache_time
+    now = _time.time()
+    if _all_model_overrides_cache and (now - _all_model_overrides_cache_time) < _SETTINGS_CACHE_TTL:
+        return _all_model_overrides_cache
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        rows = await pool.fetch("SELECT * FROM model_capabilities_overrides")
+        _all_model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
+    except Exception:
+        logger.warning(
+            "load_all_model_overrides: DB read failed; returning stale/empty cache",
+            exc_info=True,
+        )
+        if not _all_model_overrides_cache:
+            _all_model_overrides_cache = {}
+    _all_model_overrides_cache_time = _time.time()
+    return _all_model_overrides_cache
 
 
 # ── Row-to-value helpers ─────────────────────────────────────────────────────
@@ -420,6 +467,17 @@ def _build_providers(row: dict) -> list[LLMProvider]:
             _raw_pml = {}
     db_model_lists: dict[str, list[str]] = _raw_pml if isinstance(_raw_pml, dict) else {}
 
+    # Phase 149 (MODEL-01 / D-149-08): the operator-disabled model-id set. The all-rows
+    # cache (load_all_model_overrides, warmed by the async caller before this sync fn runs)
+    # is the ONLY place a disabled row is visible — the enabled-only hot cache omits them
+    # by construction (Pitfall 1). A row PRESENT with enabled=False is disabled; an absent
+    # override is not. Applied across BOTH unfiltered merge branches below so a disabled
+    # model disappears from the picker regardless of which branch surfaced it.
+    disabled_ids = {
+        mid for mid, cap in _all_model_overrides_cache.items()
+        if cap.get("enabled") is False
+    }
+
     providers: list[LLMProvider] = []
     for pid, meta in KNOWN_PROVIDERS.items():
         key_field = f"{pid}_api_key"
@@ -446,13 +504,23 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         )
         models.extend(db_registered)
 
-        # Merge static registry models -- append any not already present
+        # Merge static registry models -- append any not already present.
+        # D-149-08: exclude a static model whose override is disabled (the :449-455
+        # static-registry merge — a disabled gpt-4o must not surface here).
         existing_set = set(models)
         registry = sorted(
             m for m, cap in MODEL_CAPABILITIES.items()
-            if cap.get("provider") == pid and m not in existing_set
+            if cap.get("provider") == pid and m not in existing_set and m not in disabled_ids
         )
         models.extend(registry)
+
+        # D-149-08: apply the SAME disabled-set filter to the WHOLE assembled list so a
+        # disabled model cannot leak back in via the legacy db_model_lists / env-CSV branch
+        # (:431-438, sourced from app_settings.provider_model_lists JSONB) for legacy-migrated
+        # accounts. One condition covers db_model_lists + env-CSV uniformly; the db_registered
+        # branch (:443-447) is already enabled-only.
+        if disabled_ids:
+            models = [m for m in models if m not in disabled_ids]
 
         if pid == "ollama":
             base_url = f"{ollama_base}/v1"
@@ -634,6 +702,10 @@ def load_app_settings() -> UserEffectiveSettings:
 async def load_app_settings_async() -> UserEffectiveSettings:
     """Async settings read. Refreshes cache from DB if TTL expired."""
     row = await _load_settings_from_db()
+    # Phase 149 (MODEL-01 / D-149-08): warm the all-rows override cache BEFORE the sync
+    # _build_providers runs so it can see disabled rows and hide them from the picker
+    # (Pitfall 1 — the enabled-only hot cache cannot surface a disabled model). Non-raising.
+    await load_all_model_overrides()
     return _build_settings_from_row(row)
 
 
