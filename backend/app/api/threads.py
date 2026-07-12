@@ -241,6 +241,27 @@ async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple
     return resolved_model, None
 
 
+async def _reresolve_fallback_provider(effective_model: str, current_provider: str) -> str:
+    """Phase 149 Plan 09 (D-149-10 bookkeeping honesty) — after a disabled-model fallback,
+    re-resolve the RECORDED provider from the EFFECTIVE (fallback) model's capability so
+    ``runs.provider`` matches the model that actually served the run.
+
+    The send_message provider-resolution block leaves ``_resolved_provider`` as the
+    PRE-fallback value on a fallback (the ``body.provider`` branch and the non-registry
+    ``else`` branch both keep the original ``active_provider``) — a MiniMax-served fallback
+    would otherwise record ``provider='anthropic'`` (the UAT Test-7 wart). This returns the
+    effective model's provider when it is a real (non-``"unknown"``) value, else the current
+    provider UNCHANGED — a garbage / absent capability never yanks the recorded provider.
+    Reads through the same cached ``get_model_capability_async`` the handler already calls
+    (no new per-request DB read on a warm cache); routing itself is unchanged.
+    """
+    capability = await get_model_capability_async(effective_model) or {}
+    provider = capability.get("provider", "unknown")
+    if provider and provider != "unknown":
+        return provider
+    return current_provider
+
+
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
 # SYSTEM_PROMPT, TOOL_USAGE_INSTRUCTIONS, _format_tool_list, CONFIDENCE_DISCLAIMER,
 # _compute_confidence, _deduplicate_citations MOVED verbatim to
@@ -1182,6 +1203,26 @@ async def send_message(
             _user_settings = override_provider(_user_settings, _resolved_provider)
         else:
             _resolved_provider = _user_settings.active_provider
+
+    # Phase 149 Plan 09 (D-149-10 bookkeeping honesty) — when a disabled-model fallback
+    # fired, _resolved_model is now the org-default fallback but _resolved_provider may still
+    # hold the PRE-fallback provider (both the body.provider branch and the non-registry else
+    # above leave it as the original active_provider). Re-resolve the provider from the
+    # EFFECTIVE fallback model so register_run_start records who actually served the run (a
+    # MiniMax-served fallback records "minimax", not the stale "anthropic"). Minimal additive
+    # guard at the existing seam (threads.py is a G-5 hot file — no refactor, no per-provider
+    # fork, routing unchanged); for the no-fallback case _model_fallback_notice is falsy → a
+    # no-op and the shared path stays byte-identical (D-14).
+    if _model_fallback_notice:
+        _fallback_provider = await _reresolve_fallback_provider(
+            _resolved_model, _resolved_provider
+        )
+        if _fallback_provider != _resolved_provider:
+            _resolved_provider = _fallback_provider
+            # Align _user_settings so any downstream reader (agent_runner SDK selection)
+            # stays consistent with the recorded provider — same canonical mutation path
+            # the registry branch uses.
+            _user_settings = override_provider(_user_settings, _resolved_provider)
 
     try:
         # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
