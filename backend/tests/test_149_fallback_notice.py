@@ -55,6 +55,31 @@ async def test_disabled_model_falls_back_and_names_both(monkeypatch):
     assert "claude-opus-4-8" in notice["message"]
 
 
+async def test_dead_default_surfaces_honest_notice_and_logs(monkeypatch, caplog):
+    """WR-03/WR-04 defense-in-depth: if the org default is ITSELF disabled (a dead default
+    that slipped past the Plan-06 write-side guards under multi-worker cache staleness), the
+    fallback still returns an HONEST notice — never a silent route to a disabled model — and
+    the re-verify logs the anomaly."""
+    monkeypatch.setattr(
+        threads_mod, "load_all_model_overrides",
+        AsyncMock(return_value={
+            "gpt-4o": {"enabled": False},
+            "claude-opus-4-8": {"enabled": False},  # the org default is a DEAD default
+        }),
+    )
+
+    with caplog.at_level("WARNING"):
+        effective, notice = await _resolve_enabled_model("gpt-4o", "claude-opus-4-8")
+
+    # The fallback still fires an honest notice (never a silent None) even though the org
+    # default is itself disabled — we never silently serve a disabled model.
+    assert notice is not None
+    assert notice["disabled_model"] == "gpt-4o"
+    assert notice["fallback_model"] == "claude-opus-4-8"
+    # The dead-default anomaly is logged (the re-verify path executed).
+    assert any("dead default" in r.getMessage().lower() for r in caplog.records)
+
+
 async def test_enabled_model_no_fallback_no_notice(monkeypatch):
     """An enabled override → NO fallback, NO notice (shared path unchanged)."""
     monkeypatch.setattr(

@@ -217,7 +217,7 @@ async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple
         return resolved_model, None
     is_disabled = (overrides.get(resolved_model) or {}).get("enabled") is False
     if is_disabled and org_default and org_default != resolved_model:
-        return org_default, {
+        notice = {
             "disabled_model": resolved_model,
             "fallback_model": org_default,
             "message": (
@@ -225,6 +225,19 @@ async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple
                 f"this reply used {org_default}."
             ),
         }
+        # WR-03/WR-04 defense-in-depth: re-verify the fallback target (the org default) is
+        # itself ENABLED. The Plan-06 write-side guards keep the org default enabled, but a
+        # multi-worker 30s-cache-staleness window could leave a DEAD default. If the org
+        # default is ALSO disabled we KEEP the honest notice (never a silent route to a
+        # disabled model) and log the anomaly — we do not pretend the fallback is a clean route.
+        if (overrides.get(org_default) or {}).get("enabled") is False:
+            logger.warning(
+                "_resolve_enabled_model: org default %r is itself disabled — a dead default "
+                "(WR-03 multi-worker window); surfacing the honest fallback notice, not a "
+                "silent route to a disabled model.",
+                org_default,
+            )
+        return org_default, notice
     return resolved_model, None
 
 

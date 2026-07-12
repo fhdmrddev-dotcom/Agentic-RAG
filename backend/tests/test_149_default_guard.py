@@ -86,6 +86,56 @@ async def test_disable_org_default_409_no_write(monkeypatch):
     assert not pool.calls, "the disable guard must 409 BEFORE any capability write"
 
 
+async def test_disable_guard_forces_fresh_settings_read(monkeypatch):
+    """WR-03: the disable guard invalidates the settings cache BEFORE reading the org
+    default, so a STALE per-worker cache can't let a disable of the true default slip past
+    (no cross-worker dead default). Assert the fresh-read ordering: invalidate THEN load."""
+    pool = _RecordingPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+
+    order: list[str] = []
+
+    def _fake_invalidate():
+        order.append("invalidate")
+
+    async def _fake_load():
+        order.append("load")
+        return {"llm_model": "gpt-4o", "llm_model_locked": False}
+
+    monkeypatch.setattr("app.models.user_settings.invalidate_settings_cache", _fake_invalidate)
+    monkeypatch.setattr("app.models.user_settings._load_settings_from_db", _fake_load)
+
+    with pytest.raises(HTTPException) as ei:
+        await set_model_capability("gpt-4o", {"enabled": False}, _fake_request(), _floor=None)
+    assert ei.value.status_code == 409, "gpt-4o is the org default → refused"
+    assert order == ["invalidate", "load"], "the guard must invalidate the cache BEFORE reading"
+    assert not pool.calls
+
+
+async def test_lock_guard_forces_fresh_override_read(monkeypatch):
+    """WR-03: the lock guard invalidates the all-rows override cache BEFORE reading the
+    target's enabled state, so a STALE cache can't let a lock pin a just-disabled model."""
+    order: list[str] = []
+
+    def _fake_invalidate():
+        order.append("invalidate")
+
+    async def _fake_load():
+        order.append("load")
+        return {"gpt-4o": {"enabled": False}}
+
+    monkeypatch.setattr("app.models.user_settings.invalidate_model_overrides_cache", _fake_invalidate)
+    monkeypatch.setattr("app.models.user_settings.load_all_model_overrides", _fake_load)
+    fake_save = AsyncMock(return_value=True)
+    monkeypatch.setattr(admin_mod, "save_app_settings", fake_save)
+
+    with pytest.raises(HTTPException) as ei:
+        await set_model_lock("gpt-4o", ModelLockUpdate(locked=True), _fake_request("PUT"), _floor=None)
+    assert ei.value.status_code == 409
+    assert order == ["invalidate", "load"], "the lock guard must invalidate the cache BEFORE reading"
+    fake_save.assert_not_awaited()
+
+
 async def test_disable_locked_model_409_unlock_first(monkeypatch):
     """Disabling the LOCKED model → 409 telling the operator to unlock first, no write."""
     pool = _RecordingPool()

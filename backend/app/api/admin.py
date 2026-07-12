@@ -1118,8 +1118,17 @@ async def set_model_capability(
     # reversible flip. The lock-path half of this guard lives in set_model_lock (refusing to
     # LOCK a disabled model) — the two together guarantee no dead default can ever exist.
     if body.get("enabled") is False:
-        from app.models.user_settings import _load_settings_from_db  # function-local (Pitfall 4)
+        from app.models.user_settings import (  # function-local (Pitfall 4)
+            _load_settings_from_db,
+            invalidate_settings_cache,
+        )
 
+        # WR-03: force a FRESH settings read (the cross-worker source of truth). The
+        # per-worker 30s-TTL settings cache can hold a STALE org default written by another
+        # worker (save_app_settings only invalidates the LOCAL worker's cache), which would
+        # let a disable of the TRUE org default slip past this guard and create a dead
+        # default. Zeroing the cache timestamp first guarantees the guard reads the live DB.
+        invalidate_settings_cache()
         _s = await _load_settings_from_db()
         _org_default = _s.get("llm_model") or ""
         _is_locked = bool(_s.get("llm_model_locked"))
@@ -1229,11 +1238,18 @@ async def set_model_lock(
     (never a false 204 — mirrors set_flag's honest-failure path). Non-operators are 404'd by
     the router gate; a failed persist re-enters the floor's yield so no false receipt is written.
     """
-    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    from app.models.user_settings import (  # function-local (Pitfall 4)
+        invalidate_model_overrides_cache,
+        load_all_model_overrides,
+    )
 
     if body.locked:
         # D-149-09 (lock path): never pin a DISABLED model as the org default. Refuse 409
         # BEFORE any write — no hidden auto-enable side effect (honest consequence).
+        # WR-03: force a FRESH all-rows override read (the cross-worker source of truth) so
+        # the disabled-check can't pass on a STALE per-worker cache — another worker may have
+        # just disabled this model, and a lock on a stale-enabled read would pin a dead default.
+        invalidate_model_overrides_cache()
         overrides = await load_all_model_overrides()
         if (overrides.get(model_id) or {}).get("enabled") is False:
             raise HTTPException(
