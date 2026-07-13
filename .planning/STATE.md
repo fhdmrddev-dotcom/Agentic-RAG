@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T20:17:21.314Z"
-last_activity: 2026-07-13 -- Phase 151 planning complete
+last_updated: "2026-07-13T20:47:51.000Z"
+last_activity: 2026-07-13
 progress:
   total_phases: 26
   completed_phases: 5
   total_plans: 45
-  completed_plans: 41
+  completed_plans: 42
   percent: 19
 ---
 
@@ -22,14 +22,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 151 — agent file tools
+**Current focus:** Phase 151 — agent-file-tools
 
 ## Current Position
 
-Phase: 151
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-13 -- Phase 151 planning complete
+Phase: 151 (agent-file-tools) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 151 (151-01 complete)
+Last activity: 2026-07-13 -- Phase 151 Plan 01 (FILE-02 fetch_document_file) executed
+
+**151-01 execution notes (2026-07-13) — FILE-02 fetch_document_file, backend-only, additive:**
+
+- 3/3 tasks, sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 TDD RED `9f17dcf8` (10 ImportError); Task 2 TDD GREEN `4ccdfdb3`; Task 3 registration/cross-provider `3a1a008e`.
+- **New tool `fetch_document_file` (FILE-02)** dual-wired through the flat `_TOOL_REGISTRY` G-5 contract + `get_tools()` (sandbox-gated) + `_CAPABILITY_FLAG_TOOLS["fetch_document_file"]=("sandbox_enabled","Document file fetch")`. `threads.py` untouched (G-5); `provider ==` count unchanged at 2 (D-14, no fork).
+- **Reusable resolver `_fetch_owned_document_bytes(ctx, document_id)`** in `tool_dispatcher.py` — owner→global scope (mirrors `read_path`, SELECTs storage cols), returns `(filename, bytes, mime)` on success / `{"error": ...}` on refusal. **This is the FILE-01 source #4 contract — Plan 151-04 imports THIS exact symbol.** Handler `_handle_fetch_document_file` clones the render_template copy-into-sandbox pattern (mkdir `/sandbox/input` + NamedTemporaryFile → `copy_to_runtime`), all blocking I/O `run_in_threadpool`-wrapped (D-v2.5-01). T-01: `os.path.basename` + workspace.py:184 charset scrub before `/sandbox/input/<safe>`.
+- **Honest-failure semantics proven (unit):** D-01 null file_path → "No original file" (never writes extracted text as a file); D-02 over-cap → honest MB error with `storage.download` NOT called (PRE-download gate, no partial binary); D-04/SC#4 non-owner → owner+global empty → "not found or access denied".
+- **D-02 cap = `config.Settings.fetch_document_file_max_mb`** (env `FETCH_DOCUMENT_FILE_MAX_MB`, default 50) — env-backed to avoid a 2nd migration this phase (plan D-02 discretion; SEED-117 tracks the later app_settings consolidation).
+- **Gates:** `pytest tests/unit/test_151_*.py` → 17/17 green; schema anyOf/oneOf-free; Google + Anthropic translation backstop green (SC#10 static).
+- **DEFERRED to Plan 151-04 (per plan Task 3 + RESEARCH):** the 3 stale exact-count assertions — `test_tool_dispatcher.py:68` now `28!=27` (FILE-02 +1; NOT in 151-01 scope), `test_085` base `24!=22` (ALREADY pre-existing rot from 115/116/147). Plan 04 finalizes to the +2 total once FILE-01 lands.
+- **FILE-02 requirement NOT marked complete** (false-green avoidance, 148/149/150 convention) — closes at verify-work/secure-phase after live SC#10 4-axis UAT (authored in 151-VALIDATION.md). SDK quirks (unchanged from 150): `advance-plan` bumped frontmatter completed_plans 41→42 + Current Plan → 2; `update-progress`/`record-session`/`record-metric` = "field not found" (STATE uses frontmatter progress block) → Current Position hand-updated; `roadmap.update-plan-progress 151` reported summary_count 1 but LEFT the progress-table row `0/? | Not started` stale → hand-fixed to `1/4 | Executing`.
 
 **150-05 execution notes (2026-07-13) — Control Plane secrets_encryption signal (D-150-02), the phase's only frontend touch:**
 

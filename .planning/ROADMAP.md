@@ -254,7 +254,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 151-01-PLAN.md — FILE-02 `fetch_document_file` (KB→sandbox READ tool, sandbox-gated, reusable owner-scope resolver, own T-01 threat model)
+- [x] 151-01-PLAN.md — FILE-02 `fetch_document_file` (KB→sandbox READ tool, sandbox-gated, reusable owner-scope resolver, own T-01 threat model)
 - [ ] 151-02-PLAN.md — D-10 migration: `skill_files(skill_id, filename)` unique index (author + BLOCKING operator apply, enables D-07 upsert)
 - [ ] 151-03-PLAN.md — SC#3 upload allowlist widen: `validate_upload` + lockstep `TemplateUpload.tsx` accept= (D-09)
 
@@ -375,7 +375,7 @@ Plans:
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
-| 151. Agent File Tools | 0/? | Not started | - |
+| 151. Agent File Tools | 1/4 | Executing | - |
 | 152. Workflow Run Inputs | 0/? | Not started | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
