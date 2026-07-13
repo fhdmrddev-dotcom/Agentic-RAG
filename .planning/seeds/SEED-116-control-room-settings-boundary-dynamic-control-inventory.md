@@ -5,7 +5,7 @@ planted: 2026-07-12
 status: resolved
 resolved: 2026-07-12
 resolved_by: ".planning/notes/settings-control-room-boundary.md (/gsd:explore session, operator-affirmed)"
-related_seeds: [SEED-115, SEED-112, SEED-113]
+related_seeds: [SEED-115, SEED-112, SEED-113, SEED-117]
 related_memory: [project_admin_panel_plan, project_dynamic_settings_direction, project_settings_design_guidance, project_target_scale]
 re_open_trigger: "Before or at the start of Phase 149 (Model Registry & Discovery) — the first phase whose scope concretely straddles the Settings↔Control-Room line (a user picking a model vs an operator governing the registry). Resolve the boundary rule before 149 wires a model-management surface, so we don't build the split twice."
 ---

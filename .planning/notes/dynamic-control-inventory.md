@@ -130,5 +130,5 @@ shapes verified in 149 research (provider-docs-first).
 - **quick/backlog:** dead-knob cleanup (F3/I); F2 duplication consolidation.
 
 ## Related
-[[settings-control-room-boundary]] (the RULE) · SEED-116 (resolved) · SEED-113 (profile menu) ·
+[[settings-control-room-boundary]] (the RULE) · SEED-116 (resolved) · **SEED-117 (v3.4 config-consolidation — the milestone that executes the ➡️MOVE / 🔴GAP rows deferred out of v3.3)** · SEED-113 (profile menu) ·
 SEED-115 (org-RBAC v3.4) · [[project_settings_control_room_boundary]] (memory).

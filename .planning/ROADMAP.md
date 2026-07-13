@@ -357,7 +357,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 146. Operator Foundation | 6/6 | Complete | 2026-07-11 |
-| 147. Operator Control Plane | 0/? | Not started | - |
+| 147. Operator Control Plane | 9/9 | Complete | 2026-07-11 |
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
