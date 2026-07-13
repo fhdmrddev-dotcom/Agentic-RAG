@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T17:35:17.438Z"
+last_updated: "2026-07-13T17:45:45.482Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 26
   completed_phases: 4
   total_plans: 41
-  completed_plans: 38
+  completed_plans: 39
   percent: 15
 ---
 
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 150 (secrets-at-rest) — EXECUTING
-Plan: 3 of 5 (Plans 01-02 complete)
-Status: Executing Phase 150
-Last activity: 2026-07-13 -- Phase 150 Plan 02 complete (secret key columns migration)
+Plan: 4 of 5 (Plans 01-03 complete)
+Status: Ready to execute
+Last activity: 2026-07-13 -- Phase 150 Plan 03 complete (encrypt/decrypt settings seams)
+
+**150-03 execution notes (2026-07-13) — encrypt/decrypt settings seams, backend-only, additive:**
+
+- 3/3 tasks, sequential on the main tree (`use_worktrees=false`), no deviations. Tasks 1+2 TDD (RED assertion → GREEN in one feat commit each). Task 1 `7b77e686` (encrypt-on-write); Task 2 `36e463f5` (decrypt-on-read); Task 3 `3be966fd` (SC#1 integration proof).
+- **Encrypt-on-write in `save_app_settings`** (the ONE write seam) — inserted between the `clean` build / `_is_valid_api_key` sentinel guard and the parameterized UPDATE: `get_cipher()` once, then for each key `in SECRET_COLUMNS` that is a non-empty plaintext `str` and NOT already `is_encrypted`, replace with `encrypt_secret(...)`. No key => plaintext passthrough (D-150-01); already-`enc:v1:` skipped (no double-wrap); non-secret columns never touched (SECRET_COLUMNS allowlist = SQLi-safe posture, iterates code-owned names). `get_cipher()` left to propagate `ValueError` on a malformed key (D-150-04 fail-hard intent; Plan 04 validates at boot).
+- **Decrypt-on-read via new `_decrypt_secret_columns(row)`** called as the FIRST statement of `_build_settings_from_row` (the ONE read seam both sync + async loads funnel through). Decrypts `enc:v1:` SECRET_COLUMNS onto a `dict(row)` COPY → the 30s `_load_settings_from_db` cache keeps ciphertext (D-150-05 defense-in-depth). Classify STRICTLY by prefix (`is_encrypted`), never a blind decrypt (Pitfall 1). Undecryptable column (wrong/rotated-away key, tamper) → dropped to `None` → the EXISTING `_val` DB>env chain returns env with zero new code (D-150-04/05 fail-soft); log names the COLUMN only, never the value/token. No consumer (`_build_providers`/`_resolve_llm`/embedding/rerank/tavily) sees ciphertext.
+- **SC#1 proven end-to-end** (`tests/integration/test_150_ciphertext_at_rest.py`, live-PG-guarded, reuses the test_081_1 harness): a save through the real seam against the live local Postgres stores `enc:v1:` (raw SQL read, NOT via the decrypt seam), plaintext never appears at rest, and it decrypts back (D-150-07 round-trip meaning). Column restored afterward for repeatability.
+- **Gates:** `pytest tests/test_150_save_seam.py tests/test_150_read_seam.py tests/integration/test_150_ciphertext_at_rest.py` → 10/10 green (4 save + 5 read + 1 integration). Regression: `test_147_flag_failure_semantics` + `test_150_cipher` → 16/16 green. Source review: `from app.security.secret_cipher import` at both seams; `row = _decrypt_secret_columns(row)` is line 1 of `_build_settings_from_row`.
+- **SEC-01 stays OPEN** (false-green avoidance, 148/149 convention) — closes at verify-work/secure-phase after all 5 plans. Plan 04 (boot-time key validation + eager sweep + D-150-07 HTTP 500) and Plan 05 (Control Plane signal via `encryption_status()`) remain.
+- **SDK quirks (unchanged from 150-02):** `advance-plan` bumped frontmatter `completed_plans` 38→39 and Current Plan → 4; `roadmap.update-plan-progress 150` reported `summary_count: 3` but LEFT the ROADMAP progress-table row `1/5 | Executing` stale → hand-fixed to `3/5`.
 
 **150-02 execution notes (2026-07-13) — secret key columns migration, DB-only, additive:**
 
