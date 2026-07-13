@@ -45,7 +45,7 @@ created: 2026-07-13
 | Task ID | Plan | Wave | Requirement | Decision / SC | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|---------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 150-01-01 | 01 | 1 | SEC-01 | D-150-01 | T-150-P5 | env var + declared dep; no key material committed | smoke | `python -c "import app.config; from cryptography.fernet import MultiFernet"` | ❌ W0 | ⬜ pending |
-| 150-01-02 | 01 | 1 | SEC-01 | D-150-04/06 | T-150-02/05/06/SC | cipher round-trip, malformed→ValueError, rotation, idempotent sweep, status states | unit | `pytest tests/test_150_cipher.py -x` | ❌ W0 | ⬜ pending |
+| 150-01-02 | 01 | 1 | SEC-01 | D-150-04/06 | T-150-02/05/06/SC | cipher round-trip, malformed→ValueError, rotation, idempotent sweep, status states incl. honest lingering-plaintext (columns_plaintext) under an active key | unit | `pytest tests/test_150_cipher.py -x` | ❌ W0 | ⬜ pending |
 | 150-02-01 | 02 | 1 | SEC-01 | D-150-08 | T-150-07 | idempotent DDL adds 10 text columns | source | `grep -cE 'ADD COLUMN IF NOT EXISTS ..._api_key text' supabase/migrations/100_*.sql` == 10 | ❌ W0 | ⬜ pending |
 | 150-02-02 | 02 | 1 | SEC-01 | D-150-08 | T-150-04a | migration applied live; 12 secret columns exist as text | integration (psql) | psycopg2 12-column assertion (see plan) | ❌ W0 | ⬜ pending |
 | 150-03-01 | 03 | 2 | SEC-01 | SC#1 / D-150-01 | T-150-01/02 | encrypt-on-write enc:v1:; no-key passthrough; no double-wrap | unit | `pytest tests/test_150_save_seam.py -x` | ❌ W0 | ⬜ pending |
@@ -53,8 +53,8 @@ created: 2026-07-13
 | 150-03-03 | 03 | 2 | SEC-01 | SC#1 | T-150-01 | raw read shows enc:v1:, decrypts back | integration | `pytest tests/integration/test_150_ciphertext_at_rest.py -x` | ❌ W0 | ⬜ pending |
 | 150-04-01 | 04 | 2 | SEC-01 | D-150-07 / SC#2 | T-150-10 | failed save → HTTP 500 before audit/re-embed | unit (API) | `pytest tests/api/test_150_settings_error.py -x` | ❌ W0 | ⬜ pending |
 | 150-04-02 | 04 | 2 | SEC-01 | D-150-01/03/04/06 / SC#4 | T-150-05/06/09 | boot validation hard-fail/warn; idempotent sweep; fail-open | integration | `pytest tests/integration/test_150_sweep.py tests/integration/test_150_failopen.py -x` | ❌ W0 | ⬜ pending |
-| 150-05-01 | 05 | 2 | SEC-01 | D-150-02 | T-150-02b/03b | additive backpressure secrets_encryption over the RAW row; no crash | unit | `pytest tests/ -k backpressure -q` | ✅ (existing) | ⬜ pending |
-| 150-05-02 | 05 | 2 | SEC-01 | D-150-02 | T-150-11 | three-state tile; plaintext NEUTRAL not red; back-compat optional | build | `cd frontend && npx vite build` | ✅ (existing) | ⬜ pending |
+| 150-05-01 | 05 | 2 | SEC-01 | D-150-02 | T-150-02b/03b | additive backpressure secrets_encryption over the RAW row; three-state field directly asserted; no crash | unit | `pytest -k backpressure -q && pytest tests/test_150_backpressure_secrets.py -x -q` | ❌ W0 (new: test_150_backpressure_secrets.py) | ⬜ pending |
+| 150-05-02 | 05 | 2 | SEC-01 | D-150-02 | T-150-11 | three-state tile; plaintext NEUTRAL not red; error names unreadable/not-encrypted; back-compat optional | build | `cd frontend && npx vite build` | ✅ (existing) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -62,9 +62,10 @@ created: 2026-07-13
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/test_150_cipher.py` — cipher unit tests (roundtrip, malformed ValueError, rotation, no-key passthrough, sweep idempotence, encryption_status states).
+- [ ] `backend/tests/test_150_cipher.py` — cipher unit tests (roundtrip, malformed ValueError, rotation, no-key passthrough, sweep idempotence, encryption_status states incl. lingering-plaintext columns_plaintext under an active key).
 - [ ] `backend/tests/test_150_save_seam.py` — encrypt-on-write in save_app_settings (StubPool asserts the enc:v1: param).
 - [ ] `backend/tests/test_150_read_seam.py` — decrypt-on-read + fail-soft to env + precedence.
+- [ ] `backend/tests/test_150_backpressure_secrets.py` — focused proof that get_backpressure's payload carries the additive secrets_encryption three-state field (mirror the existing `-k backpressure` harness; stub probe_dependencies + monkeypatch the raw-row loader).
 - [ ] `backend/tests/api/test_150_settings_error.py` — D-150-07 HTTP 500 surfacing + no false audit/re-embed.
 - [ ] `backend/tests/integration/test_150_ciphertext_at_rest.py` — SC#1 proof (raw read shows enc:v1:), reuse the _pg_reachable harness from test_081_1_settings_migration.py.
 - [ ] `backend/tests/integration/test_150_sweep.py` — startup sweep idempotence (live PG, guarded).
@@ -94,7 +95,7 @@ The VALIDATION-level UAT (author + run at verify-work) must at minimum prove all
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies (Nyquist-compliant — every code task has a fast automated command; integration tasks are live-PG guarded).
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify.
-- [ ] Wave 0 covers all MISSING references (7 new test files above).
+- [ ] Wave 0 covers all MISSING references (8 new test files above).
 - [ ] No watch-mode flags.
 - [ ] Feedback latency < 60s (unit).
 - [x] `nyquist_compliant: true` set in frontmatter.

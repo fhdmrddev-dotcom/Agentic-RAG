@@ -448,9 +448,10 @@ secrets_encryption_key: str = ""
 | A4 | Cloud `app_settings.embedding_api_key`/`rerank_api_key` MAY hold plaintext (local dev has them NULL). | Runtime State Inventory | Medium — if cloud holds plaintext, the sweep encrypts it on the first keyed boot; verify at deploy. Not verifiable from local. |
 | A5 | The Docker sandbox image needs no rebuild (crypto runs in the API process). | Runtime State Inventory | Low — crypto is not a sandbox package; API `pip install` covers it. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **[LOAD-BEARING] Only 2 of the nominal 12 secret columns exist — resolve the scope fork before planning.**
+   - **RESOLVED (operator decision D-150-08, Option A — root-cause):** Add all 10 missing secret columns via one numbered migration (mig 100, built in Plan 02) so SC#1 is literally true for provider keys; the cipher machinery then operates over the full 12-column set. See CONTEXT.md `<decisions>` D-150-08. The scope fork is closed — no planner escalation remains.
    - **What we know (VERIFIED against live Postgres):** `app_settings` has 61 columns; the ONLY secret columns are `embedding_api_key` and `rerank_api_key` (both `text`, both currently NULL in dev). The 9 `{provider}_api_key` columns + `tavily_api_key` do NOT exist and no migration ever added them. `llm_providers` jsonb = `[]`. A test `UPDATE app_settings SET openai_api_key=…` → `UndefinedColumn`. So provider LLM keys are env-only, and saving one through Settings already fails silently (the D-150-07 bug's root cause is the missing column, not just the ignored bool).
    - **What's unclear:** Whether SEC-01/SC#1 ("a provider API key saved through Settings is stored encrypted at rest") must be satisfiable for the 9 LLM provider keys, or whether encrypting the 2 real secret columns (embedding/rerank) demonstrably satisfies it. The CONTEXT.md assumed all 12 columns exist ("likely no migration").
    - **Recommendation:** Escalate to the operator (ideally a brief discuss-phase confirmation). Two coherent options:
@@ -459,6 +460,7 @@ secrets_encryption_key: str = ""
    - The encryption machinery (cipher module, seams, sweep, Control Plane, fail-polarity, D-150-07) is **identical** either way — build it to operate over `_API_KEY_COLUMNS ∩ existing-columns`. Only the migration + the provider-key story differ.
 
 2. **In-line round-trip proof vs. structural guarantee for SC#2.**
+   - **RESOLVED (structural guarantee adopted):** encrypt-on-write + one-seam decrypt-on-read structurally guarantees round-trip; the strict decrypt-back-equals-input assertion lives in the Plan 03 unit seams (test_150_save_seam / test_150_read_seam), and `save_app_settings`'s bool is surfaced as the HTTP-level round-trip failure signal (D-150-07, Plan 04). No re-decrypt on the request hot path. This satisfies "round-trip verified."
    - **What we know:** encrypt-then-write + one-seam-decrypt-on-read structurally guarantees round-trip.
    - **Recommendation:** Enforce the strict "decrypt-back-equals-input" assertion in unit tests (Validation Architecture) rather than on the request hot path; surface only the `save_app_settings` bool as the HTTP-level round-trip failure signal (D-150-07). Confirm with the planner this satisfies "round-trip verified."
 
