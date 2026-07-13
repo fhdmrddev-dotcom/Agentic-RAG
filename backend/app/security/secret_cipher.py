@@ -171,6 +171,12 @@ def encryption_status(row: dict) -> dict:
       - any present secret lacks the enc:v1:     -> "error" + columns_plaintext
         envelope while a cipher is ACTIVE (a swallowed D-150-03 sweep — MUST surface
         honestly, NEVER be read as "encrypted")
+      - a key IS active but ZERO secret values are observed (an empty / None row) ->
+        {"state": "unknown"} (WR-02). This is NOT green: an empty row means either a
+        genuinely secret-less row OR — the dangerous case — a cold-cache / DB-outage where
+        _load_settings_from_db() swallowed the error and returned {}. We cannot tell the
+        two apart, so we must not claim "encrypted"; the tile renders "unknown" NEUTRAL
+        (non-green), never a false-green "Encrypted" during an outage.
 
     Only counters that are > 0 are included. Empty-string values are ignored
     throughout (an unset secret is neither unreadable nor lingering plaintext).
@@ -179,14 +185,17 @@ def encryption_status(row: dict) -> dict:
     if cipher is None:
         return {"state": "plaintext"}
 
+    row = row or {}  # WR-02: tolerate a None/empty row (a cold-cache / DB-blip load).
     columns_unreadable = 0
     columns_plaintext = 0
+    columns_seen = 0  # WR-02: how many present, non-empty secret values we actually observed.
 
     for col in SECRET_COLUMNS:
         value = row.get(col)
         if not isinstance(value, str) or not value:
             continue
 
+        columns_seen += 1
         if is_encrypted(value):
             try:
                 decrypt_secret(value, cipher)
@@ -213,6 +222,14 @@ def encryption_status(row: dict) -> dict:
         if columns_plaintext:
             result["columns_plaintext"] = columns_plaintext
         return result
+
+    # WR-02: a key is active but we OBSERVED ZERO secret values (an empty / cold-cache
+    # row). Reporting "encrypted" here is a false-green — during a DB outage the raw-row
+    # load returns {} WITHOUT raising, so the tile would light green while nothing could be
+    # read at all. Report the neutral, non-green "unknown" instead; only a populated row of
+    # cleanly-decrypting ciphertext is genuinely "encrypted".
+    if columns_seen == 0:
+        return {"state": "unknown"}
 
     return {"state": "encrypted"}
 

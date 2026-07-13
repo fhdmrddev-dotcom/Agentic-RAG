@@ -143,3 +143,23 @@ def test_secrets_encryption_degrades_to_plaintext_when_raw_load_fails(
     res = client.get("/admin/backpressure", headers=auth_headers)
     assert res.status_code == 200
     assert res.json()["secrets_encryption"] == {"state": "plaintext"}
+
+
+def test_secrets_encryption_unknown_on_empty_cold_row(
+    client, auth_headers, mock_asyncpg_pool, monkeypatch
+):
+    """WR-02: a cold-cache / DB-outage raw load that returns {} WITHOUT raising must NOT
+    render false-green. _load_settings_from_db swallows DB errors and returns {}, so the
+    admin.py try/except degrade-branch never fires — the honesty must live in
+    encryption_status. With a key active and an empty raw row the field is the neutral
+    non-green "unknown", never "encrypted"."""
+    key = Fernet.generate_key().decode()
+    monkeypatch.setattr(settings, "secrets_encryption_key", key)
+    _operator(mock_asyncpg_pool, monkeypatch)
+    _stub_raw_row(monkeypatch, {})  # cold cache / DB blip returned {} (did NOT raise)
+
+    res = client.get("/admin/backpressure", headers=auth_headers)
+    assert res.status_code == 200
+    se = res.json()["secrets_encryption"]
+    assert se["state"] != "encrypted", "an empty cold-cache row must never read as encrypted"
+    assert se == {"state": "unknown"}

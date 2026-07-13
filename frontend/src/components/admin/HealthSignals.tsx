@@ -140,13 +140,16 @@ const DEP_STATUS_LABEL: Record<DepStatus, string> = {
 //   error     → destructive (red)   — genuine decrypt failures (columns_unreadable)
 //               and/or lingering plaintext under an active key (columns_plaintext —
 //               a swallowed sweep). The red label NAMES whichever count is present.
+//   unknown   → NEUTRAL grey         — a key is active but ZERO secret values were
+//               observed (an empty / cold-cache row — WR-02). NEVER green: a DB outage
+//               returns {} without raising, so a false "Encrypted" is exactly the bug.
 //   absent / loading → NEUTRAL unknown placeholder (older backend / not-yet-fetched)
 type SecretsState = "encrypted" | "plaintext" | "error" | "unknown"
 
 /** The secrets probe as it arrives on `signals.secrets_encryption` (optional —
  *  a backend that has not shipped Plan 150-05 omits it entirely). */
 interface SecretsProbe {
-  state: "encrypted" | "plaintext" | "error"
+  state: "encrypted" | "plaintext" | "error" | "unknown"
   columns_unreadable?: number
   columns_plaintext?: number
 }
@@ -168,6 +171,7 @@ function secretsLabel(probe: SecretsProbe | undefined | null): string {
   if (!probe) return "—"
   if (probe.state === "encrypted") return "Encrypted"
   if (probe.state === "plaintext") return "Plaintext (no key set)"
+  if (probe.state === "unknown") return "Status unavailable"
   // error: name the unreadable and/or not-encrypted counts.
   const unreadable = probe.columns_unreadable ?? 0
   const plaintext = probe.columns_plaintext ?? 0
@@ -182,6 +186,7 @@ function secretsSub(probe: SecretsProbe | undefined | null): string {
   if (!probe) return "secret keys at rest"
   if (probe.state === "encrypted") return "Secret keys encrypted at rest"
   if (probe.state === "plaintext") return "Set a key to encrypt secrets at rest"
+  if (probe.state === "unknown") return "Couldn't confirm secrets at rest"
   return "Secret keys need attention"
 }
 

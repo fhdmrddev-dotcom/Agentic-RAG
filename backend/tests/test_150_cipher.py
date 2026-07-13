@@ -199,3 +199,27 @@ def test_encryption_status_encrypted(monkeypatch):
         "rerank_api_key": encrypt_secret("sk-r", cipher),
     }
     assert encryption_status(row) == {"state": "encrypted"}
+
+
+def test_encryption_status_empty_row_not_green(monkeypatch):
+    """WR-02: with a cipher ACTIVE but ZERO secret values observed (an empty / cold-cache
+    row) the status must NOT be false-green "encrypted". It reports the neutral, non-green
+    "unknown" — so a DB outage that returns {} can never paint the tile a false "Encrypted".
+    """
+    _set_key(monkeypatch, Fernet.generate_key().decode())
+    # An empty row (cold cache / DB blip returned {}) → neutral, never green.
+    assert encryption_status({}) == {"state": "unknown"}
+    # A None row is tolerated the same way (defensive).
+    assert encryption_status(None) == {"state": "unknown"}
+    # A row of only empty-string secrets is likewise "nothing observed" → unknown.
+    assert encryption_status({"embedding_api_key": "", "rerank_api_key": ""}) == {"state": "unknown"}
+
+    # Sanity: the no-key case is still the deliberate "plaintext" (unchanged), and a
+    # populated ciphertext row is still genuinely "encrypted" (real detection not weakened).
+    _set_key(monkeypatch, "")
+    assert encryption_status({}) == {"state": "plaintext"}
+    _set_key(monkeypatch, Fernet.generate_key().decode())
+    cipher = get_cipher()
+    assert encryption_status({"embedding_api_key": encrypt_secret("sk-x", cipher)}) == {
+        "state": "encrypted"
+    }

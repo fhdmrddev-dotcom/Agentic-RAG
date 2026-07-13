@@ -3622,9 +3622,11 @@ export interface BackpressureSignals {
   // `encrypted` = all secret columns are ciphertext at rest; `plaintext` = the
   // deliberate no-key config (NEUTRAL, never red — Pitfall 6); `error` = genuine
   // decrypt failures (columns_unreadable) and/or lingering plaintext under an active
-  // key (columns_plaintext — a swallowed sweep). Only counters > 0 are present.
+  // key (columns_plaintext — a swallowed sweep); `unknown` = a key is active but ZERO
+  // secret values were observed (an empty / cold-cache row — WR-02: NEUTRAL, never green,
+  // so a DB outage can't paint a false "Encrypted"). Only counters > 0 are present.
   secrets_encryption?: {
-    state: "encrypted" | "plaintext" | "error"
+    state: "encrypted" | "plaintext" | "error" | "unknown"
     columns_unreadable?: number
     columns_plaintext?: number
   }
