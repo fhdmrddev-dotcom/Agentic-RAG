@@ -298,6 +298,29 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
     if not clean:
         return True  # nothing to persist is a successful no-op (caller semantics preserved)
 
+    # Phase 150 (SEC-01 / RESEARCH Pattern 3) — encrypt-on-write. This is the ONE write
+    # seam every secret save funnels through. Runs AFTER the sentinel/_is_valid_api_key
+    # guard validated PLAINTEXT (above), BEFORE the parameterized UPDATE (below). When a
+    # master key is configured, replace each SECRET_COLUMNS value that is a non-empty
+    # plaintext str with its enc:v1: envelope; leave everything else byte-identical.
+    #   - no key => get_cipher() None => plaintext passthrough (D-150-01).
+    #   - already enc:v1: => is_encrypted guard skips it (no double envelope).
+    #   - non-secret column => not in SECRET_COLUMNS => never touched (the SQLi-safe
+    #     allowlist posture — we iterate code-owned column names, never user key names).
+    # Never logs a value or token (T-081.1-04).
+    from app.security.secret_cipher import (
+        SECRET_COLUMNS,
+        encrypt_secret,
+        get_cipher,
+        is_encrypted,
+    )
+    cipher = get_cipher()
+    if cipher is not None:
+        for k in list(clean):
+            v = clean[k]
+            if k in SECRET_COLUMNS and isinstance(v, str) and v and not is_encrypted(v):
+                clean[k] = encrypt_secret(v, cipher)
+
     # Build parameterized UPDATE -- column names from code constants, values via $N
     cols = list(clean.keys())
     vals = list(clean.values())
