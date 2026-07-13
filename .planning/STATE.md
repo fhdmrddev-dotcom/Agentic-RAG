@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T17:45:45.482Z"
+last_updated: "2026-07-13T17:57:51.100Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 26
   completed_phases: 4
   total_plans: 41
-  completed_plans: 39
+  completed_plans: 40
   percent: 15
 ---
 
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 150 (secrets-at-rest) — EXECUTING
-Plan: 4 of 5 (Plans 01-03 complete)
+Plan: 5 of 5 (Plans 01-04 complete)
 Status: Ready to execute
-Last activity: 2026-07-13 -- Phase 150 Plan 03 complete (encrypt/decrypt settings seams)
+Last activity: 2026-07-13 -- Phase 150 Plan 04 complete (boot key-gate + eager sweep + failed-save 500)
+
+**150-04 execution notes (2026-07-13) — boot-time key gate + eager sweep + D-150-07 HTTP 500, backend-only:**
+
+- 2/2 tasks, sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 TDD (RED assertion confirmed → GREEN in one feat commit): `6c4a7b12` (settings 500). Task 2: `e9fb5c9c` (lifespan gate + sweep).
+- **D-150-07 / SC#2 (`settings.py`):** replaced the fire-and-forget `await save_app_settings(updates)` at :453 with `if not await save_app_settings(updates): raise HTTPException(500, "Failed to save settings")` — placed IMMEDIATELY after the save and BEFORE the audit write (:454) + re-embed kick (:471-481), so a swallowed DB write never emits a false 200 / false audit row / spurious re-embed (Phase 147 CR-02 precedent). Audit `[REDACTED]` line untouched.
+- **Boot polarity (`main.py` lifespan, after `_migrate_settings_override()`):** extracted TWO named module-level helpers (mirrors the lifespan convention where each step is a callable — `seed_operators_from_env`/`assert_action_types_synced`). `_validate_and_report_cipher()` is called **UN-wrapped** (NO try/except, Pitfall 6): malformed key → `get_cipher()` `ValueError` propagates → all WORKER_COUNT=2 workers refuse to start (D-150-04); missing key → None + one loud WARNING naming `SECRETS_ENCRYPTION_KEY` → boots plaintext (D-150-01). `_sweep_secret_columns(pool)` is **best-effort** (try/except → log + continue), runs only when a key is present, `sweep_row` → one parameterized UPDATE of only the changed columns (plaintext→enc:v1:, non-primary→rotate; D-150-03/06 idempotent; WORKER_COUNT=2-safe by the enc:v1: prefix check). Helper takes the pool as an arg so the live-PG fixture can drive it.
+- **Single source of truth:** `_API_KEY_COLUMNS` at main.py:125-130 re-pointed to `from app.security.secret_cipher import SECRET_COLUMNS as _API_KEY_COLUMNS` (no cycle — secret_cipher doesn't import main; frozenset works for the `key in` use at :173). `_migrate_settings_override` carries the RESEARCH-Pattern-5 sweep-backstop comment.
+- **Gates:** `pytest tests/api/test_150_settings_error.py` → 3/3; `pytest tests/integration/test_150_sweep.py tests/integration/test_150_failopen.py` → 4/4 (PG up); `python -c "... assert app.main._API_KEY_COLUMNS == SECRET_COLUMNS"` → clean. Regression `test_150_cipher + test_147_flag_failure_semantics + test_081_1_settings_migration + test_150_settings_error` → 27/27. Source review: validation NOT in try/except (mirrors `assert_action_types_synced`); sweep IS in try/except; settings raise before audit + re-embed.
+- **SEC-01 stays OPEN** (false-green avoidance, 148/149 convention) — closes at verify-work/secure-phase after Plan 05 (Control Plane `encryption_status()` tile) lands.
+- **SDK quirk (unchanged from 150-02/03):** `state.advance-plan` bumped frontmatter `completed_plans` 39→40 + Current Plan → 5; `roadmap.update-plan-progress 150` checked the 150-04 box + reported `summary_count: 4` but LEFT the ROADMAP progress-table row `3/5 | Executing` stale → hand-fixed to `4/5`.
 
 **150-03 execution notes (2026-07-13) — encrypt/decrypt settings seams, backend-only, additive:**
 
