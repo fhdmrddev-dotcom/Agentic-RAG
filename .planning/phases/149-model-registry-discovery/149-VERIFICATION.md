@@ -1,8 +1,8 @@
 ---
 phase: 149-model-registry-discovery
-verified: 2026-07-12T21:36:57Z
-status: human_needed
-score: 9/9 code-level must-haves verified (0 failed); 1 residual human-verification requirement (live re-run of rows 1+7)
+verified: 2026-07-13T00:00:00Z
+status: passed
+score: 9/9 code-level must-haves verified (0 failed); residual human-verification (live re-run of rows 1+7) COMPLETED 2026-07-13 — both PASS, wire-confirmed (runs a0cb6241 openai/gpt-5.4-mini 1 tool_call + c1f3dbab minimax clean chips); see 149-HUMAN-UAT.md (status complete, 12/12) + 149-SECURITY.md (threats_open 0)
 overrides_applied: 0
 re_verification:
   previous_status: human_needed

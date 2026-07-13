@@ -28,7 +28,7 @@ Requirements for this milestone. Each maps to roadmap phases. CORE vs gated-STRE
 ### Model & Settings Management (Track 3)
 
 - [x] **MODEL-01**: Operator can edit model capabilities (enable/disable, max tokens, timeout, native tools, deprecated) from the admin shell — a write UI + operator-gated write path over the ALREADY-LIVE `model_capabilities_overrides` table and hot-path read (mig 053); changes take effect without a server restart (existing TTL cache)
-- [ ] **MODEL-02**: Operator can run live model discovery — a service (lifted from `scripts/curate_models.py`) queries each provider's `/models` endpoint and PROPOSES new/changed/vanished models for human confirmation; discovery never auto-enables capabilities the endpoint didn't return (only 2 of 8 providers return capability metadata)
+- [x] **MODEL-02**: Operator can run live model discovery — a service (lifted from `scripts/curate_models.py`) queries each provider's `/models` endpoint and PROPOSES new/changed/vanished models for human confirmation; discovery never auto-enables capabilities the endpoint didn't return (only 2 of 8 providers return capability metadata)
 - [ ] **SEC-01**: Provider API keys stored in `app_settings` are encrypted at rest (app-layer `cryptography` Fernet/AESGCM — NOT pgsodium, which Supabase is deprecating) with the env-var fallback precedence preserved so local dev and existing deployments keep working unchanged; key saves are round-trip verified (never silently swallowed)
 
 ### Deployment & Packaging (Track 3, STRETCH tail per research)
@@ -86,8 +86,8 @@ Which phases cover which requirements. Filled by roadmap creation (2026-07-10). 
 | FLAG-01 | Phase 147 (CORE) | Admin Shell | Complete |
 | ADMIN-03 | Phase 148 (CORE) | Admin Shell | Complete |
 | VIS-01 | Phase 148 (CORE) | Admin Shell | Complete |
-| MODEL-01 | Phase 149 (CORE) | Model & Settings | Pending |
-| MODEL-02 | Phase 149 (CORE) | Model & Settings | Pending |
+| MODEL-01 | Phase 149 (CORE) | Model & Settings | Complete |
+| MODEL-02 | Phase 149 (CORE) | Model & Settings | Complete |
 | SEC-01 | Phase 150 (CORE) | Model & Settings | Pending |
 | FILE-02 | Phase 151 (CORE) | Workflow & File Inputs | Pending |
 | FILE-01 | Phase 151 (CORE) | Workflow & File Inputs | Pending |
