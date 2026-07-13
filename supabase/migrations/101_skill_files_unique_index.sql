@@ -1,0 +1,35 @@
+-- 101_skill_files_unique_index.sql — Phase 151 (FILE-01 / D-10).
+-- Add the ADDITIVE unique index that makes FILE-01's D-07 overwrite-in-place a
+-- clean, race-immune PostgREST upsert: a `(skill_id, filename)` tuple may exist at
+-- most once, so `.upsert(..., on_conflict="skill_id,filename")` is atomic and
+-- CORRECT under `WORKER_COUNT=2`. Without this index, FILE-01's attach path would
+-- have to read-check-then-write, and two concurrent same-filename attaches under two
+-- uvicorn workers would race to a duplicate `skill_files` row (last-writer-wins /
+-- orphaned Storage object). This index collapses that TOCTOU window to one winner +
+-- one update — it is the ENABLING mitigation for T-151-02M-01.
+--
+-- ADDITIVE ONLY: this CREATEs an index on the already-live `public.skill_files` table.
+-- It adds NO column, NO RLS policy, NO data rewrite. `skill_files` has NO
+-- `(skill_id, filename)` unique constraint today (full-schema.sql:1116 — PK `id` +
+-- non-unique indexes on `skill_id`/`user_id` only), and no duplicate `(skill_id,
+-- filename)` tuples exist in dev (the pre-D-07 per-file insert path never created
+-- same-name-same-skill rows), so the index builds without conflict. `IF NOT EXISTS`
+-- makes a re-apply a no-op (idempotent — safe to re-run).
+--
+-- APPLY (CLAUDE.md): paste the FULL contents of this file into the LOCAL Supabase SQL
+--   editor and run it (or psycopg2 to 127.0.0.1:54322). Idempotent — safe to re-run.
+--   NEVER `supabase db push` / `supabase db reset` — those wipe local dev data.
+-- THEN: from the repo root run `bash scripts/regenerate-full-schema.sh` (no --reset — a
+--   live-DB schema dump that preserves data) to rebuild supabase/full-schema.sql, then
+--   commit this file + full-schema.sql together. Never hand-edit full-schema.sql.
+-- VERIFY: SELECT indexname FROM pg_indexes WHERE tablename='skill_files'
+--           AND indexname='skill_files_skill_filename_uniq';  -- expect one row.
+-- CLOUD PARITY: paste this same SQL into the CLOUD Supabase SQL editor at promotion — a
+--   new index is a non-code deploy half (docs/DEPLOYMENT-WORKFLOW.md deploy-parity
+--   checklist). Migration 101 is a PENDING CLOUD APPLY that MUST land on cloud Supabase
+--   BEFORE Phase 151 ships live (it joins migs 099/100 in the pending-on-cloud set —
+--   scripts/pending-cloud-migrations.sh); DEFERRED to the standing production-push
+--   checklist — do NOT touch cloud now.
+
+CREATE UNIQUE INDEX IF NOT EXISTS skill_files_skill_filename_uniq
+    ON public.skill_files (skill_id, filename);
