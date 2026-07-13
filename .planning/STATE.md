@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T20:47:51.000Z"
+last_updated: "2026-07-13T20:57:26.050Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 26
   completed_phases: 5
   total_plans: 45
-  completed_plans: 42
+  completed_plans: 43
   percent: 19
 ---
 
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 151 (agent-file-tools) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 151 (151-01 complete)
-Last activity: 2026-07-13 -- Phase 151 Plan 01 (FILE-02 fetch_document_file) executed
+Plan: 3 of 4
+Status: Executing Phase 151 (151-01 + 151-03 complete; 151-02 migration + 151-04 attach remain)
+Last activity: 2026-07-13 -- Phase 151 Plan 03 (SC#3 upload allowlist widen) executed
+
+**151-03 execution notes (2026-07-13) — SC#3 upload allowlist widen (D-09), backend gate + frontend accept=:**
+
+- 2/2 tasks, both TDD, sequential on the main tree (`use_worktrees=false`). Task 1 RED `bccb6156` (ImportError — `validate_upload` absent); Task 2 GREEN `f8744a58` (validator + lockstep `accept=`).
+- **`validate_ooxml` → `validate_upload`** in `backend/app/api/workspace.py`: `_ALLOWED_EXT` widened from `{.docx,.pptx,.xlsx}` to add text-ish (`.md/.json/.csv/.txt/.py/.js/.sh`) + images (`.png/.jpg/.jpeg/.gif/.webp`) (D-09). Category branches: OOXML ZIP check kept verbatim (`_validate_ooxml_container`); text = NUL-reject + utf-8-decode (`_looks_like_text`); image = leading magic bytes (`_image_magic_ok`, `\x89PNG`/`\xFF\xD8\xFF`/`GIF8`/`RIFF..WEBP`). Size guard runs FIRST for every type (T-151-03-02); `kind='template_input'` provenance + WR-05 sanitize untouched (T-151-03-03); `threads.py` untouched (G-5).
+- **DEVIATION [Rule 3 — blocking]:** kept `validate_ooxml = validate_upload` as a behavior-preserving alias instead of a hard rename — Phase-100 `test_workspace_template.py` imports `validate_ooxml`. `validate_upload` is a strict superset for the 3 OOXML types (same return + 422), so the 17 legacy tests stay green.
+- `TemplateUpload.tsx` `accept=` widened in lockstep with `_ALLOWED_EXT`; stale "OOXML-only"/`validate_ooxml` doc comment corrected.
+- **Gates:** `pytest test_151_upload_allowlist.py + test_workspace_template.py` → 38/38 (21 new + 17 regression); `grep template_input`/`MAX_FILE_SIZE` present; `git diff --name-only` excludes `threads.py`; `npx vite build` exit 0.
+- **FILE-01 NOT marked complete** (spans plans 03+04; false-green avoidance, 148/149/150 convention) — closes at verify-work/secure-phase. **SDK quirks (unchanged from 151-01):** `advance-plan` bumped frontmatter `completed_plans` 42→43 + Current Plan → 3; `update-progress`/`record-metric` = field-not-found (STATE uses frontmatter `progress:` block) → Current Position hand-updated; `roadmap.update-plan-progress 151` checked the 151-03 box + reported `summary_count: 2` but LEFT the progress-table row `1/4 | Executing` stale → hand-fixed to `2/4`.
 
 **151-01 execution notes (2026-07-13) — FILE-02 fetch_document_file, backend-only, additive:**
 
