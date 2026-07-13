@@ -37,6 +37,9 @@ Out of scope (locked in REQUIREMENTS.md): HashiCorp Vault / external secret stor
 ### Round-trip verification (SC#2 — locked by roadmap, shape confirmed by scouting)
 - **D-150-07:** The known silent-success bug is real and in scope: `update_settings` (`backend/app/api/settings.py:453`) calls `save_app_settings` and ignores the returned bool — a failed key save returns HTTP 200 today. Phase 150 must surface a failed save as a real HTTP error (Phase 147 CR-02 precedent: `set_flag` raises 500 with no false audit row). "Round-trip verified" = after an encrypted save, the value must decrypt back to what was submitted before the save is reported successful.
 
+### Missing secret columns (research discovery, operator-resolved 2026-07-13)
+- **D-150-08:** Research verified against live Postgres that only 2 of the nominal 12 secret columns exist (`embedding_api_key`, `rerank_api_key`). The 9 `{provider}_api_key` columns + `tavily_api_key` in `_API_KEY_COLUMNS` were never created by any migration — a provider-key save through Settings already fails silently today (`UndefinedColumn`; this missing column is the true root cause under the D-150-07 ignored-bool bug, mirroring the mig-078 model-columns lesson). **Operator decision: add all 10 missing `text` columns via one numbered migration (mig 100)** so SC#1 is literally true for provider keys. Migration applied to the live local DB via Supabase SQL editor (NEVER `db push`/`db reset`), then `bash scripts/regenerate-full-schema.sh`; cloud parity: mig 100 joins mig 099 in the pending-on-cloud list (`scripts/pending-cloud-migrations.sh`). Consequence: DB-saved provider keys will then override env via the existing `_val` DB>env chain — the intended precedence, now real for provider keys.
+
 ### Claude's Discretion
 - Cipher choice within the locked library (Fernet vs AESGCM — Fernet/MultiFernet is the natural fit given D-150-06, but researcher confirms), exact env var name (something like `SECRETS_ENCRYPTION_KEY`), stored-value envelope/marker format for distinguishing encrypted from plaintext values (Fernet's `gAAAAA` prefix vs an explicit `enc:v1:` wrapper — pick one that keeps D-150-03 idempotence and future format versioning clean).
 - Where the encrypt/decrypt seam lives — the natural single seams are `save_app_settings()` (encrypt-on-write) and `_load_settings_from_db()` / `_build_settings_from_row()` (decrypt-on-read) in `backend/app/models/user_settings.py`; keep it to ONE seam per direction so no caller ever sees ciphertext.
@@ -61,7 +64,7 @@ Out of scope (locked in REQUIREMENTS.md): HashiCorp Vault / external secret stor
 - `backend/app/services/health_probe.py` — the Phase 147 dependency-health probe surface the D-150-02 Control Plane signal extends
 
 ### Conventions that bind this phase
-- `CLAUDE.md` — "env vars are for secrets and infra only" (master key = env var); migrations = numbered SQL applied via Supabase SQL editor (if any migration is even needed — the secret columns already exist; likely none); multi-worker `WORKER_COUNT=2` default + D-PRD-12 singleton audit
+- `CLAUDE.md` — "env vars are for secrets and infra only" (master key = env var); migrations = numbered SQL applied via Supabase SQL editor (mig 100 IS needed per D-150-08 — the original "columns already exist; likely none" assumption was disproven by research); multi-worker `WORKER_COUNT=2` default + D-PRD-12 singleton audit
 - `docs/DEPLOYMENT-WORKFLOW.md` — cloud parity checklist: the new env var must be documented for Coolify at promotion; note mig 099 (Phase 149) is still pending on cloud
 
 </canonical_refs>
