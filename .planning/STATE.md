@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T17:02:21.330Z"
-last_activity: 2026-07-13 -- Phase 150 planning complete
+last_updated: "2026-07-13T17:26:07Z"
+last_activity: 2026-07-13 -- Phase 150 Plan 01 complete (cipher foundation)
 progress:
   total_phases: 26
   completed_phases: 4
   total_plans: 41
-  completed_plans: 36
+  completed_plans: 37
   percent: 15
 ---
 
@@ -22,14 +22,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 150 — secrets at rest
+**Current focus:** Phase 150 — secrets-at-rest
 
 ## Current Position
 
-Phase: 150
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-13 -- Phase 150 planning complete
+Phase: 150 (secrets-at-rest) — EXECUTING
+Plan: 2 of 5 (Plan 01 complete)
+Status: Executing Phase 150
+Last activity: 2026-07-13 -- Phase 150 Plan 01 complete (cipher foundation)
+
+**150-01 execution notes (2026-07-13) — cipher foundation, backend-only, additive:**
+
+- 2/2 tasks, sequential on the main tree (`use_worktrees=false`), no deviations. Task 2 was TDD (RED `1d3bc1e9` → GREEN `b1b93f17`); Task 1 `e37518fb`.
+- **Built `backend/app/security/secret_cipher.py`** — the single source of key material + the `get_cipher`/`is_encrypted`/`encrypt_secret`/`decrypt_secret`/`sweep_row`/`encryption_status` contract Plans 02–05 import. `SECRET_COLUMNS` frozenset is set-equal to `main._API_KEY_COLUMNS` (verified live). `Fernet(...)` is constructed NOWHERE else (grep-verified); `decrypt` takes no `ttl` (Pitfall 4).
+- **Failure polarity locked in code:** no key → `get_cipher()` None (D-150-01 fail-open); malformed key → `Fernet()` `ValueError` propagated (D-150-04 fail-hard, boot caller re-raises in Plan 04); undecryptable `enc:v1:` → `InvalidToken` for fail-soft callers (D-150-05). `enc:v1:` envelope classifies by prefix, never a blind decrypt (Pitfall 1). `sweep_row` rotates only non-primary tokens (Pitfall 3, idempotent). `encryption_status` surfaces `columns_unreadable` AND lingering `columns_plaintext` so a swallowed sweep never reads false-"encrypted" (D-150-02/03).
+- **Env + dep declared:** `config.Settings.secrets_encryption_key: str = ""` binds `SECRETS_ENCRYPTION_KEY`; `cryptography>=44.0.0` promoted to a declared direct dep (venv already has 46.0.7); `.env.example` documents key-gen + `NEW,OLD` rotation (placeholder only, no real key).
+- **Gates:** `pytest tests/test_150_cipher.py -x` → 10/10 green; `import app.config` + `from app.security.secret_cipher import *` clean.
+- **SEC-01 NOT marked complete** (false-green avoidance, 148/149 convention) — the phase requirement closes at verify-work/secure-phase after all 5 plans land.
+- **ROADMAP SDK quirk (reference_phase_complete_roadmap_gap):** `roadmap.update-plan-progress 150` checked the 150-01 plan box but left the progress-table row `0/5 | Planned` stale → hand-fixed to `1/5 | Executing`.
 
 **149 gaps-only execution + round-2 review (2026-07-12, orchestrator):**
 
