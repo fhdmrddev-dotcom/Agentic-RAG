@@ -111,29 +111,28 @@ def _decode_inline_content(value) -> str:
 
 # ── Phase 100 (TMPL-01) — ephemeral template upload (D-12) ────────────────────
 
-_ALLOWED_EXT = {".docx", ".pptx", ".xlsx"}
+# Phase 151 (FILE-01 / SC#3, D-09) — the allowlist widened beyond OOXML so a user
+# can hand the agent real skill assets mid-chat. Three categories, three gates:
+_OOXML_EXT = {".docx", ".pptx", ".xlsx"}
+# Text-ish skill assets — validated as utf-8-decodable + NUL-free (D-09).
+_TEXT_EXT = {".md", ".json", ".csv", ".txt", ".py", ".js", ".sh"}
+# Images — validated by leading magic bytes (D-09).
+_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+# The full set the door accepts — kept in lockstep with TemplateUpload.tsx accept=.
+_ALLOWED_EXT = _OOXML_EXT | _TEXT_EXT | _IMAGE_EXT
 # OOXML part-name prefix that distinguishes the three OOXML types (defense-in-depth).
 _OOXML_MARKER = {".docx": "word/", ".pptx": "ppt/", ".xlsx": "xl/"}
 
 
-def validate_ooxml(filename: str, raw: bytes) -> str:
-    """Magic-byte gate for .docx/.pptx/.xlsx uploads (D-12, stdlib only).
+def _validate_ooxml_container(ext: str, raw: bytes) -> None:
+    """The strict OOXML magic-byte gate (verbatim from the pre-151 ``validate_ooxml``).
 
     OOXML files are ZIP (PK) containers. ``zipfile.is_zipfile`` validates the
     End-of-Central-Directory record — so a renamed binary / truncated file /
     non-ZIP PDF fails even though a 4-byte sniff would pass. A per-extension
     part-name marker (``word/`` / ``ppt/`` / ``xl/``) plus ``[Content_Types].xml``
-    rejects an arbitrary (non-Office) ZIP. A defense-in-depth size guard
-    (workspace_service.MAX_FILE_SIZE) trips before any ZIP parsing — the route
-    also pre-checks the declared part size before buffering (WR-04). Returns the
-    canonical extension; raises HTTPException(422) on any failure (nothing is
-    persisted).
+    rejects an arbitrary (non-Office) ZIP. Raises HTTPException(422) on failure.
     """
-    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ext not in _ALLOWED_EXT:
-        raise HTTPException(422, f"Unsupported type {ext}. Allowed: .docx, .pptx, .xlsx")
-    if len(raw) > MAX_FILE_SIZE:
-        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     bio = io.BytesIO(raw)
     if not zipfile.is_zipfile(bio):
         raise HTTPException(422, "File is not a valid Office document (not a ZIP/OOXML container)")
@@ -143,7 +142,80 @@ def validate_ooxml(filename: str, raw: bytes) -> str:
             raise HTTPException(422, "File is not a valid OOXML document")
         if not any(n.startswith(_OOXML_MARKER[ext]) for n in names):
             raise HTTPException(422, f"File contents do not match a {ext} document")
-    return ext
+
+
+def _looks_like_text(raw: bytes) -> bool:
+    """True when ``raw`` is a plausible utf-8 text payload (NUL-free, decodable).
+
+    A renamed binary (embedded NUL bytes / invalid utf-8 sequences) fails this
+    check, so the magic-byte gate survives the D-09 widen for text-ish types
+    (T-151-03-01). Called only after the size guard, so the decode is bounded.
+    """
+    if b"\x00" in raw:
+        return False
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+def _image_magic_ok(ext: str, raw: bytes) -> bool:
+    """Verify an image payload's leading magic bytes match its extension (D-09)."""
+    if ext == ".png":
+        return raw[:4] == b"\x89PNG"
+    if ext in (".jpg", ".jpeg"):
+        return raw[:3] == b"\xff\xd8\xff"
+    if ext == ".gif":
+        return raw[:4] == b"GIF8"  # GIF87a and GIF89a both start GIF8
+    if ext == ".webp":
+        return raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+    return False
+
+
+def validate_upload(filename: str, raw: bytes) -> str:
+    """Magic-byte / content gate for the widened skill-asset allowlist (D-09, stdlib only).
+
+    Generalizes the Phase-100 OOXML-only ``validate_ooxml``: keeps the strict
+    ZIP/OOXML branch for ``.docx/.pptx/.xlsx`` and ADDS per-category branches for
+    text-ish assets (``.md/.json/.csv/.txt/.py/.js/.sh`` — utf-8-decodable + NUL
+    reject) and images (``.png/.jpg/.jpeg/.gif/.webp`` — leading magic bytes).
+
+    The ``len(raw) > MAX_FILE_SIZE`` DoS/office-bomb guard trips BEFORE any parse
+    for EVERY type (T-151-03-02) — the route also pre-checks the declared part
+    size before buffering (WR-04). Returns the canonical extension; raises
+    HTTPException(422) on any failure (nothing is persisted). Files that pass are
+    stamped ``kind='template_input'`` by the route (untrusted provenance) and are
+    NEVER routed to the docxtpl Jinja engine (T-151-03-03).
+    """
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in _ALLOWED_EXT:
+        raise HTTPException(
+            422, f"Unsupported type {ext or '(none)'}. Allowed: {', '.join(sorted(_ALLOWED_EXT))}"
+        )
+    # DoS/office-bomb guard FIRST — before any decode/parse of the body (T-151-03-02).
+    if len(raw) > MAX_FILE_SIZE:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    if ext in _OOXML_EXT:
+        _validate_ooxml_container(ext, raw)
+        return ext
+    if ext in _TEXT_EXT:
+        if not _looks_like_text(raw):
+            raise HTTPException(422, f"File does not look like valid text for a {ext} upload")
+        return ext
+    if ext in _IMAGE_EXT:
+        if not _image_magic_ok(ext, raw):
+            raise HTTPException(422, f"File contents do not match a {ext} image")
+        return ext
+    # Unreachable (ext already gated against _ALLOWED_EXT); belt-and-braces.
+    raise HTTPException(422, f"Unsupported type {ext}")
+
+
+# Backward-compat alias: Phase-100 tests (test_workspace_template.py) and any
+# external caller import ``validate_ooxml``. ``validate_upload`` is a strict
+# superset for the three OOXML types (same return + 422 semantics), so the alias
+# is behavior-preserving. Mirrors the ``upload_workspace_template`` alias below.
+validate_ooxml = validate_upload
 
 
 @router.post("/files")
@@ -173,7 +245,7 @@ async def upload_template(
         raise HTTPException(422, "File is empty")
     if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
-    ext = validate_ooxml(file.filename or "", raw)  # D-12 magic-byte gate
+    ext = validate_upload(file.filename or "", raw)  # D-12/D-09 magic-byte + content gate
     ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
     expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
     # WR-05 (100-REVIEW): sanitize the ORIGINAL filename to validate_path's charset
