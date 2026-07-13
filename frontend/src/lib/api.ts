@@ -3616,6 +3616,18 @@ export interface BackpressureSignals {
     supabase: { state: "up" | "down"; latency_ms: number | null }
     sandbox: { state: "off" | "up" | "down"; latency_ms: number | null }
   }
+  // Phase 150 (SEC-01 / D-150-02 / additive, back-compat) — the at-rest secrets
+  // encryption state, appended to the SAME payload. OPTIONAL: a backend that has
+  // not shipped Plan 150-05 omits the key and every field above stays byte-compatible.
+  // `encrypted` = all secret columns are ciphertext at rest; `plaintext` = the
+  // deliberate no-key config (NEUTRAL, never red — Pitfall 6); `error` = genuine
+  // decrypt failures (columns_unreadable) and/or lingering plaintext under an active
+  // key (columns_plaintext — a swallowed sweep). Only counters > 0 are present.
+  secrets_encryption?: {
+    state: "encrypted" | "plaintext" | "error"
+    columns_unreadable?: number
+    columns_plaintext?: number
+  }
 }
 
 /** One append-only `operator_audit_log` row from `GET /admin/audit` (Plan 02) —

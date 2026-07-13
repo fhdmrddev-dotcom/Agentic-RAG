@@ -132,6 +132,59 @@ const DEP_STATUS_LABEL: Record<DepStatus, string> = {
   unknown: "—",
 }
 
+// ── Phase 150 (SEC-01 / D-150-02) — at-rest secrets encryption state ──────────
+// The three honest wire states map onto the EXISTING dependency vocabulary
+// (Pitfall 6 — a deliberate no-key config is NEUTRAL grey, NEVER red):
+//   encrypted → success (green)     — secret keys are ciphertext at rest
+//   plaintext → NEUTRAL grey        — no key set (a deliberate config, not a fault)
+//   error     → destructive (red)   — genuine decrypt failures (columns_unreadable)
+//               and/or lingering plaintext under an active key (columns_plaintext —
+//               a swallowed sweep). The red label NAMES whichever count is present.
+//   absent / loading → NEUTRAL unknown placeholder (older backend / not-yet-fetched)
+type SecretsState = "encrypted" | "plaintext" | "error" | "unknown"
+
+/** The secrets probe as it arrives on `signals.secrets_encryption` (optional —
+ *  a backend that has not shipped Plan 150-05 omits it entirely). */
+interface SecretsProbe {
+  state: "encrypted" | "plaintext" | "error"
+  columns_unreadable?: number
+  columns_plaintext?: number
+}
+
+// State → dot color. `plaintext` (no key) + `unknown` are NEUTRAL (muted) — they
+// MUST NOT use the destructive/red class (Pitfall 6 acceptance): only a genuine
+// `error` is red. `plaintext` reuses the same grey the sandbox-off state wears.
+const SECRETS_DOT: Record<SecretsState, string> = {
+  encrypted: "bg-success",
+  plaintext: "bg-muted-foreground/40",
+  error: "bg-destructive",
+  unknown: "bg-muted-foreground/25",
+}
+
+/** Map the secrets probe (or its absence) to a plain label. The `error` label is
+ *  derived HONESTLY from whichever counter(s) the payload carries — never a
+ *  fabricated number. */
+function secretsLabel(probe: SecretsProbe | undefined | null): string {
+  if (!probe) return "—"
+  if (probe.state === "encrypted") return "Encrypted"
+  if (probe.state === "plaintext") return "Plaintext (no key set)"
+  // error: name the unreadable and/or not-encrypted counts.
+  const unreadable = probe.columns_unreadable ?? 0
+  const plaintext = probe.columns_plaintext ?? 0
+  if (unreadable && plaintext) return `${unreadable} unreadable, ${plaintext} not encrypted`
+  if (unreadable) return `${unreadable} secret${unreadable === 1 ? "" : "s"} unreadable`
+  if (plaintext) return `${plaintext} secret${plaintext === 1 ? "" : "s"} not encrypted`
+  return "Encryption error"
+}
+
+/** The one-line plain subtext grounding the secrets state. */
+function secretsSub(probe: SecretsProbe | undefined | null): string {
+  if (!probe) return "secret keys at rest"
+  if (probe.state === "encrypted") return "Secret keys encrypted at rest"
+  if (probe.state === "plaintext") return "Set a key to encrypt secrets at rest"
+  return "Secret keys need attention"
+}
+
 /** The four plain-labeled health signals with a raw-name reveal (D-07). */
 export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
   const loading = signals === null
@@ -144,6 +197,12 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
   // backend has not shipped Plan 147-04 yet (or while loading) `dependencies` is
   // absent → every probe reads "unknown" (neutral placeholder), never a crash.
   const deps = signals?.dependencies
+
+  // Phase 150 (SEC-01) — the secrets-at-rest state rides the SAME payload. When the
+  // backend has not shipped Plan 150-05 yet (or while loading) it is absent →
+  // the tile reads "unknown" (neutral placeholder), never red, never a crash.
+  const secrets = signals?.secrets_encryption
+  const secretsState: SecretsState = loading || !secrets ? "unknown" : secrets.state
 
   return (
     <div className="space-y-3">
@@ -210,6 +269,42 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
             </div>
           )
         })}
+      </div>
+
+      {/* Phase 150 (SEC-01 / D-150-02) — at-rest secrets encryption state. One tile
+          mirroring the dependency markup: green encrypted / NEUTRAL plaintext-no-key
+          (never red — Pitfall 6) / red error naming the unreadable+not-encrypted
+          counts. Absent (older backend / loading) → neutral placeholder. */}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-2.5 sm:grid-cols-3",
+          loading && "opacity-40",
+        )}
+        aria-busy={loading}
+      >
+        <div className="rounded-[10px] border border-border bg-card px-3.5 py-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              aria-hidden="true"
+              className={cn("h-1.5 w-1.5 flex-none rounded-full", SECRETS_DOT[secretsState])}
+            />
+            Secrets at rest
+          </div>
+          <div className="text-sm font-semibold leading-tight text-foreground">
+            {secretsLabel(secrets)}
+          </div>
+          <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
+            {secretsSub(secrets)}
+          </div>
+          {showTechnical && (
+            <div
+              className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60"
+              title="secrets_encryption.state"
+            >
+              secrets_encryption.state
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
