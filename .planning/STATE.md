@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-13T17:57:51.100Z"
+status: verifying
+last_updated: "2026-07-13T18:07:19.902Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 26
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 41
-  completed_plans: 40
-  percent: 15
+  completed_plans: 41
+  percent: 19
 ---
 
 # Project State
@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 150 (secrets-at-rest) — EXECUTING
-Plan: 5 of 5 (Plans 01-04 complete)
-Status: Ready to execute
-Last activity: 2026-07-13 -- Phase 150 Plan 04 complete (boot key-gate + eager sweep + failed-save 500)
+Phase: 150 (secrets-at-rest) — READY FOR VERIFICATION
+Plan: 5 of 5 (all plans complete)
+Status: All 5 plans executed — ready for `/gsd:verify-work 150` → `/gsd:secure-phase 150` (SEC-01 still OPEN)
+Last activity: 2026-07-13 -- Phase 150 Plan 05 complete (Control Plane secrets_encryption tile)
+
+**150-05 execution notes (2026-07-13) — Control Plane secrets_encryption signal (D-150-02), the phase's only frontend touch:**
+
+- 2/2 tasks, sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 `e206ece5` (backend payload + focused test); Task 2 `0a9fe0eb` (api.ts type + HealthSignals tile).
+- **Additive backend field (`admin.py` `get_backpressure`):** after the Phase-147 `dependencies = await probe_dependencies()` line, computes `secrets_encryption = encryption_status(raw_row)` where `raw_row = await _load_settings_from_db()` — the RAW (ciphertext) 30s-cached row, NOT the decrypted `load_app_settings()` (which would misread every value as lingering plaintext → false "error"). Appended as a NEW key; the four existing signals + the `dependencies` block stay byte-identical (D-078-08). **Best-effort:** the raw-load + status compute are wrapped in try/except → degrade to `{"state": "plaintext"}` on any failure; the health endpoint can never 500 on this field (dep-probe posture). Both symbols imported lazily inside the handler (matches the `probe_dependencies` lazy-import precedent).
+- **Focused test (`test_150_backpressure_secrets.py`, 4 cases, HTTP-client harness = SAME as `-k backpressure`):** proves the field DIRECTLY (Nyquist) — `state ∈ {encrypted,plaintext,error}` + existing keys present; **encrypted over a ciphertext row** (locks the RAW-row contract — a decrypted row here would report error); **error + `columns_plaintext=1`** on lingering plaintext under an active key (swallowed-sweep case); **degrade-to-plaintext** when `_load_settings_from_db` raises (no 500). Stubs `probe_dependencies` + monkeypatches the raw-row loader to a known dict; the key is set via `monkeypatch.setattr(settings, "secrets_encryption_key", Fernet.generate_key())`.
+- **Frontend tile (`api.ts` + `HealthSignals.tsx`):** `BackpressureSignals` gains an OPTIONAL `secrets_encryption?: {state; columns_unreadable?; columns_plaintext?}` (three-state union, back-compat — an older backend omits it). One tile after the dependency grid mirroring the DEP markup: `encrypted`=`bg-success` "Encrypted"; `plaintext`(no key)=`bg-muted-foreground/40` NEUTRAL grey "Plaintext (no key set)" (**never `bg-destructive`** — Pitfall 6); `error`=`bg-destructive` with an HONEST label naming `columns_unreadable` and/or `columns_plaintext` ("N unreadable, M not encrypted"); absent/loading=neutral `bg-muted-foreground/25` placeholder (no crash, no red). Raw `secrets_encryption.state` revealed under the Technical-names toggle. The four-signal grid + three dependency tiles untouched.
+- **Gates:** `pytest -k backpressure` → 10/10; `pytest tests/test_150_backpressure_secrets.py` → 4/4; `npx vite build` exit 0. Self-check PASSED (4 files on disk + both commits in history).
+- **SEC-01 stays OPEN** (false-green avoidance, 148/149 convention) — the phase requirement closes at verify-work/secure-phase now that all 5 plans have landed. **Cloud parity DEFERRED** (standing checklist): mig 100 (secret columns) + the `SECRETS_ENCRYPTION_KEY` Coolify env var before Phase 150 ships live.
+- **SDK quirks (unchanged from 150-02/03/04):** `state.advance-plan` detected `last_plan` (current_plan 5, status `ready_for_verification`), bumped frontmatter `completed_plans`→41 + `completed_phases`→5 + `status: verifying`; `state.update-progress` returned "Progress field not found" (STATE.md uses the frontmatter `progress:` block) → Current Position hand-updated; `roadmap.update-plan-progress 150` checked the 150-05 box + reported `summary_count: 5 / status Complete` but LEFT the progress-table row `4/5 | Executing` stale → hand-fixed to `5/5 | Complete | 2026-07-13`.
 
 **150-04 execution notes (2026-07-13) — boot-time key gate + eager sweep + D-150-07 HTTP 500, backend-only:**
 
