@@ -1022,6 +1022,35 @@ EXPLORER_SYSTEM_PROMPT = (
 )
 
 
+FETCH_DOCUMENT_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "fetch_document_file",
+        "description": (
+            "Use when you need the REAL original file bytes of a knowledge-base document "
+            "in the sandbox so you can convert, render, or process the actual file — it is "
+            "written to /sandbox/input/<filename> and the exact path is returned, ready to "
+            "open in execute_code (e.g. with python-docx, openpyxl, pypdf). "
+            "Do not use for reading a document's text — use read_document or "
+            "analyze_document for that. Only available when the sandbox is enabled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "string",
+                    "description": (
+                        "UUID of the knowledge-base document whose original file to fetch "
+                        "into the sandbox."
+                    ),
+                },
+            },
+            "required": ["document_id"],
+        },
+    },
+}
+
+
 def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict]:
     """Return the active tool list based on per-user effective settings."""
     effective = user_settings if user_settings is not None else None
@@ -1066,6 +1095,10 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
         tools.append(WEB_SEARCH_TOOL)
     if sandbox_enabled:
         tools.append(EXECUTE_CODE_TOOL)
+        # Phase 151 FILE-02 — sandbox-gated (D-11 / Pitfall 6): fetch_document_file
+        # materializes bytes INTO the container, so it is meaningless when the sandbox
+        # is off. Also refused in-flight via _CAPABILITY_FLAG_TOOLS (defense-in-depth).
+        tools.append(FETCH_DOCUMENT_FILE_TOOL)
     return tools
 
 

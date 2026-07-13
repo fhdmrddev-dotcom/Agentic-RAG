@@ -882,6 +882,13 @@ class Settings(BaseSettings):
     # so the agent loop continues. Generous default so legitimate heavy analysis
     # is unaffected; operator-tunable via env SANDBOX_EXEC_TIMEOUT_SECONDS.
     sandbox_exec_timeout_seconds: int = 180
+    # Phase 151 (FILE-02 / D-02) — size cap for fetch_document_file. The tool streams a
+    # KB document's ORIGINAL bytes to /sandbox/input/ (disk, never model context); a file
+    # larger than this is refused PRE-download with an honest size error (refuse-never-
+    # truncate — a half binary is corrupt). Chosen as an env-backed config.Settings field
+    # (mirrors sandbox_exec_timeout_seconds above) rather than an app_settings column, to
+    # avoid a second migration this phase. Operator-tunable via env FETCH_DOCUMENT_FILE_MAX_MB.
+    fetch_document_file_max_mb: int = 50
 
     # Concurrency (Phase 058 — D-058-07)
     # Total AnyIO thread-pool tokens. FastAPI defaults to 40, which is the

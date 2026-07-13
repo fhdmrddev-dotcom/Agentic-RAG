@@ -27,6 +27,10 @@ from starlette.concurrency import run_in_threadpool
 
 from app.utils.db import aexec
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
+# Phase 151 (FILE-02) — owner→global doc-scope fallback (mirrors read_path). Module-level
+# (patch-where-used friendly) and cycle-safe: folder_utils imports only dependencies/db,
+# never tool_dispatcher.
+from app.utils.folder_utils import get_globally_visible_folder_ids
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
@@ -247,6 +251,146 @@ async def _handle_read_document(args: dict, ctx: ToolContext) -> ToolResult:
         args.get("end_line"),
     )
     return ToolResult(result=json.dumps(result))
+
+
+# ---------------------------------------------------------------------------
+# Phase 151 (FILE-02) — fetch_document_file: KB document original bytes → sandbox
+# ---------------------------------------------------------------------------
+async def _fetch_owned_document_bytes(
+    ctx: ToolContext, document_id: str
+) -> "tuple[str, bytes, str] | dict":
+    """Resolve a KB document's ORIGINAL bytes, owner→global scoped (D-04).
+
+    Mirrors ``read_path``'s owner→global two-step (kb.py:395-416) but SELECTs the
+    storage columns instead of ``full_markdown``. Returns EITHER:
+
+      * ``{"error": ...}`` — not found / access denied (D-04 / SC#4), no original file
+        stored (D-01), or over the operator cap (D-02, computed PRE-download so a
+        too-large file is NEVER partially fetched — refuse-never-truncate); OR
+      * ``(filename, file_bytes, mime_type)`` on success.
+
+    Owner-scope is load-bearing: service-role reads have NO RLS backstop, so the
+    ``.eq(user_id)`` gate runs FIRST and a non-owner id yields empty ``.data``.
+
+    This is the FILE-01 source #4 contract — Plan 04 imports THIS symbol to attach an
+    owned KB document's original bytes onto a skill. Keep the ``(filename, bytes, mime)``
+    tuple / ``{"error": ...}`` dict return shape stable for that reuse.
+    """
+    uid = ctx.current_user["id"]
+    _cols = "id, filename, file_path, file_size, mime_type"
+
+    res = await aexec(
+        ctx.supabase.table("documents").select(_cols)
+        .eq("id", document_id).eq("user_id", uid).maybe_single()
+    )
+    row = res.data if res else None
+    if not row:
+        # Owner miss → globally-visible-folder fallback (matches read_document scope, D-04).
+        gfids = await get_globally_visible_folder_ids(ctx.supabase, uid)
+        if gfids:
+            res = await aexec(
+                ctx.supabase.table("documents").select(_cols)
+                .eq("id", document_id).in_("folder_id", gfids).maybe_single()
+            )
+            row = res.data if res else None
+    if not row:
+        return {"error": f"Document '{document_id}' not found or access denied."}
+
+    # D-01: never silently write extracted text as a file — the contract is always
+    # REAL bytes. An older text-only ingest (or a doc with no stored original) gets an
+    # honest error; the agent decides on its own whether to fall back to read_document.
+    if not row.get("file_path"):
+        return {"error": (
+            "No original file stored for this document — use read_document/"
+            "analyze_document for its text."
+        )}
+
+    # D-02: size gate PRE-download. Bytes go to disk via copy_to_runtime, never into the
+    # ToolResult / model context; an over-cap file is refused with an honest size error
+    # and NOTHING is downloaded (no partial binary is ever fetched).
+    cap_bytes = settings.fetch_document_file_max_mb * 1024 * 1024
+    file_size = row.get("file_size") or 0
+    if file_size > cap_bytes:
+        return {"error": (
+            f"File is {file_size // 1024 // 1024} MB, over the "
+            f"{cap_bytes // 1024 // 1024} MB fetch limit."
+        )}
+
+    # Pull the real bytes — threadpool-wrapped (D-v2.5-01, Pitfall 1). NOT the un-wrapped
+    # storage.download at :1114 — that idiom freezes the event loop under WORKER_COUNT=2.
+    file_bytes = await run_in_threadpool(
+        ctx.supabase.storage.from_("documents").download, row["file_path"]
+    )
+    filename = row.get("filename") or "document"
+    mime_type = row.get("mime_type") or "application/octet-stream"
+    return (filename, file_bytes, mime_type)
+
+
+async def _handle_fetch_document_file(args: dict, ctx: ToolContext) -> ToolResult:
+    """FILE-02 — materialize a KB document's ORIGINAL bytes into the sandbox (D-03).
+
+    G-5: handler + one ``_TOOL_REGISTRY`` line + one ``get_tools()`` schema; threads.py
+    untouched, no ``provider ==`` fork. Sandbox-gated (D-11) in ``get_tools()`` AND refused
+    in-flight via ``_CAPABILITY_FLAG_TOOLS``. Honesty is the point (D-01): a text
+    reconstruction is NEVER presented as the real file — this tool only ships REAL bytes,
+    else an honest error via the shared honest-failure convention.
+    """
+    import re as _re_local
+    import os as _os_local
+    import tempfile as _tempfile_local
+
+    document_id = (args.get("document_id") or "").strip()
+    if not document_id:
+        return ToolResult(result=json.dumps({"error": "document_id is required."}))
+
+    resolved = await _fetch_owned_document_bytes(ctx, document_id)
+    if isinstance(resolved, dict):  # honest-failure convention (D-01 / D-02 / D-04)
+        return ToolResult(result=json.dumps(resolved))
+    filename, doc_bytes, mime_type = resolved
+
+    # T-01 path-traversal defense — os.path.basename + the workspace.py:184 charset scrub.
+    # NEVER trust documents.filename (user-set at upload): a crafted "../../etc/x" must land
+    # as a scrubbed basename UNDER /sandbox/input/, with no ".." segment.
+    stem = _os_local.path.basename(filename or "document")
+    safe = _re_local.sub(r"[^a-zA-Z0-9._\- ]", "_", stem)
+    safe = _re_local.sub(r"\.{2,}", ".", safe).strip() or "document"
+    container_path = f"/sandbox/input/{safe}"
+
+    def _ship() -> None:
+        """Synchronous sandbox interaction (run in a threadpool — blocking I/O)."""
+        session = sandbox_manager.get_or_create(ctx.thread_id)
+        try:
+            session.execute_command("mkdir -p /sandbox/input")  # D-03 landing dir
+        except Exception:
+            pass
+        # Clone the render_template copy-in (tool_dispatcher.py:2549-2568): local
+        # NamedTemporaryFile → copy_to_runtime (put_archive handles a large binary; a
+        # base64-in-source injection does not — do NOT copy the :1114-1122 path).
+        with _tempfile_local.NamedTemporaryFile(mode="wb", delete=False) as _tmp:
+            _tmp.write(doc_bytes)
+            _local = _tmp.name
+        try:
+            session.copy_to_runtime(_local, container_path)
+        finally:
+            try:
+                _os_local.unlink(_local)
+            except OSError:
+                pass
+
+    try:
+        await run_in_threadpool(_ship)  # D-v2.5-01 — ALL container/Storage I/O off-loop
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        logger.exception("fetch_document_file ship failed for doc %s", document_id)
+        return ToolResult(result=json.dumps({
+            "error": f"Failed to materialize the file into the sandbox: {exc}"
+        }))
+
+    return ToolResult(result=json.dumps({
+        "status": "ok",
+        "path": container_path,
+        "size_bytes": len(doc_bytes),
+        "mime_type": mime_type,
+    }))
 
 
 async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
@@ -3223,6 +3367,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "query_documents_by_view": _handle_query_documents_by_view,
     # Phase 116 (REL-04) — registry + get_tools BOTH (SC#1 dual-wiring); G-5: handler + one line, threads.py untouched
     "get_related_documents": _handle_get_related_documents,
+    # Phase 151 (FILE-02) — registry + get_tools BOTH (sandbox-gated); G-5: handler + one line, threads.py untouched
+    "fetch_document_file": _handle_fetch_document_file,
 }
 
 
@@ -3277,6 +3423,10 @@ _CAPABILITY_FLAG_TOOLS: dict[str, tuple[str, str]] = {
     "web_search": ("web_search_enabled", "Web search"),
     "execute_code": ("sandbox_enabled", "Code execution"),
     "save_skill": ("self_improve_enabled", "Self-improvement (skill saving)"),
+    # Phase 151 (FILE-02 / D-11) — fetch_document_file materializes bytes INTO the
+    # sandbox, so the sandbox kill-switch also refuses it in-flight (fail-closed,
+    # provider-uniform — the get_tools HIDE layer's defense-in-depth sibling).
+    "fetch_document_file": ("sandbox_enabled", "Document file fetch"),
 }
 
 
