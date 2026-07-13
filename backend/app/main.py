@@ -121,13 +121,12 @@ _PROVIDER_MODEL_KEYS: set[str] = {
 }
 
 # CR-01 fix: allowset for API key column names prevents SQL injection
-# from crafted JSON keys like "x; DROP TABLE --_api_key"
-_API_KEY_COLUMNS: set[str] = {
-    "openai_api_key", "anthropic_api_key", "google_api_key",
-    "openrouter_api_key", "ollama_api_key", "deepseek_api_key",
-    "moonshot_api_key", "minimax_api_key", "zhipu_api_key",
-    "embedding_api_key", "rerank_api_key", "tavily_api_key",
-}
+# from crafted JSON keys like "x; DROP TABLE --_api_key".
+# Phase 150 (SEC-01) — single source of truth: re-pointed to the cipher module's
+# SECRET_COLUMNS frozenset (identical 12-column set; secret_cipher does NOT import main,
+# so there is no cycle). The legacy use at _migrate_settings_override (`key in
+# _API_KEY_COLUMNS`) works unchanged against a frozenset.
+from app.security.secret_cipher import SECRET_COLUMNS as _API_KEY_COLUMNS
 
 
 async def _migrate_settings_override() -> None:
@@ -138,6 +137,10 @@ async def _migrate_settings_override() -> None:
     Idempotent: no-op if JSON file absent (D-05).
     Fail-safe: on any DB error, leaves file untouched for fallback (D-03).
     On success: renames file to .migrated (D-04).
+
+    Phase 150 (SEC-01 / RESEARCH Pattern 5): this legacy path writes secret values as
+    PLAINTEXT — no encryption is added here. The eager secret sweep (_sweep_secret_columns,
+    later in the SAME lifespan boot) encrypts whatever this migration wrote (D-150-03 backstop).
     """
     import json as _json
 
@@ -223,6 +226,63 @@ async def _migrate_settings_override() -> None:
     )
 
 
+def _validate_and_report_cipher():
+    """Phase 150 (SEC-01 / D-150-04 / D-150-01) — boot-time master-key gate.
+
+    Called UN-wrapped from lifespan (NO best-effort try/except — Pitfall 6). Returns the
+    active MultiFernet, or None when no key is configured. Polarity:
+      - MALFORMED SECRETS_ENCRYPTION_KEY -> get_cipher() raises ValueError, which PROPAGATES
+        out of this function and out of lifespan, so ALL WORKER_COUNT=2 workers refuse to
+        start (D-150-04 fail-hard). A typo'd key must NEVER silently boot plaintext. Mirrors
+        the assert_action_types_synced hard-fail / the 075.4 UnknownProviderError.
+      - MISSING key -> get_cipher() None -> one loud WARNING naming SECRETS_ENCRYPTION_KEY;
+        secrets remain PLAINTEXT at rest (D-150-01 fail-open). Returns None.
+    """
+    from app.security.secret_cipher import get_cipher
+    cipher = get_cipher()  # malformed key -> ValueError propagates (NOT swallowed)
+    if cipher is None:
+        logger.warning(
+            "SECRETS_ENCRYPTION_KEY is not set — provider/API secrets in app_settings are "
+            "stored PLAINTEXT at rest until it is configured (D-150-01 fail-open)."
+        )
+    return cipher
+
+
+async def _sweep_secret_columns(pool) -> dict[str, str]:
+    """Phase 150 (SEC-01 / D-150-03 / D-150-06) — eager, idempotent at-rest secret sweep.
+
+    Reads the id='global' app_settings row, asks sweep_row which secret columns need
+    (re)encryption (plaintext -> enc:v1:, or a value under an OLD key -> rotate to the
+    primary key), and issues ONE parameterized UPDATE writing ONLY the changed columns.
+    Returns the {col: new_enc_value} that changed ({} when already converged — a no-op boot).
+
+    Idempotent (D-150-03): sweep_row skips values already under the primary key, so a second
+    call returns {} and issues no UPDATE. WORKER_COUNT=2-safe with NO lock — encrypting the
+    same plaintext twice yields two valid ciphertexts (last-writer-wins, both decrypt
+    identically), and the enc:v1: prefix check keeps it from re-wrapping. Column names are
+    from sweep_row's SECRET_COLUMNS allowlist (never user input -> SQLi-safe, T-081.1-04);
+    values are parameterized ($N). Logs NEVER carry a value or token (T-150-02).
+    """
+    from app.security.secret_cipher import sweep_row
+
+    row = await pool.fetchrow("SELECT * FROM app_settings WHERE id = 'global'")
+    if row is None:
+        return {}
+    changed = sweep_row(dict(row))
+    if not changed:
+        return {}
+
+    cols = list(changed.keys())
+    set_clause = ", ".join(f"{col} = ${i + 1}" for i, col in enumerate(cols))
+    vals = list(changed.values())
+    vals.append("global")  # WHERE id = $N
+    await pool.execute(
+        f"UPDATE app_settings SET {set_clause}, updated_at = now() WHERE id = ${len(vals)}",
+        *vals,
+    )
+    return changed
+
+
 @asynccontextmanager
 async def lifespan(app_instance):
     # Startup: bump AnyIO default thread limiter so SSE-path .execute()
@@ -250,6 +310,28 @@ async def lifespan(app_instance):
         await _migrate_settings_override()
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
+
+    # Phase 150 (SEC-01) — at-rest secret encryption: boot-time key gate + eager sweep.
+    # TWO steps in DELIBERATELY DIFFERENT polarities (RESEARCH §Pattern 4):
+    #   (1) KEY VALIDATION is HARD-FAIL — _validate_and_report_cipher() is called UN-wrapped
+    #       (NO try/except, Pitfall 6): a MALFORMED key raises ValueError that refuses startup
+    #       for all WORKER_COUNT=2 workers (D-150-04, mirrors assert_action_types_synced below /
+    #       the 075.4 UnknownProviderError); a MISSING key warns + boots plaintext (D-150-01).
+    #   (2) EAGER SWEEP is BEST-EFFORT (try/except -> log + continue, mirrors the operator-seed
+    #       block below), runs ONLY when a key is present, encrypts existing plaintext in place +
+    #       rotates non-primary values (D-150-03 idempotent / D-150-06 rotation). Runs AFTER
+    #       _migrate_settings_override() so it encrypts whatever the legacy migration just wrote.
+    _secret_cipher = _validate_and_report_cipher()  # UN-wrapped: malformed key => refuse startup
+    if _secret_cipher is not None:
+        try:
+            _swept = await _sweep_secret_columns(await get_pg_pool())
+            if _swept:
+                logger.info(
+                    "Secret sweep encrypted/rotated %d secret column(s): %s",
+                    len(_swept), sorted(_swept.keys()),
+                )
+        except Exception as e:
+            logger.error("Secret sweep failed (app continues; retries next boot): %s", e)
 
     # Phase 146 D-01: idempotent operator bootstrap from OPERATOR_EMAILS (after the
     # asyncpg pool is ensured). The DB table (operator_users) is the runtime source of
