@@ -925,6 +925,14 @@ class Settings(BaseSettings):
     # backpressure allow-list + dev fail-open with the require_operator gate (D-02).
     environment: str = ""
 
+    # Phase 150 (SEC-01) — comma-separated MultiFernet key list; FIRST key encrypts,
+    # the rest are decrypt-only (rotation). Secret/infra → env only per CLAUDE.md;
+    # binds the env var SECRETS_ENCRYPTION_KEY via pydantic-settings. Empty =>
+    # D-150-01 fail-open (secrets stay/save plaintext) + a loud boot warning. A
+    # malformed key => D-150-04 fail-hard (refuse to start). Generate one with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    secrets_encryption_key: str = ""
+
     # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout
     # wrapper at threads.py:855 has been DELETED. The agent loop now has no
     # hard total cap (matches Claude/ChatGPT UX where complex tool-calling
