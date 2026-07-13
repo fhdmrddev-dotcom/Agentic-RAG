@@ -102,8 +102,12 @@ def sweep_row(row: dict) -> dict[str, str]:
 
     For each present, non-empty string value in SECRET_COLUMNS:
       - not enc:v1:                                  -> encrypt under the primary key
-      - enc:v1: but NOT decryptable by the primary   -> rotate() re-wrap under primary
+      - enc:v1:, decryptable by an OLDER key         -> rotate() re-wrap under primary
       - enc:v1: and already under the primary        -> skip (idempotent no-op)
+      - enc:v1: but NO configured key can decrypt    -> SKIP (WR-01) + log by name; the
+        column can't be rotated, so it is left untouched and the loop CONTINUES sweeping
+        the rest. This case is surfaced honestly by encryption_status (columns_unreadable);
+        one poisoned column must NEVER abort the whole pass.
 
     Returns only the CHANGED ``{col: enc_value}`` — an empty dict means converged.
     """
@@ -129,8 +133,26 @@ def sweep_row(row: dict) -> dict[str, str]:
             primary.decrypt(token)  # already under the primary key?
         except InvalidToken:
             # Decryptable by an OLDER key -> rotate to the primary (never blind-rotate).
-            rotated = cipher.rotate(token).decode()
-            changed[col] = f"{_ENVELOPE_PREFIX}{rotated}"
+            # WR-01: guard the rotate. A token NO configured key can decrypt (a key fully
+            # removed from the env, or corrupt/tampered ciphertext) makes rotate() raise
+            # InvalidToken too. Without this guard that exception would propagate out of
+            # sweep_row, DISCARDING every column already queued in `changed` and aborting
+            # the whole pass — so the sweep could never converge and the failure recurred
+            # identically on every boot, leaving other plaintext columns unencrypted at
+            # rest. Record the bad column by NAME only (never the value/token) and CONTINUE
+            # so the rest of the row still (re)encrypts. The lingering state is surfaced
+            # honestly by encryption_status (columns_unreadable) — one poisoned column must
+            # not block encrypting the rest.
+            try:
+                rotated = cipher.rotate(token).decode()
+                changed[col] = f"{_ENVELOPE_PREFIX}{rotated}"
+            except InvalidToken:
+                logger.error(
+                    "secret_cipher: column %s is not decryptable by any configured key; "
+                    "cannot rotate -- skipping (surfaced via encryption_status)",
+                    col,
+                )
+                continue
 
     if changed:
         logger.info(

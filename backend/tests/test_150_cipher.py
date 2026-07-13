@@ -135,6 +135,34 @@ def test_sweep_encrypts_plaintext(monkeypatch):
     assert sweep_row({"embedding_api_key": changed["embedding_api_key"]}) == {}
 
 
+def test_sweep_skips_undecryptable_and_continues(monkeypatch):
+    """WR-01: a column no configured key can decrypt must NOT abort the whole sweep.
+
+    A foreign-key enc:v1: token sits alongside a healthy plaintext column. Before the fix,
+    cipher.rotate() on the foreign token raised InvalidToken out of sweep_row, discarding
+    the plaintext column's encryption and recurring on every boot. The sweep must skip the
+    poisoned column and still encrypt the healthy plaintext one — one bad column cannot
+    block encrypting the rest.
+    """
+    foreign_key = Fernet.generate_key().decode()
+    foreign_enc = encrypt_secret("sk-foreign", MultiFernet([Fernet(foreign_key)]))
+
+    _set_key(monkeypatch, Fernet.generate_key().decode())  # a DIFFERENT active key
+
+    # No exception is raised (the whole point) and the healthy column is still processed.
+    changed = sweep_row({
+        "openai_api_key": foreign_enc,       # undecryptable by ANY active key
+        "embedding_api_key": "plainsecret",  # healthy plaintext — must still encrypt
+    })
+
+    assert "embedding_api_key" in changed, "the healthy column must be encrypted despite the poison"
+    assert changed["embedding_api_key"].startswith("enc:v1:")
+    assert "openai_api_key" not in changed, "the undecryptable column is skipped, never rotated"
+
+    cipher = get_cipher()
+    assert decrypt_secret(changed["embedding_api_key"], cipher) == "plainsecret"
+
+
 # ── encryption_status: error states ─────────────────────────────────────────────
 
 def test_encryption_status_error(monkeypatch):
