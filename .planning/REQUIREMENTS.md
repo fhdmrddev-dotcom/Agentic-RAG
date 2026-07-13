@@ -29,7 +29,7 @@ Requirements for this milestone. Each maps to roadmap phases. CORE vs gated-STRE
 
 - [x] **MODEL-01**: Operator can edit model capabilities (enable/disable, max tokens, timeout, native tools, deprecated) from the admin shell — a write UI + operator-gated write path over the ALREADY-LIVE `model_capabilities_overrides` table and hot-path read (mig 053); changes take effect without a server restart (existing TTL cache)
 - [x] **MODEL-02**: Operator can run live model discovery — a service (lifted from `scripts/curate_models.py`) queries each provider's `/models` endpoint and PROPOSES new/changed/vanished models for human confirmation; discovery never auto-enables capabilities the endpoint didn't return (only 2 of 8 providers return capability metadata)
-- [ ] **SEC-01**: Provider API keys stored in `app_settings` are encrypted at rest (app-layer `cryptography` Fernet/AESGCM — NOT pgsodium, which Supabase is deprecating) with the env-var fallback precedence preserved so local dev and existing deployments keep working unchanged; key saves are round-trip verified (never silently swallowed)
+- [x] **SEC-01**: Provider API keys stored in `app_settings` are encrypted at rest (app-layer `cryptography` Fernet/AESGCM — NOT pgsodium, which Supabase is deprecating) with the env-var fallback precedence preserved so local dev and existing deployments keep working unchanged; key saves are round-trip verified (never silently swallowed)
 
 ### Deployment & Packaging (Track 3, STRETCH tail per research)
 
