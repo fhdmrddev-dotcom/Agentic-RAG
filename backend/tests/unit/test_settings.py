@@ -214,6 +214,7 @@ async def test_update_settings_persists_registry_judge_model(monkeypatch):
 
     async def _fake_save(updates):
         captured.update(updates)
+        return True  # real save_app_settings returns True on success (D-150-07: falsy => 500)
 
     async def _fake_load():
         return _fake_settings()
