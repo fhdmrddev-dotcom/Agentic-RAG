@@ -467,6 +467,16 @@ CREATE TABLE public.app_settings (
     maintenance_mode boolean DEFAULT false,
     feature_visibility jsonb DEFAULT '{}'::jsonb NOT NULL,
     llm_model_locked boolean DEFAULT false NOT NULL,
+    openai_api_key text,
+    anthropic_api_key text,
+    google_api_key text,
+    openrouter_api_key text,
+    ollama_api_key text,
+    deepseek_api_key text,
+    moonshot_api_key text,
+    minimax_api_key text,
+    zhipu_api_key text,
+    tavily_api_key text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
