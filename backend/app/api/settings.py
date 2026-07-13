@@ -450,7 +450,15 @@ async def update_settings(
     prev_model = prev_settings.embedding_model
     prev_dims = prev_settings.embedding_dimensions
 
-    await save_app_settings(updates)
+    # Phase 150 (SEC-01 / D-150-07 / SC#2) — surface the previously-ignored save bool as a
+    # real HTTP 500. save_app_settings SWALLOWS every DB-write exception and returns False (a
+    # pool blip / connection reset / an UndefinedColumn on an unmigrated secret column). The
+    # raise sits IMMEDIATELY after the save and BEFORE the audit write + the re-embed kick
+    # below, so a failed save never emits a false settings.update audit row or a spurious
+    # re-embed (Phase 147 CR-02 precedent; RESEARCH §Round-trip verification). Round-trip
+    # meaning (SC#2): save_app_settings encrypts-then-writes; the one read seam decrypts back.
+    if not await save_app_settings(updates):
+        raise HTTPException(status_code=500, detail="Failed to save settings")
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
         write_audit_entry,
