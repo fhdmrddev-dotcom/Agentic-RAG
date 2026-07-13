@@ -100,6 +100,12 @@ None for local dev. **Cloud parity (deferred, operator-gated):** at the next pro
 - Wave 2 unblocked: all 12 secret columns exist as `text` in the live local DB — Plan 03 (encrypt-on-write / ciphertext-at-rest) and Plan 04 (D-150-07 raise-on-failure sweep) can now target real columns.
 - SEC-01 intentionally NOT marked complete (mirrors 148/149 false-green-avoidance convention) — the phase requirement closes at verify-work/secure-phase after all 5 plans land.
 
+## Self-Check: PASSED
+
+- Files verified present: `supabase/migrations/100_secret_key_columns.sql`, `supabase/full-schema.sql`, `.planning/phases/150-secrets-at-rest/150-02-SUMMARY.md`
+- Commits verified in git log: `fbd6cb4e` (Task 1), `0bc5f83d` (Task 2)
+- Live DB assertion: all 12 secret columns present as `text` (automated psycopg2 check passed)
+
 ---
 *Phase: 150-secrets-at-rest*
 *Completed: 2026-07-13*

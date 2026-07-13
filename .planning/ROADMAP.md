@@ -230,7 +230,7 @@ Plans:
 **Plans**: 5 plans
 
 - [x] 150-01-PLAN.md — Cipher foundation: secret_cipher (MultiFernet + enc:v1: envelope + sweep/status helpers), env var, dependency, unit tests
-- [ ] 150-02-PLAN.md — Migration 100: add the 10 missing app_settings secret text columns (D-150-08); apply live + regenerate full-schema [BLOCKING]
+- [x] 150-02-PLAN.md — Migration 100: add the 10 missing app_settings secret text columns (D-150-08); apply live + regenerate full-schema [BLOCKING]
 - [ ] 150-03-PLAN.md — Encrypt/decrypt seams in user_settings.py (write + read, fail-soft to env) + SC#1 ciphertext-at-rest proof
 - [ ] 150-04-PLAN.md — Lifespan key-validation (hard-fail) + eager idempotent sweep + D-150-07 failed-save HTTP 500
 - [ ] 150-05-PLAN.md — Control Plane secrets_encryption tile (D-150-02): additive /admin/backpressure block + HealthSignals tile

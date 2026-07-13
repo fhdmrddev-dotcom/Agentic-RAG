@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T17:26:07Z"
-last_activity: 2026-07-13 -- Phase 150 Plan 01 complete (cipher foundation)
+last_updated: "2026-07-13T17:35:17.438Z"
+last_activity: 2026-07-13
 progress:
   total_phases: 26
   completed_phases: 4
   total_plans: 41
-  completed_plans: 37
+  completed_plans: 38
   percent: 15
 ---
 
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 150 (secrets-at-rest) — EXECUTING
-Plan: 2 of 5 (Plan 01 complete)
+Plan: 3 of 5 (Plans 01-02 complete)
 Status: Executing Phase 150
-Last activity: 2026-07-13 -- Phase 150 Plan 01 complete (cipher foundation)
+Last activity: 2026-07-13 -- Phase 150 Plan 02 complete (secret key columns migration)
+
+**150-02 execution notes (2026-07-13) — secret key columns migration, DB-only, additive:**
+
+- 2/2 tasks, sequential on the main tree (`use_worktrees=false`), no deviations. Task 1 `fbd6cb4e` (author mig 100); Task 2 [BLOCKING] `0bc5f83d` (apply live + regenerate full-schema).
+- **Authored `supabase/migrations/100_secret_key_columns.sql`** — 10 idempotent `ADD COLUMN IF NOT EXISTS {col} text` statements for the 9 `{provider}_api_key` + `tavily_api_key` (all plain `text`, NO default — a NULL secret = the correct "unset → env fallback" state per D-150-01/08). Global-row guard + full APPLY/regenerate/CLOUD-PARITY header (099/097 shape). No RLS change (app_settings = service-role write only).
+- **[BLOCKING] Applied to the live local Postgres via inline psycopg2** (127.0.0.1:54322; never a scratch `.py` in backend/, never `db push`/`db reset`). Was 2 secret columns (embedding_api_key + rerank_api_key) → now all 12 present as `text` (automated assertion passed; raw `SELECT openai_api_key` no longer `UndefinedColumn`). Closes the true root cause of the D-150-07 silent provider-key save.
+- **Regenerated `supabase/full-schema.sql`** (no --reset, live-DB dump, 4412 lines) — 10 new columns reflected. Cloud parity carried: `pending-cloud-migrations.sh` lists mig 100 (joins mig 099); DEFERRED to the standing production-push checklist (do NOT touch cloud now).
+- **Wave 2 unblocked:** encrypt-on-write (Plan 03) + D-150-07 raise-on-failure (Plan 04) now target real columns (RESEARCH Pitfall 2 closed). SEC-01 stays OPEN (false-green avoidance, 148/149 convention) — closes at verify-work/secure-phase after all 5 plans.
+- **SDK state quirks:** `state.update-progress` + `state.record-session` both returned "field not found" (STATE.md uses frontmatter `progress:` block + no section-based session fields) → hand-updated Current Position; frontmatter `completed_plans` advanced to 38 by `advance-plan`. `roadmap.update-plan-progress 150` = 2/5 summaries, In Progress.
 
 **150-01 execution notes (2026-07-13) — cipher foundation, backend-only, additive:**
 
@@ -408,6 +417,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 149 P09 | 7min | 2 tasks | 7 files |
 | Phase 149 P11 | 18min | 2 tasks | 2 files |
 | Phase 149 P12 | 12min | 1 tasks | 2 files |
+| Phase 150 P02 | 2 | 2 tasks | 2 files |
 
 ## Decisions
 
