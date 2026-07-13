@@ -187,6 +187,25 @@ async def get_backpressure():
     from app.services.health_probe import probe_dependencies
     dependencies = await probe_dependencies()
 
+    # 6. Secrets at-rest encryption state (Phase 150 SEC-01, D-150-02) — ADDITIVE,
+    # best-effort. encryption_status() MUST be fed the RAW (ciphertext) app_settings
+    # row from _load_settings_from_db() — the 30s-cached row holding CIPHERTEXT —
+    # NOT the decrypted load_app_settings()/_build_settings_from_row(), which would
+    # misread every already-decrypted value as lingering plaintext. Same posture as
+    # the dependency probes: a failed raw-row load (or a defensive cipher error) can
+    # NEVER raise out of the health endpoint — it degrades to the plaintext state.
+    from app.models.user_settings import _load_settings_from_db
+    from app.security.secret_cipher import encryption_status
+    try:
+        raw_settings_row = await _load_settings_from_db()
+        secrets_encryption = encryption_status(raw_settings_row)
+    except Exception as exc:
+        logger.warning(
+            "backpressure: secrets_encryption unavailable, reporting plaintext: %s",
+            type(exc).__name__,
+        )
+        secrets_encryption = {"state": "plaintext"}
+
     return {
         "anyio_threadpool_depth": {
             "borrowed": anyio_borrowed,
@@ -196,6 +215,7 @@ async def get_backpressure():
         "postgres_pool_in_use": pg_in_use,
         "per_worker_run_count": per_worker_run_count,
         "dependencies": dependencies,
+        "secrets_encryption": secrets_encryption,
     }
 
 
