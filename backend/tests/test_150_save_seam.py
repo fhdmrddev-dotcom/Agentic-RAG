@@ -116,3 +116,46 @@ async def test_non_secret_column_untouched(monkeypatch):
     stored = _stored_value(pool)
     assert stored == "text-embedding-3-large", "a non-secret column must never be encrypted"
     assert not stored.startswith("enc:v1:")
+
+
+async def test_injection_column_name_rejected(monkeypatch):
+    """CR-01: a crafted (non-identifier) column key NEVER reaches the SQL SET clause.
+
+    A malicious provider id can produce a key like ``llm_model = 'x', a_api_key`` that
+    ends in ``_api_key`` and slips past _is_valid_api_key's fall-through. The
+    _VALID_COLUMN_NAME guard rejects it BEFORE the SET clause is built, so the malicious
+    fragment is neither interpolated into SQL nor bound as a value. A legitimate column in
+    the SAME call still writes (the guard is per-key, not fail-the-whole-save).
+    """
+    _set_key(monkeypatch, "")  # focus on the column-name guard, not the encryption path
+    pool = _StubPool()
+    monkeypatch.setattr("app.dependencies._pg_pool", pool)
+
+    malicious = "llm_model = 'x', a_api_key"  # ends in _api_key → passes _is_valid_api_key
+    ok = await save_app_settings({malicious: "sk-inject", "llm_model": "gpt-5.4"})
+    assert ok is True
+
+    assert pool.execute_calls, "the legit column must still be written via the pool"
+    sql, args = pool.execute_calls[-1]
+    # The malicious fragment must NEVER appear in the built SQL.
+    assert "llm_model = 'x'" not in sql
+    assert malicious not in sql
+    # The injected value must not be among the bound params.
+    assert "sk-inject" not in args
+    # The legitimate column DID write (its value is bound).
+    assert "gpt-5.4" in args
+
+
+async def test_injection_only_key_writes_nothing(monkeypatch):
+    """CR-01: a save whose ONLY key is a non-identifier injection payload persists nothing.
+
+    With every key rejected, ``clean`` is empty → the no-op success branch returns True
+    WITHOUT issuing any UPDATE, so a lone injection attempt touches no SQL at all.
+    """
+    _set_key(monkeypatch, "")
+    pool = _StubPool()
+    monkeypatch.setattr("app.dependencies._pg_pool", pool)
+
+    ok = await save_app_settings({"openai_api_key = 'x'; DROP TABLE app_settings; --": "sk-evil"})
+    assert ok is True
+    assert pool.execute_calls == [], "a rejected-only save must issue no UPDATE"

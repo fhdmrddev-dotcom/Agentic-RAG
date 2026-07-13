@@ -6,6 +6,7 @@ from app.config import MODEL_CAPABILITIES, _infer_provider_for
 from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
+    KNOWN_PROVIDERS,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
@@ -326,6 +327,13 @@ async def update_settings(
     # D-17: Store provider model lists as JSONB dict instead of individual CSV keys
     provider_model_lists: dict[str, list[str]] = {}
     for p in body.providers:
+        # Phase 150 (CR-01, defense-in-depth): p.id is client input that becomes the raw
+        # column name f"{p.id}_api_key" downstream. Reject any unknown provider id at the
+        # boundary with 422 so a crafted id never reaches save_app_settings (whose own
+        # _VALID_COLUMN_NAME guard is the load-bearing fix). KNOWN_PROVIDERS is the same
+        # code-owned set GET /settings builds the provider list from.
+        if p.id not in KNOWN_PROVIDERS:
+            raise HTTPException(status_code=422, detail=f"Unknown provider: {p.id}")
         updates[f"{p.id}_api_key"] = p.api_key  # save_app_settings handles "***" skip
         if p.models:
             provider_model_lists[p.id] = p.models  # list, not CSV

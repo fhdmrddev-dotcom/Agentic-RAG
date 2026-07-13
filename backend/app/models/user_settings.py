@@ -9,6 +9,7 @@ Writes go through save_app_settings() via asyncpg (D-20).
 from __future__ import annotations
 
 import logging
+import re
 import time as _time
 from enum import Enum
 from typing import Any
@@ -56,6 +57,16 @@ _PROVIDER_KEY_PREFIXES: dict[str, str] = {
     # ollama_api_key: any non-sentinel non-empty
 }
 _SENTINEL_VALUES: frozenset[str] = frozenset({"***", "__KEEP__", "••••••"})
+
+# Phase 150 (CR-01, SQLi defense-in-depth): the ONLY shape a key is allowed to take
+# before save_app_settings splices it into the UPDATE SET clause as a RAW column name.
+# A legal SQL identifier (lower snake_case) cannot contain the spaces / quotes / '=' /
+# '-' / parens / ';' an injection needs to break out of the column-name position, so
+# this fully closes the client-controlled-column-name vector (the provider id in
+# settings.py's f"{p.id}_api_key", whose VALUE was validated but whose NAME was not).
+# An unknown-but-valid-identifier column simply errors as UndefinedColumn (caught by the
+# DB try/except → returns False → HTTP 500), never injects.
+_VALID_COLUMN_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def _is_valid_api_key(key: str, value: str) -> bool:
@@ -283,6 +294,20 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
     # Filter out sentinel / invalid API key values (D-14, T-081.1-07)
     clean: dict[str, Any] = {}
     for k, v in updates.items():
+        # Phase 150 (CR-01): reject any key that is not a safe SQL identifier BEFORE it can
+        # reach the SET clause below (which interpolates the column NAME into SQL). The
+        # provider id in settings.py's f"{p.id}_api_key" is client-controlled and only its
+        # VALUE is validated by _is_valid_api_key; a crafted id ending in "_api_key" would
+        # otherwise pass that helper's fall-through and splice a malicious column name
+        # verbatim into the SQL. A non-identifier key is skipped + logged by NAME only
+        # (never a value/token — T-081.1-04). This guard is applied to ALL keys, not only
+        # "_api_key" keys, and is the load-bearing fix (settings.py adds a boundary check).
+        if not isinstance(k, str) or not _VALID_COLUMN_NAME.match(k):
+            logger.warning(
+                "save_app_settings: rejected non-identifier column name (possible injection): %r",
+                k,
+            )
+            continue
         if v == KEY_PLACEHOLDER:
             continue
         if k.endswith("_api_key") and v is not None and not _is_valid_api_key(k, str(v)):
@@ -305,8 +330,11 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
     # plaintext str with its enc:v1: envelope; leave everything else byte-identical.
     #   - no key => get_cipher() None => plaintext passthrough (D-150-01).
     #   - already enc:v1: => is_encrypted guard skips it (no double envelope).
-    #   - non-secret column => not in SECRET_COLUMNS => never touched (the SQLi-safe
-    #     allowlist posture — we iterate code-owned column names, never user key names).
+    #   - non-secret column => not in SECRET_COLUMNS => never touched.
+    # NOTE (CR-01): this loop only decides WHICH VALUES get encrypted — it iterates the
+    # code-owned SECRET_COLUMNS, never user key names. It is NOT the SQL-injection guard.
+    # The column NAMES that reach the SET clause are made injection-safe by the
+    # _VALID_COLUMN_NAME identifier check in the filter loop above (do not conflate the two).
     # Never logs a value or token (T-081.1-04).
     from app.security.secret_cipher import (
         SECRET_COLUMNS,
