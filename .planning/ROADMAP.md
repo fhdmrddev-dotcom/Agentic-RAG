@@ -227,7 +227,13 @@ Plans:
   3. When a key is supplied via env var, the platform still works without any DB-stored secret (env-fallback precedence preserved; a DB read is never mandatory for a secret env can supply).
   4. Existing deployments and local dev continue to function with no manual key re-entry required.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+- [ ] 150-01-PLAN.md — Cipher foundation: secret_cipher (MultiFernet + enc:v1: envelope + sweep/status helpers), env var, dependency, unit tests
+- [ ] 150-02-PLAN.md — Migration 100: add the 10 missing app_settings secret text columns (D-150-08); apply live + regenerate full-schema [BLOCKING]
+- [ ] 150-03-PLAN.md — Encrypt/decrypt seams in user_settings.py (write + read, fail-soft to env) + SC#1 ciphertext-at-rest proof
+- [ ] 150-04-PLAN.md — Lifespan key-validation (hard-fail) + eager idempotent sweep + D-150-07 failed-save HTTP 500
+- [ ] 150-05-PLAN.md — Control Plane secrets_encryption tile (D-150-02): additive /admin/backpressure block + HealthSignals tile
 
 ### Phase 151: Agent File Tools
 
@@ -354,7 +360,7 @@ Plans:
 | 147. Operator Control Plane | 0/? | Not started | - |
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
-| 150. Secrets at Rest | 0/? | Not started | - |
+| 150. Secrets at Rest | 0/5 | Planned | - |
 | 151. Agent File Tools | 0/? | Not started | - |
 | 152. Workflow Run Inputs | 0/? | Not started | - |
 | 153. Inline Citations | 0/? | Not started | - |
