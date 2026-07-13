@@ -67,6 +67,10 @@ Sweep it fresh at milestone-start; this list is the snapshot as of 2026-07-13.
   BOTH a Settings toggle AND a Control Room kill-switch. Consolidate to one home.
 - **Dead-knob cleanup (F3/§I):** `title_drafting_config`, `sub_agent_config`, `token_capture_enabled`,
   `user_settings.preferences` (columns unread) → wire-or-remove.
+- **Resource-cap knobs → `app_settings` (from Phase 151 plan-review, 2026-07-13):** `fetch_document_file_max_mb`
+  (D-02, added as an env var in Phase 151 to avoid a second migration) + the existing `sandbox_exec_timeout_seconds`
+  are operator-tunable business caps currently living in `config.py` env vars, in tension with the "env vars = secrets/infra only"
+  rule. Consolidate both into `app_settings` alongside `template_ttl_hours` when this milestone builds the resource-cap tab (§1).
 
 ## Guardrails to carry in
 - This is a **config-consolidation** milestone touching the shared `app_settings` substrate + Settings/
