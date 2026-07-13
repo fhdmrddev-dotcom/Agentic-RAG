@@ -588,11 +588,55 @@ def _resolve_llm(row: dict, providers: list[LLMProvider]) -> tuple[str, str, str
 
 # ── Settings construction helper ─────────────────────────────────────────────
 
+def _decrypt_secret_columns(row: dict) -> dict:
+    """Phase 150 (SEC-01 / RESEARCH Pattern 3) — decrypt enc:v1: secret columns onto a COPY.
+
+    Returns ``row`` unchanged when no master key is configured (D-150-01). Otherwise
+    returns a shallow ``dict(row)`` copy in which each SECRET_COLUMNS value that carries
+    the enc:v1: envelope is replaced by its plaintext. Classification is STRICTLY by the
+    prefix (is_encrypted) — never by a blind decrypt (Pitfall 1: a plaintext value and a
+    wrong-key token both raise InvalidToken), so a legacy plaintext value is left as-is.
+
+    An undecryptable column (wrong / rotated-away key, or tampered ciphertext) is dropped
+    to ``None`` and logged by COLUMN NAME only (never the value/token). ``None`` then
+    engages the EXISTING _val DB>env fallback chain with zero new code — the platform
+    stays up on env credentials (D-150-04/05 fail-soft). Operating on a copy keeps the
+    30s _load_settings_from_db cache holding ciphertext (defense-in-depth) and makes this
+    pure-CPU so the sync load path works too.
+    """
+    from app.security.secret_cipher import (
+        SECRET_COLUMNS,
+        decrypt_secret,
+        get_cipher,
+        is_encrypted,
+    )
+    from cryptography.fernet import InvalidToken
+
+    cipher = get_cipher()
+    if cipher is None:
+        return row  # D-150-01 plaintext mode — nothing to decrypt
+
+    out = dict(row)  # COPY — the cached raw (ciphertext) row is never mutated
+    for col in SECRET_COLUMNS:
+        v = out.get(col)
+        if isinstance(v, str) and is_encrypted(v):
+            try:
+                out[col] = decrypt_secret(v, cipher)
+            except InvalidToken:
+                logger.error(
+                    "secret_cipher: column %s failed to decrypt; falling back to env (D-150-04)",
+                    col,
+                )
+                out[col] = None  # _val(row, col, col, env) -> env fallback engages (SC#3)
+    return out
+
+
 def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
     """Construct UserEffectiveSettings from a DB row dict.
 
     Shared between sync load_app_settings() and async load_app_settings_async().
     """
+    row = _decrypt_secret_columns(row)  # Phase 150 — decrypt-on-read seam (must be first)
     providers = _build_providers(row)
     api_key, base_url, model, available, active_provider = _resolve_llm(row, providers)
 
