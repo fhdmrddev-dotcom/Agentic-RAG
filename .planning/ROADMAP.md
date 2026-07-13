@@ -247,7 +247,13 @@ Plans:
   3. A user can hand the agent an existing template file mid-conversation and the agent attaches it to the skill.
   4. Neither tool can read or write another user's documents or skills (owner-scope enforced, proven cross-user), and both hold across providers (SC#10).
 
-**Plans**: TBD
+**Plans**: 4 plans (2 waves)
+
+Plans:
+- [ ] 151-01-PLAN.md — FILE-02 `fetch_document_file` (KB→sandbox READ tool, sandbox-gated, reusable owner-scope resolver, own T-01 threat model)
+- [ ] 151-02-PLAN.md — D-10 migration: `skill_files(skill_id, filename)` unique index (author + BLOCKING operator apply, enables D-07 upsert)
+- [ ] 151-03-PLAN.md — SC#3 upload allowlist widen: `validate_upload` + lockstep `TemplateUpload.tsx` accept= (D-09)
+- [ ] 151-04-PLAN.md — FILE-01 `attach_skill_file` (4-source WRITE tool, race-immune upsert, own T-02/T-03/T-04 threat model)
 **Note**: Internal build order FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload/threat pattern). Each carries its own threat model.
 
 ### Phase 152: Workflow Run Inputs
