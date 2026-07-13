@@ -348,18 +348,20 @@ else:
 | A5 | FILE-02 accepts a `document_id` primary (optionally a `filename` via `resolve_document_id`); `resolve_document_id` is owner-ONLY so a filename path can't reach a global-folder doc | Code Examples / Open Q3 | Low — document_id path fully matches D-04; filename is ergonomics |
 | A6 | Widened-upload text validation = utf-8-decodable + size guard; image validation = leading magic bytes | Code Examples (D-09) | Medium — exact allowlist + per-type checks are a planner/security decision (T-02) |
 
-## Open Questions
+## Open Questions (RESOLVED — plan-phase 2026-07-13)
 
-1. **D-07 overwrite: unique-index upsert (migration) vs read-check-then-write?**
+> All four resolved before planning. RESOLVED markers below point at the decision/plan that closed each.
+
+1. **D-07 overwrite: unique-index upsert (migration) vs read-check-then-write?** — **RESOLVED: unique-index migration** (operator picked "Add unique-index migration"). See CONTEXT.md **D-10** + Plan **151-02** (`101_*.sql` UNIQUE index → race-free `.upsert(on_conflict="skill_id,filename")`).
    - What we know: `skill_files` has NO unique constraint on `(skill_id, filename)` — only PK `id` + non-unique indexes on `skill_id`/`user_id` (`full-schema.sql:1116-1125, 2455-2465`). PostgREST `.upsert(on_conflict="skill_id,filename")` therefore cannot work today.
    - What's unclear: CONTEXT says "no new migration expected" — but atomic upsert under WORKER_COUNT=2 requires the unique index.
    - Recommendation: add a tiny migration `CREATE UNIQUE INDEX skill_files_skill_filename_uniq ON public.skill_files (skill_id, filename);` then `.upsert(on_conflict="skill_id,filename")`. A unique index on the existing table is hardening, not "inventing a new table/bucket" (D-08 satisfied). If the operator prefers zero-migration, use the read-check path and accept the (rare) duplicate-row race, deduping on read. **Surface at discuss/plan.**
 
-2. **Should FILE-01 be gated behind `self_improve_enabled`?** `save_skill` is (both hidden in `get_tools()` and refused in `_CAPABILITY_FLAG_TOOLS`). Attaching a file to a skill is a skill-authoring write. Recommendation: gate it the same way for consistency; confirm with operator.
+2. **Should FILE-01 be gated behind `self_improve_enabled`?** `save_skill` is (both hidden in `get_tools()` and refused in `_CAPABILITY_FLAG_TOOLS`). Attaching a file to a skill is a skill-authoring write. — **RESOLVED: yes, gate behind `self_improve_enabled`** (operator picked "Gate behind self_improve_enabled"). See CONTEXT.md **D-11** + Plans 151-01 (`sandbox_enabled` for FILE-02) / 151-04 (`self_improve_enabled` for FILE-01).
 
-3. **FILE-02 arg: `document_id` vs `filename` vs both?** `read_document` uses `document_id` (owner→global via `read_path`); `analyze_document` uses `filename` (owner-only via `resolve_document_id`). Recommendation: accept `document_id` as the precise, D-04-faithful key; optionally accept `filename` for ergonomics but note it's owner-only (can't reach a global-folder doc). Planner picks the arg surface.
+3. **FILE-02 arg: `document_id` vs `filename` vs both?** `read_document` uses `document_id` (owner→global via `read_path`); `analyze_document` uses `filename` (owner-only via `resolve_document_id`). — **RESOLVED: `document_id`-only** (mirror `read_document`; D-04-faithful). See CONTEXT.md D-11 note + Plan 151-01 Task 2.
 
-4. **SSE event for attach (Claude's discretion):** emit `skill_file_attached` mirroring `workspace_file_written` (`tool_dispatcher.py:1565`) so a UI could reflect it live? No skills-panel live-reconcile consumer exists today, so this is optional; must stay additive + provider-uniform if added.
+4. **SSE event for attach (Claude's discretion):** emit `skill_file_attached` mirroring `workspace_file_written` (`tool_dispatcher.py:1565`) so a UI could reflect it live? — **RESOLVED: left to executor as additive/provider-uniform discretion** (no live consumer today; CONTEXT.md `## Claude's Discretion`). Not a genuine blocker.
 
 ## Environment Availability
 

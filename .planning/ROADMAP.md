@@ -159,6 +159,7 @@ Plans:
   4. Cross-user read paths in the admin browser are explicitly filtered (no full-tenant leak on the service-role client).
 
 **Plans**: 9 plans in 6 waves
+
 - [x] 148-01-PLAN.md — Wave 0 test scaffold (16 test_148_* files + conftest fixtures)
 - [x] 148-02-PLAN.md — Backend substrate: migration 098 + audience resolver/writer + require_visible + app-layer ban check
 - [x] 148-03-PLAN.md — Apply migration 098 to the live DB + regenerate full-schema (operator step)
@@ -168,6 +169,7 @@ Plans:
 - [x] 148-07-PLAN.md — Frontend VIS-01 enforcement: effective-features hook + nav vanish + graceful 403 bounce
 - [x] 148-08-PLAN.md — 067-A audit browser: source switch + chip filters + pager + recorded CSV
 - [x] 148-09-PLAN.md — 068-A users roster (victim-naming guards) + 069-A feature-visibility audience rows
+
 **Note**: "Sign in as user" impersonation ships only if scoped cheaply (dual-identity audit); otherwise it is deferred to STRETCH with a named re-open trigger.
 **UI hint**: yes
 
@@ -250,10 +252,16 @@ Plans:
 **Plans**: 4 plans (2 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 151-01-PLAN.md — FILE-02 `fetch_document_file` (KB→sandbox READ tool, sandbox-gated, reusable owner-scope resolver, own T-01 threat model)
 - [ ] 151-02-PLAN.md — D-10 migration: `skill_files(skill_id, filename)` unique index (author + BLOCKING operator apply, enables D-07 upsert)
 - [ ] 151-03-PLAN.md — SC#3 upload allowlist widen: `validate_upload` + lockstep `TemplateUpload.tsx` accept= (D-09)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 151-04-PLAN.md — FILE-01 `attach_skill_file` (4-source WRITE tool, race-immune upsert, own T-02/T-03/T-04 threat model)
+
 **Note**: Internal build order FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload/threat pattern). Each carries its own threat model.
 
 ### Phase 152: Workflow Run Inputs
