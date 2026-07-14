@@ -275,8 +275,23 @@ Plans:
   2. From the Run modal a user can point the workflow's retrieval at a chosen KB folder (author-time default + per-run override) reusing the Phase-098 server-side scope resolver, so the model cannot widen scope; behavior is identical across providers.
   3. A user can delete a workflow with a safe cascade (definitions / versions / runs disposition made explicit at discuss) behind a confirmation, leaving no orphaned runs or threads.
 
-**Plans**: TBD
-**Note**: The SEED-112 scope-control shape (definition-time field vs run-input selector vs both) is a discuss-phase/sketch decision, Glean/Beam-informed (the milestone-level research directive is satisfied; the control shape is not yet locked).
+**Plans**: 4 plans (3 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 152-01-PLAN.md — WFIN-02 folder-scope override backend: MessageCreate.folder_id + resolve_run_scope_root D-05 owner gate + kickoff/resume/Continue wiring (no migration)
+- [ ] 152-02-PLAN.md — WFIN-03 delete cascade backend: FK-safe cascade + delete-preview helpers + distinct cascade route + cancel-first (D-08, api/workflows.py)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 152-03-PLAN.md — WFIN-01/02 frontend: RunModal inline scope <select> + quiet template upload + provenance note + doRun createThread→upload→send sequencing
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 152-04-PLAN.md — WFIN-03 delete frontend: net-new PublishedCard ⋯-menu + victim-naming Sheet (exact server counts, cancel-first banner, in-place no-undo) + delete/preview clients
+
+**Note**: SEED-112 scope-control shape RESOLVED at the G-2 sketch = inline <select> (D-LOCK-01). RESEARCH confirms NO migration (project_folder_id is already the retrieval default; delete operates on existing tables).
 **UI hint**: yes
 
 ### Phase 153: Inline Citations
