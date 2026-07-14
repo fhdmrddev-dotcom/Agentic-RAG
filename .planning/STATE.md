@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T19:34:42.705Z"
-last_activity: 2026-07-14
+last_updated: "2026-07-14T19:50:00.000Z"
+last_activity: 2026-07-14 -- 152-06 executed (WR-03 backend A4 override-subtree guard closed)
 progress:
   total_phases: 26
   completed_phases: 6
   total_plans: 52
-  completed_plans: 50
+  completed_plans: 51
   percent: 23
 ---
 
@@ -27,9 +27,17 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 152 (workflow-run-inputs) — EXECUTING (gap closure)
-Plan: 152-05 of gap set 05-07 COMPLETE (next: 152-06)
-Status: Executing gap-closure plans (05 done; 06 + 07 remain)
-Last activity: 2026-07-14 -- 152-05 executed (CR-01 + WR-01 + IN-02 closed)
+Plan: 152-06 of gap set 05-07 COMPLETE (next: 152-07)
+Status: Executing gap-closure plans (05 + 06 done; 07 remains)
+Last activity: 2026-07-14 -- 152-06 executed (WR-03 backend A4 override-subtree guard closed)
+
+**152-06 execution notes (2026-07-14) — GAP CLOSURE: WR-03 backend A4 override-subtree intersection guard, scope.py + test, NO migration:**
+
+- 2 tasks (TDD RED→GREEN), sequential on the main tree (`use_worktrees=false`), 1 test-fidelity deviation. Task 1 RED `bd0053b2` (new P/A/B empty-intersection test fails against the shipped A4 branch); Task 2 GREEN `3f1de56d` (fix); summary `21846c3c`. Touched EXACTLY the 2 declared files (`services/harness/scope.py`, `tests/test_152_folder_override.py`); **`threads.py` + `phase_types.py` untouched (D-08/G-5, verified via `git diff --name-only bd0053b2^ HEAD`), NO migration.**
+- **WR-03 (`resolve_run_scope_root` A4 branch):** the shipped branch resolved `resolve_project_subtree(author_default)` and dropped the override only when OUTSIDE the whole project subtree — necessary but NOT sufficient, since `phase_types.py:326-329` intersects EACH phase's `folder_scope` with the resolved subtree. Fix (verbatim per 152-REVIEW.md WR-03): resolve `resolve_project_subtree(override)` into a set (None-guarded `or []`), iterate `definition.phases`, and `override = None; break` if any phase's non-empty `folder_scope` fails to intersect the override subtree → degrades to the author default (fail-safe, never a silently-empty phase). D-05 owner gate + `str | None` return (Pitfall 6) unchanged.
+- **DEVIATION [Rule 1 — test-contract fidelity]:** the pre-existing `test_a4_override_outside_subtree_dropped` stubbed `resolve_project_subtree` to a fixed `[author, child]` ignoring root; the corrected code resolves the OVERRIDE's subtree, so the stub was made root-aware (`subtree(override)={override}`). Assertion unchanged; stays GREEN on BOTH old and new code (no spurious RED at Task 1). Committed with Task 1 (`bd0053b2`).
+- **Gates:** `test_152_folder_override.py` 8 passed at RED / **9 passed at GREEN**; scope-consumer regressions green (`test_098_scope_governance` 6, `test_141_run_scope`+`test_098_schema_lock` 18); `grep 'resolve_project_subtree(override'` = line 162 (call written single-line so the acceptance grep matches — repo has NO black/ruff hook). **WFIN-02 stays OPEN** at the requirement level (false-green avoidance, 148-151 convention) — this plan closes Warning WR-03-backend only; the requirement closes at verify-work/secure-phase after the live SC#10 UAT. The frontend WR-03 mirror ships in 152-07. **Operator: restart uvicorn** to load the changed `scope.py`. **NEXT: `/gsd:execute-phase 152` continues to 152-07** (WR-05 label + WR-03 frontend mirror + WR-04 deleteThread — disjoint file set).
+- **SDK quirk (known):** `state.advance-plan` = `"Cannot parse Current Plan or Total Plans"` (the gap-closure 05-07 numbering confuses the counter — same as 152-05) → Current Position hand-fixed above. `roadmap.update-plan-progress 152` = `summary_count: 6 / plan_count: 7 / In Progress / complete:false` (accurate — 07 remains).
 
 **152-05 execution notes (2026-07-14) — GAP CLOSURE: CR-01 producer-identity cancel-first + WR-01 409 refuse + IN-02 route tests, backend + tests, NO migration:**
 

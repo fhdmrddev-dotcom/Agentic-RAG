@@ -111,6 +111,11 @@ None - no external service configuration required. No migration. **Operator: res
 - WR-03 backend half closed and regression-locked. Ready for **152-07** (WR-05 truthful scope label + WR-03 FRONTEND mirror in `WorkflowsPage.tsx` + WR-04 best-effort `deleteThread`) — a disjoint file set, no collision with this plan.
 - Phase verification (`/gsd:verify-work 152`) and the live SC#10 4-axis UAT remain the requirement-close gate for WFIN-02.
 
+## Self-Check: PASSED
+
+- Files: `152-06-SUMMARY.md`, `backend/app/services/harness/scope.py`, `backend/tests/test_152_folder_override.py` — all present on disk.
+- Commits: `bd0053b2` (test/RED), `3f1de56d` (fix/GREEN), `21846c3c` (docs/summary) — all in history.
+
 ---
 *Phase: 152-workflow-run-inputs*
 *Completed: 2026-07-14*
