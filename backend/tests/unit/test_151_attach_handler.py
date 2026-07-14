@@ -141,6 +141,32 @@ async def test_source_sandbox_output_harvests_and_creates(make_tool_context):
 
 
 @pytest.mark.asyncio
+async def test_source_sandbox_output_oversized_refused(make_tool_context, monkeypatch):
+    """WR-02 — a huge sandbox artifact is refused BEFORE the Storage upload. The
+    least-trustworthy source must be capped like inline/kb (no unbounded write)."""
+    handler = _handler()
+    from app.services import tool_dispatcher as td
+    monkeypatch.setattr(td, "_ATTACH_INLINE_MAX_BYTES", 8)  # tiny cap for the test
+    sb = _sb(_OWNED, existing_file_row=None)
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+
+    def _copy(container_dir, dest_dir):
+        with open(os.path.join(dest_dir, "big.bin"), "wb") as f:
+            f.write(b"0123456789")  # 10 bytes > 8-byte cap
+
+    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+        session = sm.get_or_create.return_value
+        session.copy_from_runtime.side_effect = _copy
+        result = await handler({
+            "target_skill_name": "My Skill", "filename": "big.bin",
+            "source": "sandbox_output", "sandbox_path": "/sandbox/output/big.bin",
+        }, ctx)
+    assert "error" in json.loads(result.result)
+    assert "over" in result.result.lower()
+    _upload(sb).assert_not_called()  # refused BEFORE upload — no partial write
+
+
+@pytest.mark.asyncio
 async def test_source_sandbox_output_missing_file_errors(make_tool_context):
     handler = _handler()
     sb = _sb(_OWNED, existing_file_row=None)
