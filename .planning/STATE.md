@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: verifying
-last_updated: "2026-07-14T18:19:36.061Z"
-last_activity: 2026-07-14
+status: executing
+last_updated: "2026-07-14T19:19:13.447Z"
+last_activity: 2026-07-14 -- Phase 152 planning complete
 progress:
   total_phases: 26
-  completed_phases: 7
-  total_plans: 49
+  completed_phases: 6
+  total_plans: 52
   completed_plans: 49
-  percent: 27
+  percent: 23
 ---
 
 # Project State
@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification (all 4 plans executed)
-Last activity: 2026-07-14 -- Phase 152 Plan 04 (WFIN-03 delete-cascade frontend) executed
+Phase: 152 (workflow-run-inputs) — GAP CLOSURE PLANNED (ready to execute 05-07)
+Plan: 152-05/06/07 planned (01-04 shipped); verification found 1 BLOCKER (CR-01) + 4 Warnings
+Status: Ready to execute — `/gsd:execute-phase 152` runs the 3 gap plans, then re-verify
+Last activity: 2026-07-14 -- Phase 152 gap-closure plans 05-07 created (CR-01 + WR-01/03/04/05); plan-checker PASSED
+
+**152 GAP CLOSURE planned (2026-07-14) — `/gsd:plan-phase 152 --gaps`; 1 BLOCKER + 4 Warnings, operator scope = blocker+all-4:**
+
+- **Verification** (`2bfa3d53`) returned `gaps_found`: 6/7 must-haves passed. The 1 BLOCKER is **CR-01 / D-LOCK-05** — `delete_workflow_cascade` (`api/workflows.py:509-528`) cancels in-flight runs by `workflow_runs.id`, but the live producer task is keyed in `RUN_TASKS` by the PRODUCER `runs.run_id` (`threads.py:2011`) → cancel misses → the FK-safe txn hard-deletes rows out from under a still-streaming engine (ghost assistant message, false amber-banner copy). 4 Warnings confirmed present: WR-01 (global-def cross-user blast radius), WR-03 (A4 guard silent-empty-phase), WR-04 (orphan thread per retry), WR-05 (dishonest "All documents" label).
+- **3 gap plans created + committed** (`93f708b8`), plan-checker **PASSED** with live-source fidelity checks. All `wave: 1, depends_on: []`, disjoint file sets. **01-04 untouched.**
+  - **152-05** (WFIN-03) — CR-01 fix: cancel through the PRODUCER `runs.run_id` (JOIN live `runs`), `publish_cancel_sentinel(wf_id)` + `finish_run(wf_id,"cancelled")` before delete, reusing existing primitives (admin.py Kill discipline); + WR-01 409-refuse for is_global cross-user cascades + honest docstring; + IN-02 route-level cancel-first test. Files: `api/workflows.py`, `db/workflows.py`, `tests/test_152_delete_cascade.py`.
+  - **152-06** (WFIN-02) — WR-03 backend: `resolve_run_scope_root` A4 branch resolves the OVERRIDE's own subtree, drops it unless EVERY phase `folder_scope` still intersects. Files: `services/harness/scope.py`, `tests/test_152_folder_override.py`.
+  - **152-07** (WFIN-01/02) — WR-05 truthful bound/unbound scope label + WR-03 frontend override-filter mirror + WR-04 best-effort `deleteThread` on failed launch. Files: `WorkflowsPage.tsx`, `ChatLayout.tsx`, `RunModal.test.tsx`, `ChatLayoutLaunch.test.tsx`.
+- **RED LINES honored:** NO `threads.py` edit (D-08/G-5), NO migration, `run_lifecycle.py` read-only. **WR-02 + INFO items (IN-01/03/04/05) deliberately OUT of scope** (operator chose blocker+4-warnings, not the full INFO polish). CR-01's live proof stays the manual SC#10 destructive-delete UAT (`152-VALIDATION.md` row 5) + 4-axis rows — the route test is the automated backstop. **NEXT: `/gsd:execute-phase 152`.**
+- **SDK quirk (known):** `state.planned-phase` updated frontmatter (total_plans 49→52, completed_phases 7→6) + Status/Last-Activity but left the Current-Position header stale → hand-fixed above.
 
 **152-04 execution notes (2026-07-14) — WFIN-03 delete-cascade FRONTEND, + 1 backend deviation, no migration:**
 
