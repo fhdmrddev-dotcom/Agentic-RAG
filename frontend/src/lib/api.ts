@@ -3250,6 +3250,58 @@ export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Pro
   if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
 }
 
+// ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
+//    cascade + its server-sourced victim-naming counts. These hit DISTINCT routes on
+//    api/workflows.py (Plan 02, D-08) — NEVER the draft `DELETE /workflows/{id}` above
+//    (Pitfall 7 — the routes must not collide). ────────────────────────────────────
+
+/** The victim-naming delete sheet's EXACT server-sourced counts (D-LOCK-03). The sheet
+ *  never guesses these: `versions` + `runs` are the Removed group (definition versions +
+ *  run records hard-deleted), `threads` is the Kept group (chats detached but preserved),
+ *  and `in_flight` is the count of runs STILL LIVE — the honest signal the amber
+ *  cancel-first banner gates on (D-LOCK-05). `in_flight` is the LIVE count, never `runs`
+ *  (which is historical run records — "in progress" off that would be a lie). */
+export interface WorkflowDeletePreview {
+  name: string
+  versions: number
+  runs: number
+  threads: number
+  in_flight: number
+}
+
+/** GET /workflows/{id}/delete-preview — the server-sourced Removed/Kept counts the
+ *  victim-naming sheet renders BEFORE commit (D-LOCK-03). Owner-gated + 404-collapse on
+ *  the backend (a non-owner / unknown id → WorkflowNotFoundError, no existence leak). The
+ *  error is NOT swallowed — the sheet renders its own load-error state on a throw. */
+export async function getWorkflowDeletePreview(
+  id: string,
+  signal?: AbortSignal,
+): Promise<WorkflowDeletePreview> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/delete-preview`, { headers, signal })
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to load workflow delete preview (status ${res.status})`)
+  return (await res.json()) as WorkflowDeletePreview
+}
+
+/** DELETE /workflows/{id}/cascade — the WFIN-03 hard-delete (204): the definition + ALL
+ *  versions + ALL runs are removed; in-flight runs are cancelled-first server-side; threads
+ *  are detached-but-KEPT (they become normal chats). A DISTINCT route from the draft
+ *  `DELETE /workflows/{id}` (Pitfall 7 — never collide). Owner-gated on the backend (404 on
+ *  non-owner). The error is NOT swallowed — the sheet's error state renders on a throw, and
+ *  the card is removed only AFTER the server confirms (D-LOCK-04 — no optimistic vanish,
+ *  no undo; hard-delete is irreversible). */
+export async function deleteWorkflowCascade(id: string, signal?: AbortSignal): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/cascade`, {
+    method: "DELETE",
+    headers,
+    signal,
+  })
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to delete workflow (status ${res.status})`)
+}
+
 /** POST /workflows/generate — NL one-shot structured generation. The route
  *  returns HTTP 200 even on a FAILED generation (`ok:false`), so we read the body
  *  and NEVER throw on `ok:false` (only on a real HTTP/network error). */
