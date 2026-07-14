@@ -1,8 +1,8 @@
 ---
 phase: 151-agent-file-tools
 verified: 2026-07-14T00:00:00Z
-status: human_needed
-score: 4/4 roadmap success criteria code-verified; 1 human-only gate remaining (SC#10 live 4-axis UAT)
+status: passed
+score: 4/4 roadmap success criteria code-verified + live SC#10 UAT PASSED 5/5 (2026-07-14, Chrome-MCP + psycopg2 DB ground-truth — see 151-HUMAN-UAT.md); OpenRouter gap = pre-existing tool-agnostic infra, not a 151 defect
 overrides_applied: 0
 human_verification:
   - test: "Cross-provider: fire fetch_document_file AND attach_skill_file on OpenAI, Anthropic, Google, and OpenRouter (one representative model each)"
