@@ -295,7 +295,7 @@ Plans:
 
 - [x] 152-05-PLAN.md — CR-01 (BLOCKER) producer-identity cancel-first (D-LOCK-05) + WR-01 is_global cross-user 409 refuse + IN-02 route-level test (backend; api/workflows.py, db/workflows.py)
 - [x] 152-06-PLAN.md — WR-03 backend: resolve_run_scope_root A4 per-phase intersection guard (drop an override that empties any declared phase folder_scope) + P/A/B test (scope.py)
-- [ ] 152-07-PLAN.md — WR-05 truthful bound/unbound scope label + WR-03 frontend option mirror + WR-04 orphan-thread cleanup (frontend; WorkflowsPage.tsx, ChatLayout.tsx)
+- [x] 152-07-PLAN.md — WR-05 truthful bound/unbound scope label + WR-03 frontend option mirror + WR-04 orphan-thread cleanup (frontend; WorkflowsPage.tsx, ChatLayout.tsx)
 
 **Note**: SEED-112 scope-control shape RESOLVED at the G-2 sketch = inline <select> (D-LOCK-01). RESEARCH confirms NO migration (project_folder_id is already the retrieval default; delete operates on existing tables).
 **UI hint**: yes
@@ -397,7 +397,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 6/7 | Executing (gap closure 05-07) | - |
+| 152. Workflow Run Inputs | 7/7 | Ready for verification | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |

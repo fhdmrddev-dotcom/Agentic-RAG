@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T19:50:00.000Z"
-last_activity: 2026-07-14 -- 152-06 executed (WR-03 backend A4 override-subtree guard closed)
+last_updated: "2026-07-15T00:05:00.000Z"
+last_activity: 2026-07-15 -- 152-07 executed (frontend WR-05 truthful scope label + WR-03 mirror + WR-04 orphan cleanup); all 7 plans done — phase ready for verify-work
 progress:
   total_phases: 26
   completed_phases: 6
   total_plans: 52
-  completed_plans: 51
+  completed_plans: 52
   percent: 23
 ---
 
@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — EXECUTING (gap closure)
-Plan: 152-06 of gap set 05-07 COMPLETE (next: 152-07)
-Status: Executing gap-closure plans (05 + 06 done; 07 remains)
-Last activity: 2026-07-14 -- 152-06 executed (WR-03 backend A4 override-subtree guard closed)
+Phase: 152 (workflow-run-inputs) — GAP CLOSURE COMPLETE (all 7 plans executed)
+Plan: 152-07 of gap set 05-07 COMPLETE (all of 01-07 done)
+Status: Ready for `/gsd:verify-work 152` (frontend 152-07 needs no uvicorn restart; the 152-05/06 backend restart flags still stand before the live UAT)
+Last activity: 2026-07-15 -- 152-07 executed (frontend WR-05 truthful scope label + WR-03 mirror + WR-04 orphan cleanup)
+
+**152-07 execution notes (2026-07-15) — GAP CLOSURE: frontend WR-05 truthful scope label + WR-03 A4 mirror + WR-04 orphan-thread cleanup, frontend-only, NO migration:**
+
+- 3 tasks (Task 1 TDD RED→GREEN), sequential on the main tree (`use_worktrees=false`), 1 deviation. Task 1 RED `48fce37b` (2 bound cases fail the old always-"All documents" render) → GREEN `8e1f06b9`; Task 2 `42e15e13` (WR-03 mirror); Task 3 `a052d30d` (WR-04). Touched 5 frontend files (the 4 declared + the `WorkflowsPage.test.tsx` deviation); **NO backend, NO migration, NO new packages** (verified `git diff --name-only 48fce37b^ HEAD` = 5 frontend files only).
+- **WR-05 (`WorkflowsPage.tsx` RunModal `<select>`):** the `""` option now labels the SERVER-applied scope keyed on `authorDefaultFolderId` truthiness (NOT `authorDefaultExists`, which is false for an *invisible* author folder — the exact mislabel source). Bound+visible → `Workflow default — 📁 {name}`; bound+invisible → bare `Workflow default` (still truthful, never "All documents"); unbound → `All documents` (folderId:null genuinely = whole-KB). Removed the duplicate explicit author-default `<option>`; initial `selectedFolderId=""` in every case; handleRun unchanged (`""`→null).
+- **WR-03 (frontend mirror of 152-06 `scope.py`):** `overrideOptions` now resolves each CANDIDATE folder's OWN subtree (root+descendants walk of the `folders` prop) and keeps it only when EVERY declared phase `folder_scope` intersects it — replacing the insufficient author-subtree membership check. Removed the now-unused `subtreeIds` walk, added `phaseFolderScopes`. No-scope workflows unchanged. Test: P/A/B two-phase — neither A nor B offered (each empties the other), P kept.
+- **WR-04 (`ChatLayout.tsx` doRun):** wraps upload+postMessage in try/catch; catch does fire-and-forget `deleteLaunchThread(thread.id).catch(()=>{})` then re-throws the ORIGINAL error so the modal's verbatim-422 `role="alert"` (`run-upload-error`) still surfaces. Success path stays OUTSIDE the try. Imports raw `deleteThread` aliased (`deleteLaunchThread`) to avoid shadowing the `useThreads()` binding.
+- **DEVIATION [Rule 1 — obsolete test contract]:** `WorkflowsPage.test.tsx` (not in the declared file set) locked the old `All documents`-first select order; the WR-05 source correctly obsoletes it. Updated to the new truthful-label contract (same class as the 152-03 test-contract deviation). Committed with Task 1 GREEN (`8e1f06b9`).
+- **Gates:** touched-surface suites `RunModal.test` (10) + `WorkflowsPage.test` (23) + `ChatLayoutLaunch.test` (2) = **35/35 green**; `npx vite build` exit 0; **0 net-new tsc errors** vs the captured 30-error SEED-056/049 baseline (normalized line-number shifts). **WFIN-01/02 stay OPEN** at the requirement level (false-green avoidance, 148-151 + 152-01..06 convention) — close at verify-work/secure-phase after the live SC#10 4-axis UAT (`152-VALIDATION.md`). **NEXT: `/gsd:verify-work 152`** (all 4 original + 3 gap plans executed).
+- **SDK quirks (known):** `roadmap.update-plan-progress 152` = `summary_count: 7 / status Complete / complete:true` but LEFT the progress-TABLE row `6/7 | Executing` stale → hand-fixed to `7/7 | Ready for verification`. `state.advance-plan` skipped (the gap-closure 05-07 numbering confuses the counter — same as 152-05/06); frontmatter `completed_plans` 51→52 + Current Position hand-updated above.
 
 **152-06 execution notes (2026-07-14) — GAP CLOSURE: WR-03 backend A4 override-subtree intersection guard, scope.py + test, NO migration:**
 
