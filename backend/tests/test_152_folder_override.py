@@ -13,6 +13,9 @@ Behaviors under test:
   - A4: a workflow declaring a per-phase folder_scope drops an override that is NOT
     within the project subtree (would silently empty the phase intersection); an
     override within the subtree is honored.
+  - WR-03 (A4 corrected): an override that IS inside the project subtree but empties
+    ANY declared phase's folder_scope ∩ (its OWN subtree) is DROPPED — the P/A/B
+    two-phase case (override=A, phase2 folder_scope=[B]) degrades to the author default.
   - the helper NEVER returns a set (str | None), and consults fetch_visible_folders
     exactly once when an override is present.
 """
@@ -51,6 +54,36 @@ def _def(project_folder_id, *, phase_scope=None):
             "name": "WF",
             "project_folder_id": project_folder_id,
             "phases": [{"slug": "p", "phase_index": 0, "config": config}],
+        }
+    )
+
+
+def _def_two_phase(project_folder_id, *, scope1, scope2):
+    """A definition with TWO retrieval phases carrying DISTINCT per-phase folder_scopes.
+
+    WR-03 / A4: phase1.folder_scope=scope1, phase2.folder_scope=scope2. Both structurally
+    require a project_folder_id (the @model_validator on WorkflowDefinition). This models
+    the empty-intersection gap — an override whose OWN subtree intersects one phase's scope
+    but NOT the other's must be dropped (else that phase silently retrieves nothing).
+    """
+    def _cfg(scope):
+        return {
+            "phase_type": "llm_agent",
+            "prompt": "x",
+            "available_tools": ["search_documents"],
+            "folder_scope": scope,
+        }
+
+    return WorkflowDefinition.model_validate(
+        {
+            "slug": "wf",
+            "version": 1,
+            "name": "WF",
+            "project_folder_id": project_folder_id,
+            "phases": [
+                {"slug": "p1", "phase_index": 0, "config": _cfg(scope1)},
+                {"slug": "p2", "phase_index": 1, "config": _cfg(scope2)},
+            ],
         }
     )
 
@@ -165,7 +198,12 @@ async def test_absent_override_unbound_falls_to_thread_then_whole_kb(monkeypatch
 
 # ── A4 composition: per-phase folder_scope constrains the override ───────────
 async def test_a4_override_outside_subtree_dropped(monkeypatch):
-    """A4: a scoped workflow drops an override NOT within the project subtree."""
+    """A4: a scoped workflow drops an override whose OWN subtree misses the phase scope.
+
+    WR-03: the override is an isolated leaf OUTSIDE the project subtree — subtree(override)
+    = {override} does not intersect the phase's folder_scope=[child], so the override empties
+    that phase's intersection and is dropped, degrading to the author default.
+    """
     author = str(uuid4())
     child = str(uuid4())
     override = str(uuid4())  # owned, but OUTSIDE the project subtree
@@ -174,7 +212,10 @@ async def test_a4_override_outside_subtree_dropped(monkeypatch):
     )
 
     async def _fake_subtree(root, *, supabase, user_id):
-        # project subtree is {author, child} — override is NOT in it
+        # WR-03: resolve the OVERRIDE's OWN subtree. The out-of-project override is an
+        # isolated leaf (subtree = {override}); the author subtree stays {author, child}.
+        if str(root) == override:
+            return [override]
         return [author, child]
 
     monkeypatch.setattr(scope_mod, "resolve_project_subtree", _fake_subtree)
@@ -209,6 +250,57 @@ async def test_a4_override_inside_subtree_honored(monkeypatch):
         user_id="u",
     )
     assert root == child
+
+
+# ── WR-03: in-subtree override empties ANOTHER phase's scope → dropped ────────
+async def test_a4_two_phase_empty_intersection_dropped(monkeypatch):
+    """WR-03 / A4: an IN-subtree override that empties ANY phase's folder_scope ∩ is dropped.
+
+    Project P has two DISTINCT children A, B (both ⊆ P's subtree). phase1 folder_scope=[A],
+    phase2 folder_scope=[B]. An override of A is INSIDE P's subtree — but subtree(A)={A} does
+    NOT intersect phase2's [B], so at phase_types.py:326 phase2 would retrieve NOTHING. The
+    override MUST be dropped, degrading to the author default P (no phase silently retrieves
+    nothing). Membership in the project subtree is necessary but NOT sufficient.
+
+    This is RED against the pre-WR-03 A4 branch (which resolved the AUTHOR subtree {P,A,B} and
+    honored A because A ∈ {P,A,B}); it goes GREEN once the branch resolves the OVERRIDE's subtree.
+    """
+    p = str(uuid4())
+    a = str(uuid4())
+    b = str(uuid4())
+    # P, A, B all owner-visible (A and B are children of P)
+    monkeypatch.setattr(scope_mod, "fetch_visible_folders", _fake_visible(p, a, b))
+
+    # root-aware subtree stub: subtree(P)={P,A,B}, subtree(A)={A}, subtree(B)={B}
+    subtrees = {p: [p, a, b], a: [a], b: [b]}
+
+    async def _fake_subtree(root, *, supabase, user_id):
+        return subtrees.get(str(root), [str(root)])
+
+    monkeypatch.setattr(scope_mod, "resolve_project_subtree", _fake_subtree)
+
+    definition = _def_two_phase(p, scope1=[a], scope2=[b])
+
+    # override = A: inside subtree(P) but empties phase2's [B] ∩ subtree(A)={A} → DROPPED → P
+    root = await resolve_run_scope_root(
+        definition,
+        run_inputs={"folder_id": a},
+        thread_folder_id=None,
+        supabase=object(),
+        user_id="u",
+    )
+    assert root == p  # dropped to the author default — no phase silently retrieves nothing
+
+    # good path (regression lock): override = P (project root, subtree covers A AND B) →
+    # every phase scope still intersects → honored/kept → still P.
+    root_good = await resolve_run_scope_root(
+        definition,
+        run_inputs={"folder_id": p},
+        thread_folder_id=None,
+        supabase=object(),
+        user_id="u",
+    )
+    assert root_good == p
 
 
 # ── shape guards: str|None, and fetch_visible_folders consulted once ─────────
