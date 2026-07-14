@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — READY FOR RE-VERIFICATION
-Plan: 8 of 8 (gap plan 08 executed)
-Status: Ready for re-verification (`/gsd:verify-work 152 --gaps-only`)
-Last activity: 2026-07-15 -- Phase 152 gap plan 08 executed (D-04 widen fix)
+Phase: 152 (workflow-run-inputs) — GAP #1 CLOSED; SC#10 CROSS-PROVIDER UAT PENDING
+Plan: 8 of 8 (gap plan 08 executed + re-verified)
+Status: Gap-closure re-verification PASSED (`152-VERIFICATION.md` gaps_found → human_needed). The D-04 widen BLOCKER is CLOSED and confirmed live 3 ways (committed regression tests + live-DB resolver probe root=P/subtree=[P,A1]/no P2 leak + live Run-modal UI offered only {default,A1} via Claude-driven Chrome; seed cleaned up). REMAINING before phase COMPLETE: the whole-phase SC#10 4-axis cross-provider live UAT (OpenAI/Anthropic/Google/OpenRouter) + destructive delete-cascade + template-provenance rows (152-VALIDATION.md). WFIN-01/02/03 stay OPEN at requirement level until then. Cloud parity still pending: migs 099+100+101 + SECRETS_ENCRYPTION_KEY(150).
+Last activity: 2026-07-15 -- Phase 152 gap #1 (D-04 widen) re-verified CLOSED (code+live); SC#10 cross-provider UAT pending
 
 **152-08 execution notes (2026-07-15) — GAP CLOSURE: restore author-project-subtree containment (D-04 widen regression 152-06 introduced), scope.py + WorkflowsPage.tsx + tests, NO migration:**
 
