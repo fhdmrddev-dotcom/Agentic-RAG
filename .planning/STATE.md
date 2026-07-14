@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T00:05:00.000Z"
-last_activity: 2026-07-15 -- 152-07 executed (frontend WR-05 truthful scope label + WR-03 mirror + WR-04 orphan cleanup); all 7 plans done — phase ready for verify-work
+last_updated: "2026-07-14T20:55:46.554Z"
+last_activity: 2026-07-14 -- Phase 152 planning complete
 progress:
   total_phases: 26
   completed_phases: 6
-  total_plans: 52
+  total_plans: 53
   completed_plans: 52
   percent: 23
 ---
@@ -26,10 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — GAP CLOSURE 05-07 EXECUTED; RE-VERIFY = gaps_found (1 NEW BLOCKER)
-Plan: 05-07 executed (all 01-07 done). CR-01 + WR-01/03/04/05 CLOSED — but 152-06's WR-03 fix INTRODUCED a new blocker (D-04 "cannot widen" regression: an ancestor-folder per-run override widens a bound scope to sibling projects; scope.py A4 dropped the `override ⊆ author-project-subtree` membership check, frontend mirror too). Owner-gated (same-account, no cross-USER leak) but violates the phase's own narrow-only contract; reachable via the Run-modal `<select>`.
-Status: gaps_found (6/7 must-haves) — fix = re-add the `override ⊆ author project subtree` check ALONGSIDE the per-phase intersection in `scope.py:153-168` + mirror in `WorkflowsPage.tsx:1033-1050` + ancestor-override regression test (backend+frontend). 152-REVIEW.md has a verbatim fix block. CR-01 is code+test closed (route-level producer-identity spy test); live SC#10 4-axis + destructive-delete UAT (`152-VALIDATION.md`) still pending AFTER this fix. NEXT: `/gsd:plan-phase 152 --gaps` (awaiting operator go-ahead).
-Last activity: 2026-07-15 -- Phase 152 gap-closure re-verification returned gaps_found (WR-03 A4 ancestor-override widen/sibling-leak); code review + verifier both critical, deterministic repro
+Phase: 152 (workflow-run-inputs) — GAP PLAN 08 PLANNED (closes the D-04 widen blocker); 7/8 plans done
+Plan: 152-08 planned + plan-checker PASSED (`gap_closure: true`, wave 1, deps []; 2 tasks — scope.py A4 restores the `override ⊆ author-project-subtree` membership check ALONGSIDE the per-phase intersection + WorkflowsPage `overrideOptions` mirror + backend/frontend strict-ancestor regression tests). Closes the re-verify BLOCKER: 152-06's WR-03 fix dropped the author-subtree containment → an ancestor-folder override widens a folder_scope-bound run to sibling projects (owner-gated, UI-reachable). Deferred (blocker-first): WR-01 TOCTOU + WR-02 cap_paused in `workflows.py`.
+Status: Ready to execute — `/gsd:execute-phase 152 --gaps-only` (runs 152-08 sequential on the main tree, then re-verify). CR-01 already code+test closed; live SC#10 4-axis + destructive-delete UAT (`152-VALIDATION.md`) still pending AFTER this fix lands.
+Last activity: 2026-07-15 -- Phase 152 gap plan 08 created + plan-checker PASSED (D-04 widen fix)
+
+**FOLLOW-UP (SEED candidate — uniform bound-workflow override containment):** 152-08 fixes ONLY the folder_scope-declaring bound path. The no-per-phase-folder_scope bound path is intentionally LEFT as-shipped (152-VERIFICATION truth #2 blessed the D-05-owner-gated override there; test-locked on both sides — `test_override_owned_resolves` + frontend `boundPublished` sibling launch). Whether ALL bound-workflow overrides should be contained to the author project subtree (the "safest fix") is a genuine product change deserving its own discuss-phase — plant as a SEED at the next milestone sweep; do NOT lose it.
 
 **152-07 execution notes (2026-07-15) — GAP CLOSURE: frontend WR-05 truthful scope label + WR-03 A4 mirror + WR-04 orphan-thread cleanup, frontend-only, NO migration:**
 

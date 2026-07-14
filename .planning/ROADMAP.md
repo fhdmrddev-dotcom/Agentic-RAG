@@ -397,7 +397,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 7/7 | Ready for verification | - |
+| 152. Workflow Run Inputs | 7/8 | Executing (gap plan 08 — D-04 widen fix) | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
