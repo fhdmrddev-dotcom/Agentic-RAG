@@ -67,7 +67,7 @@
 - [x] **Phase 148: Governance — Audit, Users & Feature Visibility** — audit browser (filter/paginate/CSV) + user list disable/enable + API-enforced feature greenlists (ADMIN-03, VIS-01) — completed 2026-07-12
 - [x] **Phase 149: Model Registry & Discovery** — write UI over `model_capabilities_overrides` + `model_discovery_service` propose-only (MODEL-01, MODEL-02) — completed 2026-07-13
 - [x] **Phase 150: Secrets at Rest** — app-layer `cryptography` envelope encryption of `app_settings` key columns + env-fallback + round-trip-verified saves (SEC-01) — completed 2026-07-13
-- [ ] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01)
+- [x] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01) ✓ 2026-07-14
 - [ ] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03)
 - [ ] **Phase 153: Inline Citations** — per-claim markers keyed to the run's real retrieval set + click-through + absence-as-signal (CITE-01)
 - [ ] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01)
@@ -375,7 +375,7 @@ Plans:
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
-| 151. Agent File Tools | 4/4 | Ready for verification | - |
+| 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 0/? | Not started | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
