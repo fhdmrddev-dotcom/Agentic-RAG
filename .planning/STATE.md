@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — GAP CLOSURE COMPLETE (all 7 plans executed)
-Plan: 152-07 of gap set 05-07 COMPLETE (all of 01-07 done)
-Status: Ready for `/gsd:verify-work 152` (frontend 152-07 needs no uvicorn restart; the 152-05/06 backend restart flags still stand before the live UAT)
-Last activity: 2026-07-15 -- 152-07 executed (frontend WR-05 truthful scope label + WR-03 mirror + WR-04 orphan cleanup)
+Phase: 152 (workflow-run-inputs) — GAP CLOSURE 05-07 EXECUTED; RE-VERIFY = gaps_found (1 NEW BLOCKER)
+Plan: 05-07 executed (all 01-07 done). CR-01 + WR-01/03/04/05 CLOSED — but 152-06's WR-03 fix INTRODUCED a new blocker (D-04 "cannot widen" regression: an ancestor-folder per-run override widens a bound scope to sibling projects; scope.py A4 dropped the `override ⊆ author-project-subtree` membership check, frontend mirror too). Owner-gated (same-account, no cross-USER leak) but violates the phase's own narrow-only contract; reachable via the Run-modal `<select>`.
+Status: gaps_found (6/7 must-haves) — fix = re-add the `override ⊆ author project subtree` check ALONGSIDE the per-phase intersection in `scope.py:153-168` + mirror in `WorkflowsPage.tsx:1033-1050` + ancestor-override regression test (backend+frontend). 152-REVIEW.md has a verbatim fix block. CR-01 is code+test closed (route-level producer-identity spy test); live SC#10 4-axis + destructive-delete UAT (`152-VALIDATION.md`) still pending AFTER this fix. NEXT: `/gsd:plan-phase 152 --gaps` (awaiting operator go-ahead).
+Last activity: 2026-07-15 -- Phase 152 gap-closure re-verification returned gaps_found (WR-03 A4 ancestor-override widen/sibling-leak); code review + verifier both critical, deterministic repro
 
 **152-07 execution notes (2026-07-15) — GAP CLOSURE: frontend WR-05 truthful scope label + WR-03 A4 mirror + WR-04 orphan-thread cleanup, frontend-only, NO migration:**
 
