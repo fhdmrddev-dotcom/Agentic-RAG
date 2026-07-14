@@ -579,7 +579,12 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     filename = _re_local.sub(r"\.{2,}", ".", filename).strip() or "attachment"
 
     # ── D-06 / T-04 / SC#4 — resolve the target skill OWNER-ONLY. Empty .data (not owned
-    #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter. ──
+    #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter.
+    #    WR-04: the gate intentionally does NOT reject is_global — a global skill the caller
+    #    OWNS is writable BY DESIGN (T-03: attach-to-owned-skill then owner later toggles it
+    #    global is a documented, owner-driven data-movement path, not blocked). The refusal
+    #    copy below is therefore scoped to built-in (is_system) skills only, so it never
+    #    overstates the enforcement (auditors: owner-scope on user_id is the load-bearing gate). ──
     try:
         skill_res = await aexec(
             ctx.supabase.table("skills").select("id, is_system")
@@ -591,7 +596,7 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     if not skill_row or skill_row.get("is_system"):
         return ToolResult(result=json.dumps({"error": (
             f"No skill named '{target_skill_name}' that you own — you can only attach "
-            "files to a skill you own (not a global or built-in skill)."
+            "files to a skill you own (built-in skills are never writable)."
         )}))
     skill_id = skill_row["id"]
 

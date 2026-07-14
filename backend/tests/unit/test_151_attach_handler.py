@@ -325,6 +325,38 @@ async def test_skill_select_db_error_refuses_honestly(make_tool_context):
 
 
 @pytest.mark.asyncio
+async def test_owned_global_skill_is_writable(make_tool_context):
+    """WR-04 — an is_global skill the caller OWNS is writable BY DESIGN (T-03: the
+    attach-to-owned-skill → owner toggles global path is documented, not blocked). The
+    gate rejects only is_system, so the refusal copy must not claim global exclusion."""
+    handler = _handler()
+    sb = _sb({"id": "skill-1", "is_system": False, "is_global": True}, existing_file_row=None)
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    result = await handler({
+        "target_skill_name": "My Global Skill", "filename": "notes.md",
+        "source": "inline", "content": "data",
+    }, ctx)
+    parsed = json.loads(result.result)
+    assert parsed["status"] == "created"  # owner-scope holds; is_global does not block
+    _upload(sb).assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_not_owned_refusal_copy_does_not_overstate(make_tool_context):
+    """WR-04 — the refusal copy must match enforcement: it may cite built-in skills
+    but must NOT claim global skills are excluded (owned-global IS writable)."""
+    handler = _handler()
+    sb = _sb(None, existing_file_row=None)
+    ctx = make_tool_context(supabase=sb, current_user={"id": "attacker-9"})
+    result = await handler({
+        "target_skill_name": "Not Mine", "filename": "x.py",
+        "source": "inline", "content": "print(1)",
+    }, ctx)
+    msg = json.loads(result.result)["error"]
+    assert "not a global" not in msg.lower()
+
+
+@pytest.mark.asyncio
 async def test_refuse_when_skill_is_system(make_tool_context):
     handler = _handler()
     sb = _sb({"id": "builtin-1", "is_system": True}, existing_file_row=None)
