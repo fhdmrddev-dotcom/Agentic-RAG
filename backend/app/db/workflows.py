@@ -497,10 +497,11 @@ async def delete_workflow_cascade_preview(
     (T-152-02-05). An unknown / foreign slug → ``{"found": False}`` (the route maps that to
     404, indistinguishable from not-found). ``$N`` / ``ANY($1::uuid[])`` binding only.
 
-    Returns ``{"found": True, "name", "versions", "runs", "threads"}`` where ``runs`` =
-    ``COUNT(*)`` of the workflow_runs for those versions (Removed) and ``threads`` =
+    Returns ``{"found": True, "name", "versions", "runs", "threads", "in_flight"}`` where
+    ``runs`` = ``COUNT(*)`` of the workflow_runs for those versions (Removed), ``threads`` =
     ``COUNT(DISTINCT thread_id)`` of the threads those runs live on (Kept — they become
-    normal chats). Or ``{"found": False}``.
+    normal chats), and ``in_flight`` = ``COUNT(*)`` of runs still LIVE (active/paused/
+    cap_paused — the D-LOCK-05 cancel-first signal). Or ``{"found": False}``.
     """
     async with pool.acquire() as con:
         rows = await con.fetch(
@@ -521,12 +522,23 @@ async def delete_workflow_cascade_preview(
             "WHERE definition_id = ANY($1::uuid[])",
             version_ids,
         )
+        # Phase 152-04 (D-LOCK-05): the count of runs STILL LIVE — the honest signal
+        # the frontend's amber cancel-first banner gates on. Matches the cancel-first
+        # status set the DELETE route heals (active/paused/cap_paused) so the banner
+        # and the actual cancel agree. This is a LIVE signal, never the total ``runs``
+        # (which is historical run RECORDS — showing "in progress" off that would lie).
+        in_flight = await con.fetchval(
+            "SELECT COUNT(*) FROM workflow_runs WHERE definition_id = ANY($1::uuid[]) "
+            "AND status IN ('active', 'paused', 'cap_paused')",
+            version_ids,
+        )
     return {
         "found": True,
         "name": name,
         "versions": len(version_ids),
         "runs": int(runs or 0),
         "threads": int(threads or 0),
+        "in_flight": int(in_flight or 0),
     }
 
 

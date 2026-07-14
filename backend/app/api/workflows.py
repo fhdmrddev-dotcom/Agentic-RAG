@@ -413,12 +413,16 @@ async def delete_draft(
 # layer, never inside the db-helper transaction.
 class DeletePreview(BaseModel):
     """The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +
-    ``runs`` are Removed; ``threads`` are Kept (they become normal chats)."""
+    ``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``
+    is the count of runs STILL LIVE — the honest signal the sheet's amber cancel-first
+    banner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is
+    unaffected (additive field)."""
 
     name: str
     versions: int
     runs: int
     threads: int
+    in_flight: int = 0
 
 
 async def _owned_slug_or_404(pool, definition_id: UUID, user_id: UUID) -> str:
@@ -464,6 +468,7 @@ async def get_delete_preview(
         versions=preview["versions"],
         runs=preview["runs"],
         threads=preview["threads"],
+        in_flight=preview.get("in_flight", 0),
     )
 
 
