@@ -23,6 +23,8 @@ from app.config import settings
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
 from app.db.workflows import (
     create_workflow_definition,
+    delete_published_workflow_cascade,
+    delete_workflow_cascade_preview,
     delete_workflow_definition,
     list_draft_workflows,
     list_published_workflows,
@@ -35,6 +37,7 @@ from app.models.harness import WorkflowDefinition
 # discipline). NEVER import the orchestration fns by name — patch the module attr.
 from app.services import workflow_authoring
 from app.services.harness import publish_service
+from app.services.operator_service import write_operator_audit
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +401,150 @@ async def delete_draft(
         )
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
+    return None
+
+
+# ── Phase 152 (WFIN-03 / D-08) — published-workflow safe DELETE cascade ───────
+# G-5 RED LINE: this DESTRUCTIVE cascade joins THIS router (api/workflows.py),
+# NEVER api/threads.py (the hot-file ledger forbids growing threads.py — D-08). It is
+# a DISTINCT route from the draft ``DELETE /{definition_id}`` (Pitfall 7): overloading
+# the draft path would change its draft-only 404 contract and collide with the client
+# ``deleteWorkflowDraft``. Cancel-first (D-LOCK-05) lives HERE in the route/service
+# layer, never inside the db-helper transaction.
+class DeletePreview(BaseModel):
+    """The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +
+    ``runs`` are Removed; ``threads`` are Kept (they become normal chats)."""
+
+    name: str
+    versions: int
+    runs: int
+    threads: int
+
+
+async def _owned_slug_or_404(pool, definition_id: UUID, user_id: UUID) -> str:
+    """Resolve the slug of an OWNED definition, or raise a uniform 404.
+
+    Owner-gated (``created_by = $2``) — a non-owner / unknown id resolves to ``None`` →
+    404, indistinguishable from not-found (no existence leak; the ``get_definition``
+    404-collapse precedent). The service role bypasses RLS, so this WHERE is the ONLY
+    authorization boundary (T-152-02-01)."""
+    row = await pool.fetchrow(
+        "SELECT slug FROM workflow_definitions WHERE id = $1 AND created_by = $2",
+        definition_id,
+        user_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+    return row["slug"]
+
+
+@router.get(
+    "/{definition_id}/delete-preview",
+    response_model=DeletePreview,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def get_delete_preview(
+    definition_id: UUID,
+    current_user: dict = Depends(get_current_user),
+) -> DeletePreview:
+    """Exact Removed/Kept counts for the victim-naming sheet BEFORE commit (D-LOCK-03).
+
+    Owner-gated + 404-collapse (same boundary as the cascade DELETE). The counts are
+    server-sourced — the sheet never guesses. A distinct STATIC-suffix route so it never
+    shadows (or is shadowed by) the draft ``/{definition_id}`` paths.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    slug = await _owned_slug_or_404(pool, definition_id, user_id)
+    preview = await delete_workflow_cascade_preview(pool, slug=slug, user_id=user_id)
+    if not preview.get("found"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+    return DeletePreview(
+        name=preview["name"],
+        versions=preview["versions"],
+        runs=preview["runs"],
+        threads=preview["threads"],
+    )
+
+
+@router.delete(
+    "/{definition_id}/cascade",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def delete_workflow_cascade(
+    definition_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase),
+):
+    """Hard-delete a workflow (definition + ALL versions + ALL runs) safely -> 204.
+
+    Order (D-LOCK-04/05):
+      1. Owner-gate the target id → its slug (non-owner / unknown → 404, no leak).
+      2. CANCEL-FIRST every in-flight run (status ``active``/``paused``/``cap_paused``) for
+         that slug's versions via the shared ``_cancel_run_internals`` zombie-heal — BEFORE
+         the DB delete, never deleting a live run out from under the engine (D-LOCK-05).
+      3. FK-safe cascade (``delete_published_workflow_cascade``): runs FIRST (RESTRICT
+         blocker) → phases auto-cascade → thread anchors auto-SET-NULL (threads KEPT as
+         normal chats) → all versions. ``harness_audit`` receipts linger (A3).
+      4. Best-effort audit receipt (never raises) — the victim-naming "recorded with your
+         name" (D-LOCK-03).
+
+    No return-type annotation (the ``delete_draft`` 204 precedent): a ``-> None`` makes
+    FastAPI build a response body field, which 204 forbids.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    slug = await _owned_slug_or_404(pool, definition_id, user_id)
+
+    # 2. Cancel-first (D-LOCK-05) — heal every in-flight run for this slug's versions
+    # BEFORE the DB delete. The cancel discipline lives in the SERVICE/route layer, not
+    # the db txn. ``_cancel_run_internals`` is late-imported (the admin.py:479 discipline —
+    # keeps the RUN_TASKS registry off this module's load path, avoids the import cycle).
+    inflight = await pool.fetch(
+        "SELECT wr.id, wr.status, wr.thread_id FROM workflow_runs wr "
+        "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
+        "WHERE wd.slug = $1 AND wd.created_by = $2 "
+        "AND wr.status IN ('active', 'paused', 'cap_paused')",
+        slug,
+        user_id,
+    )
+    if inflight:
+        from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
+
+        redis = get_redis()
+        for r in inflight:
+            await _cancel_run_internals(
+                run_id=r["id"],
+                status=r["status"],
+                thread_id=str(r["thread_id"]) if r["thread_id"] else None,
+                redis=redis,
+                supabase=supabase,
+            )
+
+    # 3. FK-safe hard-delete (D-LOCK-04).
+    result = await delete_published_workflow_cascade(pool, slug=slug, user_id=user_id)
+    if not result.get("deleted"):
+        # A racing delete emptied the slug between the owner-gate and here → 404.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+
+    # 4. Best-effort audit receipt — write_operator_audit NEVER raises (swallow-on-error),
+    # so the delete's 204 can never regress on an audit failure. Records the material,
+    # irreversible cascade under the actor's own id (D-LOCK-03 "recorded with your name").
+    await write_operator_audit(
+        str(user_id),
+        "workflow.delete",
+        f"Deleted {result.get('name')}",
+        is_write=True,
+        target_type="workflow_definition",
+        target_id=str(definition_id),
+        metadata={
+            "slug": slug,
+            "versions": result.get("versions"),
+            "runs": result.get("runs"),
+        },
+        supabase=supabase,
+    )
     return None
 
 
