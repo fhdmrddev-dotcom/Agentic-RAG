@@ -32,7 +32,15 @@ import type { NavItem } from "@/lib/nav-items"
 // Phase 103-06: the Run-from-page launch reuses the EXISTING kickoff path —
 // createThread + sendMessage(workflow_definition_id) — NEVER a bespoke
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
-import { createThread, postMessage, uploadWorkspaceTemplate, type PublishedWorkflow } from "@/lib/api"
+// WR-04: the raw deleteThread api client, aliased to avoid shadowing the useThreads()
+// binding (:77) — used for best-effort orphan cleanup on a failed launch.
+import {
+  createThread,
+  postMessage,
+  uploadWorkspaceTemplate,
+  deleteThread as deleteLaunchThread,
+  type PublishedWorkflow,
+} from "@/lib/api"
 
 interface Props {
   onSignOut: () => void
@@ -127,15 +135,28 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       const templateFile = opts?.templateFile ?? null
       const folderId = opts?.folderId ?? null
       const thread = await createThread(def.name)
-      // Landmine 8: upload to the launched owned thread so resolve_template_source
-      // Branch 2 discovers it by kind='template_input'. Not swallowed — a 422 aborts
-      // the launch before postMessage.
-      if (templateFile) await uploadWorkspaceTemplate(thread.id, templateFile)
-      await postMessage(thread.id, kickoff, {
-        workflowDefinitionId: def.id,
-        // WFIN-02 (D-01): additive — only when a per-run override was picked (D-06).
-        ...(folderId ? { folderId } : {}),
-      })
+      // WR-04: a post-create failure (a template 422 — now a routine step — or a
+      // postMessage 409/network error) must NOT strand the created thread shell, or
+      // every "fix the file → Run again" retry mints another orphan. Best-effort delete
+      // the created thread in the catch, then RE-THROW the ORIGINAL error so RunModal
+      // still renders the server's message verbatim (the launch-error surfacing, incl.
+      // the 422, must not regress). The cleanup is fire-and-forget (errors swallowed) so
+      // it never masks or blocks the user-facing failure.
+      try {
+        // Landmine 8: upload to the launched owned thread so resolve_template_source
+        // Branch 2 discovers it by kind='template_input'. Not swallowed — a 422 aborts
+        // the launch before postMessage.
+        if (templateFile) await uploadWorkspaceTemplate(thread.id, templateFile)
+        await postMessage(thread.id, kickoff, {
+          workflowDefinitionId: def.id,
+          // WFIN-02 (D-01): additive — only when a per-run override was picked (D-06).
+          ...(folderId ? { folderId } : {}),
+        })
+      } catch (e) {
+        void deleteLaunchThread(thread.id).catch(() => {}) // don't leak the launch shell
+        throw e
+      }
+      // Only reached on a successful launch — never runs after a thrown/cleaned failure.
       await loadThreads()
       selectThread(thread)
       onNavigate("chat")
