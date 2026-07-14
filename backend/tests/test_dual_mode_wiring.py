@@ -2405,19 +2405,27 @@ def _llm_single_phase(slug="research", prompt="do research"):
 # ── F8 (a): the live wf_ctx + both resume builders carry inputs.kickoff_prompt ──
 
 def test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source():
-    """F8 (live): the threads.py harness wf_ctx build sets inputs={"kickoff_prompt":
-    body.content} — mirroring EXACTLY what create_workflow_run persisted (:995) so
-    live ctx.inputs matches the durable inputs jsonb the resume builders read back.
+    """F8 (live): the threads.py harness wf_ctx build sets inputs["kickoff_prompt"] =
+    body.content — mirroring EXACTLY what create_workflow_run persisted so live
+    ctx.inputs matches the durable inputs jsonb the resume builders read back.
+
+    152 WFIN-02: the inputs dict now ALSO carries an optional per-run folder override
+    merged in (`**({"folder_id": ...} if body.folder_id else {})`), so the assertion
+    guards the kickoff_prompt key substring rather than the exact `inputs={...}`
+    literal — kickoff_prompt stays the first key at BOTH the create_workflow_run and
+    wf_ctx sites (the mirror invariant is preserved; the folder_id is additive).
     """
     import inspect
     from app.api import threads as threads_mod
 
     src = inspect.getsource(threads_mod)
     # create_workflow_run stored it; the wf_ctx must mirror it so the first phase reads it.
-    assert 'inputs={"kickoff_prompt": body.content}' in src, (
-        "harness wf_ctx must set inputs={'kickoff_prompt': body.content} (the "
-        "consumption half of SEED-047 — without it the first phase gets an empty "
-        "user turn and asks for the topic)"
+    # Both sites carry `"kickoff_prompt": body.content` as the first key (folder_id, when
+    # present, is merged AFTER via **{...}) — assert that F8 substring survives.
+    assert src.count('"kickoff_prompt": body.content') >= 2, (
+        "harness wf_ctx AND create_workflow_run must both set "
+        "inputs['kickoff_prompt'] = body.content (the consumption half of SEED-047 — "
+        "without it the first phase gets an empty user turn and asks for the topic)"
     )
 
 
