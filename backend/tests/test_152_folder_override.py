@@ -303,6 +303,51 @@ async def test_a4_two_phase_empty_intersection_dropped(monkeypatch):
     assert root_good == p
 
 
+# ── WR-03 regression (152-08): a strict-ANCESTOR override WIDENS scope → dropped ─
+async def test_a4_ancestor_override_dropped(monkeypatch):
+    """152-08 / D-04: an owner-visible STRICT ANCESTOR of the bound project is DROPPED.
+
+    The 152-06 WR-03 fix removed the pre-existing "override ⊆ author project subtree"
+    NECESSARY check, keeping ONLY the per-phase intersection. Consequence: a bound
+    workflow (project P) declaring phase folder_scope=[A1] accepts an override of R —
+    a strict ANCESTOR of P whose subtree ALSO contains an unrelated sibling project P2 —
+    because subtree(R) ⊇ A1 so the per-phase ∩ passes. R is then returned as the scope
+    root and WIDENS the run's retrieval to include the sibling P2 (a same-account
+    cross-project confidentiality leak, the D-04 / WFIN-02 narrow-only contract break).
+
+    Expected: the restored author-project-subtree membership check DROPS R (R ∉ subtree(P)
+    = {P, A1}) → the resolver returns the author default P. This is RED against the shipped
+    152-06 code (which returns R because subtree(R) ⊇ A1) and GREEN once the membership
+    check is re-instated ALONGSIDE the per-phase check.
+    """
+    p = str(uuid4())
+    a1 = str(uuid4())
+    p2 = str(uuid4())  # unrelated SIBLING project, also under R
+    r = str(uuid4())  # common owner-visible ANCESTOR of both P and P2
+    monkeypatch.setattr(scope_mod, "fetch_visible_folders", _fake_visible(p, a1, p2, r))
+
+    # root-aware subtree stub: subtree(P)={P,A1}, subtree(R)={R,P,A1,P2} (the widening set),
+    # subtree(A1)={A1}, subtree(P2)={P2}.
+    subtrees = {p: [p, a1], r: [r, p, a1, p2], a1: [a1], p2: [p2]}
+
+    async def _fake_subtree(root, *, supabase, user_id):
+        return subtrees.get(str(root), [str(root)])
+
+    monkeypatch.setattr(scope_mod, "resolve_project_subtree", _fake_subtree)
+
+    # override = R (an ancestor of P): subtree(R) ⊇ A1 so the per-phase ∩ passes, but R is
+    # NOT a member of subtree(P) → the author-subtree membership check DROPS it → author default P.
+    root = await resolve_run_scope_root(
+        _def(p, phase_scope=[a1]),
+        run_inputs={"folder_id": r},
+        thread_folder_id=None,
+        supabase=object(),
+        user_id="u",
+    )
+    # ancestor override dropped — retrieval stays within the bound project subtree (no P2 leak).
+    assert root == p
+
+
 # ── shape guards: str|None, and fetch_visible_folders consulted once ─────────
 async def test_returns_str_or_none_and_fetches_once(monkeypatch):
     """The helper returns str | None (NEVER a set) and gates the override with one fetch."""
