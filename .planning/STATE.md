@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T16:33:45.631Z"
-last_activity: 2026-07-14 -- Phase 152 planning complete
+last_updated: "2026-07-14T17:19:55.452Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 26
   completed_phases: 6
   total_plans: 49
-  completed_plans: 45
+  completed_plans: 46
   percent: 23
 ---
 
@@ -22,19 +22,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 152 — workflow run inputs
+**Current focus:** Phase 152 — workflow-run-inputs
 
 ## Current Position
 
-Phase: 152
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-14 -- Phase 152 planning complete
+Phase: 152 (workflow-run-inputs) — EXECUTING
+Plan: 2 of 4
+Status: 152-01 complete (1/4) — ready to execute 152-02
+Last activity: 2026-07-14 -- Phase 152 Plan 01 (WFIN-02 folder-override backend) executed
+
+**152-01 execution notes (2026-07-14) — WFIN-02 per-run folder-scope override, backend, no migration:**
+
+- 3 tasks + 1 deviation, sequential on the main tree (`use_worktrees=false`). Task 1 TDD RED `219ea5d0` (ImportError — `resolve_run_scope_root` absent) → GREEN `f700d7a2`; Task 2 kickoff `b1e6d18a`; Task 3 resume+Continue `bc94c4d3`; deviation `ab84c24e`.
+- **`MessageCreate.folder_id: UUID | None`** (D-01, malformed → 422) + **`scope.resolve_run_scope_root()`** — owns the `owned-override > author default > thread` precedence, the D-05 owner-reachability gate (`str(override) in fetch_visible_folders(owner)` → drop-not-trust), and the A4 composition guard (drops an out-of-subtree override for workflows declaring per-phase `folder_scope`). Returns `str | None`, NEVER a set (Pitfall 6). Callers still call `resolve_project_subtree(root)`.
+- **G-5 shrink-not-grow SATISFIED (ratified override):** `threads.py` kickoff removed the inline author-default/thread branch and delegates to the helper → net **2445 → 2444** (`git diff --stat` 18 ins / 19 del). Override persisted into `create_workflow_run.inputs` jsonb + mirrored into `wf_ctx` inputs. `agent_loop.py` untouched (Landmine 2 RED LINE).
+- **Pitfall 5 CLOSED:** resume (`harness_engine._build_resume_context`) + Continue (`runs.py`) now read the override from durable `workflow_runs.inputs` via the same helper — no silent revert to the author default; owner re-validated on re-drive (since-deleted folder degrades safely).
+- **DEVIATION [Rule 1]:** `test_dual_mode_wiring.py::test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source` asserted the exact literal `inputs={"kickoff_prompt": body.content}`, which Task 2's folder_id merge changed. Updated the assertion to guard the `"kickoff_prompt": body.content` substring at BOTH sites (`count >= 2`) — same F8 invariant, additive folder_id (`ab84c24e`).
+- **Gates:** `test_152_folder_override` 8/8; touched-surface regression (test_098/test_harness_resume/test_continue/test_harness_engine/test_thread_workflow_endpoint) green. **Baseline delta = 0 net-new failures**, proven via a controlled non-integration full-suite diff vs pre-152 base `205d9bcd` (base 95 → head 96 → deviation fix → 95). Pre-existing `test_harness_gates::test_bounded_retry` (ask_user `tool_call_id` KeyError, SEED-056 rot) confirmed failing at base too — NOT touched. Full-suite integration tier is environmentally flaky (needs live Supabase/Redis) — not a reliable signal.
+- **NO migration** (D-03: `project_folder_id` is ALREADY the retrieval default since Phase 098). **WFIN-02 stays open** at the requirement level (false-green avoidance, 148–151 convention) — closes at verify-work/secure-phase after the live SC#10 4-axis UAT in `152-VALIDATION.md`. **Operator: restart uvicorn** to load the changed modules before UAT.
+- **SDK quirks (unchanged):** `state.advance-plan` bumped frontmatter `completed_plans` 45→46 + Current Plan → 2; `state.update-progress`/`record-metric` = field-not-found/arg-parse (STATE uses the frontmatter `progress:` block) → Current Position hand-updated; `roadmap.update-plan-progress 152` checked the 152-01 box but LEFT the progress-table row `0/? | Not started` stale → hand-fixed to `1/4 | Executing`.
 
 **152 planning notes (2026-07-14) — autonomous discuss→plan (research→UI-SPEC→pattern-map→plan→verify), NOT auto-advanced to execute:**
 
 - **4 plans / 3 waves (commit `281c5e61`); plan-checker VERIFICATION PASSED (0 blockers, 5 doc-hygiene warnings — 4 closed, 1 audited below).** Wave 1: 152-01 (WFIN-02 folder-override backend) + 152-02 (WFIN-03 delete-cascade backend); Wave 2: 152-03 (WFIN-01/02 Run-modal frontend, deps 152-01); Wave 3: 152-04 (WFIN-03 delete frontend, deps 152-02+03). Coverage gates green (WFIN-01/02/03 all covered; decision-coverage passed). **No migration** (RESEARCH corrected D-03: `project_folder_id` is ALREADY the retrieval default since Phase 098). Artifacts: RESEARCH `ed96a176`, UI-SPEC APPROVED `205d9bcd`, PATTERNS, VALIDATION (SC#10 4-axis live UAT held there, not in plan tasks).
-- **⚠ Guardrail overrides — G-5 (threads.py) [AUDITED at plan-verification; pending operator ratification + execution]:** Plan 152-01 Task 2 touches `backend/app/api/threads.py` (hot-file ledger: "G-5 fires — extraction due", 9+ touches) to wire the WFIN-02 per-run scope override — unavoidable, as the sole live kickoff scope block lives there. **Mitigation (stronger than the Phase-147 precedent):** the touch REMOVES an inline branch and delegates to a new `resolve_run_scope_root()` helper in `scope.py`, with a `git diff --stat` net-line-count acceptance criterion enforcing `threads.py` does NOT grow (shrink-not-grow, aligned with the extraction intent). The WFIN-03 delete endpoint correctly routed to `api/workflows.py` (never threads.py) per D-08. This override was accepted autonomously under the operator's delegated auto-run; **surface for explicit operator ratification before/at execute-phase.**
+- **⚠ Guardrail overrides — G-5 (threads.py) [AUDITED at plan-verification; pending operator ratification + execution]:** Plan 152-01 Task 2 touches `backend/app/api/threads.py` (hot-file ledger: "G-5 fires — extraction due", 9+ touches) to wire the WFIN-02 per-run scope override — unavoidable, as the sole live kickoff scope block lives there. **Mitigation (stronger than the Phase-147 precedent):** the touch REMOVES an inline branch and delegates to a new `resolve_run_scope_root()` helper in `scope.py`, with a `git diff --stat` net-line-count acceptance criterion enforcing `threads.py` does NOT grow (shrink-not-grow, aligned with the extraction intent). The WFIN-03 delete endpoint correctly routed to `api/workflows.py` (never threads.py) per D-08. This override was accepted autonomously under the operator's delegated auto-run; **surface for explicit operator ratification before/at execute-phase.** **RATIFIED 2026-07-14 by operator `/gsd:execute-phase 152` invocation — the shrink-not-grow `git diff --stat` acceptance criterion on `threads.py` remains an execution gate.**
 
 **151-04 execution notes (2026-07-14) — FILE-01 attach_skill_file, backend + tests, additive:**
 

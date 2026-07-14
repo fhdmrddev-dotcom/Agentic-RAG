@@ -280,7 +280,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 152-01-PLAN.md — WFIN-02 folder-scope override backend: MessageCreate.folder_id + resolve_run_scope_root D-05 owner gate + kickoff/resume/Continue wiring (no migration)
+- [x] 152-01-PLAN.md — WFIN-02 folder-scope override backend: MessageCreate.folder_id + resolve_run_scope_root D-05 owner gate + kickoff/resume/Continue wiring (no migration)
 - [ ] 152-02-PLAN.md — WFIN-03 delete cascade backend: FK-safe cascade + delete-preview helpers + distinct cascade route + cancel-first (D-08, api/workflows.py)
 
 **Wave 2** *(blocked on Wave 1)*
@@ -391,7 +391,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 0/? | Not started | - |
+| 152. Workflow Run Inputs | 1/4 | Executing | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
