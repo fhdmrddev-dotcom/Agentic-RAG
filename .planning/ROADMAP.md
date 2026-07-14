@@ -297,6 +297,10 @@ Plans:
 - [x] 152-06-PLAN.md — WR-03 backend: resolve_run_scope_root A4 per-phase intersection guard (drop an override that empties any declared phase folder_scope) + P/A/B test (scope.py)
 - [x] 152-07-PLAN.md — WR-05 truthful bound/unbound scope label + WR-03 frontend option mirror + WR-04 orphan-thread cleanup (frontend; WorkflowsPage.tsx, ChatLayout.tsx)
 
+**Wave 5** *(gap closure — re-verify returned gaps_found: D-04 widen regression that 152-06's WR-03 fix introduced)*
+
+- [x] 152-08-PLAN.md — WFIN-02 / D-04: restore author-project-subtree membership check in resolve_run_scope_root A4 branch (alongside the per-phase intersection) + mirror in WorkflowsPage overrideOptions + strict-ancestor regression tests both sides (scope.py, WorkflowsPage.tsx)
+
 **Note**: SEED-112 scope-control shape RESOLVED at the G-2 sketch = inline <select> (D-LOCK-01). RESEARCH confirms NO migration (project_folder_id is already the retrieval default; delete operates on existing tables).
 **UI hint**: yes
 
@@ -397,7 +401,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 7/8 | Executing (gap plan 08 — D-04 widen fix) | - |
+| 152. Workflow Run Inputs | 8/8 | Ready for verification (gap plan 08 D-04 widen fix executed) | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
