@@ -40,9 +40,11 @@ def test_save_skill_present_when_self_improve_on():
 
 def test_only_difference_is_save_skill():
     """Byte-identical set equality against the baseline: flipping self_improve OFF removes
-    EXACTLY ``save_skill`` and nothing else (web/sandbox held constant). Proves the gate
-    does not disturb any other tool (Deep Mode unchanged when nothing is disabled)."""
+    EXACTLY the self_improve-gated tools and nothing else (web/sandbox held constant). Proves
+    the gate does not disturb any other tool (Deep Mode unchanged when nothing is disabled).
+    Phase 151-04 added ``attach_skill_file`` under the same ``self_improve_enabled`` gate,
+    so the gated set is now {save_skill, attach_skill_file}."""
     on = _names(get_tools(_effective(self_improve=True)))
     off = _names(get_tools(_effective(self_improve=False)))
-    assert on - off == {"save_skill"}
+    assert on - off == {"save_skill", "attach_skill_file"}
     assert off - on == set()
