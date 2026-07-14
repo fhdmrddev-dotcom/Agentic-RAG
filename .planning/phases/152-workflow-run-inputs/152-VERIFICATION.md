@@ -1,8 +1,9 @@
 ---
 phase: 152-workflow-run-inputs
 verified: 2026-07-15T01:00:00Z
-status: gaps_found
-score: 6/7 must-haves verified (1 NEW BLOCKER surfaced during re-verification)
+status: human_needed
+status_history: "gaps_found (2026-07-15T01:00Z, Gap #1 D-04 widen) → human_needed (2026-07-15T02:30Z, Gap #1 CLOSED by 152-08 code+live; whole-phase SC#10 cross-provider live UAT remains)"
+score: 7/7 must-haves verified (prior BLOCKER Gap #1 closed by plan 152-08); SC#10 4-axis cross-provider live UAT still pending
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
@@ -18,7 +19,8 @@ re_verification:
 overrides: []
 gaps:
   - truth: "Retrieval scope is bound server-side so a per-run override can never widen it beyond the workflow's own project (D-04/D-06/WFIN-02 narrow-only contract)"
-    status: failed
+    status: resolved
+    resolved_by: "152-08 (2026-07-15) — restored the author-project-subtree membership check in scope.py's A4 branch ALONGSIDE the per-phase intersection; mirrored in WorkflowsPage overrideOptions; committed strict-ancestor regression tests both sides. Confirmed live 3 ways: (1) committed test_a4_ancestor_override_dropped passes; (2) live-DB resolver probe with override=R (ancestor) returns author default P, subtree=[P,A1], no sibling P2 leak (flips the FAILED spot-check below); (3) live Run modal offers only {default P, A1} — Root/Sibling P2 absent (Claude drove Chrome). See 152-UAT.md + 152-REVIEW.md (0 crit/0 warn/1 info)."
     reason: "For a BOUND workflow that declares ANY per-phase folder_scope (the A4 composition path), resolve_run_scope_root's A4 branch (backend/app/services/harness/scope.py:153-168, introduced/rewritten by 152-06's WR-03 fix) checks ONLY that the override's OWN subtree intersects each declared phase folder_scope — it no longer checks that the override is a member of the AUTHOR's project subtree at all. Any owner-visible STRICT ANCESTOR of the bound project (e.g. a workspace root folder containing both the bound project and an unrelated sibling project) trivially satisfies the per-phase intersection (the project's own folder_scope descendants are still inside the ancestor's subtree), so it is ACCEPTED as the override and returned as the scope root. That root then flows straight into resolve_project_subtree() at the kickoff/resume/Continue call sites, so the run's actual retrieval subtree includes the unrelated sibling project — a same-account cross-project confidentiality leak. Confirmed three ways: (1) direct source read of scope.py:153-168 shows no `override not in project_subtree` check anywhere in the function despite the docstring's own claim at lines 132-138; (2) the fresh 152-REVIEW.md gap-closure re-review (reviewed 2026-07-14T20:19:42Z, AFTER commits cb7cb1e4..a052d30d) independently found and labeled this 'critical', with a concrete repro and a suggested fix — no commit since (git log tops out at 838b2b70, a docs-only commit) touches scope.py again; (3) this verifier reproduced it empirically by calling resolve_run_scope_root() directly against a P(project)/A1(phase scope)/P2(unrelated sibling) folder tree with override=R (ancestor of both P and P2) — result: root='R', resolved retrieval subtree=['R','P','A1','P2'], confirming P2 (the sibling project) leaks into the run's retrieval scope. The identical missing check is mirrored (and therefore also broken) in the frontend's overrideOptions filter (WorkflowsPage.tsx:1033-1050, from 152-07's WR-03 frontend mirror) — the UI actively OFFERS the escaping folder as a selectable option, so this is reachable through ordinary use, not just a theoretical backend path."
     artifacts:
       - path: "backend/app/services/harness/scope.py"
@@ -56,6 +58,22 @@ human_verification:
 **Verified:** 2026-07-15
 **Status:** gaps_found
 **Re-verification:** Yes — after gap closure (plans 152-05, 152-06, 152-07 against the prior 152-VERIFICATION.md BLOCKER + 4 Warnings)
+
+---
+
+## ⟳ Gap #1 CLOSED — 152-08 (2026-07-15, code + live re-verification)
+
+> The BLOCKER this report raised (Gap #1 / truth #2 / WFIN-02 — the D-04 narrow-only contract broken by 152-06's WR-03 rewrite) has since been **closed by plan 152-08** and confirmed live. Everything below this box remains the accurate record of the PRE-152-08 state; read it as history.
+
+**Fix (152-08):** `resolve_run_scope_root`'s A4 branch now restores the NECESSARY author-project-subtree membership check (`if override not in project_subtree: override = None`, `scope.py:176`) ALONGSIDE the SUFFICIENT per-phase intersection loop; `WorkflowsPage.overrideOptions` mirrors it; committed strict-ancestor regression tests exist on both sides. Gap-closure code review = **0 critical / 0 warning / 1 info** (the lone info is a latent, currently-unreachable FE/BE asymmetry, fail-safe).
+
+**Live confirmation (this is exactly the spot-check that FAILED below, now PASSING):**
+- Backend live-DB probe — `resolve_run_scope_root(override=R)` against a real seeded P/A1/P2/R tree → root=**P**, retrieval subtree=**[P, A1]** (was `['R','P','A1','P2']`). R dropped, sibling **P2 does NOT leak**. Control: override=A1 → root=A1 (narrowing still honored).
+- Frontend live UI — Claude drove Chrome; the Run modal's KB `<select>` for a bound+scoped workflow offered ONLY {Workflow default (P), A1}; the escaping ancestor R and sibling P2 were absent.
+
+**Remaining (NOT this gap):** the whole-phase **SC#10 4-axis cross-provider live UAT** (folder-scope constraint across OpenAI/Anthropic/Google/OpenRouter, multi-tool, parallel-thread, long-message) + the destructive delete-cascade and template-provenance rows are still pending — hence `status: human_needed`, not `verified`. WFIN-01/02/03 stay OPEN at the requirement level until that runs (148-151 false-green convention). See `152-UAT.md`.
+
+---
 
 ## Goal Achievement
 
