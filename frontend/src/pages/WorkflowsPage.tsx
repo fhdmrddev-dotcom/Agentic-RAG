@@ -26,16 +26,26 @@
  * flag.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Upload, Check, X } from "lucide-react"
+import { Upload, Check, X, MoreHorizontal, Trash2, Loader2, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   listPublishedWorkflows,
   listStarterWorkflows,
   listDraftWorkflows,
   createWorkflowDraft,
+  getWorkflowDeletePreview,
+  deleteWorkflowCascade,
   type PublishedWorkflow,
   type WorkflowDraftRow,
   type WorkflowDefinitionJSON,
+  type WorkflowDeletePreview,
 } from "@/lib/api"
 import { type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
@@ -483,6 +493,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                     folderName={folderName((wf.definition as DefShape | undefined)?.project_folder_id)}
                     onRun={() => { setRunFor(wf); setKickoff("") }}
                     onTweak={() => onTweak(wf)}
+                    // 152-04 (WFIN-03): after a confirmed cascade delete, re-fetch the
+                    // Published shelf so the card is removed ONLY on server confirmation
+                    // (D-LOCK-04 — no optimistic vanish; the list never filters locally).
+                    onDeleted={() => { refetchPublished().catch(console.error) }}
                   />
                 ))}
               </div>
@@ -627,22 +641,69 @@ function DraftCard({ draft, onOpen }: { draft: WorkflowDraftRow; onOpen: () => v
   )
 }
 
+/** The in-place delete lifecycle (D-LOCK-04), adapting the 064-B KillPhase machine:
+ *  idle → deleting (Deleting…) → deleted (Deleted · recorded) | error (Try again). */
+type DeletePhase = "idle" | "deleting" | "deleted" | "error"
+
 function PublishedCard({
   wf,
   folderName,
   onRun,
   onTweak,
+  onDeleted,
 }: {
   wf: PublishedWorkflow
   folderName: string | null
   onRun: () => void
   onTweak: () => void
+  /** 152-04 (WFIN-03): re-fetch the Published shelf after a CONFIRMED cascade delete —
+   *  the card leaves the list ONLY on server confirmation (D-LOCK-04: no optimistic
+   *  vanish, no undo; hard-delete is irreversible). */
+  onDeleted: () => void
 }) {
   const def = wf.definition as DefShape | undefined
   const version = typeof def?.version === "number" ? def.version : undefined
+
+  // ── WFIN-03 delete surface (D-LOCK-03/04/05). The ⋯-menu opens a victim-naming
+  //    confirm Sheet (the shipped 064-B / ActiveRunsSection primitive): it names the
+  //    EXACT server counts (Removed vs Kept), shows an amber cancel-first banner when a
+  //    run is live, and transitions the card in place — never an optimistic vanish. ──
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [preview, setPreview] = useState<WorkflowDeletePreview | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [deletePhase, setDeletePhase] = useState<DeletePhase>("idle")
+  const descId = `wf-delete-${wf.id}`
+
+  const openDeleteSheet = () => {
+    // Fresh state each open, then fetch the EXACT server counts BEFORE offering the
+    // destructive action — the sheet never renders placeholder/guessed counts (D-LOCK-03).
+    setPreview(null)
+    setPreviewError(null)
+    setDeletePhase("idle")
+    setSheetOpen(true)
+    getWorkflowDeletePreview(wf.id)
+      .then(setPreview)
+      .catch((e) =>
+        setPreviewError(e instanceof Error ? e.message : "Couldn’t load the delete preview"),
+      )
+  }
+
+  const handleDelete = async () => {
+    setDeletePhase("deleting")
+    try {
+      await deleteWorkflowCascade(wf.id)
+      setDeletePhase("deleted")
+      // Server-confirmed: re-fetch the shelf so the card leaves the list ONLY now
+      // (D-LOCK-04 — the list is never filtered locally / optimistically).
+      onDeleted()
+    } catch {
+      setDeletePhase("error")
+    }
+  }
+
   return (
     <div data-testid="published-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-      {/* Card chrome (NOT a soul atom): name/version header, folder chip, status pill. */}
+      {/* Card chrome (NOT a soul atom): name/version header, folder chip, ⋯-menu + status pill. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -656,14 +717,40 @@ function PublishedCard({
             <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">📁 {folderName}</span>
           )}
         </div>
-        <span className="shrink-0 rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
-          published
-        </span>
+        {/* Right cluster: the NET-NEW ⋯ menu (Pitfall 8 — no menu existed on this card)
+            sits immediately left of the published pill. Neutral treatment; the destructive
+            weight lands ONLY on Delete-forever in the sheet (UI-SPEC Visual Hierarchy). */}
+        <div className="flex flex-none items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Workflow actions"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                data-testid="published-delete"
+                className="text-destructive focus:text-destructive"
+                onClick={openDeleteSheet}
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                Delete workflow…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span className="rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
+            published
+          </span>
+        </div>
       </div>
       {/* WUX-01: the shared card-scale soul (tier chip + glyph-dot spine + needs +
           output) replaces the old TierBadge + PhaseChain + "entry needs" trio. */}
       <WorkflowSoul def={def} scale="card" />
-      {/* D-01: the Run button below stays the Phase-121 one-click launch-into-thread —
+      {/* D-01: the Run/Tweak footer stays UNCHANGED — the Phase-121 one-click launch —
           it is NEVER routed through the two-door fork. */}
       <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
         <button
@@ -684,6 +771,139 @@ function PublishedCard({
           ▶ Run
         </button>
       </div>
+
+      {/* ── WFIN-03 victim-naming delete Sheet (D-LOCK-03/04/05 — the shipped 064-B /
+            ActiveRunsSection bottom-sheet primitive). EXACT server-sourced Removed/Kept
+            counts; an amber cancel-first banner ONLY when a run is live; an in-place
+            lifecycle (Deleting… → Deleted · recorded) with NO optimistic vanish + NO undo.
+            The single destructive-weighted control is Delete-forever. ── */}
+      <Sheet
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          // Never dismiss mid-delete (the action is in flight). A confirmed delete stays
+          // open on its terminal state until the shelf re-fetch unmounts the card.
+          if (!o && deletePhase === "deleting") return
+          setSheetOpen(o)
+        }}
+      >
+        <SheetContent side="bottom" aria-describedby={descId} className="mx-auto max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Delete this workflow?</SheetTitle>
+          </SheetHeader>
+          <div id={descId} className="px-4 pb-4">
+            {previewError ? (
+              <div>
+                <p role="alert" className="text-sm text-destructive">
+                  {previewError}
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSheetOpen(false)}
+                    className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : preview === null ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                Loading the exact counts…
+              </p>
+            ) : (
+              <>
+                {/* Removed group — danger-tinted heading + EXACT server counts (never guessed). */}
+                <div>
+                  <p className="text-[13px] font-semibold text-destructive">Permanently removed</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    <span className="font-medium">{preview.name}</span> · {preview.versions} versions ·{" "}
+                    {preview.runs} run records
+                  </p>
+                </div>
+                {/* Kept group — neutral heading + the reassurance that closes "no orphaned
+                    threads"; it ALWAYS renders (incl. the 0-threads variant). */}
+                <div className="mt-6">
+                  <p className="text-[13px] font-semibold text-foreground">Kept — not touched</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {preview.threads > 0
+                      ? `${preview.threads} chat threads become normal chats — transcripts & files stay. Your knowledge base is untouched.`
+                      : "No chat threads to keep."}
+                  </p>
+                </div>
+                {/* Amber cancel-first banner — ONLY when a run is live (D-LOCK-05); amber,
+                    never red (the graded action-guards rule). */}
+                {preview.in_flight > 0 && (
+                  <div
+                    role="status"
+                    data-testid="delete-inflight-banner"
+                    className="mt-4 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-400"
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+                    <span>
+                      {preview.in_flight === 1
+                        ? "1 run is still in progress. It’s cancelled safely first, then the workflow is deleted."
+                        : `${preview.in_flight} runs are still in progress. They’re cancelled safely first, then the workflow is deleted.`}
+                    </span>
+                  </div>
+                )}
+                {/* Action row / in-place lifecycle (adapts the 064-B KillPhase terminals). */}
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  {deletePhase === "idle" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSheetOpen(false)}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Keep it
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="delete-forever"
+                        onClick={() => void handleDelete()}
+                        className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                      >
+                        Delete forever
+                      </button>
+                    </>
+                  )}
+                  {deletePhase === "deleting" && (
+                    <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Deleting…
+                    </span>
+                  )}
+                  {deletePhase === "deleted" && (
+                    <span role="status" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                      Deleted · recorded
+                    </span>
+                  )}
+                  {deletePhase === "error" && (
+                    <div className="flex items-center gap-2">
+                      <span role="status" className="text-sm text-destructive">
+                        Couldn’t delete the workflow
+                      </span>
+                      <button
+                        type="button"
+                        data-testid="delete-retry"
+                        onClick={() => void handleDelete()}
+                        className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* Recorded footer — the audit receipt honesty (D-LOCK-03). */}
+                <p className="mt-4 text-[12px] text-muted-foreground">
+                  ✎ Recorded with your name in the audit log.
+                </p>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
