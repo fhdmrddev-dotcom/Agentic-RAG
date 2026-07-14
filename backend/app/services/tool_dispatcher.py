@@ -623,11 +623,13 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     # ── D-07 overwrite-in-place — Storage upsert (Pitfall 2: bare .upload() 409s on a
     #    colliding path) + race-immune DB upsert on the (skill_id, filename) unique index.
     #    Both blocking calls are off-loop (Pitfall 1). ──
+    uploaded = False
     try:
         await run_in_threadpool(lambda: ctx.supabase.storage.from_("skill-files").upload(
             path=storage_path, file=file_bytes,
             file_options={"content-type": mime, "upsert": "true"},
         ))
+        uploaded = True
         await aexec(ctx.supabase.table("skill_files").upsert(
             {
                 "skill_id": skill_id, "user_id": uid, "filename": filename,
@@ -639,6 +641,20 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
         logger.exception(
             "attach_skill_file write failed (skill=%s file=%s)", skill_id, filename
         )
+        # IN-01 — the object may already be committed to the bucket while the skill_files
+        # upsert failed (e.g. migration 101's unique index not yet applied → ON CONFLICT
+        # error 42P10, or any transient DB blip). Best-effort remove the just-uploaded object
+        # so a failed attach does not accrete an untracked orphan (the tool hard-depends on
+        # migration 101; until it lands on cloud every attach would otherwise leave one behind).
+        if uploaded:
+            try:
+                await run_in_threadpool(
+                    lambda: ctx.supabase.storage.from_("skill-files").remove([storage_path])
+                )
+            except Exception:  # noqa: BLE001 — cleanup is best-effort; never mask the original error
+                logger.warning(
+                    "attach_skill_file: could not remove orphaned object %s", storage_path
+                )
         return ToolResult(result=json.dumps({
             "error": f"Failed to attach the file to the skill: {exc}"
         }))

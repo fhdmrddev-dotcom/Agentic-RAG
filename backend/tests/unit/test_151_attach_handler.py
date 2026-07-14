@@ -371,6 +371,26 @@ async def test_refuse_when_skill_is_system(make_tool_context):
 
 
 # ---------------------------------------------------------------------------
+# IN-01 — Storage upload lands but DB upsert fails → best-effort remove the orphan
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_orphan_object_removed_on_db_upsert_failure(make_tool_context):
+    handler = _handler()
+    sb = _sb(_OWNED, existing_file_row=None)
+    files_tbl = sb.table("skill_files")
+    files_tbl.upsert.return_value.execute.side_effect = Exception("42P10 no unique constraint")
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    result = await handler({
+        "target_skill_name": "My Skill", "filename": "x.py",
+        "source": "inline", "content": "print(1)",
+    }, ctx)
+    assert "error" in json.loads(result.result)
+    _upload(sb).assert_called_once()
+    # the object landed but the row didn't → the orphan is removed best-effort
+    sb.storage.from_.return_value.remove.assert_called_once_with(["owner-1/skill-1/x.py"])
+
+
+# ---------------------------------------------------------------------------
 # T-02 — storage path is ALWAYS owner-prefixed, never a model-supplied path even
 #        when the model tries a traversal filename
 # ---------------------------------------------------------------------------
