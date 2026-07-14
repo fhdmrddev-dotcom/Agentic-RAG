@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import asyncpg
 import pytest
@@ -144,15 +144,29 @@ async def two_users(pg_pool):
 # Seed helpers
 # ----------------------------------------------------------------------------
 
-async def _seed_definition(pg_pool, *, slug, version, name, created_by, status="published"):
+async def _seed_definition(pg_pool, *, slug, version, name, created_by, status="published", is_global=False):
     """Insert one workflow_definitions row (minimal valid definition JSONB)."""
     return await pg_pool.fetchval(
-        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by) "
-        "VALUES ($1, $2, $3, $4, $5::jsonb, $6) RETURNING id",
+        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+        "VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7) RETURNING id",
         slug, version, name, status,
         json.dumps({"slug": slug, "version": version, "phases": []}),
-        created_by,
+        created_by, is_global,
     )
+
+
+async def _seed_producer_run(pg_pool, *, thread_id, user_id, status="streaming"):
+    """Insert one LIVE producer ``runs`` row (db/runs.py:52 columns) on ``thread_id``.
+
+    A ``status='streaming'`` row is the identity the cascade's LEFT JOIN resolves as the
+    RUN_TASKS key (the CR-01 producer identity). ``model``/``provider`` are NOT NULL."""
+    run_id = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO runs (run_id, thread_id, user_id, status, model, provider) "
+        "VALUES ($1, $2, $3, $4, $5, $6)",
+        run_id, thread_id, user_id, status, "test-model", "openai",
+    )
+    return run_id
 
 
 async def _seed_thread(pg_pool, *, user_id, title="phase-152 delete-cascade thread"):
@@ -288,3 +302,215 @@ async def test_preview_owner_gate_foreign_slug_not_found(pg_pool, two_users):
 
     preview = await delete_workflow_cascade_preview(pg_pool, slug=slug, user_id=owner_user)
     assert preview.get("found") is False
+
+
+# ----------------------------------------------------------------------------
+# Route-level tests (IN-02) — httpx ASGITransport + dependency overrides
+#
+# The db-helper tests above never exercise the cascade ROUTE: the owner gate
+# (_owned_slug_or_404 — the ONLY authz boundary on a service-role path), the
+# 404-collapse contract, the CR-01 producer-identity cancel-first, the in_flight
+# preview, and the WR-01 409 refuse. These drive the real FastAPI app against the
+# live pool, seeding the current-user identity so created_by matches the caller.
+# Pattern copied from test_dual_mode_wiring.py (ASGITransport + dependency_overrides).
+# ----------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def route_owner(pg_pool):
+    """Seed the ROUTE current-user (the get_current_user override id) + one OTHER user
+    into auth.users so route-level tests can create owner-scoped workflow artifacts that
+    match the authenticated caller. Sweeps every workflow artifact for both on teardown."""
+    from app.main import app
+    from app.dependencies import get_current_user
+
+    owner_id = UUID(app.dependency_overrides[get_current_user]()["id"])
+    other_id = uuid4()
+    try:
+        await pg_pool.execute(
+            "INSERT INTO auth.users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+            owner_id, f"phase-152-route-owner-{owner_id}@test.local",
+        )
+        await pg_pool.execute(
+            "INSERT INTO auth.users (id, email) VALUES ($1, $2)",
+            other_id, f"phase-152-route-other-{other_id}@test.local",
+        )
+    except Exception as e:  # noqa: BLE001
+        pytest.skip(f"route_owner fixture setup failed: {type(e).__name__}: {e}")
+    yield (owner_id, other_id)
+    for uid in (owner_id, other_id):
+        for sql in (
+            ("UPDATE threads SET active_workflow_run_id = NULL WHERE user_id = $1", uid),
+            ("DELETE FROM workflow_phases WHERE workflow_run_id IN "
+             "(SELECT id FROM workflow_runs WHERE user_id = $1)", uid),
+            ("DELETE FROM workflow_runs WHERE user_id = $1", uid),
+            ("DELETE FROM workflow_definitions WHERE created_by = $1", uid),
+            ("DELETE FROM messages WHERE thread_id IN (SELECT id FROM threads WHERE user_id = $1)", uid),
+            ("DELETE FROM runs WHERE user_id = $1", uid),
+            ("DELETE FROM threads WHERE user_id = $1", uid),
+            ("DELETE FROM auth.users WHERE id = $1", uid),
+        ):
+            try:
+                await pg_pool.execute(*sql)
+            except Exception:
+                pass
+
+
+def _route_patches(pg_pool):
+    """The common patch set for a cascade/preview route call against the live pool:
+    live pg_pool for the route + is_operator False (so require_visible('workflow_authoring')
+    resolves via the 'everyone' audience carve-out — no operator needed)."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    return [
+        patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=pg_pool)),
+        patch("app.api.workflows.get_redis", MagicMock(return_value=MagicMock())),
+        patch("app.api.workflows.write_operator_audit", AsyncMock()),
+        patch("app.dependencies.is_operator", AsyncMock(return_value=False)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_route_cascade_cancels_via_producer_identity(pg_pool, route_owner):
+    """CR-01 backstop: a status='active' workflow_run whose thread has a status='streaming'
+    producer runs row → the cascade invokes _cancel_run_internals ONCE with the PRODUCER
+    runs.run_id (the RUN_TASKS key), NOT the workflow_runs.id → 204."""
+    import contextlib
+    from unittest.mock import AsyncMock, patch
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+
+    owner, _other = route_owner
+    slug = f"wf-route-cancel-{uuid4().hex[:8]}"
+    d1 = await _seed_definition(pg_pool, slug=slug, version=1, name="Cancel WF", created_by=owner)
+    thread = await _seed_thread(pg_pool, user_id=owner)
+    wf_run = await _seed_run(
+        pg_pool, thread_id=thread, definition_id=d1, user_id=owner, status="active", set_anchor=True
+    )
+    producer_run = await _seed_producer_run(pg_pool, thread_id=thread, user_id=owner, status="streaming")
+
+    cancel_spy = AsyncMock(return_value="task_cancelled")
+    sentinel_spy = AsyncMock()
+    with contextlib.ExitStack() as stack:
+        for p in _route_patches(pg_pool):
+            stack.enter_context(p)
+        stack.enter_context(patch("app.services.run_lifecycle._cancel_run_internals", cancel_spy))
+        stack.enter_context(patch("app.services.ask_user_service.publish_cancel_sentinel", sentinel_spy))
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.request(
+                "DELETE", f"/workflows/{d1}/cascade",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+    assert resp.status_code == 204, resp.text
+    # The cancel reached the LIVE producer identity exactly once — NOT the workflow_runs id.
+    cancel_spy.assert_awaited_once()
+    called_run_id = cancel_spy.await_args.kwargs["run_id"]
+    assert called_run_id == producer_run, "cancel must target the producer runs.run_id (RUN_TASKS key)"
+    assert called_run_id != wf_run, "cancel must NOT target the workflow_runs id (CR-01 miss)"
+
+
+@pytest.mark.asyncio
+async def test_route_404_on_foreign_id_both_routes(pg_pool, route_owner):
+    """The owner gate (_owned_slug_or_404) collapses an unknown/foreign id to 404 on BOTH
+    the cascade DELETE and the delete-preview GET — no existence leak (Phase-150 SQLi seam)."""
+    import contextlib
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+
+    _owner, _other = route_owner  # ensures the current-user auth.users row exists
+    unknown = uuid4()
+    with contextlib.ExitStack() as stack:
+        for p in _route_patches(pg_pool):
+            stack.enter_context(p)
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            r_del = await c.request(
+                "DELETE", f"/workflows/{unknown}/cascade",
+                headers={"Authorization": "Bearer test-token"},
+            )
+            r_prev = await c.get(
+                f"/workflows/{unknown}/delete-preview",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+    assert r_del.status_code == 404, r_del.text
+    assert r_prev.status_code == 404, r_prev.text
+
+
+@pytest.mark.asyncio
+async def test_route_preview_reports_in_flight(pg_pool, route_owner):
+    """A seeded status='active' workflow_run → GET delete-preview reports in_flight == 1
+    (the D-LOCK-05 amber-banner driving signal) alongside the versions/runs counts."""
+    import contextlib
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+
+    owner, _other = route_owner
+    slug = f"wf-route-preview-{uuid4().hex[:8]}"
+    d1 = await _seed_definition(pg_pool, slug=slug, version=1, name="Preview WF", created_by=owner)
+    thread = await _seed_thread(pg_pool, user_id=owner)
+    await _seed_run(pg_pool, thread_id=thread, definition_id=d1, user_id=owner, status="active")
+
+    with contextlib.ExitStack() as stack:
+        for p in _route_patches(pg_pool):
+            stack.enter_context(p)
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/workflows/{d1}/delete-preview",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["in_flight"] == 1
+    assert body["versions"] == 1
+    assert body["runs"] == 1
+
+
+@pytest.mark.asyncio
+async def test_route_wr01_refuse_global_cross_user(pg_pool, route_owner):
+    """WR-01: an is_global definition with ANOTHER user's run → cascade DELETE 409, and
+    BOTH the definition and the other user's run are UNTOUCHED (nothing cross-user deleted)."""
+    import contextlib
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+
+    owner, other = route_owner
+    slug = f"wf-route-wr01-{uuid4().hex[:8]}"
+    d1 = await _seed_definition(
+        pg_pool, slug=slug, version=1, name="Global WF", created_by=owner, is_global=True
+    )
+    other_thread = await _seed_thread(pg_pool, user_id=other)
+    other_run = await _seed_run(
+        pg_pool, thread_id=other_thread, definition_id=d1, user_id=other, status="completed"
+    )
+
+    with contextlib.ExitStack() as stack:
+        for p in _route_patches(pg_pool):
+            stack.enter_context(p)
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.request(
+                "DELETE", f"/workflows/{d1}/cascade",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+    assert resp.status_code == 409, resp.text
+    # Fail-closed: nothing cross-user was cancelled or deleted.
+    assert await pg_pool.fetchval(
+        "SELECT count(*) FROM workflow_definitions WHERE id = $1", d1
+    ) == 1
+    assert await pg_pool.fetchval(
+        "SELECT count(*) FROM workflow_runs WHERE id = $1", other_run
+    ) == 1
