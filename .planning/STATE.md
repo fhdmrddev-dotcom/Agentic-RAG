@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-14T03:04:39.644Z"
+status: verifying
+last_updated: "2026-07-14T03:23:12.866Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 26
@@ -26,10 +26,21 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 151 (agent-file-tools) — EXECUTING
-Plan: 4 of 4
-Status: Executing Phase 151 (Wave 1 COMPLETE — 151-01 + 151-02 + 151-03; Wave 2 151-04 attach remains)
-Last activity: 2026-07-14 -- Phase 151 Plan 02 (D-10 migration 101: skill_files unique index) executed — Wave 1 done
+Phase: 151 (agent-file-tools) — READY FOR VERIFICATION
+Plan: 4 of 4 (all plans executed)
+Status: Phase complete — ready for verification
+Last activity: 2026-07-14 -- Phase 151 Plan 04 (FILE-01 attach_skill_file, Wave 2) executed — all 4 plans done
+
+**151-04 execution notes (2026-07-14) — FILE-01 attach_skill_file, backend + tests, additive:**
+
+- 3/3 tasks, sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 TDD RED `3abbb7ed` (12 ImportError); Task 2 TDD GREEN `89bf027c`; Task 3 registration/cross-provider + count-fixes `505a0d35`.
+- **New tool `attach_skill_file` (FILE-01)** dual-wired through the flat `_TOOL_REGISTRY` G-5 contract + `get_tools()` (self_improve-gated, appended next to SAVE_SKILL_TOOL) + `_CAPABILITY_FLAG_TOOLS["attach_skill_file"]=("self_improve_enabled","Self-improvement (skill file attach)")`. `threads.py` untouched (G-5); no `provider ==` fork (D-14). Saves a file onto an OWNED skill from all 4 sources (D-05): workspace (`_get_file_content`), sandbox_output (`copy_from_runtime` harvest of `/sandbox/output/<name>`), inline (`content` utf-8 arg, weak-model size-bound + empty guard = `_ATTACH_INLINE_MAX_BYTES` 5 MB), kb_document (REUSES Plan-01 `_fetch_owned_document_bytes`, T-03).
+- **Owner-only WRITE gate (D-06/T-04):** target skill resolved by name under `.eq("name").eq("user_id")` — NEVER the `.or_(is_global.eq.true)` READ filter — empty `.data` OR `is_system` → refuse (service-role has no RLS backstop → the app gate is load-bearing). **T-02:** storage path always `{ctx.current_user['id']}/{skill_id}/{filename}` (owner-prefixed, skill_id from the resolved skill, filename sanitized to a safe basename — traversal-proof). **D-07:** overwrite-in-place via Storage `.upload(file_options={"upsert":"true"})` + race-immune `.upsert(on_conflict="skill_id,filename")` on Plan-02's unique index; a pre-check SELECT drives the "created" vs "updated" report (informational; DB correctness is the upsert). Reuses the existing `skill_files` table + `skill-files` bucket (D-08 — no new table/bucket).
+- **Optional SSE ADDED:** additive `skill_file_attached` emit (skill/filename/status), provider-uniform, best-effort no-op when emit/run_id absent.
+- **Three stale exact-count assertions FINALIZED (run-derived, not copied):** `_TOOL_REGISTRY` 27→**29**; `test_085` base (no web/sandbox, self-improve default-ON) 22→**25**; all-conditionals-on 24→**28**. FILE-02 is sandbox-gated (absent from base), FILE-01 self_improve-gated (default-ON → present in base). EXPECTED_TOOLS list extended with both new tools.
+- **Gates:** the FILE-01/FILE-02 + count-assert suites (`test_151_attach_handler` 12, `test_151_registration` 10, `test_151_cross_provider_schema` 5, `test_151_fetch_handler`, `test_151_tool_schema`, `test_085_tool_registration`, `test_tool_dispatcher`) = **67/67 green**; schema anyOf/oneOf-free; Google+Anthropic translation backstop green (SC#10 static); `git diff --name-only` excludes `threads.py`; no new `provider ==` (only a docstring mention).
+- **Out-of-scope discovery LOGGED (`deferred-items.md`):** the FULL `pytest tests/unit` tier has **63 pre-existing failures** in ~18 UNRELATED service test files (test_retrieval_service/test_sql_service/test_sandbox_service/etc.) — verified pre-existing by restoring the two source files to baseline `a0a86e8e` and reproducing 30 of them with the ORIGINAL source. NOT fixed (scope boundary); re-open trigger = Phase 151 verify-work test-hygiene sweep (SEED-056/049 precedent).
+- **FILE-01 NOT marked complete** (false-green avoidance, 148/149/150 convention) — closes at verify-work/secure-phase (live SC#10 4-axis UAT in 151-VALIDATION.md + FILE-01 T-02/T-03/T-04 threat close). REQUIREMENTS.md FILE-01 stays `Pending`. **SDK quirks (unchanged):** `advance-plan` detected `last_plan` (bumped frontmatter `completed_plans` 43→44, status→`verifying`); `update-progress`/`record-metric` = field-not-found/arg-parse (STATE uses the frontmatter `progress:` block) → Current Position + ROADMAP row hand-updated to `4/4 | Ready for verification` + 151-04 box checked.
 
 **151-02 execution notes (2026-07-14) — D-10 migration 101: skill_files(skill_id, filename) unique index, DB-only, additive:**
 

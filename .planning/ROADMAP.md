@@ -260,7 +260,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 151-04-PLAN.md — FILE-01 `attach_skill_file` (4-source WRITE tool, race-immune upsert, own T-02/T-03/T-04 threat model)
+- [x] 151-04-PLAN.md — FILE-01 `attach_skill_file` (4-source WRITE tool, race-immune upsert, own T-02/T-03/T-04 threat model)
 
 **Note**: Internal build order FILE-02 (pure new READ tool, lowest coupling) → FILE-01 (WRITE tool, whose threat model becomes the reference upload/threat pattern). Each carries its own threat model.
 
@@ -375,7 +375,7 @@ Plans:
 | 148. Governance — Audit, Users & Feature Visibility | 9/9 | Complete | 2026-07-11 |
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
-| 151. Agent File Tools | 3/4 | Executing | - |
+| 151. Agent File Tools | 4/4 | Ready for verification | - |
 | 152. Workflow Run Inputs | 0/? | Not started | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
