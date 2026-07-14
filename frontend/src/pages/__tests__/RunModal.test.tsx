@@ -121,6 +121,34 @@ const phaseScopedPublished = {
   },
 }
 
+/** Ancestor-override tree (152-08 / D-04): R ─ P ─ A1, plus an unrelated SIBLING P2 under R.
+ *  subtree(P)={P,A1}; subtree(R)={R,P,A1,P2} — so R (a strict ancestor of the bound project)
+ *  trivially satisfies the per-phase folder_scope=[A1] yet WIDENS retrieval to the sibling P2. */
+const ancestorFolders: Folder[] = [
+  { id: "folder-r", user_id: "u1", name: "Workspace root", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: "folder-r", is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-a1", user_id: "u1", name: "Team A1", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-p2", user_id: "u1", name: "Project P2", parent_id: "folder-r", is_global: false, created_at: "", updated_at: "" },
+]
+
+/** A workflow BOUND to P (project_folder_id: "folder-p") declaring phase folder_scope=[A1].
+ *  The Run modal must NEVER offer R (the escaping ancestor) or P2 (the unrelated sibling) —
+ *  only A1 (the in-project descendant). The client mirror of scope.py's restored A4 check. */
+const ancestorScopedPublished = {
+  id: "pub-4",
+  slug: "ancestor-scan",
+  name: "Ancestor scan",
+  definition: {
+    slug: "ancestor-scan",
+    version: 1,
+    project_folder_id: "folder-p", // BOUND to P → authorDefaultFolderId is "folder-p"
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [
+      { slug: "p1", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft", folder_scope: ["folder-a1"] } },
+    ],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockListPublished.mockResolvedValue([boundPublished])
@@ -265,5 +293,24 @@ describe("RunModal — A4 per-phase override filter (WR-03 frontend mirror)", ()
     // Unbound workflow → the "" option is the honest whole-KB "All documents" (WR-05).
     expect(values[0]).toBe("")
     expect(scope.options[0].textContent).toBe("All documents")
+  })
+})
+
+describe("RunModal — A4 author-subtree containment (ancestor override not offered, 152-08)", () => {
+  it("drops the escaping ancestor (R) and sibling (P2); keeps the in-project descendant (A1) for a BOUND folder_scope workflow", async () => {
+    mockListPublished.mockResolvedValue([ancestorScopedPublished])
+    const { modal } = await openModal(ancestorFolders)
+    const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
+    const values = Array.from(scope.options).map((o) => o.value)
+    // R is a strict ANCESTOR of the bound project P (its subtree {R,P,A1,P2} also holds the
+    // unrelated sibling P2), so offering it would WIDEN the bound run's retrieval beyond P —
+    // the author-subtree containment mirror must NOT offer it as a selectable option.
+    expect(values).not.toContain("folder-r")
+    expect(values).not.toContain("folder-p2")
+    // A1 is an in-project descendant (∈ subtree(P)) that satisfies phase folder_scope=[A1] → offered.
+    expect(values).toContain("folder-a1")
+    // Bound workflow → the "" option is the honest "Workflow default", never "All documents".
+    expect(values[0]).toBe("")
+    expect(scope.options[0].textContent).toContain("Workflow default")
   })
 })

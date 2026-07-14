@@ -1026,10 +1026,9 @@ function RunModal({
     ? folders.find((f) => f.id === authorDefaultFolderId)?.name ?? null
     : null
   // Override options = every OTHER owner-reachable folder. For a workflow that declares
-  // per-phase folder_scope, mirror the backend A4 rule: resolve each candidate's OWN
-  // subtree (root + descendants, the same parent_id walk as resolve_project_subtree) and
-  // keep it ONLY when EVERY declared phase folder_scope still intersects it — otherwise
-  // offering it steers the run into empty retrieval. No-scope workflows are unchanged.
+  // per-phase folder_scope, mirror the CORRECTED backend A4 rule (scope.py, 152-08): the
+  // override must satisfy BOTH the NECESSARY author-subtree membership AND the SUFFICIENT
+  // per-phase intersection. No-scope workflows are unchanged.
   const overrideOptions = useMemo(() => {
     const candidates = folders.filter((f) => f.id !== authorDefaultFolderId)
     if (!hasPhaseFolderScope) return candidates
@@ -1043,7 +1042,21 @@ function RunModal({
       visit(rootId)
       return ids
     }
-    return candidates.filter((cand) => {
+    // NECESSARY (author-subtree containment — mirrors scope.py's restored A4 check, 152-08):
+    // for a BOUND folder_scope workflow, a candidate must be a MEMBER of the author's OWN
+    // project subtree. A strict ANCESTOR/SIBLING of the bound project would WIDEN the run's
+    // retrieval to unrelated sibling projects, so it must NEVER be offered. When there is no
+    // author default (the UNBOUND + folder_scope shape) there is no declared boundary to
+    // contain against — skip this filter and apply only the per-phase intersection (the
+    // unbound path stays as shipped).
+    const contained =
+      authorDefaultFolderId != null
+        ? candidates.filter((cand) => subtreeOf(authorDefaultFolderId).has(cand.id))
+        : candidates
+    // SUFFICIENT (per-phase intersection): keep a candidate ONLY when EVERY declared phase
+    // folder_scope still intersects the CANDIDATE's OWN subtree — otherwise offering it steers
+    // the run into empty retrieval (phase_types.py:326).
+    return contained.filter((cand) => {
       const sub = subtreeOf(cand.id)
       return phaseFolderScopes.every((scope) => scope.some((id) => sub.has(id)))
     })
