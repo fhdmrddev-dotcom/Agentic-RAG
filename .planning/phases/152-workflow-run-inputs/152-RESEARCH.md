@@ -504,7 +504,10 @@ async def delete_published_workflow_cascade(pool, *, slug: str, user_id: UUID) -
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> **All 5 resolved during planning (2026-07-14)** — each recommendation below is implemented by a Phase 152 plan task: **A1**→152-02 (hard-delete all versions by slug); **A3**→152-02 (keep `harness_audit` as append-only, do not delete the receipt); **A4**→152-01 (override ⊆ `project_folder_id` when per-phase `folder_scope` exists; any owned folder otherwise, surfaced in the `<select>`); **Pitfall 5**→152-01 (all 3 run-start sites read the override from durable `inputs`); **A2**→152-02 (owner-only + `require_visible('workflow_authoring')`).
+
 
 1. **All-versions vs single-version delete (A1).** Known: sketch says "definition · N versions." Unclear: does the Published shelf render one card per slug or per version? Recommendation: cascade by `slug + created_by`; confirm the card mapping in `WorkflowsPage.tsx` before finalizing the sheet counts.
 2. **`harness_audit` disposition on delete (A3).** Recommendation: KEEP as append-only audit; if the planner wants a clean sweep, null the `run_id` (don't delete the receipt).

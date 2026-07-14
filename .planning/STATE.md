@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
-last_updated: "2026-07-14T15:28:26.871Z"
-last_activity: 2026-07-14
+status: executing
+last_updated: "2026-07-14T16:33:45.631Z"
+last_activity: 2026-07-14 -- Phase 152 planning complete
 progress:
   total_phases: 26
   completed_phases: 6
-  total_plans: 45
+  total_plans: 49
   completed_plans: 45
   percent: 23
 ---
@@ -28,8 +28,13 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 152
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-14
+Status: Ready to execute
+Last activity: 2026-07-14 -- Phase 152 planning complete
+
+**152 planning notes (2026-07-14) — autonomous discuss→plan (research→UI-SPEC→pattern-map→plan→verify), NOT auto-advanced to execute:**
+
+- **4 plans / 3 waves (commit `281c5e61`); plan-checker VERIFICATION PASSED (0 blockers, 5 doc-hygiene warnings — 4 closed, 1 audited below).** Wave 1: 152-01 (WFIN-02 folder-override backend) + 152-02 (WFIN-03 delete-cascade backend); Wave 2: 152-03 (WFIN-01/02 Run-modal frontend, deps 152-01); Wave 3: 152-04 (WFIN-03 delete frontend, deps 152-02+03). Coverage gates green (WFIN-01/02/03 all covered; decision-coverage passed). **No migration** (RESEARCH corrected D-03: `project_folder_id` is ALREADY the retrieval default since Phase 098). Artifacts: RESEARCH `ed96a176`, UI-SPEC APPROVED `205d9bcd`, PATTERNS, VALIDATION (SC#10 4-axis live UAT held there, not in plan tasks).
+- **⚠ Guardrail overrides — G-5 (threads.py) [AUDITED at plan-verification; pending operator ratification + execution]:** Plan 152-01 Task 2 touches `backend/app/api/threads.py` (hot-file ledger: "G-5 fires — extraction due", 9+ touches) to wire the WFIN-02 per-run scope override — unavoidable, as the sole live kickoff scope block lives there. **Mitigation (stronger than the Phase-147 precedent):** the touch REMOVES an inline branch and delegates to a new `resolve_run_scope_root()` helper in `scope.py`, with a `git diff --stat` net-line-count acceptance criterion enforcing `threads.py` does NOT grow (shrink-not-grow, aligned with the extraction intent). The WFIN-03 delete endpoint correctly routed to `api/workflows.py` (never threads.py) per D-08. This override was accepted autonomously under the operator's delegated auto-run; **surface for explicit operator ratification before/at execute-phase.**
 
 **151-04 execution notes (2026-07-14) — FILE-01 attach_skill_file, backend + tests, additive:**
 

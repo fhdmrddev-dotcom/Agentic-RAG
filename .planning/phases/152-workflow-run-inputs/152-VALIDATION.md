@@ -51,8 +51,10 @@ created: 2026-07-14
 
 *Finalized by planner. Expected new test files:*
 - [ ] `backend/tests/test_152_folder_override.py` — WFIN-02 per-run override + owner-reachability gate (D-05)
-- [ ] `backend/tests/test_152_workflow_delete_cascade.py` — WFIN-03 FK-safe cascade + no-orphans + owner gate
+- [ ] `backend/tests/test_152_delete_cascade.py` — WFIN-03 FK-safe cascade + no-orphans + owner gate
 - [ ] `frontend/src/pages/__tests__/RunModal.test.tsx` (or sibling) — WFIN-01/02 modal `<select>` + template upload sequencing
+
+**WFIN-01 template-upload coverage note (plan-checker warning 4):** WFIN-01's backend is **pure reuse with zero code change** (`upload_template` / `validate_upload` were built + tested in Phase 100/151-03). Its SSTI/provenance threat property ("`kind='template_input'`, MIME/size-allowlisted, never routed to the Jinja engine") is already gated by the existing `backend/tests/test_workspace_template.py` suite (unmodified by this phase) plus the WFIN-01 live-UAT provenance row below. No net-new backend test is required for WFIN-01; the net-new work is frontend sequencing (covered by the RunModal frontend test) + the manual provenance UAT.
 
 ---
 

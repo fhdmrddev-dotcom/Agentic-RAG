@@ -1,7 +1,7 @@
 ---
 phase: 152
 slug: workflow-run-inputs
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "aether-deep-midnight (style=default, baseColor=slate, cssVariables) — not a shadcn CLI preset string; the project's design system predates presets"
 created: 2026-07-14
@@ -254,4 +254,4 @@ Honesty rules (load-bearing, from 073-A + the operator receipt vocabulary):
 - [ ] Dimension 5 Spacing: PASS
 - [ ] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-07-14 — gsd-ui-checker VERIFIED (revision 1: 5 PASS + 1 non-blocking FLAG on the inherited 1px type-ladder cadence)
