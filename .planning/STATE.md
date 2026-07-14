@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T17:19:55.452Z"
+last_updated: "2026-07-14T17:33:35.634Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 26
@@ -27,9 +27,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 152 (workflow-run-inputs) — EXECUTING
-Plan: 2 of 4
-Status: 152-01 complete (1/4) — ready to execute 152-02
-Last activity: 2026-07-14 -- Phase 152 Plan 01 (WFIN-02 folder-override backend) executed
+Plan: 3 of 4
+Status: 152-02 complete (2/4) — ready to execute 152-03
+Last activity: 2026-07-14 -- Phase 152 Plan 02 (WFIN-03 delete-cascade backend) executed
+
+**152-02 execution notes (2026-07-14) — WFIN-03 safe delete cascade, backend, no migration:**
+
+- 2 tasks (Task 1 TDD), sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 RED `022a5509` (ImportError — cascade/preview helpers absent) → GREEN `7b3ff3cd`; Task 2 route `b8d73267`. Touched exactly the 3 declared files (`db/workflows.py`, `api/workflows.py`, `tests/test_152_delete_cascade.py`); **`threads.py` untouched (D-08 / G-5 red line verified via scoped `git diff --name-only`).**
+- **`delete_published_workflow_cascade(pool, *, slug, user_id)`** — ONE txn mirroring `create_workflow_run`'s `acquire()→transaction()`: resolve ALL versions owner-scoped by `slug+created_by` (A1; empty → `{deleted:False}` → route 404, no existence leak), then `DELETE workflow_runs WHERE definition_id = ANY($1::uuid[])` FIRST (the ON DELETE RESTRICT blocker → auto-cascades `workflow_phases`, auto-SET-NULLs `threads.active_workflow_run_id` — threads KEPT as normal chats, D-LOCK-04), then `DELETE workflow_definitions`. Returns `{deleted, name, versions, runs}` (runs parsed from the asyncpg `DELETE <n>` command tag). `harness_audit` NOT touched (A3, no FK on run_id). No migration (immutability trigger is `BEFORE UPDATE` only).
+- **`delete_workflow_cascade_preview(...)`** — owner-scoped `{name, versions, runs=COUNT(*), threads=COUNT(DISTINCT thread_id)}` for the victim-naming sheet (D-LOCK-03); foreign/unknown slug → `{found:False}` → route 404 (T-152-02-05 no count leak).
+- **Route (`api/workflows.py`, D-08):** DISTINCT `DELETE /{definition_id}/cascade` (never overloads the draft `DELETE /{id}`, Pitfall 7) + `GET /{definition_id}/delete-preview`, both `require_visible("workflow_authoring")`. Owner-gate `_owned_slug_or_404` → 404 collapse (service role bypasses RLS → the WHERE is the only boundary). **Cancel-first (D-LOCK-05):** in-flight runs (`active`/`paused`/`cap_paused`) healed via the shared `_cancel_run_internals` (late-imported, admin.py:479 discipline) BEFORE the DB delete, never inside the txn.
+- **Audit receipt** written best-effort via `write_operator_audit` (operator_audit_log, action `workflow.delete`) — the only non-migration audit seam (`audit_log`'s CHECK-enum needs a migration; harness_audit's 22-kind CHECK has no delete kind). NEVER raises → the 204 can't regress on an audit failure. **Nuance:** records a user self-service delete via the operator seam (see SUMMARY Deviations).
+- **Gates:** `test_152_delete_cascade.py` 4/4 GREEN against LIVE local PG :54322 (real FK cascade, not skipped); touched-surface regression (`test_147_workflows_flag` / `test_152_folder_override` / `test_thread_workflow_endpoint`) 22/22 green; `import app.api.workflows` clean (no cycle). No new packages. **WFIN-03 NOT marked complete** (false-green avoidance, 148–151 convention) — closes at verify-work/secure-phase after the live SC#10 4-axis UAT + T-152-02-* threat close. **Operator: restart uvicorn** to load the new routes before UAT.
+- **SDK quirks (unchanged):** `state.advance-plan` bumped Current Plan → 3; `roadmap.update-plan-progress 152` needs a post-summary re-run to check the 152-02 box + the progress-table row `1/4 → 2/4` hand-fixed.
 
 **152-01 execution notes (2026-07-14) — WFIN-02 per-run folder-scope override, backend, no migration:**
 
