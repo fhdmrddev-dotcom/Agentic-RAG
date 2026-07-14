@@ -129,10 +129,13 @@ async def resolve_run_scope_root(
     the owner cannot see. ``fetch_visible_folders`` is consulted only when an override is
     present (absence is the free D-06 path — no owner-fetch cost).
 
-    A4 composition guard: when the definition declares ANY per-phase ``folder_scope``, an
-    override root MUST be within the project subtree (else the intersection at
-    ``phase_types.py`` silently empties → no retrieval). An out-of-subtree override in
-    that case is DROPPED, falling back to the author default.
+    A4 composition guard (WR-03): when the definition declares ANY per-phase ``folder_scope``,
+    resolve the OVERRIDE's OWN subtree and DROP the override unless EVERY declared phase
+    ``folder_scope`` still intersects it. Membership in the project subtree is necessary but
+    NOT sufficient — an in-subtree override whose subtree misses a phase's ``folder_scope``
+    would empty that phase's intersection at ``phase_types.py:326`` (silent no-retrieval), so
+    it is DROPPED, falling back to the author default. A phase with no ``folder_scope``
+    imposes no constraint.
 
     Owner-scoped via ``user_id`` (same threat posture as ``resolve_project_subtree`` —
     the run-start sites pass the durable run owner on the service-role path).
@@ -148,13 +151,21 @@ async def resolve_run_scope_root(
         if override not in visible:
             override = None  # never-owned / unreachable → drop (no narrowing / refuse)
         elif _definition_has_phase_folder_scope(definition):
-            # A4: a scoped workflow's override must be ⊆ the project subtree, else the
-            # per-phase intersection empties → phases retrieve nothing. Drop it if outside.
-            subtree = await resolve_project_subtree(
-                author_default, supabase=supabase, user_id=user_id
+            # A4 (WR-03): resolve the OVERRIDE's OWN subtree and drop the override unless
+            # EVERY declared per-phase folder_scope still intersects it. Membership in the
+            # project subtree is necessary but NOT sufficient: an in-subtree override (e.g.
+            # child A of project P) whose subtree misses a phase whose folder_scope=[B]
+            # would empty that phase's ∩ at phase_types.py:326 → the phase retrieves NOTHING.
+            # Drop such an override so it degrades to the author default (fail-safe), never a
+            # silently-empty phase. A phase with no folder_scope imposes no constraint.
+            override_subtree = set(
+                await resolve_project_subtree(override, supabase=supabase, user_id=user_id) or []
             )
-            if subtree is not None and override not in set(subtree):
-                override = None
+            for phase in definition.phases:
+                scope = getattr(phase.config, "folder_scope", None)
+                if scope and not ({str(f) for f in scope} & override_subtree):
+                    override = None  # would empty this phase's intersection → drop
+                    break
 
     return override or author_root or thread_folder_id
 
