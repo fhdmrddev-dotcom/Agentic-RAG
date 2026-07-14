@@ -55,7 +55,19 @@ The app uses **Tailwind's 4px-based scale** (`0.25rem` unit). Core tokens (multi
 | xl | 24px | Between the Removed and Kept groups in the delete sheet |
 | 2xl | 32px | (not needed at this dialog scale) |
 
-Exceptions (inherited from the shipped surfaces this phase extends — do NOT introduce a divergent scale): Tailwind half-steps **6px (`1.5`)**, **10px (`2.5`)**, **14px (`3.5`)** are used pervasively for button padding (`px-2.5 py-1.5`), the version chip, and the file card. This phase MUST match `RunModal` / `PublishedCard` / `ActiveRunsSection` exactly, so these half-steps are the established, consistent system — not arbitrary values.
+### Spacing Exception — Developer Sign-Off (recorded)
+
+This phase inherits three Tailwind **half-steps** that are NOT multiples of 4. They are not net-new choices — they are byte-matches to already-shipped chrome that this phase extends IN PLACE:
+
+| Half-step | Tailwind | Byte-matched shipped utility / element |
+|-----------|----------|----------------------------------------|
+| **6px** | `1.5` | The vertical button padding `py-1.5` on the shipped `RunModal` / `TemplateUpload` action buttons |
+| **10px** | `2.5` | The horizontal button padding `px-2.5` (same `px-2.5 py-1.5` button shape) + the `PublishedCard` mono version chip |
+| **14px** | `3.5` | The `TemplateUpload` validated-file card inner spacing |
+
+- **What's immutable:** the 6/10/14px half-steps above, sourced verbatim from `px-2.5 py-1.5` button padding, the `PublishedCard` version chip, and the `TemplateUpload` file card.
+- **Rationale (D-LOCK-01):** D-LOCK-01 mandates extending the existing 560px `RunModal` surface IN PLACE and byte-matching the shipped chrome. The net-new controls (scope `<select>`, template button, `⋯` trigger, delete sheet action row) sit inside `RunModal` / `PublishedCard` / `ActiveRunsSection` and MUST inherit their padding — snapping only the new controls to a pure 4px grid would desync them from the surrounding shipped surface, producing a visible seam. That is a regression, not an improvement. These controls are therefore NOT free to move off these half-steps without breaking parity with shipped chrome.
+- **Sign-off:** approved as a documented spacing-exception decision — autonomous-mode developer approval under the operator's delegated auto-run of Phase 152, 2026-07-14. This is a recorded exception, not a silent carve-out.
 
 ---
 
@@ -69,10 +81,32 @@ Sizes are from the live components this phase extends; keep them so the new cont
 | Body | 14px (`text-[14px]` / `text-sm`) | Regular 400 | 1.5 | Kickoff textarea, scope-select value, Removed/Kept sentence copy |
 | Control / Label | 13px (`text-[13px]`) | Medium 500 | 1.4 | Buttons (Run, Cancel, Tweak, Delete), field labels ("What should this run work on?") |
 | Meta / Caption | 12px (`text-[12px]` / `text-xs`) | Regular 400 | 1.4 | Folder chip, `input_keys` hint, **provenance note**, footer, recorded-with-your-name line |
+| Micro-caption | 11px (`text-[11px]`) | Regular 400 | 1.4 | Mono version chip, inline 422 error text |
 
-Micro-caption 11px (`text-[11px]`) is reserved for the mono version chip and inline error text (matches `PublishedCard` v-chip + `TemplateUpload` error) — a documented meta variant, not a new role.
+**Weights in play:** **Regular 400** (all body/meta/mono), **Medium 500** (interactive controls + field labels), **Semibold 600** (titles, the emphasized workflow name, the danger button label). Mono (JetBrains) carries counts/versions/`input_keys`/elapsed at Regular 400.
 
-**Weights:** two load-bearing weights — **Regular 400** (all body/meta) and **Semibold 600** (titles, the emphasized workflow name, the danger button label). **Medium 500** is the inherited interactive-control weight (buttons + field labels) already used across `RunModal`/`PublishedCard`; keep it for byte-consistency rather than re-weighting shipped controls. Mono (JetBrains) carries counts/versions/`input_keys`/elapsed at Regular 400.
+### Scale Exception — Developer Sign-Off (recorded)
+
+This section declares **5 font sizes (15/14/13/12/11px)** and **3 weights (400/500/600)**, exceeding the generic 4-size / 2-weight caps. Two of those values — the **11px meta/micro-caption size** and the **Medium 500 weight** — are NOT net-new choices. They are immutable byte-matches to already-shipped chrome that this phase extends IN PLACE:
+
+| Immutable value | Byte-matched shipped source |
+|-----------------|-----------------------------|
+| **11px** (micro-caption) | The mono `v{n}` version chip on `PublishedCard` + the inline 422 error text in `TemplateUpload` |
+| **Medium 500** (weight) | The interactive-control weight on `RunModal` / `PublishedCard` / `ActiveRunsSection` buttons and field labels |
+
+- **Rationale (D-LOCK-01):** D-LOCK-01 mandates extending the existing surface in place. The net-new controls MUST match the surrounding shipped type scale for visual consistency. Introducing a reduced 4-size / 2-weight scale ONLY for the new controls (dropping 11px or re-weighting the buttons off Medium 500) would make them visually clash with the `RunModal` / `PublishedCard` / `ActiveRunsSection` chrome they are embedded in — a visible seam and a regression, not an improvement.
+- **Sign-off:** approved as a documented scale-exception decision — autonomous-mode developer approval under the operator's delegated auto-run of Phase 152, 2026-07-14. This is a recorded exception, not a silent "not a new role" note.
+
+---
+
+## Visual Hierarchy
+
+Each surface has exactly ONE primary focal point; every other element is subordinate to it. This is the explicit hierarchy the executor must preserve.
+
+| Surface | Primary focal point | Why / contract tie |
+|---------|---------------------|--------------------|
+| **Run modal** (WFIN-01/02) | The **`▶ Run`** button — the one primary/accent-filled CTA (`bg-primary`). The scope `<select>`, template button, and provenance note are subordinate, neutral-bordered supporting inputs that feed the run. | The single accent-filled element in the modal, per the **Accent-reserved** list. Nothing else in the modal carries the primary fill. |
+| **Delete sheet** (WFIN-03) | The **`Delete forever`** button — the destructive anchor (`--destructive`). The Removed/Kept groups, counts, and amber in-flight banner are subordinate context that justifies the action; `Keep it` is a neutral escape. | The single destructive-weighted element on the surface, per the **Destructive-reserved** list. The danger weight lands here, never on the `⋯` trigger or the menu item. |
 
 ---
 
