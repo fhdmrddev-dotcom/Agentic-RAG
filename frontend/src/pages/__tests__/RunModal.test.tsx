@@ -80,6 +80,21 @@ const boundPublished = {
   },
 }
 
+/** An UNBOUND workflow (no project_folder_id) — here folderId:null genuinely means
+ *  whole-KB, so the "" option truthfully reads "All documents" (WR-05). */
+const unboundPublished = {
+  id: "pub-2",
+  slug: "open-scan",
+  name: "Open scan",
+  definition: {
+    slug: "open-scan",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } }],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockListPublished.mockResolvedValue([boundPublished])
@@ -97,19 +112,47 @@ async function openModal(pageFolders: Folder[], onLaunch = vi.fn().mockResolvedV
   return { modal, onLaunch }
 }
 
-describe("RunModal — KB-scope <select> (WFIN-02 / D-LOCK-01)", () => {
-  it("renders All documents → author default (tagged 'workflow default') → other folders, in order", async () => {
+describe("RunModal — KB-scope <select> truthful label (WR-05 / WFIN-02)", () => {
+  it("bound + author folder visible: the '' option reads 'Workflow default — 📁 {folder}', with NO 'All documents'", async () => {
     const { modal } = await openModal(folders)
     const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
     const opts = Array.from(scope.options)
-    expect(opts.map((o) => o.value)).toEqual(["", "folder-aaa", "folder-bbb"])
+    // The author default is no longer a separate option — the "" option IS the workflow
+    // default (truthful: selecting it resolves to the author default server-side, D-06).
+    expect(opts.map((o) => o.value)).toEqual(["", "folder-bbb"])
+    expect(opts[0].textContent).toContain("Workflow default")
+    expect(opts[0].textContent).toContain("DBA Chapters")
+    // WR-05: a bound workflow NEVER shows the dishonest "All documents" option.
+    expect(opts.some((o) => o.textContent === "All documents")).toBe(false)
+    expect(opts[1].textContent).toContain("Contracts")
+    expect(opts[1].textContent).not.toContain("workflow default")
+    // Initial selection is now "" (truthfully = the workflow default for a bound wf).
+    expect(scope.value).toBe("")
+  })
+
+  it("bound + author folder NOT visible: the '' option reads bare 'Workflow default' (never mislabelled whole-KB)", async () => {
+    // boundPublished binds folder-aaa, but this runner only sees folder-bbb — the exact
+    // mislabel case WR-05 fixes: the old code defaulted to "All documents" while the run
+    // was actually author-scoped to the invisible folder.
+    const { modal } = await openModal([folders[1]])
+    const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
+    const opts = Array.from(scope.options)
+    expect(opts[0].value).toBe("")
+    expect(opts[0].textContent).toBe("Workflow default")
+    expect(opts.some((o) => o.textContent === "All documents")).toBe(false)
+    expect(scope.value).toBe("")
+  })
+
+  it("unbound workflow (no project_folder_id): the '' option truthfully reads 'All documents'", async () => {
+    mockListPublished.mockResolvedValue([unboundPublished])
+    const { modal } = await openModal(folders)
+    const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
+    const opts = Array.from(scope.options)
+    expect(opts[0].value).toBe("")
     expect(opts[0].textContent).toBe("All documents")
-    expect(opts[1].textContent).toContain("DBA Chapters")
-    expect(opts[1].textContent).toContain("workflow default")
-    expect(opts[2].textContent).toContain("Contracts")
-    expect(opts[2].textContent).not.toContain("workflow default")
-    // The author default is the DEFAULT selection (D-06 baseline).
-    expect(scope.value).toBe("folder-aaa")
+    // No author default to exclude → every owner folder is an override option.
+    expect(opts.map((o) => o.value)).toEqual(["", "folder-aaa", "folder-bbb"])
+    expect(scope.value).toBe("")
   })
 
   it("hides the whole scope control when there are no folders (matches ChatArea's guard)", async () => {
