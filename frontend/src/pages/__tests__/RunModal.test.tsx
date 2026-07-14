@@ -95,6 +95,32 @@ const unboundPublished = {
   },
 }
 
+/** Project P with children A and B (the backend 152-06 P/A/B shape). */
+const phaseScopedFolders: Folder[] = [
+  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-a", user_id: "u1", name: "Team A", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-b", user_id: "u1", name: "Team B", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
+]
+
+/** A workflow declaring two per-phase folder_scopes [A] and [B]. An override of A would
+ *  empty phase-2 (folder_scope=[B] ∩ subtree(A) = ∅) and vice-versa, while P covers both
+ *  (subtree(P) ⊇ {A,B}) — the exact WR-03 / backend-A4 case (152-06). */
+const phaseScopedPublished = {
+  id: "pub-3",
+  slug: "two-phase",
+  name: "Two-phase scan",
+  definition: {
+    slug: "two-phase",
+    version: 1,
+    project_folder_id: null, // unbound → "" is "All documents"; overrides are the offered folders
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [
+      { slug: "p1", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft", folder_scope: ["folder-a"] } },
+      { slug: "p2", phase_index: 1, config: { phase_type: "llm_emit", citation_policy: "draft", folder_scope: ["folder-b"] } },
+    ],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockListPublished.mockResolvedValue([boundPublished])
@@ -221,5 +247,23 @@ describe("RunModal — onLaunch run-input payload (WFIN-01 / WFIN-02)", () => {
     expect(within(modal).getByTestId("run-provenance")).toHaveTextContent(
       "Stored untrusted — never run as code, never fed to the fill engine.",
     )
+  })
+})
+
+describe("RunModal — A4 per-phase override filter (WR-03 frontend mirror)", () => {
+  it("drops any override whose subtree empties a declared phase folder_scope; keeps a candidate (P) that covers every phase", async () => {
+    mockListPublished.mockResolvedValue([phaseScopedPublished])
+    const { modal } = await openModal(phaseScopedFolders)
+    const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
+    const values = Array.from(scope.options).map((o) => o.value)
+    // Phases scope [A] and [B]: offering A empties phase-2 and offering B empties phase-1
+    // (subtree(A) ∩ [B] = ∅, subtree(B) ∩ [A] = ∅) → neither is a valid override.
+    expect(values).not.toContain("folder-a")
+    expect(values).not.toContain("folder-b")
+    // Good path: P's subtree {P,A,B} intersects BOTH phase scopes → P survives the filter.
+    expect(values).toContain("folder-p")
+    // Unbound workflow → the "" option is the honest whole-KB "All documents" (WR-05).
+    expect(values[0]).toBe("")
+    expect(scope.options[0].textContent).toBe("All documents")
   })
 })

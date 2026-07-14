@@ -1002,36 +1002,52 @@ function RunModal({
   const [launchError, setLaunchError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // A4 composition guard: a workflow that declares any per-phase folder_scope must
-  // only offer folders ⊆ the author subtree (an out-of-project override would silently
-  // empty the phase intersection at retrieval — mirrors the server's A4 drop, Plan 01).
+  // A4 composition guard (WR-03 — the client mirror of backend scope.py
+  // resolve_run_scope_root, 152-06): a workflow that declares any per-phase folder_scope
+  // must NOT offer an override whose OWN subtree misses a declared phase's folder_scope —
+  // that would silently empty the phase's ∩ at retrieval (phase_types.py:326). Membership
+  // in the author subtree is necessary but NOT sufficient (a child A of project P empties
+  // a phase scoped to sibling B), so we intersect against each CANDIDATE's own subtree.
   const hasPhaseFolderScope = (def?.phases ?? []).some((p) => {
     const fs = (p.config as { folder_scope?: unknown } | undefined)?.folder_scope
     return Array.isArray(fs) && fs.length > 0
   })
-  // The author project subtree (root + descendants), walked client-side from `folders`
-  // (mirrors the server resolve_project_subtree parent_id walk).
-  const subtreeIds = useMemo<Set<string> | null>(() => {
-    if (!authorDefaultExists) return null
-    const ids = new Set<string>()
-    const walk = (rid: string) => {
-      if (ids.has(rid)) return
-      ids.add(rid)
-      for (const f of folders) if (f.parent_id === rid) walk(f.id)
-    }
-    walk(authorDefaultFolderId as string)
-    return ids
-  }, [authorDefaultExists, authorDefaultFolderId, folders])
+  // Each declared phase's non-empty folder_scope id list. A phase with no folder_scope
+  // imposes no constraint — dropped here, exactly like the backend's `if scope and …`.
+  const phaseFolderScopes = useMemo<string[][]>(() => {
+    return (def?.phases ?? [])
+      .map((p) => {
+        const fs = (p.config as { folder_scope?: unknown } | undefined)?.folder_scope
+        return Array.isArray(fs) ? fs.filter((x): x is string => typeof x === "string") : []
+      })
+      .filter((fs) => fs.length > 0)
+  }, [def])
   const authorDefaultName = authorDefaultExists
     ? folders.find((f) => f.id === authorDefaultFolderId)?.name ?? null
     : null
-  // Override options = every OTHER owner-reachable folder; for a scoped workflow, only
-  // those ⊆ the author subtree (never offer an option that empties retrieval — A4).
+  // Override options = every OTHER owner-reachable folder. For a workflow that declares
+  // per-phase folder_scope, mirror the backend A4 rule: resolve each candidate's OWN
+  // subtree (root + descendants, the same parent_id walk as resolve_project_subtree) and
+  // keep it ONLY when EVERY declared phase folder_scope still intersects it — otherwise
+  // offering it steers the run into empty retrieval. No-scope workflows are unchanged.
   const overrideOptions = useMemo(() => {
-    let candidates = folders
-    if (hasPhaseFolderScope) candidates = subtreeIds ? folders.filter((f) => subtreeIds.has(f.id)) : []
-    return candidates.filter((f) => f.id !== authorDefaultFolderId)
-  }, [folders, hasPhaseFolderScope, subtreeIds, authorDefaultFolderId])
+    const candidates = folders.filter((f) => f.id !== authorDefaultFolderId)
+    if (!hasPhaseFolderScope) return candidates
+    const subtreeOf = (rootId: string): Set<string> => {
+      const ids = new Set<string>()
+      const visit = (rid: string) => {
+        if (ids.has(rid)) return
+        ids.add(rid)
+        for (const f of folders) if (f.parent_id === rid) visit(f.id)
+      }
+      visit(rootId)
+      return ids
+    }
+    return candidates.filter((cand) => {
+      const sub = subtreeOf(cand.id)
+      return phaseFolderScopes.every((scope) => scope.some((id) => sub.has(id)))
+    })
+  }, [folders, hasPhaseFolderScope, phaseFolderScopes, authorDefaultFolderId])
 
   const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
