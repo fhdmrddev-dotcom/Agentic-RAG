@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T17:33:35.634Z"
+last_updated: "2026-07-14T17:56:23.131Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 26
   completed_phases: 6
   total_plans: 49
-  completed_plans: 46
+  completed_plans: 48
   percent: 23
 ---
 
@@ -27,9 +27,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 152 (workflow-run-inputs) — EXECUTING
-Plan: 3 of 4
-Status: 152-02 complete (2/4) — ready to execute 152-03
-Last activity: 2026-07-14 -- Phase 152 Plan 02 (WFIN-03 delete-cascade backend) executed
+Plan: 4 of 4
+Status: 152-03 complete (3/4) — ready to execute 152-04
+Last activity: 2026-07-14 -- Phase 152 Plan 03 (WFIN-01/02 Run-modal frontend) executed
+
+**152-03 execution notes (2026-07-14) — WFIN-01/02 Run-modal frontend, frontend-only, no migration:**
+
+- 3 tasks (all type=auto), sequential on the main tree (`use_worktrees=false`), 1 deviation. Task 1 `387b1fe7` (api.postMessage folderId + doRun sequencing + onLaunch type); Task 2 `370397f1` (RunModal chip→select + template upload + provenance + the 3 broken-test fixes); Task 3 `400f57bb` (RunModal.test.tsx, 7 cases).
+- **Chip → native `<select>`** byte-matching `ChatArea.tsx:410` — `All documents` → `📁 {authorDefault} — workflow default` → other owner folders; default = author default; HIDES on `folders.length===0`. **A4 composition guard** computed client-side (root+descendants walk of the `folders` prop) — a per-phase `folder_scope` workflow offers only ⊆-project folders. **Quiet Upload-template button** stages a `File` in modal state (no thread yet); doRun uploads it to the LAUNCHED owned thread (Landmine 8) between createThread and postMessage; validated-file card + inline 422 `role="alert"` verbatim + honest provenance note.
+- **`doRun` widened** to `(def, kickoff, {templateFile, folderId})`; `api.postMessage` adds `folder_id` ADDITIVELY only when truthy (D-06 byte-identical; keeps `ChatLayoutLaunch.test` green). **Override sent only when a real folder ≠ the author default** — "workflow default"/"All documents" pass no override.
+- **KEY CONSTRAINT (documented inline):** the Plan-01 backend resolver is `override or author_root` (narrow-only) — a BOUND workflow cannot widen to whole-KB via `folder_id`; "All documents" on a bound workflow keeps the author default. Narrowing (the SEED-112 ask) works fully. A widen path would be a NEW scope input (out of scope).
+- **DEVIATION [Rule 1]:** 3 pre-existing `WorkflowsPage.test.tsx` tests locked the OLD chip + 2-arg `onLaunch` contract this plan changes → updated to the `<select>` order + 3-arg `{templateFile, folderId}` (D-06 default). Same launch invariants, new contract (mirrors the Plan-01 `test_dual_mode_wiring.py` deviation). Committed with the source change (`370397f1`).
+- **Gates:** touched-surface suite `RunModal.test` (7) + `WorkflowsPage.test` (23) + `ChatLayoutLaunch.test` (1) + `api.workflows.test` (14) = **45/45 green**; `npx vite build` exit 0; **0 net-new tsc errors** vs the captured 30-error baseline (SEED-056/049 rot untouched). Untracked `frontend/test-results/` = pre-existing Playwright E2E rot, NOT mine — left as-is.
+- **WFIN-01/02 NOT marked complete** (false-green avoidance, 148–151 convention) — close at verify-work/secure-phase after the live 4-axis SC#10 cross-provider UAT in `152-VALIDATION.md`. **NEXT: `/gsd:execute-phase 152` continues to 152-04** (WFIN-03 delete frontend — ⋯-menu + victim-naming Sheet on the SAME page; deps 152-02+03).
+- **SDK quirks (unchanged):** `state.advance-plan` bumped Current Plan → 4; `roadmap.update-plan-progress 152` checked the 152-03 box but LEFT the progress-table row `2/4` stale → hand-fixed to `3/4`. STATE Current Position hand-updated (frontmatter `progress:` block; `update-progress`/`record-metric` field-not-found as before).
 
 **152-02 execution notes (2026-07-14) — WFIN-03 safe delete cascade, backend, no migration:**
 
