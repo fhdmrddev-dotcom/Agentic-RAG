@@ -982,15 +982,18 @@ function RunModal({
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
 
-  // ── WFIN-02 (D-LOCK-01): the KB-scope <select>. Default selection = the author
-  //    default ("workflow default"); "" = All documents. Only a real folder DIFFERENT
-  //    from the author default becomes a per-run override at launch (D-06 — staying on
-  //    the default, or "All documents", passes NO override).
+  // ── WFIN-02 (D-LOCK-01) + WR-05: the KB-scope <select>. The "" option is ALWAYS the
+  //    resting selection and truthfully labels the server-applied scope: for a BOUND
+  //    workflow it reads "Workflow default" (the override channel is narrow-only, D-06 —
+  //    "" resolves to the author default server-side, never whole-KB), and ONLY an
+  //    UNBOUND workflow (no project_folder_id) reads "All documents" (where folderId:null
+  //    genuinely means whole-KB). A real folder DIFFERENT from the author default is the
+  //    only per-run override.
   const authorDefaultExists =
     !!authorDefaultFolderId && folders.some((f) => f.id === authorDefaultFolderId)
-  const [selectedFolderId, setSelectedFolderId] = useState<string>(
-    authorDefaultExists ? (authorDefaultFolderId as string) : "",
-  )
+  // Initial selection is "" in every case — for a bound workflow "" now truthfully IS
+  // the workflow default (WR-05); it never mislabels an author-scoped run as whole-KB.
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("")
   // ── WFIN-01 (D-LOCK-02): the staged template File. No thread exists yet — doRun
   //    uploads it to the launched thread (Landmine 8); this only stages it.
   const [templateFile, setTemplateFile] = useState<File | null>(null)
@@ -1041,10 +1044,11 @@ function RunModal({
   const handleRun = async () => {
     setLaunchError(null)
     // Only a real folder that DIFFERS from the author default is a per-run override.
-    // "All documents" ("") or staying on the default → no override (D-06). NOTE: the
-    // Plan-01 override channel narrows only — a bound workflow cannot widen to whole-KB
-    // via this path (override falls through to the author default), so "All documents"
-    // on a bound workflow keeps the author default. Narrowing (the SEED-112 ask) works.
+    // The "" option (labelled "Workflow default" for a bound wf, "All documents" for an
+    // unbound one — WR-05) passes NO override (D-06). NOTE: the Plan-01 override channel
+    // narrows only — a bound workflow cannot widen to whole-KB via this path (override
+    // falls through to the author default), which is exactly why the "" label reads
+    // "Workflow default" (not "All documents") on a bound workflow. Narrowing works.
     const normalized = selectedFolderId || null
     const folderId = normalized && normalized !== authorDefaultFolderId ? normalized : null
     try {
@@ -1123,12 +1127,17 @@ function RunModal({
                 onChange={(e) => setSelectedFolderId(e.target.value)}
                 className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                <option value="">All documents</option>
-                {authorDefaultExists && authorDefaultName && (
-                  <option value={authorDefaultFolderId as string}>
-                    📁 {authorDefaultName} — workflow default
-                  </option>
-                )}
+                {/* WR-05: the "" option truthfully labels the server-applied scope.
+                    Bound → "Workflow default" (with the folder name when the author
+                    folder is visible, bare otherwise — never a whole-KB lie); unbound →
+                    "All documents" (folderId:null genuinely means whole-KB). */}
+                <option value="">
+                  {authorDefaultFolderId
+                    ? authorDefaultName
+                      ? `Workflow default — 📁 ${authorDefaultName}`
+                      : "Workflow default"
+                    : "All documents"}
+                </option>
                 {overrideOptions.map((f) => (
                   <option key={f.id} value={f.id}>
                     📁 {f.name}

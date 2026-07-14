@@ -308,15 +308,16 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     const cards = await screen.findAllByTestId("published-card")
     fireEvent.click(within(cards[0]).getByTestId("published-run"))
     const modal = await screen.findByTestId("run-modal")
-    // Phase 152 (WFIN-02 / D-LOCK-01): the read-only chip is now an inline native
-    // <select>. The author default (folder-aaa = "DBA Chapters") is tagged "workflow
-    // default" and is the default selection; "All documents" leads. NAME, never a path.
+    // Phase 152 (WFIN-02 / D-LOCK-01 + WR-05): the read-only chip is now an inline native
+    // <select>. For a BOUND workflow (folder-aaa = "DBA Chapters") the leading "" option
+    // is the truthful "Workflow default — 📁 {folder}" and is the resting selection —
+    // never the dishonest "All documents" (which is unbound-only). NAME, never a path.
     const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
-    expect(scope.value).toBe("folder-aaa")
+    expect(scope.value).toBe("")
     const optionText = Array.from(scope.options).map((o) => o.textContent)
-    expect(optionText[0]).toBe("All documents")
-    expect(optionText[1]).toContain("DBA Chapters")
-    expect(optionText[1]).toContain("workflow default")
+    expect(optionText[0]).toContain("Workflow default")
+    expect(optionText[0]).toContain("DBA Chapters")
+    expect(optionText.some((t) => t === "All documents")).toBe(false)
     expect(scope.textContent).not.toMatch(/[/\\]/)
     // Exactly one textbox: the kickoff textarea (the <select> + file input aren't textboxes).
     expect(within(modal).getAllByRole("textbox")).toHaveLength(1)
