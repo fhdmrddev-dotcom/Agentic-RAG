@@ -253,32 +253,41 @@ def test_get_tools_includes_phase_085_tools():
     )
 
 
-def test_get_tools_returns_22_tools_with_no_conditional_enabled():
-    """Behavior 6: the base toolbox (no web_search / no sandbox) is exactly 19 tools
-    (8 KB + 3 skills + 3 memory/sql + 5 workspace = 19) + 3 Phase 085 = 22 minimum.
-    Phase-end target is 24 when web_search + sandbox both enabled.
+def test_get_tools_returns_25_tools_with_no_conditional_enabled():
+    """Behavior 6: run-derived tool counts as of Phase 151 (FILE-01/FILE-02).
+
+    Base (no web_search / no sandbox, self-improve default-ON) = 25:
+      23 unconditional (8 KB incl. query_documents_by_view + get_related_documents,
+      3 skills, 3 memory/sql, 5 workspace, 3 Phase-085) + save_skill + attach_skill_file
+      (both self-improve-gated, default-ON). fetch_document_file + execute_code + web_search
+      are sandbox/web-gated → absent from the base.
+
+    Both conditionals on (web + sandbox, self-improve default-ON) = 28:
+      base 25 + web_search + execute_code + fetch_document_file.
 
     Pass a duck-typed object with the two conditional flags off, because
     get_tools(None) falls through to global Settings, which in dev environments
     typically has TAVILY_API_KEY set (web_search_enabled True) and/or
     SANDBOX_ENABLED True — so the no-conditional baseline must be asserted via
-    explicit injection, not None.
+    explicit injection, not None. self_improve_enabled is absent here → getattr
+    default-True, so save_skill + attach_skill_file are BOTH present in the base.
     """
     from types import SimpleNamespace
     from app.services.openai_service import get_tools
 
     eff = SimpleNamespace(web_search_enabled=False, sandbox_enabled=False)
     base_tools = get_tools(eff)
-    assert len(base_tools) == 22, (
-        f"Expected exactly 22 tools in base (no web/sandbox); got {len(base_tools)}: "
+    assert len(base_tools) == 25, (
+        f"Expected exactly 25 tools in base (no web/sandbox); got {len(base_tools)}: "
         f"{[t['function']['name'] for t in base_tools]}"
     )
 
-    # And both conditionals on → 24 (phase-end target).
+    # And both conditionals on → 28 (phase-end target: + web_search + execute_code
+    # + fetch_document_file).
     eff_all = SimpleNamespace(web_search_enabled=True, sandbox_enabled=True)
     all_tools = get_tools(eff_all)
-    assert len(all_tools) == 24, (
-        f"Expected exactly 24 tools with both conditionals on; got {len(all_tools)}: "
+    assert len(all_tools) == 28, (
+        f"Expected exactly 28 tools with both conditionals on; got {len(all_tools)}: "
         f"{[t['function']['name'] for t in all_tools]}"
     )
 

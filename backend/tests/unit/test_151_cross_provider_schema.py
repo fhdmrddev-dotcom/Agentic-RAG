@@ -47,3 +47,28 @@ def test_fetch_document_file_survives_anthropic_translation():
     anthropic_tools = _convert_tools_to_anthropic(_tools_sandbox_on())  # must not raise
     names = {t["name"] for t in anthropic_tools}
     assert "fetch_document_file" in names
+
+
+# --- FILE-01 (Plan 151-04) — attach_skill_file flat schema survives both translators ---
+def test_attach_skill_file_survives_google_translation():
+    from app.services.google_service import _convert_tools_to_google
+
+    google_tools = _convert_tools_to_google(_tools_sandbox_on())  # must not raise
+    assert "attach_skill_file" in _google_names(google_tools)
+
+
+def test_attach_skill_file_survives_anthropic_translation():
+    from app.services.anthropic_service import _convert_tools_to_anthropic
+
+    anthropic_tools = _convert_tools_to_anthropic(_tools_sandbox_on())  # must not raise
+    names = {t["name"] for t in anthropic_tools}
+    assert "attach_skill_file" in names
+
+
+def test_both_new_file_tools_present_together_google():
+    """Multi-tool axis backstop: with sandbox + self_improve both on, BOTH new Phase-151
+    file tools survive Google translation in the same call (SC#10 static half)."""
+    from app.services.google_service import _convert_tools_to_google
+
+    names = _google_names(_convert_tools_to_google(_tools_sandbox_on()))
+    assert {"fetch_document_file", "attach_skill_file"} <= names
