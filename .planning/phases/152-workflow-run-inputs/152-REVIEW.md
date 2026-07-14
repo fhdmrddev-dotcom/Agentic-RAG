@@ -1,180 +1,200 @@
 ---
 phase: 152-workflow-run-inputs
-reviewed: 2026-07-14T18:36:22Z
+reviewed: 2026-07-14T20:19:42Z
 depth: standard
-files_reviewed: 16
+files_reviewed: 5
 files_reviewed_list:
-  - backend/app/api/runs.py
-  - backend/app/api/threads.py
   - backend/app/api/workflows.py
   - backend/app/db/workflows.py
-  - backend/app/models/message.py
   - backend/app/services/harness/scope.py
-  - backend/app/services/harness_engine.py
-  - backend/tests/test_152_delete_cascade.py
-  - backend/tests/test_152_folder_override.py
-  - backend/tests/test_dual_mode_wiring.py
-  - frontend/src/components/layout/ChatLayout.tsx
-  - frontend/src/lib/api.ts
-  - frontend/src/pages/__tests__/PublishedCardDelete.test.tsx
-  - frontend/src/pages/__tests__/RunModal.test.tsx
-  - frontend/src/pages/WorkflowsPage.test.tsx
   - frontend/src/pages/WorkflowsPage.tsx
+  - frontend/src/components/layout/ChatLayout.tsx
 findings:
   critical: 1
-  warning: 5
-  info: 5
-  total: 11
+  warning: 2
+  info: 0
+  total: 3
 status: issues_found
 ---
 
-# Phase 152: Code Review Report
+# Phase 152: Code Review Report (gap-closure re-review, plans 05–07)
 
-**Reviewed:** 2026-07-14T18:36:22Z
+**Reviewed:** 2026-07-14T20:19:42Z
 **Depth:** standard
-**Files Reviewed:** 16
+**Files Reviewed:** 5
 **Status:** issues_found
 
 ## Summary
 
-Phase 152 adds (1) a per-run folder-scope override resolved by `resolve_run_scope_root()` and honored at kickoff / resume / Continue, (2) an owner-gated destructive workflow delete cascade with a preview endpoint, and (3) the Run-modal + victim-naming delete Sheet frontend.
+This is a **gap-closure re-review** of phase 152. The prior full review (see git history for
+the earlier version of this file) found blocker CR-01 + warnings WR-01/03/04/05; gap-closure
+plans 05–07 (commits `cb7cb1e4`…`a052d30d`) were executed to close them. This review is scoped
+to the diff those plans introduced across the 5 listed files, and evaluates (1) whether CR-01 is
+genuinely fixed and (2) whether the gap-closure code introduces any new defect.
 
-The security fundamentals asked for in the review brief hold up under scrutiny:
+**CR-01 (cancel-first cascade delete) — genuinely fixed for the primary case.** I traced this
+end-to-end against the actual schema and call graph rather than trusting the route's comments:
+`runs.run_id` really is the table's own PK (confirmed against `full-schema.sql:1042`, not
+`runs.id`), and it is correctly resolved via `LEFT JOIN runs r ON r.thread_id = wr.thread_id AND
+r.status = 'streaming'` and threaded into `_cancel_run_internals(run_id=r["producer_id"], ...)`
+— the same identity `RUN_TASKS` is keyed by (`threads.py:2011`). The separate
+`publish_cancel_sentinel(redis, r["wf_id"])` call is also correctly targeted: I verified the
+`llm_human_input` phase type (`phase_types.py:_exec_llm_human_input`) subscribes with
+`run_id = ctx.run_id`, where `ctx` is the harness ctx bag whose `.run_id` **is**
+`workflow_runs.id` — so a workflow paused on `llm_human_input` really is reachable via the
+workflow-run-id channel, not the producer-run-id channel used by the Deep-chat `ask_user` tool.
+WR-01's new `count_foreign_runs_on_global` 409 guard is correctly ordered before any
+cancel/delete side effect.
 
-- **SQL parameterization** — every new query in `db/workflows.py` and `api/workflows.py` binds `$N` / `ANY($1::uuid[])`; no user value is interpolated into SQL. The `slug` used by the cascade is itself resolved server-side from an owner-gated `id` lookup, never taken from the client.
-- **Owner gate on the cascade** — `_owned_slug_or_404` (`created_by = $2`) is the single authorization boundary; the cascade and preview both re-scope by `created_by` inside the db helpers, and the live-PG test proves a foreign slug is untouched and 404-collapsed. I could not construct a path that deletes another owner's *definitions*.
-- **Folder-override drop-not-trust** — the client `folder_id` is gated through `fetch_visible_folders(owner)` at all three run-start sites; the service-role resume path passes the durable run owner's id; an unreachable id degrades to the author default. No widen path exists (the override can only move the root to a folder the owner can already see; "All documents" sends no override).
-- **Blocking I/O** — all supabase-py calls in the new code go through `aexec` (`run_in_threadpool`); the cascade uses the asyncpg pool natively; `write_operator_audit` is off-loop and never raises.
+**However, the WR-03 fix (`scope.py` A4 override guard) introduces a new BLOCKER.** It silently
+drops the "override must be within the project subtree" bound the pre-patch code enforced,
+replacing it with a check that has no necessary-condition component at all — despite the
+function's own updated docstring explicitly asserting that bound still holds ("Membership in the
+project subtree is necessary but NOT sufficient"). This is a genuine, easily-reachable
+regression introduced by this gap-closure patch (not a re-litigation of the accepted 01–04
+design): a per-run KB-scope override can now widen a bound workflow's retrieval to unrelated
+sibling folders/projects it was never bound to. I confirmed the resolved root flows straight
+into the run's real `folder_subtree_ids` at the kickoff call site (`threads.py:1543-1552`), so
+this is not theoretical. The identical logic is mirrored (and therefore also broken) in the
+frontend's `overrideOptions` computation, so the UI actively offers the problematic folder as a
+selectable option. The gap-closure's own test file does not exercise this case, so it ships
+green.
 
-However, the delete cascade's **cancel-first promise (D-LOCK-05) does not actually hold for the most common in-flight case**: `_cancel_run_internals` is invoked with the `workflow_runs.id`, but a live kickoff-started run's producer task is registered in `RUN_TASKS` under the *producer* `runs.run_id` — so nothing is cancelled and the engine keeps executing against rows the transaction then hard-deletes. That is a Critical finding. Five warnings and five info items follow.
-
-## Narrative Findings (AI reviewer)
+Two WARNING-level gaps round out the review: a TOCTOU race between the WR-01 foreign-run guard
+and the actual cancel/cascade (no shared transaction or lock spans the check and the delete),
+and an incomplete inflight-producer match (`r.status = 'streaming'` only) that misses a workflow
+paused via the harness's own iteration-cap (`cap_paused`), leaving that producer's `runs` row
+un-terminalized (though the workflow_runs row itself is still correctly finalized, so the delete
+is not blocked).
 
 ## Critical Issues
 
-### CR-01: Cascade "cancel-first" cannot cancel live kickoff-started workflow runs — engine keeps running against deleted rows
+### CR-01: WR-03 A4 fix drops the "override ⊆ project subtree" bound — scope can escape to unrelated folders
 
-**File:** `backend/app/api/workflows.py:509-528` (with `backend/app/services/run_lifecycle.py:202-292`, `backend/app/api/threads.py:2011`, `backend/app/services/harness_engine.py:1071-1126`)
-**Issue:** The cancel-first loop passes the **workflow_runs id** to `_cancel_run_internals(run_id=r["id"], ...)`. But:
+**File:** `backend/app/services/harness/scope.py:143-170` (mirrored in
+`frontend/src/pages/WorkflowsPage.tsx:1033-1050`)
 
-1. For a run started via the normal kickoff path, the live producer task is registered as `RUN_TASKS[run_id]` where `run_id` is the **producer `runs.run_id`** (threads.py:2011) — NOT the workflow_runs id. Only Continue-re-driven runs are keyed by the workflow id (`_RUN_TASKS[wf_run_uuid]`, runs.py:1043). So `RUN_TASKS.get(<workflow_run_id>)` misses and the live task is **never cancelled**.
-2. The fallback zombie-heal then targets the wrong table: `finalize_run_terminal` executes `UPDATE runs ... WHERE run_id = <workflow_run_id>` → 0 rows (there is no `runs` row with that id). The synthetic terminal sentinel is gated on `redis.exists("run:{workflow_run_id}")` — a stream nobody writes to (engine events route to `run:{producer_run_id}` per Facet B 092-07) — so no terminal event reaches the client either. The only effective side effect is the anchor-clear.
-3. For a `paused` (ask_user-blocked) run, the PUBLISH-first cancel sentinel only fires on the task-found path — which misses — so the engine's SUBSCRIBE stays blocked until its own timeout, then resumes execution.
+**Issue:** The pre-gap-closure code enforced two conditions for a scoped workflow's per-run
+override: (1) the override must be a member of the **author's own project subtree**, and (2) [the
+WR-03 bug being fixed] the override's own subtree must intersect every declared phase's
+`folder_scope`. The new code implements **only** (2) and never re-checks (1) — despite the
+function's own updated docstring explicitly claiming "Membership in the project subtree is
+necessary but NOT sufficient" (scope.py:135-136). The code no longer implements the "necessary"
+half at all; it was removed, not preserved.
 
-Net effect: `DELETE /{id}/cascade` hard-deletes `workflow_runs`/`workflow_phases` out from under a **still-running** engine task. `run_workflow` drives phases from an in-memory list loaded once (harness_engine.py:1071) and never re-checks the rows, so it continues making LLM/tool calls (token spend), its `mark_phase_active`/`complete_phase`/`finish_run` writes silently 0-row no-op, its SSE stream keeps streaming to the user, and `_surface_final_answer` persists a ghost assistant message into the *kept* thread of a workflow the user just watched "Delete forever" confirm. This directly defeats D-LOCK-05 ("never deleting a live run out from under the engine") and the amber banner's "cancelled safely first" copy. The same window exists for a run started between the cancel loop and the delete transaction (TOCTOU), and — with the default `WORKER_COUNT=2` — for a task living on the other worker, where the durable half of the heal (the part that is supposed to cover cross-worker) also targets the wrong table.
+Concretely: if a workflow is bound to `project_folder_id = ProjectA` and declares
+`phase.config.folder_scope = [SubA1]` (a legal descendant of ProjectA, enforced at
+publish-time by `assert_folder_scopes_subset`), a caller can pass
+`run_inputs["folder_id"] = Root` where `Root` is any owner-visible **ancestor** of `ProjectA`
+that also has unrelated sibling children (e.g. `ProjectB`, a different client's folder). The
+guard computes `override_subtree = resolve_project_subtree(Root, ...)`, which — because it
+walks the *entire* subtree under `Root` — contains `SubA1` (so the intersection check at
+scope.py:166 passes) **and also contains `ProjectB` and everything else under `Root`**. The
+override is therefore accepted and returned as the scope root (scope.py:170). This root then
+flows straight into `resolve_project_subtree(_wf_scope_root, ...)` at
+`backend/app/api/threads.py:1550` to become `folder_subtree_ids` — the run's actual retrieval
+scope — so the workflow now retrieves from `ProjectB` too, despite being explicitly bound to
+`ProjectA`, and despite the caller only ever picking a folder from the KB-scope `<select>`.
 
-**Fix:** Cancel through the **producer `runs` rows**, the same identity the admin Kill path uses, and terminalize the workflow rows durably before the delete:
+This directly contradicts the documented "narrow-only" contract this whole feature (WFIN-02 /
+D-06 / D-LOCK-01) is built around, and breaks the project-isolation guarantee PROJ-01/D-03 exists
+to provide (a multi-project account — the stated B2B target — could leak one client's documents
+into another client's workflow output, silently, with no error surfaced to the user). It is not
+a cross-user issue (D-05's owner-reachability gate still holds — only the account owner's own
+folders are reachable), but it is a same-account cross-project confidentiality break, and it is
+trivially reachable with ordinary nested folders — no adversarial folder-tree construction
+required.
+
+The new unit test `test_a4_override_outside_subtree_dropped` only covers an override that is an
+**isolated leaf** (`subtree(override) = {override}`), and
+`test_a4_two_phase_empty_intersection_dropped`'s "good path" regression lock only exercises
+`override = project root` exactly. Neither exercises an override that is a strict **ancestor**
+of the project root with unrelated siblings, so the regression ships green.
+
+**Fix:** Re-instate the project-subtree membership check alongside the new per-phase
+intersection check — both are necessary, matching the docstring's own claim:
+
 ```python
-# inside delete_workflow_cascade, replacing the inflight loop body
-inflight = await pool.fetch(
-    "SELECT wr.id AS wf_id, wr.status AS wf_status, wr.thread_id, "
-    "       r.run_id AS producer_id, r.status AS producer_status "
-    "FROM workflow_runs wr "
-    "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
-    "LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming' "
-    "WHERE wd.slug = $1 AND wd.created_by = $2 "
-    "AND wr.status IN ('active', 'paused', 'cap_paused')",
-    slug, user_id,
-)
-for r in inflight:
-    # cancel the LIVE producer (RUN_TASKS is keyed by the producer runs.run_id)
-    if r["producer_id"] is not None:
-        await _cancel_run_internals(
-            run_id=r["producer_id"], status=r["producer_status"],
-            thread_id=str(r["thread_id"]), redis=redis, supabase=supabase,
+elif _definition_has_phase_folder_scope(definition):
+    project_subtree = set(
+        await resolve_project_subtree(author_default, supabase=supabase, user_id=user_id) or []
+    )
+    if override not in project_subtree:
+        override = None  # restore the "necessary" bound the pre-WR-03 code enforced
+    else:
+        override_subtree = set(
+            await resolve_project_subtree(override, supabase=supabase, user_id=user_id) or []
         )
-    # ask_user wake for harness prompts (channel is keyed by the WORKFLOW run id)
-    await publish_cancel_sentinel(redis, r["wf_id"])
-    # durable workflow-side terminal (covers the cross-worker case)
-    await finish_run(pool, r["wf_id"], "cancelled")
+        for phase in definition.phases:
+            scope = getattr(phase.config, "folder_scope", None)
+            if scope and not ({str(f) for f in scope} & override_subtree):
+                override = None  # existing WR-03 "sufficient" check
+                break
 ```
-Also verify in a live UAT row that a mid-run delete actually stops the stream (the current 152 tests only cover the db helpers, never an in-flight cancel).
+
+Mirror the same `override ⊆ author project subtree` filter in `WorkflowsPage.tsx`'s
+`overrideOptions` (intersect the candidate list with the already-computed author subtree before
+applying the per-phase intersection filter), and add a regression test with an override that is
+a **strict ancestor** of the project root carrying an unrelated sibling subtree, asserting the
+override is dropped.
 
 ## Warnings
 
-### WR-01: Cascade on a global definition destroys and cancels OTHER users' runs — preview counts and docstring claim otherwise
+### WR-01: `count_foreign_runs_on_global` 409 guard is not atomic with the cancel/cascade — TOCTOU race
 
-**File:** `backend/app/db/workflows.py:474-477, 490-542`; `backend/app/api/workflows.py:509-528`
-**Issue:** The owner gate is on the *definition* (`created_by`), but `DELETE FROM workflow_runs WHERE definition_id = ANY(...)` sweeps **all users'** runs of an `is_global` definition (any user can run a global published workflow; their `workflow_runs.user_id` is the runner, not the definition owner). The cancel-first loop likewise cancels other users' live runs, and their threads are silently detached. The preview's `runs`/`threads`/`in_flight` counts also aggregate across all users — contradicting the docstring's "no cross-user count leak (T-152-02-05) … computed over the caller's OWN definitions" claim (the *definitions* are owner-scoped; the *runs* are not). The blast radius is structurally forced by the `ON DELETE RESTRICT` FK (you cannot delete the definition without deleting all dependent runs), and today only seed-owner accounts can own `is_global` rows (`create_workflow_definition` binds `is_global=false`), but the seam is live: the seed owner deleting a starter would cancel/delete every user's runs with no signal in the sheet.
-**Fix:** Either (a) refuse the cascade for `is_global` definitions with cross-user runs (409 with an honest message), or (b) split the preview counts into "yours" vs "other users'" and surface them in the sheet; at minimum correct the T-152-02-05 docstring so the next reader doesn't assume run-level owner-scoping.
+**File:** `backend/app/api/workflows.py:509-547, 575`
 
-### WR-02: `scope_resolution_failed` emits land on the orphan `run:{workflow_run_id}` stream — the observability signal is invisible
+**Issue:** The WR-01 fix correctly refuses (409) a global-workflow delete when
+`count_foreign_runs_on_global` finds another user's run at check time. But the check
+(`workflows.py:516`), the cancel-first `inflight` query (`workflows.py:537`), and the FK-safe
+cascade delete (`workflows.py:575`) are three separate, unsynchronized round-trips against the
+pool — no shared transaction, row lock, or re-check immediately before the destructive delete.
+If another user starts a run on the same global, published workflow in the window between the
+guard passing (0 foreign runs) and the cascade committing, that run is silently cancelled and
+its history destroyed without the 409 ever firing — precisely the outcome WR-01 was written to
+prevent. The window is narrow but real, and this route is reachable by any owner of a
+global-published workflow at any time.
 
-**File:** `backend/app/api/runs.py:958-969`; `backend/app/api/threads.py:1588-1598`; `backend/app/services/harness_engine.py:1576-1586`
-**Issue:** All three run-start sites emit the WR-03 (098) fall-open signal keyed by the **workflow run id**, but per Facet B (092-07, documented at harness_engine.py:1061-1069) the frontend subscribes to `run:{producer_run_id}` — `run:{workflow_run_id}` is "a stream nobody subscribes to". So the one event whose entire purpose is making the silent whole-KB degradation OBSERVABLE in the run timeline never reaches the timeline. This predates 152 (098 secure-phase), but 152 restructured the Continue block containing one of the emits and propagated the pattern to the resume site's new layering — and at every site the correct id is already in scope (`_producer_id` at runs.py:853/harness_engine.py:1456; `run_id` at threads.py).
-**Fix:** Emit on the producer stream: `await _harness_emit(redis, _producer_id, "scope_resolution_failed", ...)` (Continue/resume) and `await _harness_emit(redis, run_id, ...)` (kickoff). One identifier per site.
+**Fix:** Re-run `count_foreign_runs_on_global` (or an equivalent `SELECT ... FOR UPDATE`-style
+check) inside the same transaction as `delete_published_workflow_cascade`, immediately before
+the `DELETE FROM workflow_runs`, so the guard and the destructive write are atomic. At minimum,
+take a row lock on the target `workflow_definitions` rows for the duration of the cancel+delete
+sequence.
 
-### WR-03: A4 guard incomplete — an in-subtree override can still silently empty a phase's `folder_scope` intersection
+### WR-02: cancel-first inflight query only matches `runs.status = 'streaming'`, missing `cap_paused` producers
 
-**File:** `backend/app/services/harness/scope.py:150-157`; mirrored at `frontend/src/pages/WorkflowsPage.tsx:1027-1031`
-**Issue:** The A4 guard drops an override only when it is *outside the whole project subtree*. But the per-phase narrowing at `phase_types.py:326-329` intersects each phase's `folder_scope` with the **override's** subtree. Take project P with children A and B, phase1 `folder_scope=[A]`, phase2 `folder_scope=[B]`: the override root A is inside P's subtree, so it is honored — and phase2's intersection `[B] ∩ subtree(A)` is `[]`, i.e. that phase retrieves **nothing**, silently. This is precisely the failure mode the guard's own comment names ("would silently empty the intersection … Drop it if outside") — membership in the project subtree is a necessary but not sufficient condition. The frontend's `overrideOptions` filter has the same hole (it offers any folder in the author subtree), so the UI can steer users straight into it.
-**Fix:** In the `elif _definition_has_phase_folder_scope(definition)` branch, resolve the *override's* subtree and drop the override unless every declared phase `folder_scope` still intersects it:
-```python
-override_subtree = set(await resolve_project_subtree(override, supabase=supabase, user_id=user_id))
-for phase in definition.phases:
-    scope = getattr(phase.config, "folder_scope", None)
-    if scope and not ({str(f) for f in scope} & override_subtree):
-        override = None  # would empty this phase's intersection → drop
-        break
+**File:** `backend/app/api/workflows.py:537-547`
+
+**Issue:** `workflow_runs.status IN ('active', 'paused', 'cap_paused')` is the declared
+"in-flight" set the route claims to heal (see the docstring at `workflows.py:491`: "CANCEL-FIRST
+every in-flight run"), and `cap_paused` is a legitimate non-terminal producer-run status
+(`runs_status_check` constraint, `full-schema.sql:1057`; also confirmed by
+`run_reconciler.py:84` — `_NON_TERMINAL_CHAT_STATUSES = ["streaming", "cap_paused"]`). But the
+`LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming'` only matches a
+`'streaming'` producer row. A workflow run whose harness-level status is `cap_paused` (the
+harness's own iteration-cap pause) will typically have its producer `runs` row also at
+`cap_paused`, not `'streaming'` — so `producer_id` resolves to `NULL` for that row, and
+`_cancel_run_internals` is never invoked for it. The `workflow_runs` row itself still gets
+durably terminalized via the unconditional `finish_run(pool, r["wf_id"], "cancelled")` call, so
+the delete cascade itself is not blocked or corrupted — but the orphaned `runs` row is left
+sitting at `cap_paused` forever (never transitioned to `'cancelled'`), relying entirely on an
+unrelated mechanism (the boot-time `run_reconciler` sweep) to eventually clean it up, which is
+not guaranteed to run before the workflow (and its FK trail) has already been deleted.
+
+**Fix:** Broaden the LEFT JOIN's producer-status filter to `r.status IN ('streaming',
+'cap_paused')` so a cap-paused producer is resolved and passed through `_cancel_run_internals`
+the same way a streaming one is:
+
+```sql
+LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status IN ('streaming', 'cap_paused')
 ```
-Mirror the same per-phase check in the frontend option filter (or at least warn).
 
-### WR-04: Failed launch leaks an orphan thread per retry (template 422 makes this a common path)
-
-**File:** `frontend/src/components/layout/ChatLayout.tsx:121-140`
-**Issue:** `doRun` sequences `createThread → uploadWorkspaceTemplate → postMessage`. When the upload 422s (the deliberately-surfaced validation path the modal renders verbatim) or `postMessage` fails (409 lock, network), the already-created thread is stranded: `loadThreads()` is never called, so it doesn't even appear in the sidebar until the next refresh, and every "fix the file → Run again" retry mints another one. Pre-152 the only post-create failure was `postMessage`; 152 inserts a new, *expected* failure step (template validation happens at launch because no thread exists at stage time), so the leak rate goes from rare to routine.
-**Fix:** Cache the created thread across retries within the modal session (create once, reuse on retry), or best-effort `deleteThread(thread.id)` in a catch before re-throwing:
-```ts
-const thread = await createThread(def.name)
-try {
-  if (templateFile) await uploadWorkspaceTemplate(thread.id, templateFile)
-  await postMessage(thread.id, kickoff, { workflowDefinitionId: def.id, ...(folderId ? { folderId } : {}) })
-} catch (e) {
-  void deleteThread(thread.id).catch(() => {})  // don't leak the launch shell
-  throw e
-}
-```
-
-### WR-05: Run modal's "All documents" option is dishonest for bound workflows
-
-**File:** `frontend/src/pages/WorkflowsPage.tsx:1041-1050, 1126` (option), `989-992` (initial selection)
-**Issue:** For a workflow with an author default, selecting "All documents" sends `folderId: null` → the server applies the **author default** (the override channel is narrow-only by design, D-06 — the code comment admits "'All documents' on a bound workflow keeps the author default"). The user picks an option labeled "All documents" and gets a folder-scoped run: the select lies. Worse, when the author-default folder is not in the runner's visible `folders` (global workflow bound to the author's private folder, or a deleted folder), `authorDefaultExists` is false and the select **defaults to "All documents"** while the run is actually scoped to the invisible author folder — the modal's only scope indicator misstates the run's real scope in its resting state. This violates the project's honesty-first UI contract (the same phase ships "never guessed counts" and "verbatim 422" copy).
-**Fix:** For a bound workflow, replace the `""` option with the truthful label (e.g. `Workflow default{authorDefaultName ? ` — 📁 ${authorDefaultName}` : ""}`) as the `""` value, and only offer a literal "All documents" option on unbound workflows (where `folderId: null` genuinely means whole-KB).
-
-## Info
-
-### IN-01: Contradictory immutability-trigger docstrings in db/workflows.py
-
-**File:** `backend/app/db/workflows.py:381-387, 413-418` vs `450-452`
-**Issue:** `update_workflow_definition`/`delete_workflow_definition` docstrings claim "the immutability trigger raises 23514 on a published-row DELETE", while `delete_published_workflow_cascade` (correctly, per `full-schema.sql:2598`) states the trigger is `BEFORE UPDATE` only and "does NOT fire on DELETE". The schema confirms the latter. Pre-existing text, but now directly adjacent to new code asserting the opposite — a future reader auditing the destructive path will trip on it.
-**Fix:** Correct the two older docstrings (the DELETE protection is the `status='draft'` WHERE guard, not the trigger).
-
-### IN-02: No test covers the cascade route's security boundary or cancel-first; preview test omits `in_flight`
-
-**File:** `backend/tests/test_152_delete_cascade.py:260-291`
-**Issue:** The live-PG tests exercise only the db helpers. Untested: `_owned_slug_or_404` (the ONLY authorization boundary on a service-role path — the exact seam class where Phase 150's confirmed SQLi was caught), the 404-collapse contract of both routes, the cancel-first invocation (which CR-01 shows is broken), the `require_visible` gate, and the audit write. `test_preview_counts_match_reality` also predates the `in_flight` field and never asserts it (the D-LOCK-05 banner's driving signal).
-**Fix:** Add route-level tests (httpx + dependency overrides, per the test_dual_mode_wiring pattern): foreign-id → 404 on both routes; a seeded `status='active'` run → preview `in_flight == 1` and cascade invokes the cancel helper with the *producer* identity once CR-01 is fixed.
-
-### IN-03: Kickoff now runs the thread-folder SELECT unconditionally, enlarging the bound fail-closed surface
-
-**File:** `backend/app/api/threads.py:1538-1541`
-**Issue:** Pre-152, a bound workflow's kickoff never queried `threads.folder_id` (the thread fallback only applied to unbound). Now the `.single()` SELECT runs for every workflow kickoff before `resolve_run_scope_root`, inside the try whose failure fails a BOUND run closed (RuntimeError → terminal `failed`). A transient failure of a query whose result is irrelevant for bound-with-no-override runs can now kill the run.
-**Fix:** Fetch the thread folder lazily/best-effort — e.g. wrap just that SELECT in its own try that degrades `_wf_thread_folder = None` (the fallback is optional by contract), keeping the fail-closed try focused on the resolver itself.
-
-### IN-04: Inputs-merge expression duplicated inline at both kickoff sites; the mirror invariant is only substring-tested
-
-**File:** `backend/app/api/threads.py:1353, 1633`
-**Issue:** `{"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})}` is pasted at the `create_workflow_run` persist site and the `wf_ctx.inputs` mirror site. The F8 invariant (live ctx.inputs == durable inputs) is now guarded only by a `src.count('"kickoff_prompt": body.content') >= 2` substring assertion (test_dual_mode_wiring.py:2425) that would stay green if one site's `folder_id` merge drifted.
-**Fix:** Build the dict once (`_wf_inputs = {...}`) above the `create_workflow_run` call and pass the same object to both sites — the mirror invariant then holds by construction.
-
-### IN-05: Delete sheet's error state discards the server's error detail
-
-**File:** `frontend/src/pages/WorkflowsPage.tsx:691-701`
-**Issue:** `catch { setDeletePhase("error") }` drops the thrown message; the sheet always renders the generic "Couldn't delete the workflow", even though `deleteWorkflowCascade` throws distinguishable errors (`WorkflowNotFoundError` vs status-bearing `Error`). A 404 (deleted elsewhere / permission drift) and a 500 look identical, and the phase's own copy standard elsewhere is "the server's message verbatim, never a friendlier lie".
-**Fix:** Capture the error and render its message under the retry control (special-casing `WorkflowNotFoundError` → "Already deleted" + shelf refetch).
+(If multiple producer rows could match per thread once `cap_paused` is included, add an
+`ORDER BY r.started_at DESC LIMIT 1`-style tie-break, or a `DISTINCT ON`, to keep one row per
+`workflow_runs.id`.)
 
 ---
 
-_Reviewed: 2026-07-14T18:36:22Z_
+_Reviewed: 2026-07-14T20:19:42Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
