@@ -25,7 +25,9 @@
  * live; the draft-CRUD affordances + the Workflows nav entry wear a net-new violet
  * flag.
  */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Upload, Check, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   listPublishedWorkflows,
   listStarterWorkflows,
@@ -520,11 +522,15 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         </div>
       </div>
 
-      {/* ── Run modal (D-103-1: read-only folder chip + ONE textarea + hint; enabled on empty) ── */}
+      {/* ── Run modal (152 WFIN-01/02: scope <select> + staged template + provenance;
+            D-LOCK-01/02). `key` forces fresh per-workflow modal state (staged file +
+            scope pick reset between opens). ── */}
       {runFor && (
         <RunModal
+          key={runFor.id}
           wf={runFor}
-          folderName={folderName((runFor.definition as DefShape | undefined)?.project_folder_id)}
+          folders={folders}
+          authorDefaultFolderId={(runFor.definition as DefShape | undefined)?.project_folder_id ?? null}
           kickoff={kickoff}
           submitting={runSubmitting}
           onKickoffChange={setKickoff}
@@ -532,15 +538,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             if (runSubmitting) return
             setRunFor(null)
           }}
-          onRun={async () => {
+          onRun={async ({ templateFile, folderId }) => {
             // WR-05: one click = one thread. Ignore re-entry while a launch is in flight.
             if (runSubmitting) return
             const target = runFor
             const text = kickoff
             setRunSubmitting(true)
             try {
-              await onLaunch(target, text)
-              setRunFor(null)
+              // 152 (WFIN-01/02): thread the staged template + per-run folder override
+              // through the existing launch (doRun uploads the file to the launched
+              // thread, then create_workflow_run.inputs carries folder_id). Re-throw on
+              // failure so the modal can render the server's 422 verbatim (do NOT close).
+              await onLaunch(target, text, { templateFile, folderId })
+              setRunFor(null) // close only on a successful launch
             } finally {
               setRunSubmitting(false)
             }
@@ -726,7 +736,8 @@ function StarterCard({ wf, onUse }: { wf: PublishedWorkflow; onUse: () => void }
 
 function RunModal({
   wf,
-  folderName,
+  folders,
+  authorDefaultFolderId,
   kickoff,
   submitting,
   onKickoffChange,
@@ -734,15 +745,95 @@ function RunModal({
   onRun,
 }: {
   wf: PublishedWorkflow
-  folderName: string | null
+  /** The owner's project folders — the scope <select>'s option source (D-LOCK-01). */
+  folders: Folder[]
+  /** The workflow's author-time retrieval default (definition.project_folder_id).
+   *  null = an unbound workflow (whole-KB default). */
+  authorDefaultFolderId: string | null
   kickoff: string
   submitting: boolean
   onKickoffChange: (v: string) => void
   onCancel: () => void
-  onRun: () => void | Promise<void>
+  /** 152 (WFIN-01/02): launch carries the two run inputs — a staged template `File`
+   *  and a per-run folder override `folderId` (null = stay on the workflow default,
+   *  D-06). May reject (e.g. a template 422) → the modal renders the message inline. */
+  onRun: (extras: { templateFile: File | null; folderId: string | null }) => void | Promise<void>
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+
+  // ── WFIN-02 (D-LOCK-01): the KB-scope <select>. Default selection = the author
+  //    default ("workflow default"); "" = All documents. Only a real folder DIFFERENT
+  //    from the author default becomes a per-run override at launch (D-06 — staying on
+  //    the default, or "All documents", passes NO override).
+  const authorDefaultExists =
+    !!authorDefaultFolderId && folders.some((f) => f.id === authorDefaultFolderId)
+  const [selectedFolderId, setSelectedFolderId] = useState<string>(
+    authorDefaultExists ? (authorDefaultFolderId as string) : "",
+  )
+  // ── WFIN-01 (D-LOCK-02): the staged template File. No thread exists yet — doRun
+  //    uploads it to the launched thread (Landmine 8); this only stages it.
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
+  // The inline launch/upload error (the server's validate_upload 422 verbatim — it
+  // surfaces at launch because the upload targets the launched thread, not on stage).
+  const [launchError, setLaunchError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // A4 composition guard: a workflow that declares any per-phase folder_scope must
+  // only offer folders ⊆ the author subtree (an out-of-project override would silently
+  // empty the phase intersection at retrieval — mirrors the server's A4 drop, Plan 01).
+  const hasPhaseFolderScope = (def?.phases ?? []).some((p) => {
+    const fs = (p.config as { folder_scope?: unknown } | undefined)?.folder_scope
+    return Array.isArray(fs) && fs.length > 0
+  })
+  // The author project subtree (root + descendants), walked client-side from `folders`
+  // (mirrors the server resolve_project_subtree parent_id walk).
+  const subtreeIds = useMemo<Set<string> | null>(() => {
+    if (!authorDefaultExists) return null
+    const ids = new Set<string>()
+    const walk = (rid: string) => {
+      if (ids.has(rid)) return
+      ids.add(rid)
+      for (const f of folders) if (f.parent_id === rid) walk(f.id)
+    }
+    walk(authorDefaultFolderId as string)
+    return ids
+  }, [authorDefaultExists, authorDefaultFolderId, folders])
+  const authorDefaultName = authorDefaultExists
+    ? folders.find((f) => f.id === authorDefaultFolderId)?.name ?? null
+    : null
+  // Override options = every OTHER owner-reachable folder; for a scoped workflow, only
+  // those ⊆ the author subtree (never offer an option that empties retrieval — A4).
+  const overrideOptions = useMemo(() => {
+    let candidates = folders
+    if (hasPhaseFolderScope) candidates = subtreeIds ? folders.filter((f) => subtreeIds.has(f.id)) : []
+    return candidates.filter((f) => f.id !== authorDefaultFolderId)
+  }, [folders, hasPhaseFolderScope, subtreeIds, authorDefaultFolderId])
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = "" // reset so re-selecting the same file fires change again
+    if (!f) return
+    setTemplateFile(f)
+    setLaunchError(null)
+  }
+
+  const handleRun = async () => {
+    setLaunchError(null)
+    // Only a real folder that DIFFERS from the author default is a per-run override.
+    // "All documents" ("") or staying on the default → no override (D-06). NOTE: the
+    // Plan-01 override channel narrows only — a bound workflow cannot widen to whole-KB
+    // via this path (override falls through to the author default), so "All documents"
+    // on a bound workflow keeps the author default. Narrowing (the SEED-112 ask) works.
+    const normalized = selectedFolderId || null
+    const folderId = normalized && normalized !== authorDefaultFolderId ? normalized : null
+    try {
+      await onRun({ templateFile, folderId })
+    } catch (e) {
+      // Surface the server's validate_upload message VERBATIM (never a friendlier lie).
+      setLaunchError(e instanceof Error ? e.message : "Run failed")
+    }
+  }
   // WR-06 (a11y): a lightweight focus contract for the aria-modal dialog —
   // Escape-to-close, initial focus on the textarea, and Tab containment within the
   // dialog (a minimal trap, no heavy dep / no shadcn Dialog rewrite).
@@ -799,13 +890,33 @@ function RunModal({
           <span className="text-[15px] font-semibold text-foreground">{wf.name}</span>
         </div>
         <div className="flex flex-col gap-3 px-4 py-4">
-          {/* Read-only bound-folder chip (D-103-1 — the NAME, never a path; never a picker). */}
-          <div data-testid="run-folder-chip" className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <span className="font-medium text-foreground">Knowledge base:</span>
-            <span className="rounded-md border border-border bg-muted px-2 py-1">
-              📁 {folderName ?? "Bound to the workflow"}
-            </span>
-          </div>
+          {/* WFIN-02 (D-LOCK-01): the KB-scope <select> — native, byte-matching the
+              ChatArea scope selector ("All documents / {folder}"). The author default
+              is tagged "workflow default"; picking another = a per-run override. Hidden
+              when there are no folders (matches ChatArea's folders.length guard). */}
+          {folders.length > 0 && (
+            <label data-testid="run-scope" className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-foreground">Knowledge base:</span>
+              <select
+                data-testid="run-scope-select"
+                value={selectedFolderId}
+                onChange={(e) => setSelectedFolderId(e.target.value)}
+                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">All documents</option>
+                {authorDefaultExists && authorDefaultName && (
+                  <option value={authorDefaultFolderId as string}>
+                    📁 {authorDefaultName} — workflow default
+                  </option>
+                )}
+                {overrideOptions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    📁 {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-foreground">What should this run work on?</span>
             <textarea
@@ -818,6 +929,67 @@ function RunModal({
               className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </label>
+          {/* WFIN-01 (D-LOCK-02): a quiet, self-start template upload. The button STAGES
+              the picked File in modal state (no thread exists yet — doRun uploads it to
+              the launched thread, Landmine 8). Idle → validated-file card ({name} ✓ ✕)
+              OR the inline 422 error (server message verbatim, role="alert"). Beneath it,
+              the honest provenance note. */}
+          <div className="flex flex-col gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp"
+              aria-label="Upload template file"
+              tabIndex={-1}
+              className="hidden"
+              onChange={onFilePicked}
+            />
+            {templateFile ? (
+              <div
+                data-testid="run-template-file"
+                className="flex items-center gap-2 self-start rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[12px]"
+              >
+                <span className="text-foreground">{templateFile.name}</span>
+                <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-label="Remove template"
+                  disabled={submitting}
+                  onClick={() => {
+                    setTemplateFile(null)
+                    setLaunchError(null)
+                  }}
+                  className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid="run-template-upload"
+                disabled={submitting}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  "flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5",
+                  "text-[12px] font-medium text-foreground/80 transition-colors",
+                  "hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                )}
+              >
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                {submitting ? "Uploading…" : "Upload template"}
+              </button>
+            )}
+            {launchError && (
+              <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
+                {launchError}
+              </p>
+            )}
+            <p data-testid="run-provenance" className="px-0.5 text-[12px] text-muted-foreground">
+              Stored untrusted — never run as code, never fed to the fill engine.
+            </p>
+          </div>
           {/* Declared input_keys → a HINT line only (never fake structured fields). */}
           <p data-testid="run-hint" className="text-[12px] text-muted-foreground">
             This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
@@ -842,7 +1014,7 @@ function RunModal({
               type="button"
               data-testid="run-confirm"
               disabled={submitting}
-              onClick={() => void onRun()}
+              onClick={() => void handleRun()}
               className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Running…" : "▶ Run workflow"}
