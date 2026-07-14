@@ -492,10 +492,16 @@ async def delete_workflow_cascade_preview(
 ) -> dict:
     """Exact Removed/Kept counts for the victim-naming sheet (D-LOCK-03) — read-only.
 
-    Owner-scoped (``created_by = $2``): the versions, run count, and kept-thread count are
-    all computed over the caller's OWN definitions for ``slug`` — no cross-user count leak
-    (T-152-02-05). An unknown / foreign slug → ``{"found": False}`` (the route maps that to
-    404, indistinguishable from not-found). ``$N`` / ``ANY($1::uuid[])`` binding only.
+    Owner-scoping applies to the DEFINITIONS only (``created_by = $2`` resolves the
+    caller's own version_ids for ``slug``). The ``runs`` / ``threads`` / ``in_flight``
+    counts are then computed over those definitions' workflow_runs — which, for an
+    ``is_global`` definition, AGGREGATE across ALL runners (``workflow_runs.user_id`` is
+    the runner, not the definition owner), NOT just the caller's own runs (WR-01). These
+    read counts are owner-definition-scoped and low-sensitivity; the DESTRUCTIVE path is
+    fail-closed separately by the ``count_foreign_runs_on_global`` 409 guard in the
+    cascade route, which refuses to delete a global definition that has other users' runs.
+    An unknown / foreign slug → ``{"found": False}`` (the route maps that to 404,
+    indistinguishable from not-found). ``$N`` / ``ANY($1::uuid[])`` binding only.
 
     Returns ``{"found": True, "name", "versions", "runs", "threads", "in_flight"}`` where
     ``runs`` = ``COUNT(*)`` of the workflow_runs for those versions (Removed), ``threads`` =
@@ -540,6 +546,43 @@ async def delete_workflow_cascade_preview(
         "threads": int(threads or 0),
         "in_flight": int(in_flight or 0),
     }
+
+
+async def count_foreign_runs_on_global(
+    pool: asyncpg.Pool, *, slug: str, user_id: UUID
+) -> int:
+    """Count OTHER users' runs on the caller's ``is_global`` definitions for ``slug`` (WR-01).
+
+    The delete cascade's owner gate is on the DEFINITION (``created_by``), but the
+    ``ON DELETE RESTRICT`` FK forces ``DELETE workflow_runs`` to sweep EVERY runner's
+    rows on an ``is_global`` definition (any user may run a global published workflow;
+    ``workflow_runs.user_id`` is the runner). This helper is the fail-closed guard: it
+    resolves the caller's OWN global version_ids (``created_by = $2 AND is_global = true``)
+    then returns ``COUNT(*)`` of workflow_runs on those versions owned by anyone else
+    (``user_id <> $2``). The cascade route refuses (409) when this is > 0, so a global
+    starter's owner can no longer silently cancel + delete every user's run history.
+
+    Non-global definitions and global definitions with only the owner's own runs → 0
+    (unaffected). ``$N`` / ``ANY($1::uuid[])`` binding only — never an f-string on user
+    values (T-152-05-05).
+    """
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            "SELECT id FROM workflow_definitions "
+            "WHERE slug = $1 AND created_by = $2 AND is_global = true",
+            slug,
+            user_id,
+        )
+        if not rows:
+            return 0  # non-global / foreign slug → no cross-user blast radius
+        version_ids = [r["id"] for r in rows]
+        count = await con.fetchval(
+            "SELECT COUNT(*) FROM workflow_runs "
+            "WHERE definition_id = ANY($1::uuid[]) AND user_id <> $2",
+            version_ids,
+            user_id,
+        )
+    return int(count or 0)
 
 
 # ── workflow_phases reads (RUN-KEYED → workflow_run_id) ──────────────────────

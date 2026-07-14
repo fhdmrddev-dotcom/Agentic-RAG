@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
 from app.db.workflows import (
+    count_foreign_runs_on_global,
     create_workflow_definition,
     delete_published_workflow_cascade,
     delete_workflow_cascade_preview,
@@ -506,6 +507,21 @@ async def delete_workflow_cascade(
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
     slug = await _owned_slug_or_404(pool, definition_id, user_id)
+
+    # WR-01 fail-closed guard: an ``is_global`` definition's runs are owned by RUNNERS,
+    # not the definition owner. The ON DELETE RESTRICT FK forces the cascade to sweep
+    # every runner's rows, so deleting a shared workflow here would cancel + destroy
+    # OTHER users' run history. Refuse with 409 (before any cancel/delete side effect)
+    # when the caller's global definition(s) for this slug carry other users' runs.
+    foreign_runs = await count_foreign_runs_on_global(pool, slug=slug, user_id=user_id)
+    if foreign_runs > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This is a shared workflow with runs owned by other users — deleting it "
+                "here would remove their run history, so it's blocked."
+            ),
+        )
 
     # 2. Cancel-first (D-LOCK-05) — heal every in-flight run for this slug's versions
     # BEFORE the DB delete. The cancel discipline lives in the SERVICE/route layer, not
