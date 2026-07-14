@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-14T19:19:13.447Z"
-last_activity: 2026-07-14 -- Phase 152 planning complete
+last_updated: "2026-07-14T19:34:42.705Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 26
   completed_phases: 6
   total_plans: 52
-  completed_plans: 49
+  completed_plans: 50
   percent: 23
 ---
 
@@ -26,10 +26,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — GAP CLOSURE PLANNED (ready to execute 05-07)
-Plan: 152-05/06/07 planned (01-04 shipped); verification found 1 BLOCKER (CR-01) + 4 Warnings
-Status: Ready to execute — `/gsd:execute-phase 152` runs the 3 gap plans, then re-verify
-Last activity: 2026-07-14 -- Phase 152 gap-closure plans 05-07 created (CR-01 + WR-01/03/04/05); plan-checker PASSED
+Phase: 152 (workflow-run-inputs) — EXECUTING (gap closure)
+Plan: 152-05 of gap set 05-07 COMPLETE (next: 152-06)
+Status: Executing gap-closure plans (05 done; 06 + 07 remain)
+Last activity: 2026-07-14 -- 152-05 executed (CR-01 + WR-01 + IN-02 closed)
+
+**152-05 execution notes (2026-07-14) — GAP CLOSURE: CR-01 producer-identity cancel-first + WR-01 409 refuse + IN-02 route tests, backend + tests, NO migration:**
+
+- 3 tasks (Task 1 tdd-tagged but treated as targeted fix — no RED test authored; the 4 pre-existing helper tests are the guard), sequential on the main tree (`use_worktrees=false`), NO deviations. Task 1 `cb7cb1e4` (CR-01 producer cancel); Task 2 `c5575789` (WR-01 409 + docstring); Task 3 `9b2e71be` (IN-02 4 route tests). Touched exactly the 3 declared files; **`threads.py` untouched (D-08/G-5, verified via `git diff --name-only cb7cb1e4^ HEAD`), NO migration.**
+- **CR-01 / D-LOCK-05 (`api/workflows.py`):** `delete_workflow_cascade` in-flight query now `LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming'` selecting `wr.id AS wf_id, wr.thread_id, r.run_id AS producer_id, r.status AS producer_status`. Cancel-first loop (outside the delete txn): (1) `_cancel_run_internals(run_id=r["producer_id"], ...)` — the PRODUCER runs.run_id (the RUN_TASKS key at threads.py:2011), NOT `workflow_runs.id`; guarded on `producer_id is not None`; (2) `publish_cancel_sentinel(redis, r["wf_id"])` (wake paused ask_user); (3) `finish_run(pool, r["wf_id"], "cancelled")` (durable terminalize — paused + cross-worker WORKER_COUNT=2 backstop). `_cancel_run_internals` + `publish_cancel_sentinel` stay late-imported (admin.py:479 discipline); `finish_run` promoted to module-top import (pure DB helper, no RUN_TASKS cycle). The wrong-identity `run_id=r["id"]` is GONE.
+- **WR-01 (`db/workflows.py` + `api/workflows.py`):** new `count_foreign_runs_on_global(pool, *, slug, user_id)` — resolves the caller's own `is_global=true` version_ids then `COUNT(*)` of workflow_runs `WHERE definition_id = ANY($1::uuid[]) AND user_id <> $2`. The cascade route raises **409** (before any cancel/delete) when > 0. `delete_workflow_cascade_preview` docstring corrected — removed the false "no cross-user count leak" claim, now states the run/thread/in_flight counts aggregate across all runners for is_global defs and the 409 guard protects the destructive path. `$N`/`ANY($1::uuid[])` binding only.
+- **IN-02 (`tests/test_152_delete_cascade.py`):** 4 route-level tests via httpx `AsyncClient(ASGITransport(app))` + dependency overrides against LIVE PG. New `route_owner` fixture seeds the get_current_user override id into auth.users (so `created_by` matches the caller) + one OTHER user; `_seed_producer_run` helper; `is_global` kwarg on `_seed_definition`. `is_operator` patched False → `require_visible('workflow_authoring')` passes via the 'everyone' carve-out. Tests: (a) producer-identity cancel — spy asserts `run_id == producer_run` AND `!= workflow_run_id`, awaited once; (b) 404 on both `/cascade` + `/delete-preview` for a foreign id; (c) `in_flight == 1` on an active run; (d) WR-01 409 leaving cross-user rows untouched.
+- **Gates:** `test_152_delete_cascade.py` **8/8 GREEN** against LIVE local PG :54322 (4 pre-existing helper + 4 new route); touched-surface regression (`test_152_folder_override` + `test_147_workflows_flag`) 19/19 total green; `import app.api.workflows` clean. **WFIN-03 stays open** at requirement level (false-green avoidance) — closes at verify-work/secure-phase after the manual SC#10 destructive-delete UAT (152-VALIDATION.md row 5, mid-run delete actually stops the stream). **Operator: restart uvicorn** to load the changed modules before UAT. **NEXT: `/gsd:execute-phase 152` continues to 152-06** (WR-03 backend scope.py — disjoint).
+- **SDK quirk:** `state.advance-plan` bumped frontmatter `completed_plans` 49→50 but set Current Position "Plan: 2 of 7 / Ready to execute" (the gap-closure numbering 05-07 confuses the counter) → hand-fixed above. `roadmap.update-plan-progress 152` = `summary_count: 5 / In Progress / complete:false` (accurate — 06+07 remain).
 
 **152 GAP CLOSURE planned (2026-07-14) — `/gsd:plan-phase 152 --gaps`; 1 BLOCKER + 4 Warnings, operator scope = blocker+all-4:**
 
