@@ -320,11 +320,21 @@ async def _fetch_owned_document_bytes(
             "analyze_document for its text."
         )}
 
-    # D-02: size gate PRE-download. Bytes go to disk via copy_to_runtime, never into the
-    # ToolResult / model context; an over-cap file is refused with an honest size error
+    # D-02 / WR-03: size gate PRE-download. Bytes go to disk via copy_to_runtime, never into
+    # the ToolResult / model context; an over-cap file is refused with an honest size error
     # and NOTHING is downloaded (no partial binary is ever fetched).
     cap_bytes = settings.fetch_document_file_max_mb * 1024 * 1024
-    file_size = row.get("file_size") or 0
+    file_size = row.get("file_size")
+    # WR-03: a NULL/0 file_size is NOT "unlimited". The prior `row.get("file_size") or 0`
+    # collapsed a missing byte-count (older text-only ingests / any row that never recorded
+    # one) to 0, which is never > cap — the gate was skipped and the full file streamed into
+    # backend RAM regardless of its true size (a memory-exhaustion vector under WORKER_COUNT=2).
+    # Treat unknown size as untrusted and refuse PRE-download rather than fetch unbounded.
+    if not file_size:
+        return {"error": (
+            "This document has no recorded size, so its original bytes cannot be safely "
+            "fetched. Use read_document/analyze_document for its text instead."
+        )}
     if file_size > cap_bytes:
         return {"error": (
             f"File is {file_size // 1024 // 1024} MB, over the "
@@ -336,6 +346,14 @@ async def _fetch_owned_document_bytes(
     file_bytes = await run_in_threadpool(
         ctx.supabase.storage.from_("documents").download, row["file_path"]
     )
+    # WR-03 metadata-drift backstop: the pre-download gate trusts documents.file_size, which
+    # can under-count the real payload. Re-check the ACTUAL byte length and refuse if it
+    # exceeds the cap — the bytes never enter the ToolResult / model context on this path.
+    if len(file_bytes) > cap_bytes:
+        return {"error": (
+            f"File is {len(file_bytes) // 1024 // 1024} MB, over the "
+            f"{cap_bytes // 1024 // 1024} MB fetch limit."
+        )}
     filename = row.get("filename") or "document"
     mime_type = row.get("mime_type") or "application/octet-stream"
     return (filename, file_bytes, mime_type)

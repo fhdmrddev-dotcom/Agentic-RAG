@@ -103,6 +103,26 @@ async def test_over_cap_refused_before_download(make_tool_context):
 
 
 # ---------------------------------------------------------------------------
+# WR-03 — NULL/0 file_size must NOT bypass the DoS cap; refuse PRE-download
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("bad_size", [None, 0])
+@pytest.mark.asyncio
+async def test_null_or_zero_file_size_refused_before_download(make_tool_context, bad_size):
+    handler = _handler()
+    row = {"id": "d8", "filename": "mystery.bin", "file_path": "u/d8/mystery.bin",
+           "file_size": bad_size, "mime_type": "application/octet-stream"}
+    sb = _sb(row)
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+        session = sm.get_or_create.return_value
+        result = await handler({"document_id": "d8"}, ctx)
+    assert "error" in json.loads(result.result)
+    # unknown size is untrusted → refuse without ever streaming the file into RAM
+    _download(sb).assert_not_called()
+    session.copy_to_runtime.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # D-03 — happy path lands at /sandbox/input/<safe> and returns that path
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
