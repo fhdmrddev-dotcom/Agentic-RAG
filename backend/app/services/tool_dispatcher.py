@@ -67,6 +67,12 @@ from app.services.workspace_service import (
     delete_file as ws_delete_file,
     get_diff as ws_get_diff,
     WorkspaceError,
+    # Phase 151 (FILE-01) — attach_skill_file source #1 (workspace) bytes reader +
+    # filename mime guess. get_file_by_path is a workspace_service re-export of the
+    # db.workspace fetch (cycle-safe at module level; patch-where-used friendly for tests).
+    _get_file_content,
+    get_file_by_path,
+    guess_mime_type,
 )
 
 if TYPE_CHECKING:
@@ -390,6 +396,222 @@ async def _handle_fetch_document_file(args: dict, ctx: ToolContext) -> ToolResul
         "path": container_path,
         "size_bytes": len(doc_bytes),
         "mime_type": mime_type,
+    }))
+
+
+# ---------------------------------------------------------------------------
+# Phase 151 (FILE-01) — attach_skill_file: save a file onto an OWNED skill from
+# one of four sources (workspace / sandbox_output / inline / kb_document, D-05)
+# ---------------------------------------------------------------------------
+# Inline (source #3) size bound — the weak-model guard. Inline is for small text/config/
+# scripts; a model that mangles a large/binary file into a huge `content` string is
+# refused here (use the workspace or sandbox_output source for real files). 5 MB is
+# generous for text while capping accidental context blow-ups.
+_ATTACH_INLINE_MAX_BYTES = 5 * 1024 * 1024
+
+
+async def _resolve_attach_source_bytes(
+    args: dict, ctx: ToolContext, source: str, filename: str
+) -> "tuple[bytes, str] | dict":
+    """Resolve ``(file_bytes, mime_type)`` from one of the four D-05 sources.
+
+    Returns EITHER ``(bytes, mime)`` on success OR ``{"error": ...}`` (the shared
+    honest-failure convention — the caller relays it as a ToolResult error). Every
+    blocking Storage/DB/container call is threadpool-wrapped (Pitfall 1).
+    """
+    import os as _os_local
+    import tempfile as _tempfile_local
+
+    # ── #1 workspace: a thread workspace file, read via the shared inline-vs-Storage
+    #    reader (`_get_file_content`, already threadpool-safe). ──
+    if source == "workspace":
+        wpath = (args.get("workspace_path") or "").strip()
+        if not wpath:
+            return {"error": "source='workspace' requires 'workspace_path'."}
+        try:
+            file_row = await get_file_by_path(ctx.pool, UUID(ctx.thread_id), wpath)
+        except Exception:  # noqa: BLE001 — a bad path/uuid is an honest not-found, never a 500
+            file_row = None
+        if not file_row:
+            return {"error": f"No workspace file at '{wpath}'."}
+        try:
+            file_bytes = await _get_file_content(ctx.pool, ctx.supabase, file_row)
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"Could not read workspace file '{wpath}': {exc}"}
+        mime = file_row.get("mime_type") or guess_mime_type(filename)
+        return (file_bytes, mime)
+
+    # ── #2 sandbox_output: harvest a named file the agent produced in /sandbox/output,
+    #    reusing the harvest idiom (copy the dir out, walk, match basename). ──
+    if source == "sandbox_output":
+        spath = (args.get("sandbox_path") or "").strip()
+        if not spath:
+            return {"error": "source='sandbox_output' requires 'sandbox_path'."}
+        want = _os_local.path.basename(spath) or spath
+
+        def _harvest() -> "bytes | None":
+            session = sandbox_manager.get_or_create(ctx.thread_id)
+            try:
+                session.execute_command("mkdir -p /sandbox/output")
+            except Exception:
+                pass  # best-effort; copy_from_runtime 404s if it truly doesn't exist
+            with _tempfile_local.TemporaryDirectory() as tmpdir:
+                # No trailing slash — Docker's get_archive is strict (sandbox_service.py:264).
+                session.copy_from_runtime("/sandbox/output", tmpdir)
+                for root, _dirs, files in _os_local.walk(tmpdir):
+                    for fn in files:
+                        if fn == want:
+                            with open(_os_local.path.join(root, fn), "rb") as f:
+                                return f.read()
+            return None
+
+        try:
+            data = await run_in_threadpool(_harvest)
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"Could not read sandbox output '{spath}': {exc}"}
+        if data is None:
+            return {"error": f"No sandbox output file named '{want}' in /sandbox/output."}
+        return (data, guess_mime_type(filename))
+
+    # ── #3 inline: content passed directly as a tool arg (utf-8 text). Weak-model
+    #    guards: a non-str / empty / oversized `content` is an honest error, never a
+    #    silent empty or context-blowing write. ──
+    if source == "inline":
+        content = args.get("content")
+        if not isinstance(content, str) or content == "":
+            return {"error": "source='inline' requires non-empty 'content'."}
+        file_bytes = content.encode("utf-8")
+        if len(file_bytes) > _ATTACH_INLINE_MAX_BYTES:
+            return {"error": (
+                f"Inline content is {len(file_bytes) // 1024} KB, over the "
+                f"{_ATTACH_INLINE_MAX_BYTES // 1024 // 1024} MB inline limit — attach a "
+                "large file via the 'workspace' or 'sandbox_output' source instead."
+            )}
+        return (file_bytes, guess_mime_type(filename))
+
+    # ── #4 kb_document: REUSE FILE-02's owner-scope resolver (T-03). The doc→skill
+    #    data-movement path is owner-scoped on BOTH ends — the resolver's owner→global
+    #    gate here, the owner-only skill gate in the caller. Its {"error"} propagates. ──
+    if source == "kb_document":
+        document_id = (args.get("document_id") or "").strip()
+        if not document_id:
+            return {"error": "source='kb_document' requires 'document_id'."}
+        resolved = await _fetch_owned_document_bytes(ctx, document_id)
+        if isinstance(resolved, dict):  # owner-scope refusal (T-03) → propagate honestly
+            return resolved
+        _fname, doc_bytes, mime = resolved
+        return (doc_bytes, mime)
+
+    return {"error": (
+        f"Unknown source '{source}'. Use one of: workspace, sandbox_output, inline, "
+        "kb_document."
+    )}
+
+
+async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
+    """FILE-01 — attach a file onto a skill the caller OWNS, from four sources (D-05).
+
+    G-5: handler + one ``_TOOL_REGISTRY`` line + one ``get_tools()`` schema; threads.py
+    untouched, no ``provider ==`` fork. self_improve-gated (D-11) in ``get_tools()`` AND
+    refused in-flight via ``_CAPABILITY_FLAG_TOOLS``. Owner-only WRITE gate (D-06/T-04):
+    the target skill is resolved by name under ``.eq("user_id")`` — NEVER the
+    ``.or_(is_global.eq.true)`` READ filter — and ``is_system`` skills are also rejected;
+    service-role has no RLS backstop so this app gate is load-bearing. A colliding filename
+    overwrites in place via a race-immune upsert (D-07, Plan 02 unique index). Reuses the
+    existing ``skill_files`` table + ``skill-files`` bucket (D-08) — no new table/bucket.
+    """
+    import os as _os_local
+    import re as _re_local
+
+    uid = ctx.current_user["id"]
+    target_skill_name = (args.get("target_skill_name") or "").strip()
+    filename_raw = (args.get("filename") or "").strip()
+    source = (args.get("source") or "").strip()
+
+    if not target_skill_name:
+        return ToolResult(result=json.dumps({"error": "target_skill_name is required."}))
+    if not filename_raw:
+        return ToolResult(result=json.dumps({"error": "filename is required."}))
+
+    # T-02 / Pitfall 4 — sanitize the MODEL-supplied filename to a safe basename so it can
+    # never carry a "../" traversal segment out of the owner-prefixed Storage path. For a
+    # normal filename this is a no-op (basename + charset scrub, matching FILE-02's stem).
+    stem = _os_local.path.basename(filename_raw)
+    filename = _re_local.sub(r"[^a-zA-Z0-9._\- ]", "_", stem)
+    filename = _re_local.sub(r"\.{2,}", ".", filename).strip() or "attachment"
+
+    # ── D-06 / T-04 / SC#4 — resolve the target skill OWNER-ONLY. Empty .data (not owned
+    #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter. ──
+    skill_res = await aexec(
+        ctx.supabase.table("skills").select("id, is_system")
+        .eq("name", target_skill_name).eq("user_id", uid).maybe_single()
+    )
+    skill_row = skill_res.data if skill_res else None
+    if not skill_row or skill_row.get("is_system"):
+        return ToolResult(result=json.dumps({"error": (
+            f"No skill named '{target_skill_name}' that you own — you can only attach "
+            "files to a skill you own (not a global or built-in skill)."
+        )}))
+    skill_id = skill_row["id"]
+
+    # ── Resolve file_bytes + mime by the source discriminator (D-05) ──
+    resolved = await _resolve_attach_source_bytes(args, ctx, source, filename)
+    if isinstance(resolved, dict):  # honest-failure convention (weak-model guard / T-03)
+        return ToolResult(result=json.dumps(resolved))
+    file_bytes, mime = resolved
+
+    # ── T-02 — owner-prefixed Storage path. skill_id from the RESOLVED owned skill, uid
+    #    from ctx, filename sanitized above — no segment is ever a raw model arg. ──
+    storage_path = f"{uid}/{skill_id}/{filename}"
+
+    # ── D-07 pre-check drives the created/updated REPORT only (informational). Write
+    #    correctness is the race-immune upsert below (Plan 02 unique index), so even if two
+    #    concurrent same-name attaches both read "not present" the DB still collapses to one
+    #    row — the report may say "created" twice but the state stays consistent. ──
+    exist_res = await aexec(
+        ctx.supabase.table("skill_files").select("id")
+        .eq("skill_id", skill_id).eq("filename", filename).maybe_single()
+    )
+    pre_existed = bool(exist_res and exist_res.data)
+
+    # ── D-07 overwrite-in-place — Storage upsert (Pitfall 2: bare .upload() 409s on a
+    #    colliding path) + race-immune DB upsert on the (skill_id, filename) unique index.
+    #    Both blocking calls are off-loop (Pitfall 1). ──
+    try:
+        await run_in_threadpool(lambda: ctx.supabase.storage.from_("skill-files").upload(
+            path=storage_path, file=file_bytes,
+            file_options={"content-type": mime, "upsert": "true"},
+        ))
+        await aexec(ctx.supabase.table("skill_files").upsert(
+            {
+                "skill_id": skill_id, "user_id": uid, "filename": filename,
+                "file_path": storage_path, "file_size": len(file_bytes), "mime_type": mime,
+            },
+            on_conflict="skill_id,filename",
+        ))
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        logger.exception(
+            "attach_skill_file write failed (skill=%s file=%s)", skill_id, filename
+        )
+        return ToolResult(result=json.dumps({
+            "error": f"Failed to attach the file to the skill: {exc}"
+        }))
+
+    status = "updated" if pre_existed else "created"
+
+    # Optional additive SSE — provider-uniform (no provider== fork), best-effort no-op when
+    # the run/emit substrate is absent (mirrors workspace_file_written).
+    try:
+        if getattr(ctx, "emit", None) and getattr(ctx, "run_id", None):
+            await ctx.emit(
+                ctx.redis, ctx.run_id, "skill_file_attached",
+                skill=target_skill_name, filename=filename, status=status,
+            )
+    except Exception:  # noqa: BLE001 — an emit failure must never break a clean attach
+        logger.exception("skill_file_attached emit failed for run %s", getattr(ctx, "run_id", None))
+
+    return ToolResult(result=json.dumps({
+        "status": status, "filename": filename, "skill": target_skill_name,
     }))
 
 
@@ -3369,6 +3591,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "get_related_documents": _handle_get_related_documents,
     # Phase 151 (FILE-02) — registry + get_tools BOTH (sandbox-gated); G-5: handler + one line, threads.py untouched
     "fetch_document_file": _handle_fetch_document_file,
+    # Phase 151 (FILE-01) — registry + get_tools BOTH (self_improve-gated); G-5: handler + one line, threads.py untouched
+    "attach_skill_file": _handle_attach_skill_file,
 }
 
 
@@ -3427,6 +3651,10 @@ _CAPABILITY_FLAG_TOOLS: dict[str, tuple[str, str]] = {
     # sandbox, so the sandbox kill-switch also refuses it in-flight (fail-closed,
     # provider-uniform — the get_tools HIDE layer's defense-in-depth sibling).
     "fetch_document_file": ("sandbox_enabled", "Document file fetch"),
+    # Phase 151 (FILE-01 / D-11) — attach_skill_file is a self-improvement WRITE (it saves a
+    # file onto an owned skill), so the self-improve kill-switch also refuses it in-flight
+    # (fail-closed, provider-uniform — the get_tools HIDE layer's defense-in-depth sibling).
+    "attach_skill_file": ("self_improve_enabled", "Self-improvement (skill file attach)"),
 }
 
 

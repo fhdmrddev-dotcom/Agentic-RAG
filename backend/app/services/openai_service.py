@@ -469,6 +469,68 @@ SAVE_SKILL_TOOL = {
     },
 }
 
+# Phase 151 (FILE-01) — attach_skill_file: save a file onto an OWNED skill from one of
+# four sources. FLAT schema (source enum discriminator, no anyOf/oneOf/$ref) — the only
+# cross-provider-safe function-calling shape (Google rejects union keywords). Modeled on
+# QUERY_DOCUMENTS_BY_VIEW_TOOL; optional source-specific fields are ["string","null"] and
+# NOT in `required`, so weak/strict callers accept it.
+ATTACH_SKILL_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "attach_skill_file",
+        "description": (
+            "Use when you want to SAVE a file onto a skill you own — a helper script, "
+            "template, or asset the skill should carry so it persists for future runs. "
+            "Do not use to write to a global or built-in skill; you can only attach files "
+            "to a skill you own. Set `source` to say where the bytes come from: "
+            "'workspace' (a thread workspace file at `workspace_path`), 'sandbox_output' "
+            "(a file you produced in the sandbox at `sandbox_path`, e.g. "
+            "/sandbox/output/report.docx), 'inline' (text you pass directly in `content`), "
+            "or 'kb_document' (a knowledge-base document by `document_id`). A colliding "
+            "`filename` overwrites the existing file on the skill in place. Only available "
+            "when self-improvement is enabled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "target_skill_name": {
+                    "type": "string",
+                    "description": "Exact name of a skill YOU own to attach the file to.",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": (
+                        "Filename to save on the skill (e.g. 'helper.py'). A colliding "
+                        "name overwrites the existing file in place."
+                    ),
+                },
+                "source": {
+                    "type": "string",
+                    "enum": ["workspace", "sandbox_output", "inline", "kb_document"],
+                    "description": "Where the file bytes come from.",
+                },
+                "workspace_path": {
+                    "type": ["string", "null"],
+                    "description": "For source='workspace': the workspace file path (e.g. '/report.docx').",
+                },
+                "sandbox_path": {
+                    "type": ["string", "null"],
+                    "description": "For source='sandbox_output': the sandbox file path (e.g. '/sandbox/output/chart.png').",
+                },
+                "content": {
+                    "type": ["string", "null"],
+                    "description": "For source='inline': the file's text content, passed directly.",
+                },
+                "document_id": {
+                    "type": ["string", "null"],
+                    "description": "For source='kb_document': the UUID of an owned knowledge-base document.",
+                },
+            },
+            "required": ["target_skill_name", "filename", "source"],
+        },
+    },
+}
+
 READ_SKILL_FILE_TOOL = {
     "type": "function",
     "function": {
@@ -1091,6 +1153,12 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
         self_improve_on = _self_improve_enabled()
     if self_improve_on:
         tools.append(SAVE_SKILL_TOOL)
+        # Phase 151 (FILE-01 / D-11) — attach_skill_file is a self-improvement WRITE
+        # (save a file onto an owned skill), so it rides the SAME self_improve gate as
+        # save_skill: hidden here when self-improve is OFF, and refused in-flight via
+        # _CAPABILITY_FLAG_TOOLS (defense-in-depth). Not sandbox-gated — its sources
+        # include workspace/inline/kb_document that need no sandbox.
+        tools.append(ATTACH_SKILL_FILE_TOOL)
     if web_enabled:
         tools.append(WEB_SEARCH_TOOL)
     if sandbox_enabled:
