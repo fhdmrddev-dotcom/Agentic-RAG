@@ -289,7 +289,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 152-04-PLAN.md — WFIN-03 delete frontend: net-new PublishedCard ⋯-menu + victim-naming Sheet (exact server counts, cancel-first banner, in-place no-undo) + delete/preview clients
+- [x] 152-04-PLAN.md — WFIN-03 delete frontend: net-new PublishedCard ⋯-menu + victim-naming Sheet (exact server counts, cancel-first banner, in-place no-undo) + delete/preview clients
 
 **Note**: SEED-112 scope-control shape RESOLVED at the G-2 sketch = inline <select> (D-LOCK-01). RESEARCH confirms NO migration (project_folder_id is already the retrieval default; delete operates on existing tables).
 **UI hint**: yes
@@ -391,7 +391,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 3/4 | Executing | - |
+| 152. Workflow Run Inputs | 4/4 | Ready for verification | - |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |

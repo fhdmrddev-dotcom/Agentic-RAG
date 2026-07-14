@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-14T17:56:23.131Z"
+status: verifying
+last_updated: "2026-07-14T18:19:36.061Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 26
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 49
-  completed_plans: 48
-  percent: 23
+  completed_plans: 49
+  percent: 27
 ---
 
 # Project State
@@ -28,8 +28,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 152 (workflow-run-inputs) — EXECUTING
 Plan: 4 of 4
-Status: 152-03 complete (3/4) — ready to execute 152-04
-Last activity: 2026-07-14 -- Phase 152 Plan 03 (WFIN-01/02 Run-modal frontend) executed
+Status: Phase complete — ready for verification (all 4 plans executed)
+Last activity: 2026-07-14 -- Phase 152 Plan 04 (WFIN-03 delete-cascade frontend) executed
+
+**152-04 execution notes (2026-07-14) — WFIN-03 delete-cascade FRONTEND, + 1 backend deviation, no migration:**
+
+- 3 tasks (all type=auto), sequential on the main tree (`use_worktrees=false`), 1 backend deviation. Deviation `3225797a` (backend in_flight); Task 1 `195ce2d7` (api.ts clients); Task 2 `78d0cc0d` (PublishedCard ⋯-menu + Sheet); Task 3 `e08f5516` (PublishedCardDelete.test.tsx, 7 cases).
+- **api.ts:** `getWorkflowDeletePreview(id)` → `GET /workflows/{id}/delete-preview` → `WorkflowDeletePreview {name, versions, runs, threads, in_flight}` + `deleteWorkflowCascade(id, signal?)` → `DELETE /workflows/{id}/cascade` (204). DISTINCT routes (never the draft `DELETE /{id}`, Pitfall 7); reuse the `deleteWorkflowDraft` `getAuthHeaders` + status-mapped-error shape (404 → `WorkflowNotFoundError`); errors NOT swallowed (the sheet renders its own error state).
+- **PublishedCard net-new `⋯` menu** (Pitfall 8 — none existed): neutral `MoreHorizontal` trigger left of the `published` pill → single destructive-tinted `Delete workflow…` → the victim-naming confirm **Sheet** (`side="bottom" mx-auto max-w-lg`, the SAME 064-B/ActiveRunsSection primitive). Sheet fetches the preview on open → EXACT server counts (Removed `{name} · N versions · N run records`; Kept `{N} chat threads become normal chats…`, always-rendered incl. 0-threads `No chat threads to keep.`), amber cancel-first banner gated on `preview.in_flight > 0` (D-LOCK-05, amber-not-red), in-place lifecycle adapting the 064-B KillPhase machine (`Delete forever` → `Deleting…` → `Deleted · recorded`) with the card removed ONLY on the server-confirmed re-fetch (`onDeleted` → `refetchPublished`; NO optimistic vanish, NO undo — D-LOCK-04), error → `Try again`, `✎ Recorded with your name` footer. `⑂ Tweak` / `▶ Run` footer UNCHANGED. `Delete forever` is the SOLE `bg-destructive` element.
+- **DEVIATION [Rule 2 — missing critical]:** the Plan-02 `DeletePreview` returned only total run RECORDS (`runs`), no live-run signal — gating the amber D-LOCK-05 banner off that would falsely claim "in progress" whenever any completed run exists (a dishonest stub). Added an ADDITIVE `in_flight` COUNT (`status IN ('active','paused','cap_paused')` — the same set the cascade route cancel-first heals) to `db/workflows.py delete_workflow_cascade_preview` + an additive `in_flight: int = 0` field to `api/workflows.py DeletePreview`. NEVER `threads.py` (D-08/G-5 safe). The 4 live-PG `test_152_delete_cascade.py` tests stay green (they assert individual keys, not exact dict equality). Committed `3225797a` before Task 1.
+- **Gates:** touched-surface suite `PublishedCardDelete.test` (7) + `WorkflowsPage.test` (23) + `RunModal.test` (7) = **37/37 green**; `npx vite build` exit 0; **0 net-new tsc errors** vs the captured 30-error baseline (SEED-056/049 rot untouched). Radix DropdownMenu opened in jsdom via the ViewsGroup pointer-capture shims; the Sheet needs none (proven by ActiveRunsSection.test).
+- **WFIN-03 NOT marked complete** at the requirement level (false-green avoidance, 148–151 convention) — closes at verify-work/secure-phase after the live SC#10 4-axis destructive UAT in `152-VALIDATION.md` (real DB counts, cancel-first, no orphaned runs/threads) + the T-152-04-* / T-152-02-* threat close. **Operator: restart uvicorn** to load the additive `in_flight` field before UAT. **NEXT: `/gsd:verify-work 152`** (all 4 plans executed).
+- **SDK quirks (unchanged):** `state.advance-plan` detected `last_plan` (bumped frontmatter `completed_plans` 48→49 + `completed_phases`→7 + `status: verifying`, + Current Position). `state.update-progress` = "Progress field not found" (STATE uses the frontmatter `progress:` block); `state.record-metric` = "phase, plan, and duration required" (arg-parse) → skipped. `roadmap.update-plan-progress 152` reported `summary_count: 4 / status Complete / complete:true` — verify the ROADMAP progress-table row reads `4/4 | Complete`.
 
 **152-03 execution notes (2026-07-14) — WFIN-01/02 Run-modal frontend, frontend-only, no migration:**
 
