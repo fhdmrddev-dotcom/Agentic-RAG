@@ -275,7 +275,7 @@ Plans:
   2. From the Run modal a user can point the workflow's retrieval at a chosen KB folder (author-time default + per-run override) reusing the Phase-098 server-side scope resolver, so the model cannot widen scope; behavior is identical across providers.
   3. A user can delete a workflow with a safe cascade (definitions / versions / runs disposition made explicit at discuss) behind a confirmation, leaving no orphaned runs or threads.
 
-**Plans**: 4 plans (3 waves)
+**Plans**: 7 plans (4 waves; Wave 4 = gap closure for CR-01 + WR-01/03/04/05)
 
 Plans:
 **Wave 1**
@@ -290,6 +290,12 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 152-04-PLAN.md — WFIN-03 delete frontend: net-new PublishedCard ⋯-menu + victim-naming Sheet (exact server counts, cancel-first banner, in-place no-undo) + delete/preview clients
+
+**Wave 4** *(gap closure — verify-work returned gaps_found: CR-01 BLOCKER + WR-01/03/04/05)*
+
+- [ ] 152-05-PLAN.md — CR-01 (BLOCKER) producer-identity cancel-first (D-LOCK-05) + WR-01 is_global cross-user 409 refuse + IN-02 route-level test (backend; api/workflows.py, db/workflows.py)
+- [ ] 152-06-PLAN.md — WR-03 backend: resolve_run_scope_root A4 per-phase intersection guard (drop an override that empties any declared phase folder_scope) + P/A/B test (scope.py)
+- [ ] 152-07-PLAN.md — WR-05 truthful bound/unbound scope label + WR-03 frontend option mirror + WR-04 orphan-thread cleanup (frontend; WorkflowsPage.tsx, ChatLayout.tsx)
 
 **Note**: SEED-112 scope-control shape RESOLVED at the G-2 sketch = inline <select> (D-LOCK-01). RESEARCH confirms NO migration (project_folder_id is already the retrieval default; delete operates on existing tables).
 **UI hint**: yes
