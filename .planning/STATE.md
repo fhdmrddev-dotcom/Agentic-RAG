@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-13T20:57:26.050Z"
-last_activity: 2026-07-13
+last_updated: "2026-07-14T03:04:39.644Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 26
   completed_phases: 5
   total_plans: 45
-  completed_plans: 43
+  completed_plans: 44
   percent: 19
 ---
 
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 151 (agent-file-tools) — EXECUTING
-Plan: 3 of 4
-Status: Executing Phase 151 (151-01 + 151-03 complete; 151-02 migration + 151-04 attach remain)
-Last activity: 2026-07-13 -- Phase 151 Plan 03 (SC#3 upload allowlist widen) executed
+Plan: 4 of 4
+Status: Executing Phase 151 (Wave 1 COMPLETE — 151-01 + 151-02 + 151-03; Wave 2 151-04 attach remains)
+Last activity: 2026-07-14 -- Phase 151 Plan 02 (D-10 migration 101: skill_files unique index) executed — Wave 1 done
+
+**151-02 execution notes (2026-07-14) — D-10 migration 101: skill_files(skill_id, filename) unique index, DB-only, additive:**
+
+- 2/2 tasks. Task 1 (author, prior session) `209a546f`; Task 2 [BLOCKING checkpoint:human-action] operator applied migration 101 to the live LOCAL Supabase DB via SQL editor/psycopg2 (never `db push`/`db reset`) → resume signal "applied", `pg_indexes` confirms `skill_files_skill_filename_uniq` on `skill_files` (one row) + no duplicate `(skill_id, filename)` tuples. NO deviations.
+- **Authored `supabase/migrations/101_skill_files_unique_index.sql`** — ADDITIVE `CREATE UNIQUE INDEX IF NOT EXISTS skill_files_skill_filename_uniq ON public.skill_files (skill_id, filename)`; no column, no RLS, no data rewrite. Full APPLY/regenerate/CLOUD-PARITY header mirrors mig 075. `IF NOT EXISTS` = idempotent re-apply. This is the ENABLING mitigation for T-151-02M-01 (collapses FILE-01's read-check-then-write TOCTOU race to one winner under `WORKER_COUNT=2`, making `.upsert(on_conflict=skill_id,filename)` atomic).
+- **Regenerated `supabase/full-schema.sql`** via `scripts/regenerate-full-schema.sh` (NO `--reset` — live-DB dump, preserves dev data): 4412 → 4419 lines, clean 7-line diff that is ONLY the new index block (`skill_files_skill_filename_uniq` at line 2458, no schema drift). Never hand-edited.
+- **Cloud parity: mig 101 is a PENDING CLOUD APPLY** — auto-tracked by the git-based `scripts/pending-cloud-migrations.sh` (HEAD vs `origin/production` watermark, no manual tracker edit); it now lists 095–101, so 101 joins **099/100** in the pending-on-cloud set. Must land on cloud Supabase (in numeric order) BEFORE Phase 151 ships live. DEFERRED to the standing production-push checklist — do NOT touch cloud now.
+- **FILE-01 NOT marked complete** (false-green avoidance, 148/149/150 convention) — this plan only ENABLES FILE-01 (the DB precondition); the `attach_skill_file` tool ships in Plan 04 and FILE-01 closes at verify-work/secure-phase. REQUIREMENTS.md FILE-01 stays `Pending`.
+- **SDK quirks (unchanged from 151-01/03):** `advance-plan` bumped frontmatter `completed_plans` 43→44 + Current Plan → 4; `roadmap.update-plan-progress 151` checked the 151-02 box + reported `summary_count: 3` but LEFT the progress-table row `2/4 | Executing` stale → hand-fixed to `3/4`.
 
 **151-03 execution notes (2026-07-13) — SC#3 upload allowlist widen (D-09), backend gate + frontend accept=:**
 

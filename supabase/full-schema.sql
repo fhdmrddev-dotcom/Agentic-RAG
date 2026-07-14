@@ -2452,6 +2452,13 @@ CREATE INDEX message_feedback_user_created_idx ON public.message_feedback USING 
 
 
 --
+-- Name: skill_files_skill_filename_uniq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX skill_files_skill_filename_uniq ON public.skill_files USING btree (skill_id, filename);
+
+
+--
 -- Name: skill_files_skill_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
