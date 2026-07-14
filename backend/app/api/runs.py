@@ -819,6 +819,7 @@ async def continue_run(
         from app.services.harness.scope import (  # noqa: PLC0415
             assert_folder_scopes_subset as _assert_folder_scopes_subset,
             resolve_project_subtree as _resolve_project_subtree,
+            resolve_run_scope_root as _resolve_run_scope_root,
         )
 
         from app.db.runs import insert_run as _insert_run, finalize_run as _finalize_run  # noqa: PLC0415
@@ -916,31 +917,44 @@ async def continue_run(
         # inject via a stubbed _load_run_definition; a real WorkflowDefinition always
         # has the field. An unbound workflow (None) skips resolution → whole-KB.
         _cont_project_folder_id = getattr(definition, "project_folder_id", None)
-        if _cont_project_folder_id is not None:
-            try:
+        try:
+            if _cont_project_folder_id is not None:
+                # D-07 DB half (unchanged): re-assert every per-phase folder_scope ⊆ the
+                # project subtree before binding retrieval scope.
                 await _assert_folder_scopes_subset(
                     definition, supabase=supabase, user_id=current_user["id"]
                 )
+            # 152 WFIN-02 (Pitfall 5): layer the durable per-run folder override from
+            # workflow_runs.inputs so a CONTINUED run stays on the operator's chosen
+            # folder instead of silently reverting to the author default. The helper
+            # owner-re-validates the override (a since-deleted folder degrades safely).
+            _cont_scope_root = await _resolve_run_scope_root(
+                definition,
+                run_inputs=_wf_inputs,
+                thread_folder_id=None,
+                supabase=supabase,
+                user_id=current_user["id"],
+            )
+            if _cont_scope_root is not None:
                 _cont_subtree = await _resolve_project_subtree(
-                    _cont_project_folder_id,
+                    _cont_scope_root,
                     supabase=supabase,
                     user_id=current_user["id"],
                 )
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "continue: project-scope resolution failed for run %s "
-                    "(falling back to unscoped search)", wf_run_uuid,
-                )
-                _cont_subtree = None
-                # WR-03 (098 secure-phase): EMIT scope_resolution_failed so the
-                # fall-open is OBSERVABLE in the run timeline — otherwise a bound
-                # workflow silently degrades to whole-KB on a transient failure (the
-                # Plan-05 clip + scope_violation are gated on
-                # `folder_subtree_ids is not None` and never fire on this None
-                # fallback). This except only runs inside the bound branch
-                # (_cont_project_folder_id is not None), so bound=True always holds.
-                # Continue is an in-flight re-drive → stays fail-OPEN (never block the
-                # Continue); the emit is the security signal, not a block.
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "continue: project-scope resolution failed for run %s "
+                "(falling back to unscoped search)", wf_run_uuid,
+            )
+            _cont_subtree = None
+            # WR-03 (098 secure-phase): EMIT scope_resolution_failed so the fall-open is
+            # OBSERVABLE in the run timeline — otherwise a bound workflow silently degrades
+            # to whole-KB on a transient failure (the Plan-05 clip + scope_violation are
+            # gated on `folder_subtree_ids is not None` and never fire on this None
+            # fallback). Gated on a BOUND workflow (bound=True holds) — an unbound run whose
+            # override merely dropped has no governance scope to signal. Continue is an
+            # in-flight re-drive → stays fail-OPEN (never block the Continue).
+            if _cont_project_folder_id is not None:
                 try:
                     await _harness_emit(
                         redis,
