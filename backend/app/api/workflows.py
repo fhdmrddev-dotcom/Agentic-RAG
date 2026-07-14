@@ -26,6 +26,7 @@ from app.db.workflows import (
     delete_published_workflow_cascade,
     delete_workflow_cascade_preview,
     delete_workflow_definition,
+    finish_run,
     list_draft_workflows,
     list_published_workflows,
     list_starter_workflows,
@@ -487,8 +488,12 @@ async def delete_workflow_cascade(
     Order (D-LOCK-04/05):
       1. Owner-gate the target id → its slug (non-owner / unknown → 404, no leak).
       2. CANCEL-FIRST every in-flight run (status ``active``/``paused``/``cap_paused``) for
-         that slug's versions via the shared ``_cancel_run_internals`` zombie-heal — BEFORE
-         the DB delete, never deleting a live run out from under the engine (D-LOCK-05).
+         that slug's versions — BEFORE the DB delete, never deleting a live run out from
+         under the engine (D-LOCK-05). Cancel through the PRODUCER ``runs.run_id`` (the
+         RUN_TASKS key, resolved by the LEFT JOIN — NOT the ``workflow_runs.id``, which the
+         registry never keys), publish the ask_user cancel sentinel on the workflow-run
+         channel, and durably ``finish_run`` the workflow_runs row (covers the paused +
+         cross-worker ``WORKER_COUNT=2`` cases).
       3. FK-safe cascade (``delete_published_workflow_cascade``): runs FIRST (RESTRICT
          blocker) → phases auto-cascade → thread anchors auto-SET-NULL (threads KEPT as
          normal chats) → all versions. ``harness_audit`` receipts linger (A3).
@@ -504,28 +509,51 @@ async def delete_workflow_cascade(
 
     # 2. Cancel-first (D-LOCK-05) — heal every in-flight run for this slug's versions
     # BEFORE the DB delete. The cancel discipline lives in the SERVICE/route layer, not
-    # the db txn. ``_cancel_run_internals`` is late-imported (the admin.py:479 discipline —
-    # keeps the RUN_TASKS registry off this module's load path, avoids the import cycle).
+    # the db txn. ``_cancel_run_internals`` + ``publish_cancel_sentinel`` are late-imported
+    # (the admin.py:479 discipline — keeps the RUN_TASKS registry off this module's load
+    # path, avoids the import cycle).
+    #
+    # CR-01 / D-LOCK-05: a live kickoff-started run's producer task is registered in
+    # RUN_TASKS under the PRODUCER ``runs.run_id`` (threads.py:2011), NOT the
+    # ``workflow_runs.id``. Resolve that producer identity via a LEFT JOIN to the live
+    # ``runs`` row (status='streaming') and cancel through IT — the same identity the
+    # admin Kill path uses — so the engine task is actually cancelled.
     inflight = await pool.fetch(
-        "SELECT wr.id, wr.status, wr.thread_id FROM workflow_runs wr "
+        "SELECT wr.id AS wf_id, wr.thread_id, "
+        "r.run_id AS producer_id, r.status AS producer_status "
+        "FROM workflow_runs wr "
         "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
+        "LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming' "
         "WHERE wd.slug = $1 AND wd.created_by = $2 "
         "AND wr.status IN ('active', 'paused', 'cap_paused')",
         slug,
         user_id,
     )
     if inflight:
+        from app.services.ask_user_service import publish_cancel_sentinel  # noqa: PLC0415
         from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
 
         redis = get_redis()
         for r in inflight:
-            await _cancel_run_internals(
-                run_id=r["id"],
-                status=r["status"],
-                thread_id=str(r["thread_id"]) if r["thread_id"] else None,
-                redis=redis,
-                supabase=supabase,
-            )
+            # (1) Cancel the LIVE producer task — RUN_TASKS is keyed by the producer
+            # runs.run_id, never the workflow_runs id (CR-01). A run with no live
+            # producer row (already terminal / cross-worker) has producer_id = None.
+            if r["producer_id"] is not None:
+                await _cancel_run_internals(
+                    run_id=r["producer_id"],
+                    status=r["producer_status"],
+                    thread_id=str(r["thread_id"]) if r["thread_id"] else None,
+                    redis=redis,
+                    supabase=supabase,
+                )
+            # (2) Wake any paused ask_user harness prompt — the harness subscribes on the
+            # WORKFLOW run id channel (best-effort, never raises).
+            await publish_cancel_sentinel(redis, r["wf_id"])
+            # (3) Durably terminalize the workflow_runs row BEFORE the delete — the
+            # cross-worker (WORKER_COUNT=2) + paused backstop D-LOCK-05 needs (the engine's
+            # own writes 0-row no-op once its rows are gone, so this is the authoritative
+            # terminal state + anchor-clear).
+            await finish_run(pool, r["wf_id"], "cancelled")
 
     # 3. FK-safe hard-delete (D-LOCK-04).
     result = await delete_published_workflow_cascade(pool, slug=slug, user_id=user_id)
