@@ -32,7 +32,7 @@ import type { NavItem } from "@/lib/nav-items"
 // Phase 103-06: the Run-from-page launch reuses the EXISTING kickoff path —
 // createThread + sendMessage(workflow_definition_id) — NEVER a bespoke
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
-import { createThread, postMessage, type PublishedWorkflow } from "@/lib/api"
+import { createThread, postMessage, uploadWorkspaceTemplate, type PublishedWorkflow } from "@/lib/api"
 
 interface Props {
   onSignOut: () => void
@@ -109,12 +109,33 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    views the thread and switches to Chat. active_workflow_run_id is set
   //    server-side atomically (create_workflow_run); GET /threads/{id}/workflow ->
   //    "harness" is the proof a real run was kicked off (NOT a view-only switch).
-  //    The free-text kickoff becomes inputs={"kickoff_prompt": content}; project
-  //    scope is BAKED INTO the published definition (we never pass a folder here). ──
+  //    The free-text kickoff becomes inputs={"kickoff_prompt": content}.
+  //    ── Phase 152 (WFIN-01/02): the Run modal now carries two optional run inputs.
+  //    A staged template File uploads to THIS launched (owned) thread BETWEEN
+  //    createThread and postMessage, so the fill path discovers it by `kind` on the
+  //    thread (Landmine 8 — the order is strict: createThread → upload → send). A
+  //    per-run KB-folder override rides into create_workflow_run.inputs via
+  //    postMessage's folder_id (D-01); absence = today's behavior (D-06). A failed
+  //    upload surfaces BEFORE the send (the await is not swallowed) so the modal can
+  //    render the server's 422 verbatim and no run kicks off. ──
   const doRun = useCallback(
-    async (def: PublishedWorkflow, kickoff: string) => {
+    async (
+      def: PublishedWorkflow,
+      kickoff: string,
+      opts?: { templateFile?: File | null; folderId?: string | null },
+    ) => {
+      const templateFile = opts?.templateFile ?? null
+      const folderId = opts?.folderId ?? null
       const thread = await createThread(def.name)
-      await postMessage(thread.id, kickoff, { workflowDefinitionId: def.id })
+      // Landmine 8: upload to the launched owned thread so resolve_template_source
+      // Branch 2 discovers it by kind='template_input'. Not swallowed — a 422 aborts
+      // the launch before postMessage.
+      if (templateFile) await uploadWorkspaceTemplate(thread.id, templateFile)
+      await postMessage(thread.id, kickoff, {
+        workflowDefinitionId: def.id,
+        // WFIN-02 (D-01): additive — only when a per-run override was picked (D-06).
+        ...(folderId ? { folderId } : {}),
+      })
       await loadThreads()
       selectThread(thread)
       onNavigate("chat")

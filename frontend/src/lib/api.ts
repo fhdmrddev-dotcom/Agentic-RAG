@@ -520,6 +520,13 @@ export async function postMessage(
      *  the producer drives run_workflow instead of the Deep agent loop. Only
      *  sent when a workflow is picked — a Deep send omits it (byte-identical). */
     workflowDefinitionId?: string
+    /** Phase 152 (WFIN-02 / D-01) — a per-run KB-folder retrieval OVERRIDE for a
+     *  Harness kickoff. Travels as `folder_id` in the create_workflow_run.inputs
+     *  jsonb (MessageCreate.folder_id, Plan 01); the server owner-gates it (D-05)
+     *  and layers it over the definition's author default. Only sent when the Run
+     *  modal picks a folder that differs from the workflow default — absence is the
+     *  byte-identical D-06 path (no override → the author default / whole-KB). */
+    folderId?: string | null
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -535,6 +542,9 @@ export async function postMessage(
       ...(options.workflowDefinitionId
         ? { workflow_definition_id: options.workflowDefinitionId }
         : {}),
+      // WFIN-02 (D-01): additive — same shape as workflow_definition_id. Only sent
+      // when a per-run folder override is present; absence = D-06 (author default).
+      ...(options.folderId ? { folder_id: options.folderId } : {}),
     }),
   })
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is

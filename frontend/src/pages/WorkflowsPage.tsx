@@ -78,9 +78,17 @@ interface WorkflowsPageProps {
   /** The project folders (the filter rail's options) — from ChatLayout's useFolders. */
   folders: Folder[]
   /** doRun — defined in ChatLayout (it owns thread state): createThread →
-   *  sendMessage(workflowDefinitionId) → select + view + redirect to Chat. The page
-   *  NEVER constructs a bespoke run route. */
-  onLaunch: (def: PublishedWorkflow, kickoff: string) => Promise<void>
+   *  (upload staged template) → sendMessage(workflowDefinitionId, folder_id) → select
+   *  + view + redirect to Chat. The page NEVER constructs a bespoke run route.
+   *  Phase 152 (WFIN-01/02): the optional third arg carries the Run modal's two run
+   *  inputs — a staged template `File` (uploaded to the launched thread, Landmine 8)
+   *  and a per-run KB-folder override `folderId` (→ create_workflow_run.inputs, D-01).
+   *  Both absent = today's byte-identical launch (D-06). */
+  onLaunch: (
+    def: PublishedWorkflow,
+    kickoff: string,
+    opts?: { templateFile?: File | null; folderId?: string | null },
+  ) => Promise<void>
 }
 
 type PageView = "library" | "builder"
