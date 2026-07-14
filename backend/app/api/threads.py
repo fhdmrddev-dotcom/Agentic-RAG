@@ -51,7 +51,7 @@ from app.services.run_lifecycle import register_run_start, finalize_run_terminal
 from app.db.workflows import create_workflow_run, list_published_workflows
 from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
 from app.utils.folder_utils import fetch_visible_folders
-from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset
+from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset, resolve_run_scope_root
 # 099 WFSKILL-01: imported as a MODULE (not bound names) so the kickoff helper calls
 # validate_skill_refs / materialize_skill_snapshots_if_needed through the module
 # object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
@@ -1349,7 +1349,8 @@ async def send_message(
                 else _kickoff_definition_id
             ),
             definition=_kickoff_definition,
-            inputs={"kickoff_prompt": body.content},   # SEED-047
+            # SEED-047 kickoff_prompt + 152 WFIN-02: persist the per-run folder override (D-01, no migration) so resume/Continue read it back (Pitfall 5).
+            inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
             model=_resolved_model,                      # SEED-047
             # Phase 092-05 F1: persist the run-owner so harness_audit writes
             # (NOT NULL user_id) and the resume path resolve a real user.
@@ -1534,19 +1535,17 @@ async def send_message(
                     _wf_folder_subtree_ids: list[str] | None = None
                     _wf_scoped_folder_path: str | None = None
                     try:
-                        if _kickoff_definition.project_folder_id is not None:
-                            _wf_scope_root = str(_kickoff_definition.project_folder_id)
-                        else:
-                            _wf_thread_data = await aexec(
-                                supabase.table("threads")
-                                .select("folder_id")
-                                .eq("id", thread_id)
-                                .single()
-                            )
-                            _wf_scope_root = (
-                                _wf_thread_data.data.get("folder_id")
-                                if _wf_thread_data.data else None
-                            )
+                        _wf_thread_data = await aexec(
+                            supabase.table("threads").select("folder_id").eq("id", thread_id).single()
+                        )
+                        _wf_thread_folder = _wf_thread_data.data.get("folder_id") if _wf_thread_data.data else None
+                        # 152 WFIN-02: owned-override > author > thread precedence + D-05 gate in the helper (G-5).
+                        _wf_scope_root = await resolve_run_scope_root(
+                            _kickoff_definition,
+                            run_inputs={"folder_id": str(body.folder_id)} if body.folder_id else None,
+                            thread_folder_id=_wf_thread_folder,
+                            supabase=supabase, user_id=current_user["id"],
+                        )
                         if _wf_scope_root:
                             _wf_folder_subtree_ids = await resolve_project_subtree(
                                 _wf_scope_root, supabase=supabase, user_id=current_user["id"]
@@ -1628,10 +1627,10 @@ async def send_message(
                         # (:995 above) but the phase executors never read it — the FIRST phase
                         # (research) ran with an empty user turn and asked "send me the topic…".
                         # Mirror EXACTLY what was persisted so live ctx.inputs == the durable
-                        # inputs jsonb the resume builders read back. phase_types._exec_llm_*
-                        # use ctx.inputs["kickoff_prompt"] as the first phase's user turn /
-                        # sub-agent task; programmatic split_topic reads ctx.inputs at :178.
-                        inputs={"kickoff_prompt": body.content},
+                        # inputs jsonb the resume builders read back (152: mirror the folder
+                        # override too). ctx.inputs["kickoff_prompt"] is the first phase's user
+                        # turn / sub-agent task; programmatic split_topic reads ctx.inputs at :178.
+                        inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
                         redis=redis,
                         pool=_wf_pool,
                         emit=_harness_emit,
