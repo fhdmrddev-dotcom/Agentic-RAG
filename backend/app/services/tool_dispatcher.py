@@ -285,20 +285,29 @@ async def _fetch_owned_document_bytes(
     uid = ctx.current_user["id"]
     _cols = "id, filename, file_path, file_size, mime_type"
 
-    res = await aexec(
-        ctx.supabase.table("documents").select(_cols)
-        .eq("id", document_id).eq("user_id", uid).maybe_single()
-    )
-    row = res.data if res else None
-    if not row:
-        # Owner miss → globally-visible-folder fallback (matches read_document scope, D-04).
-        gfids = await get_globally_visible_folder_ids(ctx.supabase, uid)
-        if gfids:
-            res = await aexec(
-                ctx.supabase.table("documents").select(_cols)
-                .eq("id", document_id).in_("folder_id", gfids).maybe_single()
-            )
-            row = res.data if res else None
+    # WR-01 — mirror read_path's honest-failure wrapper (kb.py:395-418). document_id is
+    # model-supplied and routinely a non-UUID / filename / free text; PostgREST rejects the
+    # `id = eq.<garbage>` uuid cast (400) and .maybe_single() re-raises it as an APIError
+    # (only the PGRST116 "0 rows" case is swallowed). Wrap BOTH SELECTs so that failure — or
+    # any transient DB blip — collapses to the calm honest refusal, never a raw PostgREST/DB
+    # error string leaked out into the agent loop.
+    try:
+        res = await aexec(
+            ctx.supabase.table("documents").select(_cols)
+            .eq("id", document_id).eq("user_id", uid).maybe_single()
+        )
+        row = res.data if res else None
+        if not row:
+            # Owner miss → globally-visible-folder fallback (matches read_document scope, D-04).
+            gfids = await get_globally_visible_folder_ids(ctx.supabase, uid)
+            if gfids:
+                res = await aexec(
+                    ctx.supabase.table("documents").select(_cols)
+                    .eq("id", document_id).in_("folder_id", gfids).maybe_single()
+                )
+                row = res.data if res else None
+    except Exception:  # noqa: BLE001 — honest refusal on ANY DB failure, never raise raw DB text
+        return {"error": f"Document '{document_id}' not found or access denied."}
     if not row:
         return {"error": f"Document '{document_id}' not found or access denied."}
 
@@ -542,11 +551,14 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
 
     # ── D-06 / T-04 / SC#4 — resolve the target skill OWNER-ONLY. Empty .data (not owned
     #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter. ──
-    skill_res = await aexec(
-        ctx.supabase.table("skills").select("id, is_system")
-        .eq("name", target_skill_name).eq("user_id", uid).maybe_single()
-    )
-    skill_row = skill_res.data if skill_res else None
+    try:
+        skill_res = await aexec(
+            ctx.supabase.table("skills").select("id, is_system")
+            .eq("name", target_skill_name).eq("user_id", uid).maybe_single()
+        )
+        skill_row = skill_res.data if skill_res else None
+    except Exception:  # noqa: BLE001 — WR-01: honest refusal on a bad-arg/transient DB failure, no raw DB text leak
+        skill_row = None
     if not skill_row or skill_row.get("is_system"):
         return ToolResult(result=json.dumps({"error": (
             f"No skill named '{target_skill_name}' that you own — you can only attach "

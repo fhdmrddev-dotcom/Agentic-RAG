@@ -196,3 +196,46 @@ async def test_resolver_returns_error_dict_when_no_original(make_tool_context):
     assert isinstance(out, dict)
     assert "error" in out
     _download(sb).assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# WR-01 — a bad-UUID / transient DB failure on the SELECT becomes the honest
+# refusal (like read_path), NEVER a raw PostgREST/DB error leaked to the loop
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_resolver_db_error_returns_honest_refusal_no_leak(make_tool_context):
+    resolver = _resolver()
+    sb = MagicMock()
+    raw = 'invalid input syntax for type uuid: "not-a-uuid"'
+    (
+        sb.table.return_value.select.return_value
+        .eq.return_value.eq.return_value.maybe_single.return_value
+        .execute.side_effect
+    ) = Exception(raw)
+    sb.storage.from_.return_value.download.return_value = b"REAL-DOCUMENT-BYTES"
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    out = await resolver(ctx, "not-a-uuid")
+    assert isinstance(out, dict)
+    assert "not found or access denied" in out["error"]
+    assert raw not in out["error"], "raw DB error text must NOT leak into the tool result"
+    _download(sb).assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_handler_db_error_returns_honest_refusal(make_tool_context):
+    """WR-01 — the propagation path: a bare APIError out of the resolver must not
+    surface as 'Tool execution failed: <raw>' — the handler relays the honest dict."""
+    handler = _handler()
+    sb = MagicMock()
+    (
+        sb.table.return_value.select.return_value
+        .eq.return_value.eq.return_value.maybe_single.return_value
+        .execute.side_effect
+    ) = Exception("PGRST connection reset")
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    with patch("app.services.tool_dispatcher.sandbox_manager") as sm:
+        session = sm.get_or_create.return_value
+        result = await handler({"document_id": "not-a-uuid"}, ctx)
+    assert "not found or access denied" in result.result
+    assert "PGRST connection reset" not in result.result
+    session.copy_to_runtime.assert_not_called()

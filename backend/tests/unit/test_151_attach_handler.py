@@ -277,6 +277,28 @@ async def test_refuse_when_skill_not_owned(make_tool_context):
 
 
 @pytest.mark.asyncio
+async def test_skill_select_db_error_refuses_honestly(make_tool_context):
+    """WR-01 — a bad-arg APIError / transient DB blip on the owner-only skills SELECT
+    must become an honest refusal (no upload, no upsert), never a raw DB text leak."""
+    handler = _handler()
+    sb = _sb(_OWNED, existing_file_row=None)
+    skills_tbl = sb.table("skills")
+    (
+        skills_tbl.select.return_value.eq.return_value.eq.return_value
+        .maybe_single.return_value.execute.side_effect
+    ) = Exception("PG connection reset")
+    ctx = make_tool_context(supabase=sb, current_user={"id": "owner-1"})
+    result = await handler({
+        "target_skill_name": "My Skill", "filename": "x.py",
+        "source": "inline", "content": "print(1)",
+    }, ctx)
+    assert "error" in json.loads(result.result)
+    assert "PG connection reset" not in result.result
+    _upload(sb).assert_not_called()
+    _files_tbl(sb).upsert.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_refuse_when_skill_is_system(make_tool_context):
     handler = _handler()
     sb = _sb({"id": "builtin-1", "is_system": True}, existing_file_row=None)
