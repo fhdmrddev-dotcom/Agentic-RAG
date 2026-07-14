@@ -16,6 +16,12 @@ class MessageCreate(BaseModel):
     # calls create_workflow_run (which sets threads.active_workflow_run_id), and
     # the producer branches to the harness engine. None = ordinary Deep send.
     workflow_definition_id: UUID | None = None
+    # Phase 152 D-01 (WFIN-02): an optional per-run KB folder-scope OVERRIDE for a
+    # workflow kickoff. Travels in create_workflow_run.inputs jsonb (no migration),
+    # is owner-reachability-gated server-side (D-05), and layers on top of the
+    # definition's project_folder_id author default (D-03). None = today's behavior
+    # (whole-KB / author default — D-06). A malformed UUID → FastAPI 422 for free (V5).
+    folder_id: UUID | None = None
 
 
 class MessageResponse(BaseModel):

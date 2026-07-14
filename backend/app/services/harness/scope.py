@@ -89,6 +89,76 @@ async def resolve_project_subtree(
     return _walk(root)  # list[str] — Pitfall 1: NEVER a set
 
 
+def _definition_has_phase_folder_scope(definition: "WorkflowDefinition") -> bool:
+    """True when ANY phase of the definition declares a per-phase ``folder_scope``.
+
+    Used by the A4 composition guard: a scoped workflow intersects each phase's
+    ``folder_scope`` with the resolved project subtree (``phase_types.py:326``), so a
+    per-run override OUTSIDE that subtree would silently empty the intersection.
+    """
+    for phase in getattr(definition, "phases", None) or []:
+        if getattr(getattr(phase, "config", None), "folder_scope", None):
+            return True
+    return False
+
+
+async def resolve_run_scope_root(
+    definition: "WorkflowDefinition",
+    *,
+    run_inputs: "dict | None",
+    thread_folder_id: "str | None",
+    supabase: "Client",
+    user_id: str,
+) -> str | None:
+    """Resolve the run-start retrieval scope ROOT, layering the per-run override (WFIN-02).
+
+    Precedence (highest → lowest):
+      1. an owner-gated per-run OVERRIDE — ``run_inputs["folder_id"]`` (D-05 gated)
+      2. the definition's author-time default — ``project_folder_id`` (D-03)
+      3. the thread-folder fallback — ``thread_folder_id`` (legacy / unbound)
+
+    Returns the scope ROOT as ``str | None`` (NEVER a set — Pitfall 6). Callers pass the
+    result to ``resolve_project_subtree(root, ...)``, so this keeps the run-start sites
+    (threads.py / harness_engine.py / runs.py) minimal — the precedence lives HERE, not
+    in inline branches (G-5). ``None`` out = whole-KB (unchanged behavior — D-06).
+
+    D-05 owner gate: a client-supplied override ``folder_id`` is UNTRUSTED. It is honored
+    ONLY when it is owner-reachable (``str(override) in fetch_visible_folders(owner)``);
+    a never-owned / unreachable id DROPS the override (no narrowing / refuse) and the
+    precedence falls through to the author default — a run can NEVER scope into a folder
+    the owner cannot see. ``fetch_visible_folders`` is consulted only when an override is
+    present (absence is the free D-06 path — no owner-fetch cost).
+
+    A4 composition guard: when the definition declares ANY per-phase ``folder_scope``, an
+    override root MUST be within the project subtree (else the intersection at
+    ``phase_types.py`` silently empties → no retrieval). An out-of-subtree override in
+    that case is DROPPED, falling back to the author default.
+
+    Owner-scoped via ``user_id`` (same threat posture as ``resolve_project_subtree`` —
+    the run-start sites pass the durable run owner on the service-role path).
+    """
+    author_default = getattr(definition, "project_folder_id", None)
+    author_root = str(author_default) if author_default is not None else None
+
+    override = (run_inputs or {}).get("folder_id")
+    if override is not None:
+        override = str(override)
+        # D-05 owner-reachability gate — NEVER trust a client folder_id blindly.
+        visible = {f["id"] for f in await fetch_visible_folders(supabase, user_id)}
+        if override not in visible:
+            override = None  # never-owned / unreachable → drop (no narrowing / refuse)
+        elif _definition_has_phase_folder_scope(definition):
+            # A4: a scoped workflow's override must be ⊆ the project subtree, else the
+            # per-phase intersection empties → phases retrieve nothing. Drop it if outside.
+            subtree = await resolve_project_subtree(
+                author_default, supabase=supabase, user_id=user_id
+            )
+            if subtree is not None and override not in set(subtree):
+                override = None
+
+    return override or author_root or thread_folder_id
+
+
 async def assert_folder_scopes_subset(
     definition: "WorkflowDefinition",
     *,
