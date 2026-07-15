@@ -91,8 +91,11 @@ const PHASE_TYPE_FRIENDLY: Record<string, string> = {
 function InfoHint({ text }: { text: string }) {
   return (
     <span
+      // Phase 155 (A11Y-01): role="button" (not "img") so the focusable ⓘ hint is a
+      // valid tabIndex host (jsx-a11y/no-noninteractive-tabindex) — the guidance is
+      // revealed on hover/focus via the native title + the aria-label names it.
       tabIndex={0}
-      role="img"
+      role="button"
       aria-label={text}
       title={text}
       className="ml-1 inline-grid h-3.5 w-3.5 cursor-help place-items-center rounded-full border border-border text-[8px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"

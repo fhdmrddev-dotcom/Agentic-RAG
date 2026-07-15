@@ -282,7 +282,7 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // Mobile (<768px): bottom-sheet (reuse the WorkspacePanel:233 shape).
   if (isMobile) {
     return (
-      <aside role="complementary" aria-label="Document details">
+      <aside aria-label="Document details">
         <Sheet open onOpenChange={(o) => { if (!o) onClose() }}>
           <SheetContent side="bottom" className="max-h-[80vh] p-0" hideCloseButton>
             {body}
@@ -295,7 +295,6 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
   // Desktop: fills the push/split grid column IngestionPage sizes (430px).
   return (
     <aside
-      role="complementary"
       aria-label="Document details"
       className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[hsl(var(--panel-border))] bg-[hsl(var(--panel-surface))]"
     >

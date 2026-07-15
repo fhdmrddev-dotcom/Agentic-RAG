@@ -561,8 +561,11 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     <div className="flex h-full flex-col overflow-hidden">
       <OperatorBand identity={identity} onBack={onBack} recordingPulse={recordingPulse} />
 
-      {/* Horizontal section tabs (061-B — NOT a second left rail). */}
-      <nav
+      {/* Horizontal section tabs (061-B — NOT a second left rail). Phase 155
+          (A11Y-01): a <div> host, not <nav> — the interactive "tablist" role must
+          not override a <nav> landmark's implicit "navigation" role
+          (jsx-a11y/no-noninteractive-element-to-interactive-role). */}
+      <div
         role="tablist"
         aria-label="Control Plane sections"
         className="flex flex-wrap items-center gap-1 border-b border-border/60 px-6 py-2"
@@ -596,7 +599,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             </button>
           )
         })}
-      </nav>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === "control-plane" ? (

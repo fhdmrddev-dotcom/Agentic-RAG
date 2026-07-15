@@ -158,6 +158,12 @@ export function FilterBar({
   const [naming, setNaming] = useState(false)
   const [viewName, setViewName] = useState("")
   const [saving, setSaving] = useState(false)
+  // Phase 155 (A11Y-01): focus the name field via ref when the naming input opens,
+  // instead of the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same UX.
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (naming) nameInputRef.current?.focus()
+  }, [naming])
 
   // Phase 114 (D-114-3): in EDIT mode the save-name pre-fills from the view being
   // edited, so a Save updates the SAME row under its existing name (the user can
@@ -278,8 +284,8 @@ export function FilterBar({
             (naming ? (
               <span className="inline-flex items-center gap-1.5">
                 <input
+                  ref={nameInputRef}
                   aria-label="View name"
-                  autoFocus
                   value={viewName}
                   onChange={(e) => setViewName(e.target.value)}
                   onKeyDown={(e) => {

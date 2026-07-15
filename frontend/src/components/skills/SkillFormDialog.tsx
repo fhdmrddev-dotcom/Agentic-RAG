@@ -77,6 +77,9 @@ function SkillForm({
   // Sketch 046-C: the "Expand" full-size editor for long instructions. Lives in
   // the SHARED form so both the inline SkillDetailPanel and the modal get it.
   const [editorExpanded, setEditorExpanded] = useState(false)
+  // Phase 155 (A11Y-01): focus the expanded editor via the dialog's open-autofocus
+  // hook + a ref, instead of the declarative `autoFocus` prop (jsx-a11y/no-autofocus).
+  const expandRef = useRef<HTMLTextAreaElement>(null)
 
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -88,8 +91,8 @@ function SkillForm({
     <div className="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0">
       {/* Name */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-foreground">Name</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. SQL Writer" />
+        <label htmlFor="skill-form-name" className="text-sm font-medium text-foreground">Name</label>
+        <Input id="skill-form-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. SQL Writer" />
       </div>
 
       {/* Description */}
@@ -150,7 +153,7 @@ function SkillForm({
           closing it just returns to the form with edits already applied. */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground">Instructions</label>
+          <label htmlFor="skill-form-instructions" className="text-sm font-medium text-foreground">Instructions</label>
           <Button
             type="button"
             variant="ghost"
@@ -163,6 +166,7 @@ function SkillForm({
           </Button>
         </div>
         <Textarea
+          id="skill-form-instructions"
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
@@ -175,7 +179,10 @@ function SkillForm({
       {isEdit && skill && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">Attached Files</label>
+            {/* Phase 155 (A11Y-01): a section heading, not a single-control label —
+                a <span> avoids jsx-a11y/label-has-associated-control (no lone control
+                to bind; the group holds a file list + the Attach File button). */}
+            <span className="text-sm font-medium text-foreground">Attached Files</span>
             {isOwner && (
               <Button
                 variant="ghost"
@@ -229,16 +236,23 @@ function SkillForm({
       {/* Focused full-size instructions editor (sketch 046-C escape hatch). Edits
           the same `instructions` string; "Done" just closes — Save is unchanged. */}
       <Dialog open={editorExpanded} onOpenChange={setEditorExpanded}>
-        <DialogContent className="flex h-[85vh] w-[92vw] max-w-4xl flex-col gap-3">
+        <DialogContent
+          className="flex h-[85vh] w-[92vw] max-w-4xl flex-col gap-3"
+          onOpenAutoFocus={(e) => {
+            // Focus the editor on open via ref (replaces the textarea's autoFocus).
+            e.preventDefault()
+            expandRef.current?.focus()
+          }}
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle>Instructions{name ? ` — ${name}` : ""}</DialogTitle>
           </DialogHeader>
           <Textarea
+            ref={expandRef}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
             className="min-h-0 flex-1 resize-none font-mono text-sm"
-            autoFocus
           />
           <DialogFooter className="shrink-0">
             <Button type="button" onClick={() => setEditorExpanded(false)}>

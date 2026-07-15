@@ -318,7 +318,7 @@ export function WorkspacePanel({
   //    Otherwise byte-equivalent to Plan 06's sheet branch. ──
   if (isMobile) {
     return (
-      <aside role="complementary" aria-label="Agent workspace">
+      <aside aria-label="Agent workspace">
         <Sheet open={state === "open"} onOpenChange={(o) => (o ? onExpand() : onToggle())}>
           <SheetContent side="bottom" className="max-h-[70vh]" hideCloseButton>
             <div className="flex items-center gap-2 px-4 pb-2 pt-1">
@@ -347,7 +347,6 @@ export function WorkspacePanel({
   //    (no "hidden" opacity branch). ──
   return (
     <aside
-      role="complementary"
       aria-label="Agent workspace"
       className={cn(
         // Phase 087 (gaps 5/6): dedicated panel surface + strengthened left edge

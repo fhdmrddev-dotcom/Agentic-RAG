@@ -151,7 +151,9 @@ export function CaseEditor({ skillId, onCasesChanged }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-foreground">Test cases</label>
+        {/* Phase 155 (A11Y-01): section heading, not a single-control label -> <span>
+            (jsx-a11y/label-has-associated-control). */}
+        <span className="text-sm font-medium text-foreground">Test cases</span>
         <Button
           type="button"
           variant="ghost"

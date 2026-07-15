@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +27,12 @@ export function MemorySection() {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
+  // Phase 155 (A11Y-01): focus the edit field via ref when a row opens for editing,
+  // instead of the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same UX.
+  const editInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (editingKey) editInputRef.current?.focus()
+  }, [editingKey])
   const [deleteTarget, setDeleteTarget] = useState<MemoryEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -156,11 +162,12 @@ export function MemorySection() {
                     {editingKey === entry.key ? (
                       <div className="flex items-center gap-2">
                         <input
+                          ref={editInputRef}
                           type="text"
+                          aria-label={`Edit value for ${entry.key}`}
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           className="flex-1 text-sm bg-transparent border-b border-primary/40 focus:outline-none px-1 py-0.5"
-                          autoFocus
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && editValue.trim()) saveEdit()
                             if (e.key === "Escape") cancelEdit()

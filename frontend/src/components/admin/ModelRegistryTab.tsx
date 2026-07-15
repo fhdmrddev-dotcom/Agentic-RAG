@@ -416,8 +416,14 @@ function NumericCell({
   // One-shot guard so an Enter-commit isn't re-fired by the blur that follows it (and an
   // Escape-cancel isn't turned into a commit by its own blur). Reset each time editing opens.
   const settled = useRef(false)
+  // Phase 155 (A11Y-01): focus the editor via ref when the cell opens, instead of
+  // the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same behavior.
+  const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (editing) settled.current = false
+    if (editing) {
+      settled.current = false
+      inputRef.current?.focus()
+    }
   }, [editing])
 
   if (editing) {
@@ -432,9 +438,9 @@ function NumericCell({
     }
     return (
       <input
+        ref={inputRef}
         type="number"
         aria-label={`${field.label} for ${modelId}`}
-        autoFocus
         defaultValue={value === null ? "" : String(value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
