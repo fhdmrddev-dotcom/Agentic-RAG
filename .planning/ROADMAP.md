@@ -70,7 +70,7 @@
 - [x] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01) ✓ 2026-07-14
 - [x] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03) — completed 2026-07-15 (SC#10 UAT 8/9; OpenRouter axis blocked by BUG-260714-02, operator-accepted)
 - [x] **Phase 153: Inline Citations** — per-claim markers keyed to the run's real retrieval set + click-through + absence-as-signal (CITE-01) — completed 2026-07-15 (SC#10 Anthropic proof operator-accepted; secure-phase 27/27 CLOSED)
-- [ ] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01)
+- [x] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01) — completed 2026-07-15 (live UAT 154-HUMAN-UAT U1–U5 ✅; secure-phase 4/4 CLOSED)
 - [ ] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01)
 - [ ] **Phase 156 (STRETCH): Everyday UX Polish** — collapsed-nav New Chat + thread-list search + date/folder grouping (POLISH-01)
 - [ ] **Phase 157 (STRETCH): Deployment Presets & Runbook** — Solo/Team/Enterprise env + `docker-compose.prod.yml` + `OPERATOR.md` (DEPLOY-01)
@@ -422,7 +422,7 @@ Plans:
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
-| 154. Plain-Language Layer | 3/3 | Verified (human_needed) — operator UAT + secure-phase pending | - |
+| 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |

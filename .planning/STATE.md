@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: verifying
-last_updated: "2026-07-15T16:01:26.504Z"
+status: ready_to_plan
+last_updated: 2026-07-15T17:49:44.109Z
 last_activity: 2026-07-15
 progress:
   total_phases: 26
@@ -11,6 +11,7 @@ progress:
   total_plans: 61
   completed_plans: 61
   percent: 35
+stopped_at: Phase 154 complete (3/3) — ready to discuss Phase 155
 ---
 
 # Project State
@@ -22,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 154 — Plain-Language Layer
+**Current focus:** Phase 155 — accessibility sweep — wcag aa
 
 ## Current Position
 
-Phase: 154 (Plain-Language Layer) — EXECUTED + VERIFIED (human_needed)
-Plan: 3 of 3
-Status: Executed + verified (human_needed) + **live UAT PASSED (Claude-driven, operator-requested — U1..U5 all live-confirmed incl. persistence + one-switch both directions)** + F-01 fixed. NEXT: operator copy-wording sign-off (only subjective item left — 154-HUMAN-UAT.md) → `/gsd:secure-phase 154` (frontend display-only; code-review threats_open:0) → close LANG-01. App left in plain default (toggle OFF).
-Last activity: 2026-07-15 -- Phase 154 EXECUTED autonomously (discuss→plan→execute, operator-unattended).
+Phase: 155
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-15
 
 **154 PHASE COMPLETE (autonomous, 2026-07-15) — LANG-01 executed + verified:** discuss (154-CONTEXT D-01..D-05) → research (term inventory + provider shape) → pattern-map → plan (3 plans/2 waves, plan-checker PASSED after 1 revision) → execute (spine 154-01 + document surfaces 154-02 + Settings toggle/composer 154-03) → verify. **gsd-verifier: 8/8 must-haves code-verified, status human_needed** (SC#1 copy + SC#3 full cross-surface walk = operator-judgment per 148-153 convention). **gsd-code-reviewer: 0 Critical / 1 Warning (WR-01) / 2 Info, threats_open:0** — WR-01/F-01 (settings.embedding.technical "embedding"→"Embedding model" verbatim-shipped-string) FIXED same-session (`8ba20bc2`). Both agents independently converged on F-01. **Live Chrome UAT: SC#1 plain-default ("Search"/"General") + SC#3 reveal-flip ("Search"→"Search & Retrieval" on toggle ON) proven LIVE**; persistence unit-covered; full cross-surface walk + copy taste → operator (154-HUMAN-UAT.md). Gates: 14 files/115 tests green, tsc exactly 30 SEED-056/049 baseline (0 net-new), vite build 0. SC#2 contract-safety: ZERO backend/migration files, G-5 (MessageItem/StreamsProvider) untouched. **Spine shipped:** `TechnicalNamesProvider` (shared context, NOT bare hook) + single-source `termMap.ts` + `PlainLabel` + App-wide mount + D-01a ControlRoomPage consolidation (Settings toggle ↔ admin toggle = one switch). Frontend-only — NO backend/migration/cloud-parity. **Operator note:** the "Show technical names" toggle was left ON during UAT (harmless personal pref; revert at Settings › AI Model). Commits `9b68e049`..`0a8b6b34`. NEXT: operator UAT → secure-phase 154 → Phase 155 (A11Y-01, sequenced LAST — audits all net-new v3.3 surfaces incl. the new toggle + unlabeled nav icons).
 
