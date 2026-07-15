@@ -13,9 +13,9 @@ Requirements for this milestone. Each maps to roadmap phases. CORE vs gated-STRE
 
 - [x] **FILE-01**: Agent can attach files it creates (scripts, assets) to a skill during authoring via a new `attach_skill_file` tool, and a user can hand the agent an existing template file mid-conversation for the agent to attach — owner-scoped, reusing the existing `skill_files` table + bucket, with its own threat model (carried from v3.2 Phase 144, never executed)
 - [x] **FILE-02**: Agent can materialize a KB document's ORIGINAL bytes into the sandbox working directory via a new `fetch_document_file` tool (owner/RLS-scoped, size-capped, streamed to disk) so it can faithfully convert/render/operate on the real file instead of refusing or reconstructing from text
-- [ ] **WFIN-01**: User can upload a file (e.g. a docx template to fill) as a workflow run input from the Run modal — stored with the untrusted-upload provenance stamp (`kind='template_input'`, never routed to the Jinja engine), size/MIME allowlisted, wired through `create_workflow_run.inputs` into the existing whitelist-gated fill path
-- [ ] **WFIN-02**: User can point a workflow's retrieval at a chosen KB folder — author-time default plus per-run override on the Run modal (the read-only bound-folder chip becomes selectable) — reusing the Phase 098 server-side scope resolver so the model cannot widen scope; identical behavior across providers
-- [ ] **WFIN-03**: User can delete a workflow with a safe cascade (definitions, versions, runs disposition made explicit — archive vs hard-delete decided at phase discuss), with confirmation and no orphaned runs/threads (SEED-111 gap add)
+- [x] **WFIN-01**: User can upload a file (e.g. a docx template to fill) as a workflow run input from the Run modal — stored with the untrusted-upload provenance stamp (`kind='template_input'`, never routed to the Jinja engine), size/MIME allowlisted, wired through `create_workflow_run.inputs` into the existing whitelist-gated fill path
+- [x] **WFIN-02**: User can point a workflow's retrieval at a chosen KB folder — author-time default plus per-run override on the Run modal (the read-only bound-folder chip becomes selectable) — reusing the Phase 098 server-side scope resolver so the model cannot widen scope; identical behavior across providers
+- [x] **WFIN-03**: User can delete a workflow with a safe cascade (definitions, versions, runs disposition made explicit — archive vs hard-delete decided at phase discuss), with confirmation and no orphaned runs/threads (SEED-111 gap add)
 
 ### Admin Shell (Track 2)
 
@@ -91,9 +91,9 @@ Which phases cover which requirements. Filled by roadmap creation (2026-07-10). 
 | SEC-01 | Phase 150 (CORE) | Model & Settings | Pending |
 | FILE-02 | Phase 151 (CORE) | Workflow & File Inputs | Complete |
 | FILE-01 | Phase 151 (CORE) | Workflow & File Inputs | Complete |
-| WFIN-01 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
-| WFIN-02 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
-| WFIN-03 | Phase 152 (CORE) | Workflow & File Inputs | Pending |
+| WFIN-01 | Phase 152 (CORE) | Workflow & File Inputs | Complete |
+| WFIN-02 | Phase 152 (CORE) | Workflow & File Inputs | Complete (OpenRouter cross-provider axis blocked by BUG-260714-02, operator-accepted) |
+| WFIN-03 | Phase 152 (CORE) | Workflow & File Inputs | Complete |
 | CITE-01 | Phase 153 (CORE) | Trust & Friendliness UX | Pending |
 | LANG-01 | Phase 154 (CORE) | Trust & Friendliness UX | Pending |
 | A11Y-01 | Phase 155 (CORE) | Trust & Friendliness UX | Pending |

@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-15T01:10:00.000Z"
+status: ready_to_plan
+last_updated: 2026-07-15T01:17:41.784Z
 last_activity: 2026-07-15 -- Phase 152 gap plan 08 executed (D-04 widen fix)
 progress:
   total_phases: 26
@@ -11,6 +11,7 @@ progress:
   total_plans: 53
   completed_plans: 53
   percent: 23
+stopped_at: Phase 152 complete (8/8) — ready to discuss Phase 153
 ---
 
 # Project State
@@ -22,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 152 — workflow-run-inputs
+**Current focus:** Phase 153 — inline citations
 
 ## Current Position
 
-Phase: 152 (workflow-run-inputs) — GAP #1 CLOSED; SC#10 CROSS-PROVIDER UAT PENDING
-Plan: 8 of 8 (gap plan 08 executed + re-verified)
-Status: Gap-closure re-verification PASSED (`152-VERIFICATION.md` gaps_found → human_needed). The D-04 widen BLOCKER is CLOSED and confirmed live 3 ways (committed regression tests + live-DB resolver probe root=P/subtree=[P,A1]/no P2 leak + live Run-modal UI offered only {default,A1} via Claude-driven Chrome; seed cleaned up). REMAINING before phase COMPLETE: the whole-phase SC#10 4-axis cross-provider live UAT (OpenAI/Anthropic/Google/OpenRouter) + destructive delete-cascade + template-provenance rows (152-VALIDATION.md). WFIN-01/02/03 stay OPEN at requirement level until then. Cloud parity still pending: migs 099+100+101 + SECRETS_ENCRYPTION_KEY(150).
-Last activity: 2026-07-15 -- Phase 152 gap #1 (D-04 widen) re-verified CLOSED (code+live); SC#10 cross-provider UAT pending
+Phase: 153
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-15
 
 **152-08 execution notes (2026-07-15) — GAP CLOSURE: restore author-project-subtree containment (D-04 widen regression 152-06 introduced), scope.py + WorkflowsPage.tsx + tests, NO migration:**
 

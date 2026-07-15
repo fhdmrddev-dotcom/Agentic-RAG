@@ -68,7 +68,7 @@
 - [x] **Phase 149: Model Registry & Discovery** — write UI over `model_capabilities_overrides` + `model_discovery_service` propose-only (MODEL-01, MODEL-02) — completed 2026-07-13
 - [x] **Phase 150: Secrets at Rest** — app-layer `cryptography` envelope encryption of `app_settings` key columns + env-fallback + round-trip-verified saves (SEC-01) — completed 2026-07-13
 - [x] **Phase 151: Agent File Tools** — `fetch_document_file` (KB→sandbox, read) → `attach_skill_file` (agent→skill, write) (FILE-02, FILE-01) ✓ 2026-07-14
-- [ ] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03)
+- [x] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03) — completed 2026-07-15 (SC#10 UAT 8/9; OpenRouter axis blocked by BUG-260714-02, operator-accepted)
 - [ ] **Phase 153: Inline Citations** — per-claim markers keyed to the run's real retrieval set + click-through + absence-as-signal (CITE-01)
 - [ ] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01)
 - [ ] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01)
@@ -401,7 +401,7 @@ Plans:
 | 149. Model Registry & Discovery | 12/12 | Complete | 2026-07-13 |
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
-| 152. Workflow Run Inputs | 8/8 | Ready for verification (gap plan 08 D-04 widen fix executed) | - |
+| 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 0/? | Not started | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
