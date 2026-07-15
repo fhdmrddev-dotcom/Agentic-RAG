@@ -43,16 +43,16 @@ created: 2026-07-15
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD (backend strip) | TBD | TBD | CITE-01 | integrity (D-02) | Non-member `[n]` stripped before persist | unit | `pytest tests/unit/test_153_citation_markers.py::test_strips_non_members -x` | ❌ W0 | ⬜ pending |
-| TBD (backend renumber) | TBD | TBD | CITE-01 | integrity (D-03) | Survivors renumber 1..k to footer order | unit | `pytest tests/unit/test_153_citation_markers.py::test_renumbers_to_footer -x` | ❌ W0 | ⬜ pending |
-| TBD (code-span skip) | TBD | TBD | CITE-01 | Pitfall 2 | `[n]` in code span/block NOT a marker | unit | `pytest tests/unit/test_153_citation_markers.py::test_skips_code_spans -x` | ❌ W0 | ⬜ pending |
-| TBD (no-inject off-retrieval) | TBD | TBD | CITE-01 | D-12/D-14 | Non-retrieval turn → prompt byte-identical | unit | `pytest tests/unit/test_153_citation_instruction.py::test_no_inject_without_retrieval -x` | ❌ W0 | ⬜ pending |
-| TBD (dual-channel inject) | TBD | TBD | CITE-01 | SC#10 | Injection reaches BOTH `active_system_prompt` and `messages[0]` | unit | `pytest tests/unit/test_153_citation_instruction.py::test_dual_channel_inject -x` | ❌ W0 | ⬜ pending |
-| TBD (CitedMarkdown render) | TBD | TBD | CITE-01 | XSS (V5) | `[n]` → interactive `<sup>` keyed to `citations[n-1]`; range-checked | unit | `npx vitest run …/CitedMarkdown.test.tsx` | ❌ W0 | ⬜ pending |
-| TBD (footer numbering) | TBD | TBD | CITE-01 | — | Footer numbered, open-by-default w/ markers; marker↔row flash | unit | `npx vitest run …/CitationList.test.tsx` | ❌ W0 | ⬜ pending |
-| TBD (full-doc peek) | TBD | TBD | CITE-01 | D-10 | "Full document" + Open, no snippet/score | unit | `npx vitest run …/CitationPeek.test.tsx` | ❌ W0 | ⬜ pending |
-| TBD (G-5 non-regression msg) | TBD | TBD | CITE-01 | G-5 | Non-cited assistant + user messages byte-identical | unit | `npx vitest run …/MessageItem.test.tsx` | ✅ extend | ⬜ pending |
-| TBD (G-5 non-regression stream) | TBD | TBD | CITE-01 | G-5 | Streaming-narration / `dedupParagraphs` unchanged | unit | `npx vitest run …/StreamsProvider*.test.tsx` | ✅ extend | ⬜ pending |
+| 153-01 T1 (backend strip) | 153-01 | 1 | CITE-01 | integrity (D-02) | Non-member `[n]` stripped before persist | unit | `pytest tests/unit/test_153_citation_markers.py::test_strips_non_members -x` | ❌ W0 | ⬜ pending |
+| 153-01 T1 (backend renumber) | 153-01 | 1 | CITE-01 | integrity (D-03) | Survivors renumber 1..k to footer order | unit | `pytest tests/unit/test_153_citation_markers.py::test_renumbers_to_footer -x` | ❌ W0 | ⬜ pending |
+| 153-01 T1 (code-span skip) | 153-01 | 1 | CITE-01 | Pitfall 2 | `[n]` in code span/block NOT a marker | unit | `pytest tests/unit/test_153_citation_markers.py::test_skips_code_spans -x` | ❌ W0 | ⬜ pending |
+| 153-01 T3 (no-inject off-retrieval) | 153-01 | 1 | CITE-01 | D-12/D-14 | Non-retrieval turn → prompt byte-identical | unit | `pytest tests/unit/test_153_citation_instruction.py::test_no_inject_without_retrieval -x` | ❌ W0 | ⬜ pending |
+| 153-01 T3 (dual-channel inject) | 153-01 | 1 | CITE-01 | SC#10 | Injection reaches BOTH `active_system_prompt` and `messages[0]` | unit | `pytest tests/unit/test_153_citation_instruction.py::test_dual_channel_inject -x` | ❌ W0 | ⬜ pending |
+| 153-05 T1 (CitedMarkdown render) | 153-05 | 3 | CITE-01 | XSS (V5) | `[n]` → interactive `<sup>` keyed to `citations[n-1]`; range-checked | unit | `npx vitest run …/CitedMarkdown.test.tsx` | ❌ W0 | ⬜ pending |
+| 153-03 T2 (footer numbering) | 153-03 | 2 | CITE-01 | — | Footer numbered, open-by-default w/ markers; marker↔row flash | unit | `npx vitest run …/CitationList.test.tsx` | ❌ W0 | ⬜ pending |
+| 153-04 T1 (full-doc peek) | 153-04 | 2 | CITE-01 | D-10 | "Full document" + Open, no snippet/score | unit | `npx vitest run …/CitationPeek.test.tsx` | ❌ W0 | ⬜ pending |
+| 153-05 T2 (G-5 non-regression msg) | 153-05 | 3 | CITE-01 | G-5 | Non-cited assistant + user messages byte-identical | unit | `npx vitest run …/MessageItem.test.tsx` | ✅ extend | ⬜ pending |
+| 153-05 T2 (G-5 non-regression stream) | 153-05 | 3 | CITE-01 | G-5 | Streaming-narration / `dedupParagraphs` unchanged | unit | `npx vitest run …/StreamsProvider*.test.tsx` | ✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

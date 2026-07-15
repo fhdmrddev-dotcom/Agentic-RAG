@@ -316,8 +316,24 @@ Plans:
   3. Claims without a marker read as general knowledge (absence-as-signal) — no fabricated attributions (Pitfall 14).
   4. Inline markers render consistently across all providers (SC#10) and Deep Mode stays byte-identical where unchanged.
 
-**Plans**: TBD
-**Note**: G-2 sketch-first is mandatory (live UI, "feels like"); the set-membership attribution design must be nailed down before coding.
+**Plans**: 5 plans (3 waves)
+
+Plans:
+**Wave 1** *(parallel — zero file overlap)*
+
+- [ ] 153-01-PLAN.md — Backend citation integrity + retrieval-gated dual-channel injection (normalize_citation_markers strip/renumber at settle + apply_citation_instruction; citation_markers.py + agent_loop.py seams; Wave-0 backend tests) [CITE-01]
+- [ ] 153-02-PLAN.md — Citation interaction foundation: nav context (useCitationNav.openDocument, owner-scoped) + App/IngestionPage wiring + marker↔row flash contract + additive citation CSS [CITE-01]
+
+**Wave 2** *(blocked on 153-02)*
+
+- [ ] 153-03-PLAN.md — References footer restructure: CitationList numbered + open-by-default-when-markers + CitationCard [n]/Open document/full-doc row/flash target [CITE-01]
+- [ ] 153-04-PLAN.md — CitationPeek hover-peek → click-to-pin popover (chunk + full-doc variants, calm degrade, a11y pin/Esc) [CITE-01]
+
+**Wave 3** *(blocked on 153-03 + 153-04)*
+
+- [ ] 153-05-PLAN.md — CitedMarkdown post-mount marker upgrade (owned <sup>, range-check, code-span skip) + MessageItem G-5 additive cited branch + StreamsProvider non-regression verify [CITE-01]
+
+**Note**: G-2 sketch-first is mandatory (live UI, "feels like") — sketches 074-A + 075-A done + operator-approved; UI-SPEC APPROVED. The set-membership attribution is the honesty core (D-01/D-02/D-03 in 153-01). SC#10 4-axis live UAT held in `153-VALIDATION.md` (not plan tasks); operator restarts uvicorn after 153-01 before live checks.
 **UI hint**: yes
 
 ### Phase 154: Plain-Language Layer
@@ -402,7 +418,7 @@ Plans:
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
-| 153. Inline Citations | 0/? | Not started | - |
+| 153. Inline Citations | 0/5 | Ready to execute | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
