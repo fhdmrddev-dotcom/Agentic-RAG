@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 153 (inline-citations) — ALL PLANS EXECUTED, ready for verification
+Phase: 153 (inline-citations) — EXECUTED + VERIFIED (human_needed) + live UAT PARTIAL; awaiting operator SC#10 cross-provider sign-off
 Plan: 5 of 5 complete (153-01, 153-02, 153-03, 153-04, 153-05)
-Status: Phase complete — ready for `/gsd:verify-work 153` (run 153-VALIDATION SC#10 4-axis UAT first; operator restarts uvicorn)
-Last activity: 2026-07-15 -- 153-05 executed (CitedMarkdown marker upgrade + MessageItem G-5 cited branch + AbsenceHint ⓘ, Wave 3 — final plan)
+Status: Verification human_needed. Code review 0 BLOCKER/0 HIGH (1 MED+4 LOW+4 INFO, non-blocking, 153-REVIEW.md). Live UAT (Claude-driven, 153-HUMAN-UAT.md): core feature PROVEN live on Anthropic claude-sonnet-5 — inline markers render + click-through (peek passage + Open-document→doc panel, owner-scoped) + AbsenceHint verbatim ⓘ + numbered footer; DB set-membership 0 out-of-range (markers [1..9]=9 source_refs). SC#10 cross-provider breadth (OpenAI/Google/OpenRouter) + full-doc peek + parallel-thread/long-message/no-retrieval axes PENDING live (all unit-covered) — Chrome MCP degraded mid-session. CITE-01 stays Pending until operator ratifies cross-provider (152 precedent). NEXT: operator confirm remaining providers, or accept (like 152) → `/gsd:verify-work 153` to close.
+Last activity: 2026-07-15 -- 153 executed (5 plans/11 tasks), verified human_needed, live UAT partial (Anthropic proven + DB set-membership)
 
 **153-05 execution notes (2026-07-15) — CITE-01 inline-marker assembly (Wave 3, final): CitedMarkdown owned-<sup> marker upgrade + MessageItem G-5 additive cited branch + AbsenceHint absence-as-signal ⓘ, frontend-only, NO backend, NO migration, NO new package:**
 
