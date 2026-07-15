@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T07:15:26.718Z"
+last_updated: "2026-07-15T07:30:14.456Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 26
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 153 (inline-citations) — EXECUTING
-Plan: 2 of 5 (153-01 complete)
-Status: Executing Phase 153
-Last activity: 2026-07-15 -- 153-01 executed (backend citation honesty core)
+Plan: 3 of 5 (153-01, 153-02 complete)
+Status: Ready to execute (153-03 next — References footer restructure, Wave 2)
+Last activity: 2026-07-15 -- 153-02 executed (frontend citation interaction foundation)
+
+**153-02 execution notes (2026-07-15) — CITE-01 shared citation-interaction foundation (interface-first): nav context + marker↔row flash contract + additive CSS + App/IngestionPage owner-scoped wiring, frontend-only, NO backend, NO migration, NO new package:**
+
+- 2 tasks (Task 1 TDD RED→GREEN), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: Task 1 RED `09c401ed` (test) → GREEN `44e59f9e` (feat nav+flash+CSS); Task 2 `3436d569` (feat App/IngestionPage wiring); SUMMARY commit follows. Touched EXACTLY the 5 declared files (`frontend/src/lib/citationNav.tsx`, `frontend/src/index.css`, `frontend/src/App.tsx`, `frontend/src/pages/IngestionPage.tsx`, `frontend/src/lib/__tests__/citationNav.test.tsx`); **NO backend, NO migration, NO new package** (React context + CSS over already-vendored deps — Package Legitimacy Gate not triggered).
+- **NEW `frontend/src/lib/citationNav.tsx` (interface-first contract the Wave-2/3 plans consume):** `CitationNavProvider` + `useCitationNav()` (throws outside a provider) exposing `openDocument(documentId)` — records a ONE-SHOT pending-document intent AND fires the injected `navigate("documents")`; `useCitationNavOptional()` (non-throwing accessor so hosts still render in isolation); `flashCitationRow`/`flashCitationMarker` (scoped-to-container, integer-guarded DOM helpers — a missing/invalid `n` is a no-op, never an injectable/global selector, T-153-02-02); and the shared constants `CITATION_ROW_ATTR="data-citation-row"` / `CITATION_MARKER_ATTR="data-citation-marker"` / `CITATION_FLASH_CLASS="citation-ref-flash"` / `CITATION_ACTIVE_CLASS="citation-marker-active"` (the single source both the footer 153-03 and cited-markdown 153-05 import — no divergent attribute names).
+- **Additive `index.css` citation block (appended after the scrollbar rules — 0 existing token/keyframe touched, T-153-02-03):** `.citation-marker` chip states (resting/hover/focus-visible/active), `@keyframes markerPop` (200ms cubic-bezier bounce, staggerable via inline animationDelay), `.citation-ref-row` scroll-margin + `.citation-ref-flash` bloom (inset 3px bar + ring — never colour-alone, WCAG 1.4.1), and a `@media (prefers-reduced-motion: reduce)` override dropping bounce/flash to a plain fade. `--primary` reserved EXCLUSIVELY for marker/[n]/active/Open-document; active-ink uses the literal `239 84% 67%` (sketch `--primary-strong`); meaningful muted text uses `--muted-foreground` (the `--muted-foreground-dim` 3.6:1 trap is NOT introduced).
+- **Owner/RLS gate (SC#2 / T-153-02-01):** App mounts `<CitationNavProvider navigate={setActiveView}>` wrapping ChatLayout (chat subtree with MessageItem AND the documents view both inside). IngestionPage consumes the pending intent via `useCitationNavOptional` → the EXISTING `setSelectedDocId`; `selectedDoc` resolves from the user's OWN owner/RLS-scoped `documents` list, so a document the user cannot see simply never opens — **NO new fetch, NO endpoint, NO unscoped raw-`document_id` lookup** (verified: no new `fetch(`/`getDocument` in the diff; DocumentDetailPanel mount region unchanged). The intent is one-shot (consumed after use) so re-opening / closing the panel is never fought. No ChatLayout edit needed — the shared context carries the intent.
+- **Gates:** new suite `citationNav.test.tsx` **13/13 GREEN** (throw-outside-provider, records intent + fires navigate, optional accessor null-outside, flash add/scroll/scope/no-op-on-missing/injection-guard); existing `IngestionPage.test.tsx` **4/4 GREEN** (renders in isolation — the optional accessor keeps it provider-free, no test edit); `npx tsc -b` = exactly **30** pre-existing SEED-056/049 baseline errors, **0 net-new** (0 in citationNav.tsx/App.tsx/pages/IngestionPage.tsx; the one `IngestionPage.test.tsx` `beforeEach` error is pre-existing baseline rot, not mine); `npx vite build` exit **0**. **CITE-01 stays OPEN** at the requirement level (false-green avoidance, 148–152 + 153-01 convention) — closes at verify-work/secure-phase after the Wave-2/3 render plans + the live SC#10 4-axis cross-provider UAT (`153-VALIDATION.md`).
+- **SDK quirks (known):** `state.advance-plan` clean (bumped frontmatter `completed_plans` 54→55 + Current Plan → 3 of 5). `roadmap.update-plan-progress 153` = `summary_count: 1` pre-SUMMARY (accurate at run time; the progress-TABLE row `1/5` was hand-fixed to `2/5` + the 153-02 checkbox flipped, since the SDK counts SUMMARY files on disk).
 
 **153-01 execution notes (2026-07-15) — CITE-01 backend honesty core: pure citation_markers module + 2 additive agent_loop seams, NO migration, NO new package:**
 
