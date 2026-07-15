@@ -88,7 +88,7 @@ Which phases cover which requirements. Filled by roadmap creation (2026-07-10). 
 | VIS-01 | Phase 148 (CORE) | Admin Shell | Complete |
 | MODEL-01 | Phase 149 (CORE) | Model & Settings | Complete |
 | MODEL-02 | Phase 149 (CORE) | Model & Settings | Complete |
-| SEC-01 | Phase 150 (CORE) | Model & Settings | Pending |
+| SEC-01 | Phase 150 (CORE) | Model & Settings | Complete |
 | FILE-02 | Phase 151 (CORE) | Workflow & File Inputs | Complete |
 | FILE-01 | Phase 151 (CORE) | Workflow & File Inputs | Complete |
 | WFIN-01 | Phase 152 (CORE) | Workflow & File Inputs | Complete |
