@@ -92,10 +92,20 @@ the scope line. Append; nothing gets lost.
   high-value sweep (MemorySection, SkillCard, MessageFeedback, FolderNode,
   FolderTree, HealthDocumentRow, ProviderPicker + Settings password-eye toggles).
   Any node the live scan still flags on a legacy page lands here.
-- **D-14 documented exclusions:** none required this phase — every jsx-a11y
-  error was fixed at the source with a real change (no false-positive Radix
-  internal needed an exclusion). If the D-03 live axe scan surfaces a genuine
-  false-positive, record it here per-rule/per-selector with the reasoning.
+- **D-14 documented exclusions:** one this phase (Plan 05). The 070-A
+  `ModelRegistryTab` trailing actions column is `<th aria-label="Row actions" />`
+  (an intentionally text-less action column). axe's `empty-table-header` rule
+  (a **best-practice** rule, NOT WCAG A/AA) flags it for having no *visible* text,
+  yet the header IS accessibly named via `aria-label`, so the barrier the rule
+  guards does not exist. Encoded as a per-rule/per-selector exclusion in
+  `ModelRegistryTab.a11y.test.tsx` (scoped to the two table-rendering scans; every
+  WCAG-AA rule stays on; the header name is asserted positively) + mirrored in the
+  155-VALIDATION.md D-14 register. **Additive real-fix follow-up (out of Plan 05's
+  test-only scope):** give that `<th>` an `sr-only` visible-to-SR header text so
+  the best-practice rule passes without the exclusion — do it whenever a Control
+  Room refactor phase next touches ModelRegistryTab. All other jsx-a11y errors were
+  fixed at the source with real changes (no other exclusions). If the D-03 live axe
+  scan surfaces a further genuine false-positive, record it here per-rule/per-selector.
 
 ## Concrete starting points when this re-opens
 

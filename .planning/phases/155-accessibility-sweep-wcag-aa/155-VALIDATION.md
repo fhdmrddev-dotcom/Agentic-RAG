@@ -120,7 +120,7 @@ These are the LIVE half of the D-01 HYBRID gate — not automatable in jsdom. Ex
 
 | Rule ID | Selector / Node | Surface | WHY (upstream link / false-positive reasoning) | Encoded in test |
 |---------|-----------------|---------|-------------------------------------------------|-----------------|
-| *(none yet — append during execution)* | | | | |
+| `empty-table-header` | `th[aria-label="Row actions"]` | ModelRegistryTab (070-A) — the registry table's trailing actions column | Confirmed false-positive for the WCAG-AA bar. `empty-table-header` is an axe **best-practice** rule (tag: `best-practice`, NOT WCAG A/AA). The `<th>` is an intentionally text-less actions column that IS accessibly named via `aria-label="Row actions"` (asserted positively in the suite via `getByRole("columnheader", { name: /row actions/i })`), so the barrier the rule guards — an unnamed column header — does not exist for AT users. The rule only fires because the name is not *visible* text. Cannot be source-fixed this pass (Plan 05 is test-only; a real fix = add `sr-only` header text, logged to SEED-092-remainder as the additive follow-up). | `ModelRegistryTab.a11y.test.tsx` — per-rule exclusion `axe(container, { rules: { "empty-table-header": { enabled: false } } })` applied ONLY to the two table-rendering scans (populated + ⌥ technical); every other WCAG-AA structural rule stays ON; header name asserted positively. |
 
 ---
 
