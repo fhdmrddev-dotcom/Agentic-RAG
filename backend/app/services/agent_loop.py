@@ -61,7 +61,10 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
-from app.services.citation_markers import normalize_citation_markers
+from app.services.citation_markers import (
+    apply_citation_instruction,
+    normalize_citation_markers,
+)
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
 # error classifier — replaces the billing-first keyword if-ladder in the outer
@@ -1807,6 +1810,21 @@ async def run_agent_loop(
                         }
                         _structured_tools_injected = True
                         break
+
+            # Phase 153 Seam B (D-12/SC#10): on retrieval turns ONLY, inject the
+            # citation-density instruction + numbered source manifest via the
+            # provider-uniform dual channel — the note is appended to BOTH
+            # active_system_prompt (reaches the native system_prompt= param at the
+            # GatewayRequest sites below) AND the messages[0] system entry (reaches
+            # the compat channel; Anthropic silently drops mid-list system messages,
+            # so both are required — Pitfall 1). Gated on retrieved_citations so every
+            # non-retrieval turn is byte-identical (D-14). Recomputed fresh each turn
+            # (the manifest grows as more sources are retrieved). No per-provider
+            # branch — the dual channel IS the provider-uniform seam.
+            if retrieved_citations:
+                active_system_prompt = apply_citation_instruction(
+                    active_system_prompt, messages, retrieved_citations
+                )
 
             while True:
                 try:

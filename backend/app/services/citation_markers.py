@@ -20,6 +20,28 @@ retrieval-turns-only instruction, rebuilt from the deduped set each retrieval tu
 
 import re
 
+# Density wording (Discretion #3): mark load-bearing facts only, leave framing /
+# general knowledge unmarked, one marker per claim, absence-as-signal. This is static
+# guidance; the numbered manifest of THIS turn's sources is appended after it.
+CITATION_INSTRUCTION = (
+    "When you state a specific fact, figure, name, quote, or claim that comes from the "
+    "documents retrieved this turn, place a citation marker [n] immediately after it, "
+    "where n is the source number from the list below. Cite only load-bearing claims — "
+    "the specific facts a reader would want to verify. Do not cite framing sentences, "
+    "transitions, your own reasoning, or general knowledge; those flow unmarked. One "
+    "marker per claim is enough; never stack markers or add a marker to a sentence that "
+    "is not grounded in a listed source. If a sentence draws on your general knowledge "
+    "rather than a retrieved source, leave it unmarked — an unmarked sentence tells the "
+    "reader it is general knowledge.\n\nSources retrieved this turn:"
+)
+
+# Delimiters wrapping the injected note so it can be stripped and refreshed cleanly on
+# each retrieval turn (the manifest may grow as more sources are retrieved) without
+# double-appending and without disturbing any other instruction (e.g. tool-usage) that
+# may have been appended after it (D-12 fresh-each-turn / guard against stacking).
+_NOTE_START = "\n\n<<<CITATION_GUIDANCE>>>\n"
+_NOTE_END = "\n<<<END_CITATION_GUIDANCE>>>"
+
 # ``[n]`` marker: a bracketed positive integer. Applied only to NON-code text.
 _MARKER_RE = re.compile(r"\[(\d+)\]")
 
@@ -106,3 +128,50 @@ def format_citation_manifest(unique_citations: list[dict]) -> str:
             else:
                 lines.append(f"[{n}] {filename}")
     return "\n".join(lines)
+
+
+def _strip_citation_note(text: str) -> str:
+    """Remove a previously-injected citation note (delimited block), wherever it sits."""
+    start = text.find(_NOTE_START)
+    if start == -1:
+        return text
+    end = text.find(_NOTE_END, start)
+    if end == -1:
+        # Malformed (start present, no end) — drop from the start marker onward.
+        return text[:start]
+    return text[:start] + text[end + len(_NOTE_END):]
+
+
+def apply_citation_instruction(
+    active_system_prompt: str,
+    messages: list[dict],
+    retrieved_citations: list[dict],
+) -> str:
+    """Inject the retrieval-turns-only citation instruction via the dual channel.
+
+    Returns the (possibly augmented) system prompt for the native ``system_prompt=``
+    channel, and appends the SAME note to the first ``role == "system"`` entry of
+    ``messages`` in place for the compat ``messages[0]`` channel (SC#10 — Anthropic
+    drops mid-list system messages, so both channels are required).
+
+    When ``retrieved_citations`` is empty this is a no-op: the system prompt is
+    returned unchanged and ``messages`` is not touched, so a non-retrieval turn is
+    byte-identical (D-12/D-14). Recomputed fresh each retrieval turn (the note is
+    stripped and re-appended) so the manifest reflects the current deduped set and
+    never double-appends.
+    """
+    if not retrieved_citations:
+        return active_system_prompt
+
+    manifest = format_citation_manifest(_deduplicate_citations(retrieved_citations))
+    note = _NOTE_START + CITATION_INSTRUCTION + "\n" + manifest + _NOTE_END
+
+    new_system_prompt = _strip_citation_note(active_system_prompt) + note
+    for i, m in enumerate(messages):
+        if m.get("role") == "system":
+            messages[i] = {
+                "role": "system",
+                "content": _strip_citation_note(m.get("content", "")) + note,
+            }
+            break
+    return new_system_prompt
