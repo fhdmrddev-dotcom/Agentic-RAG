@@ -235,7 +235,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         <div className="fixed inset-y-0 left-0 z-50 w-72 bg-sidebar/95 backdrop-blur-md flex flex-col md:hidden">
           {/* Thread list (scrollable, top) */}
           <div className="flex-1 overflow-y-auto px-2 pt-4">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Chat
             </p>
             <div className="px-1 mb-2">
@@ -262,7 +262,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             </div>
             <div className="space-y-0.5 mt-2">
               {threads.length === 0 && (
-                <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
+                <p className="text-[10px] text-muted-foreground text-center py-4 italic">No recent chats</p>
               )}
               {threads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id

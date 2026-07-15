@@ -136,7 +136,7 @@ export function ViewsGroup({
     <div className="flex flex-col">
       {/* Group header — mirrors the Folders header style (uppercase, tracked). */}
       <div className="flex items-center justify-between px-2 mb-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Views
         </span>
         <SlidersHorizontal

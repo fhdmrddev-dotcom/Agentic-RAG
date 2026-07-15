@@ -127,7 +127,7 @@ export function NavPanel({
     return (
       <div className="space-y-0.5 mt-2">
         {threads.length === 0 && (
-          <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
+          <p className="text-[10px] text-muted-foreground text-center py-4 italic">No recent chats</p>
         )}
         {threads.map((thread) => {
           const isSelected = selectedThread?.id === thread.id
@@ -343,7 +343,7 @@ export function NavPanel({
             {activeView === "chat" && (
               <div className="flex flex-col">
                 <div className="flex items-center justify-between pb-2 px-1 border-b border-border/10 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Chats
                   </span>
                   <div className="flex items-center gap-1">

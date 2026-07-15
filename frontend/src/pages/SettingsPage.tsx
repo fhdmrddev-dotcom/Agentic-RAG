@@ -124,7 +124,7 @@ function SliderInput({
           {displayValue}
         </span>
       </div>
-      {hint && <p className="text-xs text-muted-foreground/70">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
 }
@@ -1133,7 +1133,7 @@ export function SettingsPage() {
                       {`${skillBuilderModel || resolvedSkillBuilderModel || "claude-haiku-4-5"} · your configured models · no single-point-of-failure`}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground/70 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     The builder <span className="italic">writes</span> candidates; the benchmark
                     targets <span className="italic">measure</span> firing — independent settings,
                     decoupled by design.
