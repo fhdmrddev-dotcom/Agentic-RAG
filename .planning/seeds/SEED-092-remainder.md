@@ -92,7 +92,8 @@ the scope line. Append; nothing gets lost.
   high-value sweep (MemorySection, SkillCard, MessageFeedback, FolderNode,
   FolderTree, HealthDocumentRow, ProviderPicker + Settings password-eye toggles).
   Any node the live scan still flags on a legacy page lands here.
-- **D-14 documented exclusions:** one this phase (Plan 05). The 070-A
+- **D-14 documented exclusions:** two this phase (Plan 05 + Plan 06).
+  **(1, Plan 05)** The 070-A
   `ModelRegistryTab` trailing actions column is `<th aria-label="Row actions" />`
   (an intentionally text-less action column). axe's `empty-table-header` rule
   (a **best-practice** rule, NOT WCAG A/AA) flags it for having no *visible* text,
@@ -103,7 +104,21 @@ the scope line. Append; nothing gets lost.
   155-VALIDATION.md D-14 register. **Additive real-fix follow-up (out of Plan 05's
   test-only scope):** give that `<th>` an `sr-only` visible-to-SR header text so
   the best-practice rule passes without the exclusion — do it whenever a Control
-  Room refactor phase next touches ModelRegistryTab. All other jsx-a11y errors were
+  Room refactor phase next touches ModelRegistryTab.
+  **(2, Plan 06)** The 153 References footer ROW (`.citation-ref-row[role="button"]`
+  in `CitationCard`) is a CONVENIENCE click-target (flashes the in-text marker) that
+  wraps a proper, independently-reachable "Open document" `<button>` — the SAME
+  sanctioned `role="button"` container pattern noted for NavRow/SkillCard above.
+  axe's `nested-interactive` (WCAG 4.1.2 A) flags the focusable-descendant nesting,
+  but the barrier it guards does not exist here: the nested Open-document button is
+  in the tab order AND independently named (asserted positively). Encoded per-rule
+  in `CitationUI.a11y.test.tsx` (constant `CITATION_ROW_AXE_OPTS`, scoped to the two
+  citation-row scans; every other WCAG-AA rule stays on) + mirrored in the
+  155-VALIDATION.md D-14 register. **Additive real-fix follow-up (out of Plan 06's
+  test-only + verify-not-rebuild scope):** the fully-separated row → non-interactive
+  wrapper + sibling controls restructure, folded into the same NavRow/SkillCard
+  primitive-restructure follow-up above (the citation footer row is the third
+  instance of the shared pattern). All other jsx-a11y errors were
   fixed at the source with real changes (no other exclusions). If the D-03 live axe
   scan surfaces a further genuine false-positive, record it here per-rule/per-selector.
 
