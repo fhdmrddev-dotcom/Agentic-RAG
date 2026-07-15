@@ -380,7 +380,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 
 - [x] 155-04-PLAN.md — Control Room Control-Plane a11y suites (shell band + active-runs/kill-switch/maintenance guards)
-- [ ] 155-05-PLAN.md — Control Room Governance/Registry a11y suites (audit / users / feature-visibility / model registry+discovery)
+- [x] 155-05-PLAN.md — Control Room Governance/Registry a11y suites (audit / users / feature-visibility / model registry+discovery)
 - [ ] 155-06-PLAN.md — Run modal + Citation UI + 154-surface a11y suites
 
 **UI hint**: yes
@@ -441,7 +441,7 @@ Plans:
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
-| 155. Accessibility Sweep — WCAG AA | 5/7 | Executing | - |
+| 155. Accessibility Sweep — WCAG AA | 6/7 | Executing | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
