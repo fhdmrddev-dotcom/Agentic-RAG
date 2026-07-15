@@ -331,7 +331,7 @@ Plans:
 
 **Wave 3** *(blocked on 153-03 + 153-04)*
 
-- [ ] 153-05-PLAN.md — CitedMarkdown post-mount marker upgrade (owned <sup>, range-check, code-span skip) + MessageItem G-5 additive cited branch + StreamsProvider non-regression verify [CITE-01]
+- [x] 153-05-PLAN.md — CitedMarkdown post-mount marker upgrade (owned <sup>, range-check, code-span skip) + MessageItem G-5 additive cited branch + StreamsProvider non-regression verify [CITE-01]
 
 **Note**: G-2 sketch-first is mandatory (live UI, "feels like") — sketches 074-A + 075-A done + operator-approved; UI-SPEC APPROVED. The set-membership attribution is the honesty core (D-01/D-02/D-03 in 153-01). SC#10 4-axis live UAT held in `153-VALIDATION.md` (not plan tasks); operator restarts uvicorn after 153-01 before live checks.
 **UI hint**: yes
@@ -418,7 +418,7 @@ Plans:
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
-| 153. Inline Citations | 4/5 | Executing | - |
+| 153. Inline Citations | 5/5 | Ready for verification | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |

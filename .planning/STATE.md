@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-15T07:59:34.811Z"
+status: verifying
+last_updated: "2026-07-15T08:29:33.384Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 26
@@ -26,10 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 ## Current Position
 
-Phase: 153 (inline-citations) — EXECUTING
-Plan: 5 of 5 (153-01, 153-02, 153-03, 153-04 complete)
-Status: Ready to execute (153-05 next — CitedMarkdown + MessageItem marker injection, Wave 3 — the last plan; blocked on 153-03 + 153-04, both now done)
-Last activity: 2026-07-15 -- 153-04 executed (CitationPeek hover-peek → click-to-pin popover, Wave 2)
+Phase: 153 (inline-citations) — ALL PLANS EXECUTED, ready for verification
+Plan: 5 of 5 complete (153-01, 153-02, 153-03, 153-04, 153-05)
+Status: Phase complete — ready for `/gsd:verify-work 153` (run 153-VALIDATION SC#10 4-axis UAT first; operator restarts uvicorn)
+Last activity: 2026-07-15 -- 153-05 executed (CitedMarkdown marker upgrade + MessageItem G-5 cited branch + AbsenceHint ⓘ, Wave 3 — final plan)
+
+**153-05 execution notes (2026-07-15) — CITE-01 inline-marker assembly (Wave 3, final): CitedMarkdown owned-<sup> marker upgrade + MessageItem G-5 additive cited branch + AbsenceHint absence-as-signal ⓘ, frontend-only, NO backend, NO migration, NO new package:**
+
+- 3 tasks (Task 1 + Task 3 TDD RED→GREEN; Task 2 auto), sequential on the main tree (`use_worktrees=false`), 1 auto-fix deviation. Commits: T1 RED `75bc236e` → GREEN `9782b5b9`; T2 `b889192e`; T3 RED `47bccfbc` → GREEN `57d1a937`; SUMMARY commit follows. Touched EXACTLY the 6 declared files (`CitedMarkdown.tsx`, `AbsenceHint.tsx`, `MessageItem.tsx` + their 3 tests); **`StreamsProvider.tsx` VERIFIED UNCHANGED** (absent from `git diff --name-only 75bc236e^..HEAD`), **NO backend, NO migration, NO new package** (marked/dompurify shared pipeline, CitationPeek + Radix tooltip + lucide vendored — Legitimacy Gate not triggered).
+- **`CitedMarkdown`:** reuses the `MarkdownRenderer` marked+DOMPurify pipeline byte-identically; a post-mount `useLayoutEffect` walks text nodes (`TreeWalker`), SKIPS `code`/`pre`/`a` (Pitfall 2), and upgrades in-range `[n]` (`n∈[1,citations.length]`, D-07) into OWNED `document.createElement` `<sup>` (role=button/tabindex/aria-label + delegated listeners set programmatically — Pitfall 3/V5); out-of-range/`[0]` stay literal. Hover/focus → CitationPeek; click/Enter → pin + `flashCitationRow(n, scope)` (scope = `marker.closest('[data-testid="assistant-message"]')`); Esc/outside-click unpin + restore marker focus; markerPop stagger from 153-02 CSS.
+- **`MessageItem` (G-5 additive):** the ONE new branch — CitedMarkdown only when `assistant && citations?.length`; StreamingNarration + MarkdownRenderer paths byte-identical (D-12/D-14). Produces CitationList `defaultOpen` (in-range marker scan of the deduped content) + a callback-ref `flashContainer` (row→marker scope). Mounts `AbsenceHint` once between the answer and the footer on the settled cited-assistant path only.
+- **`AbsenceHint` (074-A):** quiet inline row + keyboard-reachable ⓘ (rest `--muted-foreground-dim` → `--primary`) revealing the VERBATIM UI-SPEC copy via the vendored Radix tooltip — non-blocking, never a banner (no alert/banner role, no aria-modal), self-guards to cited messages (null otherwise). `muted-foreground-dim` used exactly ONCE (the ⓘ dot).
+- **DEVIATION [Rule 1 — bug]:** dropped `dangerouslySetInnerHTML` from CitedMarkdown's JSX — a parent re-render (MessageItem's `setMessageBody` callback ref) was re-applying it and WIPING the injected markers. The layout effect now SOLELY owns the div's innerHTML, so React manages zero children and the markers survive re-renders (base render still byte-identical to MarkdownRenderer). Folded into `b889192e`.
+- **Gates:** `CitedMarkdown.test` 6/6 + `AbsenceHint.test` 6/6 + `MessageItem.test` 11/11 + `CitationList`/`CitationPeek`/`citationNav`/`CitationCard` + provider suites = **79/79 GREEN across 8 files**; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new**; `npx vite build` exit **0**; greps: createElement(CitedMarkdown)=2, AbsenceHint(MessageItem)=2, muted-foreground-dim(AbsenceHint)=1. **CITE-01 stays OPEN** at the requirement level (false-green avoidance) — closes at verify-work/secure-phase after the live SC#10 4-axis cross-provider UAT (`153-VALIDATION.md`; OpenRouter axis may stay blocked by external BUG-260714-02).
+- **SDK quirks (known):** `state.advance-plan` = `last_plan` (status→verifying, no counter bump). `roadmap.update-plan-progress 153` post-SUMMARY = `summary_count:5 / Complete` and flipped the 153-05 checkbox, but LEFT the progress-TABLE row `4/5 | Executing` stale → hand-fixed to `5/5 | Ready for verification`.
 
 **153-04 execution notes (2026-07-15) — CITE-01 CitationPeek click-through popover (Wave 2): net-new positioned/portaled hover-peek → click-to-pin card (chunk + full-doc D-10 variants + D-04 calm degrade + non-blocking pin/dialog/Esc a11y), frontend-only, NO backend, NO migration, NO new package:**
 
