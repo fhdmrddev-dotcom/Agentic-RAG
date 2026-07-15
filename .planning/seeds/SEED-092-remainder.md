@@ -121,6 +121,19 @@ the scope line. Append; nothing gets lost.
   instance of the shared pattern). All other jsx-a11y errors were
   fixed at the source with real changes (no other exclusions). If the D-03 live axe
   scan surfaces a further genuine false-positive, record it here per-rule/per-selector.
+- **SettingsPage expert-config form — pre-existing whole-page findings (Plan 06,
+  DEFERRED per D-06, NOT a D-14 exclusion).** The 154 net-new surface on Settings is
+  the "Show technical names" toggle ROW + the relabeled TABS only — those are asserted
+  axe-clean in `SettingsPage.a11y.test.tsx` (scoped scans). A FULL-page axe scan of the
+  AI-Model tab additionally surfaces PRE-EXISTING findings on controls that predate v3.3
+  and were NOT part of the 154 relabel: (a) `select-name` on the rerank-provider and
+  `openrouter_tool_strategy` `<select>`s (they use adjacent `<span>`/`<p>` captions, not
+  an associated `<label>`/`aria-label`); (b) `heading-order` on the SectionCard heading
+  levels. These sit OUTSIDE the D-06 scope line (not one of the two named offender
+  classes — colour-contrast / button-name — and not net-new surfaces), so they are
+  logged here, explicitly NOT fixed this test-only plan. **Follow-up:** give each
+  expert-config `<select>` an `aria-label`/associated `<label>` and normalise the tab
+  heading order whenever a Settings-page refactor phase next touches this form.
 
 ## Concrete starting points when this re-opens
 
