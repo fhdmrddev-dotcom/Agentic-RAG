@@ -20,6 +20,10 @@ import { MarkdownRenderer } from "./MarkdownRenderer"
 // ONLY on the settled cited-assistant branch (message.citations?.length); every
 // other path stays byte-identical on the shared MarkdownRenderer (D-12/D-14).
 import { CitedMarkdown } from "./CitedMarkdown"
+// Phase 153-05 (CITE-01 / 074-A): the quiet absence-as-signal ⓘ. Mounted once
+// under the answer body on the settled cited-assistant branch (self-guards on
+// citations, never a banner) — never on the streaming/user path (G-5 additive).
+import { AbsenceHint } from "./AbsenceHint"
 import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
@@ -490,6 +494,14 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
             {message.confidence && <ConfidenceBadge confidence={message.confidence} />}
+            {/* Phase 153-05 (CITE-01 / 074-A): the absence-as-signal ⓘ — mounted
+                ONCE under the answer body, between the answer and the footer, on
+                the settled cited-assistant path only. Self-guards on citations
+                (null otherwise) and is never given the streaming-narration path. */}
+            {message.role === "assistant" &&
+              !(isMessageStreaming && (message.tool_calls?.length ?? 0) > 0) && (
+                <AbsenceHint citations={message.citations} />
+              )}
             {message.citations && message.citations.length > 0 && (
               <CitationList
                 citations={message.citations}

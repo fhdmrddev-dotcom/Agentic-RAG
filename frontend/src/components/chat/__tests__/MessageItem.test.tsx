@@ -150,6 +150,22 @@ describe("MessageItem — Phase 153-05 cited render routing (G-5 additive, D-12/
     expect(screen.getByText(/References ·/)).toBeInTheDocument()
   })
 
+  it("mounts the absence-as-signal ⓘ under a cited answer (074-A) — and never on a non-cited message", () => {
+    // Cited → the ⓘ label is present under the answer.
+    const cited = renderMessage(
+      assistantMessage({ runStatus: "completed", content: "Grounded fact [1].", citations: [makeCitation()] }),
+    )
+    expect(cited.getByText("Unmarked claims read as general knowledge")).toBeInTheDocument()
+    // It is not a banner (no alert chrome) and the ⓘ is a real button.
+    expect(cited.queryByRole("alert")).not.toBeInTheDocument()
+    expect(cited.getByRole("button", { name: "About citations" })).toBeInTheDocument()
+    cleanup()
+    // Non-cited assistant → the ⓘ is absent (self-guard + additive gate).
+    renderMessage(assistantMessage({ runStatus: "completed", content: "Plain general-knowledge answer." }))
+    expect(screen.queryByText("Unmarked claims read as general knowledge")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "About citations" })).not.toBeInTheDocument()
+  })
+
   it("a cited assistant message with NO markers degrades to footer-only — no markers, footer present (D-06/D-07)", () => {
     const { container } = renderMessage(
       assistantMessage({
