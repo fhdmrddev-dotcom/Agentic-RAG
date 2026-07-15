@@ -364,13 +364,14 @@ Plans:
   2. Each net-new surface is fully operable via keyboard (manual walkthrough) at WCAG 2.1 AA.
   3. The worst pre-existing offenders (contrast tokens, unlabeled icon buttons) are fixed in the same pass.
 
-**Plans**: 6 plans (3 waves)
+**Plans**: 7 plans (3 waves)
 
 Plans:
 **Wave 1**
 
 - [ ] 155-01-PLAN.md — jsx-a11y regression gate (eslint-plugin-jsx-a11y as errors + CI lint step + violation inventory)
-- [ ] 155-02-PLAN.md — Contrast token retune + app-wide opacity-offender sweep + D-07 operator eyeball
+- [ ] 155-02-PLAN.md — Contrast token retune + admin-cluster opacity sweep + D-07 operator eyeball
+- [ ] 155-07-PLAN.md — Opacity-offender sweep, remaining clusters (chat / studio / settings / ingestion / layout long tail)
 
 **Wave 2** *(blocked on Wave 1)*
 

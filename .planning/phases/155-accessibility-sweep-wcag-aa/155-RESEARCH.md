@@ -373,19 +373,19 @@ export default defineConfig([
 | A4 | The Run-modal hidden file-input pattern (`tabIndex={-1}` + proxy button) is keyboard-safe (not a trap) | Net-New Inventory | LOW — standard accessible upload pattern; D-09 scenario 1 confirms live `[VERIFIED: WorkflowsPage.tsx L1196-1240]` |
 | A5 | Contrast ratios computed here (7.7:1, 3.4:1, 3.8:1) match a real browser scan | Contrast Token Retune | MEDIUM — hand-computed via WCAG luminance formula from HSL; sub-pixel antialiasing + font-weight can shift the browser's number slightly. The live scan (D-03) is authoritative `[ASSUMED — math verified, browser rendering not]` |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does CI enforcement of jsx-a11y land in this phase or is lint left local-only?**
+1. **RESOLVED (Plan 155-01 Task 2 adds the `npm run lint` CI step) — Does CI enforcement of jsx-a11y land in this phase or is lint left local-only?**
    - What we know: `frontend-tests.yml` currently runs no lint; D-02 promises "regressions cannot merge."
    - What's unclear: whether the operator wants the CI lint step added now (recommended) or accepts local-only enforcement.
    - Recommendation: Add `npm run lint` to the `vitest` CI job in this phase — it's a 3-line change and is the only thing that makes D-02's promise structurally true. Flag it as a plan task.
 
-2. **Isolation vs. whole-page scan for the Control Room tabs?**
+2. **RESOLVED (Plans 155-04/155-05 use per-sub-component isolation suites) — Isolation vs. whole-page scan for the Control Room tabs?**
    - What we know: custom tablist conditionally renders panels; sub-components mostly have `__tests__/` dirs.
    - What's unclear: whether the planner prefers per-sub-component suites (simpler, matches precedent) or one page suite that clicks through tabs.
    - Recommendation: per-sub-component `*.a11y.test.tsx` (matches DocumentDetailPanel/RelationshipsSection precedent, avoids Pitfall 3).
 
-3. **Is the light theme in the D-03 zero-contrast bar, or dark only?**
+3. **RESOLVED (dark theme is the primary zero-contrast bar; light spot-checked per 155-VALIDATION.md live rows) — Is the light theme in the D-03 zero-contrast bar, or dark only?**
    - What we know: SEED-092 baseline was measured on Deep Midnight (dark, the default); the opacity sweep fixes both themes.
    - What's unclear: whether the operator's live scan covers the light theme too.
    - Recommendation: run the live scan on the dark theme (the shipped default + baseline surface); spot-check light if the operator uses it. Note in VALIDATION.md which theme(s) were scanned.
