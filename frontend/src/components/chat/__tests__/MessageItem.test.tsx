@@ -42,9 +42,22 @@ vi.mock("@/providers/StreamsProvider", () => ({
 
 import { MessageItem } from "../MessageItem"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import type { Message } from "@/types"
+import type { Message, Citation } from "@/types"
 
 afterEach(() => cleanup())
+
+/** A minimal chunk citation for the Phase 153-05 cited-render non-regression tests. */
+function makeCitation(overrides: Partial<Citation> = {}): Citation {
+  return {
+    document_id: "doc-1",
+    filename: "alpha.pdf",
+    chunk_index: 3,
+    passage: "A grounded passage.",
+    similarity: 0.63,
+    is_full_doc: false,
+    ...overrides,
+  }
+}
 
 /** A reloaded (non-streaming) assistant message — the historical-message shape
  *  that flows from persisted `messages` rows, the exact reload path both bugs hit. */
@@ -96,5 +109,58 @@ describe("MessageItem — persistent cancelled honesty (BUG-260710-01/-02)", () 
     expect(screen.getByText("all done")).toBeInTheDocument()
     expect(screen.queryByText("Response stopped")).not.toBeInTheDocument()
     expect(screen.queryByTestId("cancelled-no-output")).not.toBeInTheDocument()
+  })
+})
+
+describe("MessageItem — Phase 153-05 cited render routing (G-5 additive, D-12/D-14)", () => {
+  it("non-cited assistant message renders via MarkdownRenderer — NO markers, NO absence ⓘ (byte-identical)", () => {
+    const { container } = renderMessage(
+      assistantMessage({ runStatus: "completed", content: "Just general knowledge, no sources." }),
+    )
+    // The shared MarkdownRenderer path renders the prose.
+    expect(screen.getByText("Just general knowledge, no sources.")).toBeInTheDocument()
+    // No cited markdown was mounted → no inline markers.
+    expect(container.querySelector("sup.citation-marker")).toBeNull()
+    // The absence-as-signal ⓘ (mounted only on the cited branch) is absent here.
+    expect(screen.queryByText("Unmarked claims read as general knowledge")).not.toBeInTheDocument()
+    // No References footer without a citation set.
+    expect(screen.queryByText(/References ·/)).not.toBeInTheDocument()
+  })
+
+  it("a user message stays byte-identical on the shared path — NO markers even when the text contains [1]", () => {
+    const { container } = renderMessage(
+      assistantMessage({ role: "user", content: "does [1] mean anything here?" }),
+    )
+    expect(screen.getByTestId("user-message")).toBeInTheDocument()
+    expect(container.querySelector("sup.citation-marker")).toBeNull()
+  })
+
+  it("a settled cited assistant message routes to CitedMarkdown — [1] upgrades to an interactive marker", () => {
+    const { container } = renderMessage(
+      assistantMessage({
+        runStatus: "completed",
+        content: "Grounded fact [1].",
+        citations: [makeCitation()],
+      }),
+    )
+    const marker = container.querySelector<HTMLElement>("sup.citation-marker")
+    expect(marker).not.toBeNull()
+    expect(marker).toHaveAttribute("data-citation-marker", "1")
+    // The numbered References footer renders when a citation set exists (D-06).
+    expect(screen.getByText(/References ·/)).toBeInTheDocument()
+  })
+
+  it("a cited assistant message with NO markers degrades to footer-only — no markers, footer present (D-06/D-07)", () => {
+    const { container } = renderMessage(
+      assistantMessage({
+        runStatus: "completed",
+        content: "A plain grounded answer with no inline markers.",
+        citations: [makeCitation()],
+      }),
+    )
+    // CitedMarkdown's base render is byte-identical to MarkdownRenderer — no markers.
+    expect(container.querySelector("sup.citation-marker")).toBeNull()
+    // The footer still renders (retrieval ran) — no provider worse than today.
+    expect(screen.getByText(/References ·/)).toBeInTheDocument()
   })
 })

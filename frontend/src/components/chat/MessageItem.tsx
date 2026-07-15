@@ -16,6 +16,10 @@ import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+// Phase 153-05 (CITE-01 / G-5 additive): the cited-answer render path. Swapped in
+// ONLY on the settled cited-assistant branch (message.citations?.length); every
+// other path stays byte-identical on the shared MarkdownRenderer (D-12/D-14).
+import { CitedMarkdown } from "./CitedMarkdown"
 import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
@@ -261,6 +265,25 @@ function dedupParagraphs(text: string): string {
   return result.join('\n\n')
 }
 
+/**
+ * Phase 153-05 (CITE-01 / D-06/D-07): does the settled content carry ≥1 valid
+ * in-range inline marker? Drives the canonical `defaultOpen` on the References
+ * footer — the footer opens by default only when markers exist, else it keeps
+ * today's collapsed default (footer-only degradation). The backend already
+ * strips non-members/out-of-range markers before persist (D-02), so any `[n]`
+ * with n ∈ [1, count] in the persisted content is a real, keyed marker.
+ */
+function hasInRangeMarker(content: string, count: number): boolean {
+  if (!count || !content) return false
+  const re = /\[(\d+)\]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    const n = parseInt(m[1], 10)
+    if (n >= 1 && n <= count) return true
+  }
+  return false
+}
+
 // Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.
 // ChatArea stabilizes onSendMessage + onResume via useCallback (ref-stable
 // across parent re-renders); StreamsProvider mutates messagesByThread by
@@ -276,6 +299,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const workflowLock = useWorkflowLockForThread(message.thread_id ?? null)
   const [continuePending, setContinuePending] = useState(false)
   const [continueExhausted, setContinueExhausted] = useState(false)
+  // Phase 153-05 (CITE-01): a callback-ref to the settled answer body so the
+  // References footer's row→marker flash (flashCitationMarker) is scoped to THIS
+  // message's marker host (the body contains both the cited markdown and the
+  // footer). A callback ref that stores the node in state makes it reactive
+  // without prop-drilling; adding it changes no DOM (byte-identical, G-5).
+  const [messageBody, setMessageBody] = useState<HTMLDivElement | null>(null)
 
   if (isUser) {
     return (
@@ -440,13 +469,20 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           </div>
         )}
         {message.content ? (
-          <div className="text-sm text-foreground">
+          <div ref={setMessageBody} className="text-sm text-foreground">
             {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
               // Live agentic run: message.content here is the model's interim
               // narration ("Now I'll search…"), not the final answer. Fold it to
               // a one-line gist (click to expand the full trail). At run-end the
               // backend-persisted final answer renders normally via the else path.
+              // NEVER given markers — the body streams calm & unmarked (D-05).
               <StreamingNarration content={dedupParagraphs(message.content)} />
+            ) : message.role === "assistant" && message.citations && message.citations.length > 0 ? (
+              // Phase 153-05 (CITE-01 / G-5 additive): the settled cited-assistant
+              // answer routes to CitedMarkdown, which upgrades validated [n] to
+              // interactive markers over the SAME dedupParagraphs output. This is
+              // the ONLY new branch; the else path stays byte-identical (D-12/D-14).
+              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} />
             ) : (
               <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
             )}
@@ -455,7 +491,15 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             )}
             {message.confidence && <ConfidenceBadge confidence={message.confidence} />}
             {message.citations && message.citations.length > 0 && (
-              <CitationList citations={message.citations} />
+              <CitationList
+                citations={message.citations}
+                // Phase 153-05 (CITE-01 / D-06/D-07): open by default only when the
+                // settled answer actually carries valid in-range markers; else keep
+                // today's collapsed default (footer-only degradation).
+                defaultOpen={hasInRangeMarker(dedupParagraphs(message.content), message.citations.length)}
+                // Scope the row→marker flash to this message's marker host.
+                flashContainer={messageBody}
+              />
             )}
             {!isStreaming && message.suggestions && message.suggestions.length > 0 && onSendMessage && (
               <SuggestionPills

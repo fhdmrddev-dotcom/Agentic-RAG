@@ -259,10 +259,15 @@ export function CitedMarkdown({ content, citations, className }: Props) {
 
   return (
     <>
+      {/* The layout effect SOLELY owns this div's innerHTML (sets the sanitized
+          html, then injects the owned marker nodes). We deliberately do NOT use
+          `dangerouslySetInnerHTML` here: React must not manage/re-apply the div's
+          children, or a parent re-render (e.g. MessageItem's callback ref) would
+          wipe the imperatively-injected markers. React owns zero children of this
+          node, so the injected DOM survives re-renders. */}
       <div
         ref={containerRef}
         className={cn("markdown text-sm text-foreground leading-relaxed", className)}
-        dangerouslySetInnerHTML={{ __html: html }}
       />
       {peek && peekCitation && (
         <CitationPeek
