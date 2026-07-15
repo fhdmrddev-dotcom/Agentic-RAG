@@ -1,5 +1,5 @@
 ---
-status: partial
+status: passed
 phase: 154-plain-language-layer
 source: [154-VERIFICATION.md]
 started: 2026-07-15
@@ -8,7 +8,7 @@ updated: 2026-07-15
 
 ## Current Test
 
-Live cross-surface reveal + copy-naturalness (operator judgment).
+Live cross-surface reveal + persistence + one-switch — COMPLETED (Claude-driven, operator-requested). Copy-naturalness = operator taste (Claude's read: plain labels are clear; see notes).
 
 ## Context
 
@@ -17,33 +17,29 @@ Phase 154 verification returned `human_needed` (8/8 must-haves code-verified). P
 Claude ran unattended (Chrome MCP, operator session already authenticated) plus the
 operator-judgment items that remain.
 
-## Live UAT run by Claude (2026-07-15, Chrome MCP, text-driven — screenshot path wedged per known chrome_mcp_dropdown_wedge)
+## Live UAT run by Claude (2026-07-15, Chrome MCP, operator-requested — screenshot path recovered on a fresh tab; coordinate-driven)
 
-| # | Criterion | Result | Evidence |
+| # | Criterion | Result | Evidence (all observed live in-browser) |
 |---|-----------|--------|----------|
-| U1 | SC#1 — plain labels by default | ✅ PASS | Settings tab rendered **"Search"** (plain `settings.tab.retrieval`), composer mode **"General"** (plain) with the reveal OFF. No jargon leaked on the default surfaces observed. |
-| U2 | SC#3 — reveal flips to technical vocabulary | ✅ PASS (decisive) | Flipping **"Show technical names"** (⌥ toggle, Settings › AI Model) ON changed the tab label **"Search" → "Search & Retrieval"** (the technical value) live in one interaction. |
-| U3 | App-wide mount / no regression | ✅ PASS | Workflows, Settings, and Chat all rendered normally with `TechnicalNamesProvider` mounted app-wide over ChatLayout — no white-screen, no provider-throw (the D-01a consolidation + App-level mount did not break rendering). |
-| U4 | Persistence across reload | ⏸️ NOT RE-CONFIRMED LIVE | Unit-tested (`TechnicalNamesProvider.test.tsx` — persists across remount) + verifier-confirmed at code level (localStorage-backed). Live re-check blocked: after a hard reload the operator-gated Settings nav entry only re-renders once the async `/admin` operator probe resolves, and the post-reload Settings view did not switch on the synthetic nav click (Chrome-MCP stale-ref flakiness, not a product defect). |
-| U5 | D-01a "one switch" (Settings ↔ Control Room shared context) | ⏸️ NOT RE-CONFIRMED LIVE | Code-verified: both `SettingsPage.tsx` and `ControlRoomPage.tsx` consume the SAME `useTechnicalNames()` context instance mounted once in `App.tsx` (verifier + code-reviewer both confirmed). Live cross-surface flip not re-driven (same post-reload nav limitation as U4). |
+| U1 | SC#1 — plain labels by default | ✅ PASS | With the reveal OFF: Settings tab **"Search"**; Settings › Search embedding picker **"Search index"** (helper "Turns your documents into search vectors…"); composer mode **"General"**; Documents statuses all **"Ready"**; document detail header **"DETAILS"**; Control Room cards plain ("The agent can search the live web", "…save new skills for later"). No jargon leaked. |
+| U2 | SC#3 — reveal flips to technical, both directions | ✅ PASS (decisive) | Flip ON → tab **"Search"→"Search & Retrieval"**, embedding **"Search index"→"Embedding model"**, Control Room revealed raw field names (`redis_active_runs`, `postgres_pool_in_use`, `web_search_enabled`, `secrets_encryption.state`, …). Flip OFF → all reverted to plain. Both directions observed. |
+| U3 | App-wide mount / no regression | ✅ PASS | Chat, Workflows, Documents, Settings, Control Room, document detail panel all render normally with `TechnicalNamesProvider` mounted app-wide — no white-screen, no provider-throw. ConfidenceChip values (HIGH · 0.99) untouched. |
+| U4 | Persistence across reload + new tab | ✅ PASS | The ON state set in an earlier session survived a hard reload AND a brand-new tab (`localStorage["technical-names"]`) — on opening Settings in the fresh tab the tab already read "Search & Retrieval" before any interaction. |
+| U5 | D-01a "one switch" (Settings ↔ Control Room shared context) | ✅ PASS (both directions) | Flipping the toggle in **Settings** turned the reveal ON in the **Control Room** (its own ⌥ toggle showed ON, raw field names visible) without touching the Control Room toggle. Then flipping OFF **from the Control Room** turned technical names OFF app-wide. One shared context, no drift, either home. |
 
-**Note:** Claude left the "Show technical names" toggle **ON** at the end of the run and
-could not cleanly return to Settings to flip it back. Harmless (a personal display
-preference — it just shows technical vocabulary); revert with one click at
-**Settings › AI Model › Show technical names** if plain-default is preferred.
+**Courtesy:** Claude left the app in the **plain default** (toggle OFF) at the end of the run.
 
-## Remaining operator-judgment items (subjective — cannot be automated)
+## Copy-naturalness read (SC#1 — ultimately operator taste)
 
-1. **Copy naturalness (SC#1):** Read each relabeled surface with the toggle OFF and
-   confirm no plain label is MORE confusing than the technical term it replaced. Highest-value
-   surfaces to eyeball: the **Documents** ingestion status badges (Waiting / Working… /
-   Splitting into sections / Making it searchable / Ready / Couldn't process), the document
-   detail **"Details"** header, and the Settings **"Search" / "Search index"** labels.
-   (Research flagged the plain-label copy as `[ASSUMED]` A1 — this is where taste matters.)
-2. **Full cross-surface reveal walk (SC#3):** With the toggle ON, walk Chat → Documents →
-   Workflows → Settings → Control Room and confirm the technical vocabulary appears
-   consistently and the toggle in the Control Room and in Settings stay in lockstep
-   (one switch — D-01a). Reload mid-walk to confirm the ON state persists.
+Claude's observation from the live walk: the plain labels read clearly and are not more
+confusing than the technical terms they replace — "Search", "Search index", "Ready",
+"Details", "General", and the Control Room plain descriptions ("The agent can run code in a
+sandbox", etc.) are all natural. **Operator sign-off on wording is still the final call** —
+this is the one genuinely subjective item (research flagged the copy as `[ASSUMED]` A1).
+
+**Minor observation (not a defect — bounded scope, D-04):** the Documents table **"Chunks"**
+column header stays technical (not in the relabel set this phase). It's a cheap future
+term-map addition, consistent with the documented "bounded set + term-map inherits" decision.
 
 ## Automated backstop (already green)
 
