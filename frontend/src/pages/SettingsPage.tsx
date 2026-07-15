@@ -21,6 +21,12 @@ import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
+// Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
+// Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
+// shared context, and routes bounded user-facing labels through the term-map (D-04).
+import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
+import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
+import { usePlainLabel } from "@/lib/termMap"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -487,6 +493,16 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Phase 154 (LANG-01 / D-01, D-03, D-04) — host the app-wide "Show technical
+  // names" reveal here so EVERY user can flip it (SC#3). It reads/writes the SAME
+  // shared context the admin Control Room consumes (D-01a), so the two toggles can
+  // never disagree. `retrievalTabLabel` / `embeddingLabel` are bounded, DISPLAY-only
+  // relabels routed through the single-source term-map (D-02a) — plain by default,
+  // today's technical wording under the reveal. Deep expert-config knobs stay as-is.
+  const { showTechnical, toggle: toggleTechnical } = useTechnicalNames()
+  const retrievalTabLabel = usePlainLabel("settings.tab.retrieval")
+  const embeddingLabel = usePlainLabel("settings.embedding")
+
   // Per-tab save states
   const [savingAI, setSavingAI] = useState(false)
   const [savedAI, setSavedAI] = useState(false)
@@ -852,7 +868,10 @@ export function SettingsPage() {
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="0">AI Model</TabsTrigger>
-            <TabsTrigger value="1">Search &amp; Retrieval</TabsTrigger>
+            {/* D-04: display-only relabel via the term-map (Search by default, the
+                shipped "Search & Retrieval" under the reveal). value="1" — the tab
+                ROUTING key — is unchanged (D-02a / no contract break). */}
+            <TabsTrigger value="1">{retrievalTabLabel}</TabsTrigger>
             <TabsTrigger value="2">Integrations</TabsTrigger>
             <TabsTrigger value="3">Memory</TabsTrigger>
             <TabsTrigger value="4">Audit Log</TabsTrigger>
@@ -861,6 +880,21 @@ export function SettingsPage() {
           {/* Tab 0: AI Model */}
           <TabsContent value="0">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
+              {/* Phase 154 (LANG-01 / D-01, D-03) — the app-wide "Show technical
+                  names" reveal HOST. The toggle is tab-agnostic (it flips the whole
+                  app off the shared context) but lives here, near the top of the AI
+                  Model tab, so every user can reach it (SC#3). Flipping it moves the
+                  SAME value the admin Control Room reads (D-01a) — one switch. */}
+              <div className="flex items-center justify-between gap-4 rounded-lg ghost-border bg-muted/20 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">Show technical names</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Reveal the raw field, model, and status names alongside the plain labels — everywhere in the app.
+                  </p>
+                </div>
+                <TechnicalNamesToggle enabled={showTechnical} onToggle={toggleTechnical} />
+              </div>
+
               {/* LLM Providers SectionCard */}
               <SectionCard
                 title="LLM Providers"
@@ -1145,7 +1179,10 @@ export function SettingsPage() {
                   <ProviderPicker
                     presets={EMBEDDING_PRESETS}
                     showDimensions
-                    title="Embedding model"
+                    // D-04: the search-index label reads plainly by default
+                    // ("Search index") and reveals today's "embedding" wording under
+                    // the toggle — DISPLAY-only via the term-map (D-02a).
+                    title={embeddingLabel}
                     description="Turns your documents into search vectors. Changing this re-embeds your library."
                     value={{
                       provider: embeddingProvider,
