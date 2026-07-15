@@ -105,8 +105,17 @@
     --warning: 38 92% 60%;
     --warning-foreground: 240 60% 8%;
     /* Phase 087: dim-label token for meta text (file sizes, version chips,
-       diff context gutters) — one step quieter than --muted-foreground. */
-    --muted-foreground-dim: 220 16% 45%;
+       diff context gutters) — one step quieter than --muted-foreground.
+       Phase 155 (A11Y-01 / D-04, WCAG 2.1 AA 1.4.3) — lifted 220 16% 45% → 220 16% 70%.
+       The old 45% L (#606d85) measured only ~3.6:1 on the dark --background
+       (216 45% 4% ≈ #060a0f) → FAILED the ≥4.5:1 floor for meaningful text.
+       The new 70% L mirrors the operator-approved Phase 088-05 panel token
+       --panel-muted-foreground-dim (220 16% 70% = #a6aebf → 8.42:1) — so the
+       global dim token itself is now AA-safe (~8:1 on the dark bg) and no page
+       can regress by reading it, while the blue-gray "muted" read is preserved.
+       Only this DIM token + the opacity modifiers change; the base
+       --muted-foreground (220 16% 65%, already ~7.7:1) is intentionally left. */
+    --muted-foreground-dim: 220 16% 70%;
     --border: 220 20% 16%;
     --input: 220 20% 16%;
     --ring: 239 100% 82%;
