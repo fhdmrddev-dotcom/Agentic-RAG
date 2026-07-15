@@ -364,7 +364,24 @@ Plans:
   2. Each net-new surface is fully operable via keyboard (manual walkthrough) at WCAG 2.1 AA.
   3. The worst pre-existing offenders (contrast tokens, unlabeled icon buttons) are fixed in the same pass.
 
-**Plans**: TBD
+**Plans**: 6 plans (3 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 155-01-PLAN.md — jsx-a11y regression gate (eslint-plugin-jsx-a11y as errors + CI lint step + violation inventory)
+- [ ] 155-02-PLAN.md — Contrast token retune + app-wide opacity-offender sweep + D-07 operator eyeball
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 155-03-PLAN.md — jsx-a11y lint-fix-to-zero + icon-button aria-label sweep + SEED-092-remainder follow-up list
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 155-04-PLAN.md — Control Room Control-Plane a11y suites (shell band + active-runs/kill-switch/maintenance guards)
+- [ ] 155-05-PLAN.md — Control Room Governance/Registry a11y suites (audit / users / feature-visibility / model registry+discovery)
+- [ ] 155-06-PLAN.md — Run modal + Citation UI + 154-surface a11y suites
+
 **UI hint**: yes
 
 ### Phase 156: Everyday UX Polish (STRETCH)
