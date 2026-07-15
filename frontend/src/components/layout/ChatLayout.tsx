@@ -223,7 +223,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
 
       {/* Mobile drawer backdrop */}
       {drawerOpen && (
-        <div
+        <button
+          type="button"
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           aria-label="Close navigation"
           onClick={() => setDrawerOpen(false)}
@@ -267,10 +268,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               {threads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={thread.id}
                     className={cn(
-                      "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
+                      "relative block w-full text-left rounded-lg cursor-pointer transition-all duration-150 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                       isSelected
                         ? "bg-primary/15 text-primary"
                         : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
@@ -281,10 +283,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                       <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500" />
                     )}
                     <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
                       <span className="text-sm truncate" title={thread.title}>{thread.title}</span>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>

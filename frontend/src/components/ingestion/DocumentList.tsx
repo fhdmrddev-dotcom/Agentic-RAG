@@ -223,6 +223,9 @@ function ClassificationRowChip({ doc, onRefresh }: { doc: Document; onRefresh: (
     <span
       className="inline-flex items-center gap-1"
       // The chip's controls are NOT the filename-open affordance — stop row clicks.
+      // Phase 155 (A11Y-01): role="presentation" — this wrapper is a pure layout +
+      // click-propagation guard, not itself an interactive control (its buttons are).
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
     >
       <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--warning)/0.15)] px-2 py-0.5 text-[11px] font-semibold text-[hsl(var(--warning))] whitespace-nowrap">

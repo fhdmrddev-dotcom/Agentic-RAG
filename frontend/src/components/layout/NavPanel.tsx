@@ -158,29 +158,38 @@ export function NavPanel({
                   className="w-full px-3 py-1.5 text-xs bg-card border border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
                 />
               ) : (
+                // Phase 155 (A11Y-01 / D-05): the row is a real <button> for the
+                // primary "open thread" action; the Stop + options controls are
+                // SIBLINGS (never nested inside the row button — nested buttons are
+                // invalid HTML), so every control is independently keyboard-operable.
                 <div
                   className={cn(
-                    "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
+                    "relative rounded-lg transition-all duration-150",
                     isSelected
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
                   )}
-                  onClick={() => onSelectThread(thread)}
                 >
                   {/* Active indicator */}
                   {isSelected && (
-                    <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500" />
+                    <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500 z-10" />
                   )}
-                  {/* Title row */}
-                  <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                    <span className="text-sm truncate" title={thread.title}>
-                      {thread.title}
-                    </span>
-                    {thread.folder_id && (
-                      <FolderIcon className="h-3 w-3 shrink-0 text-primary/40" />
-                    )}
-                  </div>
+                  {/* Title row — the primary click/keyboard target */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectThread(thread)}
+                    className="w-full py-1.5 cursor-pointer rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  >
+                    <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
+                      <span className="text-sm truncate" title={thread.title}>
+                        {thread.title}
+                      </span>
+                      {thread.folder_id && (
+                        <FolderIcon className="h-3 w-3 shrink-0 text-primary/40" aria-hidden="true" />
+                      )}
+                    </div>
+                  </button>
 
                   {/* SEED-064: resting running dot — ambient "this chat is working"
                       signal. A short gradient scrim keeps it clear of a long title.
@@ -201,6 +210,7 @@ export function NavPanel({
                     <div className="absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg">
                       {isRunning && (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             void streamActions.stopThread(thread.id)
@@ -208,18 +218,20 @@ export function NavPanel({
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
                           aria-label="Stop run"
                         >
-                          <Square className="h-2.5 w-2.5 fill-current" />
+                          <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
                         </button>
                       )}
-                      <span
+                      <button
+                        type="button"
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
                         onClick={(e) => {
                           e.stopPropagation()
                           setMenuOpenId(isMenuOpen ? null : thread.id)
                         }}
+                        aria-label="Thread options"
                       >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </span>
+                        <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -351,17 +363,20 @@ export function NavPanel({
                         (renders null when nothing is running). */}
                     <ActiveRunsTray threads={threads} />
                     <button
+                      type="button"
                       onClick={() => {
                         onNewThread(selectedFolderId)
                         setShowFolderPicker(false)
                       }}
                       className="flex p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors items-center justify-center"
                       title="New Chat"
+                      aria-label="New chat"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                     {folders.length > 0 && (
                       <button
+                        type="button"
                         onClick={() => setShowFolderPicker((prev) => !prev)}
                         className={cn(
                           "flex p-1 rounded-md transition-colors items-center justify-center",
@@ -370,8 +385,9 @@ export function NavPanel({
                             : "hover:bg-accent/40 text-muted-foreground hover:text-sidebar-foreground"
                         )}
                         title="Choose folder"
+                        aria-label="Choose folder"
                       >
-                        <FolderIcon className="w-3.5 h-3.5" />
+                        <FolderIcon className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     )}
                   </div>

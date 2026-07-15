@@ -88,11 +88,27 @@ export function SkillCard({
 
   return (
     <div
+      // Phase 155 (A11Y-01): the card is a keyboard-operable button-role open target.
+      // It hosts nested controls (toggle, export/edit/delete, Try in Chat), so it
+      // cannot be a native <button>; the rule's sanctioned fallback (role + tab +
+      // keyboard support) is used, with the Enter/Space handler guarded to the card
+      // itself so a nested control's key press never double-fires open. (A fully
+      // separated open/action restructure is logged to SEED-092-remainder.)
+      role="button"
+      tabIndex={0}
+      aria-label={`Open skill: ${skill.name}`}
       className={cn(
-        "rounded-xl bg-card ghost-border p-4 transition-all animate-fadeSlideUp cursor-pointer",
+        "rounded-xl bg-card ghost-border p-4 transition-all animate-fadeSlideUp cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
         !localEnabled && "opacity-50",
       )}
       onClick={() => onSelect(skill)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect(skill)
+        }
+      }}
     >
       {/* Header row */}
       <div className="flex items-start gap-2">

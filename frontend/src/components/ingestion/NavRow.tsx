@@ -83,10 +83,13 @@ export function NavRow({
   const editInputRef = useRef<HTMLInputElement>(null)
 
   // Re-seed the edit value (and clear any stale hint) whenever an edit session opens.
+  // Phase 155 (A11Y-01): focus the rename input via ref (managed focus) instead of
+  // the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same behavior.
   useEffect(() => {
     if (isEditing) {
       setEditValue(name)
       setHint(null)
+      editInputRef.current?.focus()
     }
   }, [isEditing, name])
 
@@ -107,14 +110,31 @@ export function NavRow({
       )}
 
       <div
+        // Phase 155 (A11Y-01): the row is a keyboard-operable button-role select
+        // target. It hosts nested controls (the actions menu, inline-rename input),
+        // so it cannot be a native <button> (nested interactives are invalid); the
+        // rule's sanctioned fallback — role + tab + keyboard support — is used. The
+        // Enter/Space handler is guarded to the row itself so a nested control's key
+        // press never double-fires select. (Restructuring this shared row primitive
+        // into fully-separated select/action regions is logged to SEED-092-remainder.)
+        role="button"
+        tabIndex={isEditing ? -1 : 0}
+        aria-label={name}
         className={cn(
-          "flex items-center gap-2 py-1.5 px-2 rounded-lg cursor-pointer group relative transition-colors duration-150",
+          "flex items-center gap-2 py-1.5 px-2 rounded-lg cursor-pointer group relative transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           isSelected
             ? "bg-primary/10 text-primary font-medium shadow-sm shadow-primary/5"
             : "hover:bg-accent/60",
         )}
         onClick={() => {
           if (!isEditing) onSelect?.()
+        }}
+        onKeyDown={(e) => {
+          if (isEditing || e.target !== e.currentTarget) return
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            onSelect?.()
+          }
         }}
       >
         {/* Leading slot (chevron for folders, spacer for flat rows) */}
@@ -130,7 +150,7 @@ export function NavRow({
 
         {/* Name or inline-rename input */}
         {isEditing ? (
-          <div className="flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 min-w-0" role="presentation" onClick={(e) => e.stopPropagation()}>
             <input
               ref={editInputRef}
               value={editValue}
@@ -167,7 +187,6 @@ export function NavRow({
                   ? "border-destructive/60 focus:ring-destructive/40"
                   : "border-primary/30 focus:ring-primary/40",
               )}
-              autoFocus
             />
             {hint && (
               <span className="block mt-0.5 text-[11px] text-destructive">{hint}</span>
