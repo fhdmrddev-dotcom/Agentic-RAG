@@ -375,7 +375,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 155-03-PLAN.md — jsx-a11y lint-fix-to-zero + icon-button aria-label sweep + SEED-092-remainder follow-up list
+- [x] 155-03-PLAN.md — jsx-a11y lint-fix-to-zero + icon-button aria-label sweep + SEED-092-remainder follow-up list
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -441,7 +441,7 @@ Plans:
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
-| 155. Accessibility Sweep — WCAG AA | 3/7 | Executing | - |
+| 155. Accessibility Sweep — WCAG AA | 4/7 | Executing | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
