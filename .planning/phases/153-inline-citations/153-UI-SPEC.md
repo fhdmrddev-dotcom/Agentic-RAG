@@ -1,10 +1,11 @@
 ---
 phase: 153
 slug: inline-citations
-status: draft
+status: approved
 shadcn_initialized: true
 preset: existing (Aether Intelligence — Deep Midnight, frontend/src/index.css :.dark)
 created: 2026-07-15
+reviewed_at: 2026-07-15
 ---
 
 # Phase 153 — UI Design Contract
@@ -251,11 +252,11 @@ No third-party registry, no new block install. Vetting gate not triggered.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved (2026-07-15, revision 1/2 — Dimension 4 typography + Dimension 2 pin aria-label resolved)
