@@ -21,6 +21,7 @@ import {
 } from "@/lib/api"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useCitationNavOptional } from "@/lib/citationNav"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
 import type { Document, MetadataFieldDef, SavedView, ViewFilter } from "@/types"
@@ -137,6 +138,22 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
     () => (selectedDocId === null ? null : documents.find((d) => d.id === selectedDocId) ?? null),
     [selectedDocId, documents],
   )
+
+  // Phase 153 (CITE-01 / SC#2 / T-153-02-01): consume the one-shot cross-view
+  // "Open document" intent from a chat citation. We route it through the EXISTING
+  // owner/RLS-scoped panel by pre-selecting the id and letting `selectedDoc`
+  // resolve it from the user's OWN owner-scoped `documents` list — a document the
+  // user cannot see simply never resolves, so there is NO new unscoped fetch by
+  // raw document_id. Optional accessor so the page still renders in isolation
+  // (no provider) in unit tests. One-shot: consume so re-opening / closing works.
+  const citationNav = useCitationNavOptional()
+  const pendingDocumentId = citationNav?.pendingDocumentId ?? null
+  const consumePendingDocument = citationNav?.consumePendingDocument
+  useEffect(() => {
+    if (!pendingDocumentId) return
+    setSelectedDocId(pendingDocumentId)
+    consumePendingDocument?.()
+  }, [pendingDocumentId, consumePendingDocument])
 
   // The sidebar collapses to a rail when the detail panel is open UNLESS the user
   // pinned it expanded. Mobile never rails (the sidebar is a bottom-sheet there).

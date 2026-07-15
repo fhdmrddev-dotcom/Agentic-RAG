@@ -7,6 +7,7 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+import { CitationNavProvider } from "@/lib/citationNav"
 import { getMaintenanceStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL } from "@/lib/api"
 
 // Phase 147 (D-06 / T-147-15) — the persistent, app-wide, end-user maintenance
@@ -179,22 +180,30 @@ function App() {
             <span>{featureRefusal}</span>
           </div>
         )}
-        <ChatLayout
-          onSignOut={signOut}
-          activeView={activeView}
-          onNavigate={setActiveView}
-          navItems={navItems}
-          isOperator={isOperator}
-          operatorIdentity={operatorIdentity}
-          prefillMessage={prefillMessage}
-          onSetPrefillMessage={setPrefillMessage}
-          studioSkillId={studioSkillId}
-          studioTab={studioTab}
-          onOpenStudio={handleOpenStudio}
-          onReviewEvals={handleReviewEvals}
-          onStudioTabChange={handleStudioTabChange}
-          onTuneSkill={handleTuneSkill}
-        />
+        {/* Phase 153 (CITE-01 / SC#2): the citation cross-view nav provider wraps
+            BOTH the chat subtree (where the citation markers/"Open document"
+            affordance live) and the documents view (IngestionPage, which reads the
+            one-shot pending intent). `navigate` is the real view switcher; opening
+            a cited doc pre-selects it through IngestionPage's EXISTING owner/RLS-
+            scoped DocumentDetailPanel fetch — no new unscoped document_id fetch. */}
+        <CitationNavProvider navigate={setActiveView}>
+          <ChatLayout
+            onSignOut={signOut}
+            activeView={activeView}
+            onNavigate={setActiveView}
+            navItems={navItems}
+            isOperator={isOperator}
+            operatorIdentity={operatorIdentity}
+            prefillMessage={prefillMessage}
+            onSetPrefillMessage={setPrefillMessage}
+            studioSkillId={studioSkillId}
+            studioTab={studioTab}
+            onOpenStudio={handleOpenStudio}
+            onReviewEvals={handleReviewEvals}
+            onStudioTabChange={handleStudioTabChange}
+            onTuneSkill={handleTuneSkill}
+          />
+        </CitationNavProvider>
       </TooltipProvider>
     </StreamsProvider>
   )
