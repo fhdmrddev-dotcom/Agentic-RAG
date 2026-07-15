@@ -321,7 +321,7 @@ Plans:
 Plans:
 **Wave 1** *(parallel — zero file overlap)*
 
-- [ ] 153-01-PLAN.md — Backend citation integrity + retrieval-gated dual-channel injection (normalize_citation_markers strip/renumber at settle + apply_citation_instruction; citation_markers.py + agent_loop.py seams; Wave-0 backend tests) [CITE-01]
+- [x] 153-01-PLAN.md — Backend citation integrity + retrieval-gated dual-channel injection (normalize_citation_markers strip/renumber at settle + apply_citation_instruction; citation_markers.py + agent_loop.py seams; Wave-0 backend tests) [CITE-01]
 - [ ] 153-02-PLAN.md — Citation interaction foundation: nav context (useCitationNav.openDocument, owner-scoped) + App/IngestionPage wiring + marker↔row flash contract + additive citation CSS [CITE-01]
 
 **Wave 2** *(blocked on 153-02)*
@@ -418,7 +418,7 @@ Plans:
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
-| 153. Inline Citations | 0/5 | Ready to execute | - |
+| 153. Inline Citations | 1/5 | Executing | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |

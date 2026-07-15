@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T06:55:53.902Z"
-last_activity: 2026-07-15 -- Phase 153 planning complete
+last_updated: "2026-07-15T07:15:26.718Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 26
   completed_phases: 7
   total_plans: 58
-  completed_plans: 53
+  completed_plans: 54
   percent: 27
 ---
 
@@ -22,14 +22,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 153 — inline citations
+**Current focus:** Phase 153 — inline-citations
 
 ## Current Position
 
-Phase: 153
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-15 -- Phase 153 planning complete
+Phase: 153 (inline-citations) — EXECUTING
+Plan: 2 of 5 (153-01 complete)
+Status: Executing Phase 153
+Last activity: 2026-07-15 -- 153-01 executed (backend citation honesty core)
+
+**153-01 execution notes (2026-07-15) — CITE-01 backend honesty core: pure citation_markers module + 2 additive agent_loop seams, NO migration, NO new package:**
+
+- 3 tasks (Task 1 + Task 3 TDD RED→GREEN), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: Task 1 RED `a6124113` (test) → GREEN `bfe730bb` (feat normalize+manifest); Task 2 `53ec2bcc` (Seam A normalize-at-settle); Task 3 RED `1eda5762` (test) → GREEN `a4f682d1` (Seam B dual-channel instruction); SUMMARY `4857e75f`. Touched EXACTLY the 4 declared files; **`backend/app/api/threads.py` UNTOUCHED (D-08/G-5 RED LINE, verified `git diff --name-only a6124113^..HEAD`), NO migration, NO new package, no new `provider ==` on the shared path.**
+- **NEW `backend/app/services/citation_markers.py` (pure, 0 I/O):** `normalize_citation_markers` (code-span/fence-aware strip of out-of-range/non-member `[n]`, D-02; survivors keep footer-aligned numbers, D-03 — renumber is an identity by construction since the manifest is built from the SAME dedup order as the footer), `format_citation_manifest` (chunk `· chunk N` + full-doc `· full document` rows), `apply_citation_instruction` + `CITATION_INSTRUCTION` (density wording + numbered manifest, delimited-note strip-and-reappend so it refreshes fresh each retrieval turn without stacking). Owns its OWN `_deduplicate_citations` copy (avoids a circular import with agent_loop; identical key/order).
+- **Seam A (D-05, agent_loop ~L2790):** `full_content = normalize_citation_markers(full_content, unique_citations)` rebound right after `unique_citations[:] = _deduplicate_citations(...)` and before persist, so the persisted `content` carries only validated/renumbered markers. Closure-cell correctness confirmed (existing `full_content += fallback` at the same 6-space block level proves it's a directly-assignable `run_agent_loop` local read by the `_persist_assistant_message` closure). NO new SSE event — the existing terminal reconcile carries the normalized content live.
+- **Seam B (D-12/SC#10, agent_loop top-of-iteration ~L1824):** `if retrieved_citations: active_system_prompt = apply_citation_instruction(active_system_prompt, messages, retrieved_citations)` — injects into BOTH the native `system_prompt=` param AND the compat `messages[0]` system entry (Anthropic drops mid-list system messages, Pitfall 1), gated so non-retrieval turns are byte-identical (D-14). Mirrors the Phase 149 injection precedent; no per-provider branch.
+- **Gates:** the 2 new suites `test_153_citation_markers.py` (5) + `test_153_citation_instruction.py` (4) = **9/9 GREEN**; existing `test_citations_confidence.py` + `test_citation_policy.py` = **30/30 GREEN** (no regression); `import app.services.agent_loop` exits 0 (no import cycle); citation_markers purity asserted (0 `provider ==` non-comment, 0 `import redis`/`await `). **CITE-01 NOT marked complete** at the requirement level (false-green avoidance, 148–152 convention; the SDK's `requirements.mark-complete` flip was REVERTED) — closes at verify-work/secure-phase after the frontend render plans + the live SC#10 4-axis cross-provider UAT (153-VALIDATION.md; OpenRouter axis may stay blocked by external BUG-260714-02). **Operator: restart uvicorn** to load the changed `agent_loop.py` before any live verification.
+- **SDK quirks (known):** `state.advance-plan` clean this time (bumped frontmatter `completed_plans` 53→54 + Current Plan → 2 of 5). `state.update-progress` = "Progress field not found" (STATE uses the frontmatter `progress:` block). `roadmap.update-plan-progress 153` = `summary_count: 1 / plan_count: 5 / In Progress` (accurate — 02–05 remain).
 
 **152-08 execution notes (2026-07-15) — GAP CLOSURE: restore author-project-subtree containment (D-04 widen regression 152-06 introduced), scope.py + WorkflowsPage.tsx + tests, NO migration:**
 

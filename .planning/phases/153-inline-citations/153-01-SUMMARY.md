@@ -113,6 +113,12 @@ None - no external service configuration required.
 - Frontend plans (CitedMarkdown marker render, numbered footer, hover-peek/pin, AbsenceHint) render what this plan validates; 153-02 adds cross-view "Open document" navigation.
 - **UAT gate (deferred to 153-VALIDATION.md, not this plan):** SC#10 4-axis live cross-provider UAT — markers render on native providers and degrade to footer-only where a model emits none (D-07); OpenRouter axis may be blocked by external BUG-260714-02 (operator-accept precedent from Phase 152). CITE-01 stays open at the requirement level until verify-work/secure-phase per the 148-152 false-green-avoidance convention.
 
+## Self-Check: PASSED
+
+- All 3 created files + SUMMARY.md exist on disk.
+- All 5 task commits (`a6124113`, `bfe730bb`, `53ec2bcc`, `1eda5762`, `a4f682d1`) + the SUMMARY commit (`4857e75f`) exist in git history.
+- `git diff --name-only a6124113^..HEAD` = exactly the four declared files; `backend/app/api/threads.py` absent; no migration touched.
+
 ---
 *Phase: 153-inline-citations*
 *Completed: 2026-07-15*
