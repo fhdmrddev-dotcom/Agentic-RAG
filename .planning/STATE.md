@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-15T15:48:40.552Z"
+status: verifying
+last_updated: "2026-07-15T16:01:26.504Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 26
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 61
-  completed_plans: 60
-  percent: 31
+  completed_plans: 61
+  percent: 35
 ---
 
 # Project State
@@ -28,8 +28,19 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 154 (Plain-Language Layer) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-07-15 -- 154-02 Wave 2 executed (DocumentStatusBadge + DocumentDetailPanel relabels through the term-map)
+Status: Phase complete — ready for verification
+Last activity: 2026-07-15 -- 154-03 executed (Settings hosts the app-wide "Show technical names" toggle + bounded Search/embedding relabels; composer General/Explorer helpers, G-5-safe). NEXT: `/gsd:verify-work 154`.
+
+**154-03 execution notes (2026-07-15) — LANG-01 Wave 2 (final): host the app-wide reveal toggle in Settings (SC#3) + bounded Settings/composer relabels through the 154-01 term-map, frontend-only, NO backend, NO migration, NO new package:**
+
+- 2 tasks (both `type=auto`), sequential on the main tree (`use_worktrees=false`), 1 deviation. Commits: T1 `49bbd81f` (Settings toggle host + relabels + Rule-3 test wrapper); T2 `a03746b4` (composer helpers); SUMMARY commit follows. Touched 3 files (`SettingsPage.tsx`, `SettingsPage.test.tsx`, `MessageInput.tsx`), ALL under `frontend/src/`. D-05a Contract-Safety Recipe CLEAN: `git diff --name-only 49bbd81f^..HEAD | grep -E '^backend/|^supabase/migrations/'` = NOTHING; `grep -vE '^frontend/src/'` = NOTHING; G-5 hot files (`MessageItem.tsx`/`StreamsProvider.tsx`) = NOTHING.
+- **Task 1 (`SettingsPage.tsx` — SC#3 toggle host + D-04 relabels):** a compact "Show technical names" row near the top of the AI Model tab renders the reused `<TechnicalNamesToggle enabled={showTechnical} onToggle={toggle} />` from `useTechnicalNames()` — the GLOBAL app-wide reveal, reachable by every user, writing the SAME shared context the admin Control Room reads (D-01a → one switch). `Search & Retrieval` `TabsTrigger` label → `{usePlainLabel("settings.tab.retrieval")}` (Search default / technical on reveal) with `value="1"` UNCHANGED; embedding `ProviderPicker title` → `{usePlainLabel("settings.embedding")}` (Search index / embedding). NO phantom `settings.temperature` wiring (no such field here — Pitfall 4; grep == 0). Deep expert-config knobs left as-is.
+- **Task 2 (`MessageInput.tsx` — D-03 composer helpers, G-5-safe):** each General/Explorer dropdown item gained a one-line `text-[10px] text-muted-foreground` helper off `TERM_MAP["agentmode.*"].helper`; labels route through `usePlainLabel` (plain === technical → byte-identical visible label); `onAgentModeChange("default")/("explorer")` enum calls intact. Additive markup in the composer SHELL only — `MessageItem.tsx`/`StreamsProvider.tsx` untouched (verified by diff), chat suites re-run as non-regression.
+- **DEVIATION [Rule 3 — blocking]:** `SettingsPage.test.tsx` (not in the declared 2-file set) rendered `<SettingsPage />` bare at 7 sites; the new `useTechnicalNames()` throws outside its provider → wrapped in a `renderSettings()` helper mounting `<TechnicalNamesProvider>` (the 154-01 ControlRoomPage.test precedent). Folded into `49bbd81f`.
+- **Gates:** `SettingsPage.test` 7/7 + chat `__tests__` 58/58 (8 files, G-5 non-regression) = GREEN; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new** (only line-number shifts of the same 3 pre-existing errors; 0 referencing the new code); `npx vite build` exit **0**; acceptance greps: `TechnicalNamesToggle`=2, `useTechnicalNames(`=1, `Show technical names`=2, `usePlainLabel("settings.tab.retrieval")`=1, `usePlainLabel("settings.temperature")`=0, `value="1"`=1, MessageInput `onAgentModeChange("default")`=1 + `usePlainLabel`=3. **LANG-01 stays OPEN** at the requirement level (false-green avoidance, 148–153 + 154-01/02 convention) — spine (154-01) + document surfaces (154-02) + Settings/composer (154-03) complete the bounded relabel budget; closes at `/gsd:verify-work 154` + live UAT. No operator setup, no migration, no cloud parity (frontend-only).
+- **SDK quirks (known):** `state.advance-plan` = `last_plan` (status → ready_for_verification, no counter bump — correct for 3/3). `roadmap.update-plan-progress 154` = `summary_count: 3 / Complete` + flipped the 154-03 checkbox, but LEFT the progress-TABLE row `2/3 | Executing` stale → hand-fixed to `3/3 | Ready for verification`.
+
+**154 discuss (2026-07-15) — autonomous:** operator granted full authority (discuss→plan→execute unattended). Gray areas identified + decided by Claude with recommendations. `154-CONTEXT.md` locked D-01..D-05: (D-01) app-wide `TechnicalNamesProvider` localStorage context modeled on `useTheme`, default plain, all-users Settings toggle, NO operator gate + consolidate ControlRoomPage local `showTechnical` onto it; (D-02) single-source `frontend/src/lib/termMap.ts` + `usePlainLabel`; (D-03) global toggle primary, keep Phase-103 ⓘ+helper in forms; (D-04) spine + bounded prioritized end-user surfaces (chat/composer, workflow user surfaces, documents, Settings), admin surfaces only consume the context; (D-05) frontend display-only, NO backend/migration/enum/API/audit rename → Deep byte-identical by construction. G-2 = no new sketch (reuses 3 shipped operator-approved patterns). G-5 = MessageItem/StreamsProvider label-only-additive. Reported-bugs: 0 folded (no open Agentic-RAG bug in the labeling domain). Committed `3c00c2db`.
 
 **154 discuss (2026-07-15) — autonomous:** operator granted full authority (discuss→plan→execute unattended). Gray areas identified + decided by Claude with recommendations. `154-CONTEXT.md` locked D-01..D-05: (D-01) app-wide `TechnicalNamesProvider` localStorage context modeled on `useTheme`, default plain, all-users Settings toggle, NO operator gate + consolidate ControlRoomPage local `showTechnical` onto it; (D-02) single-source `frontend/src/lib/termMap.ts` + `usePlainLabel`; (D-03) global toggle primary, keep Phase-103 ⓘ+helper in forms; (D-04) spine + bounded prioritized end-user surfaces (chat/composer, workflow user surfaces, documents, Settings), admin surfaces only consume the context; (D-05) frontend display-only, NO backend/migration/enum/API/audit rename → Deep byte-identical by construction. G-2 = no new sketch (reuses 3 shipped operator-approved patterns). G-5 = MessageItem/StreamsProvider label-only-additive. Reported-bugs: 0 folded (no open Agentic-RAG bug in the labeling domain). Committed `3c00c2db`.
 
