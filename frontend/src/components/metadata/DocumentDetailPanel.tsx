@@ -33,6 +33,7 @@ import { ClassificationSection } from "@/components/classification/Classificatio
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
 import { updateDocumentMetadata, listMetadataFields } from "@/lib/api"
+import { usePlainLabel } from "@/lib/termMap"
 import { getFileIcon } from "@/lib/fileIcons"
 import { cn } from "@/lib/utils"
 import type { Document, MetadataFieldDef } from "@/types"
@@ -227,7 +228,9 @@ export function DocumentDetailPanel({ doc, onClose, onReconcile }: DocumentDetai
       {/* Sections — Metadata (112), then Relationships (117). 118 adds Classification. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <PanelSection
-          title="Metadata"
+          // Phase 154 Plan 02 (LANG-01 / Surface B): plain "Details" by default,
+          // "Metadata" under the reveal — via the single-source term-map (D-02).
+          title={usePlainLabel("doc.metadata_section")}
           warn={lowPlusEmpty > 0}
           count={lowPlusEmpty}
           defaultOpen

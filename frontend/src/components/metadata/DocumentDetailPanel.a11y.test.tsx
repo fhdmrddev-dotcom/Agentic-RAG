@@ -125,15 +125,19 @@ describe("DocumentDetailPanel a11y (AC11) — WCAG 2.1 AA + honest states", () =
 
   it("the accordion head is a <button aria-expanded aria-controls> + role=region body", async () => {
     render(<DocumentDetailPanel doc={doc} onClose={vi.fn()} />)
-    const head = await screen.findByRole("button", { name: /metadata/i })
+    // Phase 154 Plan 02: the section header now reads plainly ("Details") by
+    // default via the term-map, so the accordion's accessible name is /details/i.
+    // Anchor to the start so the section header ("Details" + count) is matched, not
+    // the panel's "Close document details" control (which also contains "details").
+    const head = await screen.findByRole("button", { name: /^details/i })
     expect(head).toHaveAttribute("aria-expanded")
     expect(head).toHaveAttribute("aria-controls")
-    expect(screen.getByRole("region", { name: /metadata/i })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: /details/i })).toBeInTheDocument()
   })
 
   it("every ConfidenceChip state renders a visible WORD (never colour-alone)", async () => {
     render(<DocumentDetailPanel doc={doc} onClose={vi.fn()} />)
-    await screen.findByRole("region", { name: /metadata/i })
+    await screen.findByRole("region", { name: /details/i })
     const chips = screen.getAllByTestId("confidence-chip")
     // Each chip carries a word: High / Med / Low / Extracted / Edited.
     for (const chip of chips) {
@@ -154,7 +158,7 @@ describe("DocumentDetailPanel a11y (AC11) — WCAG 2.1 AA + honest states", () =
       metadata: { language: "en" },
     }
     render(<DocumentDetailPanel doc={unscoredDoc} onClose={vi.fn()} />)
-    await screen.findByRole("region", { name: /metadata/i })
+    await screen.findByRole("region", { name: /details/i })
     expect(screen.getByText(/Extracted/)).toBeInTheDocument()
     expect(screen.queryByText(/High/)).not.toBeInTheDocument()
   })
@@ -162,7 +166,7 @@ describe("DocumentDetailPanel a11y (AC11) — WCAG 2.1 AA + honest states", () =
   it("the save receipt is role=status aria-live=polite (only after a successful PATCH)", async () => {
     const user = userEvent.setup()
     render(<DocumentDetailPanel doc={doc} onClose={vi.fn()} onReconcile={vi.fn()} />)
-    await screen.findByRole("region", { name: /metadata/i })
+    await screen.findByRole("region", { name: /details/i })
 
     // No receipt before any edit (honesty: never optimistic).
     expect(screen.queryByRole("status")).not.toBeInTheDocument()
@@ -184,7 +188,7 @@ describe("DocumentDetailPanel a11y (AC11) — WCAG 2.1 AA + honest states", () =
     const user = userEvent.setup()
     updateDocumentMetadata.mockRejectedValueOnce(new Error("boom"))
     render(<DocumentDetailPanel doc={doc} onClose={vi.fn()} />)
-    await screen.findByRole("region", { name: /metadata/i })
+    await screen.findByRole("region", { name: /details/i })
 
     await user.click(screen.getByRole("button", { name: /edit author/i }))
     const input = screen.getByRole("textbox", { name: /edit author/i })
@@ -216,7 +220,7 @@ describe("DocumentDetailPanel a11y (AC11) — WCAG 2.1 AA + honest states", () =
     })
     const user = userEvent.setup()
     render(<DocumentDetailPanel doc={doc} onClose={vi.fn()} onReconcile={vi.fn()} />)
-    await screen.findByRole("region", { name: /metadata/i })
+    await screen.findByRole("region", { name: /details/i })
 
     await user.click(screen.getByRole("button", { name: /edit title/i }))
     const input = screen.getByRole("textbox", { name: /edit title/i })
