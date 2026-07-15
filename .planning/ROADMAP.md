@@ -422,7 +422,7 @@ Plans:
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
-| 154. Plain-Language Layer | 3/3 | Ready for verification | - |
+| 154. Plain-Language Layer | 3/3 | Verified (human_needed) — operator UAT + secure-phase pending | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
