@@ -283,8 +283,9 @@ export function ProviderPicker({
                       type="button"
                       onClick={() => setShowKey((s) => !s)}
                       className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showKey ? "Hide API key" : "Show API key"}
                     >
-                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      {showKey ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
                     </button>
                   )}
                 </div>

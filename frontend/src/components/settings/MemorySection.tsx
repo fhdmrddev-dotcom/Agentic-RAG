@@ -179,11 +179,12 @@ export function MemorySection() {
                           className="h-6 w-6 p-0 text-primary"
                           onClick={saveEdit}
                           disabled={!editValue.trim() || saving}
+                          aria-label="Save value"
                         >
                           {saving ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                           ) : (
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
                           )}
                         </Button>
                         <Button
@@ -192,8 +193,9 @@ export function MemorySection() {
                           className="h-6 w-6 p-0 text-muted-foreground"
                           onClick={cancelEdit}
                           disabled={saving}
+                          aria-label="Cancel editing"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       </div>
                     ) : (
@@ -218,16 +220,18 @@ export function MemorySection() {
                         size="sm"
                         className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => startEdit(entry)}
+                        aria-label={`Edit ${entry.key}`}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => setDeleteTarget(entry)}
+                        aria-label={`Delete ${entry.key}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </div>
                   )}

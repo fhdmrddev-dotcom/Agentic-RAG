@@ -117,8 +117,9 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
                       size="sm"
                       className="h-7 w-7 p-0 hover:text-destructive"
                       onClick={() => setDeleteOpen(true)}
+                      aria-label="Delete document"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Delete document</TooltipContent>
@@ -132,11 +133,12 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
                       className="h-7 w-7 p-0 hover:text-primary"
                       onClick={() => setReingestConfirm(true)}
                       disabled={reingestLoading}
+                      aria-label="Re-ingest document"
                     >
                       {reingestLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                       ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                       )}
                     </Button>
                   </TooltipTrigger>
@@ -150,8 +152,9 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
                       size="sm"
                       className="h-7 w-7 p-0"
                       onClick={() => setMoveOpen(true)}
+                      aria-label="Move to folder"
                     >
-                      <FolderInput className="h-3.5 w-3.5" />
+                      <FolderInput className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Move to folder</TooltipContent>

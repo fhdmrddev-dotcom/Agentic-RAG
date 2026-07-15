@@ -221,11 +221,12 @@ export function SkillCard({
                       className="h-8 w-8"
                       disabled={exporting}
                       onClick={handleExport}
+                      aria-label="Export skill"
                     >
                       {exporting ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                       ) : (
-                        <Download className="h-3.5 w-3.5" />
+                        <Download className="h-3.5 w-3.5" aria-hidden="true" />
                       )}
                     </Button>
                   </TooltipTrigger>
@@ -239,8 +240,9 @@ export function SkillCard({
                       size="icon"
                       className="h-8 w-8"
                       onClick={(e) => { e.stopPropagation(); onSelect(skill); onEdit(skill) }}
+                      aria-label="Edit skill"
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Edit skill</TooltipContent>
@@ -261,8 +263,9 @@ export function SkillCard({
                           setShowPublishDialog(true)
                         }
                       }}
+                      aria-label={skill.is_global ? "Unshare skill" : "Share skill globally"}
                     >
-                      <Globe className="h-3.5 w-3.5" />
+                      <Globe className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -277,8 +280,9 @@ export function SkillCard({
                       size="icon"
                       className="h-8 w-8 hover:text-destructive"
                       onClick={() => setConfirmingDelete(true)}
+                      aria-label="Delete skill"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Delete skill</TooltipContent>

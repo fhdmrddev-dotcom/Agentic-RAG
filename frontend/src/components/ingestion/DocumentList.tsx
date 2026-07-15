@@ -426,11 +426,12 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             onClick={() => handleReingest(doc.id)}
                             disabled={reingestingId === doc.id || doc.status === "pending" || doc.status === "processing"}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                            aria-label="Re-ingest document"
                           >
                             {reingestingId === doc.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                             ) : (
-                              <RefreshCw className="h-3.5 w-3.5" />
+                              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                             )}
                           </Button>
                         </TooltipTrigger>
@@ -443,8 +444,9 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             size="sm"
                             onClick={() => setMoveTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                            aria-label="Move to folder"
                           >
-                            <FolderInput className="h-3.5 w-3.5" />
+                            <FolderInput className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Move to folder</TooltipContent>
@@ -456,8 +458,9 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             size="sm"
                             onClick={() => setDeleteTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label="Delete document"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Delete document</TooltipContent>

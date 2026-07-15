@@ -172,8 +172,9 @@ function ApiKeyInput({ value, onChange, placeholder = "Enter API key…" }: {
           type="button"
           onClick={() => setShow((s) => !s)}
           className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={show ? "Hide value" : "Show value"}
         >
-          {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {show ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
         </button>
       )}
     </div>

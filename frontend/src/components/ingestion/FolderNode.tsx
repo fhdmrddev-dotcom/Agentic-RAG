@@ -101,6 +101,7 @@ export function FolderNode({
           hasChildren ? (
             <button
               data-testid="chevron-btn"
+              aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
               className="h-4 w-4 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground transition-transform duration-200"
               onClick={(e) => {
                 e.stopPropagation()
@@ -108,6 +109,7 @@ export function FolderNode({
               }}
             >
               <ChevronRight
+                aria-hidden="true"
                 className={cn(
                   "h-3.5 w-3.5 transition-transform duration-200",
                   isExpanded && "rotate-90",
@@ -128,8 +130,9 @@ export function FolderNode({
                     e.stopPropagation()
                     onCreateSubfolder(node.id)
                   }}
+                  aria-label="New subfolder"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="h-3 w-3" aria-hidden="true" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>New subfolder</TooltipContent>
@@ -142,8 +145,9 @@ export function FolderNode({
                   size="sm"
                   className="h-6 w-6 p-0"
                   onClick={(e) => e.stopPropagation()}
+                  aria-label="Folder options"
                 >
-                  <MoreHorizontal className="h-3 w-3" />
+                  <MoreHorizontal className="h-3 w-3" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
