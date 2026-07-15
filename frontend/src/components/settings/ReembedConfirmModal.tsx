@@ -107,21 +107,21 @@ export function ReembedConfirmModal({
           {/* A's 4-fact grid — chunks · ETA · target model · runs-in-background */}
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Chunks to re-embed</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Chunks to re-embed</div>
               <div className="text-lg font-mono font-bold text-foreground">{countLabel}</div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Estimated time</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Estimated time</div>
               <div className="text-lg font-mono font-bold text-foreground">{eta}</div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Target model</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Target model</div>
               <div className="text-sm font-mono text-foreground truncate" title={targetModel}>
                 {targetModel}{targetDims ? ` · ${targetDims}d` : ""}
               </div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Runs</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Runs</div>
               <div className="text-sm font-mono text-foreground">in background</div>
             </div>
           </div>

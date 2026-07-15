@@ -197,7 +197,7 @@ export function RunCaseDetail({ testCase, results, onRate }: Props) {
               {/* Token counts + per-arm wall-clock duration (EVAL-05e). Duration is
                   METADATA beside tokens — never a verdict. */}
               {r && (r.input_tokens != null || r.output_tokens != null || r.duration_ms != null) && (
-                <p className="font-mono text-[9px] text-muted-foreground/70">
+                <p className="font-mono text-[9px] text-muted-foreground">
                   {r.input_tokens ?? "—"} → {r.output_tokens ?? "—"} tok
                   {r.duration_ms != null && (
                     <span data-testid={`duration-${v}`}>
@@ -216,7 +216,7 @@ export function RunCaseDetail({ testCase, results, onRate }: Props) {
                   data-testid={`rating-${v}`}
                   className="mt-auto flex items-center gap-1.5 pt-1"
                 >
-                  <span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">
+                  <span className="text-[9px] uppercase tracking-wide text-muted-foreground">
                     Your rating
                   </span>
                   <button

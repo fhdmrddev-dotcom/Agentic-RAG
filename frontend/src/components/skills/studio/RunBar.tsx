@@ -173,7 +173,7 @@ export function RunBar({
             Run matrix ({matrixCount} configured)
           </Button>
 
-          <span className="text-[11px] text-muted-foreground/70">
+          <span className="text-[11px] text-muted-foreground">
             One run per skill — a live run holds the claim until it finishes.
           </span>
         </div>
