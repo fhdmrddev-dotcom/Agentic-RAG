@@ -73,6 +73,7 @@ import { cn } from "@/lib/utils"
 import { OperatorBand } from "./OperatorBand"
 import { HealthSignals } from "./HealthSignals"
 import { TechnicalNamesToggle } from "./TechnicalNamesToggle"
+import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 import { RecentActionsCard } from "./RecentActionsCard"
 import { LockedTab } from "./LockedTab"
 import { AuditTab, type AuditSource } from "./AuditTab"
@@ -213,9 +214,12 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience>>(
     DEFAULT_VISIBILITY,
   )
-  // This shell owns the two-audience toggle state (LANG-01); it threads
-  // showTechnical down to HealthSignals + CapabilityGrid + the Audit tab.
-  const [showTechnical, setShowTechnical] = useState(false)
+  // Phase 154 (D-01a): the two-audience toggle state is now the ONE app-wide
+  // shared reveal context (was a local useState). Flipping it here and flipping
+  // it in Settings move the SAME switch — no drift. The variable name stays
+  // `showTechnical` so every leaf prop thread below is byte-identical; only the
+  // state SOURCE changed (state swap, not a behavior change for the operator).
+  const { showTechnical, toggle: toggleTechnical } = useTechnicalNames()
   // Prop-controlled recording FLASH for the band (062-A marker beat); pulsed after
   // a manual refresh records the operator's own "refresh" row.
   const [recordingPulse, setRecordingPulse] = useState(false)
@@ -617,7 +621,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                 <span className="flex-1" />
                 <TechnicalNamesToggle
                   enabled={showTechnical}
-                  onToggle={() => setShowTechnical((v) => !v)}
+                  onToggle={toggleTechnical}
                 />
                 <button
                   type="button"
@@ -694,7 +698,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             onQueryPlatform={queryPlatform}
             onExportPlatform={handleExportPlatform}
             showTechnical={showTechnical}
-            onToggleTechnical={() => setShowTechnical((v) => !v)}
+            onToggleTechnical={toggleTechnical}
           />
         ) : activeTab === "users-access" ? (
           // 068-A roster, then the 069-A feature-visibility rows BELOW it (visibility
@@ -704,7 +708,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
               <span className="flex-1" />
               <TechnicalNamesToggle
                 enabled={showTechnical}
-                onToggle={() => setShowTechnical((v) => !v)}
+                onToggle={toggleTechnical}
               />
             </div>
             <UsersAndAccess
@@ -738,7 +742,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
               <span className="flex-1" />
               <TechnicalNamesToggle
                 enabled={showTechnical}
-                onToggle={() => setShowTechnical((v) => !v)}
+                onToggle={toggleTechnical}
               />
             </div>
             <ModelRegistryTab

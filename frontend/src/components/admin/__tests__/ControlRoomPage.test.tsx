@@ -16,6 +16,7 @@ import { render, screen, cleanup, within, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ControlRoomPage } from "../ControlRoomPage"
+import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 import type { BackpressureSignals, FullAppSettings } from "@/lib/api"
 
 vi.mock("@/lib/api", () => ({
@@ -90,7 +91,14 @@ afterEach(() => {
 })
 
 function renderPage() {
-  return render(<ControlRoomPage identity={null} onBack={() => {}} />)
+  // Phase 154 (D-01a): ControlRoomPage now reads the shared reveal state via
+  // useTechnicalNames(), which throws outside a provider — wrap the render in the
+  // app-level TechnicalNamesProvider (citationNav.test wrapper idiom).
+  return render(
+    <TechnicalNamesProvider>
+      <ControlRoomPage identity={null} onBack={() => {}} />
+    </TechnicalNamesProvider>,
+  )
 }
 
 describe("ControlRoomPage (066) — the assembled Control Plane", () => {
