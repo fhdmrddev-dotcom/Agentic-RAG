@@ -347,7 +347,10 @@ Plans:
   2. Relabels are display-only — underlying enum values, API contracts, and audit action names are unchanged (verified; Pitfall 15), and Deep Mode stays byte-identical.
   3. An operator/advanced user can flip the reveal and see the technical vocabulary.
 
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
+  - [ ] 154-01-PLAN.md — Spine: shared reveal context + single-source term-map + app-wide mount + Control Room consolidation (Wave 1)
+  - [ ] 154-02-PLAN.md — Document surfaces: ingestion status badge + document-detail Metadata header (Wave 2)
+  - [ ] 154-03-PLAN.md — Settings toggle host + bounded Settings/composer relabels (Wave 2)
 **UI hint**: yes
 
 ### Phase 155: Accessibility Sweep — WCAG AA
