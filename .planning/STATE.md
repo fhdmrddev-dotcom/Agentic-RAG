@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T15:23:34.906Z"
-last_activity: 2026-07-15 -- Phase 154 planning complete
+last_updated: "2026-07-15T15:36:29.152Z"
+last_activity: 2026-07-15 -- Phase 154 Plan 01 SPINE executed
 progress:
   total_phases: 26
   completed_phases: 8
   total_plans: 61
-  completed_plans: 58
+  completed_plans: 59
   percent: 31
 ---
 
@@ -22,16 +22,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 154 — plain language layer
+**Current focus:** Phase 154 — Plain-Language Layer
 
 ## Current Position
 
-Phase: 154
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-15 -- Phase 154 planning complete
+Phase: 154 (Plain-Language Layer) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 154 (154-01 spine complete)
+Last activity: 2026-07-15 -- 154-01 SPINE executed (provider + term-map + mount + D-01a consolidation)
 
 **154 discuss (2026-07-15) — autonomous:** operator granted full authority (discuss→plan→execute unattended). Gray areas identified + decided by Claude with recommendations. `154-CONTEXT.md` locked D-01..D-05: (D-01) app-wide `TechnicalNamesProvider` localStorage context modeled on `useTheme`, default plain, all-users Settings toggle, NO operator gate + consolidate ControlRoomPage local `showTechnical` onto it; (D-02) single-source `frontend/src/lib/termMap.ts` + `usePlainLabel`; (D-03) global toggle primary, keep Phase-103 ⓘ+helper in forms; (D-04) spine + bounded prioritized end-user surfaces (chat/composer, workflow user surfaces, documents, Settings), admin surfaces only consume the context; (D-05) frontend display-only, NO backend/migration/enum/API/audit rename → Deep byte-identical by construction. G-2 = no new sketch (reuses 3 shipped operator-approved patterns). G-5 = MessageItem/StreamsProvider label-only-additive. Reported-bugs: 0 folded (no open Agentic-RAG bug in the labeling domain). Committed `3c00c2db`.
+
+**154-01 execution notes (2026-07-15) — LANG-01 the plain-language SPINE (Wave 1): TechnicalNamesProvider shared reveal context + single-source termMap.ts/usePlainLabel/PlainLabel + App-wide mount + D-01a ControlRoomPage consolidation, frontend-only, NO backend, NO migration, NO new package:**
+
+- 3 tasks (Task 1 + Task 2 TDD RED→GREEN; Task 3 auto), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: T1 RED `9b68e049` → GREEN `20ce3a78`; T2 RED `22e26860` → GREEN `a7db00e4`; T3 `5f108a9e`; SUMMARY commit follows. Touched EXACTLY the 8 declared files (5 created + 3 modified); **NO backend, NO migration, NO new package** (React context + localStorage over vendored deps — Package Legitimacy Gate not triggered). D-05a Contract-Safety Recipe CLEAN: `git diff --name-only c9f3cf2b..HEAD | grep -E '^backend/|^supabase/migrations/'` = NOTHING; every changed file under `frontend/src/`.
+- **`TechnicalNamesProvider.tsx` (the #1-failure-mode guard):** a SHARED React context (NOT a bare `useTheme` hook — that would give each consumer its own state and let the two toggles drift). Copies `citationNav.tsx` sharing structure (`createContext<T|null>` + throwing `useTechnicalNames()` + non-throwing `useTechnicalNamesOptional()`) + `useTheme.ts` localStorage persistence (`"technical-names"`, default OFF), **dropping `matchMedia`** (default is a hard `false`, D-01). Value `{ showTechnical, toggle, setShowTechnical }` memoized.
+- **`termMap.ts` + `PlainLabel.tsx`:** `TERM_MAP as const satisfies Record<string, Term>` — 18 rows across Surfaces A–D (ingest steps, statuses, doc detail, composer modes, Settings labels). `technical:` side = today's shipped string VERBATIM (D-02a, DISPLAY-only, never a wire enum/API-field/audit-action) — verified against live `DocumentStatusBadge.tsx:16-27`, `DocumentDetailPanel.tsx:230`, `SettingsPage.tsx:855`, `MessageInput.tsx:327+`; the contract-guard test loops every row + asserts key-set equality. `usePlainLabel` reads the OPTIONAL context (plain fallback, unknown-key → `String(key)` passthrough). `PlainLabel` = auto-escaped React text node (**no `dangerouslySetInnerHTML`**, T-154-02) + optional ⓘ (InfoHint inlined, mirrors PhaseFormPanel's non-exported local — keeps the 8-file scope exact; NOT a deviation).
+- **Mount + D-01a (Task 3):** `App.tsx` wraps `<CitationNavProvider>`/`<ChatLayout>` in `<TechnicalNamesProvider>` (covers chat/docs/workflows/settings/`/admin`). `ControlRoomPage.tsx` local `showTechnical` useState → `useTechnicalNames()`; 4 toggle closures → shared `toggleTechnical`; all 5 leaf prop threads (`HealthSignals`/`CapabilityGrid`/`AuditTab`/`FeatureVisibility`/`ModelRegistryTab`) BYTE-IDENTICAL (zero leaf edits). `ControlRoomPage.test.tsx` `renderPage()` wrapped in the provider (else `useTechnicalNames` throws). Settings + admin toggles are now ONE switch.
+- **Gates:** `TechnicalNamesProvider.test` 6/6 + `termMap.test` 11/11 + `ControlRoomPage.test` 7/7 = **24/24 GREEN**; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new** (0 referencing the new files); `npx vite build` exit **0**; greps: `createContext`≥1, `matchMedia`=0, `technical-names`≥1, `as const satisfies`≥1, `dangerouslySetInnerHTML`(PlainLabel)=0, `setShowTechnical`(ControlRoom)=0, `useTechnicalNames(`=1, `TechnicalNamesProvider`(App)=3. **LANG-01 stays OPEN** at the requirement level (false-green avoidance, 148–153 convention) — the Wave-2 relabel surfaces (154-02/03) + live UAT close it. Wave-2 consumers now import `usePlainLabel`/`PlainLabel` + the provider hooks off this spine.
+- **SDK quirks (known):** `state.advance-plan` clean (bumped frontmatter `completed_plans` 58→59 + Current Plan → 2 of 3). `state.update-progress` = "Progress field not found" (STATE uses the frontmatter `progress:` block). `state.record-metric` = "phase, plan, and duration required" (arg-parse) → skipped. `roadmap.update-plan-progress 154` = `summary_count: 1 / In Progress` + flipped the 154-01 checkbox, but LEFT the progress-TABLE row `0/? | Not started` stale → hand-fixed to `1/3 | Executing`.
 
 **153-05 execution notes (2026-07-15) — CITE-01 inline-marker assembly (Wave 3, final): CitedMarkdown owned-<sup> marker upgrade + MessageItem G-5 additive cited branch + AbsenceHint absence-as-signal ⓘ, frontend-only, NO backend, NO migration, NO new package:**
 
