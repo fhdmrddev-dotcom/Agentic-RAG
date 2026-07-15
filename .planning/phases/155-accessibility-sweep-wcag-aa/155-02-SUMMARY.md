@@ -154,6 +154,12 @@ No new security-relevant surface. The one trust boundary in play (design tokens 
 - The approved token (`220 16% 70%`) is locked and in-file — plan 155-07 (same wave, disjoint files) can now sweep the remaining clusters (chat/studio/classification/settings/ingestion/layout/pages/workflows/panel) onto it.
 - A11Y-01 stays OPEN at the requirement level until `/gsd:verify-work 155` (full app-wide sweep + live contrast scan).
 
+## Self-Check: PASSED
+- Commits verified present: `e0cd7760` (Task 1), `f617bbff` (Task 2), `5e4b7b02` (SUMMARY) — all FOUND in git log.
+- SUMMARY file exists at `.planning/phases/155-accessibility-sweep-wcag-aa/155-02-SUMMARY.md`.
+- Approved token confirmed unchanged in `frontend/src/index.css` line 118: `--muted-foreground-dim: 220 16% 70%`.
+- Gates green: admin `__tests__` 46/46, `tsc -b` 30 baseline (0 net-new), `vite build` exit 0.
+
 ---
 *Phase: 155-accessibility-sweep-wcag-aa*
 *Completed: 2026-07-16*

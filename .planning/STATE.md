@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T19:53:16.091Z"
-last_activity: 2026-07-15
+last_updated: "2026-07-16T00:20:47.992Z"
+last_activity: 2026-07-16
 progress:
   total_phases: 26
   completed_phases: 9
   total_plans: 68
-  completed_plans: 62
+  completed_plans: 63
   percent: 35
 ---
 
@@ -27,9 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 155 (accessibility-sweep-wcag-aa) — EXECUTING
-Plan: 2 of 7
-Status: Ready to execute (Plan 155-02 — contrast token retune + D-07 operator eyeball)
-Last activity: 2026-07-15 -- Plan 155-01 executed (jsx-a11y regression gate)
+Plan: 3 of 7
+Status: Ready to execute (Plan 155-07 — remaining-cluster opacity sweep onto the D-07-approved token)
+Last activity: 2026-07-16 -- Plan 155-02 executed + D-07 operator eyeball APPROVED
+
+**155-02 execution notes (2026-07-16) — A11Y-01 Wave 1: contrast token retune at SOURCE (D-04) + densest (admin) opacity-cluster sweep + D-07 operator eyeball, frontend-only, NO backend, NO migration:** 3 tasks (2 `type=auto` + 1 `checkpoint:human-verify`), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: T1 `e0cd7760` (feat — global dark `--muted-foreground-dim` lifted `220 16% 45%` #606d85 ~3.6:1 FAIL → `220 16% 70%` #a6aebf ~8:1, mirroring the 088-05 panel token 8.42:1; Phase 087 comment extended with the AA math; base `--muted-foreground` 220 16% 65% ~7.7:1 LEFT untouched — G-6 #4 washed-out guard); T2 `f617bbff` (fix — swept 40 meaningful-text `text-muted-foreground/{40,50,60,70}` offenders → full-opacity across 10 admin files; ModelDiscoveryPanel.tsx correctly UNtouched — its 2 occurrences are exemptions, so 10 files not 11); SUMMARY `5e4b7b02`. **T3 = D-07 CHECKPOINT: operator eyeballed the retuned dark tokens LIVE (Control Room / Deep Midnight) → APPROVED, NO lightness nudge. Final locked value `--muted-foreground-dim: 220 16% 70%` (index.css L118). Plan 155-07 sweeps the remaining non-admin clusters onto this SAME approved value.** Admin residual = **8 documented WCAG-allowed exemptions** across 4 files (decorative `aria-hidden` icons ×2, input placeholders ×3, disabled `cursor-not-allowed` controls ×3 — none meaningful text; down from 48). **No global light-theme `--muted-foreground-dim`** (dark-block only; light relies on the opacity sweeps) — flagged for the D-03 live scan. G-5 RED LINE honored (`git diff --name-only` both commits = ONLY index.css + admin/; MessageItem/StreamsProvider untouched). Gates: admin `__tests__` **46/46 GREEN (5 files)**; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new**; `npx vite build` exit **0**. **Contrast SC (D-03) proven ONLY by the live Chrome color-contrast scan** (jsdom can't compute contrast) — recorded in 155-VALIDATION.md after 155-07; never from the green vitest run. **A11Y-01 stays OPEN** at the requirement level (false-green avoidance, 148–154 convention; `requirements.mark-complete` deliberately NOT called) — closes at `/gsd:verify-work 155`. **D-155-01-A** (CI lint gates ~160 pre-existing non-a11y errors) remains out-of-scope, owed at Plan 03 review. **SDK quirks (known):** `state.advance-plan` clean (bumped `completed_plans` 62→63 + Plan → 3 of 7); `roadmap.update-plan-progress 155` = `summary_count: 2 / In Progress` + flipped the 155-02 checkbox but LEFT the progress-TABLE row `1/7 | Executing` stale → hand-fixed to `2/7 | Executing`.
 
 **155-01 execution notes (2026-07-15) — A11Y-01 Wave 1: install + wire the jsx-a11y regression gate + capture the violation inventory, frontend-tooling + CI only, NO backend, NO migration:** 2 tasks (both `type=auto`), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: T1 `5d216725` (chore — install `eslint-plugin-jsx-a11y@6.10.2` EXACT-pinned + spread `jsxA11y.flatConfigs.recommended` into the ESLint 9 flat config + capture `155-lint-inventory.txt`); T2 `5056f007` (ci — additive `npm run lint` step in the `frontend-tests.yml` vitest job, playwright job byte-identical, no new secrets/actions); SUMMARY `beac4269`. Gate verified via `eslint --print-config`: **31 jsx-a11y rules at error(2), 0 at warn(1)**, 3 off by recommended's own defaults (`anchor-ambiguous-text`/`control-has-associated-label`/`label-has-for` — left off; forcing them = strict-level, past the D-06 scope line). **@axe-core/playwright deliberately ABSENT** (D-01a / SEED-049). Inventory = **215 problems (201 errors, 14 warnings)**: **41 jsx-a11y errors = the Plan 03 fix-sweep target** (no-static-element-interactions ×9, click-events-have-key-events ×9, no-autofocus ×7, label-has-associated-control ×7, no-redundant-roles ×4, +3). Gates: `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new**; `npx vite build` exit **0**; `npm run lint` intentionally FAILS (violations unfixed until Plan 03 — expected, phase lands as a unit). **⚠ DEFERRED FINDING (out of scope, logged `deferred-items.md` D-155-01-A):** the CI `npm run lint` step also gates on **160 pre-existing NON-a11y errors** (`no-explicit-any`/`no-unused-vars`/`react-refresh`/`import/first`/`react-hooks`) — Plan 03 alone will NOT make `frontend-tests` CI green; the phase must decide the lint-gate scope (recommend an a11y-only `lint:a11y` script) at Plan 03 review / verification. **A11Y-01 stays OPEN** at the requirement level (false-green avoidance, 148–154 convention; `requirements.mark-complete` deliberately NOT called). **SDK quirks (known):** `state.advance-plan` clean (bumped `completed_plans` 61→62 + Plan → 2 of 7); `state.update-progress` = "Progress field not found" (frontmatter `progress:` block); `state.record-metric` = arg-parse; `state.record-session` = "No session fields found" → all hand-applied. `roadmap.update-plan-progress 155` flipped the 155-01 checkbox but LEFT the progress-TABLE row `0/? | Not started` stale → hand-fixed to `1/7 | Executing`.
 
