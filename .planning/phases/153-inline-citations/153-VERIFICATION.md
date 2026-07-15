@@ -1,9 +1,10 @@
 ---
 phase: 153-inline-citations
 verified: 2026-07-15T08:58:53Z
-status: human_needed
-score: 4/4 roadmap truths verified (code-level); live SC#10 4-axis UAT pending
+status: passed
+score: 4/4 roadmap truths verified (code-level) + live UAT accepted 2026-07-15 (153-UAT.md 7/7 pass; Anthropic proven live + DB set-membership 0-out-of-range; operator accepted the Anthropic proof for SC#10 cross-provider, 152 precedent)
 overrides_applied: 0
+resolution: human_verification closed 2026-07-15 — operator accepted; see 153-UAT.md + 153-HUMAN-UAT.md
 human_verification:
   - test: "Cross-provider markers + graceful degradation — one representative model each for OpenAI, Anthropic, Google, OpenRouter"
     expected: "Markers render on native providers that comply; a model that emits none degrades to footer-only (D-06/D-07) — no provider ends up worse than today. OpenRouter axis may be blocked by external BUG-260714-02 (operator-accept precedent from Phase 152)."

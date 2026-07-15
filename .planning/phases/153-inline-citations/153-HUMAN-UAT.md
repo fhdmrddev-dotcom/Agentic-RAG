@@ -1,9 +1,10 @@
 ---
-status: partial
+status: accepted
 phase: 153-inline-citations
 source: [153-VERIFICATION.md, 153-VALIDATION.md]
 started: 2026-07-15
 updated: 2026-07-15
+resolution: operator accepted the Anthropic proof for SC#10 (152 precedent) 2026-07-15 — formal results in 153-UAT.md
 driver: Claude (Chrome MCP + psycopg2) — live run on Anthropic claude-sonnet-5, thread c7a3eed5-6f0e-414a-939b-adbf175b8878, backend http://localhost:8000 (--reload instance, new agent_loop.py live)
 ---
 
