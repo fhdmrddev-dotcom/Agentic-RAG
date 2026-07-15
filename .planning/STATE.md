@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T07:30:14.456Z"
+last_updated: "2026-07-15T07:47:04.564Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 26
   completed_phases: 7
   total_plans: 58
-  completed_plans: 54
-  percent: 27
+  completed_plans: 56
+  percent: 28
 ---
 
 # Project State
@@ -27,9 +27,17 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 153 (inline-citations) — EXECUTING
-Plan: 3 of 5 (153-01, 153-02 complete)
-Status: Ready to execute (153-03 next — References footer restructure, Wave 2)
-Last activity: 2026-07-15 -- 153-02 executed (frontend citation interaction foundation)
+Plan: 4 of 5 (153-01, 153-02, 153-03 complete)
+Status: Ready to execute (153-04 next — CitationPeek hover-peek → click-to-pin, Wave 2)
+Last activity: 2026-07-15 -- 153-03 executed (References footer restructure, Wave 2)
+
+**153-03 execution notes (2026-07-15) — CITE-01 References footer restructure (Wave 2): CitationList numbered + open-by-default-when-markers + CitationCard [n]/Open document/full-doc row/flash target, frontend-only, NO backend, NO migration, NO new package:**
+
+- 2 tasks (Task 1 build-verified feat; Task 2 TDD RED→GREEN), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: Task 1 `9f7d4977` (feat CitationCard); Task 2 RED `c5ebf7a9` (test — 9 failing / 2 passing) → GREEN `4ba0ffa6` (feat CitationList); SUMMARY commit follows. Touched EXACTLY the 3 declared files (`CitationList.tsx`, `CitationCard.tsx`, `__tests__/CitationList.test.tsx`); **NO backend, NO migration, NO new package** (pure render restructure over the 153-02 `citationNav` contract — Package Legitimacy Gate not triggered).
+- **`CitationCard`:** optional 1-based `n` prop → leading mono `[n]` chip in `--primary` (D-03, keyed 1:1 to the marker); REUSED the existing `is_full_doc` branch — full-doc row shows `· Full document` with NO chunk index / NO similarity, chunk row shows `· Chunk N · {similarity 2dp}` (D-09/D-10); `↗ Open document` via the owner-scoped `useCitationNavOptional().openDocument(document_id)` (T-153-03-02 — no new unscoped fetch); the row is a keyboard-operable `role="button"` (Enter/Space) with `aria-label` (filename + location), `data-citation-row={n}` (imported `CITATION_ROW_ATTR`, not hardcoded), transient `aria-current`, and `flashCitationMarker(n, flashContainer)` on activate (row→marker direction). `n`-optional + `useCitationNavOptional` keep the pre-existing out-of-scope `src/__tests__/components/CitationCard.test.tsx` GREEN with NO edit. Location text upgraded `/50` → `--muted-foreground` (AA); no `--muted-foreground-dim`.
+- **`CitationList`:** canonical **`defaultOpen: boolean`** prop (the ONE open-state prop, no `hasMarkers` alias — the locked wave-2↔wave-3 contract; 153-05 passes the SAME name) → `useState(defaultOpen)`: open-by-default when markers exist (D-07), collapsed otherwise (today's behavior); header copy `References · {N} source(s)` reusing today's pluralization; `citations.length===0 → null` guard kept (D-06 footer renders only when a set exists, but ALWAYS when it does, marker-independent); threads `n = i + 1` preserving `citations` order (D-03) + an optional `flashContainer` to each row for the 153-05 producer. Kept the existing `Collapsible`/`CollapsibleTrigger` + `aria-expanded` (no hand-rolled disclosure).
+- **Gates:** new suite `CitationList.test.tsx` **11/11 GREEN** (empty-set null, References header + pluralization, defaultOpen open-by-default vs collapsed, 1-based `[n]` numbering + order, full-doc `· Full document` no chunk/score, row→marker flash toggles `citation-marker-active`, Open-document → `openDocument(document_id)`); pre-existing `CitationCard.test.tsx` **7/7 GREEN** (no edit); non-regression `MessageItem.test.tsx` + `citationNav.test.tsx` **16/16 GREEN**; `npx tsc -b` = exactly **30** pre-existing SEED-056/049 baseline errors, **0 net-new**; `npx vite build` exit **0**. **CITE-01 stays OPEN** at the requirement level (false-green avoidance, 148–152 + 153-01/02 convention) — closes at verify-work/secure-phase after the Wave-3 render plan + the live SC#10 4-axis cross-provider UAT (`153-VALIDATION.md`).
+- **SDK quirks (known):** `state.advance-plan` bumped Current Plan → 4 of 5. `state.update-progress` = "Progress field not found" (STATE uses the frontmatter `progress:` block); `state.record-metric` = arg-parse "phase, plan, and duration required"; `state.add-decision` = "summary required" → all hand-applied here. `roadmap.update-plan-progress 153` = `summary_count: 2` pre-SUMMARY → the progress-TABLE row `2/5` was hand-fixed to `3/5` + the 153-03 checkbox flipped (the SDK counts SUMMARY files on disk).
 
 **153-02 execution notes (2026-07-15) — CITE-01 shared citation-interaction foundation (interface-first): nav context + marker↔row flash contract + additive CSS + App/IngestionPage owner-scoped wiring, frontend-only, NO backend, NO migration, NO new package:**
 

@@ -326,7 +326,7 @@ Plans:
 
 **Wave 2** *(blocked on 153-02)*
 
-- [ ] 153-03-PLAN.md — References footer restructure: CitationList numbered + open-by-default-when-markers + CitationCard [n]/Open document/full-doc row/flash target [CITE-01]
+- [x] 153-03-PLAN.md — References footer restructure: CitationList numbered + open-by-default-when-markers + CitationCard [n]/Open document/full-doc row/flash target [CITE-01]
 - [ ] 153-04-PLAN.md — CitationPeek hover-peek → click-to-pin popover (chunk + full-doc variants, calm degrade, a11y pin/Esc) [CITE-01]
 
 **Wave 3** *(blocked on 153-03 + 153-04)*
@@ -418,7 +418,7 @@ Plans:
 | 150. Secrets at Rest | 5/5 | Complete | 2026-07-13 |
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
-| 153. Inline Citations | 2/5 | Executing | - |
+| 153. Inline Citations | 3/5 | Executing | - |
 | 154. Plain-Language Layer | 0/? | Not started | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
