@@ -53,7 +53,7 @@ const SHIPPED_TECHNICAL: Record<string, string> = {
   "settings.tab.retrieval": "Search & Retrieval",
   "settings.temperature": "temperature",
   "settings.context_window": "context window max tokens",
-  "settings.embedding": "embedding",
+  "settings.embedding": "Embedding model",
   "settings.reembed": "re-embed",
 }
 

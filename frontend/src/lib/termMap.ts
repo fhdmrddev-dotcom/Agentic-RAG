@@ -127,7 +127,7 @@ export const TERM_MAP = {
   "settings.embedding": {
     plain: "Search index",
     helper: "The model that makes your documents searchable.",
-    technical: "embedding",
+    technical: "Embedding model",
   },
   "settings.reembed": {
     plain: "Rebuild the search index",
