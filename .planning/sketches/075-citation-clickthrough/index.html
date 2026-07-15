@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 075 — Citation Click-through</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { font-family: var(--font-sans); color: var(--color-text); background: var(--color-bg); padding-top: 46px; min-height: 100vh; }
+
+  /* push/split layout: chat shrinks when the panel opens (variant C) */
+  .wrap { display: grid; grid-template-columns: minmax(0,1fr) 0px; transition: grid-template-columns var(--dur-slow) var(--ease-out); min-height: calc(100vh - 46px); }
+  .wrap.panel-open { grid-template-columns: minmax(0,1fr) 400px; }
+
+  .stage { max-width: 760px; margin: 0 auto; padding: var(--space-6) var(--space-6) 120px; width: 100%; }
+  .intro h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0 0 6px; }
+  .intro p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 var(--space-5); line-height: 1.55; }
+
+  /* behavior caption per variant */
+  .behavior { display: flex; align-items: center; gap: 9px; margin-bottom: var(--space-6); padding: 10px 13px; background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-primary); border-radius: var(--radius-md); font-size: var(--text-sm); }
+  .behavior .k { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); text-transform: uppercase; letter-spacing: .05em; }
+  .behavior .d { color: var(--color-text-muted); }
+
+  .turn { display: flex; gap: var(--space-3); margin-bottom: var(--space-6); }
+  .turn.user { flex-direction: row-reverse; }
+  .avatar { width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0; display: grid; place-items: center; font-size: 14px; }
+  .avatar.bot { background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+  .avatar.me { background: var(--color-accent); color: var(--color-text-muted); }
+  .bubble.user-b { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); padding: 9px 14px; max-width: 70%; font-size: var(--text-sm); }
+  .answer { flex: 1; min-width: 0; }
+  .answer .meta-line { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: 7px; }
+  .answer p { font-size: var(--text-base); line-height: 1.72; margin: 0 0 var(--space-3); color: var(--color-text); }
+  .answer strong { color: var(--color-text); font-weight: 650; }
+
+  /* winning marker form A — superscript chip (from sketch 074) */
+  .cite-sup { font-family: var(--font-mono); font-size: 0.62em; font-weight: 700; vertical-align: super; line-height: 0; color: var(--color-primary); background: var(--color-primary-dim); border-radius: 4px; padding: 1px 4px; margin-left: 1px; cursor: pointer; transition: all var(--dur-fast); user-select: none; }
+  .cite-sup:hover { background: var(--color-primary-glow); color: #fff; }
+  .cite-sup.active-ref { background: var(--color-primary-strong); color: #fff; }
+
+  /* ── restructured numbered References footer (operator pick — the winner track, present in all 3) ── */
+  .refs { margin-top: var(--space-4); border-top: 1px solid var(--color-border-soft); padding-top: var(--space-3); }
+  .refs-head { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--color-text-muted); cursor: pointer; user-select: none; }
+  .refs-head:hover { color: var(--color-text); }
+  .refs-body { margin-top: 10px; display: none; flex-direction: column; gap: 8px; }
+  .refs-body.open { display: flex; }
+  .ref-row { display: flex; gap: 10px; font-size: var(--text-xs); padding: 8px 10px; border-radius: var(--radius-sm); background: var(--color-muted); transition: all var(--dur-base); cursor: pointer; scroll-margin-top: 70px; }
+  .ref-row:hover { background: var(--color-accent); }
+  .ref-row.flash { background: var(--color-primary-dim); box-shadow: inset 3px 0 0 var(--color-primary), 0 0 0 1px var(--color-primary-glow); }
+  .ref-num { font-family: var(--font-mono); font-weight: 700; color: var(--color-primary); flex-shrink: 0; }
+  .ref-meta { min-width: 0; flex: 1; }
+  .ref-file { color: var(--color-text); font-weight: 600; }
+  .ref-loc { color: var(--color-text-dim); margin-left: 6px; }
+  .ref-pass { color: var(--color-text-muted); font-style: italic; margin-top: 3px; line-height: 1.45; }
+  .ref-open { color: var(--color-text-dim); font-size: 10px; margin-top: 4px; }
+  .ref-open a { color: var(--color-primary); text-decoration: none; }
+  .ref-open a:hover { text-decoration: underline; }
+
+  /* ── variant A: hover-preview popover → click to pin ── */
+  .peek { position: absolute; z-index: 60; width: 320px; background: var(--color-surface-hi); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 12px 14px; font-size: var(--text-xs); opacity: 0; pointer-events: none; transform: translateY(4px); transition: all var(--dur-fast); }
+  .peek.show { opacity: 1; transform: none; pointer-events: auto; }
+  .peek.pinned { border-color: var(--color-primary-glow); box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-primary-glow); }
+  .peek .pk-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); color: var(--color-text-muted); margin-bottom: 7px; }
+  .peek .pk-num { color: var(--color-primary); font-weight: 700; }
+  .peek .pk-pin { margin-left: auto; font-size: 13px; color: var(--color-text-dim); cursor: pointer; background: none; border: 0; }
+  .peek .pk-pin:hover { color: var(--color-text); }
+  .peek .pk-pass { color: var(--color-text-muted); font-style: italic; line-height: 1.55; }
+  .peek .pk-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--color-border-soft); font-size: 10px; color: var(--color-text-dim); display: flex; justify-content: space-between; align-items: center; }
+  .peek .pk-open { color: var(--color-primary); text-decoration: none; font-weight: 600; }
+  .peek .pk-open:hover { text-decoration: underline; }
+
+  /* ── variant C: right-side workspace panel (push/split, reuses 004-B shell) ── */
+  .panel { grid-column: 2; background: var(--color-bg-elev1); border-left: 1px solid var(--color-border); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 9px; padding: 13px 15px; border-bottom: 1px solid var(--color-border); }
+  .panel-head .pt { font-family: var(--font-headline); font-size: var(--text-sm); font-weight: 700; flex: 1; }
+  .panel-head .close { background: none; border: 0; color: var(--color-text-dim); cursor: pointer; font-size: 17px; line-height: 1; }
+  .panel-head .close:hover { color: var(--color-text); }
+  .panel-src-tabs { display: flex; gap: 5px; padding: 9px 13px; border-bottom: 1px solid var(--color-border-soft); flex-wrap: wrap; }
+  .src-tab { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--color-text-muted); background: var(--color-muted); border: 1px solid transparent; border-radius: var(--radius-sm); padding: 4px 8px; cursor: pointer; transition: all var(--dur-fast); }
+  .src-tab:hover { color: var(--color-text); }
+  .src-tab.active { color: var(--color-primary); background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+  .panel-body { padding: 15px; overflow-y: auto; flex: 1; }
+  .doc-title { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: var(--text-sm); margin-bottom: 3px; }
+  .doc-sub { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); margin-bottom: 14px; }
+  .passage-full { font-size: var(--text-sm); line-height: 1.75; color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 2px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 13px 15px; }
+  .passage-full mark { background: var(--color-primary-dim); color: var(--color-text); border-radius: 3px; padding: 0 2px; }
+  .panel-foot { padding: 12px 15px; border-top: 1px solid var(--color-border); }
+  .btn-open-doc { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 8px 13px; cursor: pointer; text-decoration: none; transition: all var(--dur-fast); }
+  .btn-open-doc:hover { background: var(--color-primary-strong); color: #fff; }
+
+  .wire-flag { font-size: 9px; font-weight: 800; color: var(--color-accent-violet); background: hsl(258 90% 66% / .13); border: 1px solid hsl(258 90% 66% / .35); padding: 1px 6px; border-radius: var(--radius-full); vertical-align: middle; }
+  .legend { margin-top: var(--space-8); font-size: 11.5px; color: var(--color-text-dim); line-height: 1.7; border-top: 1px dashed var(--color-border); padding-top: var(--space-4); }
+  .legend b { color: var(--color-text-muted); }
+
+  #variant-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998; height: 46px; background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+  #variant-nav .brand { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-right: 8px; }
+  .variant-tab { font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--color-text-muted); background: transparent; border: 1px solid transparent; padding: 6px 12px; border-radius: var(--radius-sm); transition: all var(--dur-fast); }
+  .variant-tab:hover { color: var(--color-text); }
+  .variant-tab.active { color: var(--color-text); background: var(--color-accent); border-color: var(--color-border); }
+  #tools { position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui; font-size: 12px; background: rgba(0,0,0,0.72); color: #fff; padding: 8px 12px; border-radius: 8px; opacity: 0.42; transition: opacity var(--dur-base); display: flex; align-items: center; gap: 10px; }
+  #tools:hover { opacity: 1; }
+  #tools select, #tools button { font-size: 11px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 3px 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">075 · citation-clickthrough</span>
+  <button class="variant-tab active" onclick="pick('a', this)">A: Hover-peek → click-to-pin ★ Selected</button>
+  <button class="variant-tab" onclick="pick('b', this)">B: Scroll + flash References</button>
+  <button class="variant-tab" onclick="pick('c', this)">C: Open in workspace panel</button>
+</div>
+
+<div class="wrap" id="wrap">
+  <div class="stage" id="stage">
+    <div class="intro">
+      <h1>Inline citations — the click-through</h1>
+      <p>
+        The marker is the winning <b>superscript chip</b> (Sketch&nbsp;074). This sketch settles what happens when you <b>use</b> it — and confirms the bottom "N&nbsp;sources" list has become a <b>numbered <code>[n]</code> References footer keyed to the markers</b> (your pick). Switch A/B/C to feel each click target on the <i>same</i> marker.
+      </p>
+    </div>
+
+    <div class="behavior" id="behavior"></div>
+
+    <div class="turn user">
+      <div class="avatar me">You</div>
+      <div class="bubble user-b">What drove the Q3 revenue growth, and how did margins hold up?</div>
+    </div>
+
+    <div class="turn">
+      <div class="avatar bot">✦</div>
+      <div class="answer">
+        <div class="meta-line">anthropic · claude-opus-4-7 · turn 1 · 🔍 search_documents → 3 chunks</div>
+        <p>
+          Revenue grew <strong>30.9% YoY</strong> in Q3<sup class="cite-sup" data-n="1" onmouseenter="hoverOn(this,1)" onmouseleave="hoverOff()" onclick="clickMarker(this,1,event)">1</sup>, driven mainly by enterprise renewals and a 14% lift in net-new logos<sup class="cite-sup" data-n="2" onmouseenter="hoverOn(this,2)" onmouseleave="hoverOff()" onclick="clickMarker(this,2,event)">2</sup>. Gross margin held roughly flat at <strong>71%</strong> despite higher infrastructure spend<sup class="cite-sup" data-n="3" onmouseenter="hoverOn(this,3)" onmouseleave="hoverOff()" onclick="clickMarker(this,3,event)">3</sup>. In general, SaaS businesses at this stage trade a little margin for growth — so flat margin alongside 30%+ growth is a healthy signal.
+        </p>
+
+        <div class="refs">
+          <div class="refs-head" onclick="toggleRefs()"><span id="refsCaret">▾</span> <span>References · 3 sources</span> <span class="wire-flag">numbered = net-new</span></div>
+          <div class="refs-body open" id="refsBody">
+            <div class="ref-row" id="ref-1" onclick="clickRow(1)"><span class="ref-num">[1]</span><div class="ref-meta"><span class="ref-file">board_minutes_q3.md</span><span class="ref-loc">· Chunk 4 · 0.63</span><div class="ref-pass">"…total revenue of $18.4M, up 30.9% from $14.1M in Q3 last year, the strongest quarter on record…"</div><div class="ref-open"><a onclick="event.stopPropagation()">↗ Open document</a></div></div></div>
+            <div class="ref-row" id="ref-2" onclick="clickRow(2)"><span class="ref-num">[2]</span><div class="ref-meta"><span class="ref-file">revenue_bridge_q3.pdf</span><span class="ref-loc">· Chunk 11 · 0.58</span><div class="ref-pass">"…enterprise renewals contributed $2.9M of the lift; net-new logo count rose 14% quarter over quarter…"</div><div class="ref-open"><a onclick="event.stopPropagation()">↗ Open document</a></div></div></div>
+            <div class="ref-row" id="ref-3" onclick="clickRow(3)"><span class="ref-num">[3]</span><div class="ref-meta"><span class="ref-file">retention_analysis.md</span><span class="ref-loc">· Full document · 0.55</span><div class="ref-pass">"…blended gross margin steady at 71% (70.8% the prior quarter) despite a step-up in infrastructure spend…"</div><div class="ref-open"><a onclick="event.stopPropagation()">↗ Open document</a></div></div></div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <b>What's real vs net-new.</b> The passages, filenames, chunk index &amp; similarity are <b>wired</b> (<code>citations</code> SSE + <code>source_refs</code>); the footer is today's <code>CitationList</code>/<code>CitationCard</code> (net-new: numbering + marker↔row link). "Open document" reuses the <b>real</b> document-detail route. <b>A</b>'s hover-popover and <b>C</b>'s panel-source-tabs are net-new render; <b>C</b>'s shell reuses the shipped workspace panel (004-B). Mutation-free — read-only click-through.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- variant C workspace panel (push/split) -->
+  <div class="panel" id="panel" style="display:none">
+    <div class="panel-head">
+      <span class="pt">Source</span>
+      <button class="close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-src-tabs" id="srcTabs"></div>
+    <div class="panel-body" id="panelBody"></div>
+    <div class="panel-foot"><a class="btn-open-doc" id="openDocBtn">↗ Open full document</a></div>
+  </div>
+</div>
+
+<div class="peek" id="peek"></div>
+
+<div id="tools">
+  <label>theme
+    <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+      <option value="default">Default</option>
+    </select>
+  </label>
+  <span>view</span>
+  <button onclick="setW('400px')">📱</button>
+  <button onclick="setW('720px')">▭</button>
+  <button onclick="setW('760px')">🖥</button>
+</div>
+
+<script>
+  const PASS = {
+    1: { file: 'board_minutes_q3.md', loc: 'Chunk 4 · 0.63', short: '"…total revenue of $18.4M, up 30.9% from $14.1M in Q3 last year, the strongest quarter on record…"',
+         full: 'The board reviewed Q3 performance in detail. The company reported <mark>total revenue of $18.4M, up 30.9% from $14.1M in Q3 last year</mark> — the strongest quarter on record. Management attributed the beat to renewal strength in the enterprise segment and disciplined pipeline conversion.' },
+    2: { file: 'revenue_bridge_q3.pdf', loc: 'Chunk 11 · 0.58', short: '"…enterprise renewals contributed $2.9M of the lift; net-new logo count rose 14% QoQ…"',
+         full: 'Bridging Q2 to Q3, the largest components of the lift were: <mark>enterprise renewals contributed $2.9M; net-new logo count rose 14% quarter over quarter</mark>. Expansion revenue was roughly flat; churn was slightly favorable versus plan.' },
+    3: { file: 'retention_analysis.md', loc: 'Full document · 0.55', short: '"…blended gross margin steady at 71% (70.8% prior quarter) despite a step-up in infra spend…"',
+         full: 'On unit economics, the analysis notes <mark>blended gross margin steady at 71% (70.8% the prior quarter) despite a step-up in infrastructure spend</mark> tied to the new region rollout. Net revenue retention held at 118%.' },
+  };
+
+  let variant = 'a';
+  let pinned = false;
+
+  const BEHAVIORS = {
+    a: { k: 'Hover → peek · click → pin', d: 'Hover a marker to peek the passage without leaving your place; click pins the card (📌) so it stays. "Open document" deep-links the source.' },
+    b: { k: 'Click → scroll + flash the footer', d: 'One canonical home: clicking a marker smooth-scrolls to the matching numbered References row and blooms it. No floating card.' },
+    c: { k: 'Click → open the workspace panel', d: 'Clicking a marker slides the source into the right push/split panel (chat shrinks). Source tabs let you compare [1][2][3]; heaviest, best for deep inspection.' },
+  };
+
+  function pick(v, btn) {
+    variant = v;
+    document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    setBehavior();
+    hoverOff(true); closePanel(); clearActive();
+    // footer open by default in A/B; in C the panel is the star but footer still available
+    document.getElementById('refsBody').classList.add('open');
+    document.getElementById('refsCaret').textContent = '▾';
+  }
+  function setBehavior() {
+    const b = BEHAVIORS[variant];
+    document.getElementById('behavior').innerHTML = `<span class="k">${b.k}</span><span class="d">${b.d}</span>`;
+  }
+
+  function clearActive(){ document.querySelectorAll('.cite-sup').forEach(m=>m.classList.remove('active-ref')); }
+
+  // ── hover (variant A only) ──
+  function hoverOn(el, n) {
+    if (variant !== 'a' || pinned) return;
+    showPeek(el, n, false);
+  }
+  function hoverOff(force) {
+    if (pinned && !force) return;
+    document.getElementById('peek').classList.remove('show','pinned');
+    pinned = false;
+  }
+  function showPeek(el, n, pin) {
+    const p = PASS[n]; const pk = document.getElementById('peek');
+    pk.innerHTML = `<div class="pk-head"><span class="pk-num">[${n}]</span> ${p.file}`
+      + (pin ? `<button class="pk-pin" onclick="hoverOff(true)" title="unpin">📌</button>` : `<button class="pk-pin" title="hover">▾</button>`)
+      + `</div><div class="pk-pass">${p.short}</div>`
+      + `<div class="pk-foot"><span>${p.loc}</span><a class="pk-open" onclick="event.stopPropagation()">↗ Open document</a></div>`;
+    const r = el.getBoundingClientRect();
+    pk.style.left = Math.min(r.left, window.innerWidth - 340) + 'px';
+    pk.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    pk.classList.add('show');
+    pk.classList.toggle('pinned', pin);
+  }
+
+  // ── click a marker — behavior depends on variant ──
+  function clickMarker(el, n, ev) {
+    ev.stopPropagation();
+    clearActive(); el.classList.add('active-ref');
+    if (variant === 'a') { pinned = true; showPeek(el, n, true); }
+    else if (variant === 'b') { hoverOff(true); flashRow(n); }
+    else { hoverOff(true); openPanel(n); }
+  }
+
+  // clicking a footer row mirrors the click-through (feels bidirectional)
+  function clickRow(n) {
+    const m = document.querySelector('.cite-sup[data-n="'+n+'"]');
+    clearActive(); if (m) m.classList.add('active-ref');
+    if (variant === 'c') openPanel(n); else flashRow(n);
+  }
+
+  function flashRow(n) {
+    const body = document.getElementById('refsBody');
+    if (!body.classList.contains('open')) toggleRefs();
+    document.querySelectorAll('.ref-row').forEach(r => r.classList.remove('flash'));
+    const row = document.getElementById('ref-'+n);
+    row.classList.add('flash');
+    row.scrollIntoView({behavior:'smooth', block:'center'});
+    setTimeout(()=>row.classList.remove('flash'), 1700);
+  }
+
+  // ── variant C panel ──
+  function openPanel(n) {
+    document.getElementById('wrap').classList.add('panel-open');
+    document.getElementById('panel').style.display = 'flex';
+    // source tabs
+    document.getElementById('srcTabs').innerHTML = [1,2,3].map(i =>
+      `<button class="src-tab ${i===n?'active':''}" onclick="showSource(${i})">[${i}] ${PASS[i].file.split('.')[0]}</button>`).join('');
+    showSource(n);
+  }
+  function showSource(n) {
+    const p = PASS[n];
+    document.querySelectorAll('.src-tab').forEach((t,i)=>t.classList.toggle('active', i===n-1));
+    document.getElementById('panelBody').innerHTML =
+      `<div class="doc-title">📄 ${p.file}</div><div class="doc-sub">[${n}] · ${p.loc}</div>`
+      + `<div class="passage-full">${p.full}</div>`;
+    document.getElementById('openDocBtn').textContent = '↗ Open ' + p.file;
+    clearActive(); const m = document.querySelector('.cite-sup[data-n="'+n+'"]'); if (m) m.classList.add('active-ref');
+  }
+  function closePanel() {
+    document.getElementById('wrap').classList.remove('panel-open');
+    document.getElementById('panel').style.display = 'none';
+    clearActive();
+  }
+
+  function toggleRefs() {
+    const b = document.getElementById('refsBody');
+    b.classList.toggle('open');
+    document.getElementById('refsCaret').textContent = b.classList.contains('open') ? '▾' : '▸';
+  }
+
+  function setW(w){ document.getElementById('stage').style.maxWidth = w; }
+
+  // dismiss pinned peek on outside click
+  document.addEventListener('click', () => { if (variant==='a' && pinned) hoverOff(true); });
+
+  setBehavior();
+</script>
+</body>
+</html>
