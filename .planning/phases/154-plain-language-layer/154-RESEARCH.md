@@ -574,9 +574,10 @@ const { showTechnical, toggle } = useTechnicalNames()
 
 **All `file:line` references and the 30-error tsc baseline are VERIFIED, not assumed.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which Settings tab hosts the "Show technical names" toggle?**
+   - **RESOLVED (154-03 Task 1):** hosted as a compact "Show technical names" row near the top of the AI Model tab (value="0"); app-wide, tab-agnostic.
    - What we know: SettingsPage has 5 tabs (AI Model / Search & Retrieval / Integrations / Memory /
      Audit Log, `SettingsPage.tsx:854-858`). The toggle is app-wide, not tab-specific.
    - What's unclear: best home — a new "Display"/"Preferences" spot, or appended to an existing tab.
@@ -584,11 +585,13 @@ const { showTechnical, toggle } = useTechnicalNames()
      "Preferences" section. Not blocking.
 
 2. **How far to plain-ify deep Settings config (sub-agent tokens, OpenRouter tool strategy)?**
+   - **RESOLVED (154-03 Task 1):** leave deep expert-config knobs as-is (helper only if trivial); relabel budget kept on the resolving user-facing fields (Search tab, search-index). Avoids Pitfall 4.
    - What we know: these are legitimately technical-audience knobs a casual user never opens.
    - Recommendation: leave as-is or add a helper only; do NOT invent plain labels for expert config
      (avoids Pitfall 4). Keep the relabel budget on Surfaces A–C.
 
 3. **Do the workflow-authoring local maps migrate to termMap this phase?**
+   - **RESOLVED (deferred):** NO — Surface E (PhaseFormPanel maps) is rank 5, below the cut line; omitted from the plan set as a documented follow-up (D-04b). Not planned this phase.
    - Recommendation: OPTIONAL (rank 5, below the cut line). Ship the spine + ranks 1–4 first; migrate
      if budget remains. Document uncovered as follow-up (D-04b).
 
