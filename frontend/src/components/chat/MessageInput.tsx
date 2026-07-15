@@ -11,6 +11,11 @@ import {
 import { MODEL_INFO } from "@/lib/model-info"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
+// Phase 154 (LANG-01 / D-03) — General/Explorer keep their already-plain labels
+// (routed through the single-source term-map so nothing drifts) and gain a one-line
+// helper. Additive DISPLAY strings only — no render-flow / stream logic; the
+// "default"/"explorer" enum + MessageItem.tsx / StreamsProvider.tsx stay untouched (G-5).
+import { TERM_MAP, usePlainLabel } from "@/lib/termMap"
 
 interface Provider {
   id: string
@@ -122,6 +127,12 @@ export function MessageInput({
       onClearPrefill?.()
     }
   }, [prefillMessage, onClearPrefill])
+
+  // Phase 154 (LANG-01 / D-03) — the mode labels sourced from the term-map (plain
+  // by default; for these keys plain === technical, so the visible label is
+  // unchanged). The one-line helper text lives on the same term-map rows.
+  const generalLabel = usePlainLabel("agentmode.default")
+  const explorerLabel = usePlainLabel("agentmode.explorer")
 
   const handleSend = () => {
     const trimmed = value.trim()
@@ -331,19 +342,31 @@ export function MessageInput({
                   <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
                     <DropdownMenuItem
                       onSelect={() => onAgentModeChange("default")}
-                      className={cn("text-xs cursor-pointer gap-2", agentMode === "default" && "font-medium bg-accent")}
+                      className={cn("text-xs cursor-pointer gap-2 items-start", agentMode === "default" && "font-medium bg-accent")}
                     >
-                      <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                      General
-                      {agentMode === "default" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                      <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span>{generalLabel}</span>
+                          {agentMode === "default" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                        </div>
+                        {/* Phase 154 — one-line plain helper off the term-map (additive). */}
+                        <p className="text-[10px] font-normal text-muted-foreground mt-0.5">{TERM_MAP["agentmode.default"].helper}</p>
+                      </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => onAgentModeChange("explorer")}
-                      className={cn("text-xs cursor-pointer gap-2", agentMode === "explorer" && "font-medium bg-accent")}
+                      className={cn("text-xs cursor-pointer gap-2 items-start", agentMode === "explorer" && "font-medium bg-accent")}
                     >
-                      <Compass className="h-3 w-3 shrink-0 text-muted-foreground" />
-                      Explorer
-                      {agentMode === "explorer" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                      <Compass className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span>{explorerLabel}</span>
+                          {agentMode === "explorer" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                        </div>
+                        {/* Phase 154 — one-line plain helper off the term-map (additive). */}
+                        <p className="text-[10px] font-normal text-muted-foreground mt-0.5">{TERM_MAP["agentmode.explorer"].helper}</p>
+                      </div>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
