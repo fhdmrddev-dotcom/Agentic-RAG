@@ -11,6 +11,7 @@ progress:
   total_plans: 61
   completed_plans: 61
   percent: 35
+stopped_at: Phase 155 context gathered — ready to plan
 ---
 
 # Project State
@@ -28,8 +29,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 155
 Plan: Not started
-Status: Ready to plan
+Status: Context gathered — ready to plan (155-CONTEXT.md committed `43679c29`)
 Last activity: 2026-07-15
+
+**155 discuss (2026-07-15):** All 4 gray areas discussed interactively, all recommended options selected. D-01..D-14 locked in `155-CONTEXT.md`: HYBRID axe gate (vitest-axe per-surface suites + live Chrome-DevTools scan for the contrast rules jsdom can't compute; `@axe-core/playwright` REJECTED — SEED-049 rot); `eslint-plugin-jsx-a11y` as ERRORS with full fix; category-zero live bar (SEED-092 baseline: 19 contrast + 46 button-name nodes); contrast fixed AT THE TOKEN SOURCE (Phase 088-05 math precedent) + full app-wide icon-button labeling sweep; lint-drawn scope line (other findings → documented SEED-092-remainder list); D-07 mid-execution operator eyeball on retuned tokens; keyboard walkthrough Claude-drives-via-Chrome-MCP + operator confirms 4 must-pass G-4 scenarios (workflow launch / cited answer / Control Room kill-switch / Settings+nav); task+3-invariants pass bar; names-only SR scope; FULL net-new surface inventory incl. 154 relabels; shared-primitive violations fixed at the primitive (G-5 display-additive exception MessageItem/StreamsProvider); documented per-rule/per-selector exclusions — zero UNEXPLAINED violations. Reported-bugs: 0 folded (none in a11y domain). Todo `spike-nl-workflow-authoring` reviewed, NOT folded (false-positive). Deferred: provider/model icons in selector + composer selected-state icon (operator request) → Phase 156 POLISH-01 via the Phase-127 @lobehub/icons convention. NEXT: `/gsd:plan-phase 155`.
 
 **154 PHASE COMPLETE (autonomous, 2026-07-15) — LANG-01 executed + verified:** discuss (154-CONTEXT D-01..D-05) → research (term inventory + provider shape) → pattern-map → plan (3 plans/2 waves, plan-checker PASSED after 1 revision) → execute (spine 154-01 + document surfaces 154-02 + Settings toggle/composer 154-03) → verify. **gsd-verifier: 8/8 must-haves code-verified, status human_needed** (SC#1 copy + SC#3 full cross-surface walk = operator-judgment per 148-153 convention). **gsd-code-reviewer: 0 Critical / 1 Warning (WR-01) / 2 Info, threats_open:0** — WR-01/F-01 (settings.embedding.technical "embedding"→"Embedding model" verbatim-shipped-string) FIXED same-session (`8ba20bc2`). Both agents independently converged on F-01. **Live Chrome UAT: SC#1 plain-default ("Search"/"General") + SC#3 reveal-flip ("Search"→"Search & Retrieval" on toggle ON) proven LIVE**; persistence unit-covered; full cross-surface walk + copy taste → operator (154-HUMAN-UAT.md). Gates: 14 files/115 tests green, tsc exactly 30 SEED-056/049 baseline (0 net-new), vite build 0. SC#2 contract-safety: ZERO backend/migration files, G-5 (MessageItem/StreamsProvider) untouched. **Spine shipped:** `TechnicalNamesProvider` (shared context, NOT bare hook) + single-source `termMap.ts` + `PlainLabel` + App-wide mount + D-01a ControlRoomPage consolidation (Settings toggle ↔ admin toggle = one switch). Frontend-only — NO backend/migration/cloud-parity. **Operator note:** the "Show technical names" toggle was left ON during UAT (harmless personal pref; revert at Settings › AI Model). Commits `9b68e049`..`0a8b6b34`. NEXT: operator UAT → secure-phase 154 → Phase 155 (A11Y-01, sequenced LAST — audits all net-new v3.3 surfaces incl. the new toggle + unlabeled nav icons).
 
