@@ -99,7 +99,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
         <span className="flex-1 min-w-0 flex flex-col">
           <span className="font-mono text-foreground/60 truncate">{file.filename}</span>
           {file.supersedes && (
-            <span className="text-[10px] text-muted-foreground/70 truncate">
+            <span className="text-[10px] text-muted-foreground truncate">
               Replaces: {file.supersedes}
             </span>
           )}
@@ -166,7 +166,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
         {/* Plan 075.4-04 D-075.4-D2 — supersedes subline (closes BUG-260523-03 UI side).
             React auto-escapes text content; no XSS surface introduced. */}
         {file.supersedes && (
-          <span className="text-[10px] text-muted-foreground/70 truncate">
+          <span className="text-[10px] text-muted-foreground truncate">
             Replaces: {file.supersedes}
           </span>
         )}
@@ -175,7 +175,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
         )}
       </span>
       {file.size != null && (
-        <span className="text-muted-foreground/50 flex-shrink-0">{formatBytes(file.size)}</span>
+        <span className="text-muted-foreground flex-shrink-0">{formatBytes(file.size)}</span>
       )}
       {downloading ? (
         <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />

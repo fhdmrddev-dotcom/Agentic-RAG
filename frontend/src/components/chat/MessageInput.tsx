@@ -237,7 +237,7 @@ export function MessageInput({
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : activeProviderLabel ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/50">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
                   <Layers className="h-3 w-3" />
                   {activeProviderLabel}
                 </span>
@@ -305,7 +305,7 @@ export function MessageInput({
                 </DropdownMenu>
               ) : (
                 selectedModel && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/50">
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
                     <Cpu className="h-3 w-3" />
                     {displayName(selectedModel)}
                   </span>
@@ -377,7 +377,7 @@ export function MessageInput({
             {/* Right: stop (while streaming) or send button */}
             <div className="flex items-center gap-2.5">
               {!disabled && (
-                <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
+                <span className="text-[10px] text-muted-foreground hidden sm:block">
                   Enter ↵ · Shift+Enter for newline
                 </span>
               )}
@@ -411,7 +411,7 @@ export function MessageInput({
           </div>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/40 text-center mt-2.5">
+        <p className="text-[10px] text-muted-foreground text-center mt-2.5">
           AI can make mistakes. Verify important information.
         </p>
       </div>

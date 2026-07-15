@@ -177,7 +177,7 @@ export function CitationCard({ citation, n, flashContainer }: Props) {
               }}
               aria-expanded={expanded}
               aria-label={expanded ? "Show less" : "Show more"}
-              className="flex items-center gap-1 mt-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="flex items-center gap-1 mt-1 text-muted-foreground hover:text-muted-foreground transition-colors"
             >
               {expanded ? (
                 <>
