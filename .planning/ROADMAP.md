@@ -369,7 +369,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 155-01-PLAN.md — jsx-a11y regression gate (eslint-plugin-jsx-a11y as errors + CI lint step + violation inventory)
+- [x] 155-01-PLAN.md — jsx-a11y regression gate (eslint-plugin-jsx-a11y as errors + CI lint step + violation inventory)
 - [ ] 155-02-PLAN.md — Contrast token retune + admin-cluster opacity sweep + D-07 operator eyeball
 - [ ] 155-07-PLAN.md — Opacity-offender sweep, remaining clusters (chat / studio / settings / ingestion / layout long tail)
 
@@ -441,7 +441,7 @@ Plans:
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
-| 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
+| 155. Accessibility Sweep — WCAG AA | 1/7 | Executing | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |

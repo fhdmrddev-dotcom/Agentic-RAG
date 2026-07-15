@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T19:34:03.814Z"
-last_activity: 2026-07-15 -- Phase 155 planning complete
+last_updated: "2026-07-15T19:53:16.091Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 26
   completed_phases: 9
   total_plans: 68
-  completed_plans: 61
+  completed_plans: 62
   percent: 35
 ---
 
@@ -22,14 +22,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 155 — accessibility sweep — wcag aa
+**Current focus:** Phase 155 — accessibility-sweep-wcag-aa
 
 ## Current Position
 
-Phase: 155
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-15 -- Phase 155 planning complete
+Phase: 155 (accessibility-sweep-wcag-aa) — EXECUTING
+Plan: 2 of 7
+Status: Ready to execute (Plan 155-02 — contrast token retune + D-07 operator eyeball)
+Last activity: 2026-07-15 -- Plan 155-01 executed (jsx-a11y regression gate)
+
+**155-01 execution notes (2026-07-15) — A11Y-01 Wave 1: install + wire the jsx-a11y regression gate + capture the violation inventory, frontend-tooling + CI only, NO backend, NO migration:** 2 tasks (both `type=auto`), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: T1 `5d216725` (chore — install `eslint-plugin-jsx-a11y@6.10.2` EXACT-pinned + spread `jsxA11y.flatConfigs.recommended` into the ESLint 9 flat config + capture `155-lint-inventory.txt`); T2 `5056f007` (ci — additive `npm run lint` step in the `frontend-tests.yml` vitest job, playwright job byte-identical, no new secrets/actions); SUMMARY `beac4269`. Gate verified via `eslint --print-config`: **31 jsx-a11y rules at error(2), 0 at warn(1)**, 3 off by recommended's own defaults (`anchor-ambiguous-text`/`control-has-associated-label`/`label-has-for` — left off; forcing them = strict-level, past the D-06 scope line). **@axe-core/playwright deliberately ABSENT** (D-01a / SEED-049). Inventory = **215 problems (201 errors, 14 warnings)**: **41 jsx-a11y errors = the Plan 03 fix-sweep target** (no-static-element-interactions ×9, click-events-have-key-events ×9, no-autofocus ×7, label-has-associated-control ×7, no-redundant-roles ×4, +3). Gates: `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new**; `npx vite build` exit **0**; `npm run lint` intentionally FAILS (violations unfixed until Plan 03 — expected, phase lands as a unit). **⚠ DEFERRED FINDING (out of scope, logged `deferred-items.md` D-155-01-A):** the CI `npm run lint` step also gates on **160 pre-existing NON-a11y errors** (`no-explicit-any`/`no-unused-vars`/`react-refresh`/`import/first`/`react-hooks`) — Plan 03 alone will NOT make `frontend-tests` CI green; the phase must decide the lint-gate scope (recommend an a11y-only `lint:a11y` script) at Plan 03 review / verification. **A11Y-01 stays OPEN** at the requirement level (false-green avoidance, 148–154 convention; `requirements.mark-complete` deliberately NOT called). **SDK quirks (known):** `state.advance-plan` clean (bumped `completed_plans` 61→62 + Plan → 2 of 7); `state.update-progress` = "Progress field not found" (frontmatter `progress:` block); `state.record-metric` = arg-parse; `state.record-session` = "No session fields found" → all hand-applied. `roadmap.update-plan-progress 155` flipped the 155-01 checkbox but LEFT the progress-TABLE row `0/? | Not started` stale → hand-fixed to `1/7 | Executing`.
 
 **155 discuss (2026-07-15):** All 4 gray areas discussed interactively, all recommended options selected. D-01..D-14 locked in `155-CONTEXT.md`: HYBRID axe gate (vitest-axe per-surface suites + live Chrome-DevTools scan for the contrast rules jsdom can't compute; `@axe-core/playwright` REJECTED — SEED-049 rot); `eslint-plugin-jsx-a11y` as ERRORS with full fix; category-zero live bar (SEED-092 baseline: 19 contrast + 46 button-name nodes); contrast fixed AT THE TOKEN SOURCE (Phase 088-05 math precedent) + full app-wide icon-button labeling sweep; lint-drawn scope line (other findings → documented SEED-092-remainder list); D-07 mid-execution operator eyeball on retuned tokens; keyboard walkthrough Claude-drives-via-Chrome-MCP + operator confirms 4 must-pass G-4 scenarios (workflow launch / cited answer / Control Room kill-switch / Settings+nav); task+3-invariants pass bar; names-only SR scope; FULL net-new surface inventory incl. 154 relabels; shared-primitive violations fixed at the primitive (G-5 display-additive exception MessageItem/StreamsProvider); documented per-rule/per-selector exclusions — zero UNEXPLAINED violations. Reported-bugs: 0 folded (none in a11y domain). Todo `spike-nl-workflow-authoring` reviewed, NOT folded (false-positive). Deferred: provider/model icons in selector + composer selected-state icon (operator request) → Phase 156 POLISH-01 via the Phase-127 @lobehub/icons convention. NEXT: `/gsd:plan-phase 155`.
 

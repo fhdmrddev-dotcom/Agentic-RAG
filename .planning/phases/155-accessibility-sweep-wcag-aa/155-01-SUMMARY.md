@@ -145,6 +145,11 @@ None — no external service configuration required. (Frontend dev-toolchain + C
 - `155-lint-inventory.txt` gives Plan 03 an exact target: **41 jsx-a11y errors across 8 rules**.
 - **Concern for the phase:** the CI lint step also surfaces 160 pre-existing non-a11y errors (see Deferred Issues / deferred-items.md) — Plan 03 alone will not make `frontend-tests` CI green. Decide the lint-gate scope (a11y-only script vs broader clean-up) at Plan 03 review / verification.
 
+## Self-Check: PASSED
+
+- Created files verified present: `155-lint-inventory.txt`, `155-01-SUMMARY.md`, `deferred-items.md`; modified `eslint.config.js` + `frontend-tests.yml`.
+- Commits verified in git history: `5d216725` (Task 1), `5056f007` (Task 2), `beac4269` (SUMMARY).
+
 ---
 *Phase: 155-accessibility-sweep-wcag-aa*
 *Completed: 2026-07-15*
