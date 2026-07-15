@@ -349,7 +349,7 @@ Plans:
 
 **Plans**: 3 plans in 2 waves
   - [x] 154-01-PLAN.md — Spine: shared reveal context + single-source term-map + app-wide mount + Control Room consolidation (Wave 1)
-  - [ ] 154-02-PLAN.md — Document surfaces: ingestion status badge + document-detail Metadata header (Wave 2)
+  - [x] 154-02-PLAN.md — Document surfaces: ingestion status badge + document-detail Metadata header (Wave 2)
   - [ ] 154-03-PLAN.md — Settings toggle host + bounded Settings/composer relabels (Wave 2)
 **UI hint**: yes
 
@@ -422,7 +422,7 @@ Plans:
 | 151. Agent File Tools | 4/4 | Complete | 2026-07-14 |
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
-| 154. Plain-Language Layer | 1/3 | Executing | - |
+| 154. Plain-Language Layer | 2/3 | Executing | - |
 | 155. Accessibility Sweep — WCAG AA | 0/? | Not started | - |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |

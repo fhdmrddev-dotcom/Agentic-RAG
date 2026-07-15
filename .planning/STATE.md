@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T15:36:29.152Z"
-last_activity: 2026-07-15 -- Phase 154 Plan 01 SPINE executed
+last_updated: "2026-07-15T15:48:40.552Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 26
   completed_phases: 8
   total_plans: 61
-  completed_plans: 59
+  completed_plans: 60
   percent: 31
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 154 (Plain-Language Layer) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 154 (154-01 spine complete)
-Last activity: 2026-07-15 -- 154-01 SPINE executed (provider + term-map + mount + D-01a consolidation)
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-07-15 -- 154-02 Wave 2 executed (DocumentStatusBadge + DocumentDetailPanel relabels through the term-map)
 
 **154 discuss (2026-07-15) — autonomous:** operator granted full authority (discuss→plan→execute unattended). Gray areas identified + decided by Claude with recommendations. `154-CONTEXT.md` locked D-01..D-05: (D-01) app-wide `TechnicalNamesProvider` localStorage context modeled on `useTheme`, default plain, all-users Settings toggle, NO operator gate + consolidate ControlRoomPage local `showTechnical` onto it; (D-02) single-source `frontend/src/lib/termMap.ts` + `usePlainLabel`; (D-03) global toggle primary, keep Phase-103 ⓘ+helper in forms; (D-04) spine + bounded prioritized end-user surfaces (chat/composer, workflow user surfaces, documents, Settings), admin surfaces only consume the context; (D-05) frontend display-only, NO backend/migration/enum/API/audit rename → Deep byte-identical by construction. G-2 = no new sketch (reuses 3 shipped operator-approved patterns). G-5 = MessageItem/StreamsProvider label-only-additive. Reported-bugs: 0 folded (no open Agentic-RAG bug in the labeling domain). Committed `3c00c2db`.
 
@@ -41,6 +41,15 @@ Last activity: 2026-07-15 -- 154-01 SPINE executed (provider + term-map + mount 
 - **Mount + D-01a (Task 3):** `App.tsx` wraps `<CitationNavProvider>`/`<ChatLayout>` in `<TechnicalNamesProvider>` (covers chat/docs/workflows/settings/`/admin`). `ControlRoomPage.tsx` local `showTechnical` useState → `useTechnicalNames()`; 4 toggle closures → shared `toggleTechnical`; all 5 leaf prop threads (`HealthSignals`/`CapabilityGrid`/`AuditTab`/`FeatureVisibility`/`ModelRegistryTab`) BYTE-IDENTICAL (zero leaf edits). `ControlRoomPage.test.tsx` `renderPage()` wrapped in the provider (else `useTechnicalNames` throws). Settings + admin toggles are now ONE switch.
 - **Gates:** `TechnicalNamesProvider.test` 6/6 + `termMap.test` 11/11 + `ControlRoomPage.test` 7/7 = **24/24 GREEN**; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new** (0 referencing the new files); `npx vite build` exit **0**; greps: `createContext`≥1, `matchMedia`=0, `technical-names`≥1, `as const satisfies`≥1, `dangerouslySetInnerHTML`(PlainLabel)=0, `setShowTechnical`(ControlRoom)=0, `useTechnicalNames(`=1, `TechnicalNamesProvider`(App)=3. **LANG-01 stays OPEN** at the requirement level (false-green avoidance, 148–153 convention) — the Wave-2 relabel surfaces (154-02/03) + live UAT close it. Wave-2 consumers now import `usePlainLabel`/`PlainLabel` + the provider hooks off this spine.
 - **SDK quirks (known):** `state.advance-plan` clean (bumped frontmatter `completed_plans` 58→59 + Current Plan → 2 of 3). `state.update-progress` = "Progress field not found" (STATE uses the frontmatter `progress:` block). `state.record-metric` = "phase, plan, and duration required" (arg-parse) → skipped. `roadmap.update-plan-progress 154` = `summary_count: 1 / In Progress` + flipped the 154-01 checkbox, but LEFT the progress-TABLE row `0/? | Not started` stale → hand-fixed to `1/3 | Executing`.
+
+**154-02 execution notes (2026-07-15) — LANG-01 Wave 2: relabel the two highest-jargon DOCUMENT surfaces (RESEARCH ranks 1 & 2) through the 154-01 term-map, frontend-only, NO backend, NO migration, NO new package:**
+
+- 2 tasks (Task 1 TDD RED→GREEN; Task 2 auto + 1 auto-fix), sequential on the main tree (`use_worktrees=false`), 1 deviation. Commits: T1 RED `84918476` → GREEN `1bcc27e8`; T2 `0f2dd7df` (feat + a11y-test auto-fix); SUMMARY commit follows. Touched 4 files (2 source + 2 test); D-05a Contract-Safety Recipe CLEAN: `git diff --name-only e1d50c59..HEAD | grep -E '^backend/|^supabase/migrations/'` = NOTHING; all 4 under `frontend/src/`.
+- **Surface A (`DocumentStatusBadge.tsx` ⭐ rank 1):** DISPLAY label now flows through `usePlainLabel`. Compute ONE term key unconditionally (hooks can't be conditional): `status==="processing" ? (ingest.<step> in TERM_MAP ? ingest.<step> : "status.processing") : status.<status>`. Reveal OFF → plain (Waiting / Working… / Splitting into sections / Making it searchable / Ready / Couldn't process); reveal ON → today's verbatim strings (pending/processing/completed/failed, Chunking, Embedding). `styles[status]` + the spinner gate stay keyed on the raw `status` enum (D-02a / T-154-01) — a dedicated test proves the color class is byte-identical across reveal states. Deleted the now-unused `ingestionStepLabel` switch (its strings live in TERM_MAP as the technical side).
+- **Surface B (`DocumentDetailPanel.tsx` rank 2):** `<PanelSection title="Metadata">` → `title={usePlainLabel("doc.metadata_section")}` (Details by default, Metadata under the reveal). ConfidenceChip words untouched (Phase 112 honest/plain); diff = header line + import only.
+- **DEVIATION [Rule 1 — bug]:** `DocumentDetailPanel.a11y.test.tsx` (NOT in the declared file set) locates the metadata accordion by accessible name via 7 `/metadata/i` role queries — the plain default is now "Details", so all 7 failed (6 tests red). Updated the matchers `/metadata/i`→`/details/i` and anchored the section-header button to `/^details/i` (the `/details/i` regex also matched the "Close document details" control). Every a11y assertion preserved. Folded into `0f2dd7df`.
+- **Gates:** `DocumentStatusBadge.test` 19/19 + `DocumentDetailPanel.a11y.test` 7/7 = **26/26 GREEN**; non-regression `termMap.test` + `GovernancePage.test` 18/18; `npx tsc -b` = exactly **30** SEED-056/049 baseline errors, **0 net-new** (0 referencing the touched files); `npx vite build` exit **0**; greps: `usePlainLabel`(badge)=3, `styles[status]`=2, plain-default assertions=5, `usePlainLabel("doc.metadata_section")`=1, `title="Metadata"` literal=0. **LANG-01 stays OPEN** at the requirement level (false-green avoidance, 148–153 + 154-01 convention) — 154-03 (Settings toggle host + bounded Settings/composer relabels) + live UAT close it. `requirements.mark-complete` deliberately NOT called.
+- **SDK quirks (known):** `state.advance-plan` clean (bumped frontmatter `completed_plans` 59→60 + Current Plan → 3 of 3). `roadmap.update-plan-progress 154` = `summary_count: 2 / In Progress` + flipped the 154-02 checkbox, but LEFT the progress-TABLE row `1/3` stale → hand-fixed to `2/3 | Executing`.
 
 **153-05 execution notes (2026-07-15) — CITE-01 inline-marker assembly (Wave 3, final): CitedMarkdown owned-<sup> marker upgrade + MessageItem G-5 additive cited branch + AbsenceHint absence-as-signal ⓘ, frontend-only, NO backend, NO migration, NO new package:**
 
