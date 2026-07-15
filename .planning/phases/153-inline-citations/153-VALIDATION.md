@@ -2,7 +2,7 @@
 phase: 153
 slug: inline-citations
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-15
 ---
@@ -53,6 +53,7 @@ created: 2026-07-15
 | 153-04 T1 (full-doc peek) | 153-04 | 2 | CITE-01 | D-10 | "Full document" + Open, no snippet/score | unit | `npx vitest run …/CitationPeek.test.tsx` | ❌ W0 | ⬜ pending |
 | 153-05 T2 (G-5 non-regression msg) | 153-05 | 3 | CITE-01 | G-5 | Non-cited assistant + user messages byte-identical | unit | `npx vitest run …/MessageItem.test.tsx` | ✅ extend | ⬜ pending |
 | 153-05 T2 (G-5 non-regression stream) | 153-05 | 3 | CITE-01 | G-5 | Streaming-narration / `dedupParagraphs` unchanged | unit | `npx vitest run …/StreamsProvider*.test.tsx` | ✅ extend | ⬜ pending |
+| 153-05 T3 (absence-as-signal ⓘ) | 153-05 | 3 | CITE-01 | T-153-05-06 | Quiet ⓘ under a cited answer, NEVER a banner; null on no-citations (locked sketch 074-A) | unit | `npx vitest run …/AbsenceHint.test.tsx` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -66,6 +67,7 @@ created: 2026-07-15
 - [ ] `frontend/src/components/chat/__tests__/CitationPeek.test.tsx` — chunk + full-doc peek variants, pin, Esc, a11y name
 - [ ] `frontend/src/components/chat/__tests__/CitationList.test.tsx` — numbering + open-by-default + marker↔row flash (or extend existing `CitationCard.test.tsx`)
 - [ ] Extend `MessageItem.test.tsx` + streaming provider tests for the G-5 non-regression assertions
+- [ ] `frontend/src/components/chat/__tests__/AbsenceHint.test.tsx` — renders-under-cited-answer (verbatim copy), not-a-banner, non-blocking, null-on-no-citations (locked sketch 074-A ⓘ)
 
 ---
 
@@ -87,11 +89,11 @@ created: 2026-07-15
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (touched-surface quick suites; `vite build ~30s` scoped to per-wave-merge, not per-task — see W5)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-07-15

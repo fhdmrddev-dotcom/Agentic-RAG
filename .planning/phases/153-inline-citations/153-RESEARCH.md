@@ -58,6 +58,7 @@ Phase 153 is **not greenfield and not large in data-model terms** — the entire
 | Citation data channel (accumulate / dedup / SSE / persist) | API / Backend | — | Already exists — reused unchanged (D-14 shared path) |
 | Marker render + hover-peek + pin + bidirectional flash | Browser / Client (`MessageItem` → new `CitedMarkdown` + peek portal) | — | Pure read-only render/interaction layer over the provider-uniform `citations` array |
 | Footer numbering + open-by-default + marker↔row link | Browser / Client (`CitationList`/`CitationCard`) | — | Restructure of existing components |
+| Absence-as-signal ⓘ teaching popover (unmarked = general knowledge) | Browser / Client (`MessageItem` → new `AbsenceHint`, under the answer) | — | Quiet, non-blocking ⓘ affordance (074-A; tiered-guidance rule #13) — never a banner; static teaching copy, self-guarded to cited messages; reuses the existing Radix tooltip primitive (no new package) |
 | "Open document" deep-link | Browser / Client (cross-view nav intent → `IngestionPage` doc panel) | — | Reuses existing Phase 112 `DocumentDetailPanel` opened by `document_id` |
 | Attach-on-settle content swap | Browser / Client (existing terminal reconcile `StreamsProvider.tsx:1988`) | API / Backend (persists normalized content) | Existing seam delivers the normalized markers live; no new event needed |
 
@@ -197,6 +198,7 @@ MessageItem settled assistant path  (:451)
         ├── [NEW] CitedMarkdown(dedupParagraphs(content), citations)
         │         └── parse [n] (n∈[1,k], skip code/pre/a) → interactive <sup> markers
         │         └── hover/focus → peek portal;  click/Enter → pin + flash matching footer row
+        ├── [NEW] AbsenceHint(citations)  → quiet ⓘ under the answer; non-blocking popover teaches absence-as-signal (never a banner)
         └── CitationList(citations)  → numbered [n] rows, open-by-default when markers exist, marker↔row link
 ```
 
@@ -209,9 +211,10 @@ backend/app/services/
                            #  pure fn: normalize_citation_markers(text, unique_citations) — unit-testable, no I/O
 
 frontend/src/components/chat/
-├── MessageItem.tsx        # G-5 — swap MarkdownRenderer→CitedMarkdown ONLY when message.citations?.length
+├── MessageItem.tsx        # G-5 — swap MarkdownRenderer→CitedMarkdown + mount AbsenceHint ONLY when message.citations?.length
 ├── (new) CitedMarkdown.tsx    # marked+DOMPurify pipeline (reused) + post-mount marker upgrade + peek portal
 ├── (new) CitationPeek.tsx     # hover-peek/pin popover (chunk + full-doc variants)
+├── (new) AbsenceHint.tsx      # quiet, non-blocking ⓘ under the answer — absence-as-signal teaching (074-A); never a banner
 ├── CitationList.tsx       # +numbering, +open-by-default-when-markers, +marker↔row link
 └── CitationCard.tsx       # +[n] number, +↗ Open document, reuse is_full_doc branch
 ```
@@ -363,14 +366,14 @@ def normalize_citation_markers(text: str, unique_citations: list[dict]) -> str:
 | A3 | Weaker/non-compliant models emit zero or few valid markers and must degrade to footer-only (D-07) | Cross-Provider Floor | Medium — this is the explicit floor; must be confirmed per-provider via live UAT, not assumed. |
 | A4 | The existing terminal reconcile (`:1988–2011`) fires reliably enough that the optional normalized-content SSE field is not required | Discretion #2 | Low-Medium — the SSE enhancement is the fallback if UAT shows a persistent pre-reconcile flash. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **"Open document" cross-view navigation carrying a `document_id`.**
+1. **"Open document" cross-view navigation carrying a `document_id`.** — **RESOLVED: 153-02** (`CitationNavProvider` + the one-shot pending-document intent → `setActiveView("documents")` + `setSelectedDocId`, routed through the existing owner/RLS-scoped `DocumentDetailPanel` fetch).
    - What we know: the doc-detail surface is `IngestionPage`'s `DocumentDetailPanel`, opened by local `selectedDocId` state (`IngestionPage.tsx:88,136–138,558–566`); app navigation is view-based via `ActiveView` (`App.tsx:73`), not react-router paths.
    - What's unclear: there is no existing mechanism to switch to the documents view AND pre-select a doc by ID from another surface.
    - Recommendation: the planner adds a lightweight cross-view "pending document intent" (e.g., a shared store field set alongside `setActiveView("documents")`, consumed by `IngestionPage` to `setSelectedDocId`). Small, additive; verify the doc is visible to the user (owner/RLS) before opening.
 
-2. **Multi-search-round manifest completeness vs single injection.**
+2. **Multi-search-round manifest completeness vs single injection.** — **RESOLVED: 153-01 Task 3** (the injection computes `note` fresh from `_deduplicate_citations(retrieved_citations)` each retrieval turn — correctness-first refresh, not one-shot).
    - What we know: refreshing the note from the current deduped set each retrieval turn keeps the manifest complete.
    - What's unclear: whether refreshing (vs one-shot) measurably changes model behavior or prompt-cache economics on Anthropic.
    - Recommendation: refresh each retrieval turn (correctness first); measure cache impact in UAT if latency regresses.
@@ -408,6 +411,7 @@ This phase is code-only (no new external tools/services/runtimes). The one runti
 | CITE-01 | Injection reaches BOTH `active_system_prompt` and `messages[0]` on a retrieval turn (SC#10) | unit | `pytest tests/unit/test_153_citation_instruction.py::test_dual_channel_inject -x` | ❌ Wave 0 |
 | CITE-01 | Frontend renders `[n]` in settled content as interactive `<sup>` keyed to `citations[n-1]`; range-checks n | unit | `npx vitest run …/CitedMarkdown.test.tsx` | ❌ Wave 0 |
 | CITE-01 | Footer numbered, open-by-default when markers exist; marker↔row bidirectional flash | unit | `npx vitest run …/CitationList.test.tsx` | ❌ Wave 0 (extend existing `CitationCard.test.tsx`) |
+| CITE-01 | Absence-as-signal ⓘ renders under cited answers (verbatim copy), never a banner, non-blocking, null on no-citations (074-A) | unit | `npx vitest run …/AbsenceHint.test.tsx` | ❌ Wave 0 |
 | CITE-01 | Full-doc peek shows "Full document" affordance + Open document, no snippet/score (D-10) | unit | `npx vitest run …/CitationPeek.test.tsx` | ❌ Wave 0 |
 | CITE-01 | Non-cited assistant + user messages render byte-identical (G-5 non-regression) | unit | `npx vitest run …/MessageItem.test.tsx` | ✅ extend |
 | CITE-01 | Streaming-narration / `dedupParagraphs` path unchanged | unit | `npx vitest run …/StreamsProvider*.test.tsx` | ✅ extend |
@@ -430,6 +434,7 @@ This phase is code-only (no new external tools/services/runtimes). The one runti
 - [ ] `frontend/src/components/chat/__tests__/CitedMarkdown.test.tsx` — marker parse/render/range-check.
 - [ ] `frontend/src/components/chat/__tests__/CitationPeek.test.tsx` — chunk + full-doc peek variants, pin, Esc, a11y name.
 - [ ] `frontend/src/components/chat/__tests__/CitationList.test.tsx` — numbering + open-by-default + marker↔row flash (or extend existing `CitationCard.test.tsx`).
+- [ ] `frontend/src/components/chat/__tests__/AbsenceHint.test.tsx` — renders-under-cited-answer, not-a-banner, non-blocking popover, null-on-no-citations (074-A absence ⓘ).
 - [ ] Extend `MessageItem.test.tsx` + streaming provider tests for the G-5 non-regression assertions.
 
 ## Security Domain
