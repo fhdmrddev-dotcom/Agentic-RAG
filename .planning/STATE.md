@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-15T07:47:04.564Z"
+last_updated: "2026-07-15T07:59:34.811Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 26
   completed_phases: 7
   total_plans: 58
-  completed_plans: 56
-  percent: 28
+  completed_plans: 57
+  percent: 27
 ---
 
 # Project State
@@ -27,9 +27,18 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 ## Current Position
 
 Phase: 153 (inline-citations) — EXECUTING
-Plan: 4 of 5 (153-01, 153-02, 153-03 complete)
-Status: Ready to execute (153-04 next — CitationPeek hover-peek → click-to-pin, Wave 2)
-Last activity: 2026-07-15 -- 153-03 executed (References footer restructure, Wave 2)
+Plan: 5 of 5 (153-01, 153-02, 153-03, 153-04 complete)
+Status: Ready to execute (153-05 next — CitedMarkdown + MessageItem marker injection, Wave 3 — the last plan; blocked on 153-03 + 153-04, both now done)
+Last activity: 2026-07-15 -- 153-04 executed (CitationPeek hover-peek → click-to-pin popover, Wave 2)
+
+**153-04 execution notes (2026-07-15) — CITE-01 CitationPeek click-through popover (Wave 2): net-new positioned/portaled hover-peek → click-to-pin card (chunk + full-doc D-10 variants + D-04 calm degrade + non-blocking pin/dialog/Esc a11y), frontend-only, NO backend, NO migration, NO new package:**
+
+- 1 task (TDD RED→GREEN, no refactor), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: RED `f5d4f0ef` (test — import failure, 0 tests) → GREEN `3ccab39c` (feat CitationPeek). Touched EXACTLY the 2 declared files (`frontend/src/components/chat/CitationPeek.tsx`, `__tests__/CitationPeek.test.tsx`); **NO backend, NO migration, NO new package** (a pure presentational + interaction layer over the 153-02 `citationNav` contract; `createPortal` from react-dom, `Pin`/`ArrowUpRight` from the vendored lucide set — Package Legitimacy Gate not triggered).
+- **`CitationPeek({ citation, n, anchorRect, pinned, onPin, onClose })`:** an absolutely-positioned card portaled to `document.body` (first `createPortal` use in `frontend/src`), mirroring `ui/tooltip.tsx` surface tokens (`bg-popover`/`border`/`shadow-lg`) + UI-SPEC sizing (`width 320`, `z-60`, `rounded-[10px]`, `px-3.5 py-3`). **Chunk variant:** head `[n] {filename}` (+`(v{version})` when >1), italic `--muted-foreground` `passage` snippet, footer `Chunk {i+1} · {sim 2dp}` + `↗ Open document`. **Full-doc variant (D-10):** reuses the CitationCard `is_full_doc` branch — head + `Full document — no single passage` (NO snippet), footer `↗ Open document` only (no loc/score) — a stray `similarity` is never rendered. **Calm degrade (D-04):** `passage.trim().length > 0` gate → a null/empty/whitespace passage drops the snippet, keeps head + Open document, NO `role="alert"`, NO error/unavailable copy, NO `text-red`/`destructive`. **Open document:** owner/RLS-scoped `useCitationNav().openDocument(document_id)` (throwing hook — leaf citation component always inside the App-level provider; T-153-04-02, no new fetch).
+- **Non-blocking a11y (feeds Phase 155):** pinned → `role="dialog" aria-modal="false"` labelled by its head (accessible name = filename), NO focus trap; `Esc` → `onClose` (document keydown listener, parent restores marker focus in 153-05); icon-only pin toggle carries the state-toggled `aria-label` `Pin citation {n}` ↔ `Unpin citation {n}` (+ `aria-pressed`), pinned state also carried by `fill-current`+`text-primary` (never colour-alone). NO `alert()`/`confirm()`, NO `dangerouslySetInnerHTML` (model text = auto-escaped React text nodes). Positioning `top = anchorRect.bottom + scrollY + 8`, `left = max(8, min(anchorRect.left, vw − 340))`. Motion via tailwindcss-animate (`animate-in fade-in-0 slide-in-from-top-1 duration-100`) + `motion-reduce:animate-none` — reduced-motion honored WITHOUT a CSS edit (index.css out of the 2-file scope; the `citation-peek` class is a test/query hook + a future CSS seam).
+- **Design-fidelity note (not a deviation):** used the vendored lucide `Pin` icon instead of the sketch's 📌 emoji shorthand (consistent with the citation surface's other lucide icons, calm-instrument) — the load-bearing state-toggled `aria-label` matches the UI-SPEC Dimension-2 contract verbatim.
+- **Gates:** new suite `CitationPeek.test.tsx` **13/13 GREEN** (chunk head/snippet/loc/Open + version suffix; full-doc D-10 no-snippet/no-score; D-04 degrade null + whitespace, no error/red; owner-scoped Open document; pin name flip Pin↔Unpin + onPin; role=dialog aria-modal=false + accessible name; no-dialog-when-unpinned; Esc→onClose; left-clamp + below-anchor positioning); `npx tsc -b` = exactly **30** pre-existing SEED-056/049 baseline errors, **0 referencing CitationPeek** (0 net-new); `npx vite build` exit **0**; `grep muted-foreground-dim` = 1 (an explanatory COMMENT, not a className); `dangerouslySetInnerHTML`/`alert(`/`confirm(` = **0**. **CITE-01 stays OPEN** at the requirement level (false-green avoidance, 148–152 + 153-01/02/03 convention) — closes at verify-work/secure-phase after the Wave-3 render plan (153-05) + the live SC#10 4-axis cross-provider UAT (`153-VALIDATION.md`).
+- **SDK quirks (known):** `state.advance-plan` clean (bumped frontmatter `completed_plans` 55→56 + Current Plan → 5 of 5). `roadmap.update-plan-progress 153` = `summary_count: 4 / In Progress` (accurate post-SUMMARY) but LEFT the progress-TABLE row `3/5` stale → hand-fixed to `4/5` (the 153-04 checkbox was already flipped by an earlier run). `state.update-progress`/`record-metric`/`add-decision` = the usual arg-parse/field-not-found quirks → hand-applied here.
 
 **153-03 execution notes (2026-07-15) — CITE-01 References footer restructure (Wave 2): CitationList numbered + open-by-default-when-markers + CitationCard [n]/Open document/full-doc row/flash target, frontend-only, NO backend, NO migration, NO new package:**
 
