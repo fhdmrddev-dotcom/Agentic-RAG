@@ -41,6 +41,16 @@ jobs:
           npm ci
           npm test
 
+      # Phase 155 (A11Y-01 / D-02): enforce the jsx-a11y regression gate in CI.
+      # `npm run lint` = `eslint .` (already in package.json scripts) — reuses the
+      # node_modules installed by the "Install + test" step above so an a11y
+      # regression cannot silently merge. This is the CI half of D-02; without it
+      # jsx-a11y would be local-only convenience (RESEARCH "CRITICAL CI gap").
+      - name: Lint (jsx-a11y as errors)
+        run: |
+          cd frontend
+          npm run lint
+
   playwright:
     runs-on: ubuntu-latest
     needs: vitest
