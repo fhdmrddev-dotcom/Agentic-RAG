@@ -503,11 +503,11 @@ export function AuditTab({
             {openChip === "action" && (
               <div className="absolute left-0 top-full z-30 mt-2 max-h-72 w-64 overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg">
                 {actionGroups.every((g) => g.options.length === 0) ? (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground/70">No actions to filter yet.</p>
+                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">No actions to filter yet.</p>
                 ) : (
                   actionGroups.map((grp) => (
                     <div key={grp.group} className="mb-1.5 last:mb-0">
-                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                         {grp.group}
                       </p>
                       {grp.options.map((opt) => {
@@ -530,7 +530,7 @@ export function AuditTab({
                             </span>
                             <span className="flex-1 text-foreground">{opt.label}</span>
                             {showTechnical && (
-                              <code className="font-mono text-[10px] text-muted-foreground/70">{opt.code}</code>
+                              <code className="font-mono text-[10px] text-muted-foreground">{opt.code}</code>
                             )}
                           </button>
                         )
@@ -587,7 +587,7 @@ export function AuditTab({
                   ))}
                 </div>
                 <div className="mt-2 border-t border-border/60 pt-2">
-                  <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                  <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Custom range
                   </p>
                   <div className="flex flex-col gap-1.5 px-1">
@@ -657,12 +657,12 @@ export function AuditTab({
         </div>
 
         {/* Resolved-window readout (030-A heritage) — always honest about the span. */}
-        <p className="mb-2.5 text-[11px] text-muted-foreground/70">Showing {windowReadout(filters)}.</p>
+        <p className="mb-2.5 text-[11px] text-muted-foreground">Showing {windowReadout(filters)}.</p>
 
         {/* The paged table — one row shape per source (067-A HTML structures). */}
         {source === "operator" ? (
           operatorFiltered.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground/70">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               {operatorRows.length === 0
                 ? "No actions yet — everything an operator does here lands here."
                 : "No operator actions match these filters."}
@@ -684,11 +684,11 @@ export function AuditTab({
                   )}
                   <span className="flex-none text-foreground">{row.label}</span>
                   {showTechnical && (
-                    <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground/70">
+                    <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                       {row.action}
                     </code>
                   )}
-                  <span className="ml-auto flex-none tabular-nums text-xs text-muted-foreground/70">
+                  <span className="ml-auto flex-none tabular-nums text-xs text-muted-foreground">
                     {formatWhen(row.created_at)}
                   </span>
                 </div>
@@ -696,7 +696,7 @@ export function AuditTab({
             </div>
           )
         ) : platformRows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground/70">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             {platformLoading ? "Loading platform activity…" : "No platform activity matches these filters."}
           </p>
         ) : (
@@ -706,7 +706,7 @@ export function AuditTab({
                 key={row.id}
                 className="flex items-baseline gap-2.5 border-b border-border/40 py-2 text-sm last:border-b-0"
               >
-                <span className="flex-none tabular-nums text-xs text-muted-foreground/70">
+                <span className="flex-none tabular-nums text-xs text-muted-foreground">
                   {formatWhen(row.created_at)}
                 </span>
                 <button
@@ -720,7 +720,7 @@ export function AuditTab({
                 </button>
                 <span className="text-foreground">{platformLabel(row.action_type)}</span>
                 {showTechnical && (
-                  <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground/70">
+                  <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {row.action_type}
                   </code>
                 )}
@@ -732,7 +732,7 @@ export function AuditTab({
         {/* Pager — ‹ Prev · page i of N · Next › (067-A). N is known for the operator
             source (client-paged); the platform source shows the current page + a Next
             gated on the server has_more (no fabricated total — SC#4 no full-tenant leak). */}
-        <div className="mt-2.5 flex items-center justify-center gap-3 border-t border-border/40 pt-2 text-xs text-muted-foreground/70">
+        <div className="mt-2.5 flex items-center justify-center gap-3 border-t border-border/40 pt-2 text-xs text-muted-foreground">
           <button
             type="button"
             disabled={!canPrev}
@@ -754,7 +754,7 @@ export function AuditTab({
           </button>
         </div>
 
-        <div className="mt-2.5 border-t border-border/40 pt-2 text-xs text-muted-foreground/70">
+        <div className="mt-2.5 border-t border-border/40 pt-2 text-xs text-muted-foreground">
           Who did what, and when — every operator action, no exceptions.
         </div>
       </div>

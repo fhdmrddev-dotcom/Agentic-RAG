@@ -214,7 +214,7 @@ function Th({ children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>)
 }
 
 function TechName({ children }: { children: React.ReactNode }) {
-  return <span className="font-mono text-[9px] text-muted-foreground/70">{children}</span>
+  return <span className="font-mono text-[9px] text-muted-foreground">{children}</span>
 }
 
 /** One capability row. Owns only its transient write state (busy / receipt / the
@@ -373,7 +373,7 @@ function ModelRow({
       {showTechnical && (
         <tr>
           <td colSpan={NUM_FIELDS.length + 5} className="border-t-0 px-4 pb-1 pt-0">
-            <span className="font-mono text-[9px] text-muted-foreground/60">
+            <span className="font-mono text-[9px] text-muted-foreground">
               {row.capability_source === "db_override" ? "db_override" : "registry"} ·{" "}
               {row.overridden_fields.length > 0
                 ? `overridden: ${row.overridden_fields.join(", ")}`
@@ -490,7 +490,7 @@ function SourceTag({ overridden }: { overridden: boolean }) {
     <span
       className={cn(
         "rounded px-1 py-px font-mono text-[9px] tracking-wide",
-        overridden ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground/70",
+        overridden ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
       )}
     >
       {overridden ? "OVR" : "DEF"}
@@ -559,7 +559,7 @@ function DeprecatedControl({
       <span
         className={cn(
           "text-[10px]",
-          row.deprecated ? "font-medium text-warning" : "text-muted-foreground/60",
+          row.deprecated ? "font-medium text-warning" : "text-muted-foreground",
         )}
       >
         deprecated

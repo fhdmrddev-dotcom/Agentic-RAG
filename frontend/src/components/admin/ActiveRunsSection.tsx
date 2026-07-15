@@ -244,7 +244,7 @@ function RunCard({
 
           {killPhase === "idle" && !run.killable && (
             // eval / tuner: bounded internal work — no victim, no Kill (D-01).
-            <span className="text-right text-[11px] leading-snug text-muted-foreground/70">
+            <span className="text-right text-[11px] leading-snug text-muted-foreground">
               Ends on its own
             </span>
           )}

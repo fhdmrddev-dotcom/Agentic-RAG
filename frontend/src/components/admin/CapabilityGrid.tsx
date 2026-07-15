@@ -180,12 +180,12 @@ function CapabilityCard({
               </span>
             )}
           </div>
-          <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
+          <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
             {def.sub}
           </div>
           {showTechnical && (
             <div
-              className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60"
+              className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground"
               title={def.key}
             >
               {def.key}

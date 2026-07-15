@@ -581,7 +581,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                 isActive
                   ? "bg-primary/10 font-semibold text-primary"
                   : t.locked
-                    ? "text-muted-foreground/70 hover:bg-accent/40 hover:text-muted-foreground"
+                    ? "text-muted-foreground hover:bg-accent/40 hover:text-muted-foreground"
                     : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
               )}
             >
@@ -682,7 +682,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                 <RecentActionsCard rows={auditRows.slice(0, ACTIVITY_PREVIEW)} />
               </section>
 
-              <p className="px-0.5 text-xs text-muted-foreground/70">
+              <p className="px-0.5 text-xs text-muted-foreground">
                 Only operators can open this page — every visit is checked on the server, and
                 every action here is recorded.
               </p>

@@ -204,7 +204,7 @@ function FeatureCard({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-medium text-foreground">{def.name}</div>
-            <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground/70">
+            <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
               {def.desc} · lives on {def.livesOn}
             </div>
           </div>
@@ -239,7 +239,7 @@ function FeatureCard({
 
       {/* Expandable enforcement grid — "what exactly this controls". */}
       <details className="group mt-2">
-        <summary className="cursor-pointer list-none text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground">
+        <summary className="cursor-pointer list-none text-[11px] text-muted-foreground transition-colors hover:text-foreground">
           <span className="underline decoration-dotted underline-offset-2">
             What exactly this controls
           </span>
@@ -262,7 +262,7 @@ function FeatureCard({
           {showTechnical && (
             <div className="flex gap-2">
               <dt className="w-28 flex-none font-medium text-muted-foreground">Routes</dt>
-              <dd className="font-mono text-muted-foreground/70">{def.routePrefixes}</dd>
+              <dd className="font-mono text-muted-foreground">{def.routePrefixes}</dd>
             </div>
           )}
         </dl>

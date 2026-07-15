@@ -44,7 +44,7 @@ export function RecentActionsCard({ rows }: RecentActionsCardProps) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground/70">
+        <p className="py-6 text-center text-sm text-muted-foreground">
           No actions yet — everything you do here lands here.
         </p>
       ) : (
@@ -63,7 +63,7 @@ export function RecentActionsCard({ rows }: RecentActionsCardProps) {
                 </>
               )}
               <span className="flex-none text-foreground">{row.label}</span>
-              <span className="ml-auto flex-none tabular-nums text-xs text-muted-foreground/70">
+              <span className="ml-auto flex-none tabular-nums text-xs text-muted-foreground">
                 {formatWhen(row.created_at)}
               </span>
             </div>
@@ -71,7 +71,7 @@ export function RecentActionsCard({ rows }: RecentActionsCardProps) {
         </div>
       )}
 
-      <div className="mt-2.5 border-t border-border/40 pt-2 text-xs text-muted-foreground/70">
+      <div className="mt-2.5 border-t border-border/40 pt-2 text-xs text-muted-foreground">
         Everything an operator does here is recorded automatically.
       </div>
     </div>

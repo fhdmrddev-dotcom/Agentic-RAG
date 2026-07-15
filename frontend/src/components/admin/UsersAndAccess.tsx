@@ -181,7 +181,7 @@ export function UsersAndAccess({
         </div>
       )}
 
-      <p className="mt-2 px-0.5 text-xs text-muted-foreground/70">
+      <p className="mt-2 px-0.5 text-xs text-muted-foreground">
         Disabling names the person first and is reversible; their documents, chats and settings
         are kept. Every change here is recorded with your name.
       </p>
@@ -256,7 +256,7 @@ function RosterRow({
           <div className="truncate text-sm font-medium text-foreground" title={email}>
             {email}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-muted-foreground/70">
+          <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
             joined {formatJoined(row.created_at)} · {row.doc_count} doc
             {row.doc_count === 1 ? "" : "s"} · {row.chat_count} chat
             {row.chat_count === 1 ? "" : "s"}
@@ -269,8 +269,8 @@ function RosterRow({
         className={cn(
           "flex-1 whitespace-nowrap text-xs tabular-nums",
           active.tone === "recent" && "text-success",
-          active.tone === "stale" && "text-muted-foreground/70",
-          active.tone === "never" && "italic text-muted-foreground/50",
+          active.tone === "stale" && "text-muted-foreground",
+          active.tone === "never" && "italic text-muted-foreground",
         )}
       >
         {active.text}
@@ -359,7 +359,7 @@ function RosterRow({
 
       {/* Disabled-user notice — what THAT user now sees (068-A honesty). */}
       {disabled && (
-        <div className="w-full text-[11px] italic text-muted-foreground/60">
+        <div className="w-full text-[11px] italic text-muted-foreground">
           This account is disabled — they see &ldquo;This account is disabled — contact your
           administrator.&rdquo;
         </div>

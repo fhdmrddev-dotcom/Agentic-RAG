@@ -228,9 +228,9 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
             <div className="font-mono text-xl font-semibold leading-tight tabular-nums text-foreground">
               {v.value}
             </div>
-            <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{v.sub}</div>
+            <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{v.sub}</div>
             {showTechnical && (
-              <div className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60" title={v.field}>
+              <div className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground" title={v.field}>
                 {v.field}
               </div>
             )}
@@ -261,10 +261,10 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
               <div className="text-sm font-semibold leading-tight text-foreground">
                 {DEP_STATUS_LABEL[status]}
               </div>
-              <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">{d.sub}</div>
+              <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{d.sub}</div>
               {showTechnical && (
                 <div
-                  className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60"
+                  className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground"
                   title={`dependencies.${d.key}`}
                 >
                   dependencies.{d.key}
@@ -298,12 +298,12 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
           <div className="text-sm font-semibold leading-tight text-foreground">
             {secretsLabel(secrets)}
           </div>
-          <div className="mt-1 text-[11px] leading-snug text-muted-foreground/70">
+          <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
             {secretsSub(secrets)}
           </div>
           {showTechnical && (
             <div
-              className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground/60"
+              className="mt-1.5 truncate font-mono text-[10px] text-muted-foreground"
               title="secrets_encryption.state"
             >
               secrets_encryption.state

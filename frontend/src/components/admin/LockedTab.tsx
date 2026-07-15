@@ -34,7 +34,7 @@ export function LockedTab({ title, description }: LockedTabProps) {
       </div>
       <h2 className="font-headline text-lg font-bold text-foreground">{title}</h2>
       <p className="text-sm text-muted-foreground">Not built yet — coming soon</p>
-      <p className="max-w-sm text-xs leading-relaxed text-muted-foreground/70">
+      <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
         {description ??
           "This part of the Control Room isn't ready yet. It'll light up right here as soon as it ships."}
       </p>
