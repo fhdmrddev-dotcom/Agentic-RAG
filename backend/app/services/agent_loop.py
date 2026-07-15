@@ -61,6 +61,7 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
+from app.services.citation_markers import normalize_citation_markers
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
 # error classifier — replaces the billing-first keyword if-ladder in the outer
@@ -2779,6 +2780,14 @@ async def run_agent_loop(
 
       # Emit citations event (D-03, D-07: after sources, before confidence)
       unique_citations[:] = _deduplicate_citations(retrieved_citations)
+      # Phase 153 Seam A (D-02/D-03/D-05): the backend is the sole author of citation
+      # truth. Strip every out-of-range / non-member [n] the model emitted and align
+      # survivors to the finalized unique_citations footer order BEFORE persist. This
+      # is a plain rebind in the send_message scope; _persist_assistant_message() reads
+      # the normalized full_content at its _strip_nul() call. Empty set -> every [n] is
+      # stripped (correct: no retrieval this run -> no valid markers). No new SSE event
+      # — the existing terminal reconcile carries the normalized content live.
+      full_content = normalize_citation_markers(full_content, unique_citations)
       if unique_citations:
           # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
           sse_citations = []
