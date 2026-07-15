@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
-last_updated: "2026-07-15T18:23:51.783Z"
-last_activity: 2026-07-15
+status: executing
+last_updated: "2026-07-15T19:34:03.814Z"
+last_activity: 2026-07-15 -- Phase 155 planning complete
 progress:
   total_phases: 26
   completed_phases: 9
-  total_plans: 61
+  total_plans: 68
   completed_plans: 61
   percent: 35
-stopped_at: Phase 155 context gathered — ready to plan
 ---
 
 # Project State
@@ -29,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 155
 Plan: Not started
-Status: Context gathered — ready to plan (155-CONTEXT.md committed `43679c29`)
-Last activity: 2026-07-15
+Status: Ready to execute
+Last activity: 2026-07-15 -- Phase 155 planning complete
 
 **155 discuss (2026-07-15):** All 4 gray areas discussed interactively, all recommended options selected. D-01..D-14 locked in `155-CONTEXT.md`: HYBRID axe gate (vitest-axe per-surface suites + live Chrome-DevTools scan for the contrast rules jsdom can't compute; `@axe-core/playwright` REJECTED — SEED-049 rot); `eslint-plugin-jsx-a11y` as ERRORS with full fix; category-zero live bar (SEED-092 baseline: 19 contrast + 46 button-name nodes); contrast fixed AT THE TOKEN SOURCE (Phase 088-05 math precedent) + full app-wide icon-button labeling sweep; lint-drawn scope line (other findings → documented SEED-092-remainder list); D-07 mid-execution operator eyeball on retuned tokens; keyboard walkthrough Claude-drives-via-Chrome-MCP + operator confirms 4 must-pass G-4 scenarios (workflow launch / cited answer / Control Room kill-switch / Settings+nav); task+3-invariants pass bar; names-only SR scope; FULL net-new surface inventory incl. 154 relabels; shared-primitive violations fixed at the primitive (G-5 display-additive exception MessageItem/StreamsProvider); documented per-rule/per-selector exclusions — zero UNEXPLAINED violations. Reported-bugs: 0 folded (none in a11y domain). Todo `spike-nl-workflow-authoring` reviewed, NOT folded (false-positive). Deferred: provider/model icons in selector + composer selected-state icon (operator request) → Phase 156 POLISH-01 via the Phase-127 @lobehub/icons convention. NEXT: `/gsd:plan-phase 155`.
 
