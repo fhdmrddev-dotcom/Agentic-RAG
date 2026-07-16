@@ -212,6 +212,20 @@ describe("ChatHistoryColumn — ⌘K chip (Wave 2 / onOpenPalette seam)", () => 
   })
 })
 
+describe("ChatHistoryColumn — ⟨| collapse handle (refinement 2026-07-16 / onCollapse seam)", () => {
+  it("renders the ⟨| handle and calls onCollapse when clicked", () => {
+    const onCollapse = vi.fn()
+    renderColumn({ onCollapse })
+    fireEvent.click(screen.getByRole("button", { name: "Collapse chat history" }))
+    expect(onCollapse).toHaveBeenCalledTimes(1)
+  })
+
+  it("omits the ⟨| handle when onCollapse is not provided (optional seam — no regression)", () => {
+    renderColumn()
+    expect(screen.queryByRole("button", { name: "Collapse chat history" })).not.toBeInTheDocument()
+  })
+})
+
 describe("ChatHistoryColumn — Date⇄Folder group toggle (Task 2 / D-04)", () => {
   it("DEFAULTS to Date (the Date toggle is pressed) — SC#3 date grouping is intact", () => {
     renderColumn()

@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Square,
   Search,
+  PanelLeftClose,
 } from "lucide-react"
 import type { Folder, Thread } from "@/types"
 // Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
@@ -55,6 +56,11 @@ interface Props {
   // filter box. Optional so the Wave-1 tests (which don't pass it) still render; wired
   // by ChatLayout since Wave 2.
   onOpenPalette?: () => void
+  // Phase 156 REFINEMENT (operator 2026-07-16): folds this whole column away so the
+  // conversation goes full-width (the workspace-panel collapse, mirrored on the left).
+  // Optional (same seam idiom as onOpenPalette) — the ⟨| header button renders only
+  // when ChatLayout wires it; the ▷ reopen handle lives in the chat top-bar (ChatArea).
+  onCollapse?: () => void
 }
 
 export function ChatHistoryColumn({
@@ -66,6 +72,7 @@ export function ChatHistoryColumn({
   onRenameThread,
   folders,
   onOpenPalette,
+  onCollapse,
 }: Props) {
   // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
   // + the cross-thread stop action. Lifted verbatim from NavPanel.
@@ -285,9 +292,26 @@ export function ChatHistoryColumn({
       {/* hc-top: title + New + folder-scope picker + the inline filter */}
       <div className="px-3.5 pt-3.5 pb-2.5 flex flex-col gap-2.5 border-b border-border/10 shrink-0">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-headline text-lg font-semibold text-sidebar-foreground m-0">
-            Chats
-          </h2>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {/* Phase 156 REFINEMENT: the ⟨| collapse handle (sketch Variant A #collapseA)
+                — folds the column away → conversation full-width. Left of the title as
+                panel chrome, distinct from the content actions on the right. Rendered
+                only when ChatLayout wires onCollapse (the optional-seam idiom). */}
+            {onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                title="Collapse chat history"
+                aria-label="Collapse chat history"
+                className="flex shrink-0 p-1 rounded-md text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground transition-colors items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
+                <PanelLeftClose className="w-4 h-4" aria-hidden="true" />
+              </button>
+            )}
+            <h2 className="font-headline text-lg font-semibold text-sidebar-foreground m-0 truncate">
+              Chats
+            </h2>
+          </div>
           <div className="flex items-center gap-1">
             {/* SEED-064: cross-thread active-runs counter + Stop tray (null when idle). */}
             <ActiveRunsTray threads={threads} />

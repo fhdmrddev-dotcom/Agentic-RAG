@@ -131,6 +131,52 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // ⌘K/Ctrl+K window keydown below OR the ⌘K chip in the ChatHistoryColumn filter box.
   const [paletteOpen, setPaletteOpen] = useState(false)
 
+  // Phase 156 REFINEMENT (operator 2026-07-16, sketch-left-layout Variant A): two
+  // left-chrome collapse states, each PINNED + persisted (survives reload), mirroring
+  // the workspace-panel collapse the app already ships.
+  //  • navExpanded — the ☰ toggle unfolds the 58px icon rail to ~210px labels
+  //    (operator concern a: "unfold it and see it fully"); never on hover.
+  //  • historyCollapsed — folds the chat-history column fully away so the conversation
+  //    goes full-width (operator concern b: "chat area even narrower"). The ▷ reopen
+  //    handle then rides the chat top-bar (ChatArea.onReopenHistory).
+  // Owned HERE (not in NavPanel/ChatHistoryColumn) so those stay pure/presentational
+  // and the NavPanel isolation test sees no localStorage. localStorage is guarded for
+  // private-mode / SSR where it can throw.
+  const [navExpanded, setNavExpanded] = useState(() => {
+    try {
+      return localStorage.getItem("nav_rail_expanded") === "1"
+    } catch {
+      return false
+    }
+  })
+  const toggleNavExpanded = useCallback(() => {
+    setNavExpanded((v) => {
+      const next = !v
+      try {
+        localStorage.setItem("nav_rail_expanded", next ? "1" : "0")
+      } catch {
+        /* private mode — the choice just won't persist */
+      }
+      return next
+    })
+  }, [])
+
+  const [historyCollapsed, setHistoryCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("chat_history_collapsed") === "1"
+    } catch {
+      return false
+    }
+  })
+  const setHistoryCollapsedPersisted = useCallback((collapsed: boolean) => {
+    setHistoryCollapsed(collapsed)
+    try {
+      localStorage.setItem("chat_history_collapsed", collapsed ? "1" : "0")
+    } catch {
+      /* private mode — the choice just won't persist */
+    }
+  }, [])
+
   const handleTryInChat = useCallback((skillName: string) => {
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
@@ -259,6 +305,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         onSignOut={onSignOut}
         theme={theme}
         onToggleTheme={toggleTheme}
+        expanded={navExpanded}
+        onToggleExpanded={toggleNavExpanded}
       />
 
       {/* Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
@@ -268,7 +316,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           relieves BUG-260711-01). It is `hidden md:flex` + `shrink-0`, so mobile still
           uses the drawer below and the chat grid keeps `flex-1 min-w-0` → the three
           desktop columns never overflow (Pitfall 7). */}
-      {activeView === "chat" && (
+      {/* Phase 156 REFINEMENT: mounted only when NOT collapsed — folding it away frees
+          its ~300px to the conversation (the chat grid below is flex-1, so it reflows to
+          full-width). The ▷ reopen handle lives in the chat top-bar (ChatArea). */}
+      {activeView === "chat" && !historyCollapsed && (
         <ChatHistoryColumn
           threads={threads}
           selectedThread={selectedThread}
@@ -278,6 +329,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           onRenameThread={renameThread}
           folders={folders}
           onOpenPalette={() => setPaletteOpen(true)}
+          onCollapse={() => setHistoryCollapsedPersisted(true)}
         />
       )}
 
@@ -460,6 +512,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               prefillMessage={prefillMessage}
               onClearPrefill={() => onSetPrefillMessage(null)}
               onOpenDrawer={() => setDrawerOpen(true)}
+              // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
+              onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
           </main>
           <WorkspacePanel

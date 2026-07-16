@@ -4,9 +4,14 @@
  *
  * Replaces the Wave-0 `it.todo` scaffold: NavPanel is now the thin 58px icon rail.
  * These tests lock New Chat reachability on every view (SC#1), nav items rendered as
- * icon buttons, the probe-gated operator shield staying OUTSIDE navItems (D-07), the
- * collapse machinery removed (no toggle, no nav_panel_collapsed), and the rail being
- * stream-free (renders with only a TooltipProvider — NO StreamsProvider).
+ * icon buttons, the probe-gated operator shield staying OUTSIDE navItems (D-07), and the
+ * rail being stream-free (renders with only a TooltipProvider — NO StreamsProvider).
+ *
+ * Refinement (operator 2026-07-16): the OLD content-masking collapse (which hid New
+ * Chat) is gone; a NEW pinned ☰ toggle swaps icons⇄labels WITHOUT hiding content — so
+ * the D-07 invariant (New Chat reachable in every rail state) is now structural. The
+ * rail stays presentational: the toggle delegates to a parent callback, the rail itself
+ * touches no localStorage (parent owns nav_rail_expanded).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"
@@ -33,6 +38,9 @@ function renderRail(overrides: Partial<NavProps> = {}) {
     onSignOut: vi.fn(),
     theme: "dark",
     onToggleTheme: vi.fn(),
+    // Phase 156 REFINEMENT: the pinned ☰ expand/collapse state (parent-owned).
+    expanded: false,
+    onToggleExpanded: vi.fn(),
     ...overrides,
   }
   // Only a TooltipProvider — deliberately NO StreamsProvider (proves the rail is
@@ -90,23 +98,66 @@ describe("NavPanel rail — nav items + operator shield (D-07)", () => {
   })
 })
 
-describe("NavPanel rail — collapse machinery removed + stream-free (D-07)", () => {
-  it('renders NO "Collapse navigation" / "Expand navigation" toggle', () => {
-    renderRail()
+describe("NavPanel rail — ☰ expand/collapse toggle (refinement 2026-07-16)", () => {
+  // The OLD content-masking collapse (w-64↔w-16, which hid New Chat + the thread list —
+  // SEED-045) is gone. This new toggle only swaps icons⇄labels and NEVER hides content,
+  // so the D-07 intent (New Chat always reachable) is preserved by construction.
+  it("renders an 'Expand navigation' toggle when collapsed (the default)", () => {
+    renderRail({ expanded: false })
+    expect(screen.getByRole("button", { name: /expand navigation/i })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /collapse navigation/i })).toBeNull()
+  })
+
+  it("flips the toggle's accessible name to 'Collapse navigation' when expanded", () => {
+    renderRail({ expanded: true })
+    expect(screen.getByRole("button", { name: /collapse navigation/i })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /expand navigation/i })).toBeNull()
   })
 
-  it("reads/writes NO nav_panel_collapsed localStorage key", () => {
+  it("clicking the ☰ toggle delegates to onToggleExpanded (pinned — never hover)", () => {
+    const { props } = renderRail({ expanded: false })
+    fireEvent.click(screen.getByRole("button", { name: /expand navigation/i }))
+    expect(props.onToggleExpanded).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders nav labels as visible body text ONLY when expanded", () => {
+    renderRail({ expanded: true })
+    // Full-width rows show the label beside the icon — real text nodes, not just aria.
+    expect(screen.getByText("Documents")).toBeInTheDocument()
+    expect(screen.getByText("New chat")).toBeInTheDocument()
+  })
+
+  it("collapsed rail shows icons only — the label is the accessible name, not body text", () => {
+    renderRail({ expanded: false })
+    expect(screen.getByRole("button", { name: /new chat/i })).toBeInTheDocument() // reachable
+    expect(screen.queryByText("New chat")).toBeNull() // but not a rendered text node
+  })
+
+  it("keeps New Chat reachable in BOTH rail states (the invariant the old collapse broke)", () => {
+    for (const expanded of [false, true]) {
+      const { unmount } = renderRail({ expanded })
+      expect(screen.getByRole("button", { name: /new chat/i })).toBeInTheDocument()
+      unmount()
+    }
+  })
+})
+
+describe("NavPanel rail — pure + stream-free (D-07)", () => {
+  it("touches NO localStorage itself (parent owns rail-expand persistence)", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem")
     const setItem = vi.spyOn(Storage.prototype, "setItem")
-    renderRail()
-    fireEvent.click(screen.getByRole("button", { name: "Chat" }))
+    const { props } = renderRail()
+    fireEvent.click(screen.getByRole("button", { name: /expand navigation/i }))
+    // The rail is presentational: the toggle delegates to the parent callback and the
+    // rail itself never reads/writes storage — neither the OLD masking key nor the new
+    // parent-owned one leaks into this component.
+    expect(props.onToggleExpanded).toHaveBeenCalled()
     const touchedKeys = [
       ...getItem.mock.calls.map((c) => c[0]),
       ...setItem.mock.calls.map((c) => c[0]),
     ]
     expect(touchedKeys).not.toContain("nav_panel_collapsed")
+    expect(touchedKeys).not.toContain("nav_rail_expanded")
     getItem.mockRestore()
     setItem.mockRestore()
   })
