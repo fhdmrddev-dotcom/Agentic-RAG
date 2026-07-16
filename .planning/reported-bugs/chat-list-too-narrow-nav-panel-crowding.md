@@ -4,9 +4,9 @@ title: Chat list / chat area squeezed too narrow — nav panel growth crowds out
 reported: 2026-07-11
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/navigation, frontend/layout, frontend/chat-list]
-folded_into: null
+folded_into: 156
 verified_closed_by: null
 related_seeds: [SEED-113]
 re_open_trigger: null
@@ -40,6 +40,7 @@ Not yet investigated (hypothesis only): nav panel sections are all always-expand
 
 - **Fold into in-flight phase:** n/a (147 is the operator control plane — different surface)
 - **Defer to future phase / milestone:** strong candidate for a small dedicated nav/IA density pass inside v3.3 (fits the milestone's "everyday UX aligned to Glean/Beam — simple, accurate" goal; consider alongside SEED-113 profile menu since both reshape the nav rail). G-2 applies: sketch before any redesign; the Phase 103 three-homes IA contract (sketch-findings skill) is the governing design context.
+- **FOLDED → Phase 156 (2026-07-16, discuss-phase):** Sketch 078-D is the "sketch before redesign" this report asked for. Its permanent thin icon rail + dedicated full-height chat-history column decouples nav growth from the thread list — the structural fix for this crowding. `status: open → folded`, `folded_into: 156`. Flips to `closed` when the shipped rail verifiably relieves the crowding.
 - **Plant as seed:** covered by this report + sibling [SEED-113] (profile/user menu — same rail real estate)
 - **External — note only:** no
 
