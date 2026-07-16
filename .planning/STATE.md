@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-16T21:53:40.447Z"
-last_activity: 2026-07-16 -- Phase 157 planning complete
+last_updated: "2026-07-16T21:56:30.164Z"
+last_activity: 2026-07-16 -- Phase 157 execution started
 progress:
   total_phases: 26
   completed_phases: 11
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 157 — deployment presets & runbook (stretch)
+**Current focus:** Phase 157 — deployment-presets-runbook-stretch
 
 ## Current Position
 
-Phase: 157
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-16 -- Phase 157 planning complete
+Phase: 157 (deployment-presets-runbook-stretch) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 157
+Last activity: 2026-07-16 -- Phase 157 execution started
 
 **157 discuss (2026-07-17) — DEPLOY-01 (STRETCH) context gathered → `0e839c17`:** 4 gray areas discussed; operator reframed mid-way (vendor-first — Enterprise = on-prem/BYO-infra/local-GPU NOT bigger-VPS; tier by users/audience not box size) → published a plain-language 4-homes deployment-map artifact + saved `project_deployment_tiers_direction` memory. Locked in `157-CONTEXT.md` (D-01..D-10): topology = **BOTH** (portable one-box `docker compose` canonical + managed Coolify+Vercel variant, cross-links DEPLOYMENT-PIPELINE.md); compose = **ALL-IN-ONE** (net-new `frontend/Dockerfile` nginx + backend + bundled Redis; Supabase always cloud); **LEAN** scope (fully build + smoke the 2 real-today homes — one-box self-host + SaaS map; BYO-cloud + on-prem = short variant sections; full air-gapped runbook DEFERRED until a real buyer); `docs/OPERATOR.md` supersedes the recovered VPS guide + cross-links the 3 docs/DEPLOYMENT-*.md + BAKES IN the LESSONS fixes (seed-migrations/A6, session-pooler :5432/A4, rediss:// TLS/A5, multi-origin CORS/B1, sandbox docker.sock+keeper/B2, SECRETS_ENCRYPTION_KEY/150); smoke (SC#3) = local `docker compose -f docker-compose.prod.yml up` one-box → /health + login + 1 chat turn (operator runs, Claude verifies). Reported-bugs: **0 folded** (none in ops domain). Todos: 0 matched. **NOT SC#10-flagged** (no streaming/agent-loop/provider/UI code). Deployment map: https://claude.ai/code/artifact/00e107fa-ac01-4300-ba2b-daed7c98e3d3 . NEXT: `/gsd:plan-phase 157`.
 
