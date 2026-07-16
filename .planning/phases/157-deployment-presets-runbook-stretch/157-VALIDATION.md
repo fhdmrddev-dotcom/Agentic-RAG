@@ -2,8 +2,8 @@
 phase: 157
 slug: deployment-presets-runbook-stretch
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-17
 ---
 
@@ -86,11 +86,11 @@ created: 2026-07-17
 
 ## Validation Sign-Off
 
-- [ ] Every artifact task's `<acceptance_criteria>` includes its static check from the Per-Task map
-- [ ] Sampling continuity: each artifact commit runs its relevant static check
-- [ ] Wave 0 equivalent honored: `deploy/onebox.env.example` authored before compose/OPERATOR consume it
-- [ ] No watch-mode flags (N/A — no test runner)
-- [ ] D-09 smoke green before `/gsd:verify-work`
-- [ ] `nyquist_compliant: true` set in frontmatter (after the checks above are wired into plan tasks)
+- [x] Every artifact task's `<acceptance_criteria>` includes its static check from the Per-Task map
+- [x] Sampling continuity: each artifact commit runs its relevant static check
+- [x] Wave 0 equivalent honored: `deploy/onebox.env.example` authored before compose/OPERATOR consume it
+- [x] No watch-mode flags (N/A — no test runner)
+- [ ] D-09 smoke green before `/gsd:verify-work` — pending 157-05 execution
+- [x] `nyquist_compliant: true` set in frontmatter (checks wired into plan tasks — verified by gsd-plan-checker)
 
-**Approval:** pending
+**Approval:** approved 2026-07-17 (gsd-plan-checker: 0 blockers; the D-09 smoke box stays open until 157-05 runs)

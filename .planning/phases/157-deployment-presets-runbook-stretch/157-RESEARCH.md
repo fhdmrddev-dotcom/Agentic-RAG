@@ -472,9 +472,11 @@ SELECT count(*) FROM public.skills
 
 **Note:** No `[ASSUMED]` claims touch compliance/retention/security-standard requirements. The security-relevant items (docker.sock=host-root, `SECRETS_ENCRYPTION_KEY` boot behavior, operator gate) are all `[VERIFIED]` from source.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Preset file location + compose `--env-file` wiring**
+> **All 4 resolved by the Phase 157 plan set (`25338e66`), verified by gsd-plan-checker:** Q1 → operator copies `deploy/onebox.env.example` to repo-root `./.env` (zero-flag interpolation; serves both compose build-args and backend `env_file`) — **157-01 Task 2 + 157-03 Task 2**. Q2 → one full `deploy/onebox.env.example` (home B, smoke-tested) + a C/D delta *table* in OPERATOR.md, no second maintained preset (LEAN D-05) — **157-01 + 157-04 Task 2**. Q3 → both: compose publishes `8000:8000` and the smoke curls `:8000/health` directly AND `/api/health` through nginx — **157-03 Task 2 + 157-05**. Q4 → `ENVIRONMENT=production` set for cleanliness only, NOT documented as the operator-access control (that remains `OPERATOR_EMAILS` + `operator_users`) — **157-01 Task 1**.
+
+1. **Preset file location + compose `--env-file` wiring** — *RESOLVED: root `./.env` + `cp` step (157-01 Task 2, 157-03 Task 2).*
    - What we know: D-06 says presets are curated `.env` files; file layout is Claude's discretion. Compose build-arg interpolation reads a `.env` beside the compose file (or via `--env-file`).
    - What's unclear: `deploy/onebox.env.example` → does the operator copy to repo-root `./.env` (auto-interpolated) or keep it at `deploy/onebox.env` and run `docker compose --env-file deploy/onebox.env …`?
    - Recommendation: Pick ONE and document the exact `cp` + `docker compose` invocation in OPERATOR.md. Root-`./.env` is the zero-flag path; `--env-file` is more explicit. Planner decides.
