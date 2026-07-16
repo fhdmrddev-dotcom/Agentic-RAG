@@ -414,7 +414,12 @@ Plans:
   2. An `OPERATOR.md` runbook supersedes the recovered VPS guides and walks an operator through a production stand-up.
   3. Following the runbook with a preset produces a working deployment (smoke-verified).
 
-**Plans**: TBD
+**Plans**: 5 plans across 4 waves (W1: onebox preset ∥ frontend build trio -> W2: compose -> W3: OPERATOR.md -> W4: D-09 smoke)
+- [ ] 157-01-PLAN.md — Wave 1: `deploy/onebox.env.example` one-box preset (the dependency-root env surface)
+- [ ] 157-02-PLAN.md — Wave 1: net-new `frontend/Dockerfile` + `nginx.conf` + `.dockerignore` (SPA + SSE reverse proxy, `npx vite build`)
+- [ ] 157-03-PLAN.md — Wave 2: `docker-compose.prod.yml` all-in-one (frontend + backend + bundled redis; Supabase external)
+- [ ] 157-04-PLAN.md — Wave 3: `docs/OPERATOR.md` day-0 runbook + supersede note + baked-in LESSONS fixes + C/D variant deltas
+- [ ] 157-05-PLAN.md — Wave 4: D-09 one-box compose smoke (operator-gated, `autonomous: false`)
 
 ### Phase 158: First-Run Install Wizard (STRETCH)
 
