@@ -265,3 +265,40 @@ _Live UAT by: Claude (autonomous, operator-unattended per the discuss-phase dire
 
 _Verified: 2026-07-16T21:45:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Post-verification REFINEMENT — collapsible left layout (operator feedback 2026-07-16)
+
+After using the shipped 078-D result, the operator flagged that the two PERMANENT left
+columns (58px NavPanel rail + always-on 300px ChatHistoryColumn) felt cramped vs
+Claude.ai/Gemini/ChatGPT: the rail "is now always folded which does not allow us to
+unfold it and see it fully", and the history "is always appearing without the ability to
+fold it... makes the chat area even narrower". Approved fix (scratchpad
+`sketch-left-layout.html` Variant A) makes the left chrome **collapsible**, keeping search
+inline + nav a compact spine so growth never crowds the conversation. Commit `8486e0c3`
+on `develop` (frontend-only; reuses everything 078-D shipped):
+
+- **NavPanel** — a **pinned `☰` toggle** expands the 58px icon rail to 210px labels and
+  back; state in `nav_rail_expanded` (localStorage). Deliberately **NOT hover-driven**
+  (the operator's explicit annoyance). New `RailItem` helper = icon-only+tooltip when
+  collapsed / icon+label when expanded. New Chat + shield reachable in BOTH states.
+- **ChatHistoryColumn** — a `⟨|` header handle (optional `onCollapse` seam) folds the
+  column fully away; `chat_history_collapsed` (localStorage).
+- **ChatArea** — a `▷` "Show chat history" handle in the chat top-bar (optional
+  `onReopenHistory`) reopens it, shown only while collapsed (welcome + active headers).
+- **ChatLayout** owns both persisted flags; NavPanel/ChatHistoryColumn stay presentational.
+- Inline filter + ⌘K + date/folder grouping + mobile drawer **unchanged**.
+
+**Gates:** 42/42 affected tests pass (NavPanel + ChatHistoryColumn contracts updated +
+toggle/collapse coverage added); tsc 0-net-new (29 SEED-056 baseline, none in the 4 touched
+files); lint:a11y clean; `vite build` green.
+
+**LIVE Chrome-DevTools UAT PASS** (passwordless local session, real 399-thread data,
+ultrawide 3440px): default rail=58/history=300/no-overflow; `☰` → 210px labels + persist;
+**hover keeps 58px (pinned confirmed)**; `⟨|` collapse → conversation widened 2616→2962px +
+`▷` handle appears + persist; `▷` reopen → history=300 + handles swap + persist; **both flags
+survive reload**; BOTH light+dark themes render clean; zero horizontal overflow in every state.
+
+_Refinement verified: 2026-07-16 (autonomous, operator-unattended). Formal POLISH-01 closure
+(`/gsd:verify-work 156`) still pending._
