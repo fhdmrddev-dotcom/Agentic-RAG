@@ -423,19 +423,18 @@ it("no aXe AA violations — populated", async () => {
 
 **All other claims are VERIFIED (in-repo reads / `npm view`) or CITED.** The Assumptions Log is short by design — the codebase and the sketch are fully readable.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Include the optional Date⇄Folder segmented toggle (D-04) and mobile date grouping (D-08)?**
+> All three resolved at plan time (2026-07-16) and reflected in the committed plans; kept here for traceability. Load-bearing assumption **A2/A3 also RESOLVED**: a backend grep confirmed `list_threads` = `.select("*").eq("user_id",…).eq("is_eval",False).order("updated_at", desc=True)` — no `.limit()`/`.range()`, so ⌘K "search all" is complete client-side, eval threads are excluded, and the sort is updated_at DESC.
+
+1. **Include the optional Date⇄Folder segmented toggle (D-04) and mobile date grouping (D-08)?** — **RESOLVED:** planned as the explicitly cut-able **156-04 Task 2** (default stays Date; ship only if trivial, else record a SUMMARY fast-follow — never a half-measure). SC#3 never depends on it.
    - What we know: the sketch ships `groupByFolder` (`index.html:248`) and a `.seg` toggle in Variant B; the mechanics are ~15 more lines.
-   - What's unclear: whether it clears the "cheap, no new state complexity" bar (Claude's Discretion).
-   - Recommendation: land date grouping first (required); add the toggle in W3 only if the filter/group plumbing makes it a few lines. Defer otherwise (it's explicitly optional).
+   - Recommendation (adopted): land date grouping first (required, W1); add the toggle in W3 only if the filter/group plumbing makes it a few lines. Defer otherwise (it's explicitly optional).
 
-2. **History-column header: repeat New Chat, or rely on the rail's +?**
+2. **History-column header: repeat New Chat, or rely on the rail's +?** — **RESOLVED:** keep both, per **156-02** (matches winning Sketch 078-D — the header New is the in-context entry; the rail `+` is the always-reachable one, D-02).
    - What we know: the sketch header carries a "New" button (`index.html:277`) AND the rail has one (Variant D). Both is redundant but harmless.
-   - Recommendation: keep both (matches the winning sketch; the header New is the in-context entry, the rail + is the always-reachable one). Low cost.
 
-3. **cmdk `shouldFilter`: use cmdk's built-in scoring or feed pre-filtered items?**
-   - Recommendation: `shouldFilter={false}` + our own `matchesTitle`+`groupByDate` — guarantees the palette and the inline filter behave identically (the sketch reuses one grouping fn for both) and keeps date grouping under our control.
+3. **cmdk `shouldFilter`: use cmdk's built-in scoring or feed pre-filtered items?** — **RESOLVED / MOOT:** `cmdk` is NOT installed (hard-directive — the unattended run forbids the install-gating checkpoint); the palette is hand-rolled on the existing Radix `ui/dialog.tsx` and feeds pre-filtered items via the shared `matchesTitle`+`groupByDate`, so palette and inline filter behave identically.
 
 ## Environment Availability
 
@@ -561,9 +560,9 @@ jsdom has no layout/contrast/scroll — the SC-defining "does the rail actually 
 | Pitfalls | HIGH | Each grounded in a specific in-repo line or explicit CONTEXT gap. |
 | Package legitimacy | MEDIUM | slopcheck unavailable; strong npm/provenance evidence; gated by checkpoint. |
 
-### Open Questions
-- Optional Date⇄Folder toggle + mobile date grouping — include only if cheap (D-04/D-08 discretion); recommend deferring to W3.
-- `list_threads` no-limit + order direction — quoted authoritatively in CONTEXT (A2/A3); a 30-second backend grep at plan time removes the last doubt (client sort mitigates A3 regardless).
+### Open Questions (RESOLVED — see § Open Questions above)
+- Optional Date⇄Folder toggle + mobile date grouping — **RESOLVED:** planned as the cut-able 156-04 Task 2 (default Date; SC#3 independent).
+- `list_threads` no-limit + order direction (A2/A3) — **RESOLVED:** backend grep confirmed `.select("*").eq("user_id",…).eq("is_eval",False).order("updated_at", desc=True)` — no limit (complete client-side), DESC, eval threads excluded.
 
 ### Ready for Planning
-Research complete. The planner can create PLAN.md files: W1 (rail refactor + ChatHistoryColumn + filter + date grouping → all 3 SCs), W2 (⌘K palette, cut-line), W3 (mobile parity + polish), with Wave-0 test scaffolding and a `checkpoint:human-verify` before any `cmdk` install.
+Research complete. The planner can create PLAN.md files: W1 (rail refactor + ChatHistoryColumn + filter + date grouping → all 3 SCs), W2 (⌘K palette, cut-line), W3 (mobile parity + polish), with Wave-0 test scaffolding. **⌘K is hand-rolled on the existing Radix `ui/dialog.tsx` — NO `cmdk` install, NO `checkpoint:human-verify`** (the unattended-run directive forbids an install-gating checkpoint).
