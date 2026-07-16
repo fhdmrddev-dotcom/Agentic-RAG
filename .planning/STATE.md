@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: planning
-last_updated: "2026-07-16T14:57:40.569Z"
-last_activity: 2026-07-16
+status: executing
+last_updated: "2026-07-16T16:06:55.400Z"
+last_activity: 2026-07-16 -- Phase 156 planning complete
 progress:
   total_phases: 26
   completed_phases: 10
-  total_plans: 68
+  total_plans: 72
   completed_plans: 68
   percent: 38
 ---
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 156
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-16
+Status: Ready to execute
+Last activity: 2026-07-16 -- Phase 156 planning complete
 
 **155-06 execution notes (2026-07-15) — A11Y-01 Wave 3 (FINAL plan): author the last 5 `*.a11y.test.tsx` vitest-axe suites for the remaining net-new v3.3 surfaces (152 Run modal + 153 citation UI VERIFY + 154 relabels), TEST-ONLY, NO component source, NO backend, NO migration:** 3 tasks (all `type=auto`), sequential on the main tree (`use_worktrees=false`); 1 D-14 documented exclusion + 1 Rule-3 tsc-clean auto-fix + 1 D-06 deferral (no source touched). Commits: T1 `70d2fef3` (test — RunModal.a11y, 8 tests); T2 `bca8d277` (test — CitationUI.a11y, 20 tests + D-14 docs); T3 `dd18b5e1` (test — SettingsPage/MessageInput/DocumentStatusBadge.a11y, 30 tests + D-06 note); fix `d157dad7` (tsc-clean). **5 suites / 58 tests GREEN** (run all-together with the MessageItem replay = 6 files / 66 GREEN). **D-12 net-new surface inventory now CLOSED** (Control Room via 155-04/05 + Run modal + citation UI + 154 surfaces via 155-06). **D-09 roles/names locked:** scenario-1 Run-modal file-input Tab-through (hidden `input[type=file]` `tabIndex=-1` + `aria-label="Upload template file"` queryable-but-not-trapped + named proxy button; remove `aria-label="Remove template"`; KB-scope combobox by role+name; `launchError`=`role=alert`; delete confirm `role=dialog` + named "Delete forever"); scenario-2 CitationPeek pinned `role=dialog aria-modal=false` + accessible name + state-toggled pin `aria-pressed`/`aria-label` + Esc-closes-restores-marker-focus + markers `role=button` + `<script>`/HTML payloads inert (no dangerouslySetInnerHTML, T-155-06-XSS) + reduced-motion; scenario-4 Settings `TechnicalNamesToggle`=BUTTON+`aria-pressed` (ASSERT-REAL-CONTRACT — NOT `role=switch`; mirrors 155-04) + relabeled `role=tablist`/`role=tab` names (Search=plain default) + composer General/Explorer `menuitem`s with associated helper text + DocumentStatusBadge never-colour-alone WORD in BOTH audiences. **D-13 VERIFY (not rebuild):** the 153 citation contracts ALL held — 0 additive citation-component fixes; components rendered DIRECTLY; **G-5 RED LINE honored** (MessageItem/StreamsProvider absent from diff; MessageItem.test replay 8/8 GREEN). **D-14:** 1 documented per-rule exclusion — `nested-interactive` (WCAG 4.1.2 A) on the 153 `.citation-ref-row[role=button]` footer rows (a KNOWN/tracked tradeoff: the sanctioned role=button container wrapping an independently-reachable Open-document button — same pattern as NavRow/SkillCard; barrier absent — nested button in tab order + named, asserted positively). Encoded per-rule `CITATION_ROW_AXE_OPTS` scoped to ONLY the 2 citation-row scans (every other WCAG-AA rule stays ON), mirrored in 155-VALIDATION.md D-14 register + SEED-092-remainder (restructure folded into the NavRow/SkillCard follow-up — the citation row is the 3rd instance). **D-06 deferral (logged NOT fixed):** a full-page SettingsPage scan surfaces PRE-EXISTING `select-name` (rerank + `openrouter_tool_strategy` expert-config selects) + `heading-order` — outside the net-new 154 surface (toggle row + tablist), so the scan is SCOPED to those net-new regions and the whole-page findings logged to SEED-092-remainder. Gates: 58/58 a11y GREEN; non-regression `SettingsPage.test`/`DocumentStatusBadge.test`/`MessageItem.test` GREEN; `npx tsc -b` = exactly **30** SEED-056/049 baseline, **0 net-new** (dropped an unused `waitFor` import + added the 147 flag fields to the a11y `mkSettings`); `npx vite build` exit **0**. No component source modified. **A11Y-01 stays OPEN** at the requirement level (false-green avoidance, 148–155 convention; `requirements.mark-complete` deliberately NOT called — A11Y-01 is phase-spanning) — the LIVE D-03 contrast/button-name Chrome scan + the D-08/D-09/D-10 operator keyboard walkthrough (scenarios 1/2/3/4 + the 3 invariants) close it at `/gsd:verify-work 155`. **SDK quirks (known):** `state.advance-plan` = `last_plan` (current_plan 7 of 7, status → ready_for_verification; frontmatter `completed_plans` 67→68, `completed_phases` 9→10, status → verifying); `roadmap.update-plan-progress 155` = `summary_count: 7 / Complete / complete:true` but LEFT the progress-TABLE row `6/7 | Executing` stale → hand-fixed to `7/7 | Ready for verification`.
 
