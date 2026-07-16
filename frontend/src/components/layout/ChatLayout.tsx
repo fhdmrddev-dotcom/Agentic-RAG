@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { NavPanel } from "./NavPanel"
+import { ChatHistoryColumn } from "./ChatHistoryColumn"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
@@ -89,6 +90,17 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
 
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
+
+  // Phase 156 (POLISH-01, Wave 1 / RESEARCH Pitfall 1): the single app-wide thread
+  // bootstrap. Lifted UP from the old NavPanel (which only mounted on the chat view)
+  // so the whole app shares one loaded thread list — the Wave-2 global ⌘K palette is
+  // never empty on a non-chat view. Keeps the retry-once-after-2s guard for an auth
+  // session that isn't ready yet on a hard refresh.
+  useEffect(() => {
+    loadThreads().catch(() => {
+      setTimeout(() => loadThreads().catch(console.error), 2000)
+    })
+  }, [loadThreads])
 
   // Title cross-wiring fix (parallel chats): apply a generated title to the run's
   // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
@@ -208,18 +220,30 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         onNavigate={onNavigate}
         navItems={navItems}
         isOperator={isOperator}
-        onSignOut={onSignOut}
-        threads={threads}
-        selectedThread={selectedThread}
-        onSelectThread={selectThread}
         onNewThread={newThread}
-        loadThreads={loadThreads}
-        onDeleteThread={deleteThread}
-        onRenameThread={renameThread}
-        folders={folders}
+        onSignOut={onSignOut}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
+
+      {/* Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
+          column — mounted ONLY on the chat view (mirrors how the thread list was
+          chat-only in the old NavPanel). It owns the thread list + inline filter +
+          date grouping; the thin rail can no longer starve it (D-10 — structurally
+          relieves BUG-260711-01). It is `hidden md:flex` + `shrink-0`, so mobile still
+          uses the drawer below and the chat grid keeps `flex-1 min-w-0` → the three
+          desktop columns never overflow (Pitfall 7). */}
+      {activeView === "chat" && (
+        <ChatHistoryColumn
+          threads={threads}
+          selectedThread={selectedThread}
+          onSelectThread={selectThread}
+          onNewThread={newThread}
+          onDeleteThread={deleteThread}
+          onRenameThread={renameThread}
+          folders={folders}
+        />
+      )}
 
       {/* Mobile drawer backdrop */}
       {drawerOpen && (
