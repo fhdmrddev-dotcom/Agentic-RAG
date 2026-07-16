@@ -91,7 +91,6 @@ export function NavPanel({
   const streamActions = useStreamActions()
 
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -133,17 +132,13 @@ export function NavPanel({
           const isSelected = selectedThread?.id === thread.id
           const isEditing = editingId === thread.id
           const isMenuOpen = menuOpenId === thread.id
-          const isHovered = hoveredId === thread.id
-          const showActions = isHovered || isMenuOpen
           // SEED-064: live run on this thread?
           const isRunning = streamingThreadIds.has(thread.id)
 
           return (
             <div
               key={thread.id}
-              className="relative group"
-              onMouseEnter={() => setHoveredId(thread.id)}
-              onMouseLeave={() => { if (!isMenuOpen) setHoveredId(null) }}
+              className="relative"
             >
               {isEditing ? (
                 <input
@@ -162,9 +157,15 @@ export function NavPanel({
                 // primary "open thread" action; the Stop + options controls are
                 // SIBLINGS (never nested inside the row button — nested buttons are
                 // invalid HTML), so every control is independently keyboard-operable.
+                // CR-01 fix: the Stop/options actions row is ALWAYS rendered and
+                // CSS-gated (opacity), revealed on hover OR keyboard focus-within
+                // (or while the options menu is open) — never render-gated on mouse
+                // state — so a keyboard-only user can Tab to Stop / Rename / Delete.
+                // `group` scopes the group-hover / group-focus-within reveal to this
+                // row (mirrors the NavRow.tsx pattern).
                 <div
                   className={cn(
-                    "relative rounded-lg transition-all duration-150",
+                    "group relative rounded-lg transition-all duration-150",
                     isSelected
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
@@ -193,47 +194,61 @@ export function NavPanel({
 
                   {/* SEED-064: resting running dot — ambient "this chat is working"
                       signal. A short gradient scrim keeps it clear of a long title.
-                      Hidden while hovered (the Stop button takes its place). */}
-                  {isRunning && !showActions && (
+                      CR-01: CSS-gated (not render-gated) so it swaps cleanly with the
+                      Stop button — it fades out on hover OR keyboard focus-within (or
+                      while the options menu is open) and never overlaps Stop for a
+                      keyboard user. `pointer-events-none` keeps it click-through. */}
+                  {isRunning && (
                     <div
-                      className="absolute inset-y-0 right-0 flex items-center pl-6 pr-3 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none"
+                      className={cn(
+                        "absolute inset-y-0 right-0 flex items-center pl-6 pr-3 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none",
+                        "transition-opacity group-hover:opacity-0 group-focus-within:opacity-0",
+                        isMenuOpen && "opacity-0",
+                      )}
                       aria-label="Run in progress"
                     >
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                     </div>
                   )}
 
-                  {/* Actions on hover: Stop (if running) + the rename/delete menu.
-                      The gradient scrim fades a long title out behind the buttons so
-                      they never visually collide with the text (SEED-064 polish). */}
-                  {showActions && (
-                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg">
-                      {isRunning && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            void streamActions.stopThread(thread.id)
-                          }}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
-                          aria-label="Stop run"
-                        >
-                          <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
-                        </button>
-                      )}
+                  {/* Actions: Stop (if running) + the rename/delete menu. CR-01: ALWAYS
+                      rendered and CSS-gated — hidden at rest (opacity-0), revealed on
+                      hover OR keyboard focus-within (or while the options menu is open)
+                      so a keyboard-only user can Tab to them (mirrors NavRow.tsx). The
+                      gradient scrim fades a long title out behind the buttons so they
+                      never visually collide with the text (SEED-064 polish). */}
+                  <div
+                    className={cn(
+                      "absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg",
+                      "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
+                      isMenuOpen && "opacity-100",
+                    )}
+                  >
+                    {isRunning && (
                       <button
                         type="button"
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setMenuOpenId(isMenuOpen ? null : thread.id)
+                          void streamActions.stopThread(thread.id)
                         }}
-                        aria-label="Thread options"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
+                        aria-label="Stop run"
                       >
-                        <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                        <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuOpenId(isMenuOpen ? null : thread.id)
+                      }}
+                      aria-label="Thread options"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               )}
 
