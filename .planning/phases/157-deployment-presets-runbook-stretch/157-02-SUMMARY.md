@@ -118,6 +118,12 @@ None - no external service configuration required by this plan. (The `VITE_*` bu
 - **Carry-forward for Plan 03/05:** because the strip now relies on a variable upstream + `resolver 127.0.0.11` (Docker embedded DNS), the compose MUST run the `frontend` service on a **user-defined network** (compose default) for `resolver 127.0.0.11` to resolve `backend`. Set `depends_on: [backend]` for start ordering (readiness is handled by the deferred DNS + nginx retry).
 - **Carry-forward for Plan 05 (D-09 smoke):** confirm `/api/health` returns 200 through nginx (proves the rewrite strip: `/api/health -> /health`) in addition to the direct `:8000/health` curl.
 
+## Self-Check: PASSED
+- Files exist: `frontend/nginx.conf`, `frontend/Dockerfile`, `frontend/.dockerignore`, `157-02-SUMMARY.md` — all FOUND.
+- Commits exist: `1b107878` (Task 1), `dd9b06b6` (Task 2), `8d714b5f` (SUMMARY) — all FOUND.
+- Scope boundary: the three task commits touch ONLY the 4 target files (all additions); no `STATE.md`, `ROADMAP.md`, or `frontend/src/` app code modified.
+- Not runnable in this session (deferred to Plan 05 D-09 smoke): the docker-based `nginx -t` syntax check and the live `/api/` strip proof — Docker daemon access was denied in this executor session.
+
 ---
 *Phase: 157-deployment-presets-runbook-stretch*
 *Completed: 2026-07-17*
