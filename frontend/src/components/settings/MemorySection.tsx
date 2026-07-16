@@ -212,9 +212,10 @@ export function MemorySection() {
                     })}
                   </span>
 
-                  {/* Action icons — visible on hover */}
+                  {/* Action icons — visible on hover OR keyboard focus-within (WR-01:
+                      keeps the focus-visible ring reachable for keyboard users). */}
                   {editingKey !== entry.key && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"

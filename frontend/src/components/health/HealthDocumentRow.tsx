@@ -87,7 +87,9 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
           <span className="shrink-0">{getFileIcon(doc.filename)}</span>
           <span className="text-sm font-medium truncate flex-1">{doc.filename}</span>
           {metricChip}
-          <div className={cn("opacity-0 group-hover:opacity-100 transition-opacity flex gap-1", reingestConfirm && "opacity-100")}>
+          {/* WR-01: reveal on hover OR keyboard focus-within so the focus-visible ring
+              stays visible for keyboard users (WCAG 2.4.7). */}
+          <div className={cn("opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex gap-1", reingestConfirm && "opacity-100")}>
             {reingestConfirm ? (
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground">Re-ingest this document?</span>
