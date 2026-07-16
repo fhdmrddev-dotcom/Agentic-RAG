@@ -71,7 +71,7 @@
 - [x] **Phase 152: Workflow Run Inputs** — Run-modal template upload + editable KB folder-scope + safe workflow delete cascade (WFIN-01, WFIN-02, WFIN-03) — completed 2026-07-15 (SC#10 UAT 8/9; OpenRouter axis blocked by BUG-260714-02, operator-accepted)
 - [x] **Phase 153: Inline Citations** — per-claim markers keyed to the run's real retrieval set + click-through + absence-as-signal (CITE-01) — completed 2026-07-15 (SC#10 Anthropic proof operator-accepted; secure-phase 27/27 CLOSED)
 - [x] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01) — completed 2026-07-15 (live UAT 154-HUMAN-UAT U1–U5 ✅; secure-phase 4/4 CLOSED)
-- [ ] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01)
+- [x] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01) — completed 2026-07-16 (live Chrome-MCP scans: 0 contrast/name failures across 1,499 controls / 1,206 muted-text elements; code-review CR-01 keyboard-reachability fix live-verified; keyboard scenarios operator-accepted, 155-HUMAN-UAT)
 - [ ] **Phase 156 (STRETCH): Everyday UX Polish** — collapsed-nav New Chat + thread-list search + date/folder grouping (POLISH-01)
 - [ ] **Phase 157 (STRETCH): Deployment Presets & Runbook** — Solo/Team/Enterprise env + `docker-compose.prod.yml` + `OPERATOR.md` (DEPLOY-01)
 - [ ] **Phase 158 (STRETCH): First-Run Install Wizard** — `/setup` browser flow, idempotent, lock-after-finalize (DEPLOY-02)
@@ -441,7 +441,7 @@ Plans:
 | 152. Workflow Run Inputs | 8/8 | Complete | 2026-07-15 |
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
-| 155. Accessibility Sweep — WCAG AA | 7/7 | Ready for verification | - |
+| 155. Accessibility Sweep — WCAG AA | 7/7 | Complete | 2026-07-16 |
 | 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
