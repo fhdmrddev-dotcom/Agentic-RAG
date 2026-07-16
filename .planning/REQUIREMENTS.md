@@ -40,7 +40,7 @@ Requirements for this milestone. Each maps to roadmap phases. CORE vs gated-STRE
 
 - [x] **CITE-01**: Chat responses show inline per-claim citation markers keyed to the run's ACTUAL retrieval set (set-membership, never a post-hoc LLM re-ask) with click-through to the source passage; claims without a marker read as general knowledge (absence-as-signal, the converged industry pattern) — G-2 sketch-gated, G-5 hot-file check first, SC#10 cross-provider
 - [x] **LANG-01**: User-facing surfaces speak plain language with technical terms behind an admin/advanced reveal (two-audience layer extending the shipped Phase-124 two-door pattern app-wide); renames never break enum/API/audit contracts
-- [ ] **POLISH-01**: Collapsed nav keeps New Chat reachable, and the thread list gets search + date/folder grouping (the two confirmed SEED-045 anchors, plus triaged minor-enhancement umbrella items that fit the phase)
+- [x] **POLISH-01**: Collapsed nav keeps New Chat reachable, and the thread list gets search + date/folder grouping (the two confirmed SEED-045 anchors, plus triaged minor-enhancement umbrella items that fit the phase)
 - [x] **A11Y-01**: All net-new v3.3 surfaces (admin shell, Run-modal inputs, citation UI) pass an automated axe-core scan + manual keyboard walkthrough at WCAG 2.1 AA; worst pre-existing app-wide offenders (contrast tokens, unlabeled icon buttons) fixed in the same pass
 
 ## Future Requirements
@@ -97,7 +97,7 @@ Which phases cover which requirements. Filled by roadmap creation (2026-07-10). 
 | CITE-01 | Phase 153 (CORE) | Trust & Friendliness UX | Complete |
 | LANG-01 | Phase 154 (CORE) | Trust & Friendliness UX | Complete |
 | A11Y-01 | Phase 155 (CORE) | Trust & Friendliness UX | Complete |
-| POLISH-01 | Phase 156 (STRETCH) | Trust & Friendliness UX | Pending |
+| POLISH-01 | Phase 156 (STRETCH) | Trust & Friendliness UX | Complete |
 | DEPLOY-01 | Phase 157 (STRETCH) | Deployment & Packaging | Pending |
 | DEPLOY-02 | Phase 158 (STRETCH) | Deployment & Packaging | Pending |
 
