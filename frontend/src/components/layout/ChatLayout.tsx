@@ -22,8 +22,12 @@ import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
 import type { OperatorIdentity } from "@/lib/api"
 import { cn } from "@/lib/utils"
+// Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer reuses the ONE shared
+// title-search predicate + XSS-safe highlight (Plan 01) so it filters its list the
+// SAME way the desktop ChatHistoryColumn does — SC#2 reaches mobile.
+import { matchesTitle, HighlightTitle } from "@/lib/threadGroups"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus, Shield } from "lucide-react"
+import { MessageSquare, Plus, Search, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
 // shared nav list (incl. the Workflows home + its distinct icon) — the local
 // NAV_ITEMS_MOBILE triplicate is gone (NavPanel consumes the same list). Phase 148
@@ -116,6 +120,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [mobileFolderId, setMobileFolderId] = useState<string | null>(null)
+  // Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer's title-search query.
+  // Narrows the drawer's flat list via the shared `matchesTitle` (SC#2 on mobile).
+  // Desktop-keyboard-first: there is deliberately NO ⌘K on mobile (D-08).
+  const [mobileQuery, setMobileQuery] = useState("")
 
   // Phase 156 (POLISH-01 / D-03, Wave 2): the global ⌘K command palette. Owned HERE
   // (not the chat-only column) so it is reachable on EVERY view over the Wave-1
@@ -235,6 +243,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // pointer still force-opens the panel.
   useEffect(() => subscribeOpenPanel(expand), [expand])
 
+  // Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer's filtered list —
+  // the SAME shared predicate the desktop column uses (parity). Blank query passes
+  // everything through, so an untouched drawer is byte-identical to before.
+  const mobileFiltered = threads.filter((t) => matchesTitle(t, mobileQuery))
+
   return (
     <div className="flex h-screen bg-background">
       <NavPanel
@@ -322,11 +335,30 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                 </select>
               )}
             </div>
+            {/* Phase 156 Wave 3 (Plan 04 / D-08): the mobile drawer title search —
+                reuses the shared `matchesTitle` predicate so the drawer filters its
+                list the SAME way the desktop column does (SC#2 reaches mobile). There
+                is deliberately NO ⌘K here (desktop-keyboard-first, D-08). */}
+            <div className="px-1 mb-2">
+              <div className="flex items-center gap-2 h-9 px-2.5 rounded-lg bg-card ghost-border transition-all focus-within:ring-2 focus-within:ring-primary/30">
+                <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={mobileQuery}
+                  onChange={(e) => setMobileQuery(e.target.value)}
+                  placeholder="Search chats…"
+                  aria-label="Search chats"
+                  className="flex-1 min-w-0 bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
             <div className="space-y-0.5 mt-2">
-              {threads.length === 0 && (
-                <p className="text-[10px] text-muted-foreground text-center py-4 italic">No recent chats</p>
-              )}
-              {threads.map((thread) => {
+              {mobileFiltered.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground text-center py-4 italic">
+                  {mobileQuery.trim() ? "No chats match your search." : "No recent chats"}
+                </p>
+              ) : (
+                mobileFiltered.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id
                 return (
                   <button
@@ -345,11 +377,14 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                     )}
                     <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
                       <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
-                      <span className="text-sm truncate" title={thread.title}>{thread.title}</span>
+                      <span className="text-sm truncate" title={thread.title}>
+                        <HighlightTitle title={thread.title} query={mobileQuery} />
+                      </span>
                     </div>
                   </button>
                 )
-              })}
+              })
+              )}
             </div>
           </div>
           {/* Nav icon row (bottom, fixed) */}
