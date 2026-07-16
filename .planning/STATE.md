@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: ready_to_plan
-last_updated: 2026-07-16T20:23:20.358Z
-last_activity: 2026-07-16
+status: planning
+last_updated: "2026-07-17T00:00:00.000Z"
+last_activity: 2026-07-17
 progress:
   total_phases: 26
   completed_phases: 11
   total_plans: 72
   completed_plans: 72
   percent: 42
-stopped_at: Phase 156 complete (4/4) — ready to discuss Phase 157
 ---
 
 # Project State
@@ -30,7 +29,9 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 Phase: 157
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-16
+Last activity: 2026-07-17
+
+**157 discuss (2026-07-17) — DEPLOY-01 (STRETCH) context gathered → `0e839c17`:** 4 gray areas discussed; operator reframed mid-way (vendor-first — Enterprise = on-prem/BYO-infra/local-GPU NOT bigger-VPS; tier by users/audience not box size) → published a plain-language 4-homes deployment-map artifact + saved `project_deployment_tiers_direction` memory. Locked in `157-CONTEXT.md` (D-01..D-10): topology = **BOTH** (portable one-box `docker compose` canonical + managed Coolify+Vercel variant, cross-links DEPLOYMENT-PIPELINE.md); compose = **ALL-IN-ONE** (net-new `frontend/Dockerfile` nginx + backend + bundled Redis; Supabase always cloud); **LEAN** scope (fully build + smoke the 2 real-today homes — one-box self-host + SaaS map; BYO-cloud + on-prem = short variant sections; full air-gapped runbook DEFERRED until a real buyer); `docs/OPERATOR.md` supersedes the recovered VPS guide + cross-links the 3 docs/DEPLOYMENT-*.md + BAKES IN the LESSONS fixes (seed-migrations/A6, session-pooler :5432/A4, rediss:// TLS/A5, multi-origin CORS/B1, sandbox docker.sock+keeper/B2, SECRETS_ENCRYPTION_KEY/150); smoke (SC#3) = local `docker compose -f docker-compose.prod.yml up` one-box → /health + login + 1 chat turn (operator runs, Claude verifies). Reported-bugs: **0 folded** (none in ops domain). Todos: 0 matched. **NOT SC#10-flagged** (no streaming/agent-loop/provider/UI code). Deployment map: https://claude.ai/code/artifact/00e107fa-ac01-4300-ba2b-daed7c98e3d3 . NEXT: `/gsd:plan-phase 157`.
 
 **156-04 execution notes (2026-07-16) — POLISH-01 Wave 3 (FINAL plan): bring SC#2 search to the mobile drawer (D-08) + ship the OPTIONAL Date⇄Folder toggle (D-04), frontend-only, NO backend, NO migration, NO new package:** 2 tasks (both `type=auto`), sequential on the main tree (`use_worktrees=false`), NO deviations. Commits: T1 `bac6d1ee` (feat — ChatLayout mobile drawer search), T2 `48f9205e` (feat — groupByFolder + Date⇄Folder toggle); SUMMARY commit follows. **Task 1 (`ChatLayout.tsx` — mobile drawer search, D-08):** a controlled "Search chats…" `<input>` (`mobileQuery` state + lucide `Search` icon) directly above the drawer's `threads.map`, narrowing the flat list via the SHARED `matchesTitle(thread, mobileQuery)` (Plan 01) so mobile filters exactly like the desktop column (SC#2 reaches mobile); row titles render through XSS-safe `HighlightTitle` (JSX text, `dangerouslySetInnerHTML`=0); honest empty-state "No chats match your search." (searching) vs "No recent chats" (rest). New Chat button, folder `<select>`, row markup, bottom nav-icon row + the `isOperator`-gated operator shield (`grep -c "Control Room"`=4 unchanged) stayed byte-identical; **NO ⌘K on mobile** (desktop-keyboard-first — the lone `toLowerCase()==="k"` is the pre-existing Wave-2 window handler; no drawer keydown added). **Task 2 (OPTIONAL — SHIPPED in-budget; `threadGroups.tsx` + `ChatHistoryColumn.tsx`):** the D-04 cut-line is "a small `groupMode` state + one `groupByFolder` helper" — the realized design fit exactly, so it was included. New `groupByFolder(threads, folders)` (groups by `folderLabel`: folders-array order, unresolved-id "Folder" then "Unfiled" LAST, empty-fold, within-group `updated_at` DESC — reuses `folderLabel`, drops NO thread) + 4 unit tests. In ChatHistoryColumn: `groupMode:"date"|"folder"` DEFAULTING to **date** (SC#3 unaffected), a compact `aria-pressed` segmented toggle (sketch `.seg`) in the header, branched `groups` (`groupByFolder` vs `groupByDate`), and the folder-mode row-meta swap (redundant folder chip → the row's date bucket via the EXISTING `bucketFor` — NO second `relDate` helper, so the budget held; non-half-measure) + 3 toggle tests. **Gates:** `npx vitest run` the 3 target files = **38/38 GREEN** (ChatLayoutLaunch 2 non-regression + threadGroups 18 [14+4] + ChatHistoryColumn 18 [15+3]) + `ChatHistoryColumn.a11y` **6/6** (toggle+folder pass vitest-axe AA); `npx tsc -b --force` = **29 errors, 0 net-new** (ZERO reference ChatLayout/threadGroups/ChatHistoryColumn; sole touched-file baseline hit stays the pre-existing `ChatLayoutLaunch.test.tsx:126` TS2740 mock rot); `npx vite build` exit **0** (groupByFolder import chain resolves); `npm run lint:a11y` exit **0**; source guards: `Control Room`=4, `dangerouslySetInnerHTML`=0 (ChatLayout+threadGroups), no drawer ⌘K, 0 file deletions in both commits. **All 3 SCs now code-complete across Waves 1–3** (SC#1 rail+column / SC#2 inline filter + ⌘K + mobile drawer / SC#3 date grouping [+ optional folder]). **POLISH-01 stays OPEN** at the requirement level (`requirements.mark-complete` deliberately NOT called) — the SC-defining "the thin rail no longer starves the history column" + the live mobile-drawer-search proof are Chrome-MCP-only (jsdom can't compute layout); closes at `/gsd:verify-work 156` (Wave-0/1/2 precedent + 148–155 false-green-avoidance convention). **SDK quirks (known):** `state.advance-plan` = `last_plan` (current_plan 4 of 4, status → ready_for_verification; bumped frontmatter `completed_plans` 71→72, `completed_phases` 10→11, milestone status → verifying, percent → 42); `state.update-progress` = "Progress field not found" (frontmatter `progress:` block); `state.record-metric` = arg-parse error → metric hand-recorded (duration ~15 min, 2 tasks, 5 files modified); `roadmap.update-plan-progress 156` = `summary_count: 4 / Complete / complete:true` + flipped the 156-04 plan checkbox but LEFT the progress-TABLE row `3/4 | In Progress` stale → hand-fixed to `4/4 | Ready for verification`.
 
