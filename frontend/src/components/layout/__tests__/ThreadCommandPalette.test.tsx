@@ -123,9 +123,11 @@ describe("ThreadCommandPalette — keyboard roving + select (SC#2)", () => {
     expect(props.onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it("clicking an option selects it the same way", () => {
+  it("mouse-selecting an option (onMouseDown) opens it the same way", () => {
     const { props } = renderPalette()
-    fireEvent.click(screen.getByText("Old prototype brainstorm"))
+    // The option selects on mousedown (preventDefault keeps focus on the combobox for
+    // correct focus-restore), mirroring the app's CreateLinkDialog typeahead.
+    fireEvent.mouseDown(screen.getByText("Old prototype brainstorm"))
     expect(props.onSelectThread).toHaveBeenCalledWith(expect.objectContaining({ id: "t-older" }))
     expect(props.onNavigate).toHaveBeenCalledWith("chat")
     expect(props.onOpenChange).toHaveBeenCalledWith(false)

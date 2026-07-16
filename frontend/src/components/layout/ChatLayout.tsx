@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatHistoryColumn } from "./ChatHistoryColumn"
+import { ThreadCommandPalette } from "./ThreadCommandPalette"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
@@ -116,6 +117,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [mobileFolderId, setMobileFolderId] = useState<string | null>(null)
 
+  // Phase 156 (POLISH-01 / D-03, Wave 2): the global ⌘K command palette. Owned HERE
+  // (not the chat-only column) so it is reachable on EVERY view over the Wave-1
+  // app-wide `threads` (RESEARCH Pitfall 1 — never empty off-chat). Toggled by the
+  // ⌘K/Ctrl+K window keydown below OR the ⌘K chip in the ChatHistoryColumn filter box.
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
   const handleTryInChat = useCallback((skillName: string) => {
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
@@ -208,6 +215,21 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     return () => window.removeEventListener("keydown", onKey)
   }, [togglePanel])
 
+  // ⌘K / Ctrl+K toggles the global command palette — mirrors the ⌘. idiom above but
+  // matches k (toLowerCase catches shifted K, exactly as the sketch does), and
+  // preventDefault also suppresses the browser's native Ctrl+K. Stable deps: the
+  // functional setState needs no dependency, so the listener is registered once.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
   // Chat-side seam affordances request a panel-open via the module-level signal
   // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe). A seam
   // pointer still force-opens the panel.
@@ -242,8 +264,23 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           onDeleteThread={deleteThread}
           onRenameThread={renameThread}
           folders={folders}
+          onOpenPalette={() => setPaletteOpen(true)}
         />
       )}
+
+      {/* Phase 156 (POLISH-01 / D-03, Wave 2): the global ⌘K palette, mounted ONCE at
+          the layout root OUTSIDE the activeView switch so it is reachable from every
+          view (chat / Documents / Settings / Workflows / …). It reads the same app-wide
+          `threads` the rest of the layout owns (Wave-1 lifted loadThreads → never empty
+          off-chat, Pitfall 1); StreamsProvider-free, so it mounts cleanly here. Selecting
+          a result runs selectThread + onNavigate("chat"). When closed it renders nothing. */}
+      <ThreadCommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        threads={threads}
+        onSelectThread={selectThread}
+        onNavigate={onNavigate}
+      />
 
       {/* Mobile drawer backdrop */}
       {drawerOpen && (

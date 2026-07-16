@@ -173,8 +173,22 @@ export function ThreadCommandPalette({
                         id={optionId(thread.id)}
                         role="option"
                         aria-selected={isActive}
-                        onClick={() => selectAt(flatIndex)}
-                        onMouseMove={() => setActiveIndex(flatIndex)}
+                        // tabIndex={-1}: focusable programmatically but OUT of the tab
+                        // sequence — satisfies jsx-a11y/interactive-supports-focus while
+                        // keeping the roving on the combobox (aria-activedescendant), not
+                        // on the options.
+                        tabIndex={-1}
+                        // aria-activedescendant pattern: the option is NOT tabbable —
+                        // keyboard lives on the combobox input (↑↓/↵). Mouse selection
+                        // uses onMouseDown + preventDefault to KEEP focus on the input
+                        // (so Radix restores focus correctly on close), mirroring the
+                        // app's CreateLinkDialog typeahead. This is also why lint:a11y
+                        // (click-events-have-key-events / interactive-supports-focus)
+                        // stays satisfied without a bogus per-option key handler.
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          selectAt(flatIndex)
+                        }}
                         className={cn(
                           "flex cursor-pointer items-center gap-2 overflow-hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors",
                           isActive

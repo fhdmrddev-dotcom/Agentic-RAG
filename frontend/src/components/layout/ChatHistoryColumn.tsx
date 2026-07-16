@@ -63,6 +63,7 @@ export function ChatHistoryColumn({
   onDeleteThread,
   onRenameThread,
   folders,
+  onOpenPalette,
 }: Props) {
   // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
   // + the cross-thread stop action. Lifted verbatim from NavPanel.
@@ -335,7 +336,23 @@ export function ChatHistoryColumn({
             aria-label="Filter chats"
             className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm text-foreground placeholder:text-muted-foreground"
           />
-          {/* ⌘K chip added in Wave 2 (Plan 03) */}
+          {/* Phase 156 Wave 2 (Plan 03): the ⌘K chip — opens the global finder (the
+              column filters what you're looking at; ⌘K jumps anywhere, Sketch 078-D). The
+              inline filter above is unchanged; this is purely additive. Optional seam —
+              rendered only when the layout wires onOpenPalette. */}
+          {onOpenPalette && (
+            <button
+              type="button"
+              onClick={onOpenPalette}
+              title="Search all chats (⌘K)"
+              aria-label="Search all chats"
+              className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            >
+              <span className="rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary">
+                ⌘K
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

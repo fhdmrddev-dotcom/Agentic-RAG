@@ -197,3 +197,17 @@ describe("ChatHistoryColumn — preserved row behaviors (D-09)", () => {
     expect(props.onSelectThread).toHaveBeenCalledWith(expect.objectContaining({ id: "t-month" }))
   })
 })
+
+describe("ChatHistoryColumn — ⌘K chip (Wave 2 / onOpenPalette seam)", () => {
+  it("renders the ⌘K chip and calls onOpenPalette when clicked", () => {
+    const onOpenPalette = vi.fn()
+    renderColumn({ onOpenPalette })
+    fireEvent.click(screen.getByRole("button", { name: "Search all chats" }))
+    expect(onOpenPalette).toHaveBeenCalledTimes(1)
+  })
+
+  it("omits the ⌘K chip when onOpenPalette is not provided (optional seam — no regression)", () => {
+    renderColumn()
+    expect(screen.queryByRole("button", { name: "Search all chats" })).not.toBeInTheDocument()
+  })
+})
