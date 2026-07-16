@@ -183,6 +183,42 @@ describe("groupByFolder — folder groups, Unfiled last, empty-fold, within-grou
   it("returns an empty array for no threads", () => {
     expect(groupByFolder([], folders)).toEqual([])
   })
+
+  it('HI-01: a folder literally named "Unfiled" does NOT merge with or double the null-folder group', () => {
+    const withUnfiledFolder: Folder[] = [
+      { id: "f-unf", user_id: "u-1", name: "Unfiled", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    ]
+    const groups = groupByFolder(
+      [
+        mkThread({ id: "in-folder", folder_id: "f-unf", updated_at: daysAgoISO(1) }),
+        mkThread({ id: "null-folder", folder_id: null, updated_at: daysAgoISO(1) }),
+      ],
+      withUnfiledFolder,
+    )
+    // Keyed by id + a null-sentinel: two DISTINCT groups, the null one LAST — never a
+    // single merged "Unfiled" nor a doubled group (the pre-fix bug pushed "Unfiled" twice).
+    expect(groups).toHaveLength(2)
+    expect(groups[0].items.map((t) => t.id)).toEqual(["in-folder"]) // the real "Unfiled" folder
+    expect(groups[1].items.map((t) => t.id)).toEqual(["null-folder"]) // null folder, last
+  })
+
+  it("HI-01: two distinct folders sharing a name stay separate (keyed by id, not name)", () => {
+    const dupName: Folder[] = [
+      { id: "f-a", user_id: "u-1", name: "Projects", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+      { id: "f-b", user_id: "u-1", name: "Projects", parent_id: "f-a", is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    ]
+    const groups = groupByFolder(
+      [
+        mkThread({ id: "a1", folder_id: "f-a", updated_at: daysAgoISO(1) }),
+        mkThread({ id: "b1", folder_id: "f-b", updated_at: daysAgoISO(1) }),
+      ],
+      dupName,
+    )
+    // Two separate groups (not one merged) — each carries only its own folder's thread.
+    expect(groups).toHaveLength(2)
+    expect(groups[0].items.map((t) => t.id)).toEqual(["a1"])
+    expect(groups[1].items.map((t) => t.id)).toEqual(["b1"])
+  })
 })
 
 describe("HighlightTitle — safe match highlight (T-156-01 XSS control)", () => {

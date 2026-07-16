@@ -51,9 +51,9 @@ interface Props {
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
   folders: Folder[]
-  // Phase 156 Wave 2 (Plan 03): the ⌘K global finder. The chip inside the filter box
-  // opens it. Left as an optional seam now — the palette does not exist yet, so the
-  // chip is a placeholder (no onClick wired to a missing overlay).
+  // Phase 156 Wave 2 (Plan 03): opens the ⌘K global finder from the chip inside the
+  // filter box. Optional so the Wave-1 tests (which don't pass it) still render; wired
+  // by ChatLayout since Wave 2.
   onOpenPalette?: () => void
 }
 
@@ -405,8 +405,11 @@ export function ChatHistoryColumn({
             {query.trim() ? "No chats match your search." : "No recent chats"}
           </p>
         ) : (
-          groups.map((group) => (
-            <div key={group.label} className="mb-1">
+          groups.map((group, gi) => (
+            // key includes the index so two folders that share a name (Folder view)
+            // never collide on a duplicate React key (HI-01); date-bucket labels are
+            // already unique so this is a no-op for the default Date view.
+            <div key={`${group.label} ${gi}`} className="mb-1">
               <div className="sticky top-0 z-[2] flex items-center gap-[7px] px-2 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-muted-foreground bg-sidebar">
                 <span className="flex-1">{group.label}</span>
                 <span className="font-mono text-[10px] text-muted-foreground bg-muted px-1.5 rounded-full">

@@ -209,7 +209,7 @@ export function ThreadCommandPalette({
 
             {flat.length === 0 && (
               <p className="px-3 py-10 text-center text-sm text-muted-foreground">
-                No chats match your search.
+                {query.trim() ? "No chats match your search." : "No chats yet."}
               </p>
             )}
           </div>
