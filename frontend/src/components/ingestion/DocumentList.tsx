@@ -385,7 +385,12 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                       <button
                         type="button"
                         onClick={() => onSelect?.(doc.id)}
-                        aria-pressed={selectedDocId === doc.id}
+                        // WR-02: this opens the detail panel — it is NOT a toggle
+                        // (re-clicking does not un-select), so aria-pressed misleads
+                        // screen readers into announcing togglable "pressed" state.
+                        // aria-current marks the currently-open item instead (the
+                        // codebase convention, cf. NavPanel's aria-current).
+                        aria-current={selectedDocId === doc.id ? "true" : undefined}
                         className="flex items-center gap-1.5 flex-wrap text-left truncate hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
                       >
                         {doc.filename}
