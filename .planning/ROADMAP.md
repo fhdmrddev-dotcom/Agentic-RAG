@@ -417,7 +417,7 @@ Plans:
 **Plans**: 5 plans across 4 waves (W1: onebox preset ∥ frontend build trio -> W2: compose -> W3: OPERATOR.md -> W4: D-09 smoke)
 - [x] 157-01-PLAN.md — Wave 1: `deploy/onebox.env.example` one-box preset (the dependency-root env surface)
 - [x] 157-02-PLAN.md — Wave 1: net-new `frontend/Dockerfile` + `nginx.conf` + `.dockerignore` (SPA + SSE reverse proxy, `npx vite build`)
-- [ ] 157-03-PLAN.md — Wave 2: `docker-compose.prod.yml` all-in-one (frontend + backend + bundled redis; Supabase external)
+- [x] 157-03-PLAN.md — Wave 2: `docker-compose.prod.yml` all-in-one (frontend + backend + bundled redis; Supabase external)
 - [ ] 157-04-PLAN.md — Wave 3: `docs/OPERATOR.md` day-0 runbook + supersede note + baked-in LESSONS fixes + C/D variant deltas
 - [ ] 157-05-PLAN.md — Wave 4: D-09 one-box compose smoke (operator-gated, `autonomous: false`)
 
