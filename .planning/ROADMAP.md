@@ -396,7 +396,11 @@ Plans:
   2. The thread list supports search.
   3. Threads are grouped by date and/or folder.
 
-**Plans**: TBD
+**Plans**: 4 plans across 4 waves (Wave 0 scaffolding, then D-06 sequencing W1→W3)
+- [ ] 156-01-PLAN.md — Wave 0: shared `threadGroups.ts` (date buckets + title filter + safe JSX highlight) + 4 test scaffolds
+- [ ] 156-02-PLAN.md — Wave 1: permanent icon rail + `ChatHistoryColumn` (inline filter + date grouping) + `ChatLayout` composition → all 3 SCs + closes BUG-260711-01
+- [ ] 156-03-PLAN.md — Wave 2: ⌘K global command palette (hand-rolled on Radix Dialog, no cmdk) + filter-box chip
+- [ ] 156-04-PLAN.md — Wave 3: mobile drawer search + optional Date⇄Folder toggle (cut-able)
 **UI hint**: yes
 
 ### Phase 157: Deployment Presets & Runbook (STRETCH)
@@ -442,7 +446,7 @@ Plans:
 | 153. Inline Citations | 5/5 | Complete | 2026-07-15 |
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
 | 155. Accessibility Sweep — WCAG AA | 7/7 | Complete | 2026-07-16 |
-| 156 (STRETCH). Everyday UX Polish | 0/? | Gated (behind CORE) | - |
+| 156 (STRETCH). Everyday UX Polish | 0/4 | Planned | - |
 | 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
 
