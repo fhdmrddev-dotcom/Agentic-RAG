@@ -36,6 +36,31 @@ services:
     networks:
       - agentic-rag
 
+  # ── backend ── uvicorn via backend/Dockerfile, reused AS-IS (EXPOSE 8000) ──
+  backend:
+    build:
+      context: ./backend    # backend/Dockerfile — reused unchanged
+    restart: unless-stopped
+    env_file:
+      - ./.env              # the operator's filled-in one-box preset (root, gitignored)
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      # Linux: lets the backend reach the operator's LOCAL Supabase during the D-09
+      # smoke (harmless for cloud Supabase; Docker Desktop resolves this name anyway).
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # execute_code sandbox spawns sibling containers via the host daemon.
+      # The socket = HOST ROOT — SINGLE-TENANT boxes ONLY (documented loudly in OPERATOR.md).
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      # Optional — lets the D-09 smoke curl http://localhost:8000/health directly.
+      # nginx (frontend :8080) is the only REQUIRED ingress; drop this on a locked-down box.
+      - "8000:8000"
+    networks:
+      - agentic-rag
+
   # ── redis ── bundled ephemeral buffer, mirrored from docker-compose.dev.yml ──
   redis:
     image: redis:7-alpine
