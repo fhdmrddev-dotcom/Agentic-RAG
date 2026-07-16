@@ -494,3 +494,13 @@ G-2 sketch, **mandatory** (live UI, "feels like", G-5 hot files `MessageItem.tsx
 |---|------|----------------|--------|------|
 | 074 | inline-citation-marker | Does a per-claim inline marker read cleanly in a streamed answer AND make absence-as-signal legible, without adding chrome-noise to the calm-instrument body? | **A — Superscript numeral chip (attach-on-settle)** ★ | phase-153, cite-01, inline-citations, marker, absence-as-signal, streaming, set-membership, messageitem, g5-hot-file |
 | 075 | citation-clickthrough | When you click an inline marker, what surfaces the source passage — and what does today's bottom "N sources" list become once markers exist? | **A — Hover-peek → click-to-pin + numbered References footer** ★ | phase-153, cite-01, inline-citations, click-through, references-footer, hover-popover, workspace-panel, citationlist, g5-hot-file |
+
+### Phase 156 session — Everyday UX Polish (STRETCH): Collapsed Nav Rail + Thread-List Organization (2026-07-16)
+
+G-2 sketch, BEFORE discuss-phase (POLISH-01 is visual — nav-collapse behavior, search UI, group rendering). The two confirmed SEED-045 anchors. Grounded in the LIVE `NavPanel.tsx`: the panel renders at `w-64` and is *masked* to `w-16` when collapsed (`:297` "no layout recalculation, eliminating layout jumps"), so the whole Chats region — **New Chat included** — is `opacity-0 pointer-events-none` (`:368`); you must expand to start a chat (Anchor 1). Top nav items already collapse correctly (icon-only + tooltip-right, `:330`) — the fix is to give New Chat/Search that same treatment (the 087-08 "collapse-to-rail, key action stays reachable" precedent). The thread list is a flat `threads.map` (`:131`) with no search/grouping across the operator's 280+ threads (Anchor 2). Real shapes are on our side: `Thread { title, folder_id, updated_at, created_at }` + `Folder { id, name }` already exist, so date/folder grouping is pure-frontend. Sessions: 076–077.
+
+**Intake decisions (operator, 2026-07-16):** scoped to POLISH-01's 3 criteria (collapsed New Chat reachable · search · date/folder grouping); pinning left as umbrella-only. Two sketches, 2–3 variants each, each rendering a full nav panel in context (Deep Midnight, real threads + folders) with a per-frame "Proposed rail ⇄ Today (broken)" before/after toggle that reproduces the real bug for contrast.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 076 | collapsed-nav-rail | When the nav collapses to the 64px rail, what stays reachable — and how does it feel? | **B — New Chat + Search rail (icon+tooltip; click Search → expand + focus)** ★ | phase-156, polish-01, seed-045, nav, collapse, rail, new-chat, search, icon-tooltip, 087-08-precedent |
