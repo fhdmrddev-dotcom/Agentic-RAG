@@ -85,15 +85,19 @@ const PHASE_TYPE_FRIENDLY: Record<string, string> = {
   llm_emit: "Deliverable",
 }
 
-/** A small ⓘ hint — reveals the technical term / guidance on hover or focus.
- *  Uses a native `title` (zero-dep, accessible) PLUS a tabbable span so keyboard
- *  users reach it too. No popover library. */
+/** A small ⓘ hint. WR-03: the guidance is exposed two honest ways — the native
+ *  `title` shows a tooltip on MOUSE hover only (evergreen browsers do NOT surface
+ *  `title` on keyboard focus), and the `aria-label` supplies the accessible name a
+ *  screen reader announces when the tabbable span receives focus. No visual popover
+ *  on keyboard focus by design (zero-dep, no popover library). */
 function InfoHint({ text }: { text: string }) {
   return (
     <span
       // Phase 155 (A11Y-01): role="button" (not "img") so the focusable ⓘ hint is a
-      // valid tabIndex host (jsx-a11y/no-noninteractive-tabindex) — the guidance is
-      // revealed on hover/focus via the native title + the aria-label names it.
+      // valid tabIndex host (jsx-a11y/no-noninteractive-tabindex). WR-03: the native
+      // `title` reveals the guidance visually on MOUSE hover only; the aria-label
+      // carries the same text as the accessible name announced on focus (no
+      // keyboard-focus visual tooltip is claimed).
       tabIndex={0}
       role="button"
       aria-label={text}

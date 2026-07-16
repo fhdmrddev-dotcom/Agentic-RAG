@@ -18,14 +18,20 @@
 import type { TermKey } from "./termMap"
 import { TERM_MAP, usePlainLabel } from "./termMap"
 
-/** The ⓘ hint — reveals the plain helper on hover or keyboard focus. Mirrors
- *  PhaseFormPanel's InfoHint shape (native `title` + tabbable, labelled span). */
+/** The ⓘ hint. WR-03: the plain helper is exposed two honest ways — the native
+ *  `title` shows a tooltip on MOUSE hover only (evergreen browsers do NOT surface
+ *  `title` on keyboard focus), and the `aria-label` supplies the accessible name a
+ *  screen reader announces when the ⓘ receives focus. There is deliberately NO
+ *  visual popover on keyboard focus: PlainLabel is app-wide, so a CSS popover here
+ *  is layout-risky. Mirrors PhaseFormPanel's InfoHint shape (title + labelled span). */
 function InfoHint({ text }: { text: string }) {
   return (
     <span
       // Phase 155 (A11Y-01): role="button" (not "img") so the focusable ⓘ hint is
-      // a valid tabIndex host (jsx-a11y/no-noninteractive-tabindex) — the helper is
-      // revealed on hover/focus via the native title + the aria-label names it.
+      // a valid tabIndex host (jsx-a11y/no-noninteractive-tabindex). WR-03: the
+      // native `title` reveals the helper visually on MOUSE hover only; the
+      // aria-label carries the same text as the accessible name announced on focus
+      // (no keyboard-focus visual tooltip is claimed).
       tabIndex={0}
       role="button"
       aria-label={text}
