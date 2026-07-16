@@ -180,3 +180,181 @@ Supabase is **not** a service here — the app talks to your external Supabase o
 Browse to **`http://localhost:8080`** (or your server's address / domain on port 8080). Log
 in with an account whose email is in `OPERATOR_EMAILS` to reach `/admin`. That's a working
 deployment.
+
+---
+
+## Configuration — the gotchas this runbook bakes in
+
+These are the settings a first deploy most often gets wrong. Each traces to a lessons-log
+entry; get them right in your `./.env` and you skip the whole class of failure.
+
+### Postgres DSN — use the Session pooler on `:5432` (A4)
+
+`POSTGRES_DSN` must point at Supabase's **Session pooler** (IPv4), which looks like:
+
+```
+postgresql://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+```
+
+Do **not** use:
+
+- the **direct** `db.<ref>.supabase.co` host — it's **IPv6-only**, and the container usually
+  can't reach it;
+- the **`:6543` transaction pooler** — it breaks asyncpg's prepared statements.
+
+(If auth fails repeatedly, Supavisor trips an `ECIRCUITBREAKER` — wait ~3 minutes before
+retrying.)
+
+### Redis — `rediss://` TLS when managed (A5)
+
+The one-box compose bundles Redis, so `REDIS_URL=redis://redis:6379` (plain, over the compose
+network). But if you point at a **managed** Redis (e.g. Upstash), it requires TLS — use
+**`rediss://`** (two s's). A plain `redis://` to a managed host fails with "Streaming
+infrastructure unavailable." Details: [`../REDIS-SETUP.md`](../REDIS-SETUP.md).
+
+### `FRONTEND_URL` — comma-split, list every origin (B1)
+
+CORS allows exactly the origins in `FRONTEND_URL`. It is **comma-split multi-origin** — list
+**every** browser origin that will hit the API, or preflight `OPTIONS` requests return `400`
+and the app can't talk to itself:
+
+```
+FRONTEND_URL=https://app.example.com,https://www.example.com
+```
+
+For the local one-box that's `http://localhost:8080` (the published nginx port).
+
+### Pin known-good models per environment (B3)
+
+A model that works on your laptop can **404 on a cloud key** — provider accounts differ in
+which models they can serve. Pin the model IDs you know your key serves (e.g.
+`OPENAI_MODELS=...`) rather than relying on a default that may not exist for this account. A
+stale default silently degraded metadata extraction to NULL in production once.
+
+## Security
+
+The instructions above **are** the security posture of a self-hosted box. Three things matter
+most.
+
+### Encrypt secrets at rest — `SECRETS_ENCRYPTION_KEY` (SEC-01)
+
+Provider/secret keys stored in `app_settings` are encrypted with a Fernet key (Phase 150).
+Generate and set it:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Behavior:
+
+- **Blank** (default) — fail-open: secrets stay **plaintext** with a loud startup warning.
+- **Valid key** — encrypted at rest (an idempotent boot sweep encrypts existing rows).
+- **Malformed key** — the backend **refuses to start** (fail-closed, on purpose).
+
+For the managed home, set `SECRETS_ENCRYPTION_KEY` per-environment in Coolify — never commit a
+real key.
+
+### The sandbox mounts the Docker socket — SINGLE-TENANT BOXES ONLY (B2)
+
+> **⚠️ LOUD WARNING: a mounted `/var/run/docker.sock` grants the backend container root on the
+> host.** The `execute_code` sandbox spawns sibling containers via the host Docker daemon,
+> which requires this mount (`docker-compose.prod.yml` includes it). **This is safe only on a
+> single-tenant box** — one customer/org per host. **Never** run this compose as-is on a
+> shared / multi-tenant machine; a mounted socket = a host-takeover surface. If you must run
+> multi-tenant, set `SANDBOX_ENABLED=false` (you lose code execution) or isolate each tenant on
+> its own host.
+
+For the sandbox to actually work you also need the image built **on the host** (it is not
+pulled at runtime):
+
+```bash
+docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/
+```
+
+…and — on a Coolify / managed host whose Docker cleanup prunes unreferenced images — **pin
+it** so a routine deploy doesn't sweep it (this bit us twice):
+
+```bash
+docker create --name sandbox-image-keeper agentic-rag-sandbox:101.1
+```
+
+The keeper is a never-started container that references the image so image-prune spares it.
+Every time the `SANDBOX_IMAGE` tag bumps: rebuild on the host, `docker rm
+sandbox-image-keeper`, recreate the keeper on the new tag. **The durable fix** is to push the
+image to a private registry (GHCR) so the host can re-pull instead of host-building. (Full
+recipe: [`./DEPLOYMENT-LESSONS.md`](./DEPLOYMENT-LESSONS.md) B2.)
+
+### Don't expose Redis
+
+The bundled `redis` publishes **no** host port — the backend reaches it only over the compose
+network. Never publish `6379` to the public internet without `--requirepass`.
+
+---
+
+## Home A — managed SaaS (variant)
+
+This is the vendor-hosted path (`superrag.cloud` today): frontend on **Vercel**, backend +
+sandbox on a **Hostinger VPS running Coolify**, DB on **Supabase cloud**, Redis on
+**Upstash**. It's document-only here — the full accounts + architecture map lives in
+**[`./DEPLOYMENT-PIPELINE.md`](./DEPLOYMENT-PIPELINE.md)** (read that; don't re-derive it).
+
+The one managed-specific gotcha to bake in — the Coolify backend service (lessons-log **A3**):
+
+- **Base Directory** `/backend`, **Dockerfile** `/Dockerfile` (don't double it to
+  `backend/backend`).
+- **Ports Exposes** `8000` (the app's port — not Coolify's default 3000).
+- **Domain** `https://` (an `http://` domain creates only an HTTP router → 503 on https).
+
+Day-2 promotion (`develop → master → production`) and the cloud-parity checklist are in
+**[`./DEPLOYMENT-WORKFLOW.md`](./DEPLOYMENT-WORKFLOW.md)** — not repeated here.
+
+## Homes C & D — variant deltas (short)
+
+The one-box compose (home B) is the engine; homes C and D are the **same app, different env
+vars**. These are delta notes, not full runbooks.
+
+### Home C — bring-your-own-cloud
+
+The customer runs on their own AWS/Azure/GCP. Deltas from home B: point `SUPABASE_URL` /
+`POSTGRES_DSN` / `REDIS_URL` at their managed equivalents (managed Redis → `rediss://` TLS,
+A5), set `FRONTEND_URL` to their origin(s), and run the same compose (or split the services
+across their orchestrator). Full bring-your-own-cloud reference manifests
+(Kubernetes/Terraform) are **deferred** until a customer commits to their own cloud.
+
+### Home D — on-prem / local-GPU
+
+Sealed inside the building, AI models on the customer's own GPUs. **This needs zero new app
+code** — the app already supports local models (Ollama / LM Studio) and multi-provider
+embeddings. Deltas from home B (all in `./.env`):
+
+```
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://<gpu-host>:11434          # or LMSTUDIO_BASE_URL=http://<gpu-host>:1234/v1
+EMBEDDING_BASE_URL=http://<gpu-host>:<port>/...  # local embedding endpoint
+SUPABASE_URL=<self-hosted-supabase-url>          # on-prem Supabase
+```
+
+Pick an embedding model whose output dimension matches `EMBEDDING_DIMENSIONS` (e.g. nomic =
+768, MiniLM = 384). The **full sealed air-gapped runbook** — self-hosted Supabase Docker stack
++ end-to-end local-GPU wiring + no-internet install — is **deferred** until a real on-prem /
+air-gapped buyer exists to validate it. This section is the pointer; nothing is thrown away.
+
+---
+
+## Verification checklist (run on a real box)
+
+After `docker compose -f docker-compose.prod.yml up -d --build`, confirm:
+
+- [ ] **`/health` returns 200** — `curl http://localhost:8000/health` (direct) →
+  `{"status":"ok", ...}`. Through nginx: `curl http://localhost:8080/api/health` (also proves
+  the `/api/` prefix strip). `redis` should read `"ok"`.
+- [ ] **Frontend loads** — open `http://localhost:8080`; the SPA renders (not a blank page or
+  a Supabase-URL console error — that would mean a `VITE_*` build-arg was wrong; rebuild with
+  `--build`).
+- [ ] **Login works** — sign in; a user in `OPERATOR_EMAILS` reaches `/admin`.
+- [ ] **One chat turn completes** — send a plain chat / retrieval prompt (no code execution
+  needed, so this passes even before you host-build the sandbox image) and watch the SSE stream
+  finish.
+
+If all four pass, the deployment is live. For ongoing updates, switch to
+**[`./DEPLOYMENT-WORKFLOW.md`](./DEPLOYMENT-WORKFLOW.md)**.
