@@ -211,3 +211,37 @@ describe("ChatHistoryColumn — ⌘K chip (Wave 2 / onOpenPalette seam)", () => 
     expect(screen.queryByRole("button", { name: "Search all chats" })).not.toBeInTheDocument()
   })
 })
+
+describe("ChatHistoryColumn — Date⇄Folder group toggle (Task 2 / D-04)", () => {
+  it("DEFAULTS to Date (the Date toggle is pressed) — SC#3 date grouping is intact", () => {
+    renderColumn()
+    expect(screen.getByRole("button", { name: "date" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByRole("button", { name: "folder" })).toHaveAttribute("aria-pressed", "false")
+    // date bucket headers are present (SC#3), and in date mode a folder name shows ONLY
+    // as a per-row chip (Finance has 2 threads) — never as a group header.
+    expect(screen.getByText("Today")).toBeInTheDocument()
+    expect(screen.getAllByText("Finance")).toHaveLength(2)
+  })
+
+  it("switching to Folder groups rows by folder name, with Unfiled last", () => {
+    renderColumn()
+    fireEvent.click(screen.getByRole("button", { name: "folder" }))
+    expect(screen.getByRole("button", { name: "folder" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByRole("button", { name: "date" })).toHaveAttribute("aria-pressed", "false")
+    // Finance/Engineering/Unfiled are now GROUP HEADERS — each once (folder mode swaps
+    // the per-row folder chip for the row's date bucket, so the name no longer repeats).
+    expect(screen.getAllByText("Finance")).toHaveLength(1)
+    expect(screen.getAllByText("Engineering")).toHaveLength(1)
+    expect(screen.getByText("Unfiled")).toBeInTheDocument()
+  })
+
+  it("keeps the inline filter working in Folder mode (shared matchesTitle)", () => {
+    renderColumn()
+    fireEvent.click(screen.getByRole("button", { name: "folder" }))
+    fireEvent.change(screen.getByPlaceholderText("Filter this list…"), { target: { value: "revenue" } })
+    // only the Finance thread "Q3 revenue…" survives → only the Finance group remains
+    expect(screen.getByText("Finance")).toBeInTheDocument()
+    expect(screen.queryByText("Engineering")).not.toBeInTheDocument()
+    expect(screen.queryByText("Unfiled")).not.toBeInTheDocument()
+  })
+})

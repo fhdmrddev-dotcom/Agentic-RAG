@@ -31,7 +31,9 @@ import type { Folder, Thread } from "@/types"
 // list now owns its own full-height column between the thin rail and the chat grid,
 // nav growth can no longer starve it (D-10 — structurally relieves BUG-260711-01).
 import {
+  bucketFor,
   groupByDate,
+  groupByFolder,
   matchesTitle,
   folderLabel,
   HighlightTitle,
@@ -81,6 +83,9 @@ export function ChatHistoryColumn({
 
   // Wave-1 wrapper state: the inline title filter (SC#2).
   const [query, setQuery] = useState("")
+  // Wave-3 (Plan 04 / D-04, OPTIONAL): group the list by date (default — keeps SC#3
+  // intact) or by folder. Folder mode swaps each row's folder chip for its date bucket.
+  const [groupMode, setGroupMode] = useState<"date" | "folder">("date")
 
   useEffect(() => {
     if (editingId) editInputRef.current?.focus()
@@ -159,19 +164,27 @@ export function ChatHistoryColumn({
                 <span className="text-sm truncate flex-1 min-w-0" title={thread.title}>
                   <HighlightTitle title={thread.title} query={query} />
                 </span>
-                {/* Folder chip (sketch .r-meta) — the folder name, or an italic
-                    "Unfiled" for a null folder. Replaces the bare FolderIcon. */}
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 text-[10px] shrink-0 whitespace-nowrap",
-                    thread.folder_id ? "text-muted-foreground" : "text-muted-foreground/70 italic",
-                  )}
-                >
-                  {thread.folder_id && (
-                    <FolderIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  )}
-                  {folderLabel(folders, thread.folder_id)}
-                </span>
+                {/* Per-row meta (sketch .r-meta rowCompact swap): DATE mode shows the
+                    folder chip (name, or an italic "Unfiled"); FOLDER mode shows the
+                    date bucket instead — the group header already names the folder, so
+                    the chip would be redundant — reusing the tested `bucketFor`. */}
+                {groupMode === "folder" ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] shrink-0 whitespace-nowrap text-muted-foreground">
+                    {bucketFor(thread.updated_at)}
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[10px] shrink-0 whitespace-nowrap",
+                      thread.folder_id ? "text-muted-foreground" : "text-muted-foreground/70 italic",
+                    )}
+                  >
+                    {thread.folder_id && (
+                      <FolderIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    )}
+                    {folderLabel(folders, thread.folder_id)}
+                  </span>
+                )}
               </div>
             </button>
 
@@ -261,8 +274,11 @@ export function ChatHistoryColumn({
 
   // SC#2 (inline tier): substring filter over the loaded threads via the shared
   // predicate; SC#3: date grouping of the filtered set (empty buckets folded away).
+  // D-04 (OPTIONAL): the Folder view swaps date buckets for folder groups; DATE stays
+  // the default, so SC#3 is satisfied by an untouched column.
   const filtered = threads.filter((t) => matchesTitle(t, query))
-  const groups = groupByDate(filtered)
+  const groups: { label: string; items: Thread[] }[] =
+    groupMode === "folder" ? groupByFolder(filtered, folders) : groupByDate(filtered)
 
   return (
     <div className="hidden md:flex flex-col w-[300px] shrink-0 bg-sidebar border-r border-border/20">
@@ -353,6 +369,32 @@ export function ChatHistoryColumn({
               </span>
             </button>
           )}
+        </div>
+
+        {/* Phase 156 Wave 3 (Plan 04 / D-04, OPTIONAL): the Date⇄Folder group toggle
+            (sketch .seg). DEFAULTS to Date so SC#3 is unaffected; Folder groups rows by
+            folder name ("Unfiled" last). aria-pressed = the app's toggle-button idiom. */}
+        <div
+          className="inline-flex self-start rounded-full bg-card ghost-border p-0.5"
+          role="group"
+          aria-label="Group chats by"
+        >
+          {(["date", "folder"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setGroupMode(mode)}
+              aria-pressed={groupMode === mode}
+              className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                groupMode === mode
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-sidebar-foreground",
+              )}
+            >
+              {mode}
+            </button>
+          ))}
         </div>
       </div>
 

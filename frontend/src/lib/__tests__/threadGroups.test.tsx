@@ -16,6 +16,7 @@ import type { Thread, Folder } from "@/types"
 import {
   bucketFor,
   groupByDate,
+  groupByFolder,
   matchesTitle,
   folderLabel,
   HighlightTitle,
@@ -131,6 +132,56 @@ describe("folderLabel — name / Unfiled / Folder (D-04)", () => {
 
   it('returns "Folder" for an unresolvable id', () => {
     expect(folderLabel(folders, "f-gone")).toBe("Folder")
+  })
+})
+
+describe("groupByFolder — folder groups, Unfiled last, empty-fold, within-group DESC (Task 2 / D-04)", () => {
+  const folders: Folder[] = [
+    { id: "f-fin", user_id: "u-1", name: "Finance", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    { id: "f-eng", user_id: "u-1", name: "Engineering", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    { id: "f-empty", user_id: "u-1", name: "Empty", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+  ]
+
+  it("groups by folder name in the folders-array order, with Unfiled LAST and empty folders dropped", () => {
+    const groups = groupByFolder(
+      [
+        mkThread({ id: "unf", folder_id: null, updated_at: daysAgoISO(1) }),
+        mkThread({ id: "eng", folder_id: "f-eng", updated_at: daysAgoISO(1) }),
+        mkThread({ id: "fin", folder_id: "f-fin", updated_at: daysAgoISO(1) }),
+      ],
+      folders,
+    )
+    // Finance + Engineering follow the folders order; the "Empty" folder has no
+    // threads → dropped; "Unfiled" (null folder) is always last.
+    expect(groups.map((g) => g.label)).toEqual(["Finance", "Engineering", "Unfiled"])
+  })
+
+  it("sorts items within a folder by updated_at DESC", () => {
+    const groups = groupByFolder(
+      [
+        mkThread({ id: "old", folder_id: "f-fin", updated_at: daysAgoISO(5) }),
+        mkThread({ id: "new", folder_id: "f-fin", updated_at: daysAgoISO(1) }),
+      ],
+      folders,
+    )
+    expect(groups).toHaveLength(1)
+    expect(groups[0].label).toBe("Finance")
+    expect(groups[0].items.map((t) => t.id)).toEqual(["new", "old"])
+  })
+
+  it('folds an unresolvable folder id into a "Folder" group (no thread dropped), before Unfiled', () => {
+    const groups = groupByFolder(
+      [
+        mkThread({ id: "gone", folder_id: "f-deleted", updated_at: daysAgoISO(1) }),
+        mkThread({ id: "unf", folder_id: null, updated_at: daysAgoISO(1) }),
+      ],
+      folders,
+    )
+    expect(groups.map((g) => g.label)).toEqual(["Folder", "Unfiled"])
+  })
+
+  it("returns an empty array for no threads", () => {
+    expect(groupByFolder([], folders)).toEqual([])
   })
 })
 

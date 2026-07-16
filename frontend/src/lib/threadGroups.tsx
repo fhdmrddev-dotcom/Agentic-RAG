@@ -81,6 +81,39 @@ export function folderLabel(folders: Folder[], folderId: string | null): string 
 }
 
 /**
+ * Group threads by FOLDER (Phase 156 Task 2 / D-04 — the OPTIONAL Folder view; the
+ * locked default stays date, so SC#3 is unaffected). Ordering: known folder names
+ * first in the `folders` array order, then any leftover labels (e.g. an unresolved
+ * "Folder" orphan), then "Unfiled" (null folder) LAST. Empty groups are dropped and
+ * items within a group are sorted `updated_at` DESC — the SAME defensive within-group
+ * sort as `groupByDate` (Pitfall 3, we don't trust the API row order).
+ *
+ * The grouping key reuses `folderLabel`, so a null id → "Unfiled" and a gone/not-loaded
+ * id → "Folder": no thread is ever dropped from the view (mirrors the sketch 078
+ * `groupByFolder` at index.html:248-249, generalized off the real `folders` list).
+ */
+export function groupByFolder(
+  threads: Thread[],
+  folders: Folder[],
+): { label: string; items: Thread[] }[] {
+  const byLabel = new Map<string, Thread[]>()
+  for (const t of threads) {
+    const label = folderLabel(folders, t.folder_id)
+    const existing = byLabel.get(label)
+    if (existing) existing.push(t)
+    else byLabel.set(label, [t])
+  }
+  const order: string[] = []
+  for (const f of folders) if (byLabel.has(f.name) && !order.includes(f.name)) order.push(f.name)
+  for (const label of byLabel.keys()) if (label !== "Unfiled" && !order.includes(label)) order.push(label)
+  if (byLabel.has("Unfiled")) order.push("Unfiled")
+  return order.map((label) => ({
+    label,
+    items: byLabel.get(label)!.slice().sort((a, z) => z.updated_at.localeCompare(a.updated_at)),
+  }))
+}
+
+/**
  * Safe match-highlight (T-156-01, the ONE real security control this phase adds).
  *
  * Renders the matched slice inside a `<mark>` as JSX TEXT NODES — React auto-escapes
