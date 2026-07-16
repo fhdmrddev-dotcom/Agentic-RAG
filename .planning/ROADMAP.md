@@ -452,7 +452,7 @@ Plans:
 | 154. Plain-Language Layer | 3/3 | Complete | 2026-07-15 |
 | 155. Accessibility Sweep — WCAG AA | 7/7 | Complete | 2026-07-16 |
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
-| 157 (STRETCH). Deployment Presets & Runbook | 0/? | Gated (behind CORE) | - |
+| 157 (STRETCH). Deployment Presets & Runbook | 4/5 | Executing (D-09 smoke deferred) | - |
 | 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
 
 **Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
