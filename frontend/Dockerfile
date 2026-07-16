@@ -1,0 +1,39 @@
+# frontend/Dockerfile — 2-stage build for the all-in-one docker-compose.prod.yml (Phase 157, D-03).
+#   stage 1 (node)  : install deps + produce the static Vite `dist`
+#   stage 2 (nginx) : serve `dist` + reverse-proxy /api/ -> backend:8000 (see nginx.conf)
+# Base image tags pinned per 157-RESEARCH: node:22-alpine (build) + nginx:1.27-alpine (runtime).
+
+# ---- build stage ----
+FROM node:22-alpine AS build
+WORKDIR /app
+
+# VITE_* are BUILD-TIME values — Vite inlines import.meta.env.VITE_* into the JS bundle when
+# the build runs, so they must be ARG -> ENV BEFORE the build (NOT runtime env; a plain
+# `docker compose up` won't rebuild — change a value => rebuild). Only browser-safe public
+# values are baked here: the Supabase URL + public anon key + the relative /api path
+# (T-157-VITE — no service-role/secret keys are ever passed as build args).
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_BASE_URL=/api
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
+    VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# Install against the committed lockfile for a reproducible build.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# Build with Vite directly. The package.json "build" script also chains `tsc -b`, which fails
+# on pre-existing test-file type rot (DEPLOYMENT-LESSONS A7); vercel.json builds the same way
+# ("buildCommand": "vite build"). Output dir: dist/.
+RUN npx vite build
+
+# ---- runtime stage ----
+FROM nginx:1.27-alpine
+# SPA static serve + /api/ SSE reverse-proxy config (retargeted to the compose `backend` service).
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy the built SPA into nginx's default web root.
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
