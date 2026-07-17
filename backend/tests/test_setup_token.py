@@ -17,11 +17,9 @@ cleanly until Wave 1 lands it. All token values are throwaway (generated per tes
 """
 import inspect
 
-import pytest
-
-# NEW module — skips cleanly until Wave 1 creates app/services/setup_store.py.
-setup_store = pytest.importorskip("app.services.setup_store")
-from app.services.setup_store import get_or_create_token, verify_token  # noqa: E402
+# app/services/setup_store.py landed in Wave 1 (Plan 158-03) — direct import (the module
+# now exists, so the 158-01 importorskip guard is retired).
+from app.services.setup_store import get_or_create_token, verify_token
 
 
 def test_verify_token_rejects_missing(setup_store_path):

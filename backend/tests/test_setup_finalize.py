@@ -17,11 +17,9 @@ signal. Finalize writes BOTH. This file pins the ``setup_store`` file-marker lat
 ``app.services.setup_store`` is a NEW module -> ``pytest.importorskip`` SKIPS the file
 cleanly until Wave 1. The store is the throwaway ``setup_store_path`` tmp file.
 """
-import pytest
-
-# NEW module — skips cleanly until Wave 1 creates app/services/setup_store.py.
-setup_store = pytest.importorskip("app.services.setup_store")
-from app.services.setup_store import setup_finalized, write_store  # noqa: E402
+# app/services/setup_store.py landed in Wave 1 (Plan 158-03) — direct import (the module
+# now exists, so the 158-01 importorskip guard is retired).
+from app.services.setup_store import setup_finalized, write_store
 
 
 def test_setup_finalized_false_on_fresh_store(setup_store_path):
