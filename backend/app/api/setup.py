@@ -314,6 +314,13 @@ async def schema_bootstrap(body: BindBody) -> dict:
     except SchemaBootstrapPrivilegeError:
         # The pooler role lacks DDL/extension/auth-schema rights — the guide is the MUST path.
         return {"ok": False, "fallback": "guide", "seed_sequence": list(_SEED_SEQUENCE)}
+    except Exception:  # noqa: BLE001
+        # WR-05: ANY other bootstrap failure (a non-privilege asyncpg PostgresError, an OSError,
+        # anything) ALSO falls back to the copy-guide — never a 500. The "never a half-applied
+        # silent success, always the guide" contract must hold for every error class, not only
+        # the privilege one.
+        logger.warning("setup: schema auto-run failed — falling back to the copy-guide", exc_info=True)
+        return {"ok": False, "fallback": "guide", "seed_sequence": list(_SEED_SEQUENCE)}
     return {"ok": True, "bootstrapped": True}
 
 
