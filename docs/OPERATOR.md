@@ -64,6 +64,18 @@ day-2 promotion process — those live in their own docs:
 One server, one `docker compose up`, a browsable working app (the DB is the only external
 piece). This is the "run-these-commands" install.
 
+> **Browser install wizard (Phase 158 — DEPLOY-02).** The manual Steps 2–5 below can also be
+> driven from a browser: clone the repo (Step 1), bring the stack up (Step 4), then open
+> **`http://localhost:8080/setup`**. A first-run wizard walks the same flow — environment
+> detect → Supabase/Redis bind → operator bootstrap → provider key → smoke test — **without
+> hand-editing `./.env`**. It is idempotent and **locks out after finalize**. It requires a
+> one-time **setup token** printed to the backend logs — read it with:
+> ```bash
+> docker compose -f docker-compose.prod.yml logs backend | grep -i "setup token"
+> ```
+> The wizard is **additive**: this manual runbook stays the canonical fallback (and the source
+> of truth the deploy drift-check tracks — `scripts/check-deploy-drift.sh`).
+
 ### Step 1 — Clone the repo
 
 ```bash
@@ -154,9 +166,14 @@ SQL editor, in order:
 
    If this returns 0, re-apply `087 → 088 → 089` in order.
 
-> Migrations currently run to 101. `full-schema.sql` is regenerated per migration commit, so
-> it should already carry the schema through the latest — the seed-row gap above is separate
-> from schema currency. Background: [`../supabase/SETUP.md`](../supabase/SETUP.md).
+> Migrations currently run to 102 (migration 102 adds the `app_settings.setup_complete` flag
+> for the Phase-158 install wizard — schema, not a seed, so it is not in the table above).
+> `full-schema.sql` is regenerated per migration commit, so it should already carry the schema
+> through the latest — the seed-row gap above is separate from schema currency. Background:
+> [`../supabase/SETUP.md`](../supabase/SETUP.md). **Cloud-parity pending:** migrations 099–102
+> + `SECRETS_ENCRYPTION_KEY` still need applying to the cloud Supabase at the next promotion
+> (see the deploy-parity checklist in [`./DEPLOYMENT-WORKFLOW.md`](./DEPLOYMENT-WORKFLOW.md);
+> `scripts/pending-cloud-migrations.sh` prints the exact set).
 
 ### Step 4 — Bring the stack up
 
@@ -170,6 +187,10 @@ This builds and starts three services (defined in
 - **`frontend`** — nginx serving the built Vite SPA and reverse-proxying `/api/` →
   `backend:8000` (SSE-safe). Published on **`:8080`**.
 - **`backend`** — uvicorn (FastAPI): the agent loop / retrieval / tools. Reads your `./.env`.
+  Carries a persistent **`setup_data`** volume (mounted at `/data`) — the first-run install
+  wizard's setup-store (`/data/setup.json`, `0600`: infra config + the finalize marker + the
+  setup token). It survives `up -d --build` recreates and restarts, so a wizard-configured box
+  keeps its config.
 - **`redis`** — the bundled ephemeral run-stream buffer (no persistence, 256 MB LRU, no host
   port).
 
