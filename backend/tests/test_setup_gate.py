@@ -23,9 +23,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-# NEW module — skips cleanly until Wave 1 creates app/middleware/setup.py.
-setup_mw = pytest.importorskip("app.middleware.setup")
-from app.middleware.setup import SetupMiddleware  # noqa: E402
+# app/middleware/setup.py landed in Wave 1 (Plan 158-03) — direct import (the module now
+# exists, so the 158-01 importorskip guard is retired). ``setup_mw`` stays bound so the
+# fixtures can monkeypatch its ``_is_finalized`` read seam.
+import app.middleware.setup as setup_mw
+from app.middleware.setup import SetupMiddleware
 
 
 def _make_app() -> FastAPI:
