@@ -350,9 +350,11 @@ Plans:
   3. An operator/advanced user can flip the reveal and see the technical vocabulary.
 
 **Plans**: 3 plans in 2 waves
+
   - [x] 154-01-PLAN.md — Spine: shared reveal context + single-source term-map + app-wide mount + Control Room consolidation (Wave 1)
   - [x] 154-02-PLAN.md — Document surfaces: ingestion status badge + document-detail Metadata header (Wave 2)
   - [x] 154-03-PLAN.md — Settings toggle host + bounded Settings/composer relabels (Wave 2)
+
 **UI hint**: yes
 
 ### Phase 155: Accessibility Sweep — WCAG AA
@@ -399,10 +401,12 @@ Plans:
   3. Threads are grouped by date and/or folder.
 
 **Plans**: 4 plans across 4 waves (Wave 0 scaffolding, then D-06 sequencing W1→W3)
+
 - [x] 156-01-PLAN.md — Wave 0: shared `threadGroups.ts` (date buckets + title filter + safe JSX highlight) + 4 test scaffolds
 - [x] 156-02-PLAN.md — Wave 1: permanent icon rail + `ChatHistoryColumn` (inline filter + date grouping) + `ChatLayout` composition → all 3 SCs + closes BUG-260711-01
 - [x] 156-03-PLAN.md — Wave 2: ⌘K global command palette (hand-rolled on Radix Dialog, no cmdk) + filter-box chip
 - [x] 156-04-PLAN.md — Wave 3: mobile drawer search + optional Date⇄Folder toggle (cut-able)
+
 **UI hint**: yes
 
 ### Phase 157: Deployment Presets & Runbook (STRETCH)
@@ -417,6 +421,7 @@ Plans:
   3. Following the runbook with a preset produces a working deployment (smoke-verified).
 
 **Plans**: 5 plans across 4 waves (W1: onebox preset ∥ frontend build trio -> W2: compose -> W3: OPERATOR.md -> W4: D-09 smoke)
+
 - [x] 157-01-PLAN.md — Wave 1: `deploy/onebox.env.example` one-box preset (the dependency-root env surface)
 - [x] 157-02-PLAN.md — Wave 1: net-new `frontend/Dockerfile` + `nginx.conf` + `.dockerignore` (SPA + SSE reverse proxy, `npx vite build`)
 - [x] 157-03-PLAN.md — Wave 2: `docker-compose.prod.yml` all-in-one (frontend + backend + bundled redis; Supabase external)
@@ -438,32 +443,41 @@ Plans:
 
 Plans:
 **Wave 0**
+
 - [ ] 158-01-PLAN.md — Backend+frontend Nyquist scaffold (12 test_setup_*.py + conftest fixtures + 2 vitest stubs)
 
 **Wave 1**
+
 - [ ] 158-02-PLAN.md — Migration 102 (app_settings.setup_complete) authoring + setup_complete() reader
 - [ ] 158-03-PLAN.md — setup_store (0600 store + sticky finalize latch + token) + SetupMiddleware (pure-ASGI no-op-when-finalized) + config store-over-env overlay
 - [ ] 158-04-PLAN.md — Deployment-artifact drift-check (D-16) + setup_data volume (D-02) + CLAUDE.md same-commit rule + OPERATOR.md + CI
 
 **Wave 2**
+
 - [ ] 158-05-PLAN.md — setup_service: throwaway submitted-value probes + operator bootstrap + encrypted provider-key save + 5-way smoke + (SHOULD) schema auto-runner
 
 **Wave 3**
+
 - [ ] 158-06-PLAN.md — api/setup: token-gated pre-auth router + all step endpoints + dual finalize marker + open /public-config + /setup/status
 
 **Wave 4**
+
 - [ ] 158-07-PLAN.md — main.py: setup-mode-tolerant lifespan (guard the sole DB hard-fail) + register SetupMiddleware + include router + announce token
 - [ ] 158-08-PLAN.md — Frontend runtime-config: defensive supabase.ts + hydrateSupabaseFromRuntime + public GETs + setupApi (X-Setup-Token)
 
 **Wave 5**
+
 - [ ] 158-09-PLAN.md — Setup components pt1: token gate + env-detect + preset picker + connection bind + schema guide
 - [ ] 158-10-PLAN.md — Setup components pt2: operator bootstrap + provider key + smoke checklist (finalize gate) + finalized lock-out
 
 **Wave 6**
+
 - [ ] 158-11-PLAN.md — SetupWizard 6-step host + App.tsx pre-auth branch + runtime hydrate
 
 **Wave 7**
+
 - [ ] 158-12-PLAN.md — [OPERATOR] apply migration 102 live + regenerate full-schema (autonomous: false)
+
 **UI hint**: yes
 
 ### Phase 159: Model Registry Curation (STRETCH)
@@ -480,11 +494,22 @@ Plans:
 **Plans**: 6 plans in 4 waves (planned 2026-07-18).
 
 Plans:
+**Wave 1**
+
 - [ ] 159-01-PLAN.md — Discovery suitability filter: shared UTILITY_MODEL_EXCLUDE constant + display-only `utility` tag; DRY curate_models.py (D-159-01)
 - [ ] 159-02-PLAN.md — Backend writes: POST /admin/models add-by-ID (lands disabled) + filter-toggle flag key (D-159-02, D-159-04)
 - [ ] 159-03-PLAN.md — Filter-toggle persistence: migration 103 + settings readback chain, operator-gated apply (D-159-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 159-04-PLAN.md — Frontend client seam (addModelById, utility, settings field) + per-family default table (D-159-02/03/04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 159-05-PLAN.md — “+ Add model by ID” form (070-A) + ControlRoomPage add-wiring (D-159-02, D-159-03)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 159-06-PLAN.md — Discovery filter UI + hidden-count + hand-fill pre-fill + ControlRoomPage filter-wiring (D-159-04, D-159-03)
 
 **Note**: Curation/UX layer on the EXISTING Phase-149 registry write-path + discovery service — not new plumbing. The companion model-icons picker polish (Proposal 2 — provider+model `@lobehub` logos in the composer + Settings model list) already shipped ad-hoc (commit `0d81d088`, 2026-07-18). Ties to `project_cross_provider_native_tools_registry_trap` (a MODEL_CAPABILITIES miss silently drops native tools) + SEED-088 (the hand-added GPT-5.6 — the add-by-ID path generalizes that manual flow). Newest-first per `feedback_prioritize_newest_models`.
