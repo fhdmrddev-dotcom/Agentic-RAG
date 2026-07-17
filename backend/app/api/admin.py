@@ -70,6 +70,12 @@ _FLAG_HUMAN_NAMES = {
     "self_improve_enabled": "self-improvement",
     "workflows_enabled": "workflows",
     "maintenance_mode": "maintenance mode",
+    # Phase 159 (MODEL-03 / D-159-04 write half): the persisted discovery-filter toggle rides
+    # the existing PUT /admin/flags path with ZERO new endpoint code — this one allowlist entry
+    # auto-includes the key in _FLAG_KEYS so set_flag accepts + routes it via save_app_settings.
+    # The app_settings column it writes is created by Plan 03's migration 103 (the readback is
+    # fail-soft until then — this Wave-1 plan lands AHEAD of the operator-applied migration).
+    "model_discovery_filter_enabled": "model discovery filter",
 }
 _FLAG_KEYS = set(_FLAG_HUMAN_NAMES)
 
