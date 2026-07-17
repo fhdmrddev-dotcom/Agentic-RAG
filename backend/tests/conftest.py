@@ -1077,3 +1077,56 @@ def feature_visibility():
         "workflow_authoring": {"audience": "everyone"},
         "governance_health": {"audience": "everyone"},
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 158 Wave-0 fixtures (Plan 158-01) — first-run install wizard scaffold
+# ═══════════════════════════════════════════════════════════════════════
+#
+# The three shared fixtures every test_setup_*.py contract consumes. All values
+# are throwaway / obviously-dummy — NO real secrets, DSNs, or tokens ever live in
+# a fixture (threat T-158-scaffold: the store writes to tmp_path only). The
+# submitted-value probes + operator/provider writes reuse the existing
+# mock_asyncpg_pool (SQL recorder, :564) and _reset_pg_pool_singleton (autouse,
+# event-loop-bound reset, :233) exactly as-is — this section only ADDS.
+
+@pytest.fixture
+def setup_store_path(tmp_path, monkeypatch):
+    """A throwaway ``SETUP_STORE_PATH`` so ``app.services.setup_store`` reads/writes a
+    disposable ``setup.json`` under ``tmp_path`` (never the real ``/data`` volume).
+
+    Sets the ``SETUP_STORE_PATH`` env var (the store's ``STORE_PATH`` reads it) to
+    ``tmp_path/setup.json`` and returns the ``Path``. Function-scoped so every test
+    gets a pristine store — the finalize-latch (D-05) + idempotency (D-14) proofs
+    must NOT leak a ``finalized`` marker or token across tests.
+    """
+    store = tmp_path / "setup.json"
+    monkeypatch.setenv("SETUP_STORE_PATH", str(store))
+    return store
+
+
+@pytest.fixture
+def mock_submitted_supabase():
+    """A MagicMock Supabase client for the operator-bootstrap + schema-sentinel probes.
+
+    Exposes the two surfaces the wizard's submitted-value path touches (D-11 / D-10):
+      - ``.auth.admin.create_user(...)`` -> a response whose ``.user.id`` is a dummy
+        UUID (so ``bootstrap_operator`` can assert ``email_confirm=True`` is passed
+        through and read back the new user id).
+      - ``.table(...).select(...).execute()`` -> a fluent schema-sentinel chain
+        returning ``.data == []`` (schema-absent by default).
+
+    Dummy identity only — no real service-role call is ever made (T-158-scaffold).
+    """
+    sb = MagicMock()
+    created = MagicMock()
+    created.user = MagicMock()
+    created.user.id = "00000000-0000-0000-0000-0000000000aa"
+    sb.auth.admin.create_user.return_value = created
+    # schema-sentinel `.table(...).select(...).execute()` fluent path
+    tbl = MagicMock()
+    tbl.select.return_value = tbl
+    tbl.eq.return_value = tbl
+    tbl.execute.return_value = MagicMock(data=[])
+    sb.table.return_value = tbl
+    return sb
