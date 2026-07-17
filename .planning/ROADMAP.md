@@ -432,7 +432,36 @@ Plans:
   2. The wizard is idempotent and locks out after finalize.
   3. A non-developer can complete setup end-to-end without hand-editing files.
 
-**Plans**: TBD
+**Plans**: 12 plans across 8 waves (W0 scaffold -> W7 operator-gated migration apply)
+
+Plans:
+**Wave 0**
+- [ ] 158-01-PLAN.md — Backend+frontend Nyquist scaffold (12 test_setup_*.py + conftest fixtures + 2 vitest stubs)
+
+**Wave 1**
+- [ ] 158-02-PLAN.md — Migration 102 (app_settings.setup_complete) authoring + setup_complete() reader
+- [ ] 158-03-PLAN.md — setup_store (0600 store + sticky finalize latch + token) + SetupMiddleware (pure-ASGI no-op-when-finalized) + config store-over-env overlay
+- [ ] 158-04-PLAN.md — Deployment-artifact drift-check (D-16) + setup_data volume (D-02) + CLAUDE.md same-commit rule + OPERATOR.md + CI
+
+**Wave 2**
+- [ ] 158-05-PLAN.md — setup_service: throwaway submitted-value probes + operator bootstrap + encrypted provider-key save + 5-way smoke + (SHOULD) schema auto-runner
+
+**Wave 3**
+- [ ] 158-06-PLAN.md — api/setup: token-gated pre-auth router + all step endpoints + dual finalize marker + open /public-config + /setup/status
+
+**Wave 4**
+- [ ] 158-07-PLAN.md — main.py: setup-mode-tolerant lifespan (guard the sole DB hard-fail) + register SetupMiddleware + include router + announce token
+- [ ] 158-08-PLAN.md — Frontend runtime-config: defensive supabase.ts + hydrateSupabaseFromRuntime + public GETs + setupApi (X-Setup-Token)
+
+**Wave 5**
+- [ ] 158-09-PLAN.md — Setup components pt1: token gate + env-detect + preset picker + connection bind + schema guide
+- [ ] 158-10-PLAN.md — Setup components pt2: operator bootstrap + provider key + smoke checklist (finalize gate) + finalized lock-out
+
+**Wave 6**
+- [ ] 158-11-PLAN.md — SetupWizard 6-step host + App.tsx pre-auth branch + runtime hydrate
+
+**Wave 7**
+- [ ] 158-12-PLAN.md — [OPERATOR] apply migration 102 live + regenerate full-schema (autonomous: false)
 **UI hint**: yes
 
 ### Progress (v3.3)
@@ -453,7 +482,7 @@ Plans:
 | 155. Accessibility Sweep — WCAG AA | 7/7 | Complete | 2026-07-16 |
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 4/5 | Executing (D-09 smoke deferred) | - |
-| 158 (STRETCH). First-Run Install Wizard | 0/? | Gated (behind CORE) | - |
+| 158 (STRETCH). First-Run Install Wizard | 0/12 | Planned (12 plans / 8 waves) | - |
 
 **Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 
