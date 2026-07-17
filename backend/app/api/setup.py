@@ -33,6 +33,7 @@ import logging
 import time
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel
 
 # Store seams (158-03) — bound at module scope so require_setup_token's finalize-latch + token
 # checks are monkeypatchable at the boundary (the idempotency + gate proofs patch these names).
@@ -42,10 +43,38 @@ from app.services.setup_store import (
     verify_token,
 )
 
-# Service seams (158-05) — the pure, unit-testable logic the router orchestrates.
-from app.services.setup_service import compute_setup_status
+# Service seams (158-05) — the pure, unit-testable logic the router orchestrates (never forked).
+# Bound at module scope so the endpoint proofs monkeypatch the boundary (save-False, dup, etc.).
+from app.services.setup_service import (
+    SchemaBootstrapPrivilegeError,
+    bootstrap_operator,
+    compute_setup_status,
+    detect_environment,
+    probe_submitted_postgres,
+    probe_submitted_redis,
+    probe_submitted_supabase,
+    run_schema_bootstrap,
+    run_smoke_checks,
+    save_provider_key,
+)
 
 logger = logging.getLogger(__name__)
+
+# D-10 guide fallback: the exact OPERATOR.md Step-3 bootstrap sequence a schema-absent box shows
+# (with copy buttons in 158-08) when the auto-runner can't/needn't run — full schema + the 9
+# ordered seed migrations. The runner also inserts the app_settings('global') row (A6 gotcha).
+_SEED_SEQUENCE = (
+    "supabase/full-schema.sql",
+    "supabase/migrations/010_app_settings.sql",
+    "supabase/migrations/018_skill_creator_seed.sql",
+    "supabase/migrations/053_settings_unification.sql",
+    "supabase/migrations/056_workflow_definitions.sql",
+    "supabase/migrations/061_harness_seed_templates.sql",
+    "supabase/migrations/066_eval_coverage_seed.sql",
+    "supabase/migrations/087_skill_creator_reborn.sql",
+    "supabase/migrations/088_skill_creator_eval_step_sequencing.sql",
+    "supabase/migrations/089_skill_creator_file_attach_honesty.sql",
+)
 
 
 # ── Token-verify rate-limit (D-15 / T-158-08 brute-force) ──────────────────────────────────
@@ -137,3 +166,162 @@ async def public_config() -> dict:
         "supabase_url": getattr(_settings, "supabase_url", "") or "",
         "supabase_anon_key": getattr(_settings, "supabase_anon_key", "") or "",
     }
+
+
+# ── Request bodies (all fields optional so a re-entered step is forgiving — D-14) ────────────
+class BindBody(BaseModel):
+    """The submitted infra tier for the LIVE bind/validate probes (D-10)."""
+
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None
+    supabase_publishable_key: str | None = None
+    supabase_secret_key: str | None = None
+    postgres_dsn: str | None = None
+    redis_url: str | None = None
+
+
+class OperatorBody(BaseModel):
+    """The first operator + the infra it is minted against (D-11). Infra travels in the body
+    because the store is not written until finalize — each step is stateless + re-entrant."""
+
+    email: str
+    password: str
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    postgres_dsn: str | None = None
+
+
+class ProviderKeyBody(BaseModel):
+    """The default provider key (+ optional embedding key) — encrypt-on-write via the seam."""
+
+    provider: str
+    api_key: str
+    embedding_key: str | None = None
+
+
+class SmokeBody(BaseModel):
+    """The submitted config the 5-way smoke checklist probes server-side (D-13)."""
+
+    supabase_url: str | None = None
+    service_role_key: str | None = None
+    postgres_dsn: str | None = None
+    redis_url: str | None = None
+    provider: str | None = None
+    provider_key: str | None = None
+
+
+def _load_schema_artifacts() -> tuple[str, list[str]]:
+    """Read ``supabase/full-schema.sql`` + the ordered seed migrations from the repo (D-10).
+
+    Used ONLY by the schema-absent auto-runner (a SHOULD). A missing artifact raises, and the
+    endpoint falls back to the copy-guide (the MUST path) — never a partial silent bootstrap.
+    """
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]  # backend/app/api/setup.py -> repo root
+    full_schema_sql = (repo_root / "supabase" / "full-schema.sql").read_text(encoding="utf-8")
+    seeds: list[str] = []
+    for rel in _SEED_SEQUENCE[1:]:  # skip full-schema.sql itself (already loaded)
+        p = repo_root / rel
+        if p.exists():
+            seeds.append(p.read_text(encoding="utf-8"))
+    return full_schema_sql, seeds
+
+
+# ── Token-gated step endpoints (each Depends(require_setup_token) — the pre-auth wall) ───────
+@router.post("/detect", dependencies=[Depends(require_setup_token)])
+async def detect() -> dict:
+    """D-08: LIGHT env-detect — cheap booleans to pre-fill defaults, not auto-discovery."""
+    return await detect_environment()
+
+
+@router.post("/validate", dependencies=[Depends(require_setup_token)])
+async def validate(body: BindBody) -> dict:
+    """D-10: validate the SUBMITTED values LIVE via THROWAWAY connections (never the app
+    singletons). Returns sanitized pass/fail only — a probe reflects ``type(exc).__name__``,
+    never the raw error / host / DSN (T-158-03 SSRF telemetry). Postgres also reports
+    ``schema_present`` (the ``to_regclass`` sentinel)."""
+    supabase = await probe_submitted_supabase(
+        body.supabase_url or "", body.supabase_service_role_key or ""
+    )
+    postgres = await probe_submitted_postgres(body.postgres_dsn or "")
+    redis = await probe_submitted_redis(body.redis_url or "")
+    return {"supabase": supabase, "postgres": postgres, "redis": redis}
+
+
+@router.post("/schema-bootstrap", dependencies=[Depends(require_setup_token)])
+async def schema_bootstrap(body: BindBody) -> dict:
+    """D-10 (SHOULD): schema-absent-GATED auto-runner with a guide fallback.
+
+    Never runs against a present schema (non-idempotent ``CREATE TABLE`` would error — this is
+    the idempotency guard for the step). On a privilege error (or a missing artifact) it returns
+    ``{fallback:"guide", seed_sequence:[...]}`` — the MUST copy-guide path (D-18), never a
+    half-applied silent success.
+    """
+    dsn = body.postgres_dsn or ""
+    probe = await probe_submitted_postgres(dsn)
+    if probe.get("state") != "up":
+        # Unreachable → cannot auto-run; hand the operator the guide (+ the sanitized reason).
+        return {
+            "ok": False,
+            "reason": probe.get("reason", "unreachable"),
+            "fallback": "guide",
+            "seed_sequence": list(_SEED_SEQUENCE),
+        }
+    if probe.get("schema_present"):
+        return {"ok": True, "skipped": True, "schema_present": True}  # idempotent no-op
+    try:
+        full_schema_sql, seed_sqls = _load_schema_artifacts()
+    except Exception:  # noqa: BLE001 — a missing artifact → guide fallback, never a 500
+        logger.warning("setup: schema artifacts unreadable — falling back to the copy-guide")
+        return {"ok": False, "fallback": "guide", "seed_sequence": list(_SEED_SEQUENCE)}
+    try:
+        await run_schema_bootstrap(dsn, full_schema_sql, seed_sqls)
+    except SchemaBootstrapPrivilegeError:
+        # The pooler role lacks DDL/extension/auth-schema rights — the guide is the MUST path.
+        return {"ok": False, "fallback": "guide", "seed_sequence": list(_SEED_SEQUENCE)}
+    return {"ok": True, "bootstrapped": True}
+
+
+@router.post("/operator", dependencies=[Depends(require_setup_token)])
+async def operator(body: OperatorBody) -> dict:
+    """D-11: mint the first CONFIRMED operator (Auth admin API) + upsert operator_users.
+
+    A duplicate email → ``{already_exists:true}`` at 200 (the service handles it, no raise). A
+    GoTrue password-policy rejection (or any other create error) is surfaced as a **400
+    verbatim** — never a 500 that hides the real cause (T-158-06). Ordering: the wizard runs
+    schema-bootstrap BEFORE this (the ``on_auth_user_created`` trigger needs its tables)."""
+    from app.config import settings as _settings
+
+    supabase_url = body.supabase_url or getattr(_settings, "supabase_url", "")
+    service_role_key = body.supabase_service_role_key or getattr(
+        _settings, "supabase_service_role_key", ""
+    )
+    pg_dsn = body.postgres_dsn or getattr(_settings, "postgres_dsn", "")
+    try:
+        return await bootstrap_operator(
+            supabase_url, service_role_key, body.email, body.password, pg_dsn
+        )
+    except Exception as exc:  # noqa: BLE001 — password policy / create error → 400 verbatim (T-158-06)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/provider-key", dependencies=[Depends(require_setup_token)])
+async def provider_key(body: ProviderKeyBody) -> dict:
+    """D-12: persist the provider key through the SINGLE ``save_app_settings`` seam
+    (encrypt-on-write inherited for free). A False return is a REAL 500 (honest write-through,
+    mirrors PUT /admin/flags) — never a false 'saved'."""
+    if not await save_provider_key(body.provider, body.api_key, body.embedding_key):
+        raise HTTPException(
+            status_code=500,
+            detail="Could not persist the provider key — it was not saved.",
+        )
+    return {"ok": True}
+
+
+@router.post("/smoke", dependencies=[Depends(require_setup_token)])
+async def smoke(body: SmokeBody) -> dict:
+    """D-13: the 5-way green checklist that IS the finalize gate — a row is green ONLY on
+    server truth. Returns ``{checks, all_green}``; any red keeps Finalize disabled."""
+    return await run_smoke_checks(body.model_dump(exclude_none=True))
