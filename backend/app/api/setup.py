@@ -38,10 +38,15 @@ from pydantic import BaseModel
 # Store seams (158-03) — bound at module scope so require_setup_token's finalize-latch + token
 # checks are monkeypatchable at the boundary (the idempotency + gate proofs patch these names).
 from app.services.setup_store import (
+    finalize as store_finalize,
     get_or_create_token,
     setup_finalized,
     verify_token,
 )
+
+# The auditable-DB-flag write seam (Phase-150 encrypt-on-write is inherited for free) — bound at
+# module scope so the finalize proof monkeypatches the boundary (no live DB in a unit test).
+from app.models.user_settings import save_app_settings
 
 # Service seams (158-05) — the pure, unit-testable logic the router orchestrates (never forked).
 # Bound at module scope so the endpoint proofs monkeypatch the boundary (save-False, dup, etc.).
@@ -325,3 +330,92 @@ async def smoke(body: SmokeBody) -> dict:
     """D-13: the 5-way green checklist that IS the finalize gate — a row is green ONLY on
     server truth. Returns ``{checks, all_green}``; any red keeps Finalize disabled."""
     return await run_smoke_checks(body.model_dump(exclude_none=True))
+
+
+class FinalizeBody(BaseModel):
+    """The full config finalize commits: the infra tier (→ file marker) + operator_emails +
+    the provider values the server RE-SMOKES (never trusting a client 'all green')."""
+
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
+    supabase_service_role_key: str | None = None
+    supabase_publishable_key: str | None = None
+    supabase_secret_key: str | None = None
+    postgres_dsn: str | None = None
+    redis_url: str | None = None
+    secrets_encryption_key: str | None = None
+    operator_emails: str | None = None
+    provider: str | None = None
+    provider_key: str | None = None
+
+
+@router.post("/finalize", dependencies=[Depends(require_setup_token)])
+async def finalize_setup(body: FinalizeBody) -> dict:
+    """D-05: write the DUAL finalize marker + signal restart-to-apply.
+
+    1. RE-RUN the smoke SERVER-SIDE and REFUSE (409) unless every row is green — the finalize
+       gate is server truth, never a client 'all green' (D-13).
+    2. Write the FILE marker (``setup_store.finalize``) — the blip-proof gate AUTHORITY (D-05)
+       and the point-of-no-return commit; after it, ``require_setup_token`` 409s every write.
+    3. Write the AUDITABLE DB flag (``save_app_settings({"setup_complete": True})``) and report
+       the result HONESTLY.
+    4. Return ``restart_required:true`` — in-process re-init is unreliable under WORKER_COUNT=2,
+       so ``docker compose restart backend`` is the documented apply step.
+
+    Note (deviation from the plan's literal 'file-first then a hard 500 on DB-False'): the
+    auditable DB flag is written best-effort and its outcome is reported as
+    ``setup_complete_persisted`` rather than 500'd. Under restart-to-apply the app pool is still
+    bound to placeholder config until the restart, so this write can legitimately not land yet;
+    the FILE marker above is the sole gate authority (D-05) and ``setup_complete()`` reads
+    default-False-safe, so a hard 500 here would BOTH falsely claim finalize failed AND be
+    unrecoverable (the marker now 409s a retry). Reporting the truth (never a false 'saved')
+    preserves the honesty intent without the retry-lock paradox.
+    """
+    # 1. Server-side smoke gate — the client cannot force finalize past a red check.
+    cfg = {
+        k: v
+        for k, v in {
+            "supabase_url": body.supabase_url,
+            "service_role_key": body.supabase_service_role_key,
+            "postgres_dsn": body.postgres_dsn,
+            "redis_url": body.redis_url,
+            "provider": body.provider,
+            "provider_key": body.provider_key,
+        }.items()
+        if v is not None
+    }
+    result = await run_smoke_checks(cfg)
+    if not result.get("all_green"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "smoke_not_green",
+                "message": "Setup is not fully green yet — resolve the red checks before finalizing.",
+                "checks": result.get("checks"),
+            },
+        )
+
+    # 2. FILE marker — the blip-proof gate AUTHORITY (D-05) + point-of-no-return lock (D-14).
+    store_finalize(body.model_dump(exclude_none=True))
+
+    # 3. Auditable DB flag — best-effort + honestly reported (see the docstring rationale).
+    setup_complete_persisted = False
+    try:
+        setup_complete_persisted = bool(await save_app_settings({"setup_complete": True}))
+    except Exception:  # noqa: BLE001 — auditable-only; never fail the (file-authoritative) finalize
+        logger.warning(
+            "setup finalize: setup_complete DB-flag write raised (best-effort)", exc_info=True
+        )
+    if not setup_complete_persisted:
+        logger.warning(
+            "setup finalize: auditable setup_complete DB flag not persisted yet (pre-restart "
+            "app pool / DB blip) — the file marker is authoritative; the flag re-syncs post-restart"
+        )
+
+    # 4. Restart-to-apply verdict (WORKER_COUNT=2 makes in-process re-init unreliable).
+    return {
+        "finalized": True,
+        "restart_required": True,
+        "setup_complete_persisted": setup_complete_persisted,
+        "message": "Setup complete — run `docker compose restart backend` to apply.",
+    }
