@@ -49,3 +49,42 @@ def test_status_does_no_live_db_probe(setup_store_path):
     DB connection, so a DB outage can never bounce live users into the wizard. Named for the
     Nyquist map; Wave 2 asserts no asyncpg.connect is invoked on the status path."""
     assert hasattr(setup_service, "compute_setup_status"), "status must be a static, no-DB computation"
+
+
+# ── 158-06 (Task 1): the OPEN routes over a real ASGI request (TestClient) ─────────────────
+# The two un-tokened routes (D-07): GET /setup/status (entry signal) + GET /public-config
+# (the two PUBLIC Supabase values, never a secret). Mounted on a minimal app — no lifespan,
+# no main.py wiring (that is 158-07) — so the router's own contract is proven in isolation.
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+def _make_setup_app():
+    """A minimal FastAPI app mounting ONLY the 158-06 setup routers (open + token-gated)."""
+    from fastapi import FastAPI
+
+    import app.api.setup as setup_api
+
+    app_ = FastAPI()
+    app_.include_router(setup_api.router)
+    app_.include_router(setup_api.public_router)
+    return app_
+
+
+def test_status_endpoint_is_open_and_returns_entry_shape(setup_store_path):
+    """158-06/D-06: GET /setup/status is OPEN (no token) and returns the static entry signal
+    {needs_setup, finalized, has_token} — the SPA's one-shot startup probe."""
+    resp = TestClient(_make_setup_app()).get("/setup/status")
+    assert resp.status_code == 200
+    assert set(resp.json().keys()) == {"needs_setup", "finalized", "has_token"}
+
+
+def test_public_config_returns_only_two_public_keys_no_secret(setup_store_path):
+    """158-06/D-07 (T-158-04 secret-leak): GET /public-config is OPEN and returns EXACTLY the
+    two PUBLIC Supabase values — NEVER the service-role key / DSN / any secret."""
+    resp = TestClient(_make_setup_app()).get("/public-config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"supabase_url", "supabase_anon_key"}
+    blob = repr(body).lower()
+    for forbidden in ("service_role", "secret", "dsn"):
+        assert forbidden not in blob, f"/public-config leaked a '{forbidden}' value"

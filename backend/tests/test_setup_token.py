@@ -53,3 +53,74 @@ def test_get_or_create_token_is_stable(setup_store_path):
     (re-printed each unfinalized boot so it stays discoverable; the finalize lock is the
     real boundary, not token rotation)."""
     assert get_or_create_token() == get_or_create_token()
+
+
+# ── 158-06 (Task 1): require_setup_token over a REAL ASGI request (TestClient) ──────────────
+# The write gate is the SOLE pre-auth access authority (no RLS backstop, D-15). A tiny
+# token-gated probe route stands in for the write endpoints (which land in 158-06 Task 2), so
+# the dependency's 401 / pass / 409 behavior is proven over a genuine request at the skeleton
+# stage. Every "should reach the gate" test patches setup_finalized -> False so the per-process
+# finalize latch (a monotonic module global another test may have tripped) can never leak in.
+from fastapi import Depends, FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+def _make_token_app():
+    """Mount the setup routers + a throwaway token-gated probe so require_setup_token runs over
+    a real request. Clears the in-process rate-limit window so each app starts pristine."""
+    import app.api.setup as setup_api
+
+    setup_api._failed_attempts.clear()
+    app_ = FastAPI()
+    app_.include_router(setup_api.router)
+    app_.include_router(setup_api.public_router)
+
+    @app_.post("/setup/_probe", dependencies=[Depends(setup_api.require_setup_token)])
+    async def _probe():  # pragma: no cover - trivial gated stand-in
+        return {"ok": True}
+
+    return app_
+
+
+def test_write_gate_rejects_missing_token(setup_store_path, monkeypatch):
+    """158-06/D-15 (T-158-01 hijack): a WRITE with NO X-Setup-Token → 401 (the pre-auth wall)."""
+    import app.api.setup as setup_api
+
+    monkeypatch.setattr(setup_api, "setup_finalized", lambda: False)
+    resp = TestClient(_make_token_app()).post("/setup/_probe")
+    assert resp.status_code == 401
+
+
+def test_write_gate_rejects_wrong_token(setup_store_path, monkeypatch):
+    """158-06/D-15: a WRITE with a WRONG token → 401 even though a real token exists."""
+    import app.api.setup as setup_api
+
+    monkeypatch.setattr(setup_api, "setup_finalized", lambda: False)
+    get_or_create_token()  # mint the real token into the throwaway store
+    resp = TestClient(_make_token_app()).post(
+        "/setup/_probe", headers={"X-Setup-Token": "not-the-real-token"}
+    )
+    assert resp.status_code == 401
+
+
+def test_write_gate_accepts_correct_token(setup_store_path, monkeypatch):
+    """158-06/D-15: the CORRECT persisted token passes the gate — the write proceeds (200)."""
+    import app.api.setup as setup_api
+
+    monkeypatch.setattr(setup_api, "setup_finalized", lambda: False)
+    tok = get_or_create_token()
+    resp = TestClient(_make_token_app()).post("/setup/_probe", headers={"X-Setup-Token": tok})
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+
+
+def test_write_gate_409_after_finalize(setup_store_path, monkeypatch):
+    """158-06/D-14 (G-6(e) lock-bypass proof): once finalized, EVERY write → 409 even with a
+    valid token — the finalize latch is checked BEFORE the token, and re-config is /admin-only."""
+    import app.api.setup as setup_api
+
+    monkeypatch.setattr(setup_api, "setup_finalized", lambda: True)
+    resp = TestClient(_make_token_app()).post(
+        "/setup/_probe", headers={"X-Setup-Token": "any-token-at-all"}
+    )
+    assert resp.status_code == 409
