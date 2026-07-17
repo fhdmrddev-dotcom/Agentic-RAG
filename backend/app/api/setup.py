@@ -109,6 +109,34 @@ def _clear_failures(host: str) -> None:
     _failed_attempts.pop(host, None)
 
 
+# ── WR-04: which /operator failures may be surfaced verbatim vs sanitized ────────────────────
+def _is_password_policy_error(exc: Exception) -> bool:
+    """True ONLY for a GoTrue password-policy rejection — the ONE error surfaced VERBATIM.
+
+    T-158-06 wants the operator to see the real password requirement (e.g. "Password should be
+    at least 6 characters"). EVERY other failure is sanitized (WR-04): ``bootstrap_operator``
+    also runs ``create_client`` and a THROWAWAY ``asyncpg.connect``, and an asyncpg / socket
+    connection error's message can carry the DB host, port, and role (e.g. ``password
+    authentication failed for user "postgres"``) — that must never reach the caller verbatim on
+    this pre-auth surface (it mirrors the probe hygiene). So: DB/connection errors → sanitized;
+    GoTrue password errors → verbatim; anything unrecognised → sanitized (fail safe).
+    """
+    # DB / socket errors — sanitize (topology leak). asyncpg exceptions live in ``asyncpg.*``;
+    # host/DNS/refused failures are OSError/ConnectionError subclasses.
+    if isinstance(exc, (OSError, ConnectionError)):
+        return False
+    module = (type(exc).__module__ or "").lower()
+    if module.startswith("asyncpg"):
+        return False
+    # GoTrue weak/short-password rejection — the class name is stable across supabase-py 2.x.
+    if "weakpassword" in type(exc).__name__.lower():
+        return True
+    # An auth-layer error (gotrue / supabase_auth) that names the password policy.
+    if module.startswith("gotrue") or module.startswith("supabase"):
+        return "password" in str(exc).lower()
+    return False
+
+
 async def require_setup_token(
     request: Request = None,
     x_setup_token: str | None = Header(default=None),
@@ -308,8 +336,18 @@ async def operator(body: OperatorBody) -> dict:
         return await bootstrap_operator(
             supabase_url, service_role_key, body.email, body.password, pg_dsn
         )
-    except Exception as exc:  # noqa: BLE001 — password policy / create error → 400 verbatim (T-158-06)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        # WR-04: surface ONLY a GoTrue password-policy message verbatim (T-158-06 UX); sanitize
+        # every other error so an asyncpg/connection failure's raw message can't leak the DB
+        # host/port/role on this pre-auth surface (mirrors the sanitized probe reasons).
+        logger.warning("setup /operator failed (%s)", type(exc).__name__)
+        detail = (
+            str(exc)
+            if _is_password_policy_error(exc)
+            else "Could not create the operator account — check the Supabase URL, "
+            "service-role key, and database connection."
+        )
+        raise HTTPException(status_code=400, detail=detail) from exc
 
 
 @router.post("/provider-key", dependencies=[Depends(require_setup_token)])

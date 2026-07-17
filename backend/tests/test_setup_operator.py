@@ -128,3 +128,63 @@ async def test_bootstrap_operator_weak_password_propagates_verbatim(setup_store_
             password="123",
             pg_dsn="postgresql://u:p@localhost:5432/db",
         )
+
+
+# ── WR-04: /operator must sanitize DB/connection errors but surface GoTrue password errors ────
+
+class _FakeAsyncpgError(Exception):
+    """A stand-in for an asyncpg connection error whose message leaks DB host/role."""
+
+
+_FakeAsyncpgError.__module__ = "asyncpg.exceptions"  # what _is_password_policy_error keys off
+
+
+class _FakeGoTrueError(Exception):
+    """A stand-in for a GoTrue password-policy rejection (surfaced verbatim, T-158-06)."""
+
+
+_FakeGoTrueError.__module__ = "gotrue.errors"
+
+
+async def test_operator_endpoint_sanitizes_db_error(setup_store_path, monkeypatch):
+    """WR-04: a DB/connection failure from bootstrap_operator must NOT reflect the raw error
+    (which can carry the DB host/port/role) — the /operator 400 detail is a generic sanitized
+    message. Before the fix the endpoint returned ``detail=str(exc)`` verbatim (topology leak)."""
+    import app.api.setup as setup_api
+    from fastapi import HTTPException
+
+    leaky = _FakeAsyncpgError('password authentication failed for user "postgres" at host db.internal:5432')
+
+    async def _boom(*a, **k):
+        raise leaky
+
+    monkeypatch.setattr(setup_api, "bootstrap_operator", _boom)
+    body = setup_api.OperatorBody(
+        email="op@example.com", password="x", supabase_url="https://real.supabase.co",
+        supabase_service_role_key="svc", postgres_dsn="postgresql://u:p@db.internal:5432/db",
+    )
+    with pytest.raises(HTTPException) as ei:
+        await setup_api.operator(body)
+    assert ei.value.status_code == 400
+    detail = str(ei.value.detail)
+    assert "db.internal" not in detail and "postgres" not in detail, "DB host/role must not leak (WR-04)"
+
+
+async def test_operator_endpoint_surfaces_password_policy_verbatim(setup_store_path, monkeypatch):
+    """WR-04 (preserve intended UX): a GoTrue password-policy rejection is still surfaced
+    VERBATIM as the 400 detail so the operator sees the real requirement (T-158-06 / D-11)."""
+    import app.api.setup as setup_api
+    from fastapi import HTTPException
+
+    async def _weak(*a, **k):
+        raise _FakeGoTrueError("Password should be at least 6 characters")
+
+    monkeypatch.setattr(setup_api, "bootstrap_operator", _weak)
+    body = setup_api.OperatorBody(
+        email="op@example.com", password="123", supabase_url="https://real.supabase.co",
+        supabase_service_role_key="svc", postgres_dsn="postgresql://u:p@localhost:5432/db",
+    )
+    with pytest.raises(HTTPException) as ei:
+        await setup_api.operator(body)
+    assert ei.value.status_code == 400
+    assert ei.value.detail == "Password should be at least 6 characters"
