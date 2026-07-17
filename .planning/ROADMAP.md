@@ -496,7 +496,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 159-01-PLAN.md — Discovery suitability filter: shared UTILITY_MODEL_EXCLUDE constant + display-only `utility` tag; DRY curate_models.py (D-159-01)
+- [x] 159-01-PLAN.md — Discovery suitability filter: shared UTILITY_MODEL_EXCLUDE constant + display-only `utility` tag; DRY curate_models.py (D-159-01)
 - [ ] 159-02-PLAN.md — Backend writes: POST /admin/models add-by-ID (lands disabled) + filter-toggle flag key (D-159-02, D-159-04)
 - [ ] 159-03-PLAN.md — Filter-toggle persistence: migration 103 + settings readback chain, operator-gated apply (D-159-04)
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-17T22:34:55.823Z"
-last_activity: 2026-07-17 -- Phase 159 planning complete
+last_updated: "2026-07-17T23:09:40.532Z"
+last_activity: 2026-07-17
 progress:
   total_phases: 27
   completed_phases: 13
   total_plans: 95
-  completed_plans: 89
+  completed_plans: 90
   percent: 48
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 159 — Model Registry Curation (late STRETCH, MODEL-03) — added + DISCUSSED 2026-07-18 (context captured). The operator wants this built in v3.3, then `/gsd:complete-milestone`. **NEXT: `/gsd:plan-phase 159`.**
+**Current focus:** Phase 159 — model-registry-curation
 
 ## Current Position
 
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 **159 added (2026-07-18):** Phase 159 appended to v3.3 STRETCH via `gsd-sdk phase.add` (SDK dropped the skeleton after the archived milestones — the known window quirk — hand-relocated into the v3.3 window: STRETCH table + checklist + detail + progress + MODEL-03 in REQUIREMENTS.md; also fixed the stale 157/158 checkboxes→[x] + DEPLOY-01/02 traceability→Complete).
 
-Phase: 158 (first-run-install-wizard-stretch) — CODE COMPLETE + VERIFIED + SECURED (11/12 plans) → operator-gated tail
-Plan: 12/12 (158-12 LOCAL done 2026-07-17 — operator applied mig 102 + Claude regenerated full-schema.sql `setup_complete`:480, 1-line diff, drift-check exit 0)
+Phase: 159 (model-registry-curation) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-07-17 -- Phase 159 planning complete
+Last activity: 2026-07-17
 
 **158 verify+secure+fix (2026-07-17) — AUTONOMOUS:** ran gsd-verifier + gsd-security-auditor + gsd-code-reviewer in parallel on the shipped code. **secure-phase: SECURED, threats_open:0** — all T-158-01..11 mitigations verified in code (7 POST writes all token+latch gated [409→429→401], constant-time compare, `/public-config` leaks nothing, SSRF sanitized, secrets via Phase-150 seam, 0600 store, boot-resilient). **Code review + verifier CONVERGED on 2 Criticals** (byte-identical invariant otherwise proven 3 ways incl. a full 2705-test pre/post regression diff = identical): **CR-02** (OPERATOR-OBSERVED LIVE — the 503: `SetupMiddleware` + `main.py _setup_mode` keyed off the finalize-MARKER alone, so every env-configured box [real supabase_url, no wizard marker — the operator's dev box + every existing deploy] got 503'd into setup mode; frontend said "log in" while backend 503'd every API) → FIXED `8047d172` (both key off `needs_setup()` = marker-absent AND infra-placeholder; regression test `test_configured_via_env_is_never_gated`); **CR-01** (would BRICK a wizard-finalized box on its mandated restart — `apply_setup_overlay` setattr'd 3 undeclared Supabase Settings fields → Pydantic ValueError at import → crash-loop; also emptied `/public-config` anon key; missed because `test_setup_overlay` used a SimpleNamespace that can't raise) → FIXED `ea232a71` (declared the 3 fields + `hasattr`/`model_fields` overlay guard + real-Settings reproduction tests). gsd-code-fixer also closed **WR-01** (operator-bootstrap self-heals on retry), **WR-02** (WORKER_COUNT=2 token converges), **WR-03** (redis probe sanitized-down), **WR-04** (`/operator` DB-error sanitized, GoTrue verbatim kept), **WR-05** (schema auto-runner→copy-guide fallback on ANY failure), **WR-06** (`useAuth` re-binds after runtime-config rehydrate) — each atomic-committed (`f09100af`..`7880f350`); IN-01 correctly REJECTED (would break real `<project-ref>` placeholder detection). **LESSONS:** (a) a green unit suite missed BOTH Criticals — the operator's live eyeball caught CR-02, the goal-backward verifier + adversarial review caught CR-01; lived-experience UAT is not optional on a gate/middleware/config surface. (b) test doubles that can't raise (SimpleNamespace for a Pydantic model) structurally hide whole bug classes — drive the REAL type. (c) a first-run gate must key off "genuinely needs setup" (marker AND placeholder), never the finalize-marker alone, or it breaks every already-configured box.
 
@@ -709,6 +709,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 149 P11 | 18min | 2 tasks | 2 files |
 | Phase 149 P12 | 12min | 1 tasks | 2 files |
 | Phase 150 P02 | 2 | 2 tasks | 2 files |
+| Phase 159 P01 | 13 | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -794,6 +795,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 148]: 148-03 (VIS-01): operator applied migration 098 to the live LOCAL DB via the SQL editor (NEVER db push/reset — preserves dev data); full-schema.sql regenerated (no --reset, live-DB dump) — feature_visibility jsonb column captured at line 468, a 1-insertion dump delta not a hand-edit (commit edfcc1a0). CLOUD PARITY: mig 098 (column + D-05 seed UPDATE) MUST be pasted into the CLOUD Supabase SQL editor at the next promotion — local + cloud each carry their own app_settings.global row (docs/DEPLOYMENT-WORKFLOW.md §5 parity checklist + the standing v3.3 cloud-migrations rule; mirrors mig 097). Skipped requirements.mark-complete for VIS-01 (multi-plan feature; marked at phase verify-work — same posture as 148-02/04/05).
 - [Phase 149]: 149-11: agent_loop pre-injection gate now fires for compat-path STRUCTURED (operator native_tools=False OVR) via _should_pre_inject_structured — warmed by get_model_capability_async before the sync resolve_calling_mode read; anthropic/google native-SDK excluded (WR-05); openrouter+xml and no-override paths byte-identical (D-14).
 - [Phase 149]: 149-12: suggestion chips strip <think> reasoning blocks before the line-parse (module-private _strip_think_blocks mirrored from the threads.py sibling, not imported — avoids api->service inversion + G-5 hot-file import); strip runs BEFORE clamp-to-3 so reasoning never fills chip slots; closes round-2 UAT Test-7 minor gap on the D-149-10 fallback path.
+- [Phase 159]: D-159-01 realized (159-01): UTILITY_MODEL_EXCLUDE is the single shared chat-filter constant; curate imports it; discovery new entries carry a display-only utility tag that never mutates the confirmable diff (SC#3).
 
 ## Operator Next Steps
 
