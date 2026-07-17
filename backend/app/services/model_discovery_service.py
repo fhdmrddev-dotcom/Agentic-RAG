@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 
 import httpx
 
@@ -97,6 +98,41 @@ _FIELD_TO_REGISTRY = {
     "max_output": "max_output_tokens",
     "native_tools": "native_tools",
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Utility-model classification (Phase 159 / D-159-01) — the shared, DRY source.
+#
+# The ONE importable regex distinguishing chat/tool-capable models from the
+# non-chat "utility" noise (embeddings, audio, image, moderation, rerank,
+# transcription, …). ``scripts/curate_models.py`` imports THIS constant so the
+# suitability filter and the curation script can never drift (D-159-01).
+#
+# Tuned for the CHAT-FILTER purpose: the chat-legacy tokens that
+# ``curate_models._MISSING_EXCLUDE`` also carried (chatgpt|instruct|codex|
+# davinci|babbage) are DELIBERATELY DROPPED here — they wrongly hide valid chat
+# models (e.g. ``chatgpt-4o-latest`` is a real chat model). curate keeps those
+# tokens LOCALLY for its own registry-gap flagging; this constant is the true
+# non-chat-utility core only.
+#
+# ReDoS-safe: plain bounded alternation, single linear scan — no nested
+# quantifiers.
+# ─────────────────────────────────────────────────────────────────────────────
+UTILITY_MODEL_EXCLUDE = re.compile(
+    r"(embed|whisper|tts|audio|realtime|image|dall-e|moderation|transcribe|"
+    r"rerank|search-preview|computer-use)",
+    re.IGNORECASE,
+)
+
+
+def is_utility_model(model_id: str) -> bool:
+    """True when ``model_id`` names a non-chat utility model (embeddings / audio
+    / image / moderation / rerank / transcription / …).
+
+    A DISPLAY-ONLY signal: the discovery panel (Plan 06) uses it to hide utility
+    noise by default, but it NEVER gates the confirmable diff — a utility-flagged
+    model stays fully confirmable if the operator opts in (D-159-01 / SC#3).
+    Null-safe (an empty/None id is not utility)."""
+    return bool(UTILITY_MODEL_EXCLUDE.search(model_id or ""))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -408,6 +444,12 @@ def _build_new_entry(provider: str, model_id: str, model_caps: dict) -> dict:
         "provider": provider,
         "model_id": model_id,
         "enabled": False,
+        # Display-only tag (Phase 159 / D-159-01): lets the discovery panel hide
+        # non-chat utility noise by default. Purely presentational — it never
+        # gates confirmation, and it rides ONLY on `new` entries (compute_diff's
+        # `changed`/`vanished` builders are untouched, so the confirmable diff is
+        # byte-identical to Phase 149).
+        "utility": is_utility_model(model_id),
         "capabilities": capabilities,
     }
 
