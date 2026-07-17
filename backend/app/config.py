@@ -1169,3 +1169,51 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def apply_setup_overlay(target) -> None:
+    """Overlay the first-run setup-store's infra tier onto ``target`` — STORE WINS (D-01/D-02).
+
+    For each enumerated ``INFRA_KEYS`` entry, a truthy value in ``/data/setup.json``
+    OVERRIDES the settings attribute. This polarity is deliberate and load-bearing: the
+    onebox preset ships NON-EMPTY placeholders (``SUPABASE_URL=https://<project-ref>.supabase.co``),
+    so a naive env-wins overlay would let the placeholder shadow the wizard's real value
+    (RESEARCH Pattern 1). ONLY the infra tier is sourced from the store — app-level keys
+    (provider API keys, ``operator_emails`` as an app read, retrieval knobs) live in
+    ``app_settings`` and are NEVER overridden here.
+
+    Mutates ``target`` in place (mirrors the ``resolve_llm_provider`` post-load mutator
+    self-precedent). No-op on a fresh/unconfigured box (empty store). The infra keys do not
+    feed the LLM resolver, so no resolver re-run is required for a store-driven change.
+    """
+    from app.services.setup_store import INFRA_KEYS, read_store
+
+    store = read_store()
+    if not store:
+        return
+    for k in INFRA_KEYS:
+        v = store.get(k)
+        if v:  # STORE WINS for infra keys (placeholder-safe) — a truthy store value overrides env
+            setattr(target, k, v)
+
+
+def needs_setup(target) -> bool:
+    """Static, blip-proof first-run signal: is the box unconfigured (D-05 / Pattern 1)?
+
+    ``needs_setup = (not setup_finalized()) AND (the infra config is still placeholder/blank)``
+    — a pure string check on ``supabase_url``, NO live DB probe, so a DB blip can never
+    re-trigger the wizard on a live box. A hand-filled 157-style box (a REAL ``supabase_url``
+    but no marker file) reads False; only a genuinely unconfigured box (placeholder URL and
+    no finalize marker) reads True.
+    """
+    from app.services.setup_store import _is_placeholder, setup_finalized
+
+    if setup_finalized():
+        return False
+    return _is_placeholder(getattr(target, "supabase_url", ""))
+
+
+# Phase 158 (DEPLOY-02, D-01/D-02): overlay the first-run setup-store's infra tier over env
+# for the enumerated INFRA_KEYS (store-wins — placeholder-safe) so a wizard-configured
+# one-box picks up its real infra values without a rebuild. No-op on a fresh box (no store).
+apply_setup_overlay(settings)

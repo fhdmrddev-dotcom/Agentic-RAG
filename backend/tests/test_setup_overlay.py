@@ -61,3 +61,15 @@ def test_app_level_key_never_overridden(setup_store_path):
     settings = SimpleNamespace(supabase_url=_PLACEHOLDER_URL, llm_api_key="env-app-tier")
     fn(settings)
     assert settings.llm_api_key == "env-app-tier", "app-level key must NOT be overridden by the store"
+
+
+def test_needs_setup_false_when_url_real(setup_store_path):
+    """SC#3/D-05 (static, blip-proof entry check): a REAL ``supabase_url`` ⇒ ``needs_setup``
+    False even WITHOUT a finalize marker — a hand-filled 157-style box must NOT show the
+    wizard. The check is a pure string test (no live DB probe), so a transient DB blip can
+    never re-trigger the wizard on a configured box (Pitfall 1)."""
+    fn = getattr(config_mod, "needs_setup", None)
+    assert fn is not None, "RED until Wave 1: app.config.needs_setup(settings) (the static entry check)"
+
+    settings = SimpleNamespace(supabase_url=_REAL_URL)
+    assert fn(settings) is False, "a real supabase_url ⇒ not a placeholder ⇒ needs_setup False"
