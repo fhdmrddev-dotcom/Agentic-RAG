@@ -38,6 +38,13 @@ _ALLOW_PREFIX: tuple[str, ...] = ("/setup",)
 # ``_is_finalized``, exactly as ``test_147`` patches maintenance's ``_read_maintenance``).
 _finalized_latch = False
 
+# Monotonic "already configured via env" latch (per worker): once True, stays True. A box
+# configured the pre-158 way (real ``supabase_url`` in env/`.env`, never ran the wizard) must
+# NEVER be gated — the gate is for a GENUINELY-fresh box (placeholder infra) only. This is the
+# second half of the D-05 first-run signal (``needs_setup`` = marker-absent AND
+# infra-still-placeholder); the finalize latch alone over-gated every env-configured deploy.
+_configured_latch = False
+
 
 def _is_finalized() -> bool:
     """Return the sticky finalized state — the byte-identical hot path.
@@ -55,6 +62,27 @@ def _is_finalized() -> bool:
     if setup_finalized():
         _finalized_latch = True
     return _finalized_latch
+
+
+def _is_configured_via_env() -> bool:
+    """True when the box is already configured via env/`.env` — a REAL ``supabase_url`` (not
+    the onebox placeholder), even without a wizard finalize marker.
+
+    A box configured the pre-158 way (env vars, never ran the wizard — every existing deploy
+    and every local dev box) reads True here and is NEVER gated. Only a genuinely-fresh box
+    (placeholder ``supabase_url`` AND no marker) is gated. Latches sticky-True (env cannot
+    change at runtime), keeping the hot path a single bool. Independently monkeypatchable so
+    ``test_setup_gate`` can drive the fresh-vs-configured distinction.
+    """
+    global _configured_latch
+    if _configured_latch:
+        return True
+    from app.config import settings
+    from app.services.setup_store import _is_placeholder
+
+    if not _is_placeholder(getattr(settings, "supabase_url", "")):
+        _configured_latch = True
+    return _configured_latch
 
 
 def _is_allowlisted(path: str) -> bool:
@@ -84,9 +112,12 @@ class SetupMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Byte-identical hot path (D-17): a finalized box is a single bool check, zero I/O,
-        # ZERO scope mutation — the router sees the request exactly as if we weren't here.
-        if _is_finalized():
+        # Byte-identical hot path (D-17): a box that is finalized OR already configured via
+        # env (real supabase_url, no wizard marker — every pre-158 / hand-filled deploy and
+        # every local dev box) is a single bool check, zero I/O, ZERO scope mutation — the
+        # router sees the request exactly as if we weren't here. Only a GENUINELY-fresh box
+        # (placeholder infra AND no marker) falls through to the gate below.
+        if _is_finalized() or _is_configured_via_env():
             await self.app(scope, receive, send)
             return
 

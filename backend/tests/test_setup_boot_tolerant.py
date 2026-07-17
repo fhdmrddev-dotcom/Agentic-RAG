@@ -38,8 +38,13 @@ async def _run_lifespan_capture(monkeypatch, *, finalized: bool) -> dict:
     """
     calls = {"audit": 0, "spawns": 0, "announce": 0}
 
-    # 1. The FILE marker => controls `_setup_mode = not setup_finalized()`.
+    # 1. `_setup_mode = needs_setup(settings)` — TRUE only for a genuinely-fresh box
+    #    (marker-absent AND infra-placeholder). `finalized=True` models a configured/finalized
+    #    box (needs_setup False → byte-identical boot); `finalized=False` models a fresh box
+    #    (needs_setup True → setup mode). Patch the single needs_setup seam the lifespan reads,
+    #    plus the file marker it still consults for the token announce.
     monkeypatch.setattr(setup_store, "setup_finalized", lambda: finalized)
+    monkeypatch.setattr("app.config.needs_setup", lambda *_a, **_k: not finalized)
 
     def _spy_announce() -> None:
         calls["announce"] += 1

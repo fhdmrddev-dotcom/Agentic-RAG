@@ -62,8 +62,10 @@ def _make_app() -> FastAPI:
 
 @pytest.fixture
 def pre_finalize_client(monkeypatch):
-    """Setup NOT finalized — the gate is active (blocks non-allowlisted routes)."""
+    """A GENUINELY-fresh box — NOT finalized AND infra still placeholder — the gate is active
+    (blocks non-allowlisted routes). Both first-run seams are forced off."""
     monkeypatch.setattr(setup_mw, "_is_finalized", lambda: False)
+    monkeypatch.setattr(setup_mw, "_is_configured_via_env", lambda: False)
     return TestClient(_make_app())
 
 
@@ -71,6 +73,16 @@ def pre_finalize_client(monkeypatch):
 def finalized_client(monkeypatch):
     """Setup finalized (latched) — the gate is a literal no-op (byte-identical)."""
     monkeypatch.setattr(setup_mw, "_is_finalized", lambda: True)
+    return TestClient(_make_app())
+
+
+@pytest.fixture
+def configured_via_env_client(monkeypatch):
+    """A box configured the pre-158 way — a REAL supabase_url in env, but NEVER ran the wizard
+    (no finalize marker). This is every existing deploy + every local dev box. The gate MUST be
+    a no-op here (the regression that 503'd configured boxes)."""
+    monkeypatch.setattr(setup_mw, "_is_finalized", lambda: False)
+    monkeypatch.setattr(setup_mw, "_is_configured_via_env", lambda: True)
     return TestClient(_make_app())
 
 
@@ -113,6 +125,7 @@ def test_setup_prefix_boundary_not_over_allowlisted(monkeypatch):
     resource (``/setupx``) must NOT be allowlisted — it is gated → 503. The allowlist
     check is ``path == prefix or path.startswith(prefix + "/")``, not a bare prefix."""
     monkeypatch.setattr(setup_mw, "_is_finalized", lambda: False)
+    monkeypatch.setattr(setup_mw, "_is_configured_via_env", lambda: False)
     app_extra = FastAPI()
     app_extra.add_middleware(SetupMiddleware)
 
@@ -122,6 +135,18 @@ def test_setup_prefix_boundary_not_over_allowlisted(monkeypatch):
 
     client = TestClient(app_extra)
     assert client.get("/setupx").status_code == 503
+
+
+# ── 3b. the configured-via-env regression: a real supabase_url + no marker → NO gate ──
+
+def test_configured_via_env_is_never_gated(configured_via_env_client):
+    """REGRESSION (the 503 an operator hit): a box configured the pre-158 way — a real
+    supabase_url in env but no wizard finalize marker — must be a LITERAL passthrough, NOT
+    503'd into setup mode. The gate keys off ``needs_setup`` (marker-absent AND
+    infra-placeholder), so a real-infra box passes through even without a marker."""
+    resp = configured_via_env_client.get("/threads")
+    assert resp.status_code != 503
+    assert resp.json() == {"ok": True}
 
 
 # ── 4. THE byte-identical invariant — the load-bearing regression home ──────────

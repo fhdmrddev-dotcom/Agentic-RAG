@@ -300,8 +300,14 @@ async def lifespan(app_instance):
     # Pitfall 3). A FINALIZED box is byte-identical to today — the audit guard runs and all four
     # reconcilers spawn. NEVER a DB read (D-05): a transient DB outage must not flip a configured
     # box into setup mode.
-    from app.services import setup_store
-    _setup_mode = not setup_store.setup_finalized()
+    from app.services import setup_store  # noqa: F401 — kept for announce_token_if_unfinalized below
+    from app.config import needs_setup, settings as _setup_cfg
+    # _setup_mode is TRUE only for a GENUINELY-fresh box (placeholder infra AND no finalize
+    # marker). A box configured via env (real supabase_url, no marker — every existing deploy
+    # and every local dev box) reads False here and boots byte-identically (audit guard + all
+    # four reconcilers run). needs_setup is a file+string check (D-05), NEVER a DB read — a
+    # transient DB outage cannot flip a configured box into setup mode.
+    _setup_mode = needs_setup(_setup_cfg)
     if _setup_mode:
         # D-15 — surface the first-boot setup token to stdout (`docker compose logs backend`)
         # exactly once. Best-effort (mirrors every other lifespan side-effect): a setup-store
