@@ -55,6 +55,28 @@ def test_get_or_create_token_is_stable(setup_store_path):
     assert get_or_create_token() == get_or_create_token()
 
 
+def test_get_or_create_token_returns_persisted_race_winner(setup_store_path, monkeypatch):
+    """WR-02 (WORKER_COUNT=2): if a sibling worker's mint clobbers ours between our write and
+    our re-read, ``get_or_create_token`` returns the PERSISTED (winner's) token — so the value
+    we announce is the one ``verify_token`` accepts, not a stale local candidate that 401s.
+    Before the fix it returned the locally-minted candidate regardless of the persisted value."""
+    import app.services.setup_store as store_mod
+
+    sibling_token = "SIBLING-WINNER-TOKEN"
+    real_write = store_mod.write_store
+
+    def _racing_write(data):
+        real_write(data)  # persist OUR candidate (as the real code does)...
+        s = store_mod.read_store()  # ...then a sibling worker's write lands + clobbers.
+        s["setup_token"] = sibling_token
+        real_write(s)
+
+    monkeypatch.setattr(store_mod, "write_store", _racing_write)
+    returned = store_mod.get_or_create_token()
+    assert returned == sibling_token, "must return the persisted race-winner, not the local candidate"
+    assert store_mod.read_store()["setup_token"] == sibling_token
+
+
 # ── 158-06 (Task 1): require_setup_token over a REAL ASGI request (TestClient) ──────────────
 # The write gate is the SOLE pre-auth access authority (no RLS backstop, D-15). A tiny
 # token-gated probe route stands in for the write endpoints (which land in 158-06 Task 2), so

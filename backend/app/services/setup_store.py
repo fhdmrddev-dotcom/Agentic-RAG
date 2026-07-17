@@ -120,14 +120,23 @@ def get_or_create_token() -> str:
     A 256-bit ``secrets``-module CSPRNG value (see the call below). Idempotent — a second
     call returns the SAME token (the operator reads it once from the logs; the finalize
     lock, not token rotation, is the real security boundary — D-15).
+
+    WR-02 (WORKER_COUNT=2): after minting, RE-READ the store and return the PERSISTED value.
+    If two workers boot together and both mint (the read-modify-write is not cross-process
+    atomic), the re-read makes each worker converge on the same last-persisted token, so the
+    logs announce a token that ``verify_token`` will actually accept — instead of one worker
+    announcing a stale candidate that 401s. (A full OS-level file lock / ``O_EXCL`` sentinel
+    would close the residual write-write window entirely — a noted follow-up; the finalize
+    lock stays the real security boundary, so this is a UX/robustness improvement.)
     """
     store = read_store()
     tok = store.get("setup_token")
-    if not tok:
-        tok = secrets.token_urlsafe(32)
-        store["setup_token"] = tok
-        write_store(store)
-    return tok
+    if tok:
+        return tok
+    candidate = secrets.token_urlsafe(32)
+    store["setup_token"] = candidate
+    write_store(store)
+    return read_store().get("setup_token") or candidate  # honor the race winner
 
 
 def announce_token_if_unfinalized() -> None:
