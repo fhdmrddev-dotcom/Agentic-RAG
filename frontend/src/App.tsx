@@ -9,7 +9,14 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 import { CitationNavProvider } from "@/lib/citationNav"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
-import { getMaintenanceStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL } from "@/lib/api"
+import { getMaintenanceStatus, getSetupStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL, type SetupStatus } from "@/lib/api"
+import { hydrateSupabaseFromRuntime } from "@/lib/supabase"
+import { SetupWizard } from "./pages/SetupWizard"
+import { FinalizedLockout } from "./components/setup/FinalizedLockout"
+
+// Phase 158 (DEPLOY-02 / D-06, D-07): the API base the startup runtime-config hydrate +
+// the public setup-status probe use — the same var the api.ts client reads.
+const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
 // Phase 147 (D-06 / T-147-15) — the persistent, app-wide, end-user maintenance
 // banner. It lives at the App/ChatLayout seam OUTSIDE the operator /admin surface
@@ -76,6 +83,26 @@ export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
+  // Phase 158 (DEPLOY-02 / D-06, D-07): the one-shot first-run setup probe + the runtime
+  // Supabase hydrate, both at bootstrap BEFORE the auth check matters. (1) hydrateSupabase-
+  // FromRuntime overlays the browser's Supabase creds from GET /public-config, so a wizard-
+  // entered Supabase URL logs in without a frontend rebuild (falls back to the baked VITE_*
+  // on any failure — never blocks boot). (2) getSetupStatus probes GET /setup/status (it
+  // resolves needs_setup:false on ANY failure, so a transient backend blip never bounces a
+  // configured box's users into the wizard — T-158-05). setupStatus stays null until the
+  // probe resolves, holding the existing spinner; the configured non-/setup path is unchanged.
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      await hydrateSupabaseFromRuntime(API_BASE)
+      const status = await getSetupStatus()
+      if (alive) setSetupStatus(status)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
   const [activeView, setActiveView] = useState<ActiveView>("chat")
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null)
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio is a
@@ -150,12 +177,28 @@ function App() {
     return () => window.clearTimeout(id)
   }, [featureRefusal])
 
-  if (loading) {
+  // Phase 158 (D-06): hold the existing spinner until BOTH the auth state AND the one-shot
+  // setup probe resolve — so a fresh box shows the wizard (never a flash of AuthPage first)
+  // and a configured box falls straight through to its unchanged path once the probe returns.
+  if (loading || setupStatus === null) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
+  }
+
+  // Phase 158 (D-06): the pre-auth setup branch, BEFORE the !user check. Render the wizard
+  // when the box needs setup, or on a literal /setup visit of an un-finalized box; render the
+  // lock-out (SC#2) for a finalized /setup visit — never a config field. A configured box that
+  // never visits /setup falls through to the unchanged AuthPage/ChatLayout path below (the
+  // byte-identical invariant). No url router — a window.location.pathname check honours /setup.
+  const atSetupPath = window.location.pathname === "/setup"
+  if (setupStatus.needs_setup || (atSetupPath && !setupStatus.finalized)) {
+    return <SetupWizard />
+  }
+  if (atSetupPath && setupStatus.finalized) {
+    return <FinalizedLockout onGoToApp={() => window.location.assign("/")} />
   }
 
   if (!user) {
