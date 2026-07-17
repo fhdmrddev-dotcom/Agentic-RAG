@@ -38,6 +38,14 @@ export let supabase: SupabaseClient = createClient(
   BAKED_KEY || "placeholder-anon-key",
 )
 
+// WR-06: window event fired when `supabase` is REASSIGNED by the runtime hydrate below. A live
+// binding lets a *call* use the new client, but an already-registered `onAuthStateChange`
+// subscription stays bound to the OLD (pre-hydrate dummy) client instance and never fires — so
+// on the D-07 no-rebuild path a real login would never update the UI. useAuth listens for this
+// event and re-subscribes to the new client. It fires ONLY when the client actually changes, so
+// the normal baked-VITE path (no reassign) is byte-identical to before.
+export const SUPABASE_CLIENT_REHYDRATED = "supabase:client-rehydrated"
+
 /**
  * Overlay runtime Supabase creds from `GET {apiBase}/public-config` (D-07). Call ONCE at App
  * bootstrap, before auth matters. Reassigns `supabase` to a client built from the runtime
@@ -64,6 +72,11 @@ export async function hydrateSupabaseFromRuntime(apiBase: string): Promise<void>
       (isPlaceholder(BAKED_URL) || cfg.supabase_url !== BAKED_URL)
     ) {
       supabase = createClient(cfg.supabase_url, cfg.supabase_anon_key)
+      // WR-06: tell useAuth to re-subscribe to the NEW client — its onAuthStateChange
+      // listener is still bound to the pre-hydrate dummy client and would miss the login.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(SUPABASE_CLIENT_REHYDRATED))
+      }
     }
   } catch {
     /* keep the baked client — /setup renders regardless (it never calls Supabase) */
