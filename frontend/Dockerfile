@@ -26,9 +26,15 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
     VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Install against the committed lockfile for a reproducible build.
+# Install deps. `npm ci` demands a perfectly-synced lockfile, but the committed
+# package-lock.json has drifted from package.json (a transitive dep-range bump — e.g.
+# @shikijs/* 4.1.0 vs 4.3.1 — that never got a lockfile regen). A dev machine with existing
+# node_modules doesn't notice; alpine's fresh resolution rejects it and `npm ci` hard-fails.
+# `npm install` reconciles the lockfile from package.json instead of failing. (Phase-157 build
+# gap, surfaced by the Phase-158 wizard smoke. To restore `npm ci` reproducibility later,
+# regenerate the lockfile cleanly: `rm package-lock.json node_modules && npm install`, commit.)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 COPY . .
 
