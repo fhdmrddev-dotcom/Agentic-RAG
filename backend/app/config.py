@@ -744,6 +744,17 @@ class Settings(BaseSettings):
 
     supabase_url: str
     supabase_service_role_key: str
+    # Phase 158 (CR-01): the remaining Supabase infra keys the install wizard collects and
+    # persists to the setup-store. They MUST be declared here (default "") so the config
+    # overlay can ``setattr`` them — Pydantic v2 raises ``ValueError`` on ``setattr`` of an
+    # UNDECLARED field, which at import (``apply_setup_overlay`` below) would crash-loop the
+    # backend on the first boot after finalize (bricking a wizard-configured box). Declaring
+    # them also lets ``/public-config`` return the real ``supabase_anon_key`` so the browser's
+    # Supabase client binds without a rebuild (the D-07 login path). Optional — a pre-158
+    # env-configured box that never set them is unaffected (they stay "").
+    supabase_anon_key: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
 
     # Active provider — set this to switch between providers
     # Options: openai | anthropic | google | openrouter | ollama | deepseek | moonshot | minimax | zhipu
@@ -1193,7 +1204,13 @@ def apply_setup_overlay(target) -> None:
         return
     for k in INFRA_KEYS:
         v = store.get(k)
-        if v:  # STORE WINS for infra keys (placeholder-safe) — a truthy store value overrides env
+        # CR-01 defense-in-depth: only ``setattr`` a key the target actually HAS. Pydantic v2
+        # raises ``ValueError`` on ``setattr`` of an undeclared field — at import that would
+        # crash-loop boot. ``hasattr`` is True for a declared Settings field (all 8 INFRA_KEYS
+        # now are) and False for an undeclared one, so a FUTURE INFRA_KEY added without a
+        # matching field is SKIPPED, never a boot-bricking raise. (It also keeps the overlay
+        # correct for the SimpleNamespace targets the unit tests drive.)
+        if v and hasattr(target, k):  # STORE WINS for infra keys (placeholder-safe)
             setattr(target, k, v)
 
 
