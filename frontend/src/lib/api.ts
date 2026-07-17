@@ -4322,3 +4322,61 @@ export async function getMaintenanceStatus(): Promise<boolean> {
     return false
   }
 }
+
+/** Phase 158 (DEPLOY-02 / D-06) — the STATIC, blip-proof first-run setup-entry signal.
+ *
+ *  Read from the PUBLIC (unauth) `GET /setup/status`. Users are PRE-AUTH here, so this NEVER
+ *  routes through `getAuthHeaders` (which throws "Not authenticated") — it mirrors
+ *  `getMaintenanceStatus`, the unauth sibling. Any failure resolves to a safe
+ *  `{needs_setup:false}`: a box that can't reach the backend must fall through to the normal
+ *  auth page, never falsely render the wizard.
+ *
+ *  URL note: the backend serves this UNPREFIXED at `/setup/status`; in prod `API_BASE` is
+ *  `/api` and nginx strips the single `/api`, in local dev `API_BASE` is `http://localhost:8000`
+ *  — so `${API_BASE}/setup/status` is correct in BOTH (exactly like `${API_BASE}/health`). */
+export interface SetupStatus {
+  needs_setup: boolean
+  finalized: boolean
+  has_token: boolean
+}
+
+export async function getSetupStatus(): Promise<SetupStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/setup/status`)
+    if (!res.ok) return { needs_setup: false, finalized: false, has_token: false }
+    const body = (await res.json()) as Partial<SetupStatus>
+    return {
+      needs_setup: body.needs_setup ?? false,
+      finalized: body.finalized ?? false,
+      has_token: body.has_token ?? false,
+    }
+  } catch {
+    return { needs_setup: false, finalized: false, has_token: false }
+  }
+}
+
+/** Phase 158 (DEPLOY-02 / D-07) — the two PUBLIC Supabase values from the open
+ *  `GET /public-config`, so the browser's Supabase client can bind at runtime WITHOUT a
+ *  frontend rebuild (VITE_* are baked at build — the SC#3 honesty hinge). NEVER a secret: the
+ *  backend returns ONLY `supabase_url` + `supabase_anon_key` (both public by design). Returns
+ *  null on any failure — the caller then keeps the baked VITE_* fallback.
+ *
+ *  Note: `lib/supabase.ts` `hydrateSupabaseFromRuntime` inlines its own equivalent fetch to
+ *  avoid an api.ts → supabase.ts import cycle; this helper is for any OTHER consumer (the
+ *  wizard) that wants the runtime creds through the shared api layer. */
+export interface PublicConfig {
+  supabase_url: string
+  supabase_anon_key: string
+}
+
+export async function getPublicConfig(): Promise<PublicConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE}/public-config`)
+    if (!res.ok) return null
+    const body = (await res.json()) as Partial<PublicConfig>
+    if (!body.supabase_url || !body.supabase_anon_key) return null
+    return { supabase_url: body.supabase_url, supabase_anon_key: body.supabase_anon_key }
+  } catch {
+    return null
+  }
+}
