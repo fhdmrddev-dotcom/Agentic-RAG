@@ -1,0 +1,44 @@
+# CI gate for the Phase-157 one-box deployment artifacts (Phase 158 / DEPLOY-02, D-16).
+#
+# Runs scripts/check-deploy-drift.sh, which fails when the deploy artifacts drift
+# out of sync — a key the app reads that the one-box preset forgot, a seed
+# migration missing from the OPERATOR.md runbook, a split sandbox image tag, or a
+# docker-compose.prod.yml that no longer parses / lost the setup_data volume.
+# This is the enforcement half of the CLAUDE.md "Deployment-artifact parity
+# (same-commit rule)"; the script is dependency-free bash on ubuntu-latest, which
+# ships docker so check #4 runs the authoritative `docker compose config` parse.
+#
+# No new secrets or actions — a single checkout + bash run.
+name: deploy-artifacts
+
+on:
+  push:
+    branches: [master, main, develop, "release/**"]
+    paths:
+      - "deploy/**"
+      - "docker-compose.prod.yml"
+      - "docs/OPERATOR.md"
+      - "backend/.env.example"
+      - "supabase/migrations/**"
+      - "CLAUDE.md"
+      - "scripts/check-deploy-drift.sh"
+      - ".github/workflows/deploy-artifacts.yml"
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "docker-compose.prod.yml"
+      - "docs/OPERATOR.md"
+      - "backend/.env.example"
+      - "supabase/migrations/**"
+      - "CLAUDE.md"
+      - "scripts/check-deploy-drift.sh"
+      - ".github/workflows/deploy-artifacts.yml"
+
+jobs:
+  deploy-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deployment-artifact drift
+        run: bash scripts/check-deploy-drift.sh
