@@ -28,7 +28,7 @@ from uuid import UUID
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
@@ -1076,6 +1076,170 @@ async def get_model_registry(request: Request):
         rows.append(_registry_row(model_id, None, ovr, default_model, model_locked))
 
     return {"models": rows}
+
+
+class AddModelRequest(BaseModel):
+    """Body for POST /admin/models — add ONE model by EXPLICIT id + provider (D-159-02).
+
+    Unlike the capability PATCH (which INFERS provider from the id/registry), add-by-ID takes
+    the operator's EXPLICIT provider pick, validated against the native-7 + openrouter roster
+    (``PROVIDER_ENDPOINTS``) before any DB touch. There is deliberately NO ``enabled`` field:
+    the row is forced ``enabled=false`` server-side (the 149 opt-in-enable rule / SC#3 — an add
+    never auto-enables; the operator flips it on from the registry table afterward). The
+    capability fields are optional pre-fills (every column is null-safe on the table).
+    ``protected_namespaces=()`` silences Pydantic's ``model_``-prefix warning for ``model_id``.
+    """
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_id: str
+    provider: str
+    context_window_tokens: int | None = None
+    max_output_tokens: int | None = None
+    native_tools: bool | None = None
+    deprecated: bool = False
+    deprecated_reason: str | None = None
+
+
+# The capability columns add-by-ID may pre-fill — a CODE-CONSTANT ordered subset of
+# _MODEL_CAP_COLUMNS (model_id + provider are handled separately; ``enabled`` is FORCED False,
+# never a body field). Column names reach the upsert ONLY from this constant — a client value
+# never becomes an identifier (T-159-02, the same SQLi wall as set_model_capability).
+_ADD_MODEL_CAP_COLUMNS = (
+    "context_window_tokens",
+    "max_output_tokens",
+    "native_tools",
+    "deprecated",
+    "deprecated_reason",
+)
+
+
+@router.post("/models")
+async def add_model_by_id(
+    request: Request,
+    body: AddModelRequest,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Add a single model by explicit id + provider as a DB-only override row (D-159-02).
+
+    Writes one ``model_capabilities_overrides`` row that lands ``enabled=false`` (SC#3 — NEVER
+    auto-enabled) and is served immediately by ``get_model_capability_async`` on the next
+    request (SC#1 — no restart; the write invalidates the override cache). Reuses the SQLi-safe
+    parameterized upsert proven in ``set_model_capability``: column names come ONLY from the code
+    allowlist (``_ADD_MODEL_CAP_COLUMNS`` + the two fixed columns), values are ``$N`` asyncpg
+    binds — no client identifier/value ever reaches a SET clause (T-159-02).
+
+    Validation runs BEFORE any DB touch (allowlist-before-touch): a blank id → 422; a provider
+    outside ``PROVIDER_ENDPOINTS`` → 422; a wrong-typed cap → 422; a model already in the
+    registry (built-in OR override, CASE-FOLDED per the WR-02 precedent so ``GLM-4.5`` can't
+    phantom-duplicate ``glm-4.5``) → 409. On success: ``invalidate_model_overrides_cache()`` + a
+    ✎ ``model.added`` receipt. On a persistence failure: a ``model.add_failed`` stamp + a real
+    500 (never a false 2xx). Non-operators are 404'd by the router gate (SC#4 / D-149-09).
+    """
+    # (1) Non-empty id (mirror set_model_capability's guard). Strip stray slash/space/newline —
+    # the cleaned id is what we dedup against AND store (a body id can carry whitespace a URL
+    # path param would not), so a re-add can never phantom-differ by a trailing space.
+    model_id = body.model_id.strip("/ \t\r\n") if body.model_id else ""
+    if not model_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model_id must be non-empty.",
+        )
+
+    # (2) Provider roster allowlist BEFORE any DB touch (function-local import — Pitfall 4). The
+    # SAME hardcoded roster the SSRF discovery gate validates against; an EXPLICIT pick (never
+    # inferred) so the operator owns the provider a DB-only model routes through.
+    from app.services.model_discovery_service import PROVIDER_ENDPOINTS
+    if body.provider not in set(PROVIDER_ENDPOINTS):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown provider: {body.provider}",
+        )
+
+    # (3) Per-column type guards (mirror set_model_capability's WR-01 discipline). bool is an int
+    # subclass, so the int columns reject a bool explicitly. Pydantic already rejects most garbage
+    # at parse time; this is belt-and-braces so a wrong type is always a 422, never a 500.
+    for col in ("context_window_tokens", "max_output_tokens"):
+        val = getattr(body, col)
+        if val is not None and (isinstance(val, bool) or not isinstance(val, int)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"'{col}' must be an integer or null.",
+            )
+    if body.native_tools is not None and not isinstance(body.native_tools, bool):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="'native_tools' must be a boolean or null.",
+        )
+
+    # (4) Duplicate guard — CASE-FOLDED (WR-02 precedent: a case-SENSITIVE check lets ``GLM-4.5``
+    # phantom-duplicate an existing ``glm-4.5``). Refuse if the id already exists in the built-in
+    # registry OR as an override row — never clobber an existing row, never add a case-variant
+    # second row (the operator edits the existing model in the table instead).
+    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    mid_lc = model_id.lower()
+    existing_lc = {k.lower() for k in MODEL_CAPABILITIES} | {
+        k.lower() for k in (await load_all_model_overrides())
+    }
+    if mid_lc in existing_lc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That model is already in the registry — edit it in the table instead.",
+        )
+
+    # Build the upsert EXACTLY like set_model_capability: column names ONLY from the code
+    # allowlist; values ONLY as ``$N`` binds. Pre-filled caps that are non-None are written; the
+    # ``enabled`` column is ALWAYS written as the literal False (never taken from the body — there
+    # is no body.enabled — so an add can never auto-enable, SC#3).
+    cap_values = {
+        "context_window_tokens": body.context_window_tokens,
+        "max_output_tokens": body.max_output_tokens,
+        "native_tools": body.native_tools,
+        "deprecated": body.deprecated,
+        "deprecated_reason": body.deprecated_reason,
+    }
+    present_cols = [c for c in _ADD_MODEL_CAP_COLUMNS if cap_values[c] is not None]
+    write_cols = [*present_cols, "enabled"]  # ``enabled`` is always written, forced False
+
+    insert_cols = ["model_id", "provider", *write_cols]
+    placeholders = ", ".join(f"${i + 1}" for i in range(len(insert_cols)))
+    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in write_cols)
+    sql = (
+        f"INSERT INTO model_capabilities_overrides ({', '.join(insert_cols)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT (model_id) DO UPDATE SET {set_clause}, updated_at = now()"
+    )
+    values = [
+        model_id,
+        body.provider,
+        *[cap_values[c] for c in present_cols],
+        False,  # ``enabled`` — the FORCED literal, never body-sourced (SC#3)
+    ]
+
+    pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
+    write_ok = False
+    if pool is not None:
+        try:
+            await pool.execute(sql, *values)
+            write_ok = True
+        except Exception:
+            logger.exception("add_model_by_id: upsert failed for %s", model_id)
+
+    if not write_ok:
+        # Honest failure: stamp a *.add_failed receipt and raise a real 500 — never a false 2xx
+        # (mirrors set_flag / set_model_capability). The raised HTTPException re-enters the
+        # floor's yield, so the floor skips its write; the stamp is belt-and-braces.
+        request.state.audit_action = "model.add_failed"
+        request.state.audit_label = f"Adding {model_id} failed to persist"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not persist the new model — it was not added.",
+        )
+
+    invalidate_model_overrides_cache()  # SC#1: the DB-only row is served on the next request
+    request.state.audit_action = "model.added"
+    request.state.audit_label = f"Added {model_id} ({body.provider})"
+    return {"ok": True, "model_id": model_id, "provider": body.provider, "enabled": False}
 
 
 @router.patch("/models/{model_id:path}")
