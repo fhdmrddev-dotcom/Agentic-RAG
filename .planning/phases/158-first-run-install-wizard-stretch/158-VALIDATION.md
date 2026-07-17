@@ -2,8 +2,8 @@
 phase: 158
 slug: first-run-install-wizard-stretch
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-17
 ---
 
@@ -63,14 +63,16 @@ created: 2026-07-17
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/test_setup_gate.py` — gate (503 vs allowlist vs latched no-op) + byte-identical invariant — SC#2
-- [ ] `backend/tests/test_setup_token.py` — token 401/pass/constant-time — D-15
-- [ ] `backend/tests/test_setup_overlay.py` — store-wins-over-placeholder — D-01/02/SC#3
-- [ ] `backend/tests/test_setup_boot_tolerant.py` — the `main.py:357` guard — D-03/SC#3
-- [ ] `backend/tests/test_setup_operator.py` · `test_setup_probe.py` · `test_setup_finalize.py` · `test_setup_idempotent.py` · `test_setup_smoke.py` · `test_setup_status.py` · `test_setup_detect.py` · `test_setup_provider.py` — the step contracts
-- [ ] `backend/tests/conftest.py` fixtures: a temp `SETUP_STORE_PATH`, mock asyncpg/redis/supabase for submitted-value probes (reuse the `mock_asyncpg_pool` idiom from `test_146`)
-- [ ] `frontend/src/pages/__tests__/SetupWizard.test.tsx` + `frontend/src/lib/__tests__/supabase.test.ts` — the branch + the runtime-config shim
-- [ ] `scripts/check-deploy-drift.sh` + a CI fixture-drift assertion
+_Test-scaffold Wave 0 delivered by plan 158-01 (commits `a18ac7b4` / `c765fcdb` / `ff9d3597`)._
+
+- [x] `backend/tests/test_setup_gate.py` — gate (503 vs allowlist vs latched no-op) + byte-identical invariant — SC#2
+- [x] `backend/tests/test_setup_token.py` — token 401/pass/constant-time — D-15
+- [x] `backend/tests/test_setup_overlay.py` — store-wins-over-placeholder — D-01/02/SC#3
+- [x] `backend/tests/test_setup_boot_tolerant.py` — the `main.py:357` guard — D-03/SC#3
+- [x] `backend/tests/test_setup_operator.py` · `test_setup_probe.py` · `test_setup_finalize.py` · `test_setup_idempotent.py` · `test_setup_smoke.py` · `test_setup_status.py` · `test_setup_detect.py` · `test_setup_provider.py` — the step contracts
+- [x] `backend/tests/conftest.py` fixtures: a temp `SETUP_STORE_PATH`, mock asyncpg/redis/supabase for submitted-value probes (reuse the `mock_asyncpg_pool` idiom from `test_146`)
+- [x] `frontend/src/pages/__tests__/SetupWizard.test.tsx` + `frontend/src/lib/__tests__/supabase.test.ts` — the branch + the runtime-config shim
+- [ ] `scripts/check-deploy-drift.sh` + a CI fixture-drift assertion — **NOT in plan 158-01** (production tooling, no test-file scaffold; D-16, its own plan)
 
 ---
 
@@ -85,11 +87,11 @@ created: 2026-07-17
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all ❌ MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter (at Wave 0 completion)
+- [x] All tasks have `<automated>` verify or a Wave 0 dependency
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all ❌ MISSING references (all 14 SC-row test files exist; D-16 drift-check is a sibling non-test-file deliverable)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (backend setup suite ~0.6s; frontend stubs ~2s)
+- [x] `nyquist_compliant: true` set in frontmatter (at Wave 0 completion)
 
-**Approval:** pending
+**Approval:** test-scaffold Wave 0 complete (plan 158-01) — impl Waves 1-6 flip the reds/skips green.
