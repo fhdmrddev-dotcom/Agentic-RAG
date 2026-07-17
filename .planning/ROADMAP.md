@@ -16,18 +16,18 @@
 - ✅ **v3.0 Document Management** — Phases 110-119 (shipped 2026-06-21). SEED-005 Tier A as a first-class product surface: DM Foundations → metadata enrichment + multi-provider embeddings → metadata-driven views / "virtual folders" → document relationships → auto-classification → governance health. 24/24 functional requirements delivered.
 - ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
 - ✅ **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-145 (CORE 132-137 + inserts 134.1/137.1/137.2; STRETCH 138-143+145 shipped; 144/FILE-01 deferred → v3.3) (shipped 2026-07-10). Skill Eval Studio (eval persistence + versions + with-vs-without runner + honest verdicts + ratings + self-improve loop + publish gate + Evals panel) · built-in skill-creator · STRETCH honesty phases · run-lifecycle foundation (FND-01) · Starter Workflow Library (WF-01).
-- 🚧 **v3.3 Operator UX** — Phases 146-158 (CORE 146-155 + STRETCH 156-158) — IN PROGRESS (started 2026-07-10). Operator/admin tier + dynamic model/secrets management + workflow file-inputs + Glean/Beam-informed trust/friendliness UX. Roadmap created 2026-07-10; 19 reqs (16 CORE + 3 STRETCH), 100% mapped.
+- 🚧 **v3.3 Operator UX** — Phases 146-159 (CORE 146-155 + STRETCH 156-159) — IN PROGRESS (started 2026-07-10). Operator/admin tier + dynamic model/secrets management + workflow file-inputs + Glean/Beam-informed trust/friendliness UX. Roadmap created 2026-07-10; 20 reqs (16 CORE + 4 STRETCH), 100% mapped. *(Phase 159 Model Registry Curation added 2026-07-18 — late STRETCH, direct follow-on to Phase 149.)*
 - 📋 **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
 
 ---
 
 ## v3.3 Operator UX — 🚧 IN PROGRESS (started 2026-07-10)
 
-**Numbering:** continues from v3.2's last phase (145) → **CORE Phases 146-155**, then **STRETCH Phases 156-158** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 precedent). *Phase 144 is BURNED — it held the deferred v3.2 FILE-01 phase (never executed, archived to `.planning/milestones/v3.2-phases/` with a DEFERRED label); FILE-01 gets a fresh number in v3.3 (Phase 151). 144/145 are never reused.*
+**Numbering:** continues from v3.2's last phase (145) → **CORE Phases 146-155**, then **STRETCH Phases 156-159** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 precedent). *(Phase 159 is a late STRETCH add 2026-07-18 — a direct follow-on to Phase 149 Model Registry & Discovery.)* *Phase 144 is BURNED — it held the deferred v3.2 FILE-01 phase (never executed, archived to `.planning/milestones/v3.2-phases/` with a DEFERRED label); FILE-01 gets a fresh number in v3.3 (Phase 151). 144/145 are never reused.*
 
 **Goal:** Make the platform operable and configurable by a non-developer admin from the UI — while closing the workflow/skill file-input gaps deferred from v3.2 and aligning the everyday UX to what Glean/Beam do well (simple, accurate, plain-language).
 
-**Scope source:** `.planning/REQUIREMENTS.md` (19 requirements — 16 CORE + 3 STRETCH). Research base: `.planning/research/SUMMARY.md` (4-dimension + a mandatory Glean/Beam competitor study; supersedes the stale `PRDs/v3.2-operator-ux.md` internals — D-PRD business decisions hold). Authoritative version map: `PRDs/SEQUENCE.md`.
+**Scope source:** `.planning/REQUIREMENTS.md` (20 requirements — 16 CORE + 4 STRETCH). Research base: `.planning/research/SUMMARY.md` (4-dimension + a mandatory Glean/Beam competitor study; supersedes the stale `PRDs/v3.2-operator-ux.md` internals — D-PRD business decisions hold). Authoritative version map: `PRDs/SEQUENCE.md`.
 
 **Red lines (every phase):**
 
@@ -52,13 +52,14 @@
 | 154 | Plain-Language Layer | User-facing surfaces speak plain language with technical terms behind an advanced reveal — no contract breaks | LANG-01 | 3 | Pitfall 15 (never break enum/API/audit contracts; Deep byte-identical); extends the Phase-124 two-door pattern app-wide; UI hint |
 | 155 | Accessibility Sweep — WCAG AA | Every net-new v3.3 surface passes axe-core + manual keyboard AA, and the worst pre-existing offenders are fixed | A11Y-01 | 3 | sequenced **LAST** (audits all net-new surfaces once stable); new dev-only deps `@axe-core/playwright` + `eslint-plugin-jsx-a11y`; UI hint |
 
-### Phase Table (STRETCH — gated behind CORE) — Phases 156-158
+### Phase Table (STRETCH — gated behind CORE) — Phases 156-159
 
 | Phase | Name | Goal (one-line) | Requirements | SC# | Depends |
 |-------|------|-----------------|--------------|-----|---------|
 | 156 | Everyday UX Polish | Collapsed nav keeps New Chat reachable and the thread list gets search + date/folder grouping | POLISH-01 (STRETCH) | 3 | — (SEED-045 anchors; gated on CORE); G-2 sketch if visual; UI hint |
 | 157 | Deployment Presets & Runbook | An operator stands up a production deployment from documented Solo/Team/Enterprise preset bundles + an `OPERATOR.md` runbook | DEPLOY-01 (STRETCH) | 3 | — (docs/config; gated on CORE) |
 | 158 | First-Run Install Wizard | A non-developer operator completes first-run setup through an idempotent, lock-after-finalize browser wizard at `/setup` | DEPLOY-02 (STRETCH) | 3 | 157 (uses the presets); the milestone's biggest lift → first to cut; UI hint |
+| 159 | Model Registry Curation | Live discovery surfaces only chat/tool-capable models, and an operator adds one model by ID with its capabilities | MODEL-03 (STRETCH) | 3 | 149 (curation/UX layer on the shipped registry write-path + discovery service); propose-not-auto-enable red line holds; model-icons picker polish already shipped (`0d81d088`); UI hint |
 
 ### Phase Checklist
 
@@ -73,8 +74,9 @@
 - [x] **Phase 154: Plain-Language Layer** — two-audience plain-language labels app-wide behind an advanced reveal, contracts untouched (LANG-01) — completed 2026-07-15 (live UAT 154-HUMAN-UAT U1–U5 ✅; secure-phase 4/4 CLOSED)
 - [x] **Phase 155: Accessibility Sweep — WCAG AA** — axe-core + manual keyboard AA on all net-new surfaces + worst pre-existing offenders (A11Y-01) — completed 2026-07-16 (live Chrome-MCP scans: 0 contrast/name failures across 1,499 controls / 1,206 muted-text elements; code-review CR-01 keyboard-reachability fix live-verified; keyboard scenarios operator-accepted, 155-HUMAN-UAT)
 - [x] **Phase 156 (STRETCH): Everyday UX Polish** — collapsed-nav New Chat + thread-list search + date/folder grouping (POLISH-01) — completed 2026-07-16 (live Chrome-DevTools UAT 9/9 + collapsible-layout refinement; secure-phase 6/6 CLOSED; BUG-260711-01 closed)
-- [ ] **Phase 157 (STRETCH): Deployment Presets & Runbook** — Solo/Team/Enterprise env + `docker-compose.prod.yml` + `OPERATOR.md` (DEPLOY-01)
-- [ ] **Phase 158 (STRETCH): First-Run Install Wizard** — `/setup` browser flow, idempotent, lock-after-finalize (DEPLOY-02)
+- [x] **Phase 157 (STRETCH): Deployment Presets & Runbook** — Solo/Team/Enterprise env + `docker-compose.prod.yml` + `OPERATOR.md` (DEPLOY-01) — completed 2026-07-17 (D-09 one-box smoke passed via the 158 live wizard UAT)
+- [x] **Phase 158 (STRETCH): First-Run Install Wizard** — `/setup` browser flow, idempotent, lock-after-finalize (DEPLOY-02) — completed 2026-07-17 (live end-to-end wizard UAT passed; CR-01/CR-02 fixed; secure-phase threats_open:0)
+- [ ] **Phase 159 (STRETCH): Model Registry Curation** — discovery filtered to chat/tool-capable models + add-model-by-ID with capabilities + sensible defaults (MODEL-03)
 
 ### Phase 146: Operator Foundation
 
@@ -464,9 +466,25 @@ Plans:
 - [ ] 158-12-PLAN.md — [OPERATOR] apply migration 102 live + regenerate full-schema (autonomous: false)
 **UI hint**: yes
 
+### Phase 159: Model Registry Curation (STRETCH)
+
+**Goal**: An operator can curate the model registry without wading through hundreds of irrelevant models — live discovery surfaces only chat/tool-capable models by default, and a single new model can be added by ID with its capabilities set explicitly.
+**Depends on**: Phase 149 (Model Registry & Discovery — the operator-gated write path over `model_capabilities_overrides` + the `model_discovery_service` propose-only diff this builds on); gated behind CORE
+**Requirements**: MODEL-03 (STRETCH)
+**Success Criteria** (what must be TRUE):
+
+  1. Live model discovery filters to chat/tool-capable models by default (image / audio / embedding / moderation hidden), with an explicit "show all" opt-in — the operator no longer scrolls hundreds of unusable entries (~401 pulled today).
+  2. An operator can add a single model by ID and set its capabilities (context window, max output, native tool support), with sensible per-provider-family defaults pre-filled and editable.
+  3. Newest-first ordering + newest-as-default still hold, and a discovered/added model never silently lacks native tools — capability is explicit, never guessed (the "Discovery proposes, humans confirm" red line holds).
+
+**Plans**: not yet planned — run `/gsd:discuss-phase 159` → `/gsd:plan-phase 159`.
+
+**Note**: Curation/UX layer on the EXISTING Phase-149 registry write-path + discovery service — not new plumbing. The companion model-icons picker polish (Proposal 2 — provider+model `@lobehub` logos in the composer + Settings model list) already shipped ad-hoc (commit `0d81d088`, 2026-07-18). Ties to `project_cross_provider_native_tools_registry_trap` (a MODEL_CAPABILITIES miss silently drops native tools) + SEED-088 (the hand-added GPT-5.6 — the add-by-ID path generalizes that manual flow). Newest-first per `feedback_prioritize_newest_models`.
+**UI hint**: yes
+
 ### Progress (v3.3)
 
-**Execution order:** 146 → 147 → 148 → 149 → 150 → 151 → 152 → 153 → 154 → 155, then STRETCH 156 → 157 → 158 (gated behind CORE).
+**Execution order:** 146 → 147 → 148 → 149 → 150 → 151 → 152 → 153 → 154 → 155, then STRETCH 156 → 157 → 158 → 159 (gated behind CORE).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -483,8 +501,9 @@ Plans:
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 5/5 | Complete (D-09 smoke passed via 158 UAT) | 2026-07-17 |
 | 158 (STRETCH). First-Run Install Wizard | 12/12 | Complete (live wizard UAT passed) | 2026-07-17 |
+| 159 (STRETCH). Model Registry Curation | 0/? | Not started (discuss → plan → execute) | — |
 
-**Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+**Coverage:** 20/20 requirements mapped (16 CORE + 4 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 
 **Sequencing rationale (research-corroborated — SUMMARY.md "Implications for Roadmap", independently by ARCHITECTURE + PITFALLS):**
 

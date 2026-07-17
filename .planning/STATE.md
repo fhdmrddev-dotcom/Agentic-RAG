@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-17T00:00:00.000Z"
-last_activity: 2026-07-17 -- Phase 157 waves 1-3 executed (4/5 plans); D-09 smoke deferred by operator
+last_updated: "2026-07-18T00:00:00.000Z"
+last_activity: 2026-07-18 -- Phase 159 (Model Registry Curation) added as late STRETCH (MODEL-03); model-icons picker polish shipped ad-hoc (0d81d088); next = /gsd:discuss-phase 159
 progress:
-  total_phases: 13
+  total_phases: 14
   completed_phases: 13
   total_plans: 77
   completed_plans: 77
-  percent: 100
+  percent: 93
 ---
 
 # Project State
@@ -22,9 +22,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 158 — first-run-install-wizard-stretch (autonomous chain: discuss→plan→execute→verify, operator unattended)
+**Current focus:** Phase 159 — Model Registry Curation (late STRETCH, MODEL-03) — added 2026-07-18 as a direct follow-on to Phase 149; about to `/gsd:discuss-phase 159`. The operator wants this in v3.3, then `/gsd:complete-milestone`.
 
 ## Current Position
+
+**159 added (2026-07-18):** Phase 159 (Model Registry Curation) appended to v3.3 STRETCH via `gsd-sdk phase.add` (SDK dropped the skeleton after the archived milestones — the known window quirk — hand-relocated into the v3.3 window: STRETCH table + checklist + detail + progress + MODEL-03 in REQUIREMENTS.md; also fixed the stale 157/158 checkboxes→[x] + DEPLOY-01/02 traceability→Complete). Scope = Proposal 1 (discovery filter to chat/tool-capable + add-model-by-ID with capabilities + defaults) on the shipped Phase-149 write-path. Companion Proposal 2 (model-icons picker logos, composer + Settings ModelPillRow) already shipped ad-hoc `0d81d088` + live-verified both themes. **NEXT: `/gsd:discuss-phase 159`.**
 
 Phase: 158 (first-run-install-wizard-stretch) — CODE COMPLETE + VERIFIED + SECURED (11/12 plans) → operator-gated tail
 Plan: 12/12 (158-12 LOCAL done 2026-07-17 — operator applied mig 102 + Claude regenerated full-schema.sql `setup_complete`:480, 1-line diff, drift-check exit 0)
