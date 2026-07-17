@@ -477,7 +477,15 @@ Plans:
   2. An operator can add a single model by ID and set its capabilities (context window, max output, native tool support), with sensible per-provider-family defaults pre-filled and editable.
   3. Newest-first ordering + newest-as-default still hold, and a discovered/added model never silently lacks native tools — capability is explicit, never guessed (the "Discovery proposes, humans confirm" red line holds).
 
-**Plans**: not yet planned — run `/gsd:discuss-phase 159` → `/gsd:plan-phase 159`.
+**Plans**: 6 plans in 4 waves (planned 2026-07-18).
+
+Plans:
+- [ ] 159-01-PLAN.md — Discovery suitability filter: shared UTILITY_MODEL_EXCLUDE constant + display-only `utility` tag; DRY curate_models.py (D-159-01)
+- [ ] 159-02-PLAN.md — Backend writes: POST /admin/models add-by-ID (lands disabled) + filter-toggle flag key (D-159-02, D-159-04)
+- [ ] 159-03-PLAN.md — Filter-toggle persistence: migration 103 + settings readback chain, operator-gated apply (D-159-04)
+- [ ] 159-04-PLAN.md — Frontend client seam (addModelById, utility, settings field) + per-family default table (D-159-02/03/04)
+- [ ] 159-05-PLAN.md — “+ Add model by ID” form (070-A) + ControlRoomPage add-wiring (D-159-02, D-159-03)
+- [ ] 159-06-PLAN.md — Discovery filter UI + hidden-count + hand-fill pre-fill + ControlRoomPage filter-wiring (D-159-04, D-159-03)
 
 **Note**: Curation/UX layer on the EXISTING Phase-149 registry write-path + discovery service — not new plumbing. The companion model-icons picker polish (Proposal 2 — provider+model `@lobehub` logos in the composer + Settings model list) already shipped ad-hoc (commit `0d81d088`, 2026-07-18). Ties to `project_cross_provider_native_tools_registry_trap` (a MODEL_CAPABILITIES miss silently drops native tools) + SEED-088 (the hand-added GPT-5.6 — the add-by-ID path generalizes that manual flow). Newest-first per `feedback_prioritize_newest_models`.
 **UI hint**: yes
@@ -501,7 +509,7 @@ Plans:
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 5/5 | Complete (D-09 smoke passed via 158 UAT) | 2026-07-17 |
 | 158 (STRETCH). First-Run Install Wizard | 12/12 | Complete (live wizard UAT passed) | 2026-07-17 |
-| 159 (STRETCH). Model Registry Curation | 0/? | Not started (discuss → plan → execute) | — |
+| 159 (STRETCH). Model Registry Curation | 0/6 | Planned (execute) | — |
 
 **Coverage:** 20/20 requirements mapped (16 CORE + 4 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 
