@@ -161,6 +161,16 @@ class UserEffectiveSettings(BaseModel):
     # false "configured" that would skip the wizard.
     setup_complete: bool = False
 
+    # Phase 159 (MODEL-03, migration 103) — the discovery-panel utility filter default.
+    # app_settings-only (env_attr=None readback below; a runtime SWITCH, not a secret/infra
+    # — CLAUDE.md). Default TRUE (D-159-04: hide known non-chat "utility" model ids from the
+    # discovery diff by default; the panel's "show all" reveals them). This flag is DISPLAY /
+    # curation only — it never deletes/disables/mutates the confirmable diff (149 red line).
+    # Persisted so "filter on" survives sessions + WORKER_COUNT=2 (rides the 30s TTL settings
+    # cache). Missing/None column (migration authored-but-not-applied until 159-03 Task 2) reads
+    # True (fail-soft) — the mig-102 setup_complete precedent, but default-ON not default-OFF.
+    model_discovery_filter_enabled: bool = True
+
     # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
     document_management_enabled: bool = True
 
@@ -733,6 +743,12 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # fallback. A missing/None column (migration authored-but-not-applied until 158-12)
         # reads False (fail-soft) — a fresh box is "not set up" until finalize writes True.
         setup_complete=_val_bool(row, "setup_complete", None, False),
+
+        # Phase 159 (MODEL-03, migration 103) — env_attr=None: app_settings-only, no env
+        # fallback (a runtime SWITCH, not a secret/infra). D-159-04 default-ON polarity: a
+        # missing/None column (migration authored-but-not-applied until 159-03 Task 2) reads
+        # True (fail-soft) — the discovery filter defaults ON, never silently OFF.
+        model_discovery_filter_enabled=_val_bool(row, "model_discovery_filter_enabled", None, True),
 
         # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.

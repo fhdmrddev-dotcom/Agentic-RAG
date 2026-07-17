@@ -113,6 +113,12 @@ _DIRECT_COLUMNS: set[str] = {
     # the dedicated PUT /admin/models/{id}/lock endpoint through save_app_settings; a code
     # CONSTANT (never user input) so the write stays SQLi-safe (value parameterized $N).
     "llm_model_locked",
+    # Phase 159 (MODEL-03, migration 103) — the persisted discovery-filter default. Added here
+    # for documentation-completeness of the legacy settings_override.json→DB migration path
+    # (_migrate_settings_override — the ONLY consumer of _DIRECT_COLUMNS), mirroring the mig
+    # 097/099 flag-column additions. This is NOT the write-path SQLi guard: the operator write
+    # rides PUT /admin/flags → _FLAG_KEYS + save_app_settings's _VALID_COLUMN_NAME regex.
+    "model_discovery_filter_enabled",
 }
 
 _PROVIDER_MODEL_KEYS: set[str] = {

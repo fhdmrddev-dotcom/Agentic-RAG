@@ -73,6 +73,11 @@ class FullSettingsResponse(BaseModel):
     self_improve_enabled: bool
     workflows_enabled: bool
     maintenance_mode: bool
+    # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-panel utility-filter default,
+    # surfaced on the SAME settings read contract so the Control Room shell can read the operator's
+    # "filter on by default" preference (ControlRoomPage `capabilityFlags` idiom). GET /settings
+    # serves it; the operator WRITE rides the shipped PUT /admin/flags path (Plan 02).
+    model_discovery_filter_enabled: bool
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -232,6 +237,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
         self_improve_enabled=s.self_improve_enabled,
         workflows_enabled=s.workflows_enabled,
         maintenance_mode=s.maintenance_mode,
+        # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-filter default (default-ON).
+        model_discovery_filter_enabled=s.model_discovery_filter_enabled,
         context_window_max_tokens=s.context_window_max_tokens,
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,
