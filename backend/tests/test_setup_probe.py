@@ -88,3 +88,15 @@ async def test_reachable_redis_reports_state_up():
     result = await setup_service.probe_submitted_redis(f"redis://{_BAD_HOST}:6379")
     assert result["state"] == "down"
     assert _BAD_HOST not in str(result), "the submitted Redis host must NOT leak (SSRF telemetry)"
+
+
+async def test_malformed_redis_url_returns_down_not_raises():
+    """WR-03: a MALFORMED Redis URL (empty / no scheme) makes ``redis.from_url`` raise EAGERLY
+    at parse time — BEFORE any connection. The probe builds the client INSIDE the try, so it
+    returns a sanitized ``state:down`` instead of propagating (which 500s ``/validate`` +
+    ``/detect``; ``detect_environment`` is documented as never-raising)."""
+    for bad in ("", "not-a-redis-url"):
+        result = await setup_service.probe_submitted_redis(bad)
+        assert result["state"] == "down", f"malformed url {bad!r} must return down, not raise"
+        reason = result.get("reason", "")
+        assert reason and reason.isidentifier(), "reason must be a bare type(exc).__name__"

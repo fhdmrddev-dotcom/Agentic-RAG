@@ -95,18 +95,25 @@ async def probe_submitted_redis(url: str) -> dict:
     PING within the timeout → ``{"state":"up"}``; else ``{"state":"down", "reason":
     type(exc).__name__}`` — the sanitized bare class name only (no host leak, T-158-03).
     """
-    client = aioredis.from_url(url, socket_connect_timeout=_PROBE_TIMEOUT_S)
+    client = None
     try:
+        # WR-03: from_url parses the URL EAGERLY and raises (ValueError) on a bad scheme or an
+        # empty string, so it MUST be inside the try — otherwise a malformed redis_url raises
+        # uncaught and 500s /validate + /detect instead of returning the sanitized down state
+        # the docstring promises (and detect_environment is documented as never-raising).
+        client = aioredis.from_url(url, socket_connect_timeout=_PROBE_TIMEOUT_S)
         await asyncio.wait_for(client.ping(), timeout=_PROBE_TIMEOUT_S)
         return {"state": "up"}
     except Exception as exc:  # noqa: BLE001 — sanitized reason, never the raw error/host
         logger.warning("setup probe: submitted Redis unreachable (%s)", type(exc).__name__)
         return {"state": "down", "reason": type(exc).__name__}
     finally:
-        try:
-            await client.aclose()
-        except Exception:  # noqa: BLE001 — best-effort close of the throwaway client
-            pass
+        # The client may be unbound if from_url raised — guard the close.
+        if client is not None:
+            try:
+                await client.aclose()
+            except Exception:  # noqa: BLE001 — best-effort close of the throwaway client
+                pass
 
 
 async def probe_submitted_supabase(url: str, service_role_key: str) -> dict:
