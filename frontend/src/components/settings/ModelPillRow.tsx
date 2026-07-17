@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { providerLogo } from "@/lib/providerLogo"
+import { providerLogo, modelLogo } from "@/lib/providerLogo"
 
 /**
  * ModelPillRow — Phase 075.3 D-075.3-10/11/12; Phase 149 D-149-17/D-149-05.
@@ -16,6 +16,11 @@ import { providerLogo } from "@/lib/providerLogo"
  * (D-149-05). All new props are optional + defensively defaulted so a caller that
  * hasn't wired them (or a backend payload without `deprecated_models`) renders
  * exactly as before.
+ *
+ * Model-icons pass: each pill also leads with the model's OWN `@lobehub`
+ * family mark (`modelLogo(m)` — Claude / Gemini / Llama / …), falling back to the
+ * active provider mark, then no icon. Same single-source seam the composer uses, so
+ * a model shows the identical mark in the picker and in Settings (ICON CONVENTION).
  *
  * Extracted from SettingsPage.tsx (was the inline render at lines 765-778) so
  * the badge logic has a narrow vitest test surface (SettingsModelBadge.test.tsx
@@ -92,21 +97,28 @@ export function ModelPillRow({
         {models.map((m) => {
           const isUnverified = !verifiedModels.has(m)
           const isDeprecated = deprecatedModels?.has(m) ?? false
+          // Model-icons pass: the model's OWN @lobehub family mark per pill
+          // (Claude / Gemini / Llama / …), falling back to the active provider's mark
+          // — the same single-source seam the composer uses (ICON CONVENTION). Absent
+          // both → no icon, so the pill renders exactly as before. gap-1.5 owns the
+          // spacing now (the badges dropped their ml-1.5).
+          const PillMark = modelLogo(m) ?? ProviderMark
           return (
             <button
               key={m}
               onClick={() => onSelect(m)}
               className={cn(
-                "text-[11px] px-2.5 py-1 rounded-full ghost-border transition-all",
+                "inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full ghost-border transition-all",
                 llmModel === m
                   ? "bg-primary/10 text-primary border-primary/30 font-medium"
                   : "bg-muted/30 text-muted-foreground hover:text-foreground",
               )}
             >
-              {m}
+              {PillMark && <PillMark size={12} />}
+              <span>{m}</span>
               {isUnverified && (
                 <span
-                  className="ml-1.5 text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
+                  className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
                   title={_tooltipFor(m, inferredProviderFor)}
                 >
                   unverified
@@ -114,7 +126,7 @@ export function ModelPillRow({
               )}
               {isDeprecated && (
                 <span
-                  className="ml-1.5 text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
+                  className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border"
                   title="This model is deprecated. It still works, but consider moving to a newer model."
                 >
                   deprecated

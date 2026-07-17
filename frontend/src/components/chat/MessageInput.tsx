@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
-import { providerLogo } from "@/lib/providerLogo"
+import { providerLogo, modelLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 // Phase 154 (LANG-01 / D-03) — General/Explorer keep their already-plain labels
 // (routed through the single-source term-map so nothing drifts) and gain a one-line
@@ -170,6 +170,14 @@ export function MessageInput({
     ? (PROVIDER_LABELS[selectedProvider] ?? selectedProvider)
     : null
 
+  // Model-icons (extends the Phase 127 ICON CONVENTION) — the FOLDED selected-state marks:
+  // the collapsed provider pill shows the selected provider's logo, the collapsed
+  // model pill shows the selected model's OWN family mark (Claude sunburst / Gemini
+  // star / …), falling back to the provider mark, then the generic lucide glyph.
+  // Single-source @lobehub via providerLogo/modelLogo (Phase 127 ICON CONVENTION).
+  const SelectedProviderMark = providerLogo(selectedProvider)
+  const SelectedModelMark = modelLogo(selectedModel) ?? providerLogo(selectedProvider)
+
   return (
     <div className="px-4 pb-3 bg-transparent">
       <div className="max-w-4xl mx-auto">
@@ -212,33 +220,44 @@ export function MessageInput({
                         "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       )}
                     >
-                      <Layers className="h-3 w-3 shrink-0" />
+                      {SelectedProviderMark ? (
+                        <SelectedProviderMark size={14} />
+                      ) : (
+                        <Layers className="h-3 w-3 shrink-0" />
+                      )}
                       <span>{activeProviderLabel}</span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
-                    {providers.map((p) => (
-                      <DropdownMenuItem
-                        key={p.id}
-                        onSelect={() => onProviderChange!(p.id)}
-                        className={cn(
-                          "text-xs cursor-pointer gap-2",
-                          p.id === selectedProvider && "font-medium bg-accent",
-                        )}
-                      >
-                        <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        {PROVIDER_LABELS[p.id] ?? p.id}
-                        {p.id === selectedProvider && (
-                          <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
+                    {providers.map((p) => {
+                      const PMark = providerLogo(p.id)
+                      return (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onSelect={() => onProviderChange!(p.id)}
+                          className={cn(
+                            "text-xs cursor-pointer gap-2",
+                            p.id === selectedProvider && "font-medium bg-accent",
+                          )}
+                        >
+                          {PMark ? (
+                            <PMark size={14} />
+                          ) : (
+                            <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          )}
+                          {PROVIDER_LABELS[p.id] ?? p.id}
+                          {p.id === selectedProvider && (
+                            <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
+                          )}
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : activeProviderLabel ? (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
-                  <Layers className="h-3 w-3" />
+                  {SelectedProviderMark ? <SelectedProviderMark size={14} /> : <Layers className="h-3 w-3" />}
                   {activeProviderLabel}
                 </span>
               ) : null}
@@ -254,7 +273,11 @@ export function MessageInput({
                         "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       )}
                     >
-                      <Cpu className="h-3 w-3 shrink-0" />
+                      {SelectedModelMark ? (
+                        <SelectedModelMark size={14} />
+                      ) : (
+                        <Cpu className="h-3 w-3 shrink-0" />
+                      )}
                       <span>{displayName(selectedModel!)}</span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                     </button>
@@ -263,11 +286,14 @@ export function MessageInput({
                     {models.map((m) => {
                       const info = MODEL_INFO[m]
                       const isDeprecated = deprecatedModels?.has(m) ?? false
-                      // Phase 149 (D-149-17): the provider logo per row (single-source
-                      // @lobehub mark, Cpu fallback) + the capability info DEMOTED to a
-                      // hover tooltip so the model name stays primary (the operator's
-                      // "context info makes it not very good" cleanup — visual-only).
-                      const ModelMark = providerLogo(selectedProvider)
+                      // Phase 149 (D-149-17) + model-icons pass: the model's OWN
+                      // family mark per row (Claude/Gemini/Llama/… — MORE specific than the
+                      // provider mark, and it differentiates rows within one provider, e.g.
+                      // OpenRouter), falling back to the provider mark, then the Cpu glyph.
+                      // Capability info stays DEMOTED to the hover tooltip so the model name
+                      // stays primary (the operator's "context info makes it not very good"
+                      // cleanup — visual-only). Single-source @lobehub (ICON CONVENTION).
+                      const ModelMark = modelLogo(m) ?? providerLogo(selectedProvider)
                       const capTooltip = info
                         ? `${(info.contextWindow / 1000).toFixed(0)}k context · ${info.maxOutputTokens.toLocaleString()} output · ${info.bestFor} · Cost tier: ${info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}`
                         : undefined
@@ -306,7 +332,7 @@ export function MessageInput({
               ) : (
                 selectedModel && (
                   <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
-                    <Cpu className="h-3 w-3" />
+                    {SelectedModelMark ? <SelectedModelMark size={14} /> : <Cpu className="h-3 w-3" />}
                     {displayName(selectedModel)}
                   </span>
                 )
