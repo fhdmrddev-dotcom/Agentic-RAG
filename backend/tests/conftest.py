@@ -24,6 +24,25 @@ os.environ.setdefault("LANGSMITH_PROJECT", "test-project")
 # test_seed_noop_when_no_emails pins).
 os.environ.setdefault("OPERATOR_EMAILS", "")
 
+# Phase 158 (DEPLOY-02) — the unit suite runs as a FINALIZED box. main.py (158-07) registers
+# SetupMiddleware + a setup-mode-tolerant lifespan: on an UNFINALIZED boot the middleware 503s
+# every non-allowlisted route AND the lifespan skips the audit-drift guard + reconcilers. The
+# existing suite asserts the byte-identical CONFIGURED-box behavior, so point SETUP_STORE_PATH at
+# a finalized store file (the real gate authority `setup_store.setup_finalized()` reads it ->
+# True). Direct assignment (not setdefault) so a stray dev env var can't leave the suite
+# unfinalized. Per-test setup-mode proofs (test_setup_boot_tolerant / test_setup_gate) monkeypatch
+# their own finalized seam, and the `setup_store_path` fixture redirects SETUP_STORE_PATH to a
+# fresh tmp file, so the fresh-store proofs (test_setup_finalize / status / token) still see an
+# unfinalized store. The `reset_mocks` autouse fixture clears the monotonic finalized latch each
+# test so finalized state is always re-derived from the active SETUP_STORE_PATH.
+import json as _json  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_FINALIZED_STORE = _Path(_tempfile.gettempdir()) / "gsd_test_setup_finalized.json"
+_FINALIZED_STORE.write_text(_json.dumps({"finalized": True}))
+os.environ["SETUP_STORE_PATH"] = str(_FINALIZED_STORE)
+
 from unittest.mock import MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
@@ -114,6 +133,15 @@ def reset_mocks():
     Also restores dependency_overrides so tests that swap get_supabase
     don't contaminate subsequent tests.
     """
+    # Phase 158 (DEPLOY-02) — reset the monotonic finalized latches so each test re-derives
+    # finalized state from its OWN SETUP_STORE_PATH (the global finalized store, or a fresh tmp
+    # via the setup_store_path fixture). Without this, a test that latches finalized True leaks
+    # into a later fresh-store proof (test_setup_finalized_false_on_fresh_store).
+    import app.services.setup_store as _setup_store_mod
+    import app.middleware.setup as _setup_mw_mod
+    _setup_store_mod._finalized_latch = False
+    _setup_mw_mod._finalized_latch = False
+
     # Restore canonical dependency overrides (tests may swap get_supabase locally)
     app.dependency_overrides[get_current_user] = lambda: mock_user_data
     app.dependency_overrides[get_supabase] = lambda: _supabase

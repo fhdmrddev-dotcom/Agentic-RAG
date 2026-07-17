@@ -292,6 +292,25 @@ async def lifespan(app_instance):
         settings.anyio_thread_tokens
     )
 
+    # Phase 158 (DEPLOY-02 / D-03) — setup-mode tolerance. Derive ONCE from the blip-proof
+    # FILE marker (a cheap read, NO DB): a fresh/unbound box (finalize marker unset) boots into
+    # setup mode so the operator reaches /setup and reads the token, instead of crash-looping on
+    # the ONE un-guarded DB hard-fail below (assert_action_types_synced, RESEARCH Pattern 3 /
+    # Pitfall 3). A FINALIZED box is byte-identical to today — the audit guard runs and all four
+    # reconcilers spawn. NEVER a DB read (D-05): a transient DB outage must not flip a configured
+    # box into setup mode.
+    from app.services import setup_store
+    _setup_mode = not setup_store.setup_finalized()
+    if _setup_mode:
+        # D-15 — surface the first-boot setup token to stdout (`docker compose logs backend`)
+        # exactly once. Best-effort (mirrors every other lifespan side-effect): a setup-store
+        # write failure must not crash the boot (D-03 degrade-not-crash); the box still boots
+        # into setup mode so the operator can act.
+        try:
+            setup_store.announce_token_if_unfinalized()
+        except Exception:  # noqa: BLE001 — announce is advisory; a store-write blip must not crash boot
+            logger.warning("setup-token announce failed (app continues in setup mode)", exc_info=True)
+
     # Phase 061 (D-061-13, T-061-05): best-effort Redis startup PING.
     # Do NOT block startup if Redis is unreachable — the warning log makes
     # misconfiguration loud. Never log settings.redis_url verbatim (may
@@ -353,8 +372,17 @@ async def lifespan(app_instance):
     # best-effort blocks above): a frozenset⊄live-CHECK drift = a silent prod audit hole.
     # Mirrors the 075.4 UnknownProviderError-at-startup pattern. Runs per worker (read-only,
     # idempotent; a drift crashes all WORKER_COUNT workers identically — the desired loud fail).
-    from app.services.audit_service import assert_action_types_synced
-    await assert_action_types_synced(await get_pg_pool())
+    # Phase 158 (D-03): this is the ONE un-guarded DB hard-fail (RESEARCH Pattern 3) — in setup
+    # mode get_pg_pool() awaits an unreachable DB and raises, the crash that hides the setup
+    # token (Pitfall 3). DEFER it until finalize; a CONFIGURED box STILL runs it (byte-identical:
+    # the loud drift guard is preserved for a bound box).
+    if not _setup_mode:
+        from app.services.audit_service import assert_action_types_synced
+        await assert_action_types_synced(await get_pg_pool())
+    else:
+        logger.warning(
+            "SETUP MODE — DB unbound; deferring audit-enum drift guard until finalize"
+        )
 
     # Phase 091 HARNESS-03 — resume runs left `active` by a restart. CLAIMS each
     # run (CAS) so WORKER_COUNT=2 workers never double-execute (Pitfall 7), and
@@ -373,7 +401,8 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Harness resume sweep failed (app continues)")
 
-    asyncio.create_task(_resume_stranded())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+        asyncio.create_task(_resume_stranded())
 
     # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
     # restart kills the in-process task driving a run, its terminal DB transition is
@@ -396,7 +425,8 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Run reconciler failed (app continues)")
 
-    asyncio.create_task(_reconcile_orphans())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+        asyncio.create_task(_reconcile_orphans())
 
     # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
     # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
@@ -418,7 +448,8 @@ async def lifespan(app_instance):
                 logger.exception("Template sweep failed (app continues)")
             await asyncio.sleep(15 * 60)   # D-07 ~15 min cadence
 
-    asyncio.create_task(_sweep_expired_templates())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no templates to sweep
+        asyncio.create_task(_sweep_expired_templates())
 
     # Phase 145 (FND-01 / D-145-06 / D-145-08) — PERIODIC stream-age orphan sweep. The
     # boot reconciler above heals restart-orphans ONCE; this INTERVAL task corrects a
@@ -450,7 +481,8 @@ async def lifespan(app_instance):
                 logger.exception("Periodic run reconciler failed (app continues)")
             await asyncio.sleep(settings.run_stale_sweep_interval_seconds)
 
-    asyncio.create_task(_reconcile_orphans_periodic())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no runs to reconcile
+        asyncio.create_task(_reconcile_orphans_periodic())
 
     yield
 
