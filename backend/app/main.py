@@ -59,6 +59,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.middleware.maintenance import MaintenanceMiddleware
+from app.middleware.setup import SetupMiddleware
 
 
 def _patch_postgrest_maybe_single():
@@ -590,6 +591,16 @@ app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 # (PUT /admin/flags), login, and DELETE /runs/{id} reachable even under maintenance.
 app.add_middleware(MaintenanceMiddleware)
 
+# Phase 158 (DEPLOY-02 / D-04) — first-run setup gate. Registered alongside Maintenance and
+# BEFORE CORS so CORS stays OUTERMOST (a 503 setup_required still carries CORS headers so the
+# browser can READ it, not surface an opaque CORS error). Pure-ASGI (NOT BaseHTTPMiddleware) so
+# it never buffers the SSE stream; it reads the blip-proof FILE marker through a monotonic
+# finalized-latch (NEVER the DB, D-05), so a CONFIGURED box is a single-bool no-op —
+# byte-identical (D-17). Pre-finalize it gates everything EXCEPT the allowlist (/health,
+# /public-config, /setup/*) so an unbound box stays observable and the operator can reach the
+# wizard. Sits OUTSIDE Maintenance (runs first) so a fresh box is gated with zero DB touch.
+app.add_middleware(SetupMiddleware)
+
 # FRONTEND_URL may hold one origin or a comma-separated list (e.g.
 # "https://superrag.cloud,https://agentic-rag-rho.vercel.app"). Split + strip
 # so multiple production origins can be allowed without a code change; a single
@@ -631,7 +642,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -658,6 +669,8 @@ app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owne
 app.include_router(evals.router)  # Phase 133 EVAL-02 — owner-scoped eval runner control surface (POST kickoff + GET results/list; companion runs row reuses runs.py stream/cancel)
 app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eval surface (POST engine-sweep + GET engine-health + GET /evals/runs/{id} skill-less readout; matrix launch stays on evals.router)
 app.include_router(features.router)  # Phase 148 VIS-01 — authenticated per-user GET /features effective-map (NOT operator-gated; top-level, not under /admin — non-operators must reach it to learn their own map)
+app.include_router(setup_api.router)  # Phase 158 DEPLOY-02 — pre-auth token-gated /setup/* wizard API + open GET /setup/status (SetupMiddleware-allowlisted)
+app.include_router(setup_api.public_router)  # Phase 158 D-07 — open top-level GET /public-config (browser Supabase creds so login works without a frontend rebuild)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

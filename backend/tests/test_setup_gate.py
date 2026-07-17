@@ -142,3 +142,37 @@ def test_configured_box_noop(finalized_client):
     # the allowlist routes are equally unaffected once finalized
     assert finalized_client.get("/health").status_code == 200
     assert finalized_client.get("/setup/status").status_code == 200
+
+
+# ── 5. byte-identical INTEGRATION proof — the REAL app, end-to-end (plan-checker item 1) ──────
+
+def test_configured_real_app_boot_byte_identical(monkeypatch):
+    """Byte-identical INTEGRATION proof (SC#2 / D-17, plan-checker item 1): boot the REAL app
+    (main.py wiring — SetupMiddleware registered before CORS + the setup routers included), force
+    the setup-store finalized marker True, and prove the gate is a LITERAL passthrough end-to-end
+    — not just the mini-`_make_app` middleware-unit proof above.
+
+    - ``/health`` keeps its EXACT pre-158 shape (``{status, redis, maintenance}``) — the wiring
+      adds no key and changes no status.
+    - a NON-allowlisted route (``/models``) that WOULD be 503'd pre-finalize now serves normally —
+      the empirical end-to-end proof that a CONFIGURED box behaves as if the gate were absent.
+
+    Bare ``TestClient`` (NOT a context manager) so the request runs WITHOUT the app lifespan
+    (the test_147 idiom — no Postgres/Redis dependency); the middleware still runs per request."""
+    import app.services.setup_store as store
+
+    # the real gate authority the middleware reads -> finalized; force a fresh latch read so the
+    # patched marker (not a leaked sticky-True) drives this proof.
+    monkeypatch.setattr(store, "setup_finalized", lambda: True)
+    monkeypatch.setattr(setup_mw, "_finalized_latch", False)
+
+    from app.main import app as real_app
+
+    client = TestClient(real_app)  # bare — no lifespan (test_147 idiom)
+
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert set(resp.json().keys()) == {"status", "redis", "maintenance"}  # exact pre-158 shape
+
+    # a NON-allowlisted route passes through untouched once finalized (a true no-op, not allowlist)
+    assert client.get("/models").status_code == 200
