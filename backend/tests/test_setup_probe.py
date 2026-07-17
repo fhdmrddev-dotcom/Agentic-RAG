@@ -40,19 +40,46 @@ async def test_bad_dsn_returns_down_with_sanitized_reason():
     assert reason and reason.isidentifier(), "reason must be a bare type(exc).__name__, not a raw error string"
 
 
-async def test_reachable_dsn_reports_state_up(mock_asyncpg_pool, monkeypatch):
+async def test_reachable_dsn_reports_state_up(monkeypatch):
     """SC#1/D-10: a reachable submitted DSN → ``state:up`` (probed via a THROWAWAY connection,
-    never the app pool). Wave 2 wires the throwaway asyncpg.connect to the recording pool."""
-    # named for the Nyquist map; the reachable path is driven in Wave 2 with a mock connect
-    assert hasattr(setup_service, "probe_submitted_postgres")
+    never the app pool). A mocked ``asyncpg.connect`` returns a conn whose ``to_regclass``
+    schema sentinel is present."""
+    class _Conn:
+        async def fetchval(self, sql, *a):
+            assert "to_regclass" in sql, "schema presence must use the to_regclass sentinel"
+            return True
+
+        async def close(self):
+            return None
+
+    async def _connect(dsn, *a, **k):
+        return _Conn()
+
+    monkeypatch.setattr("asyncpg.connect", _connect)
+    result = await setup_service.probe_submitted_postgres("postgresql://u:p@localhost:5432/db")
+    assert result["state"] == "up"
+    assert result["schema_present"] is True
 
 
-async def test_schema_absent_reports_schema_present_false(mock_asyncpg_pool, monkeypatch):
+async def test_schema_absent_reports_schema_present_false(monkeypatch):
     """SC#1/D-10: a reachable DB with NO schema → ``schema_present:false`` (the
     ``to_regclass('public.app_settings')`` sentinel returns NULL for a missing relation — one
     round-trip tells present-vs-absent without raising). Guides the operator to run the
     OPERATOR.md Step-3 bootstrap."""
-    assert hasattr(setup_service, "probe_submitted_postgres")
+    class _Conn:
+        async def fetchval(self, sql, *a):
+            return False  # to_regclass(...) IS NOT NULL → False when the relation is absent
+
+        async def close(self):
+            return None
+
+    async def _connect(dsn, *a, **k):
+        return _Conn()
+
+    monkeypatch.setattr("asyncpg.connect", _connect)
+    result = await setup_service.probe_submitted_postgres("postgresql://u:p@localhost:5432/db")
+    assert result["state"] == "up"
+    assert result["schema_present"] is False
 
 
 async def test_reachable_redis_reports_state_up():
