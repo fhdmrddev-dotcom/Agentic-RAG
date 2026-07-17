@@ -153,6 +153,14 @@ class UserEffectiveSettings(BaseModel):
     workflows_enabled: bool = True
     maintenance_mode: bool = False
 
+    # Phase 158 (DEPLOY-02, migration 102) — the AUDITABLE first-run install-wizard
+    # finalize marker. app_settings-only (env_attr=None readback below). D-05: this DB
+    # flag is the AUDITABLE / app-facing signal ONLY, NOT the gate authority (the local
+    # file marker in setup_store.py is). Defaults False so a fresh box / cold read /
+    # migration-102-not-yet-applied (column absent) all read "not set up" — never a
+    # false "configured" that would skip the wizard.
+    setup_complete: bool = False
+
     # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
     document_management_enabled: bool = True
 
@@ -721,6 +729,11 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         workflows_enabled=_val_bool(row, "workflows_enabled", None, True),
         maintenance_mode=_val_bool(row, "maintenance_mode", None, False),
 
+        # Phase 158 (DEPLOY-02, migration 102) — env_attr=None: app_settings-only, no env
+        # fallback. A missing/None column (migration authored-but-not-applied until 158-12)
+        # reads False (fail-soft) — a fresh box is "not set up" until finalize writes True.
+        setup_complete=_val_bool(row, "setup_complete", None, False),
+
         # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
         document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
@@ -919,6 +932,23 @@ def maintenance_mode() -> bool:
     try:
         return load_app_settings().maintenance_mode
     except Exception:  # noqa: BLE001 — defensive: default-OPEN (False) on cold cache / read failure
+        return False
+
+
+def setup_complete() -> bool:
+    """DEPLOY-02 (D-05) first-run install-wizard AUDITABLE signal: has setup finalized?
+
+    This is the AUDITABLE / app-facing signal ONLY — NOT the gate authority. The
+    blip-proof gate authority is the LOCAL file marker in setup_store.py
+    (``finalized:true``); a transient DB outage must NEVER bounce a live box's users
+    back into the wizard. So this mirrors maintenance_mode's no-raise posture exactly: a
+    cold-cache / DB-read failure — AND a migration-102-not-yet-applied (column absent,
+    the authored-but-unapplied state until plan 158-12) — all default to False. A False
+    read is safe (it means "auditable flag unknown", never a live-user disruption).
+    """
+    try:
+        return load_app_settings().setup_complete
+    except Exception:  # noqa: BLE001 — defensive: default False on cold cache / read failure / column absent
         return False
 
 
