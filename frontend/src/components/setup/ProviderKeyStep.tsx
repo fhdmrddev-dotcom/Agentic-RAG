@@ -39,10 +39,16 @@ import { postProviderKey, SetupApiError } from "@/lib/setupApi"
  *  cloud LLMs minus the "custom" catch-all (the selected one is filtered out live).
  *  Keys match `providerLogo` (Icon Convention §1) so each row carries its @lobehub
  *  brand mark. */
+// FULL native roster + OpenRouter (feedback 2026-07-17): the app supports the native-7,
+// not four. Keys match providerLogo (@lobehub) + the backend `{key}_api_key` columns.
 const OTHER_PROVIDER_ROWS: ReadonlyArray<{ key: string; name: string }> = [
   { key: "openai", name: "OpenAI" },
   { key: "anthropic", name: "Anthropic" },
   { key: "google", name: "Google" },
+  { key: "deepseek", name: "DeepSeek" },
+  { key: "moonshot", name: "Moonshot (Kimi)" },
+  { key: "zhipu", name: "Zhipu (GLM)" },
+  { key: "minimax", name: "MiniMax" },
   { key: "openrouter", name: "OpenRouter" },
 ]
 
