@@ -245,6 +245,33 @@ def _remember_operator_email(email: str) -> None:
         logger.warning("setup: could not persist OPERATOR_EMAILS to the setup-store (best-effort)")
 
 
+async def _upsert_operator_row(pg_dsn: str, user_id: str | None) -> None:
+    """Idempotently upsert the ``operator_users`` row over a THROWAWAY connection.
+
+    ``INSERT ... ON CONFLICT (user_id) DO NOTHING`` (the reused ``operator_service`` shape —
+    never a second upsert path). Called on BOTH the created AND the duplicate path (WR-01): if a
+    partial first attempt created the auth user but the operator-row insert never ran (a DB
+    blip), the duplicate branch used to skip the upsert entirely, so every retry returned
+    ``already_exists`` WITHOUT ever writing the row and finalize stayed blocked forever. Calling
+    this on the duplicate path lets a retry HEAL. A None ``user_id`` (a duplicate whose id could
+    not be resolved) is a no-op.
+    """
+    if not user_id:
+        return
+    conn = await asyncpg.connect(pg_dsn)  # THROWAWAY — never the app connection singletons
+    try:
+        await conn.execute(
+            "INSERT INTO operator_users (user_id, granted_by, note) "
+            "VALUES ($1, NULL, 'setup-wizard') ON CONFLICT (user_id) DO NOTHING",
+            user_id,
+        )
+    finally:
+        try:
+            await conn.close()
+        except Exception:  # noqa: BLE001 — best-effort close of the throwaway conn
+            pass
+
+
 async def bootstrap_operator(
     supabase_url: str,
     service_role_key: str,
@@ -276,28 +303,18 @@ async def bootstrap_operator(
 
     try:
         resp = await run_in_threadpool(_create)
-    except Exception as exc:  # noqa: BLE001 — duplicate → already_exists; else re-raise for 400
+    except Exception as exc:  # noqa: BLE001 — duplicate → heal + already_exists; else re-raise (400)
         if _looks_like_duplicate(exc):
             existing_id = await _find_existing_user_id(sb, email)
+            # WR-01: STILL upsert the operator row on the duplicate path so a partial first
+            # attempt (auth user created, operator-row insert failed) self-heals on retry.
+            await _upsert_operator_row(pg_dsn, existing_id)
             _remember_operator_email(email)
             return {"status": "already_exists", "already_exists": True, "user_id": existing_id}
         raise  # not a duplicate (e.g. weak password) — surfaced verbatim (router maps to 400)
 
     user_id = getattr(getattr(resp, "user", None), "id", None)
-
-    conn = await asyncpg.connect(pg_dsn)  # THROWAWAY — never the app connection singletons
-    try:
-        await conn.execute(
-            "INSERT INTO operator_users (user_id, granted_by, note) "
-            "VALUES ($1, NULL, 'setup-wizard') ON CONFLICT (user_id) DO NOTHING",
-            user_id,
-        )
-    finally:
-        try:
-            await conn.close()
-        except Exception:  # noqa: BLE001 — best-effort close of the throwaway conn
-            pass
-
+    await _upsert_operator_row(pg_dsn, user_id)
     _remember_operator_email(email)
     return {"status": "created", "already_exists": False, "user_id": user_id}
 

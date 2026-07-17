@@ -19,6 +19,8 @@ Drives the data-access layer the seam actually uses (project lesson): ``mock_sub
 for ``admin.create_user`` + ``mock_asyncpg_pool`` for the upsert.
 ``pytest.importorskip("app.services.setup_service")`` SKIPS the file cleanly until Wave 2.
 """
+from unittest.mock import MagicMock
+
 import pytest
 
 # NEW service — skips cleanly until Wave 2 creates app/services/setup_service.py.
@@ -108,6 +110,34 @@ async def test_bootstrap_operator_rerun_existing_email_returns_already_exists(se
         pg_dsn="postgresql://u:p@localhost:5432/db",
     )
     assert result.get("status") == "already_exists"
+
+
+async def test_bootstrap_operator_duplicate_still_upserts_operator_row(setup_store_path, mock_submitted_supabase, mock_asyncpg_pool, monkeypatch):
+    """WR-01: on the DUPLICATE-email path, bootstrap STILL upserts ``operator_users`` with the
+    resolved user id. Before the fix the duplicate branch returned ``already_exists`` WITHOUT
+    the upsert, so a partial first attempt (auth user created, operator-row insert failed) was
+    an unrecoverable stuck state — every retry said ``already_exists`` and the row was never
+    written, blocking finalize forever. With a resolvable existing id, the retry now HEALS."""
+    mock_submitted_supabase.auth.admin.create_user.side_effect = Exception("User already registered")
+    existing = MagicMock()
+    existing.email = "op@example.com"
+    existing.id = "11111111-1111-1111-1111-1111111111bb"
+    mock_submitted_supabase.auth.admin.list_users.return_value = MagicMock(users=[existing])
+    monkeypatch.setattr(setup_service, "create_client", lambda *a, **k: mock_submitted_supabase, raising=False)
+    _mock_throwaway_connect(monkeypatch, mock_asyncpg_pool)
+
+    result = await setup_service.bootstrap_operator(
+        supabase_url="https://real.supabase.co",
+        service_role_key="dummy-service-role",
+        email="op@example.com",
+        password="dummy-strong-pw",
+        pg_dsn="postgresql://u:p@localhost:5432/db",
+    )
+    assert result["status"] == "already_exists"
+    assert result["user_id"] == "11111111-1111-1111-1111-1111111111bb"
+    upserts = [sql for (sql, _args) in mock_asyncpg_pool.calls if "operator_users" in str(sql)]
+    assert upserts, "the duplicate path must STILL upsert operator_users (WR-01 heal)"
+    assert any("ON CONFLICT" in str(sql) and "DO NOTHING" in str(sql) for sql in upserts)
 
 
 async def test_bootstrap_operator_weak_password_propagates_verbatim(setup_store_path, mock_submitted_supabase, mock_asyncpg_pool, monkeypatch):
