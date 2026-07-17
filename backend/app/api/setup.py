@@ -110,6 +110,23 @@ def _clear_failures(host: str) -> None:
 
 
 # ── WR-04: which /operator failures may be surfaced verbatim vs sanitized ────────────────────
+# Password-policy phrases GoTrue surfaces (e.g. "Password should be at least 6 characters").
+# These are the ONLY messages shown verbatim. asyncpg's password error ("password
+# authentication failed for user ...") contains NONE of them — and is caught by the DB-error
+# denylist first anyway — so a topology-leaking message can never match here.
+_PASSWORD_POLICY_MARKERS = (
+    "should be at least",
+    "at least 6",
+    "password should",
+    "password must",
+    "too short",
+    "weak password",
+    "weak_password",
+    "password is too",
+    "characters long",
+)
+
+
 def _is_password_policy_error(exc: Exception) -> bool:
     """True ONLY for a GoTrue password-policy rejection — the ONE error surfaced VERBATIM.
 
@@ -118,23 +135,26 @@ def _is_password_policy_error(exc: Exception) -> bool:
     also runs ``create_client`` and a THROWAWAY ``asyncpg.connect``, and an asyncpg / socket
     connection error's message can carry the DB host, port, and role (e.g. ``password
     authentication failed for user "postgres"``) — that must never reach the caller verbatim on
-    this pre-auth surface (it mirrors the probe hygiene). So: DB/connection errors → sanitized;
-    GoTrue password errors → verbatim; anything unrecognised → sanitized (fail safe).
+    this pre-auth surface. So: DB/connection errors → ALWAYS sanitized (denylist first, by type,
+    regardless of message); a password-POLICY message (or a GoTrue weak-password class) →
+    verbatim; anything else → sanitized (fail safe).
     """
-    # DB / socket errors — sanitize (topology leak). asyncpg exceptions live in ``asyncpg.*``;
-    # host/DNS/refused failures are OSError/ConnectionError subclasses.
+    # 1. Denylist FIRST: DB / socket errors are always sanitized (their message can carry the DB
+    #    host/port/role). asyncpg exceptions live in ``asyncpg.*``; host/DNS/refused failures are
+    #    OSError/ConnectionError subclasses. Running before any message check means asyncpg's
+    #    "password authentication failed for user ..." can never leak via a message match.
     if isinstance(exc, (OSError, ConnectionError)):
         return False
-    module = (type(exc).__module__ or "").lower()
-    if module.startswith("asyncpg"):
+    if (type(exc).__module__ or "").lower().startswith("asyncpg"):
         return False
-    # GoTrue weak/short-password rejection — the class name is stable across supabase-py 2.x.
+    # 2. GoTrue weak-password class (stable across supabase-py 2.x) OR a password-POLICY message.
+    #    Keyed on password-policy PHRASING (not the bare word "password") so it recognises the
+    #    policy error whether GoTrue-typed or surfaced as a plain exception — without matching a
+    #    connection-auth message (already excluded by the denylist above).
     if "weakpassword" in type(exc).__name__.lower():
         return True
-    # An auth-layer error (gotrue / supabase_auth) that names the password policy.
-    if module.startswith("gotrue") or module.startswith("supabase"):
-        return "password" in str(exc).lower()
-    return False
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _PASSWORD_POLICY_MARKERS)
 
 
 async def require_setup_token(
