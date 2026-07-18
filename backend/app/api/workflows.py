@@ -20,10 +20,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase
+from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
 from app.db.workflows import (
+    count_foreign_runs_on_global,
     create_workflow_definition,
+    delete_published_workflow_cascade,
+    delete_workflow_cascade_preview,
     delete_workflow_definition,
+    finish_run,
     list_draft_workflows,
     list_published_workflows,
     list_starter_workflows,
@@ -35,6 +39,7 @@ from app.models.harness import WorkflowDefinition
 # discipline). NEVER import the orchestration fns by name — patch the module attr.
 from app.services import workflow_authoring
 from app.services.harness import publish_service
+from app.services.operator_service import write_operator_audit
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +107,10 @@ class DraftRow(BaseModel):
     definition: dict | None = None
 
 
+# Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
+# picker feeds (the Deep/Harness composer + Workflows launch); end users need them so Run stays
+# for everyone (D-05). The workflow LAUNCH in threads.py is also ungated (untouched by this
+# plan). Only the AUTHORING/publish endpoints below carry require_visible('workflow_authoring').
 @router.get("/published", response_model=list[PublishedWorkflow])
 async def get_published_workflows(
     project_folder_id: UUID | None = None,
@@ -204,7 +213,11 @@ class PublishVerdict(BaseModel):
     named_failures: list = Field(default_factory=list)
 
 
-@router.post("/{definition_id}/publish", response_model=PublishVerdict)
+@router.post(
+    "/{definition_id}/publish",
+    response_model=PublishVerdict,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def publish_workflow(
     definition_id: UUID,
     body: PublishRequest,
@@ -263,7 +276,12 @@ def _coerce_user_id(current_user: dict) -> UUID:
     return UUID(user_id) if isinstance(user_id, str) else user_id
 
 
-@router.post("", response_model=DraftCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DraftCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def create_draft(
     body: WorkflowDefinition,
     current_user: dict = Depends(get_current_user),
@@ -292,7 +310,11 @@ async def create_draft(
     return DraftCreateResponse(**row)
 
 
-@router.get("/drafts", response_model=list[DraftRow])
+@router.get(
+    "/drafts",
+    response_model=list[DraftRow],
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def list_drafts(
     current_user: dict = Depends(get_current_user),
 ) -> list[DraftRow]:
@@ -317,7 +339,11 @@ async def list_drafts(
     ]
 
 
-@router.patch("/{definition_id}", response_model=DraftCreateResponse)
+@router.patch(
+    "/{definition_id}",
+    response_model=DraftCreateResponse,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def update_draft(
     definition_id: UUID,
     body: WorkflowDefinition,
@@ -348,7 +374,11 @@ async def update_draft(
     return DraftCreateResponse(**row)
 
 
-@router.delete("/{definition_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{definition_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def delete_draft(
     definition_id: UUID,
     current_user: dict = Depends(get_current_user),
@@ -376,6 +406,197 @@ async def delete_draft(
     return None
 
 
+# ── Phase 152 (WFIN-03 / D-08) — published-workflow safe DELETE cascade ───────
+# G-5 RED LINE: this DESTRUCTIVE cascade joins THIS router (api/workflows.py),
+# NEVER api/threads.py (the hot-file ledger forbids growing threads.py — D-08). It is
+# a DISTINCT route from the draft ``DELETE /{definition_id}`` (Pitfall 7): overloading
+# the draft path would change its draft-only 404 contract and collide with the client
+# ``deleteWorkflowDraft``. Cancel-first (D-LOCK-05) lives HERE in the route/service
+# layer, never inside the db-helper transaction.
+class DeletePreview(BaseModel):
+    """The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +
+    ``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``
+    is the count of runs STILL LIVE — the honest signal the sheet's amber cancel-first
+    banner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is
+    unaffected (additive field)."""
+
+    name: str
+    versions: int
+    runs: int
+    threads: int
+    in_flight: int = 0
+
+
+async def _owned_slug_or_404(pool, definition_id: UUID, user_id: UUID) -> str:
+    """Resolve the slug of an OWNED definition, or raise a uniform 404.
+
+    Owner-gated (``created_by = $2``) — a non-owner / unknown id resolves to ``None`` →
+    404, indistinguishable from not-found (no existence leak; the ``get_definition``
+    404-collapse precedent). The service role bypasses RLS, so this WHERE is the ONLY
+    authorization boundary (T-152-02-01)."""
+    row = await pool.fetchrow(
+        "SELECT slug FROM workflow_definitions WHERE id = $1 AND created_by = $2",
+        definition_id,
+        user_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+    return row["slug"]
+
+
+@router.get(
+    "/{definition_id}/delete-preview",
+    response_model=DeletePreview,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def get_delete_preview(
+    definition_id: UUID,
+    current_user: dict = Depends(get_current_user),
+) -> DeletePreview:
+    """Exact Removed/Kept counts for the victim-naming sheet BEFORE commit (D-LOCK-03).
+
+    Owner-gated + 404-collapse (same boundary as the cascade DELETE). The counts are
+    server-sourced — the sheet never guesses. A distinct STATIC-suffix route so it never
+    shadows (or is shadowed by) the draft ``/{definition_id}`` paths.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    slug = await _owned_slug_or_404(pool, definition_id, user_id)
+    preview = await delete_workflow_cascade_preview(pool, slug=slug, user_id=user_id)
+    if not preview.get("found"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+    return DeletePreview(
+        name=preview["name"],
+        versions=preview["versions"],
+        runs=preview["runs"],
+        threads=preview["threads"],
+        in_flight=preview.get("in_flight", 0),
+    )
+
+
+@router.delete(
+    "/{definition_id}/cascade",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def delete_workflow_cascade(
+    definition_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase),
+):
+    """Hard-delete a workflow (definition + ALL versions + ALL runs) safely -> 204.
+
+    Order (D-LOCK-04/05):
+      1. Owner-gate the target id → its slug (non-owner / unknown → 404, no leak).
+      2. CANCEL-FIRST every in-flight run (status ``active``/``paused``/``cap_paused``) for
+         that slug's versions — BEFORE the DB delete, never deleting a live run out from
+         under the engine (D-LOCK-05). Cancel through the PRODUCER ``runs.run_id`` (the
+         RUN_TASKS key, resolved by the LEFT JOIN — NOT the ``workflow_runs.id``, which the
+         registry never keys), publish the ask_user cancel sentinel on the workflow-run
+         channel, and durably ``finish_run`` the workflow_runs row (covers the paused +
+         cross-worker ``WORKER_COUNT=2`` cases).
+      3. FK-safe cascade (``delete_published_workflow_cascade``): runs FIRST (RESTRICT
+         blocker) → phases auto-cascade → thread anchors auto-SET-NULL (threads KEPT as
+         normal chats) → all versions. ``harness_audit`` receipts linger (A3).
+      4. Best-effort audit receipt (never raises) — the victim-naming "recorded with your
+         name" (D-LOCK-03).
+
+    No return-type annotation (the ``delete_draft`` 204 precedent): a ``-> None`` makes
+    FastAPI build a response body field, which 204 forbids.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    slug = await _owned_slug_or_404(pool, definition_id, user_id)
+
+    # WR-01 fail-closed guard: an ``is_global`` definition's runs are owned by RUNNERS,
+    # not the definition owner. The ON DELETE RESTRICT FK forces the cascade to sweep
+    # every runner's rows, so deleting a shared workflow here would cancel + destroy
+    # OTHER users' run history. Refuse with 409 (before any cancel/delete side effect)
+    # when the caller's global definition(s) for this slug carry other users' runs.
+    foreign_runs = await count_foreign_runs_on_global(pool, slug=slug, user_id=user_id)
+    if foreign_runs > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This is a shared workflow with runs owned by other users — deleting it "
+                "here would remove their run history, so it's blocked."
+            ),
+        )
+
+    # 2. Cancel-first (D-LOCK-05) — heal every in-flight run for this slug's versions
+    # BEFORE the DB delete. The cancel discipline lives in the SERVICE/route layer, not
+    # the db txn. ``_cancel_run_internals`` + ``publish_cancel_sentinel`` are late-imported
+    # (the admin.py:479 discipline — keeps the RUN_TASKS registry off this module's load
+    # path, avoids the import cycle).
+    #
+    # CR-01 / D-LOCK-05: a live kickoff-started run's producer task is registered in
+    # RUN_TASKS under the PRODUCER ``runs.run_id`` (threads.py:2011), NOT the
+    # ``workflow_runs.id``. Resolve that producer identity via a LEFT JOIN to the live
+    # ``runs`` row (status='streaming') and cancel through IT — the same identity the
+    # admin Kill path uses — so the engine task is actually cancelled.
+    inflight = await pool.fetch(
+        "SELECT wr.id AS wf_id, wr.thread_id, "
+        "r.run_id AS producer_id, r.status AS producer_status "
+        "FROM workflow_runs wr "
+        "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
+        "LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming' "
+        "WHERE wd.slug = $1 AND wd.created_by = $2 "
+        "AND wr.status IN ('active', 'paused', 'cap_paused')",
+        slug,
+        user_id,
+    )
+    if inflight:
+        from app.services.ask_user_service import publish_cancel_sentinel  # noqa: PLC0415
+        from app.services.run_lifecycle import _cancel_run_internals  # noqa: PLC0415
+
+        redis = get_redis()
+        for r in inflight:
+            # (1) Cancel the LIVE producer task — RUN_TASKS is keyed by the producer
+            # runs.run_id, never the workflow_runs id (CR-01). A run with no live
+            # producer row (already terminal / cross-worker) has producer_id = None.
+            if r["producer_id"] is not None:
+                await _cancel_run_internals(
+                    run_id=r["producer_id"],
+                    status=r["producer_status"],
+                    thread_id=str(r["thread_id"]) if r["thread_id"] else None,
+                    redis=redis,
+                    supabase=supabase,
+                )
+            # (2) Wake any paused ask_user harness prompt — the harness subscribes on the
+            # WORKFLOW run id channel (best-effort, never raises).
+            await publish_cancel_sentinel(redis, r["wf_id"])
+            # (3) Durably terminalize the workflow_runs row BEFORE the delete — the
+            # cross-worker (WORKER_COUNT=2) + paused backstop D-LOCK-05 needs (the engine's
+            # own writes 0-row no-op once its rows are gone, so this is the authoritative
+            # terminal state + anchor-clear).
+            await finish_run(pool, r["wf_id"], "cancelled")
+
+    # 3. FK-safe hard-delete (D-LOCK-04).
+    result = await delete_published_workflow_cascade(pool, slug=slug, user_id=user_id)
+    if not result.get("deleted"):
+        # A racing delete emptied the slug between the owner-gate and here → 404.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workflow not found")
+
+    # 4. Best-effort audit receipt — write_operator_audit NEVER raises (swallow-on-error),
+    # so the delete's 204 can never regress on an audit failure. Records the material,
+    # irreversible cascade under the actor's own id (D-LOCK-03 "recorded with your name").
+    await write_operator_audit(
+        str(user_id),
+        "workflow.delete",
+        f"Deleted {result.get('name')}",
+        is_write=True,
+        target_type="workflow_definition",
+        target_id=str(definition_id),
+        metadata={
+            "slug": slug,
+            "versions": result.get("versions"),
+            "runs": result.get("runs"),
+        },
+        supabase=supabase,
+    )
+    return None
+
+
 # ── Phase 103 (REQ-2 / WFAUTH-02) — NL one-shot generation route ──────────────
 # G-5 RED LINE: joins THIS router (api/workflows.py), NEVER api/threads.py. The
 # orchestration (grounding assembly + forced_emit + retry + fidelity) lives in the
@@ -392,7 +613,10 @@ class GenerateRequest(BaseModel):
     template_placeholders: list[str] | None = None
 
 
-@router.post("/generate")
+@router.post(
+    "/generate",
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
 async def generate_workflow(
     body: GenerateRequest,
     current_user: dict = Depends(get_current_user),

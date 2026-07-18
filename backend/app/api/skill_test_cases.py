@@ -35,7 +35,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.skill_test_case import TestCaseCreate, TestCaseResponse, TestCaseUpdate
 from app.models.skill_version import SkillVersionResponse
 
@@ -43,7 +43,14 @@ logger = logging.getLogger(__name__)
 
 # No shared prefix — the routes span /skills/{id}/... and /test-cases/{id}; each declares its
 # full path.
-router = APIRouter(tags=["skill-test-cases"])
+# Phase 148 (VIS-01) — eval test-case CRUD + version history is a Skill Studio surface
+# (Operators-only). Gate the whole router (every endpoint) so a non-operator is refused
+# server-side (403 — D-03). No carve-out. require_visible is a no-op for operators + Everyone
+# features (is_operator is the ONE swappable audience boundary).
+router = APIRouter(
+    tags=["skill-test-cases"],
+    dependencies=[Depends(require_visible("skill_studio"))],
+)
 
 
 def _verify_owned_skill(supabase: Client, skill_id: str, user_id: str) -> None:

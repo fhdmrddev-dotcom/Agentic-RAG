@@ -20,6 +20,33 @@ _SUGGESTION_SYSTEM_PROMPT = (
 )
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Remove <think>...</think> reasoning blocks (closed) and any unclosed trailing
+    <think> from text. Reasoning providers served via the compat path (minimax inline,
+    DeepSeek/GLM-4.6+) emit <think> inline in message.content rather than a separate
+    reasoning_content field; without stripping, each think line becomes a suggestion chip
+    and pushes the real questions past the 3-item clamp (round-2 UAT Test 7, D-149-10
+    fallback path).
+
+    Mirrors app.api.threads._strip_think_blocks verbatim (the title path's sibling).
+    A shared-util de-dup of the two copies is a future candidate (out of scope here) —
+    do NOT silently fork the logic without keeping this note.
+    """
+    out = text or ""
+    lower = out.lower()
+    while "<think>" in lower and "</think>" in lower:
+        start = lower.find("<think>")
+        end = lower.find("</think>", start)
+        if end == -1:
+            break
+        out = out[:start] + out[end + len("</think>"):]
+        lower = out.lower()
+    idx = out.lower().find("<think>")  # unclosed trailing think (ran out of budget mid-reasoning)
+    if idx != -1:
+        out = out[:idx]
+    return out
+
+
 def generate_suggestions(
     user_message: str,
     assistant_response: str,
@@ -94,6 +121,11 @@ def generate_suggestions(
             **{token_param2: 2000},
         )
     content = resp.choices[0].message.content or ""
+    # Strip <think> reasoning BEFORE the line-parse: compat-path reasoning models
+    # (MiniMax/DeepSeek/GLM) emit <think>...</think> inline in message.content, and the
+    # non-streaming suggestion call bypasses the streaming adapter's reasoning split.
+    # Stripping precedes the split so a think line never becomes a chip nor fills the clamp.
+    content = _strip_think_blocks(content)
     # Parse: one question per line, strip empty lines, clamp to 3
     questions = [q.strip() for q in content.split("\n") if q.strip()]
     return questions[:3], fallback_info

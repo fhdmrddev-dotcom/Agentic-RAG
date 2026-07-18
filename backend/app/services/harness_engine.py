@@ -1480,6 +1480,19 @@ async def _build_resume_context(run, redis, pool):
     from app.dependencies import get_supabase
     _service_supabase = get_supabase()
 
+    # F8 (092-07) + 152 WFIN-02 (Pitfall 5): parse the durable workflow_runs.inputs jsonb
+    # ONCE up front so both the folder-override scope resolution below AND the F8
+    # kickoff_prompt rehydration read the same dict. jsonb arrives as a str under
+    # asyncpg's default codec (mirror _load_run_definition).
+    _resume_inputs = run.get("inputs") or {}
+    if isinstance(_resume_inputs, str):
+        try:
+            _resume_inputs = json.loads(_resume_inputs)
+        except (ValueError, TypeError):
+            _resume_inputs = {}
+    if not isinstance(_resume_inputs, dict):
+        _resume_inputs = {}
+
     # 098 (GOV-01 / PROJ-02 — site 2 resume): source the run-start retrieval scope
     # from the run's PROJECT binding so a bound workflow stays inside its project
     # across a restart. Closes the folder_subtree_ids=None whole-KB bypass below
@@ -1507,6 +1520,7 @@ async def _build_resume_context(run, redis, pool):
             from app.services.harness.scope import (  # noqa: PLC0415
                 assert_folder_scopes_subset,
                 resolve_project_subtree,
+                resolve_run_scope_root,
             )
             _resume_definition = await _load_run_definition(pool, run["run_id"])
             # getattr (not attribute access) defends the sentinel definitions some
@@ -1525,8 +1539,21 @@ async def _build_resume_context(run, redis, pool):
                     supabase=_service_supabase,
                     user_id=str(_user_id),
                 )
+            # 152 WFIN-02 (Pitfall 5): layer the durable per-run folder override from
+            # workflow_runs.inputs so a RESUMED run stays on the operator's chosen folder
+            # instead of silently reverting to the author default. The helper owner-
+            # re-validates the override against the durable owner's visible folders (a
+            # since-deleted folder degrades safely to the author default → whole-KB).
+            _resume_scope_root = await resolve_run_scope_root(
+                _resume_definition,
+                run_inputs=_resume_inputs,
+                thread_folder_id=None,
+                supabase=_service_supabase,
+                user_id=str(_user_id),
+            )
+            if _resume_scope_root is not None:
                 _resume_folder_subtree_ids = await resolve_project_subtree(
-                    _resume_project_folder_id,
+                    _resume_scope_root,
                     supabase=_service_supabase,
                     user_id=str(_user_id),
                 )
@@ -1563,19 +1590,9 @@ async def _build_resume_context(run, redis, pool):
                         run.get("run_id"),
                     )
 
-    # F8 (092-07): rehydrate the original kickoff_prompt from the durable
-    # workflow_runs.inputs jsonb (carried on the `run` row by find_resumable_runs'
-    # `wr.inputs` SELECT) so a resumed first phase still acts on the user's question
-    # instead of running with an empty user turn. jsonb arrives as a str under
-    # asyncpg's default codec → parse defensively (mirror _load_run_definition).
-    _resume_inputs = run.get("inputs") or {}
-    if isinstance(_resume_inputs, str):
-        try:
-            _resume_inputs = json.loads(_resume_inputs)
-        except (ValueError, TypeError):
-            _resume_inputs = {}
-    if not isinstance(_resume_inputs, dict):
-        _resume_inputs = {}
+    # F8 (092-07): _resume_inputs (parsed up front above) carries the durable
+    # kickoff_prompt so a resumed first phase still acts on the user's question instead
+    # of an empty user turn — rehydrated onto ctx.inputs in the return below.
 
     # D-04 (site 2): thread the resolved ctx model onto the resumed wf_ctx so a
     # resumed run resolves a non-stale model from the active provider (closes part

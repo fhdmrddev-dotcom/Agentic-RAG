@@ -75,18 +75,23 @@ export function ReembedConfirmModal({
   const eta = estimateEta(chunkCount)
 
   return (
-    <div
-      className="fixed inset-0 z-[500] flex items-center justify-center p-5 bg-background/80 backdrop-blur-sm animate-[fadeSlideUp_0.3s_ease-out]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-5 bg-background/80 backdrop-blur-sm animate-[fadeSlideUp_0.3s_ease-out]">
+      {/* Backdrop-dismiss — click outside the card closes; Escape also closes (the
+          keydown effect above). Kept out of the tab order (tabIndex=-1) so it never
+          steals focus from the card's controls; the aria-label names the action. */}
+      <button
+        type="button"
+        aria-label="Close dialog"
+        tabIndex={-1}
+        className="absolute inset-0 cursor-default"
+        onClick={onCancel}
+      />
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="reembed-modal-title"
         aria-describedby="reembed-modal-desc"
-        className="w-full max-w-md overflow-hidden rounded-xl bg-card border border-border shadow-2xl"
+        className="relative w-full max-w-md overflow-hidden rounded-xl bg-card border border-border shadow-2xl"
       >
         {/* Danger rail — Deep Midnight danger→warning gradient (not generic red) */}
         <div className="h-[3px] bg-gradient-to-r from-destructive to-amber-400" />
@@ -107,21 +112,21 @@ export function ReembedConfirmModal({
           {/* A's 4-fact grid — chunks · ETA · target model · runs-in-background */}
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Chunks to re-embed</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Chunks to re-embed</div>
               <div className="text-lg font-mono font-bold text-foreground">{countLabel}</div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Estimated time</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Estimated time</div>
               <div className="text-lg font-mono font-bold text-foreground">{eta}</div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Target model</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Target model</div>
               <div className="text-sm font-mono text-foreground truncate" title={targetModel}>
                 {targetModel}{targetDims ? ` · ${targetDims}d` : ""}
               </div>
             </div>
             <div className="rounded-md bg-muted/30 ghost-border px-4 py-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70 mb-0.5">Runs</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Runs</div>
               <div className="text-sm font-mono text-foreground">in background</div>
             </div>
           </div>

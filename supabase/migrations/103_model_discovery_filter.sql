@@ -1,0 +1,38 @@
+-- Migration 103: Model-discovery utility-filter default (Phase 159, MODEL-03 / D-159-04)
+-- Adds the one persisted, operator-governed app_settings knob the discovery panel reads for
+-- its "hide utility models by default" filter:
+--   (1) app_settings.model_discovery_filter_enabled — D-159-04 default-ON utility filter switch
+--
+-- D-159-04: the discovery filter is a PURE display/curation concern — it hides known non-chat
+-- "utility" model ids (embed/whisper/tts/…) from the discovery diff so the operator's review
+-- surface isn't drowned in ~400 noise rows. It NEVER deletes, disables, or mutates the confirmable
+-- diff (149 "Discovery proposes, humans confirm" red line). This flag only persists the panel's
+-- default toggle state so "filter on" survives sessions + WORKER_COUNT=2 workers (it rides the
+-- existing 30s TTL settings cache — no new cache). "Show all" reveals the hidden rows at any time.
+-- Default TRUE (filter ON by default per D-159-04).
+--
+-- Metadata-only: one idempotent ADD COLUMN. A boolean NOT NULL DEFAULT true column is SELF-SEEDING
+-- (existing app_settings rows inherit true from the DEFAULT) — no seed row, no backfill. No RLS
+-- policy needed: app_settings writes are service-role only (the operator write lands on the shipped
+-- PUT /admin/flags path, T-147-01), and the read is service-side through the settings cache. Analog
+-- shape: 099_model_registry_deprecated.sql (the ADD COLUMN app_settings precedent).
+--
+-- The code that reads this column ships FAIL-SOFT ahead of this migration (Phase 159 Plan 03,
+-- Task 1): _build_settings_from_row reads it via _val_bool(row, "model_discovery_filter_enabled",
+-- None, True), so a row where the column is ABSENT (migration not yet applied) returns the safe
+-- default `true` and never raises (the mig-102 setup_complete fail-soft precedent). This migration
+-- is therefore authored-but-NOT-applied by Claude — an operator applies it (Plan 03, Task 2).
+--
+-- APPLY (CLAUDE.md): paste the FULL contents of this file into the LOCAL Supabase SQL editor and
+--   run it. Idempotent (ADD COLUMN IF NOT EXISTS) — safe to re-run.
+--   NEVER `supabase db push` / `supabase db reset` — those wipe local dev data.
+-- THEN: from the repo root run `bash scripts/regenerate-full-schema.sh` (no --reset — a live-DB
+--   schema dump that preserves data) to rebuild supabase/full-schema.sql, then commit this file +
+--   full-schema.sql together.
+-- CLOUD PARITY: paste this same SQL into the CLOUD Supabase SQL editor at promotion — a new column
+--   is a non-code deploy half (docs/DEPLOYMENT-WORKFLOW.md deploy-parity checklist). DEFERRED to the
+--   standing production-push checklist (migrations 099/100/101/102 already pending; do not touch cloud now).
+
+-- ── D-159-04: default-ON discovery utility filter on app_settings ───────────
+ALTER TABLE public.app_settings
+  ADD COLUMN IF NOT EXISTS model_discovery_filter_enabled boolean NOT NULL DEFAULT true;

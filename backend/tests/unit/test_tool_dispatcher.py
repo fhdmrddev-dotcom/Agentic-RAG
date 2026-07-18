@@ -53,19 +53,25 @@ EXPECTED_TOOLS = [
     "query_documents_by_view",
     # Phase 116 Plan 03: get_related_documents (REL-04) — phase-end 27
     "get_related_documents",
+    # Phase 151 Plan 01: fetch_document_file (FILE-02) — 28
+    "fetch_document_file",
+    # Phase 151 Plan 04: attach_skill_file (FILE-01) — phase-end 29
+    "attach_skill_file",
 ]
 
 
-def test_registry_has_exactly_27_entries():
-    """_TOOL_REGISTRY must contain exactly 27 tool handlers after Phase 116.
+def test_registry_has_exactly_29_entries():
+    """_TOOL_REGISTRY must contain exactly 29 tool handlers after Phase 151.
 
     (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
     Plan 02 + ask_user from Plan 03 = 24; + render_template from Phase 101 = 25;
     + query_documents_by_view from Phase 115 = 26; + get_related_documents from
-    Phase 116 = 27).
-    Phase-end gate.
+    Phase 116 = 27; + fetch_document_file from Phase 151 FILE-02 = 28;
+    + attach_skill_file from Phase 151 FILE-01 = 29).
+    Phase-end gate — registry entries are NOT capability-gated (the gate is in
+    get_tools()/dispatch), so both FILE-01/02 tools are always present here.
     """
-    assert len(_TOOL_REGISTRY) == 27
+    assert len(_TOOL_REGISTRY) == 29
 
 
 def test_registry_contains_all_expected_tools():

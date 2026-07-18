@@ -469,6 +469,68 @@ SAVE_SKILL_TOOL = {
     },
 }
 
+# Phase 151 (FILE-01) — attach_skill_file: save a file onto an OWNED skill from one of
+# four sources. FLAT schema (source enum discriminator, no anyOf/oneOf/$ref) — the only
+# cross-provider-safe function-calling shape (Google rejects union keywords). Modeled on
+# QUERY_DOCUMENTS_BY_VIEW_TOOL; optional source-specific fields are ["string","null"] and
+# NOT in `required`, so weak/strict callers accept it.
+ATTACH_SKILL_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "attach_skill_file",
+        "description": (
+            "Use when you want to SAVE a file onto a skill you own — a helper script, "
+            "template, or asset the skill should carry so it persists for future runs. "
+            "Do not use to write to a global or built-in skill; you can only attach files "
+            "to a skill you own. Set `source` to say where the bytes come from: "
+            "'workspace' (a thread workspace file at `workspace_path`), 'sandbox_output' "
+            "(a file you produced in the sandbox at `sandbox_path`, e.g. "
+            "/sandbox/output/report.docx), 'inline' (text you pass directly in `content`), "
+            "or 'kb_document' (a knowledge-base document by `document_id`). A colliding "
+            "`filename` overwrites the existing file on the skill in place. Only available "
+            "when self-improvement is enabled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "target_skill_name": {
+                    "type": "string",
+                    "description": "Exact name of a skill YOU own to attach the file to.",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": (
+                        "Filename to save on the skill (e.g. 'helper.py'). A colliding "
+                        "name overwrites the existing file in place."
+                    ),
+                },
+                "source": {
+                    "type": "string",
+                    "enum": ["workspace", "sandbox_output", "inline", "kb_document"],
+                    "description": "Where the file bytes come from.",
+                },
+                "workspace_path": {
+                    "type": ["string", "null"],
+                    "description": "For source='workspace': the workspace file path (e.g. '/report.docx').",
+                },
+                "sandbox_path": {
+                    "type": ["string", "null"],
+                    "description": "For source='sandbox_output': the sandbox file path (e.g. '/sandbox/output/chart.png').",
+                },
+                "content": {
+                    "type": ["string", "null"],
+                    "description": "For source='inline': the file's text content, passed directly.",
+                },
+                "document_id": {
+                    "type": ["string", "null"],
+                    "description": "For source='kb_document': the UUID of an owned knowledge-base document.",
+                },
+            },
+            "required": ["target_skill_name", "filename", "source"],
+        },
+    },
+}
+
 READ_SKILL_FILE_TOOL = {
     "type": "function",
     "function": {
@@ -1022,13 +1084,42 @@ EXPLORER_SYSTEM_PROMPT = (
 )
 
 
+FETCH_DOCUMENT_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "fetch_document_file",
+        "description": (
+            "Use when you need the REAL original file bytes of a knowledge-base document "
+            "in the sandbox so you can convert, render, or process the actual file — it is "
+            "written to /sandbox/input/<filename> and the exact path is returned, ready to "
+            "open in execute_code (e.g. with python-docx, openpyxl, pypdf). "
+            "Do not use for reading a document's text — use read_document or "
+            "analyze_document for that. Only available when the sandbox is enabled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "string",
+                    "description": (
+                        "UUID of the knowledge-base document whose original file to fetch "
+                        "into the sandbox."
+                    ),
+                },
+            },
+            "required": ["document_id"],
+        },
+    },
+}
+
+
 def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict]:
     """Return the active tool list based on per-user effective settings."""
     effective = user_settings if user_settings is not None else None
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, QUERY_DOCUMENTS_BY_VIEW_TOOL,
              GET_RELATED_DOCUMENTS_TOOL,
              LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
-             LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
+             LOAD_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
              WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
@@ -1044,10 +1135,38 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     # path (Google max_tools:16); Deep stays byte-identical with this tool present.
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
+    # Phase 147 (FLAG-01 / D-04 layer 1 HIDE): the self-improvement operator kill-switch
+    # gates SAVE_SKILL_TOOL exactly as web/sandbox gate their tools — resolved
+    # effective-settings-first. Appended BEFORE web/sandbox so its relative order is
+    # unchanged, and default-True (migration 097) → the returned list is set-identical to
+    # the pre-147 toolbox until an operator flips self-improve OFF (the Phase 091 whitelist
+    # no-op precedent; Deep Mode byte-identical when nothing is off). The effective-None
+    # fallback reads the plan-01 TTL-cached helper — NOT ``settings.<flag>`` — because
+    # self_improve is an app_settings-only switch with NO env attribute (unlike web/sandbox).
+    # getattr default-True mirrors the D-Q4 default-ON polarity: a settings object built
+    # before this field existed (or a partial duck-typed effective) reads capability-ON,
+    # never silently hiding save_skill. Real UserEffectiveSettings always carries the field.
+    if effective is not None:
+        self_improve_on = getattr(effective, "self_improve_enabled", True)
+    else:
+        from app.models.user_settings import self_improve_enabled as _self_improve_enabled
+        self_improve_on = _self_improve_enabled()
+    if self_improve_on:
+        tools.append(SAVE_SKILL_TOOL)
+        # Phase 151 (FILE-01 / D-11) — attach_skill_file is a self-improvement WRITE
+        # (save a file onto an owned skill), so it rides the SAME self_improve gate as
+        # save_skill: hidden here when self-improve is OFF, and refused in-flight via
+        # _CAPABILITY_FLAG_TOOLS (defense-in-depth). Not sandbox-gated — its sources
+        # include workspace/inline/kb_document that need no sandbox.
+        tools.append(ATTACH_SKILL_FILE_TOOL)
     if web_enabled:
         tools.append(WEB_SEARCH_TOOL)
     if sandbox_enabled:
         tools.append(EXECUTE_CODE_TOOL)
+        # Phase 151 FILE-02 — sandbox-gated (D-11 / Pitfall 6): fetch_document_file
+        # materializes bytes INTO the container, so it is meaningless when the sandbox
+        # is off. Also refused in-flight via _CAPABILITY_FLAG_TOOLS (defense-in-depth).
+        tools.append(FETCH_DOCUMENT_FILE_TOOL)
     return tools
 
 
@@ -1232,6 +1351,9 @@ _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     "gpt-5.4-mini":                          32768,  # supports 128k; 32K conservative
     "gpt-5.4-nano":                          16384,  # budget — keep conservative
     "gpt-5.5":                               65536,  # supports 128k; 64K practical ceiling
+    "gpt-5.6-sol":                           65536,  # flagship; supports 128k; 64K practical ceiling
+    "gpt-5.6-terra":                         65536,  # balanced; supports 128k; 64K practical ceiling
+    "gpt-5.6-luna":                          32768,  # lightweight/fast; 32K conservative
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-7":                       32768,  # supports 128k; 32k practical for agentic RAG
     "claude-haiku-4-5-20251001":             32768,  # supports 64k; 32k practical for sub-agent analysis
@@ -1280,6 +1402,8 @@ def _parse_model_output_limits(raw: str) -> dict[str, int]:
 def _resolve_max_tokens(
     explicit: int | None,
     user_settings: "UserEffectiveSettings | None",
+    effective_model: str | None = None,
+    db_max_output_cap: int | None = None,
 ) -> int:
     """Pick the right max_tokens for this call.
 
@@ -1293,11 +1417,29 @@ def _resolve_max_tokens(
 
     Phase 074 D-074-01: After resolution, ALL priority branches flow through
     a single clamp gate at the bottom of this function. The clamp returns
-    ``min(resolved, MODEL_CAPABILITIES[model]["max_output_tokens"])`` when an
-    entry exists and ``resolved`` exceeds it; pass-through otherwise per
-    D-074-02. The function was refactored from a 6-early-return shape to
-    single-return to ensure the clamp covers every priority branch
-    (RESEARCH.md Pitfall 1).
+    ``min(resolved, max_output_tokens[model])`` when a cap exists and ``resolved``
+    exceeds it; pass-through otherwise per D-074-02. The function was refactored
+    from a 6-early-return shape to single-return to ensure the clamp covers every
+    priority branch (RESEARCH.md Pitfall 1).
+
+    Phase 149 D-149-15 (closes BUG-260620-01): the clamp now honors the EFFECTIVE
+    model actually being sent — not ``user_settings.llm_model`` — and an operator's
+    DB-edited ``max_output_tokens`` — not just the static ``MODEL_CAPABILITIES``
+    dict. Both new parameters are OPTIONAL so any not-yet-updated caller degrades
+    to the pre-149 static-dict-against-user_settings behavior (never crashes):
+
+    - ``effective_model``: the model id that will actually be sent (resolved by the
+      caller, e.g. ``model or user_settings.llm_model or settings.llm_model``). When
+      provided it takes precedence for the clamp lookup; when ``None`` the lookup
+      falls back to the ``user_settings.llm_model`` chain exactly as before. A
+      sub-agent / explicit-model call therefore clamps against ITS model, not the
+      user's default (the BUG-260620-01 wrong-model mechanism — Pitfall 4).
+    - ``db_max_output_cap``: a pre-resolved DB-overridable ceiling for the effective
+      model. The (already-async) request path fetches it via
+      ``get_model_capability_async(effective_model)`` and threads it in, so this
+      function stays SYNC — no await deep in the hot path (RESEARCH.md Open Q3).
+      When provided it is the clamp ceiling; when ``None`` the ceiling falls back to
+      the static ``MODEL_CAPABILITIES`` entry for the effective model.
     """
     if explicit is not None:
         resolved = explicit
@@ -1333,21 +1475,36 @@ def _resolve_max_tokens(
 
         resolved = resolved_from_priority
 
-    # Phase 074 D-074-01: Clamp gate. Single chokepoint covers all priority
-    # branches above (explicit value, env override, per-model default, etc.).
-    # Pass-through if registry entry missing OR max_output_tokens key absent
-    # per D-074-02. RESEARCH.md Open Question 2: strip ONLY the OpenRouter
-    # `:exacto` quality-routing suffix (openai_service.py:838-840) before lookup.
-    # Do NOT use a generic `split(":")[0]` — that would also strip legitimate
-    # suffixes like `:free` on `minimax/minimax-m2.5:free`, which is a real
-    # upstream model card with its own registry entry (cap=16384), and the
-    # stripped form `minimax/minimax-m2.5` is NOT in the registry, so the clamp
-    # would silently lose protection for the `:free` tier. Targeted
-    # `.removesuffix(":exacto")` keeps both paths working.
-    model_id = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
+    # Phase 074 D-074-01 / Phase 149 D-149-15: Clamp gate. Single chokepoint
+    # covers all priority branches above (explicit value, env override, per-model
+    # default, etc.). Pass-through if no cap resolves per D-074-02.
+    #
+    # Model lookup (D-149-15): the EFFECTIVE model actually being sent wins so a
+    # sub-agent / explicit-model call clamps against the RIGHT cap; fall back to
+    # the `user_settings.llm_model` chain only when the caller did not thread an
+    # effective model (BUG-260620-01 was the wrong-model mechanism — Pitfall 4).
+    #
+    # RESEARCH.md Open Question 2: strip ONLY the OpenRouter `:exacto` quality-
+    # routing suffix (openai_service.py:838-840) before the static lookup. Do NOT
+    # use a generic colon-split that keeps only the pre-colon head — that would
+    # also strip legitimate suffixes like `:free` on `minimax/minimax-m2.7:free`,
+    # which is a real upstream model card, and the stripped base form has a
+    # DIFFERENT cap, so the clamp would silently lose protection for the `:free`
+    # tier. Targeted `.removesuffix(...)` keeps both paths working.
+    #
+    # Ceiling (D-149-15): honor an operator's DB-edited max_output_tokens. When the
+    # caller pre-resolved a DB-overridable cap (via get_model_capability_async on
+    # the async request path — Open Q3, keeps this function sync) it is authoritative;
+    # otherwise fall back to the static MODEL_CAPABILITIES entry for the effective
+    # model so legacy / sync-gateway callers keep their registry protection.
+    model_id = effective_model or (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
     if model_id:
         lookup_key = model_id.removesuffix(":exacto") if model_id.endswith(":exacto") else model_id
-        cap = MODEL_CAPABILITIES.get(lookup_key, {}).get("max_output_tokens")
+        cap = (
+            db_max_output_cap
+            if db_max_output_cap is not None
+            else MODEL_CAPABILITIES.get(lookup_key, {}).get("max_output_tokens")
+        )
         if cap and resolved > cap:
             logger.info(
                 "clamped max_tokens for model=%s: %d -> %d",
@@ -1355,6 +1512,87 @@ def _resolve_max_tokens(
             )
             return cap
     return resolved
+
+
+def _resolve_db_max_output_cap(model_id: str | None) -> int | None:
+    """Best-effort SYNC read of an operator's DB-edited ``max_output_tokens`` for
+    ``model_id`` (Phase 149 D-149-15 — the DB overlay for the clamp ceiling).
+
+    Open Q3 keeps ``_resolve_max_tokens`` sync and the openai-compat stream
+    construction sync (the D-14 byte-identical boundary), so we cannot ``await``
+    the async DB overlay (``get_model_capability_async``) here. Instead we read the
+    SAME 30s-TTL ``_model_overrides_cache`` that the async request path warms:
+    ``agent_loop.py`` calls ``get_model_capability_async(effective_model)``
+    immediately before opening the stream (and ``_load_model_overrides`` loads
+    EVERY enabled override row into the cache), so this sync read reflects an
+    operator's edit within the D-149-16 TTL window WITHOUT an await in the hot
+    path — i.e. the cap is resolved on the async path and passed in via the cache.
+
+    Returns the DB-overridden cap when a row with a non-null ``max_output_tokens``
+    exists; otherwise ``None`` so ``_resolve_max_tokens`` falls back to the static
+    ``MODEL_CAPABILITIES`` ceiling (a cold cache or un-overridden model is the safe
+    static-clamp default, never a crash — D-074-02).
+    """
+    if not model_id:
+        return None
+    try:
+        # Lazy import mirrors config.get_model_capability_async's own lazy import
+        # (avoids the openai_service <-> user_settings import cycle).
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model_id)
+        if row is not None:
+            db_cap = row.get("max_output_tokens")
+            if db_cap is not None:
+                return int(db_cap)
+    except Exception:
+        logger.warning(
+            "_resolve_db_max_output_cap: sync cache read failed for model=%s; "
+            "falling back to static registry cap",
+            model_id,
+            exc_info=True,
+        )
+    return None
+
+
+def _resolve_db_native_tools(model_id: str | None) -> bool | None:
+    """Best-effort SYNC read of an operator's DB-edited ``native_tools`` override for
+    ``model_id`` (Phase 149 SC#1 / D-149-16 — the DB overlay for the tool-calling mode).
+
+    Mirrors :func:`_resolve_db_max_output_cap` byte-for-byte in structure. ``resolve_calling_mode``
+    stays SYNC (the D-14 byte-identical boundary), so we cannot ``await`` the async DB overlay
+    (``get_model_capability_async``) here. Instead we read the SAME 30s-TTL
+    ``_model_overrides_cache`` the async request path warms: ``agent_loop.py`` calls
+    ``get_model_capability_async(effective_model)`` immediately before opening the stream (and
+    ``_load_model_overrides`` loads EVERY enabled override row — the rows carry ``native_tools``
+    among their columns), so this sync read reflects an operator's toggle within the D-149-16
+    TTL window WITHOUT an await in the hot path — i.e. the mode is resolved on the async path and
+    passed in via the cache.
+
+    Returns ``True``/``False`` when a row exists AND its ``native_tools`` value is not None (the
+    operator explicitly turned native tools ON or OFF); otherwise ``None`` so
+    ``resolve_calling_mode`` falls back to the static ``MODEL_CAPABILITIES`` value (a cold cache,
+    an absent row, or a null ``native_tools`` column is the byte-identical no-override default,
+    never a crash — mirrors _resolve_db_max_output_cap / D-074-02).
+    """
+    if not model_id:
+        return None
+    try:
+        # Lazy import mirrors _resolve_db_max_output_cap's own lazy import
+        # (avoids the openai_service <-> user_settings import cycle).
+        from app.models.user_settings import _model_overrides_cache
+        row = _model_overrides_cache.get(model_id)
+        if row is not None:
+            db_native = row.get("native_tools")
+            if db_native is not None:
+                return bool(db_native)
+    except Exception:
+        logger.warning(
+            "_resolve_db_native_tools: sync cache read failed for model=%s; "
+            "falling back to static registry native_tools",
+            model_id,
+            exc_info=True,
+        )
+    return None
 
 
 def _uses_max_completion_tokens(model: str) -> bool:
@@ -1422,7 +1660,26 @@ class CallingMode(str, Enum):
 def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | None" = None) -> CallingMode:
     """Determine whether to use native API tools or structured JSON prompting."""
     cap = get_model_capability(model_id)
-    
+
+    # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT
+    # request's routing. Read the DB override SYNC from the same warm _model_overrides_cache the
+    # max_output clamp uses (_resolve_db_native_tools — no await on the hot path; None on a
+    # cold/absent/null row → byte-identical to today, D-14). An explicit native_tools=False
+    # short-circuits to STRUCTURED here — this correctly bypasses the OpenRouter strategy branch
+    # below too. SCOPE (WR-05, review round 2): resolve_calling_mode is consulted ONLY by the
+    # OpenAI-compat gateway path (7 of the 9 providers). Models served by the Anthropic/Google
+    # NATIVE SDK branches (agent_loop.py:1921 dispatches on active_provider_name BEFORE any
+    # calling-mode read) are always-native and never see this override — the registry UI gates
+    # the native_tools toggle for those rows (honest lock, "always native on this provider")
+    # rather than record a silently-inert OVR. Honoring the override there would mean rerouting
+    # native-SDK traffic through the compat adapter (Google's native base URL is not
+    # OpenAI-compatible; STRUCTURED changes tool semantics) — deferred, see 149-REVIEW.md WR-05.
+    # An explicit True flows through the existing branch (it does not override an xml strategy)
+    # and only settles the final static decision.
+    db_native = _resolve_db_native_tools(model_id)
+    if db_native is False:
+        return CallingMode.STRUCTURED
+
     # OpenRouter strategy override — applies when the active provider is openrouter
     # OR when the model is explicitly in the registry as an openrouter model
     is_openrouter = (
@@ -1435,8 +1692,11 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
             return CallingMode.STRUCTURED
         # quality and native both attempt native, but quality adds :exacto
         return CallingMode.NATIVE
-    
-    if cap["native_tools"]:
+
+    # Effective native_tools: an operator's explicit True (db_native) wins over the static cap;
+    # when db_native is None this collapses to cap["native_tools"] — byte-identical (D-14).
+    effective_native = db_native if db_native is not None else cap["native_tools"]
+    if effective_native:
         return CallingMode.NATIVE
     return CallingMode.STRUCTURED
 
@@ -1483,7 +1743,17 @@ def create_adaptive_streaming_chat(
     request construction — NOT the shared chunk/SSE path (the D-14 RED LINE)."""
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
-    resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
+    # Phase 149 D-149-15 (BUG-260620-01): clamp against the EFFECTIVE model actually
+    # sent + an operator's DB-edited max_output_tokens. The DB cap is read sync from
+    # the warm override cache (warmed by the async get_model_capability_async call on
+    # the request path — see _resolve_db_max_output_cap); None → static registry cap.
+    db_max_output_cap = _resolve_db_max_output_cap(effective_model)
+    resolved_tokens = _resolve_max_tokens(
+        max_tokens,
+        user_settings,
+        effective_model=effective_model,
+        db_max_output_cap=db_max_output_cap,
+    )
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     
     calling_mode = resolve_calling_mode(effective_model, user_settings)

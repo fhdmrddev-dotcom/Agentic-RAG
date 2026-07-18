@@ -58,6 +58,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.middleware.maintenance import MaintenanceMiddleware
+from app.middleware.setup import SetupMiddleware
 
 
 def _patch_postgrest_maybe_single():
@@ -103,6 +105,20 @@ _DIRECT_COLUMNS: set[str] = {
     "web_search_enabled", "sandbox_enabled", "context_window_max_tokens",
     "sub_agent_max_output_tokens", "sub_agent_model", "llm_max_output_tokens",
     "openrouter_tool_strategy", "ollama_base_url",
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches.
+    # Column names are code CONSTANTS (never user input) -> keeps save_app_settings
+    # SQLi-safe (T-147-01). Values are parameterized ($N) in save_app_settings.
+    "self_improve_enabled", "workflows_enabled", "maintenance_mode",
+    # Phase 149 (MODEL-02, migration 099) — the single org-default lock flag. Written by
+    # the dedicated PUT /admin/models/{id}/lock endpoint through save_app_settings; a code
+    # CONSTANT (never user input) so the write stays SQLi-safe (value parameterized $N).
+    "llm_model_locked",
+    # Phase 159 (MODEL-03, migration 103) — the persisted discovery-filter default. Added here
+    # for documentation-completeness of the legacy settings_override.json→DB migration path
+    # (_migrate_settings_override — the ONLY consumer of _DIRECT_COLUMNS), mirroring the mig
+    # 097/099 flag-column additions. This is NOT the write-path SQLi guard: the operator write
+    # rides PUT /admin/flags → _FLAG_KEYS + save_app_settings's _VALID_COLUMN_NAME regex.
+    "model_discovery_filter_enabled",
 }
 
 _PROVIDER_MODEL_KEYS: set[str] = {
@@ -112,13 +128,12 @@ _PROVIDER_MODEL_KEYS: set[str] = {
 }
 
 # CR-01 fix: allowset for API key column names prevents SQL injection
-# from crafted JSON keys like "x; DROP TABLE --_api_key"
-_API_KEY_COLUMNS: set[str] = {
-    "openai_api_key", "anthropic_api_key", "google_api_key",
-    "openrouter_api_key", "ollama_api_key", "deepseek_api_key",
-    "moonshot_api_key", "minimax_api_key", "zhipu_api_key",
-    "embedding_api_key", "rerank_api_key", "tavily_api_key",
-}
+# from crafted JSON keys like "x; DROP TABLE --_api_key".
+# Phase 150 (SEC-01) — single source of truth: re-pointed to the cipher module's
+# SECRET_COLUMNS frozenset (identical 12-column set; secret_cipher does NOT import main,
+# so there is no cycle). The legacy use at _migrate_settings_override (`key in
+# _API_KEY_COLUMNS`) works unchanged against a frozenset.
+from app.security.secret_cipher import SECRET_COLUMNS as _API_KEY_COLUMNS
 
 
 async def _migrate_settings_override() -> None:
@@ -129,6 +144,10 @@ async def _migrate_settings_override() -> None:
     Idempotent: no-op if JSON file absent (D-05).
     Fail-safe: on any DB error, leaves file untouched for fallback (D-03).
     On success: renames file to .migrated (D-04).
+
+    Phase 150 (SEC-01 / RESEARCH Pattern 5): this legacy path writes secret values as
+    PLAINTEXT — no encryption is added here. The eager secret sweep (_sweep_secret_columns,
+    later in the SAME lifespan boot) encrypts whatever this migration wrote (D-150-03 backstop).
     """
     import json as _json
 
@@ -214,6 +233,63 @@ async def _migrate_settings_override() -> None:
     )
 
 
+def _validate_and_report_cipher():
+    """Phase 150 (SEC-01 / D-150-04 / D-150-01) — boot-time master-key gate.
+
+    Called UN-wrapped from lifespan (NO best-effort try/except — Pitfall 6). Returns the
+    active MultiFernet, or None when no key is configured. Polarity:
+      - MALFORMED SECRETS_ENCRYPTION_KEY -> get_cipher() raises ValueError, which PROPAGATES
+        out of this function and out of lifespan, so ALL WORKER_COUNT=2 workers refuse to
+        start (D-150-04 fail-hard). A typo'd key must NEVER silently boot plaintext. Mirrors
+        the assert_action_types_synced hard-fail / the 075.4 UnknownProviderError.
+      - MISSING key -> get_cipher() None -> one loud WARNING naming SECRETS_ENCRYPTION_KEY;
+        secrets remain PLAINTEXT at rest (D-150-01 fail-open). Returns None.
+    """
+    from app.security.secret_cipher import get_cipher
+    cipher = get_cipher()  # malformed key -> ValueError propagates (NOT swallowed)
+    if cipher is None:
+        logger.warning(
+            "SECRETS_ENCRYPTION_KEY is not set — provider/API secrets in app_settings are "
+            "stored PLAINTEXT at rest until it is configured (D-150-01 fail-open)."
+        )
+    return cipher
+
+
+async def _sweep_secret_columns(pool) -> dict[str, str]:
+    """Phase 150 (SEC-01 / D-150-03 / D-150-06) — eager, idempotent at-rest secret sweep.
+
+    Reads the id='global' app_settings row, asks sweep_row which secret columns need
+    (re)encryption (plaintext -> enc:v1:, or a value under an OLD key -> rotate to the
+    primary key), and issues ONE parameterized UPDATE writing ONLY the changed columns.
+    Returns the {col: new_enc_value} that changed ({} when already converged — a no-op boot).
+
+    Idempotent (D-150-03): sweep_row skips values already under the primary key, so a second
+    call returns {} and issues no UPDATE. WORKER_COUNT=2-safe with NO lock — encrypting the
+    same plaintext twice yields two valid ciphertexts (last-writer-wins, both decrypt
+    identically), and the enc:v1: prefix check keeps it from re-wrapping. Column names are
+    from sweep_row's SECRET_COLUMNS allowlist (never user input -> SQLi-safe, T-081.1-04);
+    values are parameterized ($N). Logs NEVER carry a value or token (T-150-02).
+    """
+    from app.security.secret_cipher import sweep_row
+
+    row = await pool.fetchrow("SELECT * FROM app_settings WHERE id = 'global'")
+    if row is None:
+        return {}
+    changed = sweep_row(dict(row))
+    if not changed:
+        return {}
+
+    cols = list(changed.keys())
+    set_clause = ", ".join(f"{col} = ${i + 1}" for i, col in enumerate(cols))
+    vals = list(changed.values())
+    vals.append("global")  # WHERE id = $N
+    await pool.execute(
+        f"UPDATE app_settings SET {set_clause}, updated_at = now() WHERE id = ${len(vals)}",
+        *vals,
+    )
+    return changed
+
+
 @asynccontextmanager
 async def lifespan(app_instance):
     # Startup: bump AnyIO default thread limiter so SSE-path .execute()
@@ -222,6 +298,31 @@ async def lifespan(app_instance):
     anyio.to_thread.current_default_thread_limiter().total_tokens = (
         settings.anyio_thread_tokens
     )
+
+    # Phase 158 (DEPLOY-02 / D-03) — setup-mode tolerance. Derive ONCE from the blip-proof
+    # FILE marker (a cheap read, NO DB): a fresh/unbound box (finalize marker unset) boots into
+    # setup mode so the operator reaches /setup and reads the token, instead of crash-looping on
+    # the ONE un-guarded DB hard-fail below (assert_action_types_synced, RESEARCH Pattern 3 /
+    # Pitfall 3). A FINALIZED box is byte-identical to today — the audit guard runs and all four
+    # reconcilers spawn. NEVER a DB read (D-05): a transient DB outage must not flip a configured
+    # box into setup mode.
+    from app.services import setup_store  # noqa: F401 — kept for announce_token_if_unfinalized below
+    from app.config import needs_setup, settings as _setup_cfg
+    # _setup_mode is TRUE only for a GENUINELY-fresh box (placeholder infra AND no finalize
+    # marker). A box configured via env (real supabase_url, no marker — every existing deploy
+    # and every local dev box) reads False here and boots byte-identically (audit guard + all
+    # four reconcilers run). needs_setup is a file+string check (D-05), NEVER a DB read — a
+    # transient DB outage cannot flip a configured box into setup mode.
+    _setup_mode = needs_setup(_setup_cfg)
+    if _setup_mode:
+        # D-15 — surface the first-boot setup token to stdout (`docker compose logs backend`)
+        # exactly once. Best-effort (mirrors every other lifespan side-effect): a setup-store
+        # write failure must not crash the boot (D-03 degrade-not-crash); the box still boots
+        # into setup mode so the operator can act.
+        try:
+            setup_store.announce_token_if_unfinalized()
+        except Exception:  # noqa: BLE001 — announce is advisory; a store-write blip must not crash boot
+            logger.warning("setup-token announce failed (app continues in setup mode)", exc_info=True)
 
     # Phase 061 (D-061-13, T-061-05): best-effort Redis startup PING.
     # Do NOT block startup if Redis is unreachable — the warning log makes
@@ -242,12 +343,59 @@ async def lifespan(app_instance):
     except Exception as e:
         logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
+    # Phase 150 (SEC-01) — at-rest secret encryption: boot-time key gate + eager sweep.
+    # TWO steps in DELIBERATELY DIFFERENT polarities (RESEARCH §Pattern 4):
+    #   (1) KEY VALIDATION is HARD-FAIL — _validate_and_report_cipher() is called UN-wrapped
+    #       (NO try/except, Pitfall 6): a MALFORMED key raises ValueError that refuses startup
+    #       for all WORKER_COUNT=2 workers (D-150-04, mirrors assert_action_types_synced below /
+    #       the 075.4 UnknownProviderError); a MISSING key warns + boots plaintext (D-150-01).
+    #   (2) EAGER SWEEP is BEST-EFFORT (try/except -> log + continue, mirrors the operator-seed
+    #       block below), runs ONLY when a key is present, encrypts existing plaintext in place +
+    #       rotates non-primary values (D-150-03 idempotent / D-150-06 rotation). Runs AFTER
+    #       _migrate_settings_override() so it encrypts whatever the legacy migration just wrote.
+    _secret_cipher = _validate_and_report_cipher()  # UN-wrapped: malformed key => refuse startup
+    if _secret_cipher is not None:
+        try:
+            _swept = await _sweep_secret_columns(await get_pg_pool())
+            if _swept:
+                logger.info(
+                    "Secret sweep encrypted/rotated %d secret column(s): %s",
+                    len(_swept), sorted(_swept.keys()),
+                )
+        except Exception as e:
+            logger.error("Secret sweep failed (app continues; retries next boot): %s", e)
+
+    # Phase 146 D-01: idempotent operator bootstrap from OPERATOR_EMAILS (after the
+    # asyncpg pool is ensured). The DB table (operator_users) is the runtime source of
+    # truth; the env var is bootstrap-only. Best-effort — mirrors the settings-migration
+    # block above (logs on failure, NEVER blocks startup). Concurrent-safe under
+    # WORKER_COUNT=2 by construction: seed_operators_from_env upserts INSERT ... ON
+    # CONFLICT (user_id) DO NOTHING, so both workers race, the first wins, the second
+    # no-ops — NO lock/leader-election needed. An OPERATOR_EMAILS entry with no matching
+    # auth.users row is warned-and-deferred inside the seed (re-seeds on a later restart
+    # once the user signs up).
+    from app.services.operator_service import seed_operators_from_env
+    try:
+        await get_pg_pool()  # ensure pool exists before the seed write
+        await seed_operators_from_env()
+    except Exception as e:
+        logger.error("Operator seed failed (app continues, no operators bootstrapped): %s", e)
+
     # Phase 110 DMF-01 / D-110-4 — audit-enum drift guard. MUST hard-fail (unlike the
     # best-effort blocks above): a frozenset⊄live-CHECK drift = a silent prod audit hole.
     # Mirrors the 075.4 UnknownProviderError-at-startup pattern. Runs per worker (read-only,
     # idempotent; a drift crashes all WORKER_COUNT workers identically — the desired loud fail).
-    from app.services.audit_service import assert_action_types_synced
-    await assert_action_types_synced(await get_pg_pool())
+    # Phase 158 (D-03): this is the ONE un-guarded DB hard-fail (RESEARCH Pattern 3) — in setup
+    # mode get_pg_pool() awaits an unreachable DB and raises, the crash that hides the setup
+    # token (Pitfall 3). DEFER it until finalize; a CONFIGURED box STILL runs it (byte-identical:
+    # the loud drift guard is preserved for a bound box).
+    if not _setup_mode:
+        from app.services.audit_service import assert_action_types_synced
+        await assert_action_types_synced(await get_pg_pool())
+    else:
+        logger.warning(
+            "SETUP MODE — DB unbound; deferring audit-enum drift guard until finalize"
+        )
 
     # Phase 091 HARNESS-03 — resume runs left `active` by a restart. CLAIMS each
     # run (CAS) so WORKER_COUNT=2 workers never double-execute (Pitfall 7), and
@@ -266,7 +414,8 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Harness resume sweep failed (app continues)")
 
-    asyncio.create_task(_resume_stranded())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+        asyncio.create_task(_resume_stranded())
 
     # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
     # restart kills the in-process task driving a run, its terminal DB transition is
@@ -289,7 +438,8 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Run reconciler failed (app continues)")
 
-    asyncio.create_task(_reconcile_orphans())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+        asyncio.create_task(_reconcile_orphans())
 
     # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
     # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
@@ -311,7 +461,8 @@ async def lifespan(app_instance):
                 logger.exception("Template sweep failed (app continues)")
             await asyncio.sleep(15 * 60)   # D-07 ~15 min cadence
 
-    asyncio.create_task(_sweep_expired_templates())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no templates to sweep
+        asyncio.create_task(_sweep_expired_templates())
 
     # Phase 145 (FND-01 / D-145-06 / D-145-08) — PERIODIC stream-age orphan sweep. The
     # boot reconciler above heals restart-orphans ONCE; this INTERVAL task corrects a
@@ -343,7 +494,8 @@ async def lifespan(app_instance):
                 logger.exception("Periodic run reconciler failed (app continues)")
             await asyncio.sleep(settings.run_stale_sweep_interval_seconds)
 
-    asyncio.create_task(_reconcile_orphans_periodic())
+    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no runs to reconcile
+        asyncio.create_task(_reconcile_orphans_periodic())
 
     yield
 
@@ -439,6 +591,28 @@ async def lifespan(app_instance):
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
+# Phase 147 (FLAG-01 / D-06) — maintenance/read-only write-block seam. Registered
+# BEFORE CORS so CORS ends up OUTERMOST (Starlette applies add_middleware in reverse
+# registration order — the LAST-registered wraps the rest). CORS-outermost means:
+#   (a) CORS still answers OPTIONS preflight in maintenance, and
+#   (b) a 503 write-block still carries CORS headers so the browser can READ it
+#       (a maintenance-outermost 503 would surface as an opaque CORS error).
+# Pure-ASGI middleware (NOT BaseHTTPMiddleware) so it never buffers the SSE stream; it
+# reads the flag from the in-memory TTL settings cache (no per-request DB, D-v2.5-01)
+# and fails OPEN on a cold/blip read (D-Q4). The allowlist keeps the off-switch
+# (PUT /admin/flags), login, and DELETE /runs/{id} reachable even under maintenance.
+app.add_middleware(MaintenanceMiddleware)
+
+# Phase 158 (DEPLOY-02 / D-04) — first-run setup gate. Registered alongside Maintenance and
+# BEFORE CORS so CORS stays OUTERMOST (a 503 setup_required still carries CORS headers so the
+# browser can READ it, not surface an opaque CORS error). Pure-ASGI (NOT BaseHTTPMiddleware) so
+# it never buffers the SSE stream; it reads the blip-proof FILE marker through a monotonic
+# finalized-latch (NEVER the DB, D-05), so a CONFIGURED box is a single-bool no-op —
+# byte-identical (D-17). Pre-finalize it gates everything EXCEPT the allowlist (/health,
+# /public-config, /setup/*) so an unbound box stays observable and the operator can reach the
+# wizard. Sits OUTSIDE Maintenance (runs first) so a fresh box is gated with zero DB touch.
+app.add_middleware(SetupMiddleware)
+
 # FRONTEND_URL may hold one origin or a comma-separated list (e.g.
 # "https://superrag.cloud,https://agentic-rag-rho.vercel.app"). Split + strip
 # so multiple production origins can be allowed without a code change; a single
@@ -458,12 +632,17 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     from app.dependencies import get_redis
+    from app.models.user_settings import maintenance_mode
     try:
         await asyncio.wait_for(get_redis().ping(), timeout=1.0)
         redis_status = "ok"
     except Exception:
         redis_status = "unreachable"
-    return {"status": "ok", "redis": redis_status}
+    # Phase 147 (FLAG-01 / D-06) — additive maintenance boolean so the end-user
+    # (non-operator) banner has a PUBLIC flag source without hitting /admin (which is
+    # 404 to non-operators). Boolean ONLY — no other settings may leak here (T-147-15).
+    # Read via the same in-memory TTL cache (maintenance_mode(): fail-OPEN, no DB call).
+    return {"status": "ok", "redis": redis_status, "maintenance": maintenance_mode()}
 
 
 @app.get("/models")
@@ -475,7 +654,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -501,6 +680,9 @@ app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Ski
 app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
 app.include_router(evals.router)  # Phase 133 EVAL-02 — owner-scoped eval runner control surface (POST kickoff + GET results/list; companion runs row reuses runs.py stream/cancel)
 app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eval surface (POST engine-sweep + GET engine-health + GET /evals/runs/{id} skill-less readout; matrix launch stays on evals.router)
+app.include_router(features.router)  # Phase 148 VIS-01 — authenticated per-user GET /features effective-map (NOT operator-gated; top-level, not under /admin — non-operators must reach it to learn their own map)
+app.include_router(setup_api.router)  # Phase 158 DEPLOY-02 — pre-auth token-gated /setup/* wizard API + open GET /setup/status (SetupMiddleware-allowlisted)
+app.include_router(setup_api.public_router)  # Phase 158 D-07 — open top-level GET /public-config (browser Supabase creds so login works without a frontend rebuild)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

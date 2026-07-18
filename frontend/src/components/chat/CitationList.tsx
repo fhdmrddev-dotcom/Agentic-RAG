@@ -6,11 +6,27 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 interface Props {
   citations: Citation[]
+  /**
+   * Canonical open-by-default contract (D-06/D-07): `true` when the settled
+   * message has ≥1 valid in-range inline marker, so the footer opens by default;
+   * `false` (the default) preserves today's collapsed behavior for the
+   * footer-only / no-marker degradation. The 153-05 producer (MessageItem) passes
+   * this SAME prop name — it is the ONE canonical open-state prop (no alias).
+   */
+  defaultOpen?: boolean
+  /**
+   * Optional container scoping the row→marker flash to a single message's marker
+   * host (threaded to each row; the 153-05 producer supplies it). Defaults to
+   * document scope inside `flashCitationMarker`.
+   */
+  flashContainer?: ParentNode | null
 }
 
-export function CitationList({ citations }: Props) {
-  const [open, setOpen] = useState(false)
+export function CitationList({ citations, defaultOpen = false, flashContainer }: Props) {
+  const [open, setOpen] = useState(defaultOpen)
   if (!citations.length) return null
+
+  const count = citations.length
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-3">
@@ -24,7 +40,7 @@ export function CitationList({ citations }: Props) {
           ) : (
             <ChevronRight className="w-3 h-3" />
           )}
-          {citations.length} source{citations.length !== 1 ? "s" : ""}
+          References · {count} source{count !== 1 ? "s" : ""}
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent
@@ -35,6 +51,8 @@ export function CitationList({ citations }: Props) {
             <CitationCard
               key={`${c.document_id}-${c.chunk_index ?? "full"}-${i}`}
               citation={c}
+              n={i + 1}
+              flashContainer={flashContainer}
             />
           ))}
         </div>

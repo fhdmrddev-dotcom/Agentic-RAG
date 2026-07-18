@@ -9,6 +9,7 @@ Writes go through save_app_settings() via asyncpg (D-20).
 from __future__ import annotations
 
 import logging
+import re
 import time as _time
 from enum import Enum
 from typing import Any
@@ -56,6 +57,16 @@ _PROVIDER_KEY_PREFIXES: dict[str, str] = {
     # ollama_api_key: any non-sentinel non-empty
 }
 _SENTINEL_VALUES: frozenset[str] = frozenset({"***", "__KEEP__", "••••••"})
+
+# Phase 150 (CR-01, SQLi defense-in-depth): the ONLY shape a key is allowed to take
+# before save_app_settings splices it into the UPDATE SET clause as a RAW column name.
+# A legal SQL identifier (lower snake_case) cannot contain the spaces / quotes / '=' /
+# '-' / parens / ';' an injection needs to break out of the column-name position, so
+# this fully closes the client-controlled-column-name vector (the provider id in
+# settings.py's f"{p.id}_api_key", whose VALUE was validated but whose NAME was not).
+# An unknown-but-valid-identifier column simply errors as UndefinedColumn (caught by the
+# DB try/except → returns False → HTTP 500), never injects.
+_VALID_COLUMN_NAME = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def _is_valid_api_key(key: str, value: str) -> bool:
@@ -133,8 +144,42 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches.
+    # app_settings-only (env_attr=None readback below; these are runtime SWITCHES,
+    # not secrets/infra — CLAUDE.md). D-Q4 polarity: capability switches default True
+    # (byte-identical runtime until an operator flips one); maintenance_mode defaults
+    # False (platform OPEN — a cold/fresh read must never wedge the platform).
+    self_improve_enabled: bool = True
+    workflows_enabled: bool = True
+    maintenance_mode: bool = False
+
+    # Phase 158 (DEPLOY-02, migration 102) — the AUDITABLE first-run install-wizard
+    # finalize marker. app_settings-only (env_attr=None readback below). D-05: this DB
+    # flag is the AUDITABLE / app-facing signal ONLY, NOT the gate authority (the local
+    # file marker in setup_store.py is). Defaults False so a fresh box / cold read /
+    # migration-102-not-yet-applied (column absent) all read "not set up" — never a
+    # false "configured" that would skip the wizard.
+    setup_complete: bool = False
+
+    # Phase 159 (MODEL-03, migration 103) — the discovery-panel utility filter default.
+    # app_settings-only (env_attr=None readback below; a runtime SWITCH, not a secret/infra
+    # — CLAUDE.md). Default TRUE (D-159-04: hide known non-chat "utility" model ids from the
+    # discovery diff by default; the panel's "show all" reveals them). This flag is DISPLAY /
+    # curation only — it never deletes/disables/mutates the confirmable diff (149 red line).
+    # Persisted so "filter on" survives sessions + WORKER_COUNT=2 (rides the 30s TTL settings
+    # cache). Missing/None column (migration authored-but-not-applied until 159-03 Task 2) reads
+    # True (fail-soft) — the mig-102 setup_complete precedent, but default-ON not default-OFF.
+    model_discovery_filter_enabled: bool = True
+
     # Phase 110 DMF-03 — master DM capability gate (migration 071). Default True => unchanged behavior.
     document_management_enabled: bool = True
+
+    # Phase 148 (VIS-01, migration 098) — per-feature audience map. Enum-shaped
+    # records {"audience": "operators"|"everyone"} keyed by feature — NEVER booleans
+    # (SEED-115 forward-compat to roles). app_settings-only JSONB (env_attr=None
+    # readback below). Resolved via feature_audience() with a per-feature cold-read
+    # default (_GOVERNED_FEATURES, D-06); NEVER read directly as a security control.
+    feature_visibility: dict = {}
 
     # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
     multimodal_max_vision_calls: int = 100
@@ -247,15 +292,40 @@ def invalidate_settings_cache() -> None:
     _settings_cache_time = 0.0
 
 
-async def save_app_settings(updates: dict[str, Any]) -> None:
+async def save_app_settings(updates: dict[str, Any]) -> bool:
     """Write settings to app_settings DB row via asyncpg.
 
     Ports the _is_valid_api_key sentinel guard (D-14).
     Calls invalidate_settings_cache() on success (D-07).
+
+    Returns:
+        True  — the UPDATE persisted, OR there was nothing to write (the
+                filtered/sentinel no-op case), so existing callers that treated
+                a completed call as success keep their prior semantics.
+        False — the DB write raised (pool exhausted / transient Postgres blip /
+                connection reset). The exception is logged, NOT re-raised, so
+                callers that ignore the return value are unaffected — but a
+                caller that CARES (CR-02: set_flag) can now surface a failed
+                write as a real error instead of a false success + false audit
+                row.
     """
     # Filter out sentinel / invalid API key values (D-14, T-081.1-07)
     clean: dict[str, Any] = {}
     for k, v in updates.items():
+        # Phase 150 (CR-01): reject any key that is not a safe SQL identifier BEFORE it can
+        # reach the SET clause below (which interpolates the column NAME into SQL). The
+        # provider id in settings.py's f"{p.id}_api_key" is client-controlled and only its
+        # VALUE is validated by _is_valid_api_key; a crafted id ending in "_api_key" would
+        # otherwise pass that helper's fall-through and splice a malicious column name
+        # verbatim into the SQL. A non-identifier key is skipped + logged by NAME only
+        # (never a value/token — T-081.1-04). This guard is applied to ALL keys, not only
+        # "_api_key" keys, and is the load-bearing fix (settings.py adds a boundary check).
+        if not isinstance(k, str) or not _VALID_COLUMN_NAME.match(k):
+            logger.warning(
+                "save_app_settings: rejected non-identifier column name (possible injection): %r",
+                k,
+            )
+            continue
         if v == KEY_PLACEHOLDER:
             continue
         if k.endswith("_api_key") and v is not None and not _is_valid_api_key(k, str(v)):
@@ -269,7 +339,33 @@ async def save_app_settings(updates: dict[str, Any]) -> None:
         clean[k] = v
 
     if not clean:
-        return
+        return True  # nothing to persist is a successful no-op (caller semantics preserved)
+
+    # Phase 150 (SEC-01 / RESEARCH Pattern 3) — encrypt-on-write. This is the ONE write
+    # seam every secret save funnels through. Runs AFTER the sentinel/_is_valid_api_key
+    # guard validated PLAINTEXT (above), BEFORE the parameterized UPDATE (below). When a
+    # master key is configured, replace each SECRET_COLUMNS value that is a non-empty
+    # plaintext str with its enc:v1: envelope; leave everything else byte-identical.
+    #   - no key => get_cipher() None => plaintext passthrough (D-150-01).
+    #   - already enc:v1: => is_encrypted guard skips it (no double envelope).
+    #   - non-secret column => not in SECRET_COLUMNS => never touched.
+    # NOTE (CR-01): this loop only decides WHICH VALUES get encrypted — it iterates the
+    # code-owned SECRET_COLUMNS, never user key names. It is NOT the SQL-injection guard.
+    # The column NAMES that reach the SET clause are made injection-safe by the
+    # _VALID_COLUMN_NAME identifier check in the filter loop above (do not conflate the two).
+    # Never logs a value or token (T-081.1-04).
+    from app.security.secret_cipher import (
+        SECRET_COLUMNS,
+        encrypt_secret,
+        get_cipher,
+        is_encrypted,
+    )
+    cipher = get_cipher()
+    if cipher is not None:
+        for k in list(clean):
+            v = clean[k]
+            if k in SECRET_COLUMNS and isinstance(v, str) and v and not is_encrypted(v):
+                clean[k] = encrypt_secret(v, cipher)
 
     # Build parameterized UPDATE -- column names from code constants, values via $N
     cols = list(clean.keys())
@@ -286,17 +382,28 @@ async def save_app_settings(updates: dict[str, Any]) -> None:
             *vals,
         )
         invalidate_settings_cache()
+        return True
     except Exception:
         logger.warning(
             "save_app_settings: DB write failed; settings not persisted",
             exc_info=True,
         )
+        return False
 
 
 # ── Model capabilities overrides cache (Phase 081.1 D-09/D-10) ──────────
 
 _model_overrides_cache: dict[str, dict] = {}
 _model_overrides_cache_time: float = 0.0
+
+# ── All-rows model overrides cache (Phase 149 MODEL-01 / Pitfall 1) ─────────────
+# SEPARATE from the enabled-only hot cache above. The registry editor AND the
+# picker's disabled-filter must SEE disabled rows (an operator has to be able to
+# re-enable what they disabled — Pitfall 1), so this reads ALL rows with NO `enabled`
+# filter. Its own 30s TTL; the hot cache (_model_overrides_cache) is left untouched so
+# the request hot path still reads only enabled rows.
+_all_model_overrides_cache: dict[str, dict] = {}
+_all_model_overrides_cache_time: float = 0.0
 
 
 async def _load_model_overrides() -> dict[str, dict]:
@@ -328,9 +435,47 @@ async def _load_model_overrides() -> dict[str, dict]:
 
 
 def invalidate_model_overrides_cache() -> None:
-    """Zero out model overrides cache timestamp (D-07 pattern)."""
-    global _model_overrides_cache_time
+    """Zero out BOTH the enabled-only hot cache AND the all-rows registry cache
+    timestamps (D-07 pattern), so the next read of either re-hits the DB.
+
+    Called on EVERY model-capability write (Phase 149 MODEL-01) so an edit is visible
+    on the next request (SC#1) — both the request hot path (_load_model_overrides) and
+    the operator registry read (load_all_model_overrides) refresh together.
+    """
+    global _model_overrides_cache_time, _all_model_overrides_cache_time
     _model_overrides_cache_time = 0.0
+    _all_model_overrides_cache_time = 0.0
+
+
+async def load_all_model_overrides() -> dict[str, dict]:
+    """Return ALL model_capabilities_overrides rows (enabled AND disabled) as
+    ``{model_id: row_dict}`` — Phase 149 MODEL-01 (D-149-03 / D-149-08 / Pitfall 1).
+
+    Separate 30s-TTL cache from the enabled-only hot cache (_load_model_overrides): the
+    registry editor needs to see disabled rows to re-enable them, and _build_providers
+    needs the disabled-id set to hide disabled models from the picker. NO `enabled`
+    filter — this is the ONLY read that surfaces disabled rows. Never raises (mirrors
+    _load_model_overrides): a DB blip returns the stale/empty cache.
+    """
+    global _all_model_overrides_cache, _all_model_overrides_cache_time
+    now = _time.time()
+    if _all_model_overrides_cache and (now - _all_model_overrides_cache_time) < _SETTINGS_CACHE_TTL:
+        return _all_model_overrides_cache
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        rows = await pool.fetch("SELECT * FROM model_capabilities_overrides")
+        _all_model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
+    except Exception:
+        logger.warning(
+            "load_all_model_overrides: DB read failed; returning stale/empty cache",
+            exc_info=True,
+        )
+        if not _all_model_overrides_cache:
+            _all_model_overrides_cache = {}
+    _all_model_overrides_cache_time = _time.time()
+    return _all_model_overrides_cache
 
 
 # ── Row-to-value helpers ─────────────────────────────────────────────────────
@@ -391,6 +536,17 @@ def _build_providers(row: dict) -> list[LLMProvider]:
             _raw_pml = {}
     db_model_lists: dict[str, list[str]] = _raw_pml if isinstance(_raw_pml, dict) else {}
 
+    # Phase 149 (MODEL-01 / D-149-08): the operator-disabled model-id set. The all-rows
+    # cache (load_all_model_overrides, warmed by the async caller before this sync fn runs)
+    # is the ONLY place a disabled row is visible — the enabled-only hot cache omits them
+    # by construction (Pitfall 1). A row PRESENT with enabled=False is disabled; an absent
+    # override is not. Applied across BOTH unfiltered merge branches below so a disabled
+    # model disappears from the picker regardless of which branch surfaced it.
+    disabled_ids = {
+        mid for mid, cap in _all_model_overrides_cache.items()
+        if cap.get("enabled") is False
+    }
+
     providers: list[LLMProvider] = []
     for pid, meta in KNOWN_PROVIDERS.items():
         key_field = f"{pid}_api_key"
@@ -417,13 +573,23 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         )
         models.extend(db_registered)
 
-        # Merge static registry models -- append any not already present
+        # Merge static registry models -- append any not already present.
+        # D-149-08: exclude a static model whose override is disabled (the :449-455
+        # static-registry merge — a disabled gpt-4o must not surface here).
         existing_set = set(models)
         registry = sorted(
             m for m, cap in MODEL_CAPABILITIES.items()
-            if cap.get("provider") == pid and m not in existing_set
+            if cap.get("provider") == pid and m not in existing_set and m not in disabled_ids
         )
         models.extend(registry)
+
+        # D-149-08: apply the SAME disabled-set filter to the WHOLE assembled list so a
+        # disabled model cannot leak back in via the legacy db_model_lists / env-CSV branch
+        # (:431-438, sourced from app_settings.provider_model_lists JSONB) for legacy-migrated
+        # accounts. One condition covers db_model_lists + env-CSV uniformly; the db_registered
+        # branch (:443-447) is already enabled-only.
+        if disabled_ids:
+            models = [m for m in models if m not in disabled_ids]
 
         if pid == "ollama":
             base_url = f"{ollama_base}/v1"
@@ -468,13 +634,69 @@ def _resolve_llm(row: dict, providers: list[LLMProvider]) -> tuple[str, str, str
 
 # ── Settings construction helper ─────────────────────────────────────────────
 
+def _decrypt_secret_columns(row: dict) -> dict:
+    """Phase 150 (SEC-01 / RESEARCH Pattern 3) — decrypt enc:v1: secret columns onto a COPY.
+
+    Returns ``row`` unchanged when no master key is configured (D-150-01). Otherwise
+    returns a shallow ``dict(row)`` copy in which each SECRET_COLUMNS value that carries
+    the enc:v1: envelope is replaced by its plaintext. Classification is STRICTLY by the
+    prefix (is_encrypted) — never by a blind decrypt (Pitfall 1: a plaintext value and a
+    wrong-key token both raise InvalidToken), so a legacy plaintext value is left as-is.
+
+    An undecryptable column (wrong / rotated-away key, or tampered ciphertext) is dropped
+    to ``None`` and logged by COLUMN NAME only (never the value/token). ``None`` then
+    engages the EXISTING _val DB>env fallback chain with zero new code — the platform
+    stays up on env credentials (D-150-04/05 fail-soft). Operating on a copy keeps the
+    30s _load_settings_from_db cache holding ciphertext (defense-in-depth) and makes this
+    pure-CPU so the sync load path works too.
+    """
+    from app.security.secret_cipher import (
+        SECRET_COLUMNS,
+        decrypt_secret,
+        get_cipher,
+        is_encrypted,
+    )
+    from cryptography.fernet import InvalidToken
+
+    cipher = get_cipher()
+    if cipher is None:
+        return row  # D-150-01 plaintext mode — nothing to decrypt
+
+    out = dict(row)  # COPY — the cached raw (ciphertext) row is never mutated
+    for col in SECRET_COLUMNS:
+        v = out.get(col)
+        if isinstance(v, str) and is_encrypted(v):
+            try:
+                out[col] = decrypt_secret(v, cipher)
+            except InvalidToken:
+                logger.error(
+                    "secret_cipher: column %s failed to decrypt; falling back to env (D-150-04)",
+                    col,
+                )
+                out[col] = None  # _val(row, col, col, env) -> env fallback engages (SC#3)
+    return out
+
+
 def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
     """Construct UserEffectiveSettings from a DB row dict.
 
     Shared between sync load_app_settings() and async load_app_settings_async().
     """
+    row = _decrypt_secret_columns(row)  # Phase 150 — decrypt-on-read seam (must be first)
     providers = _build_providers(row)
     api_key, base_url, model, available, active_provider = _resolve_llm(row, providers)
+
+    # Phase 148 VIS-01 — feature_visibility JSONB. Same double-serialization guard
+    # provider_model_lists uses (the migration runner may json.dumps() before the
+    # JSONB codec, storing a JSON string literal in JSONB). Handle dict AND str.
+    _raw_fv = row.get("feature_visibility") or {}
+    if isinstance(_raw_fv, str):
+        import json as _json
+        try:
+            _raw_fv = _json.loads(_raw_fv)
+        except (ValueError, TypeError):
+            _raw_fv = {}
+    feature_visibility = _raw_fv if isinstance(_raw_fv, dict) else {}
 
     return UserEffectiveSettings(
         llm_api_key=api_key,
@@ -509,9 +731,31 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
 
         sandbox_enabled=_val_bool(row, "sandbox_enabled", "sandbox_enabled", True),
 
+        # Phase 147 (FLAG-01, migration 097) — env_attr=None: app_settings-only, no env
+        # fallback (runtime SWITCHES, not secrets/infra). D-Q4 polarity mirrors the
+        # migration defaults so a missing/None column reads the SAFE value for each flag:
+        # capability switches => True (never silently disable); maintenance => False (OPEN).
+        self_improve_enabled=_val_bool(row, "self_improve_enabled", None, True),
+        workflows_enabled=_val_bool(row, "workflows_enabled", None, True),
+        maintenance_mode=_val_bool(row, "maintenance_mode", None, False),
+
+        # Phase 158 (DEPLOY-02, migration 102) — env_attr=None: app_settings-only, no env
+        # fallback. A missing/None column (migration authored-but-not-applied until 158-12)
+        # reads False (fail-soft) — a fresh box is "not set up" until finalize writes True.
+        setup_complete=_val_bool(row, "setup_complete", None, False),
+
+        # Phase 159 (MODEL-03, migration 103) — env_attr=None: app_settings-only, no env
+        # fallback (a runtime SWITCH, not a secret/infra). D-159-04 default-ON polarity: a
+        # missing/None column (migration authored-but-not-applied until 159-03 Task 2) reads
+        # True (fail-soft) — the discovery filter defaults ON, never silently OFF.
+        model_discovery_filter_enabled=_val_bool(row, "model_discovery_filter_enabled", None, True),
+
         # Phase 110 DMF-03 — env_attr=None: app_settings-only, no env fallback
         # (CLAUDE.md "env vars are for secrets/infra only"). Missing/None column => True.
         document_management_enabled=_val_bool(row, "document_management_enabled", None, True),
+
+        # Phase 148 VIS-01 — env_attr=None: app_settings-only JSONB, no env fallback.
+        feature_visibility=feature_visibility,
 
         multimodal_max_vision_calls=int(_val(row, "multimodal_max_vision_calls", None, 100)),
         multimodal_max_b64_bytes_kb=int(_val(row, "multimodal_max_b64_bytes_kb", None, 4096)),
@@ -582,6 +826,10 @@ def load_app_settings() -> UserEffectiveSettings:
 async def load_app_settings_async() -> UserEffectiveSettings:
     """Async settings read. Refreshes cache from DB if TTL expired."""
     row = await _load_settings_from_db()
+    # Phase 149 (MODEL-01 / D-149-08): warm the all-rows override cache BEFORE the sync
+    # _build_providers runs so it can see disabled rows and hide them from the picker
+    # (Pitfall 1 — the enabled-only hot cache cannot surface a disabled model). Non-raising.
+    await load_all_model_overrides()
     return _build_settings_from_row(row)
 
 
@@ -648,6 +896,134 @@ def document_management_enabled() -> bool:
         return load_app_settings().document_management_enabled
     except Exception:  # noqa: BLE001 — defensive: default-on on cold cache / DB read failure
         return True
+
+
+# ── Phase 147 (FLAG-01) — operator control-plane flag reads ────────────────────
+# All three read through the per-worker 30s TTL settings cache (load_app_settings),
+# so a flip propagates within the TTL window with NO server restart, and a transient
+# DB blip returns LAST-KNOWN-GOOD (the cache is not reset on a read failure — see
+# _load_settings_from_db:233-241), never "unknown". A truly-cold cache / a
+# load_app_settings() exception falls back to the D-Q4 polarity below.
+#
+# Pitfall 5 (deliberately NOT done): no Redis pub/sub cross-worker cache-bust. A
+# ≤30s per-worker skew is expected and honest — it matches the "takes effect on
+# their next call" operator copy.
+
+
+def self_improve_enabled() -> bool:
+    """FLAG-01 capability switch: is the self-improvement (skill-saving) capability on?
+
+    Polarity mirrors document_management_enabled() (default-ON): a cold-cache / DB-read
+    failure returns True so a transient blip NEVER silently disables the capability
+    (D-Q4). Only a deliberate operator OFF flip flips it.
+    """
+    try:
+        return load_app_settings().self_improve_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-ON on cold cache / read failure
+        return True
+
+
+def workflows_enabled() -> bool:
+    """FLAG-01 capability switch: are workflow launches allowed?
+
+    Default-ON polarity (D-Q4): a cold-cache / DB-read failure returns True — a blip
+    must not silently block workflow launches. In-flight workflow runs are unaffected
+    by this flag (D-05); it gates only NEW launches at the kickoff seam.
+    """
+    try:
+        return load_app_settings().workflows_enabled
+    except Exception:  # noqa: BLE001 — defensive: default-ON on cold cache / read failure
+        return True
+
+
+def maintenance_mode() -> bool:
+    """FLAG-01 platform switch: is the platform in maintenance / read-only mode?
+
+    INVERTED polarity (D-Q4, operator-resolved 2026-07-11): a cold-cache / DB-read
+    failure returns False (platform OPEN). Failing "closed" here would be a
+    self-inflicted outage — a transient settings-read failure must NEVER wedge the
+    whole platform into read-only. Only a deliberate operator ON flip (or a live DB
+    value of True) enables maintenance.
+    """
+    try:
+        return load_app_settings().maintenance_mode
+    except Exception:  # noqa: BLE001 — defensive: default-OPEN (False) on cold cache / read failure
+        return False
+
+
+def setup_complete() -> bool:
+    """DEPLOY-02 (D-05) first-run install-wizard AUDITABLE signal: has setup finalized?
+
+    This is the AUDITABLE / app-facing signal ONLY — NOT the gate authority. The
+    blip-proof gate authority is the LOCAL file marker in setup_store.py
+    (``finalized:true``); a transient DB outage must NEVER bounce a live box's users
+    back into the wizard. So this mirrors maintenance_mode's no-raise posture exactly: a
+    cold-cache / DB-read failure — AND a migration-102-not-yet-applied (column absent,
+    the authored-but-unapplied state until plan 158-12) — all default to False. A False
+    read is safe (it means "auditable flag unknown", never a live-user disruption).
+    """
+    try:
+        return load_app_settings().setup_complete
+    except Exception:  # noqa: BLE001 — defensive: default False on cold cache / read failure / column absent
+        return False
+
+
+# ── Phase 148 (VIS-01) — feature-visibility audience resolver + writer ─────────
+# Audience is an ENUM (never a boolean). _GOVERNED_FEATURES is the ONE place the
+# D-06 cold-read polarity lives: deny (operators) for skill_studio + model_management,
+# allow (everyone) for workflow_authoring + governance_health. The DB seed (mig 098)
+# is belt-and-suspenders — a genuine cold-read still resolves to the same polarity.
+
+_GOVERNED_FEATURES: dict[str, str] = {
+    "skill_studio": "operators",
+    "model_management": "operators",
+    "workflow_authoring": "everyone",
+    "governance_health": "everyone",
+}
+
+
+def feature_audience(feature: str) -> str:
+    """Resolve a feature's audience -> 'everyone' | 'operators' (VIS-01).
+
+    Reads the stored enum record from the per-worker 30s TTL settings cache
+    (load_app_settings().feature_visibility). Returns the stored ``audience`` ONLY
+    when it is a recognized enum value; a cold cache / DB blip / missing key /
+    malformed record / unknown feature falls back to the per-feature hardcoded
+    default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
+    returns a boolean, and NEVER raises (mirrors maintenance_mode's no-raise posture).
+    """
+    try:
+        fv = load_app_settings().feature_visibility or {}
+        rec = fv.get(feature) or {}
+        aud = rec.get("audience") if isinstance(rec, dict) else None
+        if aud in ("everyone", "operators"):
+            return aud
+    except Exception:  # noqa: BLE001 — defensive: fall back to the hardcoded default
+        pass
+    return _GOVERNED_FEATURES.get(feature, "operators")
+
+
+async def set_feature_visibility(feature: str, audience: str) -> bool:
+    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01).
+
+    Merges only ``{feature: {"audience": audience}}`` into app_settings.feature_visibility
+    so a concurrent toggle of a DIFFERENT feature can't be clobbered (Pitfall 4 — the
+    lost-update a whole-column ``SET`` would cause). Deliberately does NOT route through
+    save_app_settings (which does a whole-column ``SET``). The caller validates
+    feature/audience against code allowlists before calling — this function still only
+    ever serializes the single validated record (SQLi-safe: asyncpg ``$1`` + JSONB codec).
+    Invalidates the settings cache so the next read reflects the change within the TTL.
+    """
+    from app.dependencies import get_pg_pool
+    pool = await get_pg_pool()
+    await pool.execute(
+        "UPDATE app_settings SET feature_visibility = "
+        "coalesce(feature_visibility, '{}'::jsonb) || $1::jsonb, updated_at = now() "
+        "WHERE id = 'global'",
+        {feature: {"audience": audience}},  # JSONB codec serializes the dict
+    )
+    invalidate_settings_cache()
+    return True
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:

@@ -5,8 +5,10 @@
  * WorkspacePanel made the FilesSection copy structurally unreachable on a fresh
  * thread (G-4 lived-experience gap, found during Phase 100 live UAT).
  *
- * Hidden OOXML-only file input + a quiet button. accept= is a UX hint only —
- * the server's validate_ooxml is the real gate (T-100-06-01). On success the
+ * Hidden file input + a quiet button. accept= is a UX hint only — the server's
+ * validate_upload is the real gate (T-100-06-01 / T-151-03). Phase 151 (D-09)
+ * widened the allowlist beyond OOXML to real skill assets (scripts, .md/.json/
+ * .csv, images), kept in lockstep with workspace.py _ALLOWED_EXT. On success the
  * returned row is optimistically upserted (panel reconciles, no refresh, D-03);
  * errors surface inline — nothing renders in chat (D-04).
  */
@@ -50,7 +52,7 @@ export function TemplateUpload() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".docx,.pptx,.xlsx"
+        accept=".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp"
         aria-label="Upload template file"
         tabIndex={-1}
         className="hidden"

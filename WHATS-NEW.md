@@ -22,7 +22,18 @@ The current chapter — **Skill Eval Studio + Self-Improving (v3.2)** — is abo
 
 ---
 
-## 🟢 Latest — your skills can now improve themselves (with your approval) (v3.2, in progress)
+## 🟢 Latest — the app now has a staff-only Control Room (v3.3, in progress)
+
+This new chapter is about making the whole platform manageable by a trusted person — the "operator" — right from the app, no developer tools needed.
+
+- **A hidden Control Room for the operator.** If your account is designated as the operator, a small amber shield appears at the bottom of the sidebar. It opens a Control Room showing the system's health in plain words (server capacity, agents working, database connections, work spread) — with the technical names one click away if you want them. 🟢 *Use it now (operators only).*
+- **Invisible to everyone else.** Regular users see absolutely nothing new — no button, no menu, and even someone poking at the server directly gets a plain "not found," as if the admin area doesn't exist. Verified live.
+- **Every admin action leaves a receipt.** Anything an operator does is written to a permanent log the moment it happens, and shows up in a "Recent operator actions" list that survives reloads. Trust through receipts, not promises.
+- **Coming to this Control Room next:** live run monitoring with a kill button, user management, hiding advanced features from regular users, and model management — the tabs are already there, honestly marked "Not built yet — coming soon."
+
+---
+
+## 🟢 Your skills can now improve themselves (with your approval) (v3.2)
 
 This chapter turns the Skills feature into a proper test-and-improve studio. Shipped so far:
 

@@ -16,6 +16,14 @@ import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+// Phase 153-05 (CITE-01 / G-5 additive): the cited-answer render path. Swapped in
+// ONLY on the settled cited-assistant branch (message.citations?.length); every
+// other path stays byte-identical on the shared MarkdownRenderer (D-12/D-14).
+import { CitedMarkdown } from "./CitedMarkdown"
+// Phase 153-05 (CITE-01 / 074-A): the quiet absence-as-signal ⓘ. Mounted once
+// under the answer body on the settled cited-assistant branch (self-guards on
+// citations, never a banner) — never on the streaming/user path (G-5 additive).
+import { AbsenceHint } from "./AbsenceHint"
 import { StreamingNarration } from "./StreamingNarration"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
@@ -261,6 +269,25 @@ function dedupParagraphs(text: string): string {
   return result.join('\n\n')
 }
 
+/**
+ * Phase 153-05 (CITE-01 / D-06/D-07): does the settled content carry ≥1 valid
+ * in-range inline marker? Drives the canonical `defaultOpen` on the References
+ * footer — the footer opens by default only when markers exist, else it keeps
+ * today's collapsed default (footer-only degradation). The backend already
+ * strips non-members/out-of-range markers before persist (D-02), so any `[n]`
+ * with n ∈ [1, count] in the persisted content is a real, keyed marker.
+ */
+function hasInRangeMarker(content: string, count: number): boolean {
+  if (!count || !content) return false
+  const re = /\[(\d+)\]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    const n = parseInt(m[1], 10)
+    if (n >= 1 && n <= count) return true
+  }
+  return false
+}
+
 // Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.
 // ChatArea stabilizes onSendMessage + onResume via useCallback (ref-stable
 // across parent re-renders); StreamsProvider mutates messagesByThread by
@@ -276,6 +303,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const workflowLock = useWorkflowLockForThread(message.thread_id ?? null)
   const [continuePending, setContinuePending] = useState(false)
   const [continueExhausted, setContinueExhausted] = useState(false)
+  // Phase 153-05 (CITE-01): a callback-ref to the settled answer body so the
+  // References footer's row→marker flash (flashCitationMarker) is scoped to THIS
+  // message's marker host (the body contains both the cited markdown and the
+  // footer). A callback ref that stores the node in state makes it reactive
+  // without prop-drilling; adding it changes no DOM (byte-identical, G-5).
+  const [messageBody, setMessageBody] = useState<HTMLDivElement | null>(null)
 
   if (isUser) {
     return (
@@ -424,14 +457,36 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             activated-skills array) already covers it. The legacy single-skill
             field is no longer READ in this render path; it stays intact in
             types + StreamsProvider for DB-loaded-message compat. */}
+        {/* Phase 149 Plan 09 (D-149-10) — honest disabled-model fallback notice. When the
+            user's selected model was operator-DISABLED, the backend runs the org default and
+            emits `model_disabled_fallback`; StreamsProvider stamps it here. Rendered as a
+            small inline informational notice showing the backend `message` string (which
+            already names BOTH the disabled model and the fallback) — never a silent swap.
+            A SIBLING of the content block (renders regardless of content) so it shows even
+            before any delta streams. Absent → nothing extra (enabled path byte-identical). */}
+        {message.role === "assistant" && message.modelFallbackNotice && (
+          <div
+            data-testid="model-fallback-notice"
+            className="mt-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-400/90"
+          >
+            {message.modelFallbackNotice.message}
+          </div>
+        )}
         {message.content ? (
-          <div className="text-sm text-foreground">
+          <div ref={setMessageBody} className="text-sm text-foreground">
             {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
               // Live agentic run: message.content here is the model's interim
               // narration ("Now I'll search…"), not the final answer. Fold it to
               // a one-line gist (click to expand the full trail). At run-end the
               // backend-persisted final answer renders normally via the else path.
+              // NEVER given markers — the body streams calm & unmarked (D-05).
               <StreamingNarration content={dedupParagraphs(message.content)} />
+            ) : message.role === "assistant" && message.citations && message.citations.length > 0 ? (
+              // Phase 153-05 (CITE-01 / G-5 additive): the settled cited-assistant
+              // answer routes to CitedMarkdown, which upgrades validated [n] to
+              // interactive markers over the SAME dedupParagraphs output. This is
+              // the ONLY new branch; the else path stays byte-identical (D-12/D-14).
+              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} />
             ) : (
               <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
             )}
@@ -439,8 +494,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
             {message.confidence && <ConfidenceBadge confidence={message.confidence} />}
+            {/* Phase 153-05 (CITE-01 / 074-A): the absence-as-signal ⓘ — mounted
+                ONCE under the answer body, between the answer and the footer, on
+                the settled cited-assistant path only. Self-guards on citations
+                (null otherwise) and is never given the streaming-narration path. */}
+            {message.role === "assistant" &&
+              !(isMessageStreaming && (message.tool_calls?.length ?? 0) > 0) && (
+                <AbsenceHint citations={message.citations} />
+              )}
             {message.citations && message.citations.length > 0 && (
-              <CitationList citations={message.citations} />
+              <CitationList
+                citations={message.citations}
+                // Phase 153-05 (CITE-01 / D-06/D-07): open by default only when the
+                // settled answer actually carries valid in-range markers; else keep
+                // today's collapsed default (footer-only degradation).
+                defaultOpen={hasInRangeMarker(dedupParagraphs(message.content), message.citations.length)}
+                // Scope the row→marker flash to this message's marker host.
+                flashContainer={messageBody}
+              />
             )}
             {!isStreaming && message.suggestions && message.suggestions.length > 0 && onSendMessage && (
               <SuggestionPills
@@ -553,6 +624,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
             </span>
           </span>
+        ) : message.runStatus === "cancelled" ? (
+          // BUG-260710-02 (Phase 147 / D-03): cancelling BEFORE the first visible
+          // token persists a genuinely empty assistant row (content_len=0 — e.g. a
+          // DeepSeek early cancel whose only output was stripped DSML markup). The
+          // renderer previously drew an avatar-only empty bubble that reads as
+          // "something broke". Render an honest "cancelled — no output yet"
+          // affordance instead (mirrors the stopped-indicator styling: Square icon
+          // + muted italic). Reached only in the falsy-content branch, so a
+          // cancelled run WITH content renders its content normally + the
+          // persistent "Response stopped" indicator below. Pure render-derive from
+          // the persisted runStatus — no shared-path fork (D-03/G-5 safe).
+          <div
+            className="flex items-center gap-1.5 text-sm text-muted-foreground"
+            data-testid="cancelled-no-output"
+          >
+            <Square className="w-3 h-3" />
+            <span className="italic">cancelled — no output yet</span>
+          </div>
         ) : null}
         {/* SEED-098 Change 2: the `hasAnyTools` bottom italic echo
             (`Preparing code…/Synthesizing answer…` + dots) is GONE — the RunCard
@@ -567,7 +656,21 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             this dual update, a timed_out run with content would show
             contradictory copy (in-content banner suppressed because content
             present; bottom indicator says "Response stopped"). */}
-        {(message.stopped || message.runStatus === "timed_out") && !isStreaming && (
+        {/* BUG-260710-01 (Phase 147 / D-03): `message.stopped` is LIVE-only state and
+            is NOT re-derived on reload, so a persisted cancelled run lost its
+            "Response stopped" indicator after navigating away and back (the
+            partial answer then read as a normal completed answer). Add the
+            `runStatus === 'cancelled'` clause so the indicator persists across
+            reload — the copy switch above already renders "Response stopped" for
+            the non-timed-out case (types/index.ts:163 already SAYS cancelled
+            renders "Response stopped"; the render condition was the bug). Gated on
+            `!!message.content` so an EMPTY early-cancel row is handled instead by
+            the "cancelled — no output yet" affordance in the content region (no
+            double indicator). Render-derive only — no shared-path fork (D-03/G-5). */}
+        {(message.stopped ||
+          message.runStatus === "timed_out" ||
+          (message.runStatus === "cancelled" && !!message.content)) &&
+          !isStreaming && (
           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
             <Square className="w-3 h-3" />
             <span className="italic">

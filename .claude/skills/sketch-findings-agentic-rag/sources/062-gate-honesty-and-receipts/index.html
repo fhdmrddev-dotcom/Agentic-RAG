@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 062 — Gate Honesty &amp; Audit Receipts (Phase 146)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .variant-meta {
+    padding: 10px 20px 0;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    max-width: 980px;
+  }
+  .variant-meta b { color: var(--color-text); font-weight: 600; }
+
+  .app-frame {
+    height: calc(100vh - 118px);
+    min-height: 600px;
+    margin: 12px 20px 20px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-bg);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── the locked 061-B operator band + tabs ── */
+  .op-band {
+    background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent),
+                var(--color-bg-elev1);
+    border-bottom: 1px solid hsl(38 92% 60% / 0.25);
+    padding: 14px 22px 0;
+    flex: 0 0 auto;
+  }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title {
+    display: flex; align-items: center; gap: 9px;
+    font-family: var(--font-headline); font-weight: 800;
+    font-size: var(--text-lg); color: var(--color-text);
+  }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 13px;
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    cursor: pointer; position: relative;
+    border-bottom: 2px solid transparent;
+    transition: all var(--dur-fast) var(--ease-out);
+    user-select: none;
+  }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab .count-pill {
+    font-family: var(--font-mono); font-size: 10px;
+    background: var(--color-muted); color: var(--color-text-muted);
+    border-radius: var(--radius-full); padding: 1px 7px;
+  }
+
+  .op-chip {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--color-warning);
+    background: var(--color-warning-dim);
+    border: 1px solid hsl(38 92% 60% / 0.3);
+    border-radius: var(--radius-sm); padding: 2px 7px;
+  }
+  .back-link {
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px;
+  }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+
+  .rec-marker {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--text-xs); color: var(--color-text-dim);
+    white-space: nowrap;
+    border-radius: var(--radius-full); padding: 3px 10px;
+    transition: all var(--dur-base) var(--ease-out);
+  }
+  .rec-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--color-success);
+    box-shadow: 0 0 6px hsl(142 71% 45% / 0.6);
+    flex: 0 0 6px;
+  }
+  .rec-marker.flash { background: var(--color-success-dim); color: var(--color-text-muted); }
+  .rec-marker.flash .rec-dot { animation: brandPulse 0.5s var(--ease-out) 2; }
+
+  .body-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .view { display: none; }
+  .view.open { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .section-head {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
+  }
+  .section-head h2 {
+    margin: 0; font-family: var(--font-headline);
+    font-size: var(--text-lg); font-weight: 800; color: var(--color-text);
+  }
+  .live-badge {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: var(--color-success);
+    background: var(--color-success-dim);
+    border-radius: var(--radius-sm); padding: 2px 6px;
+  }
+  .wire-flag {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-accent-violet);
+    background: hsl(258 90% 66% / 0.12);
+    border-radius: var(--radius-sm); padding: 2px 6px;
+  }
+
+  /* ── posture mini-row (context, quieter than 061) ── */
+  .posture-row {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    font-size: var(--text-sm);
+    align-items: center;
+  }
+  .posture-row .p-item { display: flex; align-items: baseline; gap: 7px; color: var(--color-text-muted); }
+  .posture-row .p-item b { font-family: var(--font-mono); color: var(--color-text); font-weight: 600; }
+  .posture-row .p-ok { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); align-self: center; }
+  .refresh-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--color-accent); color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 5px 12px;
+    font-size: var(--text-xs); font-family: var(--font-sans);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+    margin-left: auto;
+  }
+  .refresh-btn:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+
+  /* ── preview writes (the future 147 controls, flagged) ── */
+  .writes-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .writes-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .writes-head h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; }
+  .writes-sub { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: 12px; }
+  .write-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 2px;
+    border-top: 1px solid var(--color-border-soft);
+  }
+  .write-row .w-label { font-size: var(--text-sm); color: var(--color-text); }
+  .write-row .w-sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .write-row .spacer { flex: 1; }
+
+  .switch {
+    width: 36px; height: 20px; border-radius: var(--radius-full);
+    background: var(--color-muted); border: 1px solid var(--color-border);
+    position: relative; cursor: pointer;
+    transition: all var(--dur-base) var(--ease-out);
+    flex: 0 0 36px;
+  }
+  .switch::after {
+    content: '';
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--color-text-dim);
+    transition: all var(--dur-base) var(--ease-out);
+  }
+  .switch.on { background: var(--color-warning-dim); border-color: var(--color-warning); }
+  .switch.on::after { left: 18px; background: var(--color-warning); }
+
+  .maint-banner {
+    display: none;
+    align-items: center; gap: 8px;
+    margin-top: 12px;
+    background: var(--color-warning-dim);
+    border: 1px solid hsl(38 92% 60% / 0.35);
+    border-radius: var(--radius-md);
+    padding: 9px 14px;
+    font-size: var(--text-sm); color: var(--color-warning);
+  }
+  .maint-banner.on { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* ── audit feed ── */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-top: 14px;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .card-head h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; }
+  .card-foot {
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px solid var(--color-border-soft);
+    font-size: var(--text-xs); color: var(--color-text-dim);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .card-link { color: var(--color-primary); cursor: pointer; font-size: var(--text-xs); }
+  .card-link:hover { text-decoration: underline; }
+  .audit-row {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--color-border-soft);
+    font-size: var(--text-sm);
+    animation: toolSlideIn var(--dur-base) var(--ease-out);
+  }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-plain { color: var(--color-text); flex: 0 0 auto; }
+  .audit-actor { color: var(--color-text-dim); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audit-when { margin-left: auto; color: var(--color-text-dim); font-size: var(--text-xs); flex: 0 0 auto; }
+  .audit-row.is-write .audit-plain::before {
+    content: '✎ ';
+    color: var(--color-warning);
+  }
+
+  /* ── B: receipt toasts ── */
+  .toast-stack {
+    position: absolute; right: 16px; bottom: 16px;
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 50; pointer-events: none;
+    max-width: 360px;
+  }
+  .toast {
+    display: flex; align-items: center; gap: 9px;
+    background: var(--color-surface-hi);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-success);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: var(--text-sm); color: var(--color-text);
+    box-shadow: var(--shadow-md);
+    animation: toolSlideIn var(--dur-base) var(--ease-out);
+    transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+  }
+  .toast.gone { opacity: 0; transform: translateY(6px); }
+  .toast .t-shield { flex: 0 0 auto; }
+  .toast .t-sub { display: block; font-size: var(--text-xs); color: var(--color-text-dim); }
+
+  /* ── C: counting marker ── */
+  .rec-counter {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    background: var(--color-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: all var(--dur-base) var(--ease-out);
+    white-space: nowrap;
+  }
+  .rec-counter:hover { border-color: var(--color-text-dim); color: var(--color-text); }
+  .rec-counter .n { font-family: var(--font-mono); font-weight: 600; color: var(--color-text); }
+  .rec-counter.flash {
+    background: var(--color-success-dim);
+    border-color: hsl(142 71% 45% / 0.4);
+  }
+  .rec-counter.flash .rec-dot { animation: brandPulse 0.5s var(--ease-out) 2; }
+  .rec-tick {
+    font-size: var(--text-xs); color: var(--color-success);
+    opacity: 0; transition: opacity var(--dur-base) var(--ease-out);
+  }
+  .rec-tick.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 062 · Gate Honesty &amp; Audit Receipts</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Always-on ledger <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Receipt toasts</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Counting marker</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="sketch-toolbar">
+  <span>062</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setStage('768px')">💻</button>
+  <button onclick="setStage('none')">🖥</button>
+</div>
+
+<script>
+/* ═══════════ shared data ═══════════ */
+const ME = 'fhdmrd@gmail.com';
+const feeds = { a: [], b: [], c: [] };   // independent per variant so counts stay honest
+['a','b','c'].forEach(v => {
+  feeds[v] = [
+    { plain: 'Signed in to the Control Room', actor: ME, when: 'just now', write: false },
+    { plain: 'Viewed system health', actor: ME, when: '2 min ago', write: false },
+    { plain: 'Signed in to the Control Room', actor: ME, when: 'yesterday · 18:12', write: false },
+    { plain: 'Operator access granted (initial setup)', actor: 'system', when: 'Jul 10 · 09:00', write: false },
+  ];
+});
+
+const VARIANT_META = {
+  a: '<b>A — Always-on ledger.</b> The "Recent operator actions" card lives permanently on the Overview; every action lands as a new top row, sliding in where you can see it. The ledger IS the receipt — no toasts, no popups. Audit tab = the full history.',
+  b: '<b>B — Receipt toasts.</b> The Overview stays free of the ledger; each action confirms itself with a quiet bottom-right "Recorded" toast that names what was recorded, then fades. The full ledger lives ONLY in the Audit tab.',
+  c: '<b>C — Counting marker.</b> The band’s recording marker becomes a live counter ("recorded · N today") that pulses +1 on every action — ambient, zero layout shift. Clicking it opens the Audit tab, the only ledger home.',
+};
+
+/* ═══════════ frame builder (locked 061-B shell) ═══════════ */
+function buildFrame(v) {
+  const shield = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>';
+
+  /* band-right recording affordance differs per variant */
+  let recHome = '';
+  if (v === 'a' || v === 'b') {
+    recHome = `<span class="rec-marker" id="rec-${v}"><span class="rec-dot"></span> every action recorded</span>`;
+  } else {
+    recHome = `<span class="rec-counter" id="rec-${v}" onclick="go('${v}','audit')" title="Open the audit log">
+        <span class="rec-dot"></span> recorded · <span class="n" id="rec-n-${v}">0</span> today
+      </span><span class="rec-tick" id="rec-tick-${v}">✓ recorded</span>`;
+  }
+
+  /* overview ledger card only in A */
+  const ledgerCard = (v === 'a') ? `
+    <div class="card">
+      <div class="card-head"><h3>Recent operator actions</h3><span class="live-badge">live</span></div>
+      <div class="audit-feed" id="feed-ov-${v}"></div>
+      <div class="card-foot">
+        <span>Everything an operator does here is recorded automatically.</span>
+        <span class="wire-flag">net-new · 146</span>
+        <span style="flex:1"></span>
+        <span class="card-link" onclick="go('${v}','audit')">View all ›</span>
+      </div>
+    </div>` : '';
+
+  return `
+  <div class="app-frame" id="frame-${v}">
+    <div class="op-band">
+      <div class="band-top">
+        <div class="band-title">${shield} Control Room</div>
+        <span class="op-chip">OPERATOR</span>
+        <span class="band-identity">${ME}</span>
+        <span class="spacer"></span>
+        ${recHome}
+        <span class="back-link">‹ Back to app</span>
+      </div>
+      <div class="band-tabs">
+        <span class="band-tab active" id="tab-${v}-overview" onclick="go('${v}','overview')">Overview</span>
+        <span class="band-tab" id="tab-${v}-audit" onclick="go('${v}','audit')">Audit log <span class="count-pill" id="count-${v}">4</span></span>
+      </div>
+    </div>
+
+    <div class="body-scroll scrollbar-thin">
+      <div class="view open" id="${v}-view-overview">
+        <div class="section-head">
+          <h2>System health</h2><span class="live-badge">live</span>
+        </div>
+        <div class="posture-row">
+          <span class="p-ok"></span>
+          <span class="p-item">Server capacity <b>3 / 40</b></span>
+          <span class="p-item">Agents working <b id="runs-${v}">2</b></span>
+          <span class="p-item">Database connections <b>1 / 10</b></span>
+          <button class="refresh-btn" onclick="act('${v}', 'refresh')">↻ Refresh</button>
+        </div>
+
+        <div class="writes-card">
+          <div class="writes-head">
+            <h3>Platform controls</h3>
+            <span class="wire-flag">preview — these writes arrive with System Controls; here to feel the receipt</span>
+          </div>
+          <div class="writes-sub">Changes here affect every user. Each change is recorded with your name.</div>
+          <div class="write-row">
+            <div>
+              <div class="w-label">Maintenance mode</div>
+              <div class="w-sub">Users can read everything, but nothing new runs until you switch back.</div>
+            </div>
+            <span class="spacer"></span>
+            <div class="switch" id="sw-maint-${v}" onclick="act('${v}', 'maint')"></div>
+          </div>
+          <div class="write-row">
+            <div>
+              <div class="w-label">Web search</div>
+              <div class="w-sub">Lets agents search the internet. Turn off if it misbehaves.</div>
+            </div>
+            <span class="spacer"></span>
+            <div class="switch on" id="sw-search-${v}" onclick="act('${v}', 'search')"></div>
+          </div>
+          <div class="maint-banner" id="banner-${v}">⚠ Maintenance mode is ON — users currently see the platform read-only.</div>
+        </div>
+
+        ${ledgerCard}
+      </div>
+
+      <div class="view" id="${v}-view-audit">
+        <div class="section-head">
+          <h2>Audit log</h2><span class="live-badge">live</span>
+        </div>
+        <div class="card" style="margin-top:0; max-width:760px;">
+          <div class="audit-feed" id="feed-full-${v}"></div>
+          <div class="card-foot">
+            <span>Who did what, and when — every operator action, no exceptions.</span>
+            <span style="flex:1"></span>
+            <span style="font-family:var(--font-mono); font-size:10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:1px 6px;">search, date filters &amp; export coming soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast-stack" id="toasts-${v}"></div>
+  </div>`;
+}
+
+/* mount all three variants */
+const stage = document.getElementById('stage');
+['a','b','c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v === 'a' ? ' active' : '');
+  wrap.id = 'variant-' + v;
+  wrap.innerHTML = `<p class="variant-meta">${VARIANT_META[v]}</p>` + buildFrame(v);
+  stage.appendChild(wrap);
+});
+
+/* ═══════════ rendering ═══════════ */
+function renderFeed(v) {
+  const rows = feeds[v].map(r =>
+    `<div class="audit-row${r.write ? ' is-write' : ''}">
+       <span class="audit-plain">${r.plain}</span>
+       <span class="audit-actor">${r.actor}</span>
+       <span class="audit-when">${r.when}</span>
+     </div>`).join('');
+  const ov = document.getElementById('feed-ov-' + v);
+  if (ov) ov.innerHTML = feeds[v].slice(0, 5).map((r,i) =>
+    `<div class="audit-row${r.write ? ' is-write' : ''}">
+       <span class="audit-plain">${r.plain}</span>
+       <span class="audit-actor">${r.actor}</span>
+       <span class="audit-when">${r.when}</span>
+     </div>`).join('');
+  document.getElementById('feed-full-' + v).innerHTML = rows;
+  document.getElementById('count-' + v).textContent = feeds[v].length;
+  const n = document.getElementById('rec-n-' + v);
+  if (n) n.textContent = feeds[v].filter(r => r.when === 'just now' || r.when.indexOf('min ago') > -1).length;
+}
+['a','b','c'].forEach(renderFeed);
+
+/* ═══════════ the receipt beat per variant ═══════════ */
+function receipt(v, entry) {
+  feeds[v].unshift(entry);
+  renderFeed(v);
+
+  if (v === 'a') {
+    /* ledger IS the receipt — flash the band marker gently */
+    const rec = document.getElementById('rec-a');
+    rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+    setTimeout(() => rec.classList.remove('flash'), 1400);
+  }
+
+  if (v === 'b') {
+    const stack = document.getElementById('toasts-b');
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = `<span class="t-shield">🛡</span><span><b>Recorded</b> — ${entry.plain}<span class="t-sub">${entry.actor} · just now</span></span>`;
+    stack.appendChild(t);
+    setTimeout(() => t.classList.add('gone'), 2600);
+    setTimeout(() => t.remove(), 3100);
+    const rec = document.getElementById('rec-b');
+    rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+    setTimeout(() => rec.classList.remove('flash'), 1400);
+  }
+
+  if (v === 'c') {
+    const rec = document.getElementById('rec-c');
+    rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+    setTimeout(() => rec.classList.remove('flash'), 1400);
+    const tick = document.getElementById('rec-tick-c');
+    tick.classList.add('show');
+    setTimeout(() => tick.classList.remove('show'), 1600);
+  }
+}
+
+/* ═══════════ actions ═══════════ */
+function act(v, what) {
+  if (what === 'refresh') {
+    const runs = 1 + Math.floor(Math.random() * 3);
+    document.getElementById('runs-' + v).textContent = runs;
+    receipt(v, { plain: 'Viewed system health', actor: ME, when: 'just now', write: false });
+  }
+  if (what === 'maint') {
+    const sw = document.getElementById('sw-maint-' + v);
+    const on = !sw.classList.contains('on');
+    sw.classList.toggle('on', on);
+    document.getElementById('banner-' + v).classList.toggle('on', on);
+    receipt(v, {
+      plain: on ? 'Turned ON maintenance mode — platform is read-only for users'
+                : 'Turned OFF maintenance mode — platform back to normal',
+      actor: ME, when: 'just now', write: true
+    });
+  }
+  if (what === 'search') {
+    const sw = document.getElementById('sw-search-' + v);
+    const on = !sw.classList.contains('on');
+    sw.classList.toggle('on', on);
+    receipt(v, {
+      plain: on ? 'Turned ON web search for all users'
+                : 'Turned OFF web search for all users',
+      actor: ME, when: 'just now', write: true
+    });
+  }
+}
+
+/* ═══════════ navigation ═══════════ */
+function go(v, view) {
+  document.getElementById('tab-' + v + '-overview').classList.toggle('active', view === 'overview');
+  document.getElementById('tab-' + v + '-audit').classList.toggle('active', view === 'audit');
+  document.getElementById(v + '-view-overview').classList.toggle('open', view === 'overview');
+  document.getElementById(v + '-view-audit').classList.toggle('open', view === 'audit');
+}
+
+function showVariant(id, ev) {
+  document.querySelectorAll('.variant').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).classList.add('active');
+  if (ev) ev.target.classList.add('active');
+}
+function setStage(w) {
+  document.getElementById('stage').style.maxWidth = (w === 'none') ? 'none' : w;
+}
+</script>
+</body>
+</html>

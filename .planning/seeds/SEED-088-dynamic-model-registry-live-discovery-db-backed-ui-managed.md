@@ -152,3 +152,50 @@ model` everywhere → the selected model IS honored after the extraction_model p
   Anthropic claude-sonnet-4-6) + the two local presets + Custom. Model field stays editable.
 - Native-7 (deepseek/moonshot/glm/minimax) + OpenRouter are reachable via Custom; their per-model
   extraction status is the table above.
+
+---
+
+## Addendum (2026-07-11): re_open_trigger #2 FIRED — GPT-5.6 (Sol/Terra/Luna) hand-added; concrete Phase-149 input
+
+**This is not a bug and not a new seed — it is live evidence that this seed's trigger #2 ("a new
+provider model is released and someone has to hand-edit config.py") just happened, done during the
+Phase 147 conversation OUTSIDE the phase deliverable.** Captured here so `/gsd:discuss-phase 149`
+picks it up. No `STATE.md`/`ROADMAP.md` edit, no commit (other sessions open at capture time).
+
+**What was added:** OpenAI **GPT-5.6** durable-tier family — `gpt-5.6-sol` (flagship, only tier with
+max reasoning + ultra mode), `gpt-5.6-terra` (balanced everyday, ~2× cheaper than 5.5), `gpt-5.6-luna`
+(lightweight/fastest/cheapest). Real — previewed 2026-07-09 (openai.com/index/previewing-gpt-5-6-sol),
+after the assistant's Jan-2026 knowledge cutoff → confirmed via live web search (provider-docs-first).
+
+**The hand-edit tax, itemized (exactly the pain this seed kills).** To surface ONE model family I had
+to touch **5 code sites + 1 DB row** in lock-step:
+1. `config.py` → `MODEL_CAPABILITIES` (native_tools / emit_tier=force_strict / timeout / max_output / uses_max_completion_tokens)
+2. `config.py` → `MODEL_CONTEXT_DEFAULTS` (context window)
+3. `openai_service.py` → `_MODEL_OUTPUT_DEFAULTS` (practical output ceiling)
+4. `frontend/src/lib/model-info.ts` → `MODEL_INFO` (picker subtitle + cost tier)
+5. `tests/unit/test_config_registry.py` → the LOCKED emit-tier count tripwire (14→17 force_strict; total 55→61)
+6. **DB** `app_settings.provider_model_lists['openai']` — prepended the 3 ids so they're **selectable**
+   (LOCAL only; this is the "curl+hand-edit" surface `provider_model_lists`/discovery is meant to own).
+
+**Two findings Phase 149's design should absorb:**
+- **The static-dict maintenance tax is now measured, not hypothetical.** The `test_config_registry.py`
+  count tripwire was **already RED at HEAD** before my change — `force` had silently drifted 36→39 as
+  post-Phase-122 flagships (claude-sonnet-5/opus-4-8, gemini-3.x, glm-5 family, MiniMax-M3) were added
+  without anyone updating the lock. A DB-primary registry (this seed's tier 3) removes the class of
+  brittle hand-maintained invariants entirely. (Two other registry tests — `test_infer_openai_from_gpt_prefix`,
+  `test_forced_emit_judge_verdict_unmocked` — are also pre-existing RED at HEAD; unrelated rot, left as-is.)
+- **Caps are mirrored, not vendor-verified.** Context window / output caps for the 3 rows were mirrored
+  from the gpt-5.5 tier and commented "conservative pending GA spec" (OpenAI published pricing + tiering
+  only, not context/output numbers — still preview). Tier→timeout mapping: Sol=900s (reasoning), Terra=600s
+  (flagship), Luna=300s (standard). **Phase 149 discovery should re-verify these via `scripts/curate_models.py`
+  live `/models` once GA** — OpenAI is a "sparse `/models`" provider (id+owned_by only per the table above),
+  so context/output still need the UI-override or inference path, not auto-ingest.
+
+**Open follow-ups (not blockers; fold into Phase 149 or do sooner if a model is needed live):**
+- **Cloud parity:** the code rows deploy with git, but `provider_model_lists` is DB data — cloud
+  `app_settings` needs the same 3 ids added (Settings UI or SQL) or the models won't be selectable in
+  prod. (Standing rule: every production push guides the operator through DB + non-code parity.)
+- **Optional:** add one gpt-5.6 tier to the cross-provider eval matrix (`scripts/eval_cross_provider.py`
+  pins only `gpt-5.4-mini` for OpenAI today).
+- **`curate_models.py` re-verify** once the operator's key has GA access (confirms the exact API ids are
+  `gpt-5.6-sol/terra/luna` and not a dated/preview variant, and fills real context/output caps).

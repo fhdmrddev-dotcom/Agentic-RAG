@@ -5,7 +5,10 @@ priority: high
 status: pending
 trigger: v2.9 milestone kickoff — run as the FIRST move of v2.9, BEFORE designing any inputs/assets schema (do NOT start during v2.8; finish 094→095→096 first)
 related: SEED-051, SEED-050, D-092-AUTHOR, .planning/research/questions.md, .planning/notes/workflow-authoring-exploration-2026-06-03.md
+resolves_phase: 152
 ---
+
+> **v3.3 routing note (2026-07-10):** largely SATISFIED by shipped work — the Phase 097 spike answered all 4 questions and v2.9 Phase 103 shipped NL→workflow authoring. The one unshipped slice (upload-template as a workflow run input) is now WFIN-01 → **Phase 152 (Workflow Run Inputs)**; this todo closes when 152 ships.
 
 # Spike: NL→Workflow Authoring (throwaway, evidence-first)
 

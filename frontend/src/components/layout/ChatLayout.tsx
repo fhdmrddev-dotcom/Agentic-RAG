@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { NavPanel } from "./NavPanel"
+import { ChatHistoryColumn } from "./ChatHistoryColumn"
+import { ThreadCommandPalette } from "./ThreadCommandPalette"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
@@ -11,27 +13,55 @@ import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { ClassificationRulesPage } from "@/components/classification/ClassificationRulesPage"
 import { GovernancePage } from "@/pages/GovernancePage"
 import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
+// Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
+// (governance/skill-studio precedent), reachable only via the probe-gated shield.
+import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
+import type { OperatorIdentity } from "@/lib/api"
 import { cn } from "@/lib/utils"
+// Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer reuses the ONE shared
+// title-search predicate + XSS-safe highlight (Plan 01) so it filters its list the
+// SAME way the desktop ChatHistoryColumn does — SC#2 reaches mobile.
+import { matchesTitle, HighlightTitle } from "@/lib/threadGroups"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Plus } from "lucide-react"
+import { MessageSquare, Plus, Search, Shield } from "lucide-react"
 // Phase 103-06 (REQ-7 / sketch 023-A): the mobile drawer consumes the SINGLE
-// shared NAV_ITEMS const (incl. the Workflows home + its distinct icon) — the
-// local NAV_ITEMS_MOBILE triplicate is gone (NavPanel already consumes it; this
-// is the third + final consumer that kills the triplication).
-import { NAV_ITEMS } from "@/lib/nav-items"
+// shared nav list (incl. the Workflows home + its distinct icon) — the local
+// NAV_ITEMS_MOBILE triplicate is gone (NavPanel consumes the same list). Phase 148
+// (VIS-01): the list is now the effective-features-FILTERED `navItems` threaded from
+// App (governed items already vanished) — NOT the raw NAV_ITEMS const, so the mobile
+// drawer and the desktop rail hide the same governed features per one filter pass.
+import type { NavItem } from "@/lib/nav-items"
 // Phase 103-06: the Run-from-page launch reuses the EXISTING kickoff path —
 // createThread + sendMessage(workflow_definition_id) — NEVER a bespoke
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
-import { createThread, postMessage, type PublishedWorkflow } from "@/lib/api"
+// WR-04: the raw deleteThread api client, aliased to avoid shadowing the useThreads()
+// binding (:77) — used for best-effort orphan cleanup on a failed launch.
+import {
+  createThread,
+  postMessage,
+  uploadWorkspaceTemplate,
+  deleteThread as deleteLaunchThread,
+  type PublishedWorkflow,
+} from "@/lib/api"
 
 interface Props {
   onSignOut: () => void
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  // Phase 148 (VIS-01 / D-04): the effective-features-FILTERED nav list from App
+  // (governed items the caller can't use already dropped — the sketch 069-A vanish).
+  // Threaded to both the desktop NavPanel and the mobile drawer so both hide the
+  // same features from a single filter pass. Render-only; the API is the wall.
+  navItems: readonly NavItem[]
+  // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. isOperator
+  // gates the shield (nav + mobile drawer); operatorIdentity feeds the Control Room
+  // band. Non-operators get isOperator=false → nav stays byte-identical to today.
+  isOperator: boolean
+  operatorIdentity: OperatorIdentity | null
   prefillMessage: string | null
   onSetPrefillMessage: (msg: string | null) => void
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio focused
@@ -50,7 +80,7 @@ interface Props {
   onTuneSkill: (skillId: string) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill }: Props) {
   const {
     threads,
     selectedThread,
@@ -66,6 +96,17 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
 
+  // Phase 156 (POLISH-01, Wave 1 / RESEARCH Pitfall 1): the single app-wide thread
+  // bootstrap. Lifted UP from the old NavPanel (which only mounted on the chat view)
+  // so the whole app shares one loaded thread list — the Wave-2 global ⌘K palette is
+  // never empty on a non-chat view. Keeps the retry-once-after-2s guard for an auth
+  // session that isn't ready yet on a hard refresh.
+  useEffect(() => {
+    loadThreads().catch(() => {
+      setTimeout(() => loadThreads().catch(console.error), 2000)
+    })
+  }, [loadThreads])
+
   // Title cross-wiring fix (parallel chats): apply a generated title to the run's
   // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
   // — NOT the currently VIEWED thread, which under fast nav / concurrent runs was
@@ -79,6 +120,62 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [mobileFolderId, setMobileFolderId] = useState<string | null>(null)
+  // Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer's title-search query.
+  // Narrows the drawer's flat list via the shared `matchesTitle` (SC#2 on mobile).
+  // Desktop-keyboard-first: there is deliberately NO ⌘K on mobile (D-08).
+  const [mobileQuery, setMobileQuery] = useState("")
+
+  // Phase 156 (POLISH-01 / D-03, Wave 2): the global ⌘K command palette. Owned HERE
+  // (not the chat-only column) so it is reachable on EVERY view over the Wave-1
+  // app-wide `threads` (RESEARCH Pitfall 1 — never empty off-chat). Toggled by the
+  // ⌘K/Ctrl+K window keydown below OR the ⌘K chip in the ChatHistoryColumn filter box.
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Phase 156 REFINEMENT (operator 2026-07-16, sketch-left-layout Variant A): two
+  // left-chrome collapse states, each PINNED + persisted (survives reload), mirroring
+  // the workspace-panel collapse the app already ships.
+  //  • navExpanded — the ☰ toggle unfolds the 58px icon rail to ~210px labels
+  //    (operator concern a: "unfold it and see it fully"); never on hover.
+  //  • historyCollapsed — folds the chat-history column fully away so the conversation
+  //    goes full-width (operator concern b: "chat area even narrower"). The ▷ reopen
+  //    handle then rides the chat top-bar (ChatArea.onReopenHistory).
+  // Owned HERE (not in NavPanel/ChatHistoryColumn) so those stay pure/presentational
+  // and the NavPanel isolation test sees no localStorage. localStorage is guarded for
+  // private-mode / SSR where it can throw.
+  const [navExpanded, setNavExpanded] = useState(() => {
+    try {
+      return localStorage.getItem("nav_rail_expanded") === "1"
+    } catch {
+      return false
+    }
+  })
+  const toggleNavExpanded = useCallback(() => {
+    setNavExpanded((v) => {
+      const next = !v
+      try {
+        localStorage.setItem("nav_rail_expanded", next ? "1" : "0")
+      } catch {
+        /* private mode — the choice just won't persist */
+      }
+      return next
+    })
+  }, [])
+
+  const [historyCollapsed, setHistoryCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("chat_history_collapsed") === "1"
+    } catch {
+      return false
+    }
+  })
+  const setHistoryCollapsedPersisted = useCallback((collapsed: boolean) => {
+    setHistoryCollapsed(collapsed)
+    try {
+      localStorage.setItem("chat_history_collapsed", collapsed ? "1" : "0")
+    } catch {
+      /* private mode — the choice just won't persist */
+    }
+  }, [])
 
   const handleTryInChat = useCallback((skillName: string) => {
     onSetPrefillMessage(`Use the ${skillName} skill`)
@@ -93,12 +190,46 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   //    views the thread and switches to Chat. active_workflow_run_id is set
   //    server-side atomically (create_workflow_run); GET /threads/{id}/workflow ->
   //    "harness" is the proof a real run was kicked off (NOT a view-only switch).
-  //    The free-text kickoff becomes inputs={"kickoff_prompt": content}; project
-  //    scope is BAKED INTO the published definition (we never pass a folder here). ──
+  //    The free-text kickoff becomes inputs={"kickoff_prompt": content}.
+  //    ── Phase 152 (WFIN-01/02): the Run modal now carries two optional run inputs.
+  //    A staged template File uploads to THIS launched (owned) thread BETWEEN
+  //    createThread and postMessage, so the fill path discovers it by `kind` on the
+  //    thread (Landmine 8 — the order is strict: createThread → upload → send). A
+  //    per-run KB-folder override rides into create_workflow_run.inputs via
+  //    postMessage's folder_id (D-01); absence = today's behavior (D-06). A failed
+  //    upload surfaces BEFORE the send (the await is not swallowed) so the modal can
+  //    render the server's 422 verbatim and no run kicks off. ──
   const doRun = useCallback(
-    async (def: PublishedWorkflow, kickoff: string) => {
+    async (
+      def: PublishedWorkflow,
+      kickoff: string,
+      opts?: { templateFile?: File | null; folderId?: string | null },
+    ) => {
+      const templateFile = opts?.templateFile ?? null
+      const folderId = opts?.folderId ?? null
       const thread = await createThread(def.name)
-      await postMessage(thread.id, kickoff, { workflowDefinitionId: def.id })
+      // WR-04: a post-create failure (a template 422 — now a routine step — or a
+      // postMessage 409/network error) must NOT strand the created thread shell, or
+      // every "fix the file → Run again" retry mints another orphan. Best-effort delete
+      // the created thread in the catch, then RE-THROW the ORIGINAL error so RunModal
+      // still renders the server's message verbatim (the launch-error surfacing, incl.
+      // the 422, must not regress). The cleanup is fire-and-forget (errors swallowed) so
+      // it never masks or blocks the user-facing failure.
+      try {
+        // Landmine 8: upload to the launched owned thread so resolve_template_source
+        // Branch 2 discovers it by kind='template_input'. Not swallowed — a 422 aborts
+        // the launch before postMessage.
+        if (templateFile) await uploadWorkspaceTemplate(thread.id, templateFile)
+        await postMessage(thread.id, kickoff, {
+          workflowDefinitionId: def.id,
+          // WFIN-02 (D-01): additive — only when a per-run override was picked (D-06).
+          ...(folderId ? { folderId } : {}),
+        })
+      } catch (e) {
+        void deleteLaunchThread(thread.id).catch(() => {}) // don't leak the launch shell
+        throw e
+      }
+      // Only reached on a successful launch — never runs after a thrown/cleaned failure.
       await loadThreads()
       selectThread(thread)
       onNavigate("chat")
@@ -138,32 +269,88 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
     return () => window.removeEventListener("keydown", onKey)
   }, [togglePanel])
 
+  // ⌘K / Ctrl+K toggles the global command palette — mirrors the ⌘. idiom above but
+  // matches k (toLowerCase catches shifted K, exactly as the sketch does), and
+  // preventDefault also suppresses the browser's native Ctrl+K. Stable deps: the
+  // functional setState needs no dependency, so the listener is registered once.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
   // Chat-side seam affordances request a panel-open via the module-level signal
   // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe). A seam
   // pointer still force-opens the panel.
   useEffect(() => subscribeOpenPanel(expand), [expand])
+
+  // Phase 156 (POLISH-01 / D-08, Wave 3): the mobile drawer's filtered list —
+  // the SAME shared predicate the desktop column uses (parity). Blank query passes
+  // everything through, so an untouched drawer is byte-identical to before.
+  const mobileFiltered = threads.filter((t) => matchesTitle(t, mobileQuery))
 
   return (
     <div className="flex h-screen bg-background">
       <NavPanel
         activeView={activeView}
         onNavigate={onNavigate}
-        onSignOut={onSignOut}
-        threads={threads}
-        selectedThread={selectedThread}
-        onSelectThread={selectThread}
+        navItems={navItems}
+        isOperator={isOperator}
         onNewThread={newThread}
-        loadThreads={loadThreads}
-        onDeleteThread={deleteThread}
-        onRenameThread={renameThread}
-        folders={folders}
+        onSignOut={onSignOut}
         theme={theme}
         onToggleTheme={toggleTheme}
+        expanded={navExpanded}
+        onToggleExpanded={toggleNavExpanded}
+      />
+
+      {/* Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
+          column — mounted ONLY on the chat view (mirrors how the thread list was
+          chat-only in the old NavPanel). It owns the thread list + inline filter +
+          date grouping; the thin rail can no longer starve it (D-10 — structurally
+          relieves BUG-260711-01). It is `hidden md:flex` + `shrink-0`, so mobile still
+          uses the drawer below and the chat grid keeps `flex-1 min-w-0` → the three
+          desktop columns never overflow (Pitfall 7). */}
+      {/* Phase 156 REFINEMENT: mounted only when NOT collapsed — folding it away frees
+          its ~300px to the conversation (the chat grid below is flex-1, so it reflows to
+          full-width). The ▷ reopen handle lives in the chat top-bar (ChatArea). */}
+      {activeView === "chat" && !historyCollapsed && (
+        <ChatHistoryColumn
+          threads={threads}
+          selectedThread={selectedThread}
+          onSelectThread={selectThread}
+          onNewThread={newThread}
+          onDeleteThread={deleteThread}
+          onRenameThread={renameThread}
+          folders={folders}
+          onOpenPalette={() => setPaletteOpen(true)}
+          onCollapse={() => setHistoryCollapsedPersisted(true)}
+        />
+      )}
+
+      {/* Phase 156 (POLISH-01 / D-03, Wave 2): the global ⌘K palette, mounted ONCE at
+          the layout root OUTSIDE the activeView switch so it is reachable from every
+          view (chat / Documents / Settings / Workflows / …). It reads the same app-wide
+          `threads` the rest of the layout owns (Wave-1 lifted loadThreads → never empty
+          off-chat, Pitfall 1); StreamsProvider-free, so it mounts cleanly here. Selecting
+          a result runs selectThread + onNavigate("chat"). When closed it renders nothing. */}
+      <ThreadCommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        threads={threads}
+        onSelectThread={selectThread}
+        onNavigate={onNavigate}
       />
 
       {/* Mobile drawer backdrop */}
       {drawerOpen && (
-        <div
+        <button
+          type="button"
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
           aria-label="Close navigation"
           onClick={() => setDrawerOpen(false)}
@@ -175,7 +362,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         <div className="fixed inset-y-0 left-0 z-50 w-72 bg-sidebar/95 backdrop-blur-md flex flex-col md:hidden">
           {/* Thread list (scrollable, top) */}
           <div className="flex-1 overflow-y-auto px-2 pt-4">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Chat
             </p>
             <div className="px-1 mb-2">
@@ -200,17 +387,37 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
                 </select>
               )}
             </div>
+            {/* Phase 156 Wave 3 (Plan 04 / D-08): the mobile drawer title search —
+                reuses the shared `matchesTitle` predicate so the drawer filters its
+                list the SAME way the desktop column does (SC#2 reaches mobile). There
+                is deliberately NO ⌘K here (desktop-keyboard-first, D-08). */}
+            <div className="px-1 mb-2">
+              <div className="flex items-center gap-2 h-9 px-2.5 rounded-lg bg-card ghost-border transition-all focus-within:ring-2 focus-within:ring-primary/30">
+                <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={mobileQuery}
+                  onChange={(e) => setMobileQuery(e.target.value)}
+                  placeholder="Search chats…"
+                  aria-label="Search chats"
+                  className="flex-1 min-w-0 bg-transparent border-0 outline-none text-xs text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
             <div className="space-y-0.5 mt-2">
-              {threads.length === 0 && (
-                <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
-              )}
-              {threads.map((thread) => {
+              {mobileFiltered.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground text-center py-4 italic">
+                  {mobileQuery.trim() ? "No chats match your search." : "No recent chats"}
+                </p>
+              ) : (
+                mobileFiltered.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={thread.id}
                     className={cn(
-                      "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
+                      "relative block w-full text-left rounded-lg cursor-pointer transition-all duration-150 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
                       isSelected
                         ? "bg-primary/15 text-primary"
                         : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
@@ -221,17 +428,20 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
                       <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500" />
                     )}
                     <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                      <span className="text-sm truncate" title={thread.title}>{thread.title}</span>
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
+                      <span className="text-sm truncate" title={thread.title}>
+                        <HighlightTitle title={thread.title} query={mobileQuery} />
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 )
-              })}
+              })
+              )}
             </div>
           </div>
           {/* Nav icon row (bottom, fixed) */}
           <div className="border-t border-border/20 px-2 py-3 flex items-center justify-around">
-            {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
+            {navItems.map(({ view, icon: Icon, label }) => {
               const isActive = activeView === view
               return (
                 <button
@@ -254,6 +464,25 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
                 </button>
               )
             })}
+            {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield —
+                rendered OUTSIDE NAV_ITEMS (a SEPARATE element, never in the shared
+                array) so a non-operator's drawer is byte-identical. Amber Shield,
+                distinct from Governance's ShieldCheck; only when isOperator. */}
+            {isOperator && (
+              <button
+                aria-label="Control Room"
+                aria-current={activeView === "control-room" ? "page" : undefined}
+                onClick={() => { onNavigate("control-room"); setDrawerOpen(false) }}
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  activeView === "control-room"
+                    ? "bg-amber-500/15 text-amber-400"
+                    : "text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10",
+                )}
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -283,6 +512,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
               prefillMessage={prefillMessage}
               onClearPrefill={() => onSetPrefillMessage(null)}
               onOpenDrawer={() => setDrawerOpen(true)}
+              // Phase 156 REFINEMENT: the ▷ reopen handle shows only while collapsed.
+              onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
           </main>
           <WorkspacePanel
@@ -341,6 +572,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
               onTabChange={onStudioTabChange}
               onBack={() => onNavigate("skills")}
             />
+          ) : activeView === "control-room" ? (
+            // Phase 146 (ADMIN-01 / D-07): the Control Room full-surface mounts here
+            // (additive branch BEFORE the trailing KnowledgeHealthPage else — the
+            // governance/skill-studio precedent). It is reachable ONLY via the
+            // probe-gated shield (NavPanel footer + the mobile drawer); operatorIdentity
+            // feeds the band, onBack returns to chat. The reachability triad (App union
+            // + this mount + the shield action) is owned in-phase (the built-but-
+            // unreachable lesson).
+            <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
           ) : (
             <KnowledgeHealthPage />
           )}

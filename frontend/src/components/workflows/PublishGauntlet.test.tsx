@@ -376,9 +376,12 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     await user.keyboard("{Escape}")
     await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
 
-    // Backdrop click close (mousedown on the backdrop element itself, not the card)
+    // Backdrop click close (mousedown on the dedicated backdrop button, not the card).
+    // Phase 155 (A11Y-01): the dismiss handler moved from the role="dialog" element
+    // onto a tabIndex=-1 backdrop <button> (jsx-a11y/no-noninteractive-element-
+    // interactions) — same behavior, keyboard close still via ✕ / Escape.
     await openModal()
-    await user.click(screen.getByTestId("publish-modal"))
+    await user.click(screen.getByTestId("publish-modal-backdrop"))
     await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
   })
 
@@ -401,7 +404,7 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     expect(screen.getByTestId("publish-modal-close")).toBeDisabled()
     await user.keyboard("{Escape}")
     expect(screen.getByTestId("publish-modal")).toBeInTheDocument()
-    await user.click(screen.getByTestId("publish-modal")) // backdrop click no-op
+    await user.click(screen.getByTestId("publish-modal-backdrop")) // backdrop click no-op
     expect(screen.getByTestId("publish-modal")).toBeInTheDocument()
 
     // Resolve → loading ends → close affordances unlock again.

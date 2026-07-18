@@ -1,5 +1,13 @@
 # VPS Deployment Guide -- Agentic RAG
 
+> ⚠️ **SUPERSEDED — historical reference only.** This bare-VPS guide (host nginx + systemd +
+> venv + WinSCP zip upload) is **superseded by docs/OPERATOR.md**, the containerized
+> `docker compose` day-0 runbook (see [docs/OPERATOR.md](../../../docs/OPERATOR.md)). **Do not
+> follow the host-nginx / systemd / venv / WinSCP steps below for a new deploy** — use
+> `docker compose -f docker-compose.prod.yml up` per docs/OPERATOR.md instead. This file is kept
+> as history (its nginx server block was ported into `frontend/nginx.conf`); the steps below
+> reflect the old manual process and are not maintained.
+
 Tested on: **Ubuntu 25.04**, **Hostinger VPS**, **Node.js 22**, **Python 3.13**
 
 ---

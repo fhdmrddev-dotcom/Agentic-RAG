@@ -303,14 +303,23 @@ describe("WorkflowsPage — soul tier picks the STRICTEST emit policy (WR-03, or
 })
 
 describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
-  it("Run opens the modal: a read-only folder chip + one textarea + a hint line", async () => {
+  it("Run opens the modal: an editable KB-scope <select> (author default tagged) + one textarea + a hint line", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
     fireEvent.click(within(cards[0]).getByTestId("published-run"))
     const modal = await screen.findByTestId("run-modal")
-    // read-only folder chip showing the NAME (not a path), one textarea, one hint.
-    expect(within(modal).getByTestId("run-folder-chip")).toHaveTextContent("DBA Chapters")
-    expect(within(modal).getByTestId("run-folder-chip").textContent).not.toMatch(/[/\\]/)
+    // Phase 152 (WFIN-02 / D-LOCK-01 + WR-05): the read-only chip is now an inline native
+    // <select>. For a BOUND workflow (folder-aaa = "DBA Chapters") the leading "" option
+    // is the truthful "Workflow default — 📁 {folder}" and is the resting selection —
+    // never the dishonest "All documents" (which is unbound-only). NAME, never a path.
+    const scope = within(modal).getByTestId("run-scope-select") as HTMLSelectElement
+    expect(scope.value).toBe("")
+    const optionText = Array.from(scope.options).map((o) => o.textContent)
+    expect(optionText[0]).toContain("Workflow default")
+    expect(optionText[0]).toContain("DBA Chapters")
+    expect(optionText.some((t) => t === "All documents")).toBe(false)
+    expect(scope.textContent).not.toMatch(/[/\\]/)
+    // Exactly one textbox: the kickoff textarea (the <select> + file input aren't textboxes).
     expect(within(modal).getAllByRole("textbox")).toHaveLength(1)
     expect(within(modal).getByTestId("run-hint")).toBeInTheDocument()
   })
@@ -332,7 +341,12 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     fireEvent.change(textarea, { target: { value: "review Acme Corp" } })
     fireEvent.click(screen.getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
-    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp")
+    // Phase 152: onLaunch now carries the two run inputs. Default state = no template +
+    // the folder on the "workflow default" (author default) → NO override (D-06).
+    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "review Acme Corp", {
+      templateFile: null,
+      folderId: null,
+    })
   })
 
   it("D-01: the library-card Run path stays the Phase-121 launch (onLaunch), NOT wrapped by the door fork", async () => {
@@ -349,7 +363,12 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
     expect(screen.queryByTestId("workflow-doors")).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId("run-confirm"))
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1))
-    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "")
+    // Phase 152: still onLaunch (never the door fork); the third arg is the default
+    // no-input state (D-06 — no template, folder on the workflow default).
+    expect(onLaunch).toHaveBeenCalledWith(strictPublished, "", {
+      templateFile: null,
+      folderId: null,
+    })
   })
 
   it("WR-05: a double-tap of Run creates ONLY ONE launch (in-flight guard)", async () => {

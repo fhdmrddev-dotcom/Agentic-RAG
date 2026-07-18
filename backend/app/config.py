@@ -79,6 +79,9 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gpt-5.4-nano":                         200_000,  # actual 400K — 200K practical cap
     "gpt-5.5":                              400_000,  # actual 1M — 400K practical cap
     "gpt-5.5-pro":                          400_000,  # actual 1M — 400K practical cap (mirrors gpt-5.5; live /models 2026-06-07, 096 D-05 curation)
+    "gpt-5.6-sol":                          400_000,  # flagship — 400K practical cap (mirrors gpt-5.5; docs 2026-07-11, conservative pending GA spec)
+    "gpt-5.6-terra":                        400_000,  # balanced everyday — 400K practical cap (mirrors gpt-5.5; docs 2026-07-11)
+    "gpt-5.6-luna":                         200_000,  # lightweight/fast — 200K conservative cap pending published spec (docs 2026-07-11)
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-8":                      200_000,  # actual 1M — 200K practical cap (mirrors opus-4-7; live /models 2026-06-07, 096 D-05 curation)
     "claude-opus-4-7":                      200_000,  # actual 1M — 200K practical cap
@@ -203,6 +206,12 @@ class ModelCapability(TypedDict, total=False):
     # registry MISS (un-doc-verified / case-sensitivity) SAFELY degrades to coerce
     # (default-SAFE, D-122-05) — never wrongly assumes force/strict it hasn't verified.
     emit_tier: Literal["force_strict", "force", "coerce"]  # Phase 122 D-122-04 — single source of truth (default-SAFE "coerce")
+    # Phase 149 D-149-04/D-149-05 — INFORMATIONAL sunset state. True => the provider is
+    # deprecating the model / it vanished from live /models discovery (warn-and-steer).
+    # The end-user effect is a BADGE ONLY — `enabled` alone controls availability; a
+    # deprecated model can stay enabled. Overlaid from model_capabilities_overrides.deprecated
+    # by get_model_capability_async so a discovery-confirmed DB-only row carries it with no code edit.
+    deprecated: bool  # Phase 149 D-149-04 — informational deprecated badge (default absent = not deprecated)
 
 
 # Capability registry: which models support native API tool calling.
@@ -248,6 +257,14 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # representative-class
     "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # 300s -> 600s flagship tier (Open Q4 resolved, operator-approved 2026-06-07)
     "gpt-5.5-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
+    # GPT-5.6 family (Sol/Terra/Luna) — durable capability tiers, previewed 2026-07-09
+    # (openai.com/index/previewing-gpt-5-6-sol). Sol=flagship (only tier unlocking max
+    # reasoning effort + ultra mode); Terra=balanced everyday; Luna=lightweight/fastest.
+    # Same OpenAI TIER-FORCE + verified strict json_schema as the rest of the gpt-5 line.
+    # Re-verify ids + caps against live /models (scripts/curate_models.py) once GA.
+    "gpt-5.6-sol":   {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
+    "gpt-5.6-terra": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
+    "gpt-5.6-luna":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
     "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},
     # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use
@@ -684,7 +701,7 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
                 base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
             # Overlay non-None DB fields
             for field in ("llm_call_timeout_seconds", "context_window_tokens",
-                          "max_output_tokens", "native_tools"):
+                          "max_output_tokens", "native_tools", "deprecated"):
                 db_val = db_row.get(field)
                 if db_val is not None:
                     base[field] = db_val
@@ -727,6 +744,17 @@ class Settings(BaseSettings):
 
     supabase_url: str
     supabase_service_role_key: str
+    # Phase 158 (CR-01): the remaining Supabase infra keys the install wizard collects and
+    # persists to the setup-store. They MUST be declared here (default "") so the config
+    # overlay can ``setattr`` them — Pydantic v2 raises ``ValueError`` on ``setattr`` of an
+    # UNDECLARED field, which at import (``apply_setup_overlay`` below) would crash-loop the
+    # backend on the first boot after finalize (bricking a wizard-configured box). Declaring
+    # them also lets ``/public-config`` return the real ``supabase_anon_key`` so the browser's
+    # Supabase client binds without a rebuild (the D-07 login path). Optional — a pre-158
+    # env-configured box that never set them is unaffected (they stay "").
+    supabase_anon_key: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
 
     # Active provider — set this to switch between providers
     # Options: openai | anthropic | google | openrouter | ollama | deepseek | moonshot | minimax | zhipu
@@ -865,6 +893,13 @@ class Settings(BaseSettings):
     # so the agent loop continues. Generous default so legitimate heavy analysis
     # is unaffected; operator-tunable via env SANDBOX_EXEC_TIMEOUT_SECONDS.
     sandbox_exec_timeout_seconds: int = 180
+    # Phase 151 (FILE-02 / D-02) — size cap for fetch_document_file. The tool streams a
+    # KB document's ORIGINAL bytes to /sandbox/input/ (disk, never model context); a file
+    # larger than this is refused PRE-download with an honest size error (refuse-never-
+    # truncate — a half binary is corrupt). Chosen as an env-backed config.Settings field
+    # (mirrors sandbox_exec_timeout_seconds above) rather than an app_settings column, to
+    # avoid a second migration this phase. Operator-tunable via env FETCH_DOCUMENT_FILE_MAX_MB.
+    fetch_document_file_max_mb: int = 50
 
     # Concurrency (Phase 058 — D-058-07)
     # Total AnyIO thread-pool tokens. FastAPI defaults to 40, which is the
@@ -893,16 +928,28 @@ class Settings(BaseSettings):
     postgres_pool_min: int = 2
     postgres_pool_max: int = 10
 
-    # Backpressure admin endpoint (Phase 078 — D-078-07 WORKER-LIFT-04)
-    # Comma-separated Supabase Auth user IDs allowed to call GET /admin/backpressure.
-    # Fail-closed in production (ENVIRONMENT=production): 403 when unset/empty.
-    # Fail-open in dev (default): no restriction so testing works without config.
-    backpressure_admin_user_ids: str = ""
+    # Operator role bootstrap (Phase 146 — ADMIN-01, D-01)
+    # Comma-separated operator emails, idempotently seeded into operator_users on
+    # startup (resolved against auth.users by lowercased email). Bootstrap-only —
+    # the DB table is the runtime source of truth; removing an email does NOT
+    # un-operator anyone (Phase 148 territory). Legitimately env/infra, not an
+    # app_settings value (CLAUDE.md settings-vs-env rule). Replaces the deleted
+    # BACKPRESSURE_ADMIN_USER_IDS allow-list + dev fail-open (D-02): /admin now
+    # sits behind require_operator, non-operators get 404 even in dev.
+    operator_emails: str = ""
 
-    # Deployment environment — used by backpressure auth gating and test guards.
-    # Values: "production" | "prod" → fail-closed for admin endpoints.
-    # Default: "" (dev/local) → fail-open.
+    # Deployment environment marker (e.g. "production"). Consumed at the deploy/env
+    # layer and by test guards; no longer gates /admin — Phase 146 replaced the
+    # backpressure allow-list + dev fail-open with the require_operator gate (D-02).
     environment: str = ""
+
+    # Phase 150 (SEC-01) — comma-separated MultiFernet key list; FIRST key encrypts,
+    # the rest are decrypt-only (rotation). Secret/infra → env only per CLAUDE.md;
+    # binds the env var SECRETS_ENCRYPTION_KEY via pydantic-settings. Empty =>
+    # D-150-01 fail-open (secrets stay/save plaintext) + a loud boot warning. A
+    # malformed key => D-150-04 fail-hard (refuse to start). Generate one with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    secrets_encryption_key: str = ""
 
     # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout
     # wrapper at threads.py:855 has been DELETED. The agent loop now has no
@@ -1133,3 +1180,57 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def apply_setup_overlay(target) -> None:
+    """Overlay the first-run setup-store's infra tier onto ``target`` — STORE WINS (D-01/D-02).
+
+    For each enumerated ``INFRA_KEYS`` entry, a truthy value in ``/data/setup.json``
+    OVERRIDES the settings attribute. This polarity is deliberate and load-bearing: the
+    onebox preset ships NON-EMPTY placeholders (``SUPABASE_URL=https://<project-ref>.supabase.co``),
+    so a naive env-wins overlay would let the placeholder shadow the wizard's real value
+    (RESEARCH Pattern 1). ONLY the infra tier is sourced from the store — app-level keys
+    (provider API keys, ``operator_emails`` as an app read, retrieval knobs) live in
+    ``app_settings`` and are NEVER overridden here.
+
+    Mutates ``target`` in place (mirrors the ``resolve_llm_provider`` post-load mutator
+    self-precedent). No-op on a fresh/unconfigured box (empty store). The infra keys do not
+    feed the LLM resolver, so no resolver re-run is required for a store-driven change.
+    """
+    from app.services.setup_store import INFRA_KEYS, read_store
+
+    store = read_store()
+    if not store:
+        return
+    for k in INFRA_KEYS:
+        v = store.get(k)
+        # CR-01 defense-in-depth: only ``setattr`` a key the target actually HAS. Pydantic v2
+        # raises ``ValueError`` on ``setattr`` of an undeclared field — at import that would
+        # crash-loop boot. ``hasattr`` is True for a declared Settings field (all 8 INFRA_KEYS
+        # now are) and False for an undeclared one, so a FUTURE INFRA_KEY added without a
+        # matching field is SKIPPED, never a boot-bricking raise. (It also keeps the overlay
+        # correct for the SimpleNamespace targets the unit tests drive.)
+        if v and hasattr(target, k):  # STORE WINS for infra keys (placeholder-safe)
+            setattr(target, k, v)
+
+
+def needs_setup(target) -> bool:
+    """Static, blip-proof first-run signal: is the box unconfigured (D-05 / Pattern 1)?
+
+    ``needs_setup = (not setup_finalized()) AND (the infra config is still placeholder/blank)``
+    — a pure string check on ``supabase_url``, NO live DB probe, so a DB blip can never
+    re-trigger the wizard on a live box. A hand-filled 157-style box (a REAL ``supabase_url``
+    but no marker file) reads False; only a genuinely unconfigured box (placeholder URL and
+    no finalize marker) reads True.
+    """
+    from app.services.setup_store import _is_placeholder, setup_finalized
+
+    if setup_finalized():
+        return False
+    return _is_placeholder(getattr(target, "supabase_url", ""))
+
+
+# Phase 158 (DEPLOY-02, D-01/D-02): overlay the first-run setup-store's infra tier over env
+# for the enumerated INFRA_KEYS (store-wins — placeholder-safe) so a wizard-configured
+# one-box picks up its real infra values without a rebuild. No-op on a fresh box (no store).
+apply_setup_overlay(settings)

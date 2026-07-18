@@ -51,10 +51,10 @@ function provenanceChip(source: string): { label: string; className: string } {
     case "self_improve":
       return { label: "proposal-promoted", className: "bg-primary/10 text-primary" }
     case "backfill":
-      return { label: "original", className: "bg-muted text-muted-foreground/70" }
+      return { label: "original", className: "bg-muted text-muted-foreground" }
     default:
       // Defensive: render the raw source verbatim rather than fabricate a label.
-      return { label: source, className: "bg-muted text-muted-foreground/70" }
+      return { label: source, className: "bg-muted text-muted-foreground" }
   }
 }
 
@@ -83,7 +83,7 @@ const EVAL_TONE_CLASS: Record<EvalTone, string> = {
   pass: "text-emerald-600 dark:text-emerald-400",
   fail: "text-destructive",
   mixed: "text-amber-600 dark:text-amber-400",
-  none: "text-muted-foreground/60",
+  none: "text-muted-foreground",
 }
 
 // ── Forced-proposal join (b): the un-softened failed-gate evidence for a version.
@@ -241,7 +241,7 @@ export function VersionsTab({ skillId, liveVersionNumber }: Props) {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-[10px] text-muted-foreground/70">{fmtDate(v.created_at)}</td>
+                  <td className="px-3 py-2 text-[10px] text-muted-foreground">{fmtDate(v.created_at)}</td>
                 </tr>
               )
             })}
@@ -283,7 +283,7 @@ export function VersionsTab({ skillId, liveVersionNumber }: Props) {
 
           {fromV && toV && (
             <div className="overflow-x-auto rounded-md border border-border/60 bg-muted/20">
-              <div className="border-b border-border/60 px-3 py-1.5 text-[9px] text-muted-foreground/70">
+              <div className="border-b border-border/60 px-3 py-1.5 text-[9px] text-muted-foreground">
                 v{fromV.version_number} → v{toV.version_number} · instructions
               </div>
               <pre className="whitespace-pre-wrap break-words px-3 py-2 font-mono text-[10px] leading-relaxed">
@@ -308,7 +308,7 @@ export function VersionsTab({ skillId, liveVersionNumber }: Props) {
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground/70">
+        <p className="text-xs text-muted-foreground">
           Only one version so far — nothing to compare yet.
         </p>
       )}

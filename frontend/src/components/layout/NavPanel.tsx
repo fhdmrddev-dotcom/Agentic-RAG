@@ -1,476 +1,210 @@
-import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-  MessageSquare,
-  LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
-  Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
-  AlertCircle, Square,
-} from "lucide-react"
+import { LogOut, Plus, Sparkles, Moon, Sun, Shield, Menu, type LucideIcon } from "lucide-react"
 import type { ActiveView } from "@/App"
-import type { Folder, Thread } from "@/types"
 // Phase 103 (REQ-7) — the single shared nav source (kills the triplication).
-import { NAV_ITEMS } from "@/lib/nav-items"
-// SEED-064: cross-thread run visibility + Stop.
-import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
-import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
+// Phase 148 (VIS-01 / D-04): the rail renders the effective-features-FILTERED
+// `navItems` prop threaded from App (governed items already vanished per sketch
+// 069-A) — NOT the raw NAV_ITEMS const — so a non-operator's rail hides the same
+// governed features the mobile drawer does. Render-only; the API is the wall.
+import type { NavItem } from "@/lib/nav-items"
+
+// Phase 156 (POLISH-01 / D-01, D-07, Wave 1): NavPanel is a PERMANENT icon rail —
+// logo → New Chat (+) → nav icons → footer icons. The old collapsible w-64↔w-16 column
+// (which MASKED its content, incl. New Chat + the thread list, on collapse — the
+// SEED-045 Anchor-1 bug) is gone: the whole thread region moved to the dedicated
+// `ChatHistoryColumn` (D-09), so this rail is stream-free and its growth can NEVER hide
+// New Chat on any view — SC#1 by construction.
+//
+// Phase 156 REFINEMENT (operator 2026-07-16, sketch-left-layout Variant A): the rail
+// still defaults to the thin 58px icon spine, but a deliberate ☰ click now EXPANDS it
+// to ~210px with labels beside every icon — so the operator can "unfold it and see it
+// fully" (their concern a). It is PINNED (never hover — the annoyance they flagged) and
+// its open/closed choice is remembered by the parent (`nav_rail_expanded`, owned in
+// ChatLayout; this component stays pure/presentational). Collapsed icons keep their
+// hover tooltips; expanded rows drop the tooltip since the label is already visible.
 
 interface Props {
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
-  onSignOut: () => void
-  threads: Thread[]
-  selectedThread: Thread | null
-  onSelectThread: (thread: Thread) => void
+  // Phase 148 (VIS-01 / D-04): the effective-features-FILTERED nav list from App —
+  // governed items the caller can't use are already dropped (the vanish, never a
+  // locked/badged item). The operator shield stays OUTSIDE this list (isOperator).
+  navItems: readonly NavItem[]
+  // Phase 146 (ADMIN-01 / D-07): the App-level probe result, render-only. When true,
+  // the amber operator shield renders at the rail bottom; when false/loading it
+  // renders NOTHING (no placeholder, no reserved space). The shield lives OUTSIDE the
+  // shared NAV_ITEMS array (a regression test locks that), so the array never leaks
+  // the surface.
+  isOperator: boolean
+  // Phase 156 (D-02): the rail's New Chat (+) — reachable from EVERY view. Fires
+  // onNewThread() then switches to chat, so "New Chat from Settings" works.
   onNewThread: (folderId?: string | null) => void
-  loadThreads: () => Promise<void>
-  onDeleteThread: (id: string) => Promise<void>
-  onRenameThread: (id: string, title: string) => Promise<void>
-  folders: Folder[]
+  onSignOut: () => void
   theme: "light" | "dark"
   onToggleTheme: () => void
+  // Phase 156 REFINEMENT: the pinned ☰ expand/collapse state (icons ⇄ labels). Parent-
+  // owned + persisted so this component stays pure; false = the default 58px icon rail.
+  expanded: boolean
+  onToggleExpanded: () => void
+}
+
+// One rail control, two renderings. Collapsed → a 40px icon square wrapped in a
+// hover tooltip (the label lives in the tip). Expanded → a full-width row with the
+// icon + a visible label, tooltip dropped (redundant). `className` carries the
+// tone-specific colours (primary New-Chat wash, active highlight, amber shield, …).
+function RailItem({
+  expanded,
+  icon: Icon,
+  label,
+  active,
+  onClick,
+  className,
+}: {
+  expanded: boolean
+  icon: LucideIcon
+  label: string
+  active?: boolean
+  onClick: () => void
+  className?: string
+}) {
+  const button = (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center h-10 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+        expanded ? "w-full justify-start gap-3 px-3" : "w-10 justify-center",
+        className,
+      )}
+    >
+      <Icon className="w-5 h-5 shrink-0" />
+      {expanded && <span className="text-sm font-medium truncate">{label}</span>}
+    </button>
+  )
+  if (expanded) return button
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" className="ml-2">{label}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 export function NavPanel({
   activeView,
   onNavigate,
-  onSignOut,
-  threads,
-  selectedThread,
-  onSelectThread,
+  navItems,
+  isOperator,
   onNewThread,
-  loadThreads,
-  onDeleteThread,
-  onRenameThread,
-  folders,
+  onSignOut,
   theme,
   onToggleTheme,
+  expanded,
+  onToggleExpanded,
 }: Props) {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem("nav_panel_collapsed") === "true"
-  })
-
-  function handleToggle() {
-    setIsCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem("nav_panel_collapsed", String(next))
-      return next
-    })
-  }
-
-  // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
-  // + the cross-thread stop action.
-  const streamingThreadIds = useStreamingThreadIds()
-  const streamActions = useStreamActions()
-
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState("")
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const [showFolderPicker, setShowFolderPicker] = useState(false)
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
-  const editInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    loadThreads().catch(() => {
-      // Auth may not be ready yet on page refresh — retry once after 2s
-      setTimeout(() => loadThreads().catch(console.error), 2000)
-    })
-  }, [loadThreads])
-
-  useEffect(() => {
-    if (editingId) editInputRef.current?.focus()
-  }, [editingId])
-
-  function startRename(thread: Thread) {
-    setMenuOpenId(null)
-    setEditingId(thread.id)
-    setEditValue(thread.title)
-  }
-
-  async function commitRename(id: string) {
-    const trimmed = editValue.trim()
-    if (trimmed) await onRenameThread(id, trimmed)
-    setEditingId(null)
-  }
-
-  // Thread list — displayed ONLY when activeView === "chat"
-  function renderThreadList() {
-    return (
-      <div className="space-y-0.5 mt-2">
-        {threads.length === 0 && (
-          <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
-        )}
-        {threads.map((thread) => {
-          const isSelected = selectedThread?.id === thread.id
-          const isEditing = editingId === thread.id
-          const isMenuOpen = menuOpenId === thread.id
-          const isHovered = hoveredId === thread.id
-          const showActions = isHovered || isMenuOpen
-          // SEED-064: live run on this thread?
-          const isRunning = streamingThreadIds.has(thread.id)
-
-          return (
-            <div
-              key={thread.id}
-              className="relative group"
-              onMouseEnter={() => setHoveredId(thread.id)}
-              onMouseLeave={() => { if (!isMenuOpen) setHoveredId(null) }}
-            >
-              {isEditing ? (
-                <input
-                  ref={editInputRef}
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => commitRename(thread.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename(thread.id)
-                    if (e.key === "Escape") setEditingId(null)
-                  }}
-                  className="w-full px-3 py-1.5 text-xs bg-card border border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
-                />
-              ) : (
-                <div
-                  className={cn(
-                    "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
-                    isSelected
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
-                  )}
-                  onClick={() => onSelectThread(thread)}
-                >
-                  {/* Active indicator */}
-                  {isSelected && (
-                    <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500" />
-                  )}
-                  {/* Title row */}
-                  <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
-                    <span className="text-sm truncate" title={thread.title}>
-                      {thread.title}
-                    </span>
-                    {thread.folder_id && (
-                      <FolderIcon className="h-3 w-3 shrink-0 text-primary/40" />
-                    )}
-                  </div>
-
-                  {/* SEED-064: resting running dot — ambient "this chat is working"
-                      signal. A short gradient scrim keeps it clear of a long title.
-                      Hidden while hovered (the Stop button takes its place). */}
-                  {isRunning && !showActions && (
-                    <div
-                      className="absolute inset-y-0 right-0 flex items-center pl-6 pr-3 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none"
-                      aria-label="Run in progress"
-                    >
-                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                    </div>
-                  )}
-
-                  {/* Actions on hover: Stop (if running) + the rename/delete menu.
-                      The gradient scrim fades a long title out behind the buttons so
-                      they never visually collide with the text (SEED-064 polish). */}
-                  {showActions && (
-                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg">
-                      {isRunning && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            void streamActions.stopThread(thread.id)
-                          }}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
-                          aria-label="Stop run"
-                        >
-                          <Square className="h-2.5 w-2.5 fill-current" />
-                        </button>
-                      )}
-                      <span
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setMenuOpenId(isMenuOpen ? null : thread.id)
-                        }}
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Dropdown menu */}
-              {isMenuOpen && (
-                <div
-                  className="absolute right-2 top-full mt-0.5 z-50 w-36 rounded-lg ghost-border bg-popover shadow-lg shadow-black/20 py-1"
-                  onMouseLeave={() => setMenuOpenId(null)}
-                >
-                  <button
-                    onClick={() => startRename(thread)}
-                    className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Rename
-                  </button>
-                  <button
-                    onClick={() => { setMenuOpenId(null); setDeleteConfirmId(thread.id) }}
-                    className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
-                    aria-label="Delete Thread"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
+  const isControlRoom = activeView === "control-room"
 
   return (
     <div
       className={cn(
-        "hidden md:flex flex-col h-full bg-sidebar border-r border-border/20 shrink-0 transition-[width] duration-300 ease-in-out relative overflow-hidden",
-        isCollapsed ? "w-16" : "w-64"
+        "hidden md:flex flex-col h-full shrink-0 bg-sidebar border-r border-border/20 py-3 motion-safe:transition-[width] motion-safe:duration-300",
+        expanded ? "w-[210px] items-stretch px-2" : "w-[58px] items-center",
       )}
     >
-      {/* 
-        Unified Inner Wrapper: Always 64 (256px) wide. 
-        When the parent shrinks to w-16 (64px), it simply masks over the content gracefully. 
-        No layout recalculation or DOM swapping occurs, eliminating layout jumps entirely.
-      */}
-      <div className="flex flex-col h-full w-64 min-w-[16rem]">
-        
-        {/* Toggle — absolute on the outer container so it tracks the right edge when expanded
-            and sits centered in the 64px column when collapsed */}
+      {/* Logo + the ☰ expand/collapse toggle. Collapsed → stacked & centered; expanded
+          → logo left, toggle flush right (sketch Variant A .rail-toggle self-end). */}
+      <div
+        className={cn(
+          "flex shrink-0",
+          expanded ? "items-center justify-between w-full mb-1" : "flex-col items-center gap-1.5",
+        )}
+      >
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
+          <Sparkles className="w-4 h-4 text-white" />
+        </div>
+        {/* PINNED toggle (never hover) — the label-reveal the operator asked for. The
+            aria-label flips Expand⇄Collapse; the parent persists the choice. */}
         <button
-          onClick={handleToggle}
-          className={cn(
-            "absolute top-4 z-20 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-            isCollapsed ? "left-4" : "right-3"
-          )}
-          aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={onToggleExpanded}
+          aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+          aria-expanded={expanded}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+          <Menu className="w-[18px] h-[18px] shrink-0" />
         </button>
+      </div>
 
-        {/* Header Row: Logo — fades out when collapsed so the toggle is the only thing visible */}
-        <div className="flex items-center h-16 px-4 mb-2 shrink-0">
-          <div className={cn(
-            "flex items-center gap-2 transition-opacity duration-200",
-            isCollapsed ? "opacity-0" : "opacity-100 delay-100"
-          )}>
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground whitespace-nowrap">
-              Agentic RAG
-            </span>
-          </div>
-        </div>
+      {/* New Chat (+) + the primary nav items. */}
+      <div className={cn("flex flex-col gap-1 mt-4 flex-1", expanded ? "items-stretch" : "items-center")}>
+        {/* Phase 156 (D-02 / SC#1): New Chat lives permanently on the rail — no state
+            can hide it. From a non-chat view it also switches to chat. */}
+        <RailItem
+          expanded={expanded}
+          icon={Plus}
+          label="New chat"
+          onClick={() => {
+            onNewThread()
+            onNavigate("chat")
+          }}
+          className="text-primary bg-primary/10 hover:bg-primary/20"
+        />
 
-        {/* Primary Nav Items */}
-        {/* padding px-3 (12px), button px-2.5 (10px). Icon is centered at 32px perfectly fitting the 64px collapsed parent. */}
-        <div className="px-3 pb-2 space-y-1">
-          {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
-            const isActive = activeView === view
-            const buttonContent = (
-              <button
-                onClick={() => onNavigate(view)}
-                className={cn(
-                  "flex items-center gap-3 h-10 px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 relative",
-                  isCollapsed ? "w-10" : "w-full",
-                  isActive
-                    ? "bg-primary/15 text-primary font-medium"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
-                )}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200",
-                  isCollapsed ? "opacity-0" : "opacity-100"
-                )}>
-                  {label}
-                </span>
-              </button>
-            )
+        {navItems.map(({ view, icon, label }) => (
+          <RailItem
+            key={view}
+            expanded={expanded}
+            icon={icon}
+            label={label}
+            active={activeView === view}
+            onClick={() => onNavigate(view)}
+            className={
+              activeView === view
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
+            }
+          />
+        ))}
+      </div>
 
-            return isCollapsed ? (
-              <Tooltip key={view} delayDuration={0}>
-                <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
-                <TooltipContent side="right" className="ml-2">{label}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <div key={view}>{buttonContent}</div>
-            )
-          })}
-        </div>
+      {/* Footer: theme toggle, probe-gated operator shield, sign out. */}
+      <div className={cn("flex flex-col gap-1 mt-auto", expanded ? "items-stretch" : "items-center")}>
+        <RailItem
+          expanded={expanded}
+          icon={theme === "dark" ? Sun : Moon}
+          label={theme === "dark" ? "Light Mode" : "Dark Mode"}
+          onClick={onToggleTheme}
+          className="text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
+        />
 
-        {/* Dynamic Content Area (Threads) */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 scrollbar-thin">
-          <div className={cn(
-            "transition-opacity duration-200 w-[232px]", 
-            isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 delay-100"
-          )}>
-            {activeView === "chat" && (
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between pb-2 px-1 border-b border-border/10 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                    Chats
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {/* SEED-064: cross-thread active-runs counter + Stop tray
-                        (renders null when nothing is running). */}
-                    <ActiveRunsTray threads={threads} />
-                    <button
-                      onClick={() => {
-                        onNewThread(selectedFolderId)
-                        setShowFolderPicker(false)
-                      }}
-                      className="flex p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors items-center justify-center"
-                      title="New Chat"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                    {folders.length > 0 && (
-                      <button
-                        onClick={() => setShowFolderPicker((prev) => !prev)}
-                        className={cn(
-                          "flex p-1 rounded-md transition-colors items-center justify-center",
-                          showFolderPicker
-                            ? "bg-accent text-primary"
-                            : "hover:bg-accent/40 text-muted-foreground hover:text-sidebar-foreground"
-                        )}
-                        title="Choose folder"
-                      >
-                        <FolderIcon className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {showFolderPicker && folders.length > 0 && (
-                  <div className="mb-2 px-1">
-                    <select
-                      value={selectedFolderId ?? ""}
-                      onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                      className="w-full text-xs rounded-lg px-2 py-1.5 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                    >
-                      <option value="">All documents</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>{f.name}</option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Scope this chat to a folder
-                    </p>
-                  </div>
-                )}
-                {renderThreadList()}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield. Amber lucide
+            Shield (distinct from Governance's ShieldCheck), active-highlights when in
+            the Control Room. Rendered ONLY when isOperator, and OUTSIDE navItems (the
+            D-07 non-discoverable contract — nothing rendered for non-operators). */}
+        {isOperator && (
+          <RailItem
+            expanded={expanded}
+            icon={Shield}
+            label="Control Room"
+            active={isControlRoom}
+            onClick={() => onNavigate("control-room")}
+            className={
+              isControlRoom
+                ? "bg-amber-500/15 text-amber-400"
+                : "text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10"
+            }
+          />
+        )}
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null) }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
-                <AlertDialogTitle>Delete thread?</AlertDialogTitle>
-              </div>
-              <AlertDialogDescription>
-                This will permanently delete this thread and all its messages. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (deleteConfirmId) {
-                    await onDeleteThread(deleteConfirmId)
-                    setDeleteConfirmId(null)
-                  }
-                }}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Footer Area */}
-        <div className="p-3 mt-auto space-y-1">
-          {(() => {
-            const themeButtonContent = (
-              <button
-                onClick={onToggleTheme}
-                className={cn(
-                  "flex items-center gap-3 h-10 px-2.5 text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors rounded-lg focus-visible:outline-none",
-                  isCollapsed ? "w-10" : "w-full"
-                )}
-              >
-                {theme === "dark" ? <Sun className="w-5 h-5 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
-                <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200",
-                  isCollapsed ? "opacity-0" : "opacity-100"
-                )}>
-                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                </span>
-              </button>
-            )
-
-            const signOutButtonContent = (
-              <button
-                onClick={onSignOut}
-                className={cn(
-                  "flex items-center gap-3 h-10 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg focus-visible:outline-none",
-                  isCollapsed ? "w-10" : "w-full"
-                )}
-              >
-                <LogOut className="w-5 h-5 shrink-0" />
-                <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200",
-                  isCollapsed ? "opacity-0" : "opacity-100"
-                )}>
-                  Sign out
-                </span>
-              </button>
-            )
-
-            return (
-              <>
-                {isCollapsed ? (
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>{themeButtonContent}</TooltipTrigger>
-                    <TooltipContent side="right" className="ml-2">Toggle Theme</TooltipContent>
-                  </Tooltip>
-                ) : themeButtonContent}
-                
-                {isCollapsed ? (
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>{signOutButtonContent}</TooltipTrigger>
-                    <TooltipContent side="right" className="ml-2">Sign out</TooltipContent>
-                  </Tooltip>
-                ) : signOutButtonContent}
-              </>
-            )
-          })()}
-        </div>
+        <RailItem
+          expanded={expanded}
+          icon={LogOut}
+          label="Sign out"
+          onClick={onSignOut}
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        />
       </div>
     </div>
   )
 }
-

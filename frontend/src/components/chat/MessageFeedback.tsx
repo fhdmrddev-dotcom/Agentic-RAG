@@ -68,10 +68,12 @@ export function MessageFeedback({ messageId }: Props) {
 
   const isRated = ratingState !== null
 
-  // After rating: always visible. Before rating: hidden until parent row hover (group-hover).
+  // After rating: always visible. Before rating: hidden until parent row hover OR
+  // keyboard focus-within (WR-01: group-focus-within keeps the global :focus-visible
+  // ring on these buttons visible for keyboard users — WCAG 2.4.7 Focus Visible).
   const containerClass = cn(
     "flex items-center gap-1 mt-2",
-    isRated ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"
+    isRated ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
   )
 
   return (
@@ -93,11 +95,12 @@ export function MessageFeedback({ messageId }: Props) {
               )}
               onClick={handlePositive}
               disabled={isRated || pendingRating !== null}
+              aria-label="Good response"
             >
               {pendingRating === "positive" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               ) : (
-                <ThumbsUp className={cn("h-3.5 w-3.5", ratingState === "positive" && "fill-primary")} />
+                <ThumbsUp className={cn("h-3.5 w-3.5", ratingState === "positive" && "fill-primary")} aria-hidden="true" />
               )}
             </Button>
           </TooltipTrigger>
@@ -120,11 +123,12 @@ export function MessageFeedback({ messageId }: Props) {
               )}
               onClick={handleNegativeClick}
               disabled={isRated || pendingRating !== null}
+              aria-label="Poor response"
             >
               {pendingRating === "negative" ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
               ) : (
-                <ThumbsDown className={cn("h-3.5 w-3.5", ratingState === "negative" && "fill-destructive")} />
+                <ThumbsDown className={cn("h-3.5 w-3.5", ratingState === "negative" && "fill-destructive")} aria-hidden="true" />
               )}
             </Button>
           </TooltipTrigger>

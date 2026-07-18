@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 069 — Feature Visibility (Phase 148)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .variant-meta { padding: 10px 20px 0; font-size: var(--text-sm); color: var(--color-text-muted); max-width: 1080px; }
+  .variant-meta b { color: var(--color-text); font-weight: 600; }
+
+  .app-frame {
+    height: calc(100vh - 118px); min-height: 680px; margin: 12px 20px 20px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--color-bg); box-shadow: var(--shadow-lg);
+    position: relative; display: flex; flex-direction: column;
+  }
+
+  /* ── locked 061-B band ── */
+  .op-band { background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1); border-bottom: 1px solid hsl(38 92% 60% / 0.25); padding: 14px 22px 0; flex: 0 0 auto; }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title { display: flex; align-items: center; gap: 9px; font-family: var(--font-headline); font-weight: 800; font-size: var(--text-lg); color: var(--color-text); }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .op-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-sm); padding: 2px 7px; }
+  .rec-marker { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); white-space: nowrap; border-radius: var(--radius-full); padding: 3px 10px; transition: all var(--dur-base) var(--ease-out); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.6); flex: 0 0 6px; }
+  .rec-marker.flash { background: var(--color-warning-dim); color: var(--color-warning); }
+  .rec-marker.flash .rec-dot { background: var(--color-warning); animation: brandPulse 0.5s var(--ease-out) 2; }
+  .back-link { font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px; }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); user-select: none; }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab.locked { color: var(--color-text-dim); cursor: not-allowed; }
+  .band-tab .lock { font-size: 10px; opacity: 0.6; }
+
+  .body-scroll { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .live-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--color-success); background: var(--color-success-dim); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .head-spacer { flex: 1; }
+  .sub-line { font-size: var(--text-sm); color: var(--color-text-dim); margin: 0 0 16px; max-width: 760px; }
+  .sub-line b { color: var(--color-text-muted); font-weight: 600; }
+
+  .tech-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-dim); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px 10px; cursor: pointer; user-select: none; transition: all var(--dur-fast) var(--ease-out); }
+  .tech-toggle:hover { color: var(--color-text-muted); }
+  .tech-toggle.on { color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+
+  /* breadcrumb back to roster (composition hint) */
+  .crumb { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: 12px; }
+  .crumb b { color: var(--color-text-muted); }
+
+  /* ── feature row (A) ── */
+  .feat-list { display: flex; flex-direction: column; gap: 10px; max-width: 780px; }
+  .feat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 16px; transition: all var(--dur-base) var(--ease-out); }
+  .feat-card.op-only { border-color: hsl(38 92% 60% / 0.3); background: linear-gradient(180deg, hsl(38 92% 60% / 0.04), transparent), var(--color-surface); }
+  .feat-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .feat-glyph { width: 34px; height: 34px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; background: var(--color-muted); border: 1px solid var(--color-border); flex: 0 0 34px; }
+  .feat-name { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-base); color: var(--color-text); }
+  .feat-desc { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .feat-spacer { flex: 1; }
+
+  /* audience segmented control */
+  .aud-seg { display: inline-flex; background: var(--color-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px; gap: 2px; flex: 0 0 auto; }
+  .aud-seg button { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: none; color: var(--color-text-dim); font-family: var(--font-sans); font-size: var(--text-xs); padding: 5px 13px; border-radius: var(--radius-full); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap; }
+  .aud-seg button:hover { color: var(--color-text); }
+  .aud-seg button.on.everyone { background: var(--color-success-dim); color: var(--color-success); font-weight: 600; }
+  .aud-seg button.on.ops { background: var(--color-warning-dim); color: var(--color-warning); font-weight: 600; }
+
+  .feat-consequence { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border-soft); font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: baseline; gap: 8px; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .feat-consequence .mark { color: var(--color-warning); flex: 0 0 auto; }
+  .feat-consequence b { color: var(--color-text-muted); }
+
+  .feat-details { margin-top: 8px; }
+  .feat-details summary { font-size: var(--text-xs); color: var(--color-text-dim); cursor: pointer; user-select: none; list-style: none; }
+  .feat-details summary::before { content: '▸ '; }
+  .feat-details[open] summary::before { content: '▾ '; }
+  .feat-details summary:hover { color: var(--color-text-muted); }
+  .enf-grid { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .enf-row { display: flex; align-items: baseline; gap: 9px; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .enf-row .how { flex: 0 0 96px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .enf-row .code { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.1); border-radius: var(--radius-sm); padding: 1px 6px; }
+
+  .receipt { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-warning); animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* ── B: preview-led split ── */
+  .b-split { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+  .preview-panel { position: sticky; top: 0; background: var(--color-bg-elev1); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .preview-head { padding: 10px 14px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 8px; }
+  .preview-head .t { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; }
+  .preview-head .who-seg { margin-left: auto; display: inline-flex; background: var(--color-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 2px; }
+  .preview-head .who-seg button { background: transparent; border: none; color: var(--color-text-dim); font-size: 10px; font-family: var(--font-mono); padding: 3px 9px; border-radius: var(--radius-full); cursor: pointer; }
+  .preview-head .who-seg button.on { background: var(--color-surface-hi); color: var(--color-text); }
+  .mini-app { display: grid; grid-template-columns: 46px minmax(0,1fr); min-height: 300px; }
+  .mini-rail { background: var(--color-bg); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+  .mini-nav { width: 30px; height: 30px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; color: var(--color-text-muted); transition: all var(--dur-base) var(--ease-out); }
+  .mini-nav.gone { opacity: 0; transform: scale(0.6); pointer-events: none; height: 0; margin: -3px 0; }
+  .mini-nav.dimmed { outline: 1px dashed hsl(38 92% 60% / 0.5); outline-offset: 1px; }
+  .mini-main { padding: 12px; }
+  .mini-main h6 { margin: 0 0 8px; font-size: var(--text-xs); color: var(--color-text-muted); font-family: var(--font-headline); }
+  .mini-block { border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 7px; font-size: 10px; color: var(--color-text-dim); transition: all var(--dur-base) var(--ease-out); }
+  .mini-block.gone { display: none; }
+  .mini-block .bt { color: var(--color-text-muted); font-weight: 600; display: block; margin-bottom: 2px; font-size: 11px; }
+  .mini-api { padding: 10px 14px; border-top: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .mini-api .resp { color: var(--color-danger); }
+  .mini-api .resp.ok { color: var(--color-success); }
+  .preview-note { padding: 8px 14px 12px; font-size: 10px; color: var(--color-text-dim); }
+
+  /* ── C: in-Controls foil ── */
+  .ctl-section h3 { margin: 22px 0 10px; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; color: var(--color-text); }
+  .ctl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; max-width: 780px; }
+  .ctl-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; }
+  .ctl-card.kill { border-color: hsl(0 72% 51% / 0.35); background: hsl(0 72% 51% / 0.04); }
+  .ctl-card .name { font-weight: 600; color: var(--color-text); font-size: var(--text-sm); display: flex; align-items: center; gap: 8px; }
+  .ctl-card .state { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 4px; }
+  .ctl-card .state .off { color: var(--color-danger); }
+  .warn-strip { max-width: 780px; margin-top: 14px; border: 1px dashed hsl(38 92% 60% / 0.45); background: var(--color-warning-dim); border-radius: var(--radius-md); padding: 11px 14px; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .warn-strip b { color: var(--color-warning); }
+
+  .foot-note { margin-top: 16px; font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 900px; }
+  .foot-note b { color: var(--color-text-muted); font-family: var(--font-mono); font-weight: 500; }
+  .wire-flag { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12); border-radius: var(--radius-sm); padding: 2px 6px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 069 · Feature Visibility — who sees the advanced surfaces (VIS-01)</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Audience rows <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Map + live end-user preview</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: In-Controls placement (foil)</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="sketch-toolbar">
+  <span>069</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setStage('768px')" title="tablet">💻</button>
+  <button onclick="setStage('none')" title="desktop">🖥</button>
+</div>
+
+<script>
+const ME = 'fhdmrd@gmail.com';
+
+/* ── the VIS-01 feature map — REAL surfaces + REAL API prefixes ── */
+const FEATURES = [
+  { key:'skill_studio', glyph:'🧪', name:'Skill Studio', where:'Skills page',
+    desc:'Evals, trigger tuning, and version history for skills',
+    ui:'The “Open studio” button and the whole Studio surface',
+    api:['/skills/{id}/evals…','/skills/{id}/tuner…','/skills/{id}/versions…'],
+    aud:'everyone' },
+  { key:'model_management', glyph:'🎛️', name:'Model management', where:'Settings page',
+    desc:'Choosing AI models, embedding providers, and engine health',
+    ui:'The AI-model, embedding-provider and engine-health sections in Settings',
+    api:['/settings/models…','/settings/engine-health…'],
+    aud:'everyone' },
+  { key:'workflow_publishing', glyph:'⚙️', name:'Workflow authoring & publishing', where:'Workflows page',
+    desc:'Building new workflows and the publish quality gauntlet',
+    ui:'The “New workflow” Builder and Publish — running published workflows stays for everyone',
+    api:['/workflows/drafts…','/workflows/{id}/publish'],
+    aud:'everyone' },
+  { key:'governance_health', glyph:'🛡️', name:'Governance health', where:'its own page',
+    desc:'Document-quality signals: broken links, unclassified, low-confidence',
+    ui:'The Governance entry in the left rail',
+    api:['/governance/summary…'],
+    aud:'everyone' },
+];
+
+/* mini-app nav model for the B preview */
+const MINI_NAV = [
+  { icon:'💬', label:'Chat' },
+  { icon:'⚙️', label:'Workflows', feature:'workflow_publishing', partial:true },
+  { icon:'📄', label:'Documents' },
+  { icon:'🪄', label:'Classification' },
+  { icon:'📈', label:'Library Health' },
+  { icon:'🛡️', label:'Governance', feature:'governance_health' },
+  { icon:'⚡', label:'Skills', partialOf:'skill_studio' },
+  { icon:'🔧', label:'Settings', partialOf:'model_management' },
+];
+
+const V = {};
+['a','b','c'].forEach(v => V[v] = {
+  feats: FEATURES.map(f => ({...f, api:[...f.api]})),
+  tech: false, who: 'user', receiptKey: null,
+});
+
+function shield(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>'; }
+
+function band(v, tab){
+  const isCP = tab === 'cp';
+  return `<div class="op-band">
+    <div class="band-top">
+      <div class="band-title">${shield()} Control Room</div>
+      <span class="op-chip">OPERATOR</span>
+      <span class="band-identity">${ME}</span>
+      <span class="spacer"></span>
+      <span class="rec-marker" id="rec-${v}"><span class="rec-dot"></span> every action recorded</span>
+      <span class="back-link">‹ Back to app</span>
+    </div>
+    <div class="band-tabs">
+      <span class="band-tab ${isCP?'active':''}">Control Plane</span>
+      <span class="band-tab ${!isCP?'active':''}">Users &amp; Access</span>
+      <span class="band-tab locked">Model Registry <span class="lock">🔒</span></span>
+      <span class="band-tab locked">Secrets <span class="lock">🔒</span></span>
+      <span class="band-tab">Audit log</span>
+    </div>
+  </div>`;
+}
+
+function recFlash(v){
+  const rec = document.getElementById('rec-'+v);
+  if (!rec) return;
+  rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+  setTimeout(()=>rec.classList.remove('flash'), 1600);
+}
+
+function setAud(v, key, aud){
+  const st = V[v];
+  const f = st.feats.find(x=>x.key===key);
+  if (f.aud === aud) return;
+  f.aud = aud;
+  st.receiptKey = key;
+  recFlash(v);
+  render(v);
+  setTimeout(() => { if (V[v].receiptKey === key){ V[v].receiptKey = null; render(v); } }, 4200);
+}
+function toggleTech(v){ V[v].tech = !V[v].tech; render(v); }
+function setWho(v, w){ V[v].who = w; render(v); }
+
+/* ── the audience segmented control ── */
+function audSeg(v, f){
+  return `<div class="aud-seg" role="radiogroup" aria-label="Who can see ${f.name}">
+    <button class="everyone ${f.aud==='everyone'?'on':''}" onclick="setAud('${v}','${f.key}','everyone')">Everyone</button>
+    <button class="ops ${f.aud==='ops'?'on':''}" onclick="setAud('${v}','${f.key}','ops')">⛨ Operators only</button>
+  </div>`;
+}
+
+/* ── A: audience rows ── */
+function featCard(v, f, withDetails){
+  const st = V[v];
+  const receipt = st.receiptKey === f.key
+    ? `<span class="receipt">✎ ${f.aud==='ops' ? 'Hidden from end users' : 'Visible to everyone'} · recorded</span>` : '';
+  const consequence = f.aud === 'ops'
+    ? `<div class="feat-consequence"><span class="mark">⛨</span><span>End users no longer see <b>${f.ui.toLowerCase().startsWith('the')?f.ui:('the '+f.ui)}</b> — and their API calls to it are <b>refused server-side</b>, not just hidden.</span></div>`
+    : '';
+  const details = withDetails ? `<details class="feat-details">
+      <summary>What exactly this controls</summary>
+      <div class="enf-grid">
+        <div class="enf-row"><span class="how">In the app</span><span>${f.ui}</span></div>
+        <div class="enf-row"><span class="how">At the API</span><span>Non-operator calls are refused${st.tech ? ' ' + f.api.map(a=>`<span class="code">${a}</span>`).join(' ') : ''}</span></div>
+        <div class="enf-row"><span class="how">Who decides</span><span>This map — per feature, recorded on every change</span></div>
+      </div>
+    </details>` : '';
+  return `<div class="feat-card ${f.aud==='ops'?'op-only':''}">
+    <div class="feat-top">
+      <span class="feat-glyph">${f.glyph}</span>
+      <div style="min-width:0">
+        <div class="feat-name">${f.name}</div>
+        <div class="feat-desc">${f.desc} · lives on ${f.where}</div>
+      </div>
+      <span class="feat-spacer"></span>
+      ${receipt}
+      ${audSeg(v, f)}
+    </div>
+    ${consequence}${details}
+  </div>`;
+}
+
+function bodyA(v){
+  const st = V[v];
+  return `<div class="crumb">Users &amp; Access ▸ <b>Feature visibility</b> — sits below the user roster (068)</div>
+    <div class="feat-list">${st.feats.map(f => featCard(v, f, true)).join('')}</div>`;
+}
+
+/* ── B: map + live end-user preview ── */
+function miniApp(v){
+  const st = V[v];
+  const isOp = st.who === 'op';
+  const hidden = new Set(st.feats.filter(f=>f.aud==='ops').map(f=>f.key));
+  const rail = MINI_NAV.map(n => {
+    if (n.feature && hidden.has(n.feature) && !isOp && !n.partial) return `<span class="mini-nav gone" title="${n.label}">${n.icon}</span>`;
+    if (n.feature && hidden.has(n.feature) && isOp) return `<span class="mini-nav dimmed" title="${n.label} — operators only">${n.icon}</span>`;
+    return `<span class="mini-nav" title="${n.label}">${n.icon}</span>`;
+  }).join('');
+  const skillsHidden = hidden.has('skill_studio') && !isOp;
+  const modelsHidden = hidden.has('model_management') && !isOp;
+  const wfHidden = hidden.has('workflow_publishing') && !isOp;
+  const main = `
+    <h6>${isOp ? 'What YOU see (operator)' : 'What an end user sees'}</h6>
+    <div class="mini-block"><span class="bt">Skills page</span>skill list · edit form${skillsHidden ? '' : ' · <u>Open studio</u> (evals · triggering · versions)'}</div>
+    <div class="mini-block"><span class="bt">Settings</span>profile · appearance${modelsHidden ? '' : ' · <u>AI models</u> · <u>embedding provider</u> · <u>engine health</u>'}</div>
+    <div class="mini-block"><span class="bt">Workflows page</span>library · Run${wfHidden ? '' : ' · <u>New workflow</u> · <u>Publish</u>'}</div>`;
+  const probe = hidden.size
+    ? (isOp
+      ? `GET /skills/s_42/evals → <span class="resp ok">200 OK (operator)</span>`
+      : `GET /skills/s_42/evals → <span class="resp">404 — refused server-side</span>`)
+    : `GET /skills/s_42/evals → <span class="resp ok">200 OK</span>`;
+  return `<div class="preview-panel">
+    <div class="preview-head"><span class="t">Live preview</span>
+      <div class="who-seg">
+        <button class="${st.who==='user'?'on':''}" onclick="setWho('${v}','user')">as end user</button>
+        <button class="${st.who==='op'?'on':''}" onclick="setWho('${v}','op')">as operator</button>
+      </div></div>
+    <div class="mini-app"><div class="mini-rail">${rail}</div><div class="mini-main">${main}</div></div>
+    <div class="mini-api">${probe}</div>
+    <div class="preview-note">Flip a feature to “Operators only” and watch it leave the end-user app — nav entry, page section, and the API answer.</div>
+  </div>`;
+}
+
+function bodyB(v){
+  const st = V[v];
+  return `<div class="crumb">Users &amp; Access ▸ <b>Feature visibility</b></div>
+    <div class="b-split">
+      <div class="feat-list" style="max-width:none">${st.feats.map(f => featCard(v, f, false)).join('')}</div>
+      ${miniApp(v)}
+    </div>`;
+}
+
+/* ── C: in-Controls foil ── */
+function bodyC(v){
+  const st = V[v];
+  return `
+    <div class="ctl-section">
+      <h3>Capabilities <span style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-dim);font-weight:400">— kill-switches (147, shipped)</span></h3>
+      <div class="ctl-grid">
+        <div class="ctl-card"><div class="name">🔍 Web search</div><div class="state">ON for everyone</div></div>
+        <div class="ctl-card kill"><div class="name">⚙ Code sandbox</div><div class="state"><span class="off">OFF for everyone</span> · 2 runs will error on their next call</div></div>
+        <div class="ctl-card"><div class="name">✨ Self-improvement</div><div class="state">ON for everyone</div></div>
+        <div class="ctl-card"><div class="name">⛓ Workflows</div><div class="state">ON for everyone</div></div>
+      </div>
+    </div>
+    <div class="ctl-section">
+      <h3>Feature visibility <span style="font-size:10px;font-family:var(--font-mono);color:var(--color-text-dim);font-weight:400">— who can SEE it (148, this phase)</span></h3>
+      <div class="feat-list">${st.feats.map(f => featCard(v, f, false)).join('')}</div>
+      <div class="warn-strip"><b>The foil's problem, felt:</b> “OFF for everyone” (a capability nobody can use) and “Operators only” (a surface end users can't see) now sit in adjacent sections of one Controls scroll — two very different verbs distinguished only by styling. The 065-A lesson was that WHERE a control lives carries its meaning; visibility governs <i>who</i>, so it belongs with Users &amp; Access.</div>
+    </div>`;
+}
+
+/* ── assembly ── */
+function frame(v){
+  const isC = v === 'c';
+  return `<div class="app-frame">${band(v, isC ? 'cp' : 'ua')}
+    <div class="body-scroll scrollbar-thin">
+      <div class="section-head">
+        <h2>${isC ? 'Controls' : 'Feature visibility'}</h2><span class="live-badge">live</span>
+        <span class="head-spacer"></span>
+        <span class="tech-toggle" id="tech-${v}" onclick="toggleTech('${v}')">⌥ Technical names</span>
+      </div>
+      <p class="sub-line">${isC
+        ? 'The foil: the visibility map placed inside the Control Plane\'s Controls section, next to the 147 kill-switches.'
+        : 'Advanced surfaces your end users don\'t need — hidden from them and kept for operators. Hiding is enforced <b>at the API</b>: a non-operator call is refused server-side, never just tucked out of the UI.'}</p>
+      <div id="body-${v}"></div>
+      <div class="foot-note">
+        <span>The map is a per-feature <b>app_settings</b> visibility record (same TTL-cached substrate as the 147 kill-switches); enforcement = a require-visible dependency on each feature router. Every change is recorded (✎ <b>visibility.set</b>).</span>
+        <span class="wire-flag">net-new · 148 · VIS-01 API-enforced</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+const BODIES = { a: bodyA, b: bodyB, c: bodyC };
+function render(v){
+  const host = document.getElementById('body-'+v);
+  if (host) host.innerHTML = BODIES[v](v);
+  const tt = document.getElementById('tech-'+v);
+  if (tt) tt.classList.toggle('on', V[v].tech);
+}
+
+const META = {
+  a: '<b>A — Audience rows.</b> One card per advanced feature with a two-position audience control: <i>Everyone</i> | <i>⛨ Operators only</i>. Flipping to operators-only reveals the concrete consequence line + an expandable “what exactly this controls” (UI surface + refused API, codes behind ⌥). Lives under Users &amp; Access, below the roster.',
+  b: '<b>B — Map + live end-user preview.</b> The same audience rows, plus a sticky mini-app preview you can flip between “as end user / as operator” — hide Skill Studio and watch the button leave the Skills page and the API probe flip to 404. The strongest proof the enforcement is real; more chrome.',
+  c: '<b>C — In-Controls placement (foil).</b> The map placed inside the Control Plane\'s Controls section next to the 147 kill-switches — everything togglable in one place, but “OFF for everyone” and “Operators only” become neighbors distinguished only by styling. Shown to confirm the Users &amp; Access choice.',
+};
+
+const stage = document.getElementById('stage');
+['a','b','c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v==='a'?' active':'');
+  wrap.id = 'variant-'+v;
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + frame(v);
+  stage.appendChild(wrap);
+  render(v);
+});
+
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  if (ev) ev.target.classList.add('active');
+}
+function setStage(w){ document.getElementById('stage').style.maxWidth = (w==='none')?'none':w; }
+</script>
+</body>
+</html>

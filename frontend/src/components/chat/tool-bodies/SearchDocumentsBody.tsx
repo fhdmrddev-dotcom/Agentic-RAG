@@ -33,7 +33,7 @@ export default function SearchDocumentsBody({ parsed }: SearchDocumentsBodyProps
               {chunk.metadata?.filename ?? chunk.filename ?? `Chunk ${i + 1}`}
             </span>
             {chunk.similarity != null && (
-              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 flex-shrink-0">
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground flex-shrink-0">
                 {(chunk.similarity * 100).toFixed(0)}% match
               </span>
             )}

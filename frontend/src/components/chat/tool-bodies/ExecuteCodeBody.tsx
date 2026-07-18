@@ -44,7 +44,7 @@ export function ExecuteCodeEditorInset({ tc }: { tc: ToolCall }) {
       <div
         data-testid="tc-gutter"
         aria-hidden="true"
-        className="bg-[hsl(220_30%_7%)] text-muted-foreground/60 font-mono text-[11px] text-right py-2 pr-1.5 border-r border-border/40 select-none leading-[1.7]"
+        className="bg-[hsl(220_30%_7%)] text-muted-foreground font-mono text-[11px] text-right py-2 pr-1.5 border-r border-border/40 select-none leading-[1.7]"
       >
         {displayCode.split("\n").map((_: string, i: number) => (
           <div key={i}>{i + 1}</div>
@@ -132,7 +132,7 @@ function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreami
               </span>
             )}
             {!isStreaming && (
-              <span className="ml-auto text-muted-foreground/50 normal-case">
+              <span className="ml-auto text-muted-foreground normal-case">
                 {stdoutLines.length} {stdoutLines.length === 1 ? "line" : "lines"}
               </span>
             )}
@@ -292,7 +292,7 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
             - On terminal completion: drop the standalone Clock badge — the
               done/failed pill carries `· {duration}` inline. */}
         {isRunning && !isComplete && tc.elapsedSeconds != null && tc.elapsedSeconds > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground font-mono tabular-nums flex-shrink-0">
             <Clock className="w-2.5 h-2.5" />
             {formatDuration(tc.elapsedSeconds * 1000)}
           </span>
@@ -337,7 +337,7 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
           {isComplete && (
             <button
               onClick={() => setTerminalOpen(v => !v)}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors mb-1"
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors mb-1"
             >
               {terminalOpen ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
               <Terminal className="w-2.5 h-2.5" />
@@ -353,7 +353,7 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
       {/* Output file download cards (success state with files) */}
       {isSuccess && outputFiles.length > 0 && (
         <div className="mt-2.5 space-y-1.5">
-          <span className="text-[10px] text-muted-foreground/50 font-medium">Output files</span>
+          <span className="text-[10px] text-muted-foreground font-medium">Output files</span>
           {outputFiles.map((file, i) => (
             <OutputFileCard key={i} file={file} />
           ))}

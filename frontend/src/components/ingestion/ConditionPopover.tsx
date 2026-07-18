@@ -174,7 +174,7 @@ export function ConditionPopover({
     >
       {/* Field picker */}
       <label className="block space-y-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Field
         </span>
         <select
@@ -193,7 +193,7 @@ export function ConditionPopover({
 
       {/* Type-aware operator menu — the ONLY place the type system appears. */}
       <label className="block space-y-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Condition
         </span>
         <select
@@ -208,7 +208,7 @@ export function ConditionPopover({
             </option>
           ))}
         </select>
-        <span className="block text-[11px] text-muted-foreground/60">
+        <span className="block text-[11px] text-muted-foreground">
           The choices change to fit the field you pick.
         </span>
       </label>
@@ -216,7 +216,7 @@ export function ConditionPopover({
       {/* Value editor — adapts to the operator. */}
       {!VALUELESS_OPS.includes(op) && (
         <div className="space-y-1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Value
           </span>
 

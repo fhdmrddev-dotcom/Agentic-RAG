@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-agentic-rag
-description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell); AND the Phase 127 energized Workflow Studio re-skin (the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow) PLUS the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet (its energized pip/energy-spine + worded verdict), the live phase spine (PhaseCard / PhaseTimeline), provider/model logos anywhere, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, or any chat-surface component that touches the agent's mid-execution moment.
+description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell); AND the Phase 127 energized Workflow Studio re-skin (the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow) PLUS the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map); AND the Phase 146–148 OPERATOR CONTROL ROOM — the operator band+tabs shell (honest locks, plain-language-first + "⌥ Technical names" reveal, non-discoverable 404), the always-on audit-ledger receipt vocabulary (✎ write mark; consequence ≠ receipt), the pinned-vitals Control Plane (dependency health + active-runs-with-Kill via the victim-naming confirm sheet + capability kill-switch grid + spatially-separated maintenance), the two-ledger audit browser (chip filters + paged table + recorded CSV export), the users roster (last-active honesty, victim-naming disable, lockout-proof self-rows, flagged operator grant), and the API-enforced feature-visibility audience map with the extensible-audience (never-boolean) forward-compat contract. Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet (its energized pip/energy-spine + worded verdict), the live phase spine (PhaseCard / PhaseTimeline), provider/model logos anywhere, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, any `/admin` Control-Room surface (OperatorBand, ControlRoomPage, HealthSignals, ActiveRunsSection, CapabilityGrid, MaintenancePanel, AuditTab, RecentActionsCard, LockedTab, TechnicalNamesToggle, the users roster, the feature-visibility map), any operator confirm sheet / audit receipt / kill-switch, or any chat-surface component that touches the agent's mid-execution moment.
 ---
 
 <context>
@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127), and the 2026-07-04 batch wrap of six further sessions — 2026-06-16 (Settings provider picker + re-embed lifecycle — sketches 024-026, Phase 111.1), 2026-06-21 (auto-classification — 036-037, Phase 118; governance health — 038-040, Phase 119), 2026-06-23/25 (Trigger Tuner — 041-045, Phases 123/123.1), 2026-06-26 (workflow soul + strict/loose two doors — 046-047, Phase 124), 2026-06-27 (cross-provider chat polish — 048-050, Phase 128), 2026-07-03 (Skill Studio — 053-057, Phase 137), 2026-07-04 (eval production-clean: matrix runs + determinate progress + engine health — 058-060, Phase 137.1)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127), and the 2026-07-04 batch wrap of six further sessions — 2026-06-16 (Settings provider picker + re-embed lifecycle — sketches 024-026, Phase 111.1), 2026-06-21 (auto-classification — 036-037, Phase 118; governance health — 038-040, Phase 119), 2026-06-23/25 (Trigger Tuner — 041-045, Phases 123/123.1), 2026-06-26 (workflow soul + strict/loose two doors — 046-047, Phase 124), 2026-06-27 (cross-provider chat polish — 048-050, Phase 128), 2026-07-03 (Skill Studio — 053-057, Phase 137), 2026-07-04 (eval production-clean: matrix runs + determinate progress + engine health — 058-060, Phase 137.1), and 2026-07-11 (the Operator Control Room three-session wrap — shell + receipts 061-062 Phase 146; control-plane composition/active-runs-Kill/controls + the assembled linkage contract 063-066 Phase 147; governance audit-browser/users/feature-visibility 067-069 Phase 148)
 </context>
 
 <design_direction>
@@ -291,6 +291,48 @@ Full detail: `references/eval-production-clean.md`.
   shown, ✗ carries the VERBATIM provider error; ENGINE health ≠ model quality; the
   judge-model knob beneath = the 024-A picker with a registry-only list + an effective-
   default 🔒 footer.
+
+## Operator Control Room (Phases 146–148)
+
+The gated `/admin` zone. Full detail: `references/control-room-shell-and-receipts.md`,
+`references/control-plane-live-surface.md`, `references/governance-audit-users-visibility.md`.
+
+- **Shell = an amber-warmed operator band + horizontal tabs** (061-B) — never a second left
+  rail. Tabs: Control Plane (landing) · Users & Access · Model Registry 🔒 · Secrets 🔒 ·
+  Audit log; locked tabs refuse honestly, **no roadmap numbers in copy**. Non-operators:
+  byte-identical nav + plain 404 (non-discoverable). ALL copy plain-first with the
+  "⌥ Technical names" reveal (the LANG-01 pattern born at 146).
+- **The ledger IS the receipt** (062-A): an action's proof = its row landing atop the
+  always-visible Recent-actions card + a gentle band-marker flash — no toasts, no counters.
+  ✎ marks writes; plain sentences, never codes; a still-in-effect write keeps its own
+  persistent consequence banner (consequence ≠ receipt). Silent auto-polls never touch the
+  ledger; the manual ↻ Refresh is the recorded deliberate read.
+- **Control Plane = pinned vitals + one sectioned scroll** (063-B): Health → Active runs →
+  Controls → Activity; the pinned strip can go amber/red mid-scroll (a monitor you can't
+  see isn't a monitor); read failures keep last-known values.
+- **Kill names its victim** (064-B): run cards (real @lobehub mark + live elapsed from a
+  stable start-ts + what it's DOING); Kill opens a confirm sheet naming user/model/elapsed;
+  honest Cancelling… → ✎ Cancelled·recorded; stuck runs read *recovered*, never killed.
+  **The graded-guard rule (066):** target-specific destructive → victim-naming sheet;
+  global toggle → arm-to-confirm; reversible-no-victim → direct flip.
+- **Controls** (065-A): 2×2 capability kill-switch grid on the `app_settings` TTL substrate
+  (OFF looks armed — red tint + "off for everyone" + honestly-derivable impact only);
+  maintenance mode lives APART in its own amber panel (location carries the "one capability
+  off" vs "platform read-only" distinction).
+- **Audit browser = one browser, both ledgers** (067-A): source switch (operator | platform
+  19-action vocabulary) over 029-A chip filters + a paged table; CSV export names its row
+  count and is itself recorded; viewing platform activity records `audit.view_platform` —
+  cross-user reading is visible, never silent.
+- **Users & Access = instrument-table roster** (068-A): last-active honesty (never
+  fabricated), Disable via the victim-naming sheet (GoTrue ban + app-layer refusal — data
+  kept, reversible), Enable direct, self-rows lockout-proof, operator grant/revoke amber-
+  sheeted + scope-flagged.
+- **Feature visibility = audience rows on Users & Access** (069-A): *Everyone | ⛨ Operators
+  only* per feature, consequence line + refused-API detail, `require_visible` router
+  dependency (same TTL substrate). **The extensible-audience contract:** stored audience
+  values are enum-shaped records NEVER booleans; audience resolution behind ONE swappable
+  function; the control grows into an audience picker when v3.4 org-RBAC adds
+  roles/departments (Glean greenlist model; SEED-115).
 </design_direction>
 
 <findings_index>
@@ -408,6 +450,24 @@ Full detail: `references/eval-production-clean.md`.
 |------|-----------|--------------|
 | Skill Studio | [references/skill-studio.md](references/skill-studio.md) | **053-A + 057-A** ONE focused Studio: persistent header (name+vN+LIVE+gate strip on every tab) over Evals · Triggering · Versions; Tuner absorbed as Triggering; detail panel slims to form + gate line + "Open studio"; tabs deep-linkable. **054-B** lifecycle stepper (Cases→Eval→Gate→Published, counts ON nodes, only the current stage narrates; gate strip = a condensation of the same server `PublishGate`). **055-B** expandable run rows (side-by-side arms; `not_measured` excluded-never-failed; ratings distinct from verdicts) — the base grammar 137.1's matrix extends. **056-B** version table + any-to-any compare; provenance chips; NO Restore (immutable). |
 
+**Operator Control Room — shell, receipts & linkage (sketches 061, 062, 066, Phases 146–147):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Control-Room Shell & Receipts | [references/control-room-shell-and-receipts.md](references/control-room-shell-and-receipts.md) | **061-B** amber operator band + horizontal tabs (never a second rail), honest locks without roadmap numbers, plain-first + ⌥ Technical names, non-discoverable 404. **062-A** the always-on ledger IS the receipt (✎ write mark, plain sentences, consequence ≠ receipt, no toasts). **066** the linkage contract: band-tab IA, 15 button→destinations, 7 consistency guards, graded action-guards by shape. |
+
+**Control Plane — health, active runs & controls (sketches 063–065, Phase 147):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Control Plane Live Surface | [references/control-plane-live-surface.md](references/control-plane-live-surface.md) | **063-B** pinned vitals (can go amber/red mid-scroll) + Health→Runs→Controls→Activity scroll; honest degrade keeps last-known values. **064-B** run cards + the victim-naming Kill confirm sheet; Cancelling…→✎ Cancelled·recorded; stuck = *recovered*. **065-A** 2×2 kill-switch grid (OFF looks armed; honest impact counts only) + spatially-separated amber maintenance panel with arm-to-confirm. |
+
+**Governance — audit browser, users & feature visibility (sketches 067–069, Phase 148):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Governance Surfaces | [references/governance-audit-users-visibility.md](references/governance-audit-users-visibility.md) | **067-A** one audit browser, BOTH ledgers (source switch), chip filters + paged table, CSV names its count + is itself recorded, `audit.view_platform` makes cross-user reads visible. **068-A** instrument-table roster: last-active honesty, victim-naming Disable / direct Enable, lockout-proof self-rows, flagged operator grant. **069-A** audience rows on Users & Access (*Everyone \| ⛨ Operators only*), API-enforced via `require_visible`, extensible-audience (never-boolean) contract → v3.4 roles/departments (SEED-115). |
+
 **Eval production-clean (sketches 058–060, Phase 137.1):**
 
 | Area | Reference | Key Decision |
@@ -476,6 +536,15 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/058-matrix-launch-and-rows/](sources/058-matrix-launch-and-rows/) — winner: A (grouped matrix card; gate-feeder chip; history aggregation + analyst notes; live sim)
 - [sources/059-determinate-progress-and-case-feedback/](sources/059-determinate-progress-and-case-feedback/) — winner: A (thin determinate unit bar + per-arm durations + inline violet case feedback; live sim)
 - [sources/060-engine-health-card/](sources/060-engine-health-card/) — winner: A (engine-health tile board + judge-model knob; sweep sim)
+- [sources/061-control-room-shell/](sources/061-control-room-shell/) — winner: B (operator band + tabs, plain-language-first; "Viewing as → Regular user" demonstrates the 404 contract)
+- [sources/062-gate-honesty-and-receipts/](sources/062-gate-honesty-and-receipts/) — winner: A (always-on ledger receipt; ✎ write mark; consequence banner)
+- [sources/063-control-plane-composition-and-health/](sources/063-control-plane-composition-and-health/) — winner: B (pinned vitals + sectioned scroll; 'One slow / One down' degrade preview)
+- [sources/064-active-runs-and-kill/](sources/064-active-runs-and-kill/) — winner: B (run cards + victim-naming confirm sheet; incl. provider logo SVGs; A arm-inline / C press-and-hold preserved)
+- [sources/065-system-controls-and-maintenance/](sources/065-system-controls-and-maintenance/) — winner: A (capability card grid + separated amber maintenance panel)
+- [sources/066-control-plane-assembled-and-linkage/](sources/066-control-plane-assembled-and-linkage/) — reference (assembled surface + link-map toggle + the 15-row button→destination contract)
+- [sources/067-audit-browser/](sources/067-audit-browser/) — winner: A (chip filters + paged table; both-ledger source switch; recorded CSV export; B feed / C query-rail preserved)
+- [sources/068-users-and-access/](sources/068-users-and-access/) — winner: A (instrument-table roster; victim-naming disable; flagged operator grant; B expandable / C detail-panel preserved)
+- [sources/069-feature-visibility/](sources/069-feature-visibility/) — winner: A (audience rows; B live end-user preview = documented enhancement; C in-Controls foil = the rejected placement)
 
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
@@ -584,6 +653,16 @@ Load and apply this skill when:
 
 - Building matrix runs (launcher, group card, gate-feeder, aggregation, analyst notes), determinate run progress, per-arm durations, judge `case_feedback` rendering, the Settings engine-health card, or the judge-model knob (`references/eval-production-clean.md`)
 - Working on any phase tagged `eval-05`, `matrix-runs`, `smoke-sweep`, or `engine-health`
+
+**Operator Control Room (sketches 061–069, Phases 146–148) — load when:**
+
+- Touching ANY `/admin` surface — the shell (`OperatorBand`, `ControlRoomPage`, band tabs, `LockedTab`, `TechnicalNamesToggle`), receipts (`RecentActionsCard`, the ledger, the recording marker), or adding a new admin tab/section (`references/control-room-shell-and-receipts.md` — includes the 066 linkage contract + the 7 consistency guards)
+- Building or extending the Control Plane — `HealthSignals`, the pinned vitals, `ActiveRunsSection` + Kill, `CapabilityGrid`, `MaintenancePanel` (`references/control-plane-live-surface.md`)
+- Building the Phase 148 governance surfaces — the audit browser (filters/pagination/CSV, both ledgers), the users roster (disable/enable, operator grant), the feature-visibility map + `require_visible` enforcement (`references/governance-audit-users-visibility.md` — the 148 build contract)
+- Designing ANY destructive/administrative action ANYWHERE in the app — apply the graded-guard rule: target-specific-with-a-victim → victim-naming confirm sheet; global toggle → arm-to-confirm; reversible-no-victim → direct flip with a ✎ receipt
+- Adding an operator audit action or receipt — inherit the 062-A vocabulary (plain sentence + ✎ write mark; the ledger is the receipt; polls never logged)
+- Touching feature visibility or access-control storage — the extensible-audience contract (never booleans; one swappable resolver; SEED-115 / v3.4 org-RBAC)
+- Working on any phase tagged `admin`, `operator`, `control-room`, `control-plane`, `kill-switches`, `audit`, `users`, `feature-visibility`, or on Phases 146/147/148 follow-ups (149 Model Registry / 150 Secrets inhabit the same shell)
 
 Skip when:
 
@@ -699,6 +778,24 @@ Skip when:
 - 058-matrix-launch-and-rows (winner: A — grouped matrix card)
 - 059-determinate-progress-and-case-feedback (winner: A — thin unit bar + inline feedback)
 - 060-engine-health-card (winner: A — tile board + judge knob)
+
+**Phase 146 — Operator Foundation (2026-07-10):**
+
+- 061-control-room-shell (winner: B — operator band + tabs, plain-language-first)
+- 062-gate-honesty-and-receipts (winner: A — always-on ledger)
+
+**Phase 147 — Operator Control Plane (2026-07-11):**
+
+- 063-control-plane-composition-and-health (winner: B — pinned health header)
+- 064-active-runs-and-kill (winner: B — cards + victim-naming confirm sheet)
+- 065-system-controls-and-maintenance (winner: A — card grid + separated maintenance)
+- 066-control-plane-assembled-and-linkage (reference — assembled + linkage contract)
+
+**Phase 148 — Governance (2026-07-11):**
+
+- 067-audit-browser (winner: A — filter strip + paged table, both ledgers)
+- 068-users-and-access (winner: A — instrument table + graded guards)
+- 069-feature-visibility (winner: A — audience rows + extensible-audience contract)
 
 Excluded: 017-cross-thread-run-stop (orphan — no README, no MANIFEST row, no locked winner).
 </metadata>

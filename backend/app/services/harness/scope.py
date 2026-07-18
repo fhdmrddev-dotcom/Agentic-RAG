@@ -89,6 +89,111 @@ async def resolve_project_subtree(
     return _walk(root)  # list[str] — Pitfall 1: NEVER a set
 
 
+def _definition_has_phase_folder_scope(definition: "WorkflowDefinition") -> bool:
+    """True when ANY phase of the definition declares a per-phase ``folder_scope``.
+
+    Used by the A4 composition guard: a scoped workflow intersects each phase's
+    ``folder_scope`` with the resolved project subtree (``phase_types.py:326``), so a
+    per-run override OUTSIDE that subtree would silently empty the intersection.
+    """
+    for phase in getattr(definition, "phases", None) or []:
+        if getattr(getattr(phase, "config", None), "folder_scope", None):
+            return True
+    return False
+
+
+async def resolve_run_scope_root(
+    definition: "WorkflowDefinition",
+    *,
+    run_inputs: "dict | None",
+    thread_folder_id: "str | None",
+    supabase: "Client",
+    user_id: str,
+) -> str | None:
+    """Resolve the run-start retrieval scope ROOT, layering the per-run override (WFIN-02).
+
+    Precedence (highest → lowest):
+      1. an owner-gated per-run OVERRIDE — ``run_inputs["folder_id"]`` (D-05 gated)
+      2. the definition's author-time default — ``project_folder_id`` (D-03)
+      3. the thread-folder fallback — ``thread_folder_id`` (legacy / unbound)
+
+    Returns the scope ROOT as ``str | None`` (NEVER a set — Pitfall 6). Callers pass the
+    result to ``resolve_project_subtree(root, ...)``, so this keeps the run-start sites
+    (threads.py / harness_engine.py / runs.py) minimal — the precedence lives HERE, not
+    in inline branches (G-5). ``None`` out = whole-KB (unchanged behavior — D-06).
+
+    D-05 owner gate: a client-supplied override ``folder_id`` is UNTRUSTED. It is honored
+    ONLY when it is owner-reachable (``str(override) in fetch_visible_folders(owner)``);
+    a never-owned / unreachable id DROPS the override (no narrowing / refuse) and the
+    precedence falls through to the author default — a run can NEVER scope into a folder
+    the owner cannot see. ``fetch_visible_folders`` is consulted only when an override is
+    present (absence is the free D-06 path — no owner-fetch cost).
+
+    A4 composition guard (WR-03 + author-subtree containment, 152-08): when the definition
+    declares ANY per-phase ``folder_scope`` the override must satisfy BOTH conditions —
+    "Membership in the project subtree is necessary but NOT sufficient":
+      * NECESSARY (author-project-subtree membership): the override MUST be a member of the
+        AUTHOR's own project subtree (``resolve_project_subtree(author_root)``). A strict
+        ANCESTOR/SIBLING of the bound project trivially satisfies the per-phase intersection
+        (the project's own scoped descendants are still inside the ancestor's subtree) yet
+        WIDENS the run's retrieval to unrelated sibling projects — a same-account cross-project
+        leak. An override outside the author subtree is DROPPED, restoring the D-04/WFIN-02
+        narrow-only contract (this is the check 152-06's WR-03 fix removed and 152-08 restores).
+      * SUFFICIENT (per-phase intersection): even an in-subtree override is DROPPED unless
+        EVERY declared phase ``folder_scope`` still intersects the OVERRIDE's OWN subtree; an
+        override whose subtree misses a phase's ``folder_scope`` would empty that phase's
+        intersection at ``phase_types.py:326`` (silent no-retrieval).
+    Either failure falls back to the author default (fail-safe). A phase with no
+    ``folder_scope`` imposes no constraint.
+
+    Owner-scoped via ``user_id`` (same threat posture as ``resolve_project_subtree`` —
+    the run-start sites pass the durable run owner on the service-role path).
+    """
+    author_default = getattr(definition, "project_folder_id", None)
+    author_root = str(author_default) if author_default is not None else None
+
+    override = (run_inputs or {}).get("folder_id")
+    if override is not None:
+        override = str(override)
+        # D-05 owner-reachability gate — NEVER trust a client folder_id blindly.
+        visible = {f["id"] for f in await fetch_visible_folders(supabase, user_id)}
+        if override not in visible:
+            override = None  # never-owned / unreachable → drop (no narrowing / refuse)
+        elif _definition_has_phase_folder_scope(definition):
+            # A4 (WR-03 + author-subtree containment, 152-08): a scoped workflow's override
+            # must satisfy BOTH the NECESSARY author-project-subtree membership AND the
+            # SUFFICIENT per-phase intersection — matching this function's own docstring.
+            #
+            # NECESSARY: the override MUST be a member of the AUTHOR's own project subtree. A
+            # strict ANCESTOR/SIBLING of the bound project trivially satisfies the per-phase
+            # intersection below (the project's own scoped descendants are still inside the
+            # ancestor's subtree) yet WIDENS retrieval to unrelated sibling projects — the
+            # D-04/WFIN-02 narrow-only contract break. This is the check 152-06's WR-03 fix
+            # dropped; restore it so an out-of-subtree override degrades to the author default.
+            project_subtree = set(
+                await resolve_project_subtree(author_root, supabase=supabase, user_id=user_id) or []
+            )
+            if override not in project_subtree:
+                override = None  # outside the author project subtree → drop (would widen)
+            else:
+                # SUFFICIENT: resolve the OVERRIDE's OWN subtree and drop it unless EVERY
+                # declared per-phase folder_scope still intersects it. An in-subtree override
+                # (e.g. child A of project P) whose subtree misses a phase whose folder_scope=[B]
+                # would empty that phase's ∩ at phase_types.py:326 → the phase retrieves NOTHING.
+                # Drop such an override so it degrades to the author default (fail-safe), never a
+                # silently-empty phase. A phase with no folder_scope imposes no constraint.
+                override_subtree = set(
+                    await resolve_project_subtree(override, supabase=supabase, user_id=user_id) or []
+                )
+                for phase in definition.phases:
+                    scope = getattr(phase.config, "folder_scope", None)
+                    if scope and not ({str(f) for f in scope} & override_subtree):
+                        override = None  # would empty this phase's intersection → drop
+                        break
+
+    return override or author_root or thread_folder_id
+
+
 async def assert_folder_scopes_subset(
     definition: "WorkflowDefinition",
     *,

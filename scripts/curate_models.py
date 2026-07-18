@@ -101,12 +101,19 @@ _FAMILY_INCLUDE: dict[str, re.Pattern[str]] = {
     "minimax":   re.compile(r"^minimax-", re.IGNORECASE),
 }
 
-# Utility-model noise excluded from CURATE_MISSING (NOT from CURATE_LIVE).
+# Chat-legacy families excluded from CURATE_MISSING/DEFAULT registry-gap
+# flagging. These stay LOCAL to curate because they serve curate's OWN purpose
+# (flagging genuinely-missing flagship families) — NOT the chat-suitability
+# filter: `chatgpt-4o-latest` IS a valid chat model, so the shared
+# UTILITY_MODEL_EXCLUDE (Phase 159) deliberately drops these tokens. The
+# non-chat-utility core (embed|whisper|tts|audio|…) now has ONE source of truth
+# in `model_discovery_service.UTILITY_MODEL_EXCLUDE`, imported LOCALLY inside
+# `diff_provider` (keeps `--help` fast — that module pulls in app.config at
+# import) so the two files can never drift (D-159-01 DRY).
 # Dated snapshots (-YYYYMMDD / -YYYY-MM-DD) are kept — Anthropic's live list
 # is dated-ID-only, and resolving exact dated IDs is the whole point (A1/A2).
-_MISSING_EXCLUDE = re.compile(
-    r"(embed|whisper|tts|audio|realtime|image|dall-e|moderation|transcribe|"
-    r"search-preview|computer-use|codex|chatgpt|instruct|davinci|babbage)",
+_CHAT_LEGACY_EXCLUDE = re.compile(
+    r"(codex|chatgpt|instruct|davinci|babbage)",
     re.IGNORECASE,
 )
 
@@ -380,6 +387,25 @@ def diff_provider(
     live_set = set(live_ids)
     family = _FAMILY_INCLUDE.get(provider)
 
+    # DRY (D-159-01): the non-chat-utility exclude core is imported from the
+    # shared source (the live discovery service) so curate's registry-gap
+    # flagging and the discovery-panel suitability filter can never drift. The
+    # import is LOCAL — the service module imports app.config.settings at load,
+    # and `--help` must stay fast (mirrors the `_requests()` local-import
+    # discipline). `diff_provider` is never reached on the `--help` path.
+    from app.services.model_discovery_service import (  # noqa: PLC0415
+        UTILITY_MODEL_EXCLUDE,
+    )
+
+    def _missing_excluded(mid: str) -> bool:
+        """Exclude an id from CURATE_MISSING/DEFAULT when it is EITHER a shared
+        non-chat utility model (embed|whisper|tts|…) OR a curate-local
+        chat-legacy family (chatgpt|instruct|codex|…). Preserves the exact
+        pre-159 exclude behavior (plus a harmless `rerank` addition)."""
+        return bool(
+            UTILITY_MODEL_EXCLUDE.search(mid) or _CHAT_LEGACY_EXCLUDE.search(mid)
+        )
+
     for mid in live_ids:
         print(f"CURATE_LIVE {provider} {mid}")
 
@@ -388,7 +414,7 @@ def diff_provider(
         for mid in live_ids:
             if (
                 family.search(mid)
-                and not _MISSING_EXCLUDE.search(mid)
+                and not _missing_excluded(mid)
                 and mid not in caps
             ):
                 print(f"CURATE_MISSING {provider} {mid}")
@@ -414,7 +440,7 @@ def diff_provider(
         if family is not None:
             family_live = [
                 m for m in live_ids
-                if family.search(m) and not _MISSING_EXCLUDE.search(m)
+                if family.search(m) and not _missing_excluded(m)
             ]
         else:
             family_live = live_ids

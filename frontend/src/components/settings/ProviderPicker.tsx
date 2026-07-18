@@ -193,7 +193,7 @@ export function ProviderPicker({
             <option key={p.key} value={p.key}>{p.label}</option>
           ))}
         </select>
-        <p className="text-xs text-muted-foreground/70 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Each preset auto-fills the endpoint, a strong default model
           {showDimensions ? ", recommended dimensions + retrieval threshold." : "."}
         </p>
@@ -254,7 +254,7 @@ export function ProviderPicker({
                     max={4096}
                     className="h-8 text-xs font-mono bg-muted/30 ghost-border"
                   />
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">Flexible — never down-truncated.</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Flexible — never down-truncated.</p>
                 </div>
               )}
             </div>
@@ -283,8 +283,9 @@ export function ProviderPicker({
                       type="button"
                       onClick={() => setShowKey((s) => !s)}
                       className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showKey ? "Hide API key" : "Show API key"}
                     >
-                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      {showKey ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
                     </button>
                   )}
                 </div>
@@ -301,7 +302,7 @@ export function ProviderPicker({
                     step={0.05}
                     className="h-8 text-xs font-mono bg-muted/30 ghost-border"
                   />
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">Travels with the preset.</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Travels with the preset.</p>
                 </div>
               )}
             </div>

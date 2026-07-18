@@ -61,3 +61,8 @@ jsonschema>=4.26.0          # harness validators (app/services/harness/validator
 docxtpl>=0.20.2             # trusted-path template-fill engine (template_render_service.py); pulls jinja2
 jinja2>=3.1.6               # template rendering
 PyYAML>=6.0.3               # skill manifest parsing (app/api/skills.py)
+
+# Phase 150 (SEC-01) — Fernet/MultiFernet at-rest secret encryption. Already
+# present transitively in the venv (46.0.7); this promotes it to a declared
+# direct dep. Wheels available — no build toolchain needed on a fresh Coolify build.
+cryptography>=44.0.0
