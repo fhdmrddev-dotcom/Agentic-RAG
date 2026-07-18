@@ -478,6 +478,7 @@ CREATE TABLE public.app_settings (
     zhipu_api_key text,
     tavily_api_key text,
     setup_complete boolean DEFAULT false NOT NULL,
+    model_discovery_filter_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
