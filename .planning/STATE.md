@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: ready_to_plan
-last_updated: 2026-07-18T21:58:56.600Z
-last_activity: 2026-07-18
+status: planning
+last_updated: "2026-07-19T00:00:00.000Z"
+last_activity: 2026-07-19
 progress:
   total_phases: 27
   completed_phases: 3
   total_plans: 6
   completed_plans: 6
   percent: 11
-stopped_at: Phase 162 complete (3/3) — ready to discuss Phase 163
 ---
 
 # Project State
@@ -43,8 +42,8 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 Phase: 163
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-18
+Status: Ready to plan (163-CONTEXT.md committed `06a5754e` — research-phase flagged; live two-user leak test + promote-vs-wave call owed at plan-time)
+Last activity: 2026-07-19
 
 Progress: [██████████] 100%
 
