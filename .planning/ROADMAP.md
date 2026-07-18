@@ -510,7 +510,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 159-06-PLAN.md — Discovery filter UI + hidden-count + hand-fill pre-fill + ControlRoomPage filter-wiring (D-159-04, D-159-03)
+- [x] 159-06-PLAN.md — Discovery filter UI + hidden-count + hand-fill pre-fill + ControlRoomPage filter-wiring (D-159-04, D-159-03)
 
 **Note**: Curation/UX layer on the EXISTING Phase-149 registry write-path + discovery service — not new plumbing. The companion model-icons picker polish (Proposal 2 — provider+model `@lobehub` logos in the composer + Settings model list) already shipped ad-hoc (commit `0d81d088`, 2026-07-18). Ties to `project_cross_provider_native_tools_registry_trap` (a MODEL_CAPABILITIES miss silently drops native tools) + SEED-088 (the hand-added GPT-5.6 — the add-by-ID path generalizes that manual flow). Newest-first per `feedback_prioritize_newest_models`.
 **UI hint**: yes
@@ -534,7 +534,7 @@ Plans:
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 5/5 | Complete (D-09 smoke passed via 158 UAT) | 2026-07-17 |
 | 158 (STRETCH). First-Run Install Wizard | 12/12 | Complete (live wizard UAT passed) | 2026-07-17 |
-| 159 (STRETCH). Model Registry Curation | 5/6 | In Progress | — |
+| 159 (STRETCH). Model Registry Curation | 6/6 | Executed — /gsd:verify-work 159 pending | — |
 
 **Coverage:** 20/20 requirements mapped (16 CORE + 4 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 

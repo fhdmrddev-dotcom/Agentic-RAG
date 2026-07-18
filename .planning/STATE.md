@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
-status: executing
-last_updated: "2026-07-18T02:17:50.522Z"
+status: verifying
+last_updated: "2026-07-18T02:45:02.426Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 27
   completed_phases: 13
   total_plans: 95
-  completed_plans: 94
+  completed_plans: 95
   percent: 48
 ---
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 
 Phase: 159 (model-registry-curation) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-18
 
 **158 verify+secure+fix (2026-07-17) — AUTONOMOUS:** ran gsd-verifier + gsd-security-auditor + gsd-code-reviewer in parallel on the shipped code. **secure-phase: SECURED, threats_open:0** — all T-158-01..11 mitigations verified in code (7 POST writes all token+latch gated [409→429→401], constant-time compare, `/public-config` leaks nothing, SSRF sanitized, secrets via Phase-150 seam, 0600 store, boot-resilient). **Code review + verifier CONVERGED on 2 Criticals** (byte-identical invariant otherwise proven 3 ways incl. a full 2705-test pre/post regression diff = identical): **CR-02** (OPERATOR-OBSERVED LIVE — the 503: `SetupMiddleware` + `main.py _setup_mode` keyed off the finalize-MARKER alone, so every env-configured box [real supabase_url, no wizard marker — the operator's dev box + every existing deploy] got 503'd into setup mode; frontend said "log in" while backend 503'd every API) → FIXED `8047d172` (both key off `needs_setup()` = marker-absent AND infra-placeholder; regression test `test_configured_via_env_is_never_gated`); **CR-01** (would BRICK a wizard-finalized box on its mandated restart — `apply_setup_overlay` setattr'd 3 undeclared Supabase Settings fields → Pydantic ValueError at import → crash-loop; also emptied `/public-config` anon key; missed because `test_setup_overlay` used a SimpleNamespace that can't raise) → FIXED `ea232a71` (declared the 3 fields + `hasattr`/`model_fields` overlay guard + real-Settings reproduction tests). gsd-code-fixer also closed **WR-01** (operator-bootstrap self-heals on retry), **WR-02** (WORKER_COUNT=2 token converges), **WR-03** (redis probe sanitized-down), **WR-04** (`/operator` DB-error sanitized, GoTrue verbatim kept), **WR-05** (schema auto-runner→copy-guide fallback on ANY failure), **WR-06** (`useAuth` re-binds after runtime-config rehydrate) — each atomic-committed (`f09100af`..`7880f350`); IN-01 correctly REJECTED (would break real `<project-ref>` placeholder detection). **LESSONS:** (a) a green unit suite missed BOTH Criticals — the operator's live eyeball caught CR-02, the goal-backward verifier + adversarial review caught CR-01; lived-experience UAT is not optional on a gate/middleware/config surface. (b) test doubles that can't raise (SimpleNamespace for a Pydantic model) structurally hide whole bug classes — drive the REAL type. (c) a first-run gate must key off "genuinely needs setup" (marker AND placeholder), never the finalize-marker alone, or it breaks every already-configured box.
@@ -710,6 +710,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 149 P12 | 12min | 1 tasks | 2 files |
 | Phase 150 P02 | 2 | 2 tasks | 2 files |
 | Phase 159 P01 | 13 | 2 tasks | 3 files |
+| Phase 159 P06 | 12min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -796,6 +797,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 149]: 149-11: agent_loop pre-injection gate now fires for compat-path STRUCTURED (operator native_tools=False OVR) via _should_pre_inject_structured — warmed by get_model_capability_async before the sync resolve_calling_mode read; anthropic/google native-SDK excluded (WR-05); openrouter+xml and no-override paths byte-identical (D-14).
 - [Phase 149]: 149-12: suggestion chips strip <think> reasoning blocks before the line-parse (module-private _strip_think_blocks mirrored from the threads.py sibling, not imported — avoids api->service inversion + G-5 hot-file import); strip runs BEFORE clamp-to-3 so reasoning never fills chip slots; closes round-2 UAT Test-7 minor gap on the D-149-10 fallback path.
 - [Phase 159]: D-159-01 realized (159-01): UTILITY_MODEL_EXCLUDE is the single shared chat-filter constant; curate imports it; discovery new entries carry a display-only utility tag that never mutates the confirmable diff (SC#3).
+- [Phase 159]: 159-06 (D-159-04): the discovery suitability filter is DISPLAY-only — `visibleNew`/`hiddenNewCount` feed the render only; `accepted`/`enableNow`/`drafts`/`buildChanges` still read the FULL `result.new`, so a hidden utility model stays in the confirmable payload (SC#3 / T-159-13, test-locked). Default-on, persisted via `handleSetDiscoveryFilter` → `setFlag("model_discovery_filter_enabled")` → settings re-fetch; honest "N utility models hidden" + a non-destructive ephemeral "Show all".
+- [Phase 159]: 159-06 (D-159-03): family-default pre-fill via draft-SEEDING on run (`seedDraftsFromDefaults`) — `isComplete`/`buildChanges` unchanged; `enableNow` stays default-off so `buildChanges` yields `enabled:false` (never auto-enable, T-159-12). "default — confirm" keyed on the static `familyDefaults(id)[field]!=null`; `native_tools` maps true→native / null→unseeded, never "none" (SC#3 by construction). All 6 plans shipped; MODEL-03 flips at `/gsd:verify-work 159` (phase-spanning STRETCH, false-green-avoidance).
 
 ## Operator Next Steps
 

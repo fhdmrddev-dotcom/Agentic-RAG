@@ -19,3 +19,6 @@ files are logged, not fixed).
 - **Root cause:** pre-existing SEED-056 / SEED-049 rot (stale mocks, unused-var, zustand StateCreator drift), present at committed HEAD before Plan 04. Notably `SettingsPage.test.tsx:61` errors on the Phase-147 `self_improve_enabled` field (its `mkSettings` mock predates that field), NOT on Plan 04's new `model_discovery_filter_enabled`.
 - **Why out of scope for Plan 04:** Plan 04 only touched `api.ts` (+ the `SettingsPage.a11y.test.tsx` companion mock). Baseline measurement (restore committed HEAD of both changed files → `tsc -b`) yields the identical 29-error location set → **0 net-new errors**. All 29 predate the plan.
 - **Disposition:** leave for the standing SEED-056 frontend test-hygiene pass. Do NOT fix in Phase 159.
+
+### Plan 06 re-confirmation (2026-07-18) — same 29-error tsc rot, still 0 net-new
+- Plan 06 touched only `ModelDiscoveryPanel.tsx`, `ControlRoomPage.tsx`, and the two `__tests__` files. `tsc -b` reports the identical 29-error location set (none in a Plan-06 file — verified by `grep -E "ModelDiscoveryPanel|ControlRoomPage|model-defaults"` → no match). `npm run build`'s combined `tsc -b && vite build` is blocked by this pre-existing rot, but the deploy path (`vite build`, which Vercel uses — it skips tsc) succeeds cleanly (`✓ built in 4.33s`). **0 net-new tsc errors from Plan 06.** Do NOT fix here.
