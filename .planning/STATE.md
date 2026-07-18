@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.3
-milestone_name: Operator UX
-status: Awaiting next milestone
-last_updated: "2026-07-18T06:57:49.580Z"
-last_activity: 2026-07-18 — Milestone v3.3 completed and archived
+milestone: v3.4
+milestone_name: Multi-Tenancy & Org Access
+status: planning
+last_updated: "2026-07-18T09:14:27.272Z"
+last_activity: 2026-07-18
 progress:
-  total_phases: 27
-  completed_phases: 14
-  total_plans: 95
-  completed_plans: 95
-  percent: 52
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -40,10 +40,10 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: Milestone v3.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-18 — Milestone v3.3 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-18 — Milestone v3.4 started
 
 ### Quick Tasks Completed
 
