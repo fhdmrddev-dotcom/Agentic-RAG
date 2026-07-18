@@ -551,6 +551,42 @@ The v3.1 Skill Trigger Tuner became a full Skill Eval Studio: persistent eval te
 - Model mix: predominantly Opus (execution + orchestration).
 - 656 commits over ~12 days; one operator pivot (FOUNDATION pass) mid-milestone.
 
+## Milestone: v3.3 — Operator UX
+
+**Shipped:** 2026-07-18
+**Phases:** 14 (146–159) | **Plans:** 95 | **Tasks:** 212
+
+### What Was Built
+Made the platform operable + configurable by a non-developer operator from the UI: a gated `/admin` Control Room (health, active-runs + Kill, fail-closed capability kill-switches, maintenance mode, audit browser, user roster, API-enforced feature visibility — 146–148), a dynamic model-capability registry + live propose-only discovery + add-model-by-ID/utility-filtered curation (149/159), app-layer Fernet secrets-at-rest (150), the `fetch_document_file` + `attach_skill_file` agent tools and Run-modal file-input/KB-scope/safe-delete (151/152), the Glean/Beam-informed trust & friendliness UX (per-claim inline citations 153, an app-wide plain-language layer 154, a WCAG-AA sweep 155, everyday nav/thread polish 156), and deployment presets + `OPERATOR.md` (157) with an idempotent first-run install wizard at `/setup` (158). 20/20 requirements.
+
+### What Worked
+- **Per-phase rigor substituted for a formal milestone audit — and held.** Every trust-boundary phase was verify-work'd + secure-phase'd (146–150, 153, 154, 158, 159 each carry a `threats_open: 0` SECURITY.md); live Chrome-MCP UAT drove the admin + model surfaces.
+- **Code-review-then-fix caught real blockers the executor's own tests missed** — a CONFIRMED Critical SQLi in 150 (CR-01), the 149 wire bugs masked by helper-scoped tests (CR-01 twice), and 159's WR-01 (an `ON CONFLICT DO UPDATE` add-by-ID that could clobber an existing row's caps under `WORKER_COUNT=2` → fixed to a fail-safe plain INSERT + 409).
+- **The "no RLS backstop → app-layer default-deny 404" red line, enforced per-route with a 404-regression test,** kept service-role isolation honest across every `/admin` surface.
+- **Sketch-as-contract (G-2)** on the admin/citation/Run-modal surfaces gave a crisp, falsifiable acceptance bar before planning.
+
+### What Was Inefficient
+- **Bookkeeping drift recurred** — `phase.complete` left ROADMAP checkboxes + REQUIREMENTS rows + the Progress table stale (MODEL-03/DEPLOY-01/-02 hand-fixed at close; the `reference_phase_complete_roadmap_gap` lesson keeps re-firing).
+- **The schema-drift gate false-positived on SQL-editor-applied migrations** (recommended the CLAUDE.md-forbidden `db push`) — bypassed with live-column evidence each time.
+- **Cloud parity accumulated** — migrations 099–103 + `SECRETS_ENCRYPTION_KEY` are still owed on cloud; the local↔cloud non-code half lags every DB-touching phase and is deferred to the next production push.
+- **STRETCH scope wasn't fully settled at milestone start** — 159 was added 2026-07-18 as a late, direct 149 follow-on (a good outcome, but it grew the STRETCH chain mid-milestone).
+
+### Patterns Established
+- **App-layer default-deny 404** (`require_operator`) as the isolation primitive wherever there is no RLS backstop, each route carrying a byte-identical-404 regression test.
+- **Threat-model-in-PLAN → secure-phase verify-mitigations mode → SECURITY.md with file:line evidence,** one per phase (register authored at plan time).
+- **Fail-soft-ahead-of-apply migrations** — the code that reads a new column ships safe (safe default when the column is absent) BEFORE the operator applies the migration (the mig-102/103 precedent).
+- **Two-audience plain-language layer** (plain default + a one-click advanced reveal) extended app-wide from the Phase-124 two-door pattern, display-only with every enum/API/audit contract untouched.
+
+### Key Lessons
+- **Verify code-review findings against the real code before acting** — 150's SQLi was CONFIRMED and worth fixing, but the same milestone showed a finding acted on that wasn't actually present (152 gap-closure); confirm first.
+- **Assert the SERVED artifact, not a helper-scoped test** — 149's CR-01 recurred because wire bugs were masked by tests scoped to the helper, not the endpoint response.
+- **Test doubles that can't raise hide bug classes** — drive the real type (158's first-run gate).
+- **Lived-experience UAT is mandatory on gate/middleware/config surfaces** — 158's first-run gate keyed off the wrong marker; 155's NavPanel keyboard-trap was a runtime Critical that static jsx-a11y + vitest-axe missed until a live Chrome-MCP scan.
+
+### Cost Observations
+- Model mix: predominantly Opus (execution + orchestration + the secure-phase auditor).
+- ~8 days, 14 phases (95 plans / 212 tasks); one late STRETCH add (159); Chrome-MCP live UAT drove verification across the admin + model registry surfaces.
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -567,3 +603,6 @@ The v3.1 Skill Trigger Tuner became a full Skill Eval Studio: persistent eval te
 | v2.8 Harness Engine & Workflow Mode | 10 | 67 | 6.7 | 9 days |
 | v2.9 Workflow Studio (CORE) | 9 | 57 | 6.3 | 8 days |
 | v3.0 Document Management | 11 | 46 | 4.2 | 7 days |
+| v3.1 Workflow & Skill Studio (CORE) | 9 | 40 | 4.4 | 7 days |
+| v3.2 Skill Eval Studio + Self-Improving | 16 | 81 | 5.1 | 12 days |
+| v3.3 Operator UX | 14 | 95 | 6.8 | 8 days |
