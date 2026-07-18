@@ -62,7 +62,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 
 ### Phase Checklist
 
-- [ ] **Phase 160: Tenancy-Model ADR** — ratify D-PRD-02 co-tenant posture + lock `is_system`→`is_system_global` reuse + 104+ renumbering (ADR-01)
+- [x] **Phase 160: Tenancy-Model ADR** — ratify D-PRD-02 co-tenant posture + lock `is_system`→`is_system_global` reuse + 104+ renumbering (ADR-01)
 - [ ] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
 - [ ] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; value-preserving `is_global` RENAME; NOT-NULL only after zero-NULL (MIG-01)
 - [ ] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — `threads.py` extraction (Wave 0) → membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04)
@@ -238,7 +238,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 160. Tenancy-Model ADR | 0/1 | Not started | - |
+| 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
 | 161. Org / Dept / Role Schema | 0/? | Not started | - |
 | 162. Personal-Org Backfill | 0/? | Not started | - |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |

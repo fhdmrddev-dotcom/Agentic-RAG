@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-18T12:00:24.755Z"
+status: ready_to_plan
+last_updated: 2026-07-18T12:11:53.911Z
 last_activity: 2026-07-18 -- Phase 160 execution started
 progress:
   total_phases: 27
@@ -11,6 +11,7 @@ progress:
   total_plans: 1
   completed_plans: 1
   percent: 4
+stopped_at: Phase 160 complete (1/1) — ready to discuss Phase 161
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 160 — tenancy-model-adr
+**Current focus:** Phase 161 — org / dept / role schema
 
 ## Deferred Items
 
@@ -40,10 +41,10 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 160 (tenancy-model-adr) — plan execution COMPLETE (pending verification)
-Plan: 1 of 1 complete
-Status: Phase 160 plan 160-01 executed — Tenancy-Model ADR ratified; ready for /gsd:verify-work 160
-Last activity: 2026-07-18 -- Phase 160 plan 160-01 executed (Tenancy-Model ADR + D-v3.4-01 recorded in both registers)
+Phase: 161
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-18
 
 Progress: [░░░░░░░░░░] 4%
 
