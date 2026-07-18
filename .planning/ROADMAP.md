@@ -115,7 +115,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   4. Re-running the migration (a normal SQL-editor-paste recovery action) neither lock-storms production nor duplicates orgs/memberships.
 **Plans**: 2 plans
 - [x] 162-01-PLAN.md — Author migration 105: personal-org provisioning + defensive handle_new_user trigger + batched org_id backfill (35 targets) + self-guarded NOT-NULL flips
-- [ ] 162-02-PLAN.md — Apply migration 105 (non-atomic) + prove SC#1–4 + idempotent re-paste + regenerate full-schema.sql + same-commit
+- [x] 162-02-PLAN.md — Apply migration 105 (non-atomic) + prove SC#1–4 + idempotent re-paste + regenerate full-schema.sql + same-commit
 
 #### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
 **Goal**: Membership-based RLS and the per-request user-JWT DB context land TOGETHER across both data-access paths, so RLS becomes actually enforceable (not decorative) — the single load-bearing security transition of the milestone — with `threads.py` extracted FIRST (Wave 0) and retrieval performance held under the CONCUR-01 gate.
@@ -244,7 +244,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 |-------|----------------|--------|-----------|
 | 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
 | 161. Org / Dept / Role Schema | 0/? | Not started | - |
-| 162. Personal-Org Backfill | 0/? | Not started | - |
+| 162. Personal-Org Backfill | 2/2 | Ready for verification | - |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-18T19:57:10.760Z"
+status: verifying
+last_updated: "2026-07-18T21:05:56.936Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 27
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
-  percent: 7
+  completed_plans: 5
+  percent: 11
 ---
 
 # Project State
@@ -42,10 +42,10 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 Phase: 162 (personal-org-backfill) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-18
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ### Quick Tasks Completed
 
@@ -424,6 +424,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 161 P01 | 11min | 3 tasks | 1 files |
 | Phase 161 P02 | 8min | 2 tasks | 1 files |
 | Phase 162 P01 | 19min | 3 tasks | 1 files |
+| Phase 162 P162-02 | ~48min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -517,7 +518,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 161]: 161-02: migration 104 applied live + proven on the running DB — 42P17 non-recursion holds (SELECT count(*) FROM org_members = 0, no SQLSTATE 42P17); 8 org tables + RLS + 3 SECDEF helpers + D-02 seed catalog all live; full-schema.sql regenerated (head 104).
 - [Phase 161]: full-schema.sql is schema-only — roles/role_permissions seed lives in migration 104, NOT the bootstrap artifact; 104 owed at next cloud push with 099-103; OPERATOR.md Step-3 registration deferred (check-deploy-drift PASS; 093/094/098 precedent).
 - [Phase ?]: 162-01: authored mig 105 personal-org-backfill (§A provisioning loop + §D defensive handle_new_user trigger + §B batched-COMMIT procedure across 35 tables + §C 35 self-guarded NOT-NULL flips); committed per-task (author-only) — live apply + full-schema regen is Plan 162-02
-- [Phase ?]: 162 (D-11 resolved): operator_audit_log EXCLUDED from org_id backfill + kept NULLABLE (no owning auth.users); 163 RLS must handle its NULL org_id. metadata_field_definitions gets a guarded (not unconditional) NOT-NULL flip — flips iff apply-time zero-NULL (A1 cloud caveat)
+- [Phase ?]: 162 (D-11 resolved): operator_audit_log EXCLUDED from org_id backfill + kept NULLABLE (no owning auth.users); 163 RLS must handle its NULL org_id. metadata_field_definitions gets a guarded (not unconditional) NOT-NULL flip — flips iff apply-time zero-NULL (A1 cloud caveat)- [Phase 162]: 162-02 (MIG-01 COMPLETE): mig 105 applied to LOCAL via psycopg2 autocommit (never db push/reset); SC#1-4 PASS — 8 users -> 8 personal orgs + default depts + org-admin memberships, 0 dup, 0 multi-default, zero SC#3 row/census delta, idempotent re-apply; only operator_audit_log stays org_id-nullable; metadata_field_definitions flipped NOT NULL. Cloud owed at next operator push (099-105 + SECRETS_ENCRYPTION_KEY).
+- [Phase 162]: 162-02 apply-time deviations: Bug-1 page runs by run_id + user_settings by user_id (neither has an id column); Bug-2 surgically DISABLE/ENABLE the skill_versions + workflow_definitions immutability triggers around their one-time backfill CALL (re-enabled immediately; cloud-safe via table ownership). Rule 1/2: full-schema supplement handle_new_user was stale pre-105 and clobbered the extension in a greenfield paste -> updated supplement to mirror mig 105 §D.
 
 ## Operator Next Steps
 

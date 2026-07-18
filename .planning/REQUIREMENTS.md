@@ -35,7 +35,7 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 
 ### Data Migration — "nothing breaks"
 
-- [ ] **MIG-01**: A personal-org backfill silently gives every existing user one personal org + default department + org-admin membership; `org_id` is backfilled across every table (batched ~10k-row windows, idempotent on `WHERE org_id IS NULL`, resolving owner-less child tables through their parent FK) and flipped `NOT NULL` only after verified zero-NULL — all existing data preserved, no user action required.
+- [x] **MIG-01**: A personal-org backfill silently gives every existing user one personal org + default department + org-admin membership; `org_id` is backfilled across every table (batched ~10k-row windows, idempotent on `WHERE org_id IS NULL`, resolving owner-less child tables through their parent FK) and flipped `NOT NULL` only after verified zero-NULL — all existing data preserved, no user action required.
 - [ ] **MIG-02**: `is_global` is retired via a value-preserving `RENAME` to `is_org_shared` (never drop+add) + an `is_system_global` allow-list that reuses the write-locked `skills.is_system` marker so the seeded `skill-creator` stays cross-org visible.
 
 ### Org Administration
@@ -115,7 +115,7 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 | ADR-01 | 160 | Complete |
 | ORG-01 | 161 | Complete |
 | ORG-02 | 161 | Complete |
-| MIG-01 | 162 | Pending |
+| MIG-01 | 162 | Complete |
 | TEN-01 | 163 | Pending |
 | TEN-02 | 163 | Pending |
 | TEN-04 | 163 | Pending |
