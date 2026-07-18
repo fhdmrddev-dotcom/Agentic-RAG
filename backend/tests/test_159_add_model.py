@@ -83,8 +83,9 @@ async def test_add_model_happy_path_lands_disabled(monkeypatch):
     assert len(pool.calls) == 1
     sql, args = pool.calls[0]
     assert "INSERT INTO model_capabilities_overrides" in sql
-    assert "ON CONFLICT (model_id) DO UPDATE" in sql
-    assert "EXCLUDED" in sql, "the SET clause assigns from EXCLUDED (SQLi-safe, no interpolation)"
+    # WR-01: a PLAIN insert — a duplicate must fail SAFE via the DB unique constraint (→409), NOT
+    # an ON CONFLICT DO UPDATE that would silently clobber an existing row's caps + force disabled.
+    assert "ON CONFLICT" not in sql, "add-by-ID must not upsert — a duplicate fails safe as 409"
     assert "enabled" in sql, "the enabled column is always written"
     # The value list is bound params ($N) — the id/provider/caps are NEVER in the SQL text.
     assert "kimi-k3" not in sql and "moonshot" not in sql, "no client value is interpolated"
@@ -199,6 +200,34 @@ async def test_case_variant_of_override_rejected_409(monkeypatch):
         await add_model_by_id(_fake_request(), body, _floor=None)
     assert ei.value.status_code == 409
     assert not pool.calls, "a case-variant of an override must NOT create a second row"
+
+
+async def test_duplicate_race_unique_violation_409(monkeypatch):
+    """WR-01: the case-folded cache guard can miss a concurrent add under WORKER_COUNT=2 (per-worker
+    30s override cache). The DB ``model_id`` unique constraint is the backstop — a
+    ``UniqueViolationError`` from the pool maps to 409 (fail safe: never a silent clobber, never a
+    false 500), and the row is NOT cache-invalidated."""
+    import asyncpg
+
+    class _ConflictPool:
+        def __init__(self):
+            self.calls = []
+
+        async def execute(self, sql, *args):
+            self.calls.append((sql, args))
+            raise asyncpg.exceptions.UniqueViolationError("duplicate key value violates unique constraint")
+
+    pool = _ConflictPool()
+    monkeypatch.setattr(deps, "_pg_pool", pool)
+    flag = _spy_invalidate(monkeypatch)
+    _stub_overrides(monkeypatch, {})  # cache guard PASSES — this is the race (stale cache)
+
+    body = AddModelRequest(model_id="kimi-k3", provider="moonshot")
+    with pytest.raises(HTTPException) as ei:
+        await add_model_by_id(_fake_request(), body, _floor=None)
+    assert ei.value.status_code == 409, "a DB unique violation must map to 409, not 500"
+    assert len(pool.calls) == 1, "the insert was attempted (the race slipped past the cache guard)"
+    assert flag["called"] is False, "no cache invalidation on a refused add"
 
 
 # ── enabled:true in the body is IGNORED (the field isn't on AddModelRequest) ────

@@ -1209,11 +1209,15 @@ async def add_model_by_id(
 
     insert_cols = ["model_id", "provider", *write_cols]
     placeholders = ", ".join(f"${i + 1}" for i in range(len(insert_cols)))
-    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in write_cols)
+    # WR-01 (Phase 159 review): a PLAIN insert — NOT an ``ON CONFLICT DO UPDATE``. The case-folded
+    # duplicate guard above reads a per-worker 30s override cache, so under WORKER_COUNT=2 a
+    # concurrent add can slip past it; the table's ``model_id`` unique constraint is the
+    # authoritative backstop. A genuine duplicate MUST fail SAFE as a 409 (below) — never an upsert
+    # that would silently reset an existing row's caps and force ``enabled=false``. This is the ADD
+    # path; ``set_model_capability`` owns the deliberate edit/upsert with its reset semantics.
     sql = (
         f"INSERT INTO model_capabilities_overrides ({', '.join(insert_cols)}) "
-        f"VALUES ({placeholders}) "
-        f"ON CONFLICT (model_id) DO UPDATE SET {set_clause}, updated_at = now()"
+        f"VALUES ({placeholders})"
     )
     values = [
         model_id,
@@ -1222,12 +1226,21 @@ async def add_model_by_id(
         False,  # ``enabled`` — the FORCED literal, never body-sourced (SC#3)
     ]
 
+    import asyncpg  # function-local (Pitfall 4)
     pool = deps._pg_pool  # CR-02: live module attribute, never an import snapshot
     write_ok = False
     if pool is not None:
         try:
             await pool.execute(sql, *values)
             write_ok = True
+        except asyncpg.exceptions.UniqueViolationError:
+            # The race backstop (WR-01): a concurrent worker already inserted this id after our
+            # cache guard read a stale snapshot. Fail safe with the SAME 409 the cache guard raises
+            # — never clobber the existing row, never a false 500.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That model is already in the registry — edit it in the table instead.",
+            )
         except Exception:
             logger.exception("add_model_by_id: upsert failed for %s", model_id)
 
