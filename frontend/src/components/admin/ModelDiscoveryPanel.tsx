@@ -135,6 +135,19 @@ export function ModelDiscoveryPanel({
   // the next time discovery runs.
   const [showAllThisView, setShowAllThisView] = useState(false)
 
+  // WR-02 (Phase 159 review): surface a persist failure on the filter toggle. The sibling add /
+  // capability write paths all show refusals; a silently-reverting checkbox on a failed setFlag
+  // (e.g. a pending-migration 500) is dishonest. Cleared on the next attempt.
+  const [filterError, setFilterError] = useState<string | null>(null)
+  async function handleToggleFilter() {
+    setFilterError(null)
+    try {
+      await onSetFilter(!filterEnabled)
+    } catch {
+      setFilterError("Couldn't save the filter setting — try again.")
+    }
+  }
+
   async function run() {
     setPhase("running")
     setRunError(null)
@@ -344,7 +357,7 @@ export function ModelDiscoveryPanel({
                   <input
                     type="checkbox"
                     checked={filterEnabled}
-                    onChange={() => void onSetFilter(!filterEnabled)}
+                    onChange={() => void handleToggleFilter()}
                     className="h-3.5 w-3.5 flex-none accent-primary"
                   />
                   Filter to chat/tool models
@@ -352,6 +365,11 @@ export function ModelDiscoveryPanel({
                 <span className="text-[11px] text-muted-foreground/80">
                   hides utility models (embeddings, audio, image, moderation, rerank…)
                 </span>
+                {filterError && (
+                  <span className="text-xs text-destructive" role="alert">
+                    {filterError}
+                  </span>
+                )}
               </div>
               <DiffGroup glyph="✚" tone="success" title="New models" note="not in the registry yet">
                 {visibleNew.map((m) => (
