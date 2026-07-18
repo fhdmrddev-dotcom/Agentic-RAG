@@ -40,10 +40,10 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 160 of 168 CORE (Tenancy-Model ADR) — roadmap created, ready to plan
+Phase: 160 of 168 CORE (Tenancy-Model ADR) — context gathered, ready to plan
 Plan: —
-Status: Roadmap created — ready to plan Phase 160 (`/gsd:discuss-phase 160` or `/gsd:plan-phase 160`)
-Last activity: 2026-07-18 — v3.4 ROADMAP.md created (9 CORE 160-168 + 5 STRETCH 169-173; 29/29 requirements mapped, 0 unmapped)
+Status: Phase 160 context gathered — 160-CONTEXT.md + 160-DISCUSSION-LOG.md committed (`6ece296c`); 4 framing decisions captured (clean ratify of D-PRD-02). Ready to plan (`/gsd:plan-phase 160`)
+Last activity: 2026-07-18 — Phase 160 discuss-phase complete (deployment-flexibility hard-contract + per-phase check, ADR home = phase-folder doc + D-v3.4-01 pointer, reversal section, clean posture ratify)
 
 Progress: [░░░░░░░░░░] 0%
 
