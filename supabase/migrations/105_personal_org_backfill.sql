@@ -329,4 +329,278 @@ CALL public._mig105_backfill($SQL$
     AND wp.id IN (SELECT id FROM public.workflow_phases WHERE org_id IS NULL LIMIT $1)
 $SQL$);
 
--- =====  §C (NOT-NULL flips + DROP) is appended below by Plan 162-01 Task 3.  =====
+-- ================================================================================================
+-- §C — PRE-FLIP NULL CENSUS + SELF-GUARDED NOT-NULL FLIPS + DROP  (D-08 / D-11 / SC#2)
+-- Runs AFTER all §B CALLs have COMMITted (never flip first — load-bearing ordering). The census is
+-- operator visibility; each flip is preceded by a RAISE-EXCEPTION zero-NULL guard, so the DB — not a
+-- human — enforces "verified zero-NULL" (T-162-03): a flip is structurally impossible on dirty data.
+-- ================================================================================================
+
+-- ── Pre-flip NULL census across all 35 targets — every null_org_id MUST read 0 before the flips below ──
+SELECT 'audit_log' AS table_name, count(*) FILTER (WHERE org_id IS NULL) AS null_org_id FROM public.audit_log
+UNION ALL SELECT 'classification_rules',      count(*) FILTER (WHERE org_id IS NULL) FROM public.classification_rules
+UNION ALL SELECT 'code_executions',           count(*) FILTER (WHERE org_id IS NULL) FROM public.code_executions
+UNION ALL SELECT 'document_images',           count(*) FILTER (WHERE org_id IS NULL) FROM public.document_images
+UNION ALL SELECT 'document_relationships',    count(*) FILTER (WHERE org_id IS NULL) FROM public.document_relationships
+UNION ALL SELECT 'document_tables',           count(*) FILTER (WHERE org_id IS NULL) FROM public.document_tables
+UNION ALL SELECT 'document_views',            count(*) FILTER (WHERE org_id IS NULL) FROM public.document_views
+UNION ALL SELECT 'documents',                 count(*) FILTER (WHERE org_id IS NULL) FROM public.documents
+UNION ALL SELECT 'eval_ratings',              count(*) FILTER (WHERE org_id IS NULL) FROM public.eval_ratings
+UNION ALL SELECT 'eval_results',              count(*) FILTER (WHERE org_id IS NULL) FROM public.eval_results
+UNION ALL SELECT 'eval_runs',                 count(*) FILTER (WHERE org_id IS NULL) FROM public.eval_runs
+UNION ALL SELECT 'folders',                   count(*) FILTER (WHERE org_id IS NULL) FROM public.folders
+UNION ALL SELECT 'harness_audit',             count(*) FILTER (WHERE org_id IS NULL) FROM public.harness_audit
+UNION ALL SELECT 'message_feedback',          count(*) FILTER (WHERE org_id IS NULL) FROM public.message_feedback
+UNION ALL SELECT 'messages',                  count(*) FILTER (WHERE org_id IS NULL) FROM public.messages
+UNION ALL SELECT 'metadata_field_definitions',count(*) FILTER (WHERE org_id IS NULL) FROM public.metadata_field_definitions
+UNION ALL SELECT 'pdf_extraction_runs',       count(*) FILTER (WHERE org_id IS NULL) FROM public.pdf_extraction_runs
+UNION ALL SELECT 'runs',                      count(*) FILTER (WHERE org_id IS NULL) FROM public.runs
+UNION ALL SELECT 'sandbox_files',             count(*) FILTER (WHERE org_id IS NULL) FROM public.sandbox_files
+UNION ALL SELECT 'skill_files',               count(*) FILTER (WHERE org_id IS NULL) FROM public.skill_files
+UNION ALL SELECT 'skill_proposals',           count(*) FILTER (WHERE org_id IS NULL) FROM public.skill_proposals
+UNION ALL SELECT 'skill_publish_overrides',   count(*) FILTER (WHERE org_id IS NULL) FROM public.skill_publish_overrides
+UNION ALL SELECT 'skill_test_cases',          count(*) FILTER (WHERE org_id IS NULL) FROM public.skill_test_cases
+UNION ALL SELECT 'skill_versions',            count(*) FILTER (WHERE org_id IS NULL) FROM public.skill_versions
+UNION ALL SELECT 'skills',                    count(*) FILTER (WHERE org_id IS NULL) FROM public.skills
+UNION ALL SELECT 'threads',                   count(*) FILTER (WHERE org_id IS NULL) FROM public.threads
+UNION ALL SELECT 'tuner_runs',                count(*) FILTER (WHERE org_id IS NULL) FROM public.tuner_runs
+UNION ALL SELECT 'user_memory',               count(*) FILTER (WHERE org_id IS NULL) FROM public.user_memory
+UNION ALL SELECT 'user_settings',             count(*) FILTER (WHERE org_id IS NULL) FROM public.user_settings
+UNION ALL SELECT 'workflow_definitions',      count(*) FILTER (WHERE org_id IS NULL) FROM public.workflow_definitions
+UNION ALL SELECT 'workspace_files',           count(*) FILTER (WHERE org_id IS NULL) FROM public.workspace_files
+UNION ALL SELECT 'workflow_runs',             count(*) FILTER (WHERE org_id IS NULL) FROM public.workflow_runs
+UNION ALL SELECT 'todos',                     count(*) FILTER (WHERE org_id IS NULL) FROM public.todos
+UNION ALL SELECT 'workspace_file_versions',   count(*) FILTER (WHERE org_id IS NULL) FROM public.workspace_file_versions
+UNION ALL SELECT 'workflow_phases',           count(*) FILTER (WHERE org_id IS NULL) FROM public.workflow_phases
+ORDER BY null_org_id DESC;
+
+-- ── Self-guarded NOT-NULL flips — one RAISE-EXCEPTION zero-NULL guard + one flip per target (35) ──
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.audit_log WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 audit_log: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.audit_log WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.audit_log ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.classification_rules WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 classification_rules: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.classification_rules WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.classification_rules ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.code_executions WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 code_executions: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.code_executions WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.code_executions ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.document_images WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 document_images: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.document_images WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.document_images ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.document_relationships WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 document_relationships: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.document_relationships WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.document_relationships ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.document_tables WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 document_tables: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.document_tables WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.document_tables ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.document_views WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 document_views: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.document_views WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.document_views ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.documents WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 documents: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.documents WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.documents ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.eval_ratings WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 eval_ratings: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.eval_ratings WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.eval_ratings ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.eval_results WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 eval_results: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.eval_results WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.eval_results ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.eval_runs WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 eval_runs: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.eval_runs WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.eval_runs ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.folders WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 folders: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.folders WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.folders ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.harness_audit WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 harness_audit: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.harness_audit WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.harness_audit ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.message_feedback WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 message_feedback: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.message_feedback WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.message_feedback ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.messages WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 messages: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.messages WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.messages ALTER COLUMN org_id SET NOT NULL;
+
+-- metadata_field_definitions: SAME guarded flip as the other 34 (NOT unconditional). Locally 0
+-- NULL-owner rows so it flips; if a cloud DB holds global system field-defs with NULL user_id, this
+-- guard FIRES and the operator decides at apply time (D-11 fallback = keep nullable). [Assumption A1]
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.metadata_field_definitions WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 metadata_field_definitions: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.metadata_field_definitions WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.metadata_field_definitions ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.pdf_extraction_runs WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 pdf_extraction_runs: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.pdf_extraction_runs WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.pdf_extraction_runs ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.runs WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 runs: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.runs WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.runs ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.sandbox_files WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 sandbox_files: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.sandbox_files WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.sandbox_files ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skill_files WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skill_files: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skill_files WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skill_files ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skill_proposals WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skill_proposals: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skill_proposals WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skill_proposals ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skill_publish_overrides WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skill_publish_overrides: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skill_publish_overrides WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skill_publish_overrides ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skill_test_cases WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skill_test_cases: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skill_test_cases WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skill_test_cases ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skill_versions WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skill_versions: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skill_versions WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skill_versions ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.skills WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 skills: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.skills WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.skills ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.threads WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 threads: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.threads WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.threads ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.tuner_runs WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 tuner_runs: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.tuner_runs WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.tuner_runs ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.user_memory WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 user_memory: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.user_memory WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.user_memory ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.user_settings WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 user_settings: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.user_settings WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.user_settings ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.workflow_definitions WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 workflow_definitions: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.workflow_definitions WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.workflow_definitions ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.workspace_files WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 workspace_files: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.workspace_files WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.workspace_files ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.workflow_runs WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 workflow_runs: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.workflow_runs WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.workflow_runs ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.todos WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 todos: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.todos WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.todos ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.workspace_file_versions WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 workspace_file_versions: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.workspace_file_versions WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.workspace_file_versions ALTER COLUMN org_id SET NOT NULL;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM public.workflow_phases WHERE org_id IS NULL) THEN
+    RAISE EXCEPTION 'MIG105 workflow_phases: % rows still NULL, NOT-NULL flip aborted', (SELECT count(*) FROM public.workflow_phases WHERE org_id IS NULL);
+  END IF; END $$;
+ALTER TABLE public.workflow_phases ALTER COLUMN org_id SET NOT NULL;
+
+-- ── EXCLUDED from the flip: operator_audit_log ───────────────────────────────────────────────────
+-- operator_audit_log is intentionally NOT flipped and stays NULLABLE (D-11): it carries an org_id
+-- column but has NO owning auth.users (its operator_user_id points at operator_users, deliberately
+-- outside the org model — mig 095's one-way door), so its rows are org-agnostic system data and are
+-- excluded from the §B backfill entirely. Phase 163's RLS predicate on operator_audit_log MUST handle
+-- a NULL org_id explicitly (it is operator-only / deny-to-users regardless).
+
+-- ── Drop the migration-scoped batching scaffolding ───────────────────────────────────────────────
+DROP PROCEDURE public._mig105_backfill(text, int);
+
+-- Closing note (D-04 / D-05): this migration is HANDS-OFF is_global / is_system — it never read,
+-- renamed, or wrote those sharing flags; org_id was resolved purely via user_id / created_by / parent
+-- org_id, so no shared or system resource lost visibility (0 orphan shared rows: the 1 global folder,
+-- 1 global skill, 1 system skill-creator, and 15 global workflow_definitions all resolve to their
+-- owner's personal org). The value-preserving is_global -> is_org_shared rename (and the
+-- is_system_global allow-list) stays in Phase 165 (D-05 handoff), against 164's isolation-suite backstop.
