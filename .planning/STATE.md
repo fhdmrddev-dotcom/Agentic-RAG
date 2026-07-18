@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-18T19:28:48.141Z"
-last_activity: 2026-07-18 -- Phase 162 planning complete
+last_updated: "2026-07-18T19:57:10.760Z"
+last_activity: 2026-07-18
 progress:
   total_phases: 27
   completed_phases: 2
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 7
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 162 — personal org backfill
+**Current focus:** Phase 162 — personal-org-backfill
 
 ## Deferred Items
 
@@ -40,12 +40,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 162
-Plan: Not started
+Phase: 162 (personal-org-backfill) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-07-18 -- Phase 162 planning complete
+Last activity: 2026-07-18
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80%
 
 ### Quick Tasks Completed
 
@@ -423,6 +423,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 160 P160-01 | 6 | 2 tasks | 3 files |
 | Phase 161 P01 | 11min | 3 tasks | 1 files |
 | Phase 161 P02 | 8min | 2 tasks | 1 files |
+| Phase 162 P01 | 19min | 3 tasks | 1 files |
 
 ## Decisions
 
@@ -515,6 +516,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 161]: Plan 161-01: authored mig 104 (org/dept/role schema) — 8 org tables + current_user_org_ids() 42P17 recursion-break helper + membership-correct RLS + seeded 4-tier permission catalog + 23-table nullable org_id sweep. Authored, NOT applied (Plan 02 applies/verifies).
 - [Phase 161]: 161-02: migration 104 applied live + proven on the running DB — 42P17 non-recursion holds (SELECT count(*) FROM org_members = 0, no SQLSTATE 42P17); 8 org tables + RLS + 3 SECDEF helpers + D-02 seed catalog all live; full-schema.sql regenerated (head 104).
 - [Phase 161]: full-schema.sql is schema-only — roles/role_permissions seed lives in migration 104, NOT the bootstrap artifact; 104 owed at next cloud push with 099-103; OPERATOR.md Step-3 registration deferred (check-deploy-drift PASS; 093/094/098 precedent).
+- [Phase ?]: 162-01: authored mig 105 personal-org-backfill (§A provisioning loop + §D defensive handle_new_user trigger + §B batched-COMMIT procedure across 35 tables + §C 35 self-guarded NOT-NULL flips); committed per-task (author-only) — live apply + full-schema regen is Plan 162-02
+- [Phase ?]: 162 (D-11 resolved): operator_audit_log EXCLUDED from org_id backfill + kept NULLABLE (no owning auth.users); 163 RLS must handle its NULL org_id. metadata_field_definitions gets a guarded (not unconditional) NOT-NULL flip — flips iff apply-time zero-NULL (A1 cloud caveat)
 
 ## Operator Next Steps
 
