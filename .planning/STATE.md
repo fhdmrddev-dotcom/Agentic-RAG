@@ -11,6 +11,7 @@ progress:
   total_plans: 1
   completed_plans: 1
   percent: 4
+stopped_at: Phase 161 context gathered — ready to plan (/gsd:plan-phase 161)
 ---
 
 # Project State
