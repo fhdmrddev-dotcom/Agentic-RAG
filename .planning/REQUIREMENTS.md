@@ -13,7 +13,7 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 
 ### Governance
 
-- [ ] **ADR-01**: A written Tenancy-Model ADR ratifies the co-tenant (`org_id` + membership RLS) default + isolation-via-deployment-for-enterprise posture (D-PRD-02), locks the `skills.is_system` → `is_system_global` reuse and the 104+ migration renumbering, and does NOT re-litigate a decision v3.3's shipped `org_id` stubs + deploy presets already ~80% pre-decided. *(No code — ratification only.)*
+- [x] **ADR-01**: A written Tenancy-Model ADR ratifies the co-tenant (`org_id` + membership RLS) default + isolation-via-deployment-for-enterprise posture (D-PRD-02), locks the `skills.is_system` → `is_system_global` reuse and the 104+ migration renumbering, and does NOT re-litigate a decision v3.3's shipped `org_id` stubs + deploy presets already ~80% pre-decided. *(No code — ratification only.)*
 
 ### Org Foundation
 
@@ -112,7 +112,7 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADR-01 | 160 | Pending |
+| ADR-01 | 160 | Complete |
 | ORG-01 | 161 | Pending |
 | ORG-02 | 161 | Pending |
 | MIG-01 | 162 | Pending |

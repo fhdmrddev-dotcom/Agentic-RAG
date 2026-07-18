@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-18T11:46:25.088Z"
-last_activity: 2026-07-18 -- Phase 160 planning complete
+last_updated: "2026-07-18T12:00:24.755Z"
+last_activity: 2026-07-18 -- Phase 160 execution started
 progress:
   total_phases: 27
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 4
 ---
 
 # Project State
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** **v3.4 Multi-Tenancy & Org Access — ROADMAP APPROVED 2026-07-18** (9 CORE Phases 160-168 + 5 STRETCH Phases 169-173; 29/29 requirements mapped; migrations from slot 104). The load-bearing one-way RLS door. **Deployment-flexibility guarantee baked into Phase 160's ADR** (SC#4: solo-local / small-VPS / medium-SaaS / enterprise-on-prem all stay a pure env-var switch; local never breaks; org-settings forward-compatible with per-org provider config — see SEED-120). **Seeds planted at approval:** SEED-120 (per-org BYO provider keys/config), SEED-121 (provider key pooling at scale), SEED-122 (local/small-model capability validation via the eval studio); capacity-sizing points at existing SEED-001/071. Next: `/gsd:discuss-phase 160` (or `/gsd:plan-phase 160`). Prior: v3.3 Operator UX shipped + archived 2026-07-18 (tag `v3.3`).
+**Current focus:** Phase 160 — tenancy-model-adr
 
 ## Deferred Items
 
@@ -40,12 +40,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 160 of 168 CORE (Tenancy-Model ADR) — context gathered, ready to plan
-Plan: —
-Status: Ready to execute
-Last activity: 2026-07-18 -- Phase 160 planning complete
+Phase: 160 (tenancy-model-adr) — plan execution COMPLETE (pending verification)
+Plan: 1 of 1 complete
+Status: Phase 160 plan 160-01 executed — Tenancy-Model ADR ratified; ready for /gsd:verify-work 160
+Last activity: 2026-07-18 -- Phase 160 plan 160-01 executed (Tenancy-Model ADR + D-v3.4-01 recorded in both registers)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [░░░░░░░░░░] 4%
 
 ### Quick Tasks Completed
 
@@ -420,6 +420,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 150 P02 | 2 | 2 tasks | 2 files |
 | Phase 159 P01 | 13 | 2 tasks | 3 files |
 | Phase 159 P06 | 12min | 3 tasks | 4 files |
+| Phase 160 P160-01 | 6 | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -508,6 +509,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 159]: D-159-01 realized (159-01): UTILITY_MODEL_EXCLUDE is the single shared chat-filter constant; curate imports it; discovery new entries carry a display-only utility tag that never mutates the confirmable diff (SC#3).
 - [Phase 159]: 159-06 (D-159-04): the discovery suitability filter is DISPLAY-only — `visibleNew`/`hiddenNewCount` feed the render only; `accepted`/`enableNow`/`drafts`/`buildChanges` still read the FULL `result.new`, so a hidden utility model stays in the confirmable payload (SC#3 / T-159-13, test-locked). Default-on, persisted via `handleSetDiscoveryFilter` → `setFlag("model_discovery_filter_enabled")` → settings re-fetch; honest "N utility models hidden" + a non-destructive ephemeral "Show all".
 - [Phase 159]: 159-06 (D-159-03): family-default pre-fill via draft-SEEDING on run (`seedDraftsFromDefaults`) — `isComplete`/`buildChanges` unchanged; `enableNow` stays default-off so `buildChanges` yields `enabled:false` (never auto-enable, T-159-12). "default — confirm" keyed on the static `familyDefaults(id)[field]!=null`; `native_tools` maps true→native / null→unseeded, never "none" (SC#3 by construction). All 6 plans shipped; MODEL-03 flips at `/gsd:verify-work 159` (phase-spanning STRETCH, false-green-avoidance).
+- [Phase 160]: D-v3.4-01: Tenancy-Model ADR ratifies D-PRD-02 co-tenant + isolation-via-deployment posture + the binding 4-tier deployment-flexibility contract (per-phase enforcement 161-173; SEED-120 forward-compat); locks is_system_global / is_org_shared / slot 104+ naming for phases 161-168. ADR: .planning/phases/160-tenancy-model-adr/160-ADR.md
 
 ## Operator Next Steps
 
