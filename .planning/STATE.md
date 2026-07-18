@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: planning
-last_updated: "2026-07-18T09:14:27.272Z"
+last_updated: "2026-07-18T18:30:00.000Z"
 last_activity: 2026-07-18
 progress:
-  total_phases: 0
+  total_phases: 14
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** **v3.3 Operator UX SHIPPED + archived 2026-07-18** (14 phases / 95 plans / 212 tasks; 20/20 requirements; tag `v3.3`). Planning next milestone — v3.4 Multi-tenancy per `PRDs/SEQUENCE.md` (start via `/gsd:new-milestone`).
+**Current focus:** **v3.4 Multi-Tenancy & Org Access — ROADMAP APPROVED 2026-07-18** (9 CORE Phases 160-168 + 5 STRETCH Phases 169-173; 29/29 requirements mapped; migrations from slot 104). The load-bearing one-way RLS door. **Deployment-flexibility guarantee baked into Phase 160's ADR** (SC#4: solo-local / small-VPS / medium-SaaS / enterprise-on-prem all stay a pure env-var switch; local never breaks; org-settings forward-compatible with per-org provider config — see SEED-120). **Seeds planted at approval:** SEED-120 (per-org BYO provider keys/config), SEED-121 (provider key pooling at scale), SEED-122 (local/small-model capability validation via the eval studio); capacity-sizing points at existing SEED-001/071. Next: `/gsd:discuss-phase 160` (or `/gsd:plan-phase 160`). Prior: v3.3 Operator UX shipped + archived 2026-07-18 (tag `v3.3`).
 
 ## Deferred Items
 
@@ -40,10 +40,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 160 of 168 CORE (Tenancy-Model ADR) — roadmap created, ready to plan
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-18 — Milestone v3.4 started
+Status: Roadmap created — ready to plan Phase 160 (`/gsd:discuss-phase 160` or `/gsd:plan-phase 160`)
+Last activity: 2026-07-18 — v3.4 ROADMAP.md created (9 CORE 160-168 + 5 STRETCH 169-173; 29/29 requirements mapped, 0 unmapped)
+
+Progress: [░░░░░░░░░░] 0%
 
 ### Quick Tasks Completed
 
@@ -58,6 +60,7 @@ Last activity: 2026-07-18 — Milestone v3.4 started
 
 **Guardrail overrides:**
 
+- **G-5 / Phase 163 (2026-07-18, roadmap-approval — v3.4 crux):** `backend/app/api/threads.py` is the most-fired G-5 hot file (ledger: "G-5 fires — extraction due") and Phase 163 (the atomic RLS + user-JWT-client crux) threads `org_id` through its ~1850-LOC `send_message`. G-5's letter wants a *dedicated* refactor phase before the feature; the roadmap instead sequences the extraction as **Wave 0 of 163** (operator-approved at roadmap sign-off) to keep the 160–168 numbering, with a HARD gate: **no `org_id` touches `send_message` until the extraction lands + proves Deep byte-identical.** The split-vs-bundle call (promote to a standalone phase 163.x if the extraction proves large) is **deliberately deferred to `/gsd:plan-phase 163`**, where the extraction's true size is measurable — the more rigorous point to decide it than blind at roadmap time. Safety property holds either way. Recommendation on record was the dedicated phase; operator chose bundle-now / decide-at-plan-time. Mirrors the 147/149 override shape; the extraction refactor is finally being done (not deferred again), just co-located with the crux.
 - **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.
 
@@ -125,6 +128,51 @@ Items acknowledged and deferred at the **v3.2 milestone close on 2026-07-10** (4
 **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — the one undelivered requirement; **deferred → v3.3** (gated STRETCH, not executed). Rolls forward with the workflow-file cluster (SEED-110 template upload, SEED-112 folder-scope).
 
 **Open `surface: Agentic-RAG` reports (roll forward into the v3.3 UAT blast radius):** BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03, BUG-260708-01/-02, BUG-260710-01/-02 (nav/display + provider-polish), plus the deferred agent-loop / todo-loop notes. Cross-check at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.4, created 2026-07-18)
+
+Numbering continues from v3.3's last phase (159) → **CORE Phases 160-168**, then **STRETCH Phases 169-173** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 / v3.3 156-159 precedent). Migrations continue from live head → **next free slot = 104**. Scope source: `.planning/REQUIREMENTS.md` (22 CORE + 7 STRETCH = 29 reqs). Research: `.planning/research/SUMMARY.md` (re-authored against live schema head 103).
+
+**CORE (committed) — Phases 160-168:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 160 | Tenancy-Model ADR | ADR-01 | 3 | ratify-not-relitigate; no code; no threat model; skip research |
+| 161 | Org / Dept / Role Schema | ORG-01, ORG-02 | 4 | **threat model** (isolation cluster; `current_user_org_ids()` breaks 42P17); additive/zero-behavior; skip research |
+| 162 | Personal-Org Backfill | MIG-01 | 4 | **threat model** (lock-storm/idempotency/NOT-NULL-order/`is_global` data-loss) |
+| 163 | RLS Rewrite + User-JWT Client Swap — **ATOMIC CRUX** | TEN-01, TEN-02, TEN-04 | 5 | **SC#10**; **threat model (security core)**; **G-5/G-1** (`threads.py` extraction = Wave 0); **perf gate** (CONCUR-01 <1s); **research-phase** (live 2-user SET LOCAL/SET ROLE leak test) |
+| 164 | SECDEF Audit + Cross-Org Isolation Suite | TEN-03, TEN-05, TEN-06, PRAG-01 | 4 | **SC#10**; **threat model (security core)**; **research-phase** (pgvector+RLS); folds SEED-091; TEN-05 = exit gate |
+| 165 | `is_global` Retirement Cleanup | MIG-02 | 3 | threat model (lighter — `is_system_global` migration-only); mechanical; skip research |
+| 166 | Org-Admin Shell + Switcher + Profile + Audit + Settings Split | ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05 | 5 | **SC#10** (UI state); **G-2 sketch** (SEED-113); **G-5** (`StreamsProvider.tsx`); threat model (X-Org-Id/audit authz); UI hint |
+| 167 | Invitations + Roles + Greenlists + JIT + Per-User Prefs | INV-01, INV-02, VIS-01, VIS-02 | 4 | **SC#10** (VIS-02 = provider routing; greenlist UI state); **threat model** (token/JIT race); G-2 sketch (if visual); UI hint |
+| 168 | SSO — SAML 2.0 (CORE) | SSO-01 | 3 | **threat model** (Supabase owns SAML parse; enforcement-before-fallback); UI hint; 0 new deps |
+
+**STRETCH (gated behind CORE) — Phases 169-173:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 169 | Dept-Admin Shell | ADMIN-06 | 2 | 166+167; G-2 sketch; UI hint |
+| 170 | Commercial Footholds — Entitlements + Retention/Rate-Limit Data Layer | ENT-01, ENT-02 | 2 | 161+166; UI hint; footholds only (no enforcement/billing) |
+| 171 | Permission-Aware Citations | PRAG-02 | 2 | 164+167; **research-gated** (CITE-01 + pgvector+RLS bench); SC#10; G-5 (`retrieval_service.py`+citation renderer); UI hint |
+| 172 | OIDC Enterprise SSO | SSO-02 | 2 | 168; threat model (discovery SSRF); Authlib (scope-gated dep); UI hint; customer-triggered |
+| 173 | Dept-Targeted Skills + Group Feature-Rollout Gating | VIS-03, VIS-04 | 2 | 165+167; UI hint |
+
+- **Coverage:** 29/29 requirements mapped (22 CORE + 7 STRETCH); 0 unmapped, 0 duplicates. Every requirement → exactly one phase.
+- **The atomic crux (LOCKED):** TEN-01 + TEN-02 + TEN-04 in ONE phase (163) — RLS is inert while the service-role / asyncpg-owner connection bypasses it. Never "policies now, client later." `SET LOCAL ROLE authenticated` (not the claims) is what turns RLS on.
+- **`threads.py` extraction-first (G-5/G-1):** sequenced as **Wave 0 of Phase 163** before `org_id` threads through `send_message`; MAY be promoted to a dedicated refactor phase at discuss/plan-time (operator's call — if promoted, crux → 163.1 and STRETCH renumbers). Prior 147/149 in-place guard overrides logged below; this milestone pays the extraction down.
+- **Data-dependency order (forced):** ADR → schema → backfill → crux → SECDEF+isolation-suite → is_global retirement → org-admin UI → invitations/roles/greenlists → SSO last (SSO has zero downstream dependents = first-to-cut).
+- **SC#10 (cross-provider mandate):** 163 (crux — shared retrieval/agent-loop path), 164 (SECDEF/permission-aware retrieval), 166 (org-switcher/`<OrgContext>` UI state), 167 (VIS-02 model-default provider routing) + STRETCH 171. Pure-schema/ADR phases (160/161/162/165) deliberately NOT flagged.
+- **Milestone exit gate:** the two-org `test_v3_4_org_isolation.py` suite (built in 164) is re-run AFTER 166/167/168 land, PLUS a final full-regression pass (SC#10 4-axis + CONCUR-01) — not only after the SECDEF phase.
+- **G-2 sketch-gated:** 166 (org-admin shell/switcher/profile anchor — SEED-113), 167 (greenlist/roster UI if visual), 169 (dept-admin shell). `/gsd:sketch` before spec/discuss.
+- **G-5 hot files:** `threads.py` (163 — extraction-first), `StreamsProvider.tsx` (166 — `<OrgContext>` OUTSIDE it, keep 067.5 Branch-D3 clear guard), `retrieval_service.py`+citation renderer (STRETCH 171).
+- **Perf gate:** TEN-04 (163) `document_chunks`/`skill_embeddings` `org_id` denormalize+index must keep CONCUR-01 <1s green — benchmark before merge.
+- **Research flags:** 163 crux (live 2-user leak test — do not ship on docs alone), STRETCH 171 (pgvector+RLS latency/recall bench), personal-org/JIT seam 162/167 boundary (trigger vs app-layer vs both). Skip: 160/161/165/166.
+- **Threat models (secure-phase):** the isolation cluster 161-164 (security core), 165 (lighter), 166 (X-Org-Id/audit authz), 167 (token/JIT), 168 (SSO), + STRETCH 171/172. ADR 160 = no code.
+- **Red line (D-14):** Deep Mode byte-identical; provider differences at the gateway/adapter boundary; no new runtime. KEEP the ~253 `.eq("user_id")` filters this milestone (belt-and-suspenders under the user-JWT client).
+- **Reported-bugs:** chat-surface backlog stays OUT (post-v3.3 chat-polish phase); only SEED-091 folds here (TEN-06 → 164). Cross-check at each `/gsd:discuss-phase`.
+- **Cloud parity owed:** v3.3 migrations 099-103 + `SECRETS_ENCRYPTION_KEY` still owed at next production push; v3.4 migrations start at slot 104.
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.4 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Research base: `.planning/research/SUMMARY.md`.
 
 ## Roadmap shape (v3.3, created 2026-07-10)
 

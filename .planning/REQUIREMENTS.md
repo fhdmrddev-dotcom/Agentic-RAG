@@ -112,35 +112,42 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADR-01 | TBD | Pending |
-| ORG-01 | TBD | Pending |
-| ORG-02 | TBD | Pending |
-| TEN-01 | TBD | Pending |
-| TEN-02 | TBD | Pending |
-| TEN-03 | TBD | Pending |
-| TEN-04 | TBD | Pending |
-| TEN-05 | TBD | Pending |
-| TEN-06 | TBD | Pending |
-| PRAG-01 | TBD | Pending |
-| MIG-01 | TBD | Pending |
-| MIG-02 | TBD | Pending |
-| ADMIN-01 | TBD | Pending |
-| ADMIN-02 | TBD | Pending |
-| ADMIN-03 | TBD | Pending |
-| ADMIN-04 | TBD | Pending |
-| ADMIN-05 | TBD | Pending |
-| INV-01 | TBD | Pending |
-| INV-02 | TBD | Pending |
-| SSO-01 | TBD | Pending |
-| VIS-01 | TBD | Pending |
-| VIS-02 | TBD | Pending |
+| ADR-01 | 160 | Pending |
+| ORG-01 | 161 | Pending |
+| ORG-02 | 161 | Pending |
+| MIG-01 | 162 | Pending |
+| TEN-01 | 163 | Pending |
+| TEN-02 | 163 | Pending |
+| TEN-04 | 163 | Pending |
+| TEN-03 | 164 | Pending |
+| TEN-05 | 164 | Pending |
+| TEN-06 | 164 | Pending |
+| PRAG-01 | 164 | Pending |
+| MIG-02 | 165 | Pending |
+| ADMIN-01 | 166 | Pending |
+| ADMIN-02 | 166 | Pending |
+| ADMIN-03 | 166 | Pending |
+| ADMIN-04 | 166 | Pending |
+| ADMIN-05 | 166 | Pending |
+| INV-01 | 167 | Pending |
+| INV-02 | 167 | Pending |
+| VIS-01 | 167 | Pending |
+| VIS-02 | 167 | Pending |
+| SSO-01 | 168 | Pending |
+| ADMIN-06 | 169 | Pending (STRETCH) |
+| ENT-01 | 170 | Pending (STRETCH) |
+| ENT-02 | 170 | Pending (STRETCH) |
+| PRAG-02 | 171 | Pending (STRETCH) |
+| SSO-02 | 172 | Pending (STRETCH) |
+| VIS-03 | 173 | Pending (STRETCH) |
+| VIS-04 | 173 | Pending (STRETCH) |
 
 **Coverage:**
-- CORE requirements: 22 total
-- STRETCH requirements: 7 (ADMIN-06, ENT-01, ENT-02, PRAG-02, SSO-02, VIS-03, VIS-04)
-- Mapped to phases: 0 ⚠️ (roadmapper to populate)
-- Unmapped: 22 ⚠️
+- CORE requirements: 22 total — **22/22 mapped** (Phases 160-168) ✓
+- STRETCH requirements: 7 — **7/7 mapped** (ADMIN-06→169 · ENT-01/02→170 · PRAG-02→171 · SSO-02→172 · VIS-03/04→173) ✓
+- Mapped to phases: **29/29** ✓ (every requirement → exactly one phase; 0 orphans, 0 duplicates)
+- Unmapped: **0** ✓
 
 ---
 *Requirements defined: 2026-07-18 (research-first; scope + CORE/STRETCH split operator-approved)*
-*Last updated: 2026-07-18 after initial definition*
+*Last updated: 2026-07-18 — traceability populated by roadmapper (ROADMAP.md v3.4 created; 29/29 mapped across Phases 160-173)*

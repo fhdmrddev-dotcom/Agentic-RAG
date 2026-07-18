@@ -17,7 +17,257 @@
 - ✅ **v3.1 Workflow & Skill Studio — Trust, Clarity & Triggers** — Phases 120-129 (CORE 120-124+123.1; STRETCH 127-129 shipped; 125/126/130/131 deferred) (shipped 2026-06-28). Collision fix + context isolation · cross-provider trust/honesty parity · Skill Trigger Tuner · Workflow Studio soul + strict↔loose · chat tool-card unification + provider logos · MiniMax/OpenRouter arg repair.
 - ✅ **v3.2 Skill Eval Studio + Self-Improving** — Phases 132-145 (CORE 132-137 + inserts 134.1/137.1/137.2; STRETCH 138-143+145 shipped; 144/FILE-01 deferred → v3.3) (shipped 2026-07-10). Skill Eval Studio (eval persistence + versions + with-vs-without runner + honest verdicts + ratings + self-improve loop + publish gate + Evals panel) · built-in skill-creator · STRETCH honesty phases · run-lifecycle foundation (FND-01) · Starter Workflow Library (WF-01).
 - ✅ **v3.3 Operator UX** — Phases 146-159 (shipped 2026-07-18). Operator/admin tier (gated /admin Control Room + governance) + dynamic model-registry/discovery + secrets-at-rest + workflow/agent file-inputs + inline citations + plain-language + WCAG-AA + deployment presets/install wizard. 20/20 requirements delivered.
-- 📋 **v3.4 Multi-tenancy** → **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track (shifted down one slot 2026-06-21 by the Skill-Studio split; brief filenames keep old numbers). ⚠ Multi-tenancy (one-way RLS door) now 3 slots out — the GTM track jumps the queue if a paying customer appears. **Authoritative map: `PRDs/SEQUENCE.md`.**
+- 🚧 **v3.4 Multi-Tenancy & Org Access** — Phases 160-173 (CORE 160-168 + STRETCH 169-173; started 2026-07-18). The load-bearing **one-way RLS door**: membership-based tenancy (Tenancy ADR → org/dept/role schema → personal-org backfill → the atomic RLS + user-JWT-client-swap crux → SECDEF audit + two-org isolation suite → `is_global` retirement → org-admin shell/switcher → invitations/roles/greenlists → SAML SSO) plus its governance/identity projection. Migrations continue from live head → **slot 104+**. **Authoritative map: `PRDs/SEQUENCE.md`.**
+- 📋 **v3.5 Open Platform (API/MCP)** → **v3.6 Automations** — the enterprise-GTM track continues after v3.4 (SEED-013/014 connectors, SEED-117 §1/§3 config-consolidation deferred here). **Authoritative map: `PRDs/SEQUENCE.md`.**
+
+---
+
+## v3.4 Multi-Tenancy & Org Access — 🚧 ACTIVE (started 2026-07-18)
+
+**Started:** 2026-07-18 (research-first; scope + CORE/STRETCH split operator-approved). Numbering continues from v3.3's last phase (159) → **CORE Phases 160-168**, then **STRETCH Phases 169-173** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 / v3.3 156-159 precedent). Migrations continue from live head → **next free slot = 104**.
+
+**Goal:** Turn Agentic RAG from a per-user application into an org-aware multi-tenant platform — the load-bearing **one-way RLS door** that unlocks the hybrid SaaS posture (D-PRD-02): co-tenant (`org_id` + membership RLS) by default, isolation-via-deployment for enterprise.
+
+**The crux (research's single highest-signal convergence):** today RLS is *decorative* — the backend runs on a service-role singleton that unconditionally bypasses it; the real per-user boundary is ~253 hand-written `.eq("user_id")` filters across 32 files. So the RLS predicate rewrite (TEN-01) is **inert** unless the per-request user-JWT client swap (TEN-02) + the `document_chunks`/`skill_embeddings` perf denormalize (TEN-04) land in the **SAME atomic phase (163)**. Never "policies now, client later." `SET LOCAL ROLE authenticated` (not just the JWT claims) is what actually turns RLS on against the table-owner asyncpg DSN.
+
+**Red line (every phase):** Deep Mode stays byte-identical; provider differences stay at the gateway/adapter boundary; no new runtime (D-14). The ~253 `.eq("user_id")` filters become **belt-and-suspenders** under the new user-JWT client — **KEEP them this milestone** (do not delete prematurely; a later hardening pass owns their removal).
+
+**Scope source:** `.planning/REQUIREMENTS.md` (22 CORE + 7 STRETCH). Research base: `.planning/research/SUMMARY.md` (re-authored against live schema head 103 — 38 user-facing tables, 4 SECDEF retrieval/sharing functions, Supabase-native SAML). Milestone framing: `.planning/PROJECT.md` → Current Milestone. Migration head at research time: 103 (re-verify at plan time per SUMMARY Gaps).
+
+### Phase Table (CORE — Phases 160-168)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 160 | Tenancy-Model ADR | Ratify the co-tenant + isolation-via-deployment posture + the 4-tier deployment-flexibility contract; lock the naming/renumbering decisions | ADR-01 | 4 | ratify-not-relitigate; **no code**; **deployment-flexibility guarantee (non-negotiable)**; no threat model; skip research-phase |
+| 161 | Org / Dept / Role Schema | Ship the org/dept/role/membership schema with RLS + the recursion-safe helper from day one | ORG-01, ORG-02 | 4 | **threat model** (isolation cluster — RLS-from-day-one; `current_user_org_ids()` breaks 42P17 recursion); additive / zero-behavior-change; skip research-phase |
+| 162 | Personal-Org Backfill | Silently give every existing user a personal org + backfill `org_id` everywhere — nothing breaks | MIG-01 | 4 | **threat model** (isolation cluster — lock-storm / idempotency / NOT-NULL-ordering / `is_global` data-loss); no UI |
+| 163 | RLS Rewrite + User-JWT Client Swap — **THE ATOMIC CRUX** | Land membership RLS + the per-request user-JWT client TOGETHER so RLS is actually enforced | TEN-01, TEN-02, TEN-04 | 5 | **SC#10**; **threat model (the security core)**; **G-5/G-1** (`threads.py` extraction = Wave 0, BEFORE `org_id` in `send_message`); **perf gate** (CONCUR-01 <1s); **research-phase** (live two-user `SET LOCAL`/`SET ROLE` leak test — do NOT ship on docs alone) |
+| 164 | SECDEF Audit + Cross-Org Isolation Suite | Scope the 4 SECDEF functions + prove zero cross-org leakage with a two-org test suite | TEN-03, TEN-05, TEN-06, PRAG-01 | 4 | **SC#10** (retrieval path); **threat model (security core)**; **research-phase** (pgvector+RLS latency/recall unmeasured); folds SEED-091 |
+| 165 | `is_global` Retirement Cleanup | Retire `is_global` → `is_org_shared` everywhere + a migration-only `is_system_global` allow-list | MIG-02 | 3 | threat model (lighter — `is_system_global` is cross-org visibility, must stay migration-only); mechanical; skip research-phase |
+| 166 | Org-Admin Shell + Switcher + Profile + Audit + Settings Split | Ship the org-admin shell + org switcher + profile anchor + org-scoped audit + Settings IA split | ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05 | 5 | **SC#10** (UI state / stream teardown); **G-2 sketch** (SEED-113 identity anchor); **G-5** (`StreamsProvider.tsx` — `<OrgContext>` wraps OUTSIDE it, keep 067.5 Branch-D3 clear guard); threat model (X-Org-Id server-validate + audit authz); UI hint; reuses v3.3 Control-Room shell |
+| 167 | Invitations + Roles + Greenlists + JIT + Per-User Prefs | Invitations + role/group greenlists + idempotent JIT + the revived per-user preference layer | INV-01, INV-02, VIS-01, VIS-02 | 4 | **SC#10** (VIS-02 model-default = provider routing; greenlist = UI state); **threat model** (invitation token/expiry + JIT advisory-lock race); **G-2 sketch** (greenlist/roster UI if visual); UI hint |
+| 168 | SSO — SAML 2.0 (CORE) | Native SAML 2.0 SSO + JIT + email-domain routing; password fallback retained | SSO-01 | 3 | **threat model** (SSO — but Supabase/GoTrue owns the SAML XML parse, so NOT hardening a parser; surviving risk = enforcement-before-fallback); UI hint (SSO tab); **0 new hard deps** (`python3-saml` dropped) |
+
+### Phase Table (STRETCH — Phases 169-173, gated behind CORE)
+
+Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OIDC + citations are the natural cuts (zero downstream dependents / research-gated).
+
+| Phase | Name | Requirements | SC# | Depends / Flags |
+|-------|------|--------------|-----|-----------------|
+| 169 | Dept-Admin Shell | ADMIN-06 | 2 | 166 + 167; **G-2 sketch**; UI hint; scoped-down composition of the org-admin shell |
+| 170 | Commercial Footholds — Entitlements + Retention/Rate-Limit Data Layer | ENT-01, ENT-02 | 2 | 161 + 166; UI hint; **footholds only** (no sweeper / token-bucket enforcement, no billing) |
+| 171 | Permission-Aware Citations | PRAG-02 | 2 | 164 + 167; **research-gated** (CITE-01 leak threat model + pgvector+RLS latency/recall bench FIRST); **SC#10**; **G-5** (`retrieval_service.py` + citation renderer); UI hint |
+| 172 | OIDC Enterprise SSO | SSO-02 | 2 | 168; **threat model** (OIDC discovery SSRF); `Authlib` (scope-gated dep — the one org-SSO protocol Supabase lacks); UI hint; **customer-triggered** |
+| 173 | Dept-Targeted Skills + Group Feature-Rollout Gating | VIS-03, VIS-04 | 2 | 165 + 167; UI hint; folds into the rewritten skills RLS + the VIS-01 greenlist resolver |
+
+### Phase Checklist
+
+- [ ] **Phase 160: Tenancy-Model ADR** — ratify D-PRD-02 co-tenant posture + lock `is_system`→`is_system_global` reuse + 104+ renumbering (ADR-01)
+- [ ] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
+- [ ] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; value-preserving `is_global` RENAME; NOT-NULL only after zero-NULL (MIG-01)
+- [ ] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — `threads.py` extraction (Wave 0) → membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04)
+- [ ] **Phase 164: SECDEF Audit + Cross-Org Isolation Suite** — 4 SECDEF functions org-scoped + `search_path` pinned + `_inject_user_id` deleted; `test_v3_4_org_isolation.py` two-org exit gate; folder-ACL retrieval isolation; SEED-091 closed (TEN-03, TEN-05, TEN-06, PRAG-01)
+- [ ] **Phase 165: `is_global` Retirement Cleanup** — `is_global`→`is_org_shared` rename across SQL / `folder_utils.py` / Storage policy + UI copy; migration-only `is_system_global` allow-list for the seeded skill-creator (MIG-02)
+- [ ] **Phase 166: Org-Admin Shell + Switcher + Profile + Audit + Settings Split** — profile identity anchor + org switcher (`<OrgContext>` outside StreamsProvider) + 7-tab org-admin shell + org-scoped audit + SEED-116 Settings IA split (ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05)
+- [ ] **Phase 167: Invitations + Roles + Greenlists + JIT + Per-User Prefs** — email/link invitations + adoption states on the 148 roster + role/group greenlists (VIS-01 resolver) + idempotent JIT + revived `user_settings.preferences` (INV-01, INV-02, VIS-01, VIS-02)
+- [ ] **Phase 168: SSO — SAML 2.0 (CORE)** — Supabase-native SAML 2.0 SP + domain routing + attribute→dept mapping + JIT (167 seam); email/password fallback retained (SSO-01)
+- [ ] **Phase 169 (STRETCH): Dept-Admin Shell** — narrower `dept:manage` shell (Dept Members / Skills / Retention / Audit) (ADMIN-06)
+- [ ] **Phase 170 (STRETCH): Commercial Footholds** — `require_tier()` / `require_add_on()` replacing the lying stub + retention/rate-limit data layer + org-admin UI (ENT-01, ENT-02)
+- [ ] **Phase 171 (STRETCH): Permission-Aware Citations** — research-gated; an answer never cites/previews a doc the asking user can't open (PRAG-02)
+- [ ] **Phase 172 (STRETCH): OIDC Enterprise SSO** — per-org OIDC via a custom Authlib SP (customer-triggered) (SSO-02)
+- [ ] **Phase 173 (STRETCH): Dept-Targeted Skills + Group Feature-Rollout Gating** — dept-scoped skill availability + admin-tier/beta group gating (VIS-03, VIS-04)
+
+### Phase Details
+
+#### Phase 160: Tenancy-Model ADR
+**Goal**: A written Tenancy-Model ADR ratifies the co-tenant-default + isolation-via-deployment posture and locks the naming/renumbering decisions, so every downstream phase builds on a settled, non-relitigated foundation.
+**Depends on**: Nothing (first phase)
+**Requirements**: ADR-01
+**Success Criteria** (what must be TRUE):
+  1. A written ADR exists ratifying D-PRD-02 (co-tenant `org_id` + membership RLS by default; isolation-via-deployment for enterprise) — a reader can see the tenancy posture is settled, not re-opened.
+  2. The ADR locks the `skills.is_system` → `is_system_global` reuse and the 104+ migration renumbering as binding for phases 161-168.
+  3. The ADR records that v3.3's shipped `org_id` stubs + Solo/Team/Enterprise deploy presets already ~80% pre-decided this posture (ratify-not-relitigate scope) — no code changes in this phase.
+  4. The ADR ratifies the **4-tier deployment-flexibility contract — binding and non-negotiable for the milestone**: **solo-local**, **small-team-VPS**, **medium-SaaS (co-tenant)**, and **enterprise / on-prem / BYO (isolation-via-deployment, customer-owned Supabase)** all remain a **pure env-var switch** with no hardcoded URLs / keys / models / ports; the **local setup never breaks**; the co-tenant vs isolated choice is a deploy-time decision, never a code fork; and the org-settings + encrypted-secrets substrate stays **forward-compatible with per-org provider config / BYO keys / per-org (incl. local) model selection** ([[SEED-120]]) so v3.5 adds them with **no schema rewrite**. Every subsequent v3.4 phase is verified against this contract (nothing may make a deployment tier harder).
+**Plans**: TBD
+
+#### Phase 161: Org / Dept / Role Schema
+**Goal**: The org/dept/role/membership schema exists with RLS from day one and the recursion-safe membership helper, so backfill and the RLS rewrite have something to reference — with zero behavior change on creation.
+**Depends on**: Phase 160
+**Requirements**: ORG-01, ORG-02
+**Success Criteria** (what must be TRUE):
+  1. The 8 org tables ship — `organizations` (incl. `subscription_tier` + `add_ons jsonb`), `departments` (nullable `parent_id` self-FK + one auto-created default department per org), `org_members`, `dept_members`, `roles` + `role_permissions` (fixed 4-tier enum: super-admin / org-admin / dept-admin / member), `org_invitations`, `sso_configs` — all with RLS, FKs, and indexes from creation.
+  2. A `current_user_org_ids()` `SECURITY DEFINER` helper + a non-recursive self-rows-only `org_members` policy exist, and a live authenticated query against `org_members` does NOT raise `42P17`; every other table's membership predicate calls the helper (never inlines an `org_members` subquery).
+  3. Nullable `org_id` is present on every user-facing table still lacking it (the ~26 tables beyond the 12 already stubbed), added additively so existing behavior stays byte-identical.
+  4. A 5-person team and a 2,000-person org are served by the SAME schema — small orgs never touch `dept_members`; large orgs nest via `departments.parent_id` — with no schema change either way.
+**Plans**: TBD
+
+#### Phase 162: Personal-Org Backfill
+**Goal**: Every existing user silently gets a personal org + default department + org-admin membership and `org_id` is backfilled across every table, so the RLS rewrite can go live without any user action and with zero data loss.
+**Depends on**: Phase 161
+**Requirements**: MIG-01
+**Success Criteria** (what must be TRUE):
+  1. After the migration, every existing user owns exactly one personal org with a default department and an org-admin membership — no duplicates on a re-run (idempotent on `WHERE org_id IS NULL`).
+  2. `org_id` is backfilled non-NULL across every user-facing table (batched ~10k-row windows; owner-less child tables resolved through their parent FK), and the `NOT NULL` flip happens only after a verified zero-NULL check.
+  3. All existing data is preserved and every previously-visible resource stays visible — no user has to do anything, and nothing they could see before disappears.
+  4. Re-running the migration (a normal SQL-editor-paste recovery action) neither lock-storms production nor duplicates orgs/memberships.
+**Plans**: TBD
+
+#### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
+**Goal**: Membership-based RLS and the per-request user-JWT DB context land TOGETHER across both data-access paths, so RLS becomes actually enforceable (not decorative) — the single load-bearing security transition of the milestone — with `threads.py` extracted FIRST (Wave 0) and retrieval performance held under the CONCUR-01 gate.
+**Depends on**: Phase 162 (`org_id` populated). **G-5/G-1: the overdue `threads.py` extraction is sequenced as Wave 0 — no `org_id` touches `send_message` until it lands.**
+**Requirements**: TEN-01, TEN-02, TEN-04
+**Success Criteria** (what must be TRUE):
+  1. Every RLS predicate on all 38 user-facing tables is membership-based (`org_id = ANY(current_user_org_ids()) AND (owner-within-org OR is_org_shared OR dept-scoped OR is_system_global)`), shipped across reviewable per-cluster bundles (documents / chat / skills / DM / workflow-eval / identity-audit).
+  2. Hot paths run on a per-request user-JWT client on BOTH data-access paths — supabase-py (JWT-header swap) and the raw asyncpg pool (`SET LOCAL request.jwt.claims` + the mandatory `SET LOCAL ROLE authenticated`) — and a live two-user leak test proves user B cannot read user A's rows (RLS is now enforced, not bypassed by the service-role / table-owner connection).
+  3. `get_service_role_supabase(org_id)` refuses to construct without an explicit org and is retained only for legitimate cross-tenant ops (SSO JIT, org-admin cross-member reads, the fully-async agent/eval/harness/re-embed writes whose `.eq("user_id")` filters widen to org-aware); the `.eq("user_id")` filters are KEPT as belt-and-suspenders (not deleted this milestone).
+  4. `org_id` is denormalized + partial/composite-indexed on `document_chunks` and `skill_embeddings` alongside the vector index, and a benchmark shows membership-RLS retrieval keeps the CONCUR-01 <1s cross-tab-GET-during-streaming gate GREEN (measured before merge).
+  5. Deep Mode stays byte-identical on the native-7 (SC#10 — no shared-path fork; org context rides the request seam, not the provider path); `threads.py` is extracted BEFORE `org_id` is threaded through `send_message`.
+**Plans**: TBD
+
+#### Phase 164: SECDEF Audit + Cross-Org Isolation Test Suite
+**Goal**: The four `SECURITY DEFINER` retrieval/sharing functions carry an in-body org predicate + pinned `search_path`, the fragile regex is deleted, and a two-org adversarial test suite proves zero cross-org leakage — the milestone's verifiable isolation gate.
+**Depends on**: Phase 163 (needs `document_chunks` `org_id`/RLS live for the INVOKER-caller rewrite)
+**Requirements**: TEN-03, TEN-05, TEN-06, PRAG-01
+**Success Criteria** (what must be TRUE):
+  1. All four DEFINER functions (`match_document_chunks`, `keyword_search_chunks`, `match_skills`, `folder_is_globally_visible` → `folder_is_org_shared`) carry an explicit org predicate in-body + a pinned `search_path`; `_inject_user_id` is DELETED (not extended to `org_id`) and `query_user_documents` is called through the user-JWT client.
+  2. `test_v3_4_org_isolation.py` passes and is the milestone exit gate: two seeded orgs × every user-facing table × all four DEFINER functions (0 cross-org rows) × both DB access paths × `X-Org-Id` header-spoof rejection.
+  3. Hybrid search returns only rows the asking user may access — org- AND folder-ACL-isolated (`document_chunks` RLS mirrors the full folder-visibility predicate authored in 163) — proven with a live two-user retrieval test (PRAG-01).
+  4. Global / org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path (SEED-091 / TEN-06 closed).
+**Plans**: TBD
+
+#### Phase 165: `is_global` Retirement Cleanup
+**Goal**: The `is_global` mechanism is fully retired to `is_org_shared` across code, UI copy, and storage policies, with a migration-only `is_system_global` allow-list keeping the seeded skill-creator cross-org visible — no cross-org leak, no per-org skill-creator copies.
+**Depends on**: Phase 164 (mechanical; can overlap — sequenced after the isolation gate)
+**Requirements**: MIG-02
+**Success Criteria** (what must be TRUE):
+  1. `is_global` is value-preservingly RENAMEd to `is_org_shared` (never drop+add) everywhere it lives — SQL columns, the `folder_utils.py` recursive-visibility mirror, and the Storage `skill-files` bucket policy branch.
+  2. User-facing copy reads "Shared with org" (not "Global"), and no previously-shared folder / skill / view silently un-shares.
+  3. An `is_system_global` allow-list — reusing the write-locked `skills.is_system` marker — keeps the seeded `skill-creator` visible across every org, and no route can set `is_system_global` (migration-only, never route-settable).
+**Plans**: TBD
+
+#### Phase 166: Org-Admin Shell + Org Switcher + Profile-Menu Anchor
+**Goal**: A multi-org user gets a real identity anchor, an org switcher that safely swaps active-org context, and an org-admin shell with org-scoped audit + a resolved Settings IA — the human-facing surface of the now-real tenancy model, reusing the shipped v3.3 Control-Room shell as composition.
+**Depends on**: Phase 164 (meaningless before org isolation is real)
+**Requirements**: ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05
+**Success Criteria** (what must be TRUE):
+  1. A profile-menu identity anchor shows name / email / role badge / sign-out (the user-side counterpart to the Phase-146 operator shield; SEED-113).
+  2. A multi-org user sees an org switcher; switching changes active-org context for all subsequent calls via the hybrid mechanism (membership set in the JWT for RLS + a server-validated `X-Org-Id` header), `<OrgContext>` wraps OUTSIDE `StreamsProvider`, and an org switch tears down in-flight subscriptions + refetches (Realtime is best-effort, never the isolation boundary).
+  3. An org-admin (with `org:manage`) sees the 7-tab shell (Members/Invitations · Departments/Roles · SSO · Audit · Subscription · Retention · Settings); a non-admin does not.
+  4. An org-admin with `org:audit_view` sees all members' audit rows within their org; a member sees only their own (ADMIN-04).
+  5. The Settings IA split resolves SEED-116 — personal preferences under the profile menu, org config behind `org:manage`, platform config stays in the Control Room (ADMIN-05).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 167: Invitations + Roles + Greenlists + JIT + Per-User Prefs
+**Goal**: An org-admin can invite and onboard members with role/group-based feature greenlists, concurrent first-logins converge to one membership idempotently, and users pick their own defaults within the org-allowed set — the governance + onboarding projection of the tenancy model.
+**Depends on**: Phase 161 (org/role schema) + Phase 166 (org-admin shell UI home)
+**Requirements**: INV-01, INV-02, VIS-01, VIS-02
+**Success Criteria** (what must be TRUE):
+  1. An org-admin sends email + link invitations (`org_invitations`, hashed token, expiry, `resend` / SES / `none`-log env-switched provider); a recipient accepts via sign-in or sign-up; adoption states (not-yet-invited / pending / active) render on the Phase-148 roster.
+  2. A concurrent first-login (signup / SSO-callback) creates the `org_members` row idempotently (`INSERT … ON CONFLICT DO NOTHING` + advisory lock) so it converges to exactly one membership (INV-02).
+  3. Feature visibility resolves per-feature role/group greenlists through the SAME one swappable `require_visible` function VIS-01 already built, with a Glean precedence-merge rule (highest role wins for primary tier, union for secondary grants).
+  4. A user picks a default (e.g. model) WITHIN the operator/org-allowed set — the revived `user_settings.preferences` layer (dead since mig 011) honors operator lock flags under the SEED-116 two-layer pattern (VIS-02).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 168: SSO — SAML 2.0 (CORE)
+**Goal**: An org-admin can register a SAML 2.0 IdP via Supabase's native SP with JIT provisioning and email-domain routing, while email/password fallback stays — the enterprise-onboarding capstone with zero downstream dependents (first-to-cut).
+**Depends on**: Phase 167 (JIT seam). LAST in CORE (heaviest external IdP dependency; invitations already cover onboarding if cut).
+**Requirements**: SSO-01
+**Success Criteria** (what must be TRUE):
+  1. An org-admin registers a SAML 2.0 IdP via Supabase's native SAML SP (Cloud Pro+ managed OR self-hosted GoTrue, un-gated), provisioned via `supabase sso add`; users route to it by email domain.
+  2. On first SSO login, JIT provisioning (INV-02's seam) creates the `org_members` row, and attribute→claim mapping feeds department import.
+  3. Email/password fallback is RETAINED (SSO enforcement explicitly deferred) — an existing user can still sign in the old way; no `python3-saml` (Supabase owns the SAML parsing).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 169: Dept-Admin Shell (STRETCH)
+**Goal**: A narrower dept-admin shell lets a department admin manage their department's members / skills / retention / audit — a scoped-down composition of the org-admin shell.
+**Depends on**: Phase 166 (org-admin shell pattern) + Phase 167 (roles/dept schema live); gated behind CORE
+**Requirements**: ADMIN-06
+**Success Criteria** (what must be TRUE):
+  1. A user with `dept:manage` sees a dept-admin shell (Dept Members / Dept Skills / Dept Retention / Dept Audit) scoped to their department only.
+  2. A dept-admin cannot see or act on other departments' members or resources.
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 170: Commercial Footholds — Entitlements + Retention/Rate-Limit Data Layer (STRETCH)
+**Goal**: A reusable entitlement-check primitive replaces the lying stub, and per-org retention/rate-limit gets its data layer + org-admin UI — commercial footholds only, no enforcement, no billing.
+**Depends on**: Phase 161 (`subscription_tier`/`add_ons` columns) + Phase 166 (org-admin UI); gated behind CORE
+**Requirements**: ENT-01, ENT-02
+**Success Criteria** (what must be TRUE):
+  1. `require_tier()` / `require_add_on()` read `orgs.subscription_tier` / `add_ons` and gate a feature honestly — the `_is_tier_pro_or_higher` stub that unconditionally returns `True` is replaced (SEED-080).
+  2. Per-org retention + rate-limit settings have a data layer + an org-admin UI surface (schema + surfaces only — the sweeper / Redis token-bucket enforcement stays deferred to v3.5/v3.6).
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 171: Permission-Aware Citations (STRETCH)
+**Goal**: An answer never cites or previews a document the asking user cannot open — the Glean citation-safety guarantee, gated on a leak threat model + a pgvector+RLS benchmark and on dept/role folder-sharing stabilizing first.
+**Depends on**: Phase 164 (retrieval RLS) + Phase 167 (dept/role folder-sharing stabilized); research-gated; gated behind CORE
+**Requirements**: PRAG-02
+**Success Criteria** (what must be TRUE):
+  1. A CITE-01 leak threat model + a pgvector+RLS latency/recall benchmark are completed FIRST and show the guarantee is buildable without moving the CONCUR-01 gate.
+  2. An answer's citations/previews only ever name documents the asking user may open — a cross-org or unauthorized-folder document is never cited/previewed, proven with a live two-user test.
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 172: OIDC Enterprise SSO (STRETCH)
+**Goal**: Per-org OIDC enterprise SSO via a custom Authlib SP — the one org-SSO protocol Supabase does not offer natively — built only if a customer forces OIDC into scope.
+**Depends on**: Phase 168 (SSO SAML seam + JIT); gated behind CORE + a customer trigger
+**Requirements**: SSO-02
+**Success Criteria** (what must be TRUE):
+  1. An org-admin can register an OIDC IdP (custom Authlib SP) and users route to it by email domain, reusing the Phase-168 JIT provisioning seam.
+  2. Email/password + SAML fallback remain, and OIDC discovery is SSRF-guarded.
+**Plans**: TBD
+**UI hint**: yes
+
+#### Phase 173: Dept-Targeted Skills + Group Feature-Rollout Gating (STRETCH)
+**Goal**: Skills/automations can be targeted to departments, and admin tiers + beta/feature-rollout gating can be assigned to groups — folding into the already-rewritten skills RLS + greenlist substrate.
+**Depends on**: Phase 165 (skills RLS rewritten) + Phase 167 (greenlists/roles); gated behind CORE
+**Requirements**: VIS-03, VIS-04
+**Success Criteria** (what must be TRUE):
+  1. A skill/automation can be made available to a specific department (folds into the skills RLS), and members of other departments don't see it.
+  2. Admin tiers are assignable to groups, and per-group beta / feature-rollout gating routes a feature to a named group through the VIS-01 greenlist resolver (VIS-04).
+**Plans**: TBD
+**UI hint**: yes
+
+### Progress
+
+**Execution Order:** Phases execute in numeric order 160 → 161 → … → 168 (CORE), then 169 → 173 (STRETCH, gated behind CORE completion + budget).
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 160. Tenancy-Model ADR | 0/? | Not started | - |
+| 161. Org / Dept / Role Schema | 0/? | Not started | - |
+| 162. Personal-Org Backfill | 0/? | Not started | - |
+| 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
+| 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
+| 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
+| 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
+| 167. Invitations + Roles + Greenlists + JIT + Per-User Prefs | 0/? | Not started | - |
+| 168. SSO — SAML 2.0 (CORE) | 0/? | Not started | - |
+| 169 (STRETCH). Dept-Admin Shell | 0/? | Gated (behind CORE) | - |
+| 170 (STRETCH). Commercial Footholds | 0/? | Gated (behind CORE) | - |
+| 171 (STRETCH). Permission-Aware Citations | 0/? | Gated (behind CORE + research) | - |
+| 172 (STRETCH). OIDC Enterprise SSO | 0/? | Gated (behind CORE + customer trigger) | - |
+| 173 (STRETCH). Dept-Targeted Skills + Group Gating | 0/? | Gated (behind CORE) | - |
+
+### Guardrails, gates & sequencing (v3.4)
+
+- **Coverage:** 29/29 requirements mapped (22 CORE → 160-168; 7 STRETCH → 169-173); 0 unmapped, 0 duplicates. Every requirement → exactly one phase.
+- **The atomic crux (LOCKED — do not reorder):** TEN-01 + TEN-02 + TEN-04 ship in ONE phase (163). RLS is inert while the service-role / asyncpg-owner connection bypasses it — "policies now, client later" is forbidden. This is the milestone's highest-signal research convergence.
+- **G-5 / G-1 — `threads.py` extraction-first (flagged explicitly):** `threads.py` (~1850 LOC, 6+ prior phases; CLAUDE.md ledger = "extraction due") is G-5-firing. The overdue extraction refactor is sequenced as **Wave 0 of Phase 163**, BEFORE `org_id` is threaded through `send_message`. Per G-5/G-1's stated preference this MAY be promoted to a **dedicated refactor phase immediately before the crux** at discuss/plan-time (operator's call) — if promoted, it becomes Phase 163 and the crux shifts to 163.1 (STRETCH renumbers accordingly). Either way, **no `org_id` touches `send_message` until the extraction lands.** Prior 147/149 in-place `threads.py` guard overrides are logged in STATE.md; this milestone finally pays the extraction down.
+- **Data-dependency order (forced):** ADR (160) → schema-additive (161) → backfill (162) → atomic RLS+client-swap crux (163) → SECDEF audit + two-org isolation suite (164) → `is_global` retirement (165) → org-admin shell/switcher (166) → invitations/roles/greenlists/JIT/prefs (167) → SSO SAML (168, last). You cannot flip `org_id NOT NULL` before backfilling; RLS predicates are meaningless before the column is populated; the `match_document_chunks` INVOKER rewrite needs `document_chunks`'s new `org_id`/RLS to exist first.
+- **SC#10 (cross-provider mandate):** flagged on the phases touching the shared streaming / agent-loop / provider-routing / UI-state path — **163** (crux — shared retrieval/agent-loop path), **164** (SECDEF / permission-aware retrieval), **166** (org-switcher / `<OrgContext>` — UI state + stream teardown), **167** (VIS-02 per-user model-default = provider routing; greenlist = UI state), and STRETCH **171** (permission-aware citations — retrieval/citation path). Multi-tenancy is mostly backend-auth, so the pure-schema/ADR phases (160/161/162/165) are deliberately NOT SC#10-flagged.
+- **Threat model / secure-phase:** the whole isolation cluster (**161** schema, **162** backfill, **163** RLS crux, **164** SECDEF audit — the milestone's security core), **165** (lighter — `is_system_global` migration-only), **166** (X-Org-Id server-validate + org-scoped-audit authz), **167** (invitation token/expiry + JIT advisory-lock race), **168** (SSO — Supabase owns SAML XML parse, so the surviving risks are JIT race [covered 167] + enforcement-before-fallback), plus STRETCH **171** (CITE-01 leak) + **172** (OIDC discovery SSRF). ADR (160) has no code → no threat model.
+- **Milestone exit gate:** the two-org `test_v3_4_org_isolation.py` suite (built in 164) is BOTH the Phase-164 gate AND the milestone-closing gate — **re-run after 168 (SSO) / 167 (invitations) / 166 (admin-UI) all land**, PLUS a final full-regression pass (SC#10 4-axis + CONCUR-01 <1s). "Looks isolated" from a one-org suite is worthless (every existing fixture is single-tenant by construction and stays green even if isolation is completely broken).
+- **G-2 sketch-gated:** **166** (org-admin shell / org switcher / profile-menu identity anchor — live UI/panel/badge, pairs with SEED-113), **167** (greenlist / roster UI if visual), and STRETCH **169** (dept-admin shell). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`. `sketch-findings-agentic-rag` already names the operator Control-Room shell + the profile-menu anchor + the 148 roster this composes on.
+- **G-5 hot files (audit at discuss-phase):** `backend/app/api/threads.py` (**163** — extraction-first, above), `frontend/src/providers/StreamsProvider.tsx` (**166** — `<OrgContext>` wraps OUTSIDE it; preserve the Phase-067.5 Branch-D3 clear guard verbatim), and (STRETCH) `backend/app/services/retrieval_service.py` + the citation renderer (**171** if PRAG-02 is built).
+- **Perf gate (CONCUR-01):** TEN-04 (**163**) — `document_chunks` / `skill_embeddings` `org_id` denormalize + index — must keep the CONCUR-01 <1s cross-tab-GET-during-streaming binding gate green; benchmark BEFORE merge (a per-row membership join over a seq-scan on the pgvector hot path is the single largest perf threat).
+- **Research-phase recommended (per SUMMARY flags):** **163** crux (live two-user `SET LOCAL`/`SET ROLE` leak test — the exact semantics are MEDIUM-confidence; do NOT ship on documentation alone) and STRETCH **171** citations (pgvector + RLS/HNSW latency AND ANN-recall are completely unmeasured — benchmark before promising the guarantee). Also unresolved: the personal-org/JIT provisioning seam (162/167 boundary — trigger vs app-layer vs BOTH). Skip research-phase: 160 (ADR), 161 (textbook DEFINER-helper), 165 (mechanical rename), 166 (reuses v3.3 shell).
+- **Red line (D-14):** Deep Mode stays byte-identical; provider differences at the gateway/adapter boundary; no new runtime. The ~253 `.eq("user_id")` filters stay as belt-and-suspenders under the user-JWT client — KEEP them this milestone.
+- **Reported-bugs:** the chat-surface backlog (BUG-260708-01/-02, 260714-01, 260718-02/-03/-04, …) stays OUT of v3.4 (its own planned post-v3.3 chat-polish phase); only **SEED-091 folds here** (TEN-06 → Phase 164). External reports are never auto-folded. Cross-check at each `/gsd:discuss-phase`.
+- **Cloud parity owed (standing rule):** v3.3 migrations 099-103 + `SECRETS_ENCRYPTION_KEY` are still owed at the next production push; v3.4 migrations start at slot 104 (order matters — paste into the cloud Supabase SQL editor, never `db push`).
 
 ---
 
