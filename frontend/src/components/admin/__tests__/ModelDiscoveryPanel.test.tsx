@@ -100,10 +100,27 @@ describe("ModelDiscoveryPanel (071-A) — SC#3 propose-only hero", () => {
     expect(within(anthropic).getByText(/no key/i)).toBeInTheDocument()
   })
 
-  it("disables the 'enable now' tick for a new model with unknown capabilities (never auto-enabled)", async () => {
-    await runDiscovery()
-    // gpt-5.6-nova is IDs-only with nothing filled → cannot be enabled.
-    const tick = screen.getByRole("checkbox", { name: /enable gpt-5\.6-nova now/i })
+  it("disables the 'enable now' tick for an unknown-capability model with NO family default (never auto-enabled)", async () => {
+    // An opaque id with no family match → no pre-fill → genuinely incomplete → not enable-able.
+    // (gpt-5.6-nova now pre-fills from the openai family — see the D-159-03 suite below.)
+    await runWith({
+      new: [
+        {
+          provider: "openrouter",
+          model_id: "acme/opaque-1",
+          enabled: false,
+          capabilities: {
+            context: DISCOVERY_UNKNOWN,
+            max_output: DISCOVERY_UNKNOWN,
+            native_tools: DISCOVERY_UNKNOWN,
+          },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "openrouter", status: "ok", ok: true }],
+    })
+    const tick = screen.getByRole("checkbox", { name: /enable acme\/opaque-1 now/i })
     expect(tick).toBeDisabled()
     expect(tick).not.toBeChecked()
   })
@@ -358,5 +375,122 @@ describe("ModelDiscoveryPanel (159) — D-159-04 default-on suitability filter",
     expect(container.querySelector('[data-changed-model="z-ai/glm-6"]')).not.toBeNull()
     expect(container.querySelector('[data-vanished-model="gpt-4-turbo"]')).not.toBeNull()
     expect(screen.getByText(/2 utility models hidden/i)).toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 159 Plan 06 (MODEL-03 / D-159-03) — family-default pre-fill (three-way source
+// honesty). An un-returned capability with a matching family default pre-fills the amber
+// input from `familyDefaults`, styled "default — confirm" — visually distinct from a blank
+// "unknown — you set it" (null default) and from a green provider-returned value. CRITICAL
+// SC#3: pre-fill makes isComplete true so the operator CAN opt in, but enableNow stays
+// default-off, so buildChanges still yields enabled:false until they explicitly tick.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A new model with ALL capabilities un-returned — the claude family default fills every one. */
+const CLAUDE_NEO: DiscoveryResult = {
+  new: [
+    {
+      provider: "anthropic",
+      model_id: "claude-neo-1",
+      enabled: false,
+      capabilities: {
+        context: DISCOVERY_UNKNOWN,
+        max_output: DISCOVERY_UNKNOWN,
+        native_tools: DISCOVERY_UNKNOWN,
+      },
+    },
+  ],
+  changed: [],
+  vanished: [],
+  providers: [{ provider: "anthropic", status: "ok", ok: true }],
+}
+
+describe("ModelDiscoveryPanel (159) — D-159-03 family-default pre-fill (three-way source honesty)", () => {
+  it("pre-fills an un-returned capability from the family default, labeled 'default — confirm'", async () => {
+    const { container } = await runWith(CLAUDE_NEO)
+    const row = container.querySelector<HTMLElement>('[data-new-model="claude-neo-1"]')!
+    // The claude family default (200k context) pre-fills the amber numeric input…
+    expect(within(row).getByRole("spinbutton", { name: /context for claude-neo-1/i })).toHaveValue(200000)
+    // …and native_tools pre-fills to "native" (true → native, NEVER "none" — SC#3 by construction).
+    expect(within(row).getByRole("combobox", { name: /tools for claude-neo-1/i })).toHaveValue("native")
+    // …styled distinctly as "default — confirm" (a reviewed suggestion).
+    expect(within(row).getAllByText(/default — confirm/i).length).toBeGreaterThan(0)
+  })
+
+  it("keeps a null-default field blank ('unknown — you set it'), distinct from a pre-filled default", async () => {
+    const { container } = await runWith({
+      new: [
+        {
+          provider: "openrouter",
+          model_id: "acme/opaque-1",
+          enabled: false,
+          capabilities: {
+            context: DISCOVERY_UNKNOWN,
+            max_output: DISCOVERY_UNKNOWN,
+            native_tools: DISCOVERY_UNKNOWN,
+          },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "openrouter", status: "ok", ok: true }],
+    })
+    const row = container.querySelector<HTMLElement>('[data-new-model="acme/opaque-1"]')!
+    // No family default → the input is BLANK and carries NO "default — confirm" marker.
+    expect(within(row).getByRole("spinbutton", { name: /context for acme\/opaque-1/i })).toHaveValue(null)
+    expect(within(row).queryByText(/default — confirm/i)).toBeNull()
+  })
+
+  it("keeps 'Enable now' OFF even when defaults make the model complete — never auto-enabled (SC#3)", async () => {
+    await runWith(CLAUDE_NEO)
+    const tick = screen.getByRole("checkbox", { name: /enable claude-neo-1 now/i })
+    // Complete (all fields pre-filled) → the tick is enable-ABLE…
+    expect(tick).not.toBeDisabled()
+    // …but NEVER pre-checked — the operator must explicitly opt in.
+    expect(tick).not.toBeChecked()
+  })
+
+  it("confirms an accepted-but-un-ticked pre-filled model as enabled:false, sending the reviewed values", async () => {
+    const { user, onConfirm } = await runWith(CLAUDE_NEO)
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    const changes = onConfirm.mock.calls[0][0] as Array<{ modelId: string; patch: Record<string, unknown> }>
+    const claude = changes.find((c) => c.modelId === "claude-neo-1")!
+    // Pre-fill NEVER auto-enables (enableNow untouched) …
+    expect(claude.patch.enabled).toBe(false)
+    // … but the reviewed default values ARE sent for the accepted model.
+    expect(claude.patch).toMatchObject({ context_window_tokens: 200000, native_tools: true })
+  })
+
+  it("shows the 'review the suggested defaults' warning when defaults are pre-filled", async () => {
+    const { container } = await runWith(CLAUDE_NEO)
+    const row = container.querySelector<HTMLElement>('[data-new-model="claude-neo-1"]')!
+    expect(
+      within(row).getByText(/review the suggested defaults — it will NOT be auto-enabled/i),
+    ).toBeInTheDocument()
+    expect(within(row).queryByText(/set the unknown fields/i)).toBeNull()
+  })
+
+  it("leaves a provider-confirmed (green) value unchanged — no input, no default marker", async () => {
+    const { container } = await runWith({
+      new: [
+        {
+          provider: "google",
+          model_id: "gemini-neo",
+          enabled: false,
+          // context RETURNED (green); max_output un-returned → pre-fills from the google family.
+          capabilities: { context: 600000, max_output: DISCOVERY_UNKNOWN, native_tools: DISCOVERY_UNKNOWN },
+        },
+      ],
+      changed: [],
+      vanished: [],
+      providers: [{ provider: "google", status: "ok", ok: true }],
+    })
+    const row = container.querySelector<HTMLElement>('[data-new-model="gemini-neo"]')!
+    // The returned context is a plain green value — NOT an editable input.
+    expect(within(row).queryByRole("spinbutton", { name: /context for gemini-neo/i })).toBeNull()
+    expect(within(row).getByText(/600k/i)).toBeInTheDocument()
+    // The un-returned max_output DID pre-fill from the google family default (32768).
+    expect(within(row).getByRole("spinbutton", { name: /max out for gemini-neo/i })).toHaveValue(32768)
   })
 })

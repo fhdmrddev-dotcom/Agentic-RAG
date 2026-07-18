@@ -30,6 +30,7 @@ import {
   type DiscoveryResult,
   type ModelCapabilityPatch,
 } from "@/lib/api"
+import { familyDefaults, type FamilyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 
@@ -68,6 +69,42 @@ const COL_FOR = new Map(CAP_FIELDS.map((f) => [f.field, f.col]))
 const LABEL_FOR = new Map(CAP_FIELDS.map((f) => [f.field, f.label]))
 
 const isUnknown = (v: number | boolean | string): boolean => v === DISCOVERY_UNKNOWN
+
+// ── D-159-03: reviewed family-default PRE-FILL (never authoritative, never auto-enable) ──
+// Map a discovery capability field ("context" / "max_output" / "native_tools") to the matching
+// family default as a DRAFT STRING (the input/select vocabulary). native_tools maps the tri-state
+// family default to the select's vocabulary: `true` → "native", `null` → unseeded (""). It can
+// NEVER yield "none" — `familyDefaults().tools` is only ever `true` or `null` (never `false`), so a
+// pre-fill can never silently DISABLE tools (SC#3 holds by construction).
+function defaultDraftForField(field: string, fam: FamilyDefaults): string | null {
+  if (field === "native_tools") return fam.tools === true ? "native" : null
+  if (field === "context") return fam.context != null ? String(fam.context) : null
+  if (field === "max_output") return fam.maxOutput != null ? String(fam.maxOutput) : null
+  return null
+}
+
+/** Seed the per-model draft map from each new model's FAMILY defaults — ONLY for un-returned
+ *  (UNKNOWN) capabilities that HAVE a sensible family default. A provider-returned field is never
+ *  seeded (it renders green); a family with no default leaves the field blank ("unknown — you set
+ *  it"). Seeding makes a pre-filled model `isComplete`, so the operator CAN opt in — but `enableNow`
+ *  stays default-off, so `buildChanges` still yields `enabled:false` until they explicitly tick
+ *  "Enable now" (SC#3: pre-fill NEVER auto-enables). */
+function seedDraftsFromDefaults(
+  newModels: DiscoveryResult["new"],
+): Record<string, Record<string, string>> {
+  const seeded: Record<string, Record<string, string>> = {}
+  for (const m of newModels) {
+    const fam = familyDefaults(m.model_id)
+    const perField: Record<string, string> = {}
+    for (const [field, value] of Object.entries(m.capabilities)) {
+      if (!isUnknown(value)) continue
+      const d = defaultDraftForField(field, fam)
+      if (d != null) perField[field] = d
+    }
+    if (Object.keys(perField).length > 0) seeded[m.model_id] = perField
+  }
+  return seeded
+}
 
 type VanishedDecision = "deprecate" | "disable" | "keep"
 
@@ -111,7 +148,10 @@ export function ModelDiscoveryPanel({
       res.changed.forEach((m) => acc.add(m.model_id))
       setAccepted(acc)
       setEnableNow(new Set())
-      setDrafts({})
+      // D-159-03: pre-seed the hand-fill drafts from each new model's FAMILY defaults (reviewed,
+      // never authoritative). enableNow stays empty above, so a pre-filled model still lands
+      // enabled:false until the operator explicitly ticks "Enable now" (SC#3).
+      setDrafts(seedDraftsFromDefaults(res.new))
       setVanished({})
       setShowAllThisView(false)
       setPhase("done")
@@ -533,6 +573,13 @@ function NewModelRow({
   const id = model.model_id
   const capValues = Object.values(model.capabilities)
   const anyUnknown = capValues.some(isUnknown)
+  // D-159-03: the family this model belongs to (the reviewed pre-fill source). `anyPrefilled`
+  // switches the warning copy — "review the suggested defaults" when at least one un-returned
+  // field HAS a family default, vs "set the unknown fields" when every unknown is blank.
+  const fam = familyDefaults(id)
+  const anyPrefilled = Object.entries(model.capabilities).some(
+    ([field, value]) => isUnknown(value) && defaultDraftForField(field, fam) != null,
+  )
   // SC#3 / D-149-13: derive the provenance suffix from the ACTUAL per-field returned-vs-unknown
   // counts, not the binary `!anyUnknown`. The old all-or-nothing basis lied whenever a provider
   // returned SOME (not all) fields — e.g. a Google model returns its token limits but never
@@ -578,10 +625,20 @@ function NewModelRow({
               </span>
             )
           }
+          // D-159-03: a family default pre-fills this un-returned field → style it distinctly as
+          // amber "default — confirm" (a REVIEWED suggestion), vs the blank amber "unknown — you
+          // set it" when no default exists, vs the green provider-confirmed value above. The draft
+          // itself is seeded on run (seedDraftsFromDefaults), so the input shows the family value.
+          const prefilled = defaultDraftForField(field, fam) != null
           return (
             <span
               key={field}
-              className="inline-flex items-center gap-1.5 rounded-[6px] border border-warning/40 bg-warning/[0.05] px-2 py-1 text-xs"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-1 text-xs",
+                prefilled
+                  ? "border-warning/60 bg-warning/[0.09]"
+                  : "border-warning/40 bg-warning/[0.05]",
+              )}
             >
               <span className="text-warning">{label}</span>
               {field === "native_tools" ? (
@@ -604,6 +661,11 @@ function NewModelRow({
                   onChange={(e) => onDraft(field, e.target.value)}
                   className="w-20 rounded border border-warning/50 bg-background px-1.5 py-0.5 font-mono text-xs text-foreground placeholder:text-muted-foreground/50"
                 />
+              )}
+              {prefilled && (
+                <span className="rounded bg-warning/15 px-1 py-px font-mono text-[9px] uppercase tracking-wide text-warning">
+                  default — confirm
+                </span>
               )}
             </span>
           )
@@ -630,7 +692,9 @@ function NewModelRow({
         {anyUnknown && (
           <span className="inline-flex items-center gap-1 text-[11px] text-warning">
             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-            set the unknown fields — it will NOT be auto-enabled
+            {anyPrefilled
+              ? "review the suggested defaults — it will NOT be auto-enabled"
+              : "set the unknown fields — it will NOT be auto-enabled"}
           </span>
         )}
       </div>
