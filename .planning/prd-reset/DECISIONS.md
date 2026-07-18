@@ -1397,6 +1397,17 @@ not re-litigated by overwriting existing rows.
 
 ---
 
+## D-v3.4-01 — Tenancy-Model ADR (ratifies D-PRD-02)
+
+**Status:** Ratified 2026-07-18
+**Type:** Per-milestone architectural decision (v3.4). This is the FIRST `D-vX.Y-NN` entry recorded in this file — locked decision D-02 places the v3.4 tenancy pointer HERE (alongside the cross-milestone `D-PRD-NN` ADRs) AND in `.planning/PROJECT.md`'s Key Decisions table, so the milestone's biggest posture call is complete in both registers (belt-and-suspenders per the footer convention below).
+
+The standalone Tenancy-Model ADR at `.planning/phases/160-tenancy-model-adr/160-ADR.md` ratifies the already-ACCEPTED `D-PRD-02` (Hybrid SaaS posture: co-tenant `org_id` + membership RLS by default; isolation-via-deployment on a customer-owned Supabase for enterprise) — a ratify-not-relitigate call, not a re-opening. It additionally locks, as binding for phases 161-168, the naming/renumbering decisions (`skills.is_system` -> `is_system_global` reuse; value-preserving `is_global` -> `is_org_shared` rename; v3.4 migrations continuing at slot 104+) and pins the one genuinely-new commitment: the binding, non-negotiable **4-tier deployment-flexibility contract** (solo-local / small-team-VPS / medium-SaaS / enterprise-BYO as a pure env-var switch, per-phase enforcement across phases 161-173, + SEED-120 forward-compat so v3.5 adds per-org provider config / BYO keys / per-org model selection with no schema rewrite).
+
+`D-PRD-02` itself is unchanged by this entry — see its section above for the full posture rationale. This is a pointer; the full ratification lives in `160-ADR.md`.
+
+---
+
 ## Cross-references
 
 - Synthesis (full): `.planning/research/milestone-shaping-2026-05-09.md`
