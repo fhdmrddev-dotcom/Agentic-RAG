@@ -547,6 +547,18 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     },
     [fetchRegistry, pulseRecording],
   )
+  // ── 159-06 discovery filter (D-159-04). The panel's "Filter to chat/tool models" toggle
+  //    persists an operator-governed app_settings flag. Mirror the FLAG-01 flag handlers:
+  //    write via setFlag (PUT /admin/flags → 204, no body to parse), then re-fetch settings so
+  //    the panel reflects the persisted default (server is the source of truth — no optimistic
+  //    flip). The ✎ receipt lands via the shared flag path. ──
+  const handleSetDiscoveryFilter = useCallback(
+    async (enabled: boolean) => {
+      await setFlag("model_discovery_filter_enabled", enabled)
+      if (alive.current) void fetchSettings()
+    },
+    [fetchSettings],
+  )
 
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
 
@@ -772,6 +784,8 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             <ModelDiscoveryPanel
               onRunDiscovery={handleRunDiscovery}
               onConfirm={handleConfirmDiscovery}
+              filterEnabled={settings?.model_discovery_filter_enabled ?? true}
+              onSetFilter={handleSetDiscoveryFilter}
             />
           </div>
         ) : (
