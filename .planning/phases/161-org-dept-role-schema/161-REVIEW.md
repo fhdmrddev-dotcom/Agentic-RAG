@@ -10,7 +10,26 @@ findings:
   warning: 1
   info: 3
   total: 6
-status: issues_found
+status: resolved
+resolution:
+  resolved_commit: 07bf6a4e
+  resolved: [CR-01, CR-02]
+  deferred:
+    - id: WR-01
+      to: 163
+      why: dept_members.org_id denormalization FK — latent until Phase 163 wires dept-scoped access; needs departments UNIQUE(id,org_id) + composite FK. Fold into the RLS crux + 164 two-org isolation suite.
+    - id: IN-01
+      to: 163
+      why: departments.parent_id cross-org tree edge (matches folders precedent).
+    - id: IN-02
+      to: 167
+      why: org_invitations.token_hash unique index — redemption is Phase 167.
+    - id: IN-03
+      to: 167
+      why: org_invitations.invited_by FK to auth.users — invitation lifecycle is Phase 167.
+    - id: INVITE-CEILING
+      to: 167
+      why: org_invitations.role super-admin/above-your-own-role ceiling — invited-role validation belongs with 167 JIT/redemption design (org_members/dept_members super-admin block landed in this phase).
 ---
 
 # Phase 161: Code Review Report
@@ -18,7 +37,14 @@ status: issues_found
 **Reviewed:** 2026-07-18T16:47:32Z
 **Depth:** standard
 **Files Reviewed:** 1
-**Status:** issues_found
+**Status:** resolved (2 Critical fixed in `07bf6a4e`; 1 Warning + 3 Info + invite-ceiling deferred → 163/164/167)
+
+## Resolution (2026-07-18)
+
+- **CR-01 — FIXED** (`07bf6a4e`): `REVOKE EXECUTE ON FUNCTION create_org_with_default_dept FROM PUBLIC/anon/authenticated` + `GRANT ... TO service_role`. Verified live: `has_function_privilege` = authenticated:F / anon:F / service_role:T.
+- **CR-02 — FIXED** (`07bf6a4e`): added `AND role <> 'super-admin'` to the `WITH CHECK` of `org_members` + `dept_members` INSERT/UPDATE. Verified live: `pg_policies.with_check` carries the guard on all 4; 42P17 proof still 0 rows, no error.
+- **WR-01, IN-01 → Phase 163** (RLS crux + 164 two-org isolation suite / TEN-05 exit gate).
+- **IN-02, IN-03, invited-role ceiling → Phase 167** (invitations/JIT lifecycle).
 
 ## Summary
 
