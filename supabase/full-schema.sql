@@ -4676,7 +4676,7 @@ CREATE POLICY dept_members_delete ON public.dept_members FOR DELETE TO authentic
 -- Name: dept_members dept_members_insert; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY dept_members_insert ON public.dept_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+CREATE POLICY dept_members_insert ON public.dept_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
 
 
 --
@@ -4690,7 +4690,7 @@ CREATE POLICY dept_members_select ON public.dept_members FOR SELECT TO authentic
 -- Name: dept_members dept_members_update; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY dept_members_update ON public.dept_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+CREATE POLICY dept_members_update ON public.dept_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
 
 
 --
@@ -4860,7 +4860,7 @@ CREATE POLICY org_members_delete ON public.org_members FOR DELETE TO authenticat
 -- Name: org_members org_members_insert; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY org_members_insert ON public.org_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+CREATE POLICY org_members_insert ON public.org_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
 
 
 --
@@ -4874,7 +4874,7 @@ CREATE POLICY org_members_self_select ON public.org_members FOR SELECT TO authen
 -- Name: org_members org_members_update; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY org_members_update ON public.org_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+CREATE POLICY org_members_update ON public.org_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
 
 
 --

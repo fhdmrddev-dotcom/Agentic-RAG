@@ -226,6 +226,15 @@ BEGIN
 END;
 $$;
 
+-- CR-01 (161-REVIEW): create_org_with_default_dept is SECURITY DEFINER and bypasses RLS. Postgres grants
+-- EXECUTE to PUBLIC by default, which Supabase auto-exposes as an anon/authenticated PostgREST RPC — i.e.
+-- an ungated, RLS-bypassing org-creation write reachable by logged-out callers. Lock it to service_role:
+-- the creation seam (162/167) runs service-side; the function owner (postgres) can always execute.
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.create_org_with_default_dept(text, text, text) TO service_role;
+
 -- ================================================================================================
 -- SECTION 3 — MEMBERSHIP-CORRECT RLS ON ALL 8 NEW TABLES  (D-08 correct-from-birth; these 8 are
 --             EXCLUDED from Phase 163's 38-existing-table rewrite per D-09).
@@ -263,13 +272,19 @@ CREATE POLICY org_members_admin_select ON public.org_members
 DROP POLICY IF EXISTS org_members_insert ON public.org_members;
 CREATE POLICY org_members_insert ON public.org_members
   FOR INSERT TO authenticated
-  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+  -- CR-02 (161-REVIEW): super-admin is the cross-org system role — never assignable via a user JWT.
+  -- A user-JWT INSERT/UPDATE may set only org-admin/dept-admin/member; super-admin rows are created
+  -- solely by the migration seed or a service-role/SECDEF path (both bypass RLS). Closes the org:manage
+  -- self-escalation the plan's T-161-03 missed (reference-table lock alone did NOT secure the invariant).
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()) AND role <> 'super-admin');
 
 DROP POLICY IF EXISTS org_members_update ON public.org_members;
 CREATE POLICY org_members_update ON public.org_members
   FOR UPDATE TO authenticated
   USING (public.current_user_has_permission(org_id, 'org:manage'))
-  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+  -- CR-02 (161-REVIEW): block self-escalation — an org:manage holder cannot UPDATE a membership row to
+  -- the cross-org super-admin role (WITH CHECK gates the post-image; super-admin stays service-role-only).
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()) AND role <> 'super-admin');
 
 DROP POLICY IF EXISTS org_members_delete ON public.org_members;
 CREATE POLICY org_members_delete ON public.org_members
@@ -317,13 +332,16 @@ CREATE POLICY dept_members_select ON public.dept_members
 DROP POLICY IF EXISTS dept_members_insert ON public.dept_members;
 CREATE POLICY dept_members_insert ON public.dept_members
   FOR INSERT TO authenticated
-  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+  -- CR-02 (161-REVIEW): same super-admin floor as org_members — dept_members.role carries the identical
+  -- 4-tier CHECK, so without this an org:manage holder could escalate here instead. Service-role only.
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()) AND role <> 'super-admin');
 
 DROP POLICY IF EXISTS dept_members_update ON public.dept_members;
 CREATE POLICY dept_members_update ON public.dept_members
   FOR UPDATE TO authenticated
   USING (public.current_user_has_permission(org_id, 'org:manage'))
-  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+  -- CR-02 (161-REVIEW): super-admin floor (see org_members_update).
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()) AND role <> 'super-admin');
 
 DROP POLICY IF EXISTS dept_members_delete ON public.dept_members;
 CREATE POLICY dept_members_delete ON public.dept_members
