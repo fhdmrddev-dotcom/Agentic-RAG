@@ -534,7 +534,7 @@ Plans:
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 5/5 | Complete (D-09 smoke passed via 158 UAT) | 2026-07-17 |
 | 158 (STRETCH). First-Run Install Wizard | 12/12 | Complete (live wizard UAT passed) | 2026-07-17 |
-| 159 (STRETCH). Model Registry Curation | 4/6 | In Progress | — |
+| 159 (STRETCH). Model Registry Curation | 5/6 | In Progress | — |
 
 **Coverage:** 20/20 requirements mapped (16 CORE + 4 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 
