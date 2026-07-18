@@ -113,7 +113,9 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   2. `org_id` is backfilled non-NULL across every user-facing table (batched ~10k-row windows; owner-less child tables resolved through their parent FK), and the `NOT NULL` flip happens only after a verified zero-NULL check.
   3. All existing data is preserved and every previously-visible resource stays visible — no user has to do anything, and nothing they could see before disappears.
   4. Re-running the migration (a normal SQL-editor-paste recovery action) neither lock-storms production nor duplicates orgs/memberships.
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 162-01-PLAN.md — Author migration 105: personal-org provisioning + defensive handle_new_user trigger + batched org_id backfill (35 targets) + self-guarded NOT-NULL flips
+- [ ] 162-02-PLAN.md — Apply migration 105 (non-atomic) + prove SC#1–4 + idempotent re-paste + regenerate full-schema.sql + same-commit
 
 #### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
 **Goal**: Membership-based RLS and the per-request user-JWT DB context land TOGETHER across both data-access paths, so RLS becomes actually enforceable (not decorative) — the single load-bearing security transition of the milestone — with `threads.py` extracted FIRST (Wave 0) and retrieval performance held under the CONCUR-01 gate.
