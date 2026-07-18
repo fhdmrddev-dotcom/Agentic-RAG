@@ -37,6 +37,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronRight, Lock, RefreshCw } from "lucide-react"
 
 import {
+  addModelById,
   getAdminActiveRuns,
   getBackpressure,
   disableUser,
@@ -56,6 +57,7 @@ import {
   setFlag,
   setModelCapability,
   setModelLock,
+  type AddModelBody,
   type AdminActiveRun as ActiveRun,
   type BackpressureSignals,
   type FeatureAudience,
@@ -519,6 +521,18 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     },
     [fetchRegistry, pulseRecording],
   )
+  // ── 159-05 add-by-ID (D-159-02). Mirror handleSetCapability: the server is the source
+  //    of truth — write, pulse the ✎ marker, then RE-FETCH the registry so the new
+  //    (server-forced `enabled=false`) row appears (no optimistic add). Errors are NOT
+  //    swallowed — they propagate so the form surfaces the server's 409/422 refusal in-form. ──
+  const handleAddModel = useCallback(
+    async (body: AddModelBody) => {
+      await addModelById(body)
+      pulseRecording()
+      if (alive.current) void fetchRegistry()
+    },
+    [fetchRegistry, pulseRecording],
+  )
   // Discovery is ephemeral (D-149-12) — the panel owns the diff; the shell only runs the
   // fan-out. Confirming routes each chosen change through the PATCH capability seam, then
   // re-fetches the registry so any newly-confirmed model appears (propose-only — SC#3).
@@ -752,6 +766,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
               rows={registryRows}
               onSetCapability={handleSetCapability}
               onLock={handleLock}
+              onAddModel={handleAddModel}
               showTechnical={showTechnical}
             />
             <ModelDiscoveryPanel
