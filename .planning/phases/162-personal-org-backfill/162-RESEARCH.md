@@ -501,13 +501,18 @@ UNION ALL SELECT 'workflow_definitions', count(*) FILTER (WHERE is_global) FROM 
 | A4 | `profiles` PK is `id` (for the `ON CONFLICT (id)` hardening on the trigger's profile insert) | handle_new_user | If not, drop the ON CONFLICT clause (leaves existing behavior). Trivial to confirm at plan time. |
 | A5 | Cloud has no orphan `user_id`/`created_by` (owner not in `auth.users`) on target tables | Backfill | Local = 0 orphans across all checked tables. A cloud orphan would leave a NULL row → self-guard fires → surfaced before flip. Fails safe. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All three were resolved during `/gsd:plan-phase 162` (plans `30a2de3f`); retained for provenance.
 
 1. **Idempotency gate: Option B (membership-existence, no schema change) vs Option A (add `is_personal`)?**
    - Known: no marker column exists; B is provably idempotent for 162's window + the trigger; A is more precise + helps 166's switcher.
    - Recommendation: **Option B** (aligns with D-01's name-based identity + mig-104 minimalism); adopt A only if the team wants a machine-checkable personal-org flag now (else defer to 166).
+   - **RESOLVED → Option B.** Plan 162-01 Task 1 (§A provisioning loop + §D trigger) both gate on `NOT EXISTS (SELECT 1 FROM org_members WHERE user_id = …)`; no `is_personal`/`joined_via`/`slug` column added.
 2. **`metadata_field_definitions` NOT-NULL flip at cloud scale** — flip (local-safe) or keep nullable if cloud has NULL-owner global defs? The self-guard forces the decision at apply time; default lean = flip, fall back to nullable (D-11).
+   - **RESOLVED → guarded flip (not unconditional).** Plan 162-01 Task 3 applies the SAME `RAISE EXCEPTION`-guarded `SET NOT NULL` to `metadata_field_definitions` as the other 34 targets — so it flips iff apply-time data is zero-NULL and self-aborts otherwise (the DB decides at apply time, exactly as recommended).
 3. **Apply mechanics** — confirm whether the operator applies via psycopg2-autocommit (recommended) or the SQL editor with per-CALL execution. Purely operational; both are safe.
+   - **RESOLVED → both offered, psycopg2-autocommit preferred.** Plan 162-02 Task 2 specifies psycopg2 `autocommit=True` @ :54322 (preferred) OR SQL-editor per-`CALL` execution; never a single wrapping-transaction paste (Pitfall 1). Operator's choice at apply time.
 
 ## Sources
 

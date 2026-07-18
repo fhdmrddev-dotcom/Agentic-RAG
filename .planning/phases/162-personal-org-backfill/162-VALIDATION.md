@@ -1,8 +1,8 @@
 ---
 phase: 162
 slug: personal-org-backfill
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-18
 ---
@@ -85,11 +85,11 @@ Everything is manual-SQL for this phase (no automatable harness). The cloud-scal
 
 ## Validation Sign-Off
 
-- [ ] All Success Criteria have a concrete verification query or an explicit reason-only justification
-- [ ] Sampling continuity: the full SC#1–4 pack runs after apply AND after a re-paste
-- [ ] Wave 0 baseline snapshot captured before applying migration 105
-- [ ] No watch-mode flags (N/A — no test runner)
-- [ ] Feedback latency < 5s (local DB)
-- [ ] `nyquist_compliant: true` set in frontmatter (flip once the planner embeds the query pack as acceptance criteria)
+- [x] All Success Criteria have a concrete verification query or an explicit reason-only justification
+- [x] Sampling continuity: the full SC#1–4 pack runs after apply (SC#1/2/3 machine-gated in 162-02 Task 2) AND after a re-paste (SC#4)
+- [ ] Wave 0 baseline snapshot captured before applying migration 105 *(execution-time — 162-02 Task 1)*
+- [x] No watch-mode flags (N/A — no test runner)
+- [x] Feedback latency < 5s (local DB)
+- [x] `nyquist_compliant: true` set in frontmatter (plans embed the SC#1–4 query pack as machine-gated acceptance criteria — checker-confirmed)
 
-**Approval:** pending
+**Approval:** approved 2026-07-18 (plan-phase — one unchecked box is the execution-time Wave-0 baseline)
